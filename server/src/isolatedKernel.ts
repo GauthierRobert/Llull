@@ -71,7 +71,9 @@ const BOOTSTRAP = `
 const { workerData } = require('node:worker_threads');
 const status = new Int32Array(workerData.statusBuffer);
 process.on('exit', () => {
-  if (Atomics.compareExchange(status, 0, 0, ${STATUS_DIED}) === 0) Atomics.notify(status, 0);
+  const previous = Atomics.compareExchange(status, 0, 0, ${STATUS_DIED});
+  if (previous === ${STATUS_READY}) Atomics.compareExchange(status, 0, ${STATUS_READY}, ${STATUS_DIED});
+  if (previous === 0 || previous === ${STATUS_READY}) Atomics.notify(status, 0);
 });
 try {
   require(workerData.entry);
@@ -85,7 +87,12 @@ interface LiveWorker {
   readonly worker: Worker;
   readonly port: MessagePort;
   readonly status: Int32Array;
+  /** False while the WASM module is still loading in the background. */
+  ready: boolean;
 }
+
+const errorText = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
 
 export function createIsolatedKernel(options: IsolatedKernelOptions = {}): IsolatedKernel {
   const entry = options.entry ?? defaultWorkerEntry();
@@ -110,7 +117,8 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
     live = null;
   };
 
-  const spawn = (): LiveWorker => {
+  /** Start a worker without waiting for its WASM load (it loads in parallel with the server). */
+  const launch = (): LiveWorker => {
     const statusBuffer = new SharedArrayBuffer(4);
     const status = new Int32Array(statusBuffer);
     const { port1, port2 } = new MessageChannel();
@@ -122,38 +130,69 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
     });
     worker.on('error', () => undefined); // surfaced through the status word, not an event
     worker.unref();
+    worker.on('exit', () => {
+      if (live?.worker === worker) live = null; // died while idle: the next call respawns
+    });
+    return { worker, port: port1, status, ready: false };
+  };
+
+  /** Block until `candidate` finished loading (instant when it warmed up between calls). */
+  const awaitReady = (candidate: LiveWorker): void => {
+    if (candidate.ready) return;
+    const { status } = candidate;
     const outcome = Atomics.wait(status, 0, 0, startTimeoutMs);
     if (outcome === 'timed-out' || Atomics.load(status, 0) !== STATUS_READY) {
-      port1.close();
-      void worker.terminate();
+      if (live === candidate) live = null;
+      candidate.port.close();
+      void candidate.worker.terminate();
       throw new Error(
         outcome === 'timed-out' ? 'OCC worker start timed out' : 'OCC worker died on start',
       );
     }
     Atomics.store(status, 0, 0);
-    return { worker, port: port1, status };
+    candidate.ready = true;
+  };
+
+  const ensureLive = (): LiveWorker => {
+    live ??= launch();
+    awaitReady(live);
+    return live;
+  };
+
+  /** Replace the worker; the new one loads in the background while the server handles requests. */
+  const recycle = (): void => {
+    kill();
+    try {
+      live = launch();
+    } catch (error) {
+      console.warn(`[occt] warm restart failed: ${errorText(error)}`);
+    }
   };
 
   const call = (op: KernelOperation | TestHook, args: readonly unknown[]): unknown => {
+    let target: LiveWorker;
     try {
-      live ??= spawn();
+      target = ensureLive();
+      if (Atomics.load(target.status, 0) === STATUS_DIED) {
+        kill(); // the worker died while idle (its exit event may not have run yet)
+        target = ensureLive();
+      }
     } catch (error) {
-      console.warn(
-        `[occt] ${error instanceof Error ? error.message : String(error)}; returning null`,
-      );
+      console.warn(`[occt] ${errorText(error)}; returning null`);
       return null;
     }
-    const { port, status } = live;
+    const { port, status } = target;
     Atomics.store(status, 0, 0);
     port.postMessage({ op, args });
     const outcome = Atomics.wait(status, 0, 0, callTimeoutMs);
     const state = Atomics.load(status, 0);
     if (outcome !== 'timed-out' && state === STATUS_REPLY) {
       const reply = receiveMessageOnPort(port)?.message as KernelReply | undefined;
+      Atomics.store(status, 0, 0); // idle: a later death can now flag STATUS_DIED
       if (reply?.error !== undefined) console.warn(`[occt] ${op} failed: ${reply.error}`);
       if (reply?.recycle === true) {
         recycles++;
-        kill(); // a native OCC exception leaves the module degraded; the next call gets a fresh one
+        recycle(); // a degraded module is replaced; the next call gets a fresh, pre-loaded one
       }
       return reply?.result ?? null;
     }
@@ -163,7 +202,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
         ? `[occt] worker aborted during ${op}; restarting it and returning null`
         : `[occt] ${op} exceeded ${callTimeoutMs} ms; killing the worker and returning null`,
     );
-    kill();
+    recycle();
     return null;
   };
 
@@ -183,10 +222,10 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
     forceFailure: (hook) => void call(hook, []),
     start: () => {
       try {
-        live ??= spawn();
+        ensureLive();
         return true;
       } catch (error) {
-        console.warn(`[occt] ${error instanceof Error ? error.message : String(error)}`);
+        console.warn(`[occt] ${errorText(error)}`);
         return false;
       }
     },

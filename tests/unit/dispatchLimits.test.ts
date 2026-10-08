@@ -21,6 +21,39 @@ describe('shapeToolCallContent size limits', () => {
     expect(shaped.content[1]?.text).not.toContain('more not listed');
   });
 
+  it('keeps every affected id in structuredContent, with or without data', () => {
+    const all = ids(5000);
+    const noData = shapeToolCallContent({ summary: 's', affected: all, isError: false });
+    expect(noData.structuredContent).toEqual({ affected: all });
+    const withData = shapeToolCallContent({
+      summary: 's',
+      affected: all,
+      isError: false,
+      data: { created: 5000 },
+    });
+    expect(withData.structuredContent).toEqual({ created: 5000, affected: all });
+    const wrapped = shapeToolCallContent({
+      summary: 's',
+      affected: all,
+      isError: false,
+      data: [1],
+    });
+    expect(wrapped.structuredContent).toEqual({ data: [1], affected: all });
+  });
+
+  it('adds no structuredContent for a small mutation, and keeps a data record own affected key', () => {
+    expect(
+      shapeToolCallContent({ summary: 's', affected: ids(3), isError: false }).structuredContent,
+    ).toBeUndefined();
+    const own = shapeToolCallContent({
+      summary: 's',
+      affected: ids(3),
+      isError: false,
+      data: { affected: 'mine' },
+    });
+    expect(own.structuredContent).toEqual({ affected: 'mine' });
+  });
+
   it('shows only the first ids past the cap and says how many are missing', () => {
     const shaped = shapeToolCallContent({ summary: 's', affected: ids(5000), isError: false });
     const text = shaped.content[1]?.text ?? '';

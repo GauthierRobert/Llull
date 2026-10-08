@@ -40,6 +40,12 @@ function clearRadius(
   );
   let radius = sphere.radius;
   local.forEach((component, axis) => {
+    // The contact point is the centre's foot on the plane: it must lie inside the face rectangle.
+    const footInsideFace = local.every(
+      (other, otherAxis) =>
+        otherAxis === axis || Math.abs(other) <= (box.size[otherAxis] ?? 0) / 2 + gap * 4,
+    );
+    if (!footInsideFace) return;
     const half = (box.size[axis] ?? 0) / 2;
     // Centre-to-plane distance of the +face and the -face (sign ignored: outside or inside contact).
     for (const distance of [Math.abs(component - half), Math.abs(component + half)]) {

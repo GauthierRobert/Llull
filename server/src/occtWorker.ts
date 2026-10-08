@@ -51,9 +51,13 @@ async function main(): Promise<void> {
 }
 
 function run(kernel: GeometryKernel, request: KernelRequest, testHooks: boolean): unknown {
-  if (request.op === '__abort' || request.op === '__hang') {
+  if (request.op === '__abort' || request.op === '__hang' || request.op === '__exitIdle') {
     if (!testHooks) throw new Error(`unknown kernel operation ${request.op}`);
     if (request.op === '__abort') process.exit(1);
+    if (request.op === '__exitIdle') {
+      setTimeout(() => process.exit(1), 100); // after the reply: the worker dies while idle
+      return null;
+    }
     for (;;);
   }
   const method = kernel[request.op] as (...args: unknown[]) => unknown;

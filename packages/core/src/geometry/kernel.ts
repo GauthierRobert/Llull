@@ -21,7 +21,7 @@ export type BooleanOp = 'union' | 'subtract' | 'intersect';
 /**
  * Every operation returns null when it cannot be performed (unsupported kind, degenerate geometry,
  * kernel limitation); commands treat null as a no-op. Implementors must not mutate arguments.
- * Support today: `filletEdges` OCC only (Manifold null); `chamferEdges` and `shellSolid` neither.
+ * Support today: `filletEdges`, `chamferEdges` and `shellSolid` are OCC only (Manifold returns null).
  *
  * @pure
  */

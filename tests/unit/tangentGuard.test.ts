@@ -49,6 +49,14 @@ describe('clearTangentContact', () => {
     expect(radiusOf(translated)).toBeLessThan(3);
   });
 
+  it('leaves a sphere tangent to the face plane but outside the face bounds unchanged', () => {
+    // Plane z = 2 is exactly r = 3 below the centre, but the centre's foot (x = 10) is off the face.
+    const offFace = sphere([10, 0, 5], 3);
+    expect(clearTangentContact(offFace, box([0, 0, 0], [4, 4, 4]))[0]).toBe(offFace);
+    const offFaceY = sphere([0, -9, 5], 3);
+    expect(clearTangentContact(offFaceY, box([0, 0, 0], [4, 4, 4]))[0]).toBe(offFaceY);
+  });
+
   it('leaves non-tangent spheres, other kinds and sphere-sphere pairs untouched', () => {
     const away = sphere([0, 0, 6], 3);
     expect(clearTangentContact(away, box([0, 0, 0], [4, 4, 4]))[0]).toBe(away);

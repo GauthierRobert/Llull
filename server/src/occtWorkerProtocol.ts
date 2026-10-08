@@ -12,7 +12,7 @@ export const STATUS_DIED = 2;
 export const STATUS_READY = 3;
 
 export type KernelOperation = keyof GeometryKernel;
-export type TestHook = '__abort' | '__hang';
+export type TestHook = '__abort' | '__hang' | '__exitIdle';
 
 export interface KernelRequest {
   readonly op: KernelOperation | TestHook;
