@@ -104,6 +104,42 @@ describe('dispatch while connecting', () => {
     expect(useStore.getState().document.order).toHaveLength(2);
   });
 
+  it('setDocument cancels pending grace runs: the old command never lands in the new document', async () => {
+    let rejectFetch: (reason: Error) => void = () => undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise((_resolve, reject) => (rejectFetch = reject))),
+    );
+    useStore.getState().dispatch('add_box', { size: [1, 1, 1] });
+    useStore.getState().setDocument(createEmptyDocument());
+    useStore.setState({ liveStatus: 'connecting', sseEverConnected: false });
+
+    await vi.advanceTimersByTimeAsync(CONNECT_GRACE_MS * 2);
+    rejectFetch(new Error('refused'));
+    await vi.advanceTimersByTimeAsync(10);
+
+    expect(useStore.getState().document.order).toHaveLength(0);
+    expect(useStore.getState().localOutbox).toHaveLength(0);
+  });
+
+  it('a cancelled dispatch settling late does not disturb a newer grace run', async () => {
+    const settle: Array<(reason: Error) => void> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise((_resolve, reject) => settle.push(reject))),
+    );
+    useStore.getState().dispatch('add_box', { size: [1, 1, 1] });
+    useStore.getState().setDocument(createEmptyDocument());
+    useStore.setState({ liveStatus: 'connecting', sseEverConnected: false });
+    useStore.getState().dispatch('add_sphere', { radius: 1 });
+    settle[0]?.(new Error('refused'));
+    await vi.advanceTimersByTimeAsync(CONNECT_GRACE_MS);
+
+    const { document, localOutbox } = useStore.getState();
+    expect(localOutbox.map((entry) => entry.name)).toEqual(['add_sphere']);
+    expect(document.order.map((id) => document.entities[id]?.kind)).toEqual(['sphere']);
+  });
+
   it('never starts the grace timer once connected (a slow POST is waited for)', async () => {
     resetStore('connected');
     useStore.setState({ sseEverConnected: true });

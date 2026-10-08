@@ -4,6 +4,8 @@
  * a hang kills only the worker, the call returns null, and the next call respawns it.
  */
 
+import { rmSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import type { Entity } from '@core/model/types';
@@ -141,6 +143,38 @@ describe('isolated OCC kernel', () => {
       expect(Date.now() - started).toBeLessThan(15_000);
     }, 120_000);
   });
+
+  it('a worker that exits with an unconsumed REPLY wakes the server as DIED, not at the timeout', () => {
+    const kernel = createIsolatedKernel({
+      entry: path.join(__dirname, 'fixtures', 'replyThenExitWorker.cjs'),
+      execArgv: [],
+      callTimeoutMs: 20_000,
+    });
+    kernels.push(kernel);
+    const started = Date.now();
+    expect(kernel.tessellate(box(2))).toBeNull();
+    expect(Date.now() - started).toBeLessThan(10_000);
+    expect(kernel.crashCount()).toBe(1);
+  }, 60_000);
+
+  it('retries once when the background-loaded replacement worker dies on start', () => {
+    const counterFile = path.join(os.tmpdir(), `llull-flaky-worker-${process.pid}`);
+    rmSync(counterFile, { force: true });
+    const kernel = createIsolatedKernel({
+      entry: path.join(__dirname, 'fixtures', 'flakyStartWorker.cjs'),
+      execArgv: [],
+      testHooks: true,
+    });
+    kernels.push(kernel);
+    try {
+      expect(kernel.tessellate(box(2))).toEqual({ loads: 0 });
+      kernel.forceFailure('__abort'); // the warm restart (load #1) dies on start
+      expect(kernel.crashCount()).toBe(1);
+      expect(kernel.tessellate(box(2))).toEqual({ loads: 2 });
+    } finally {
+      rmSync(counterFile, { force: true });
+    }
+  }, 60_000);
 
   it('returns null promptly instead of throwing when the worker cannot load', () => {
     const kernel = createIsolatedKernel({

@@ -7,7 +7,8 @@
 
 import type { CadDocument, EntityId } from '@core/model/types';
 import {
-  isPermanentHttpError,
+  isCommandRefusal,
+  isConnectionRefusal,
   postCommand,
   postRedo,
   postUndo,
@@ -15,7 +16,8 @@ import {
 } from './serverCommands';
 import type { ServerCommandResponse } from './serverCommands';
 import { measureAfter, statusSummaryFor } from './feedback';
-import { newCommandId, removeOutboxEntry } from './outbox';
+import { newCommandId, poisonDroppedEntry, removeOutboxEntry } from './outbox';
+import { forgetGraceRun, nextDispatchSeq, runEarlierGraceRuns, trackGraceRun } from './graceRuns';
 import { runLocally, selectionAfter, stepLocalHistory } from './localMode';
 import type { CadStoreState, DispatchOptions, StoreGet, StoreSet } from './storeTypes';
 
@@ -88,40 +90,23 @@ function responseChanged(response: ServerCommandResponse): boolean {
 }
 
 /**
- * A grace-run command the server then refused permanently would be re-POSTed forever by the
- * flush: drop its outbox entry and tell the user (the post-flush snapshot reconciles the document).
+ * A grace-run command the server then refused (400/413/422) would be re-POSTed forever by the
+ * flush: drop its outbox entry, poison the ids it created (later entries using them are dropped
+ * by the flush), and tell the user (the post-flush snapshot reconciles the document).
  */
-function dropRefusedGraceRun(set: StoreSet, commandId: string, message: string): void {
+function dropRefusedGraceRun(
+  set: StoreSet,
+  get: StoreGet,
+  commandId: string,
+  message: string,
+): void {
+  const { localOutbox, liveBase } = get();
+  const entry = localOutbox.find((queued) => queued.commandId === commandId);
+  if (entry !== undefined) poisonDroppedEntry(entry, liveBase);
   set((state) => ({
     localOutbox: removeOutboxEntry(state.localOutbox, commandId),
     lastSummary: `${message} — the server refused the command; it will not be synced.`,
   }));
-}
-
-/** A dispatch whose grace timer is armed and whose POST has not settled yet. */
-interface PendingGraceRun {
-  readonly dispatchSeq: number;
-  /** Cancel the grace timer and run the command locally now (no-op if it already ran). */
-  readonly runNow: () => void;
-}
-
-let lastDispatchSeq = 0;
-/** In dispatch order. */
-const pendingGraceRuns: PendingGraceRun[] = [];
-
-function forgetGraceRun(dispatchSeq: number): void {
-  const index = pendingGraceRuns.findIndex((pending) => pending.dispatchSeq === dispatchSeq);
-  if (index >= 0) pendingGraceRuns.splice(index, 1);
-}
-
-/**
- * @invariant local run order = dispatch order: before a command falls back locally, every
- * earlier dispatch still inside its grace period runs first (a hung POST must not reorder them).
- */
-function runEarlierGraceRuns(dispatchSeq: number): void {
-  while (pendingGraceRuns[0] !== undefined && pendingGraceRuns[0].dispatchSeq < dispatchSeq) {
-    pendingGraceRuns.shift()?.runNow();
-  }
 }
 
 /** Fire-and-forget: the document update comes from the /live SSE stream. */
@@ -134,10 +119,12 @@ export function postDispatch(
 ): void {
   const selectionAtDispatch = get().document.selection;
   const commandId = newCommandId();
-  const dispatchSeq = (lastDispatchSeq += 1);
+  const dispatchSeq = nextDispatchSeq();
   let ranLocally = false;
+  /** The document was replaced while this dispatch was in its grace period (`resetGraceRuns`). */
+  let cancelled = false;
   const runLocalOnce = (): void => {
-    if (ranLocally) return;
+    if (ranLocally || cancelled) return;
     ranLocally = true;
     runLocally(set, get, name, params, options, commandId);
   };
@@ -156,10 +143,15 @@ export function postDispatch(
       clearTimeout(graceTimer);
       runLocalOnce();
     };
-    pendingGraceRuns.push({ dispatchSeq, runNow });
+    const cancel = (): void => {
+      clearTimeout(graceTimer);
+      cancelled = true;
+    };
+    trackGraceRun({ dispatchSeq, runNow, cancel });
   }
   void postCommand(name, params, commandId)
     .then((response) => {
+      if (cancelled) return;
       clearTimeout(graceTimer);
       forgetGraceRun(dispatchSeq);
       if (ranLocally) return;
@@ -173,10 +165,16 @@ export function postDispatch(
       options?.onResult?.({ summary: response.summary, changed: responseChanged(response) });
     })
     .catch((err: unknown) => {
+      if (cancelled) return;
       clearTimeout(graceTimer);
       forgetGraceRun(dispatchSeq);
       if (ranLocally) {
-        if (isPermanentHttpError(err)) dropRefusedGraceRun(set, commandId, err.message);
+        if (isCommandRefusal(err)) dropRefusedGraceRun(set, get, commandId, err.message);
+        else if (isConnectionRefusal(err)) {
+          set({
+            lastSummary: `${err.message} — server refused the connection (auth/origin), offline edits kept.`,
+          });
+        }
         return;
       }
       handlePostFailure(set, get, err, `Command '${name}'`, fallBackLocally, (summary) =>

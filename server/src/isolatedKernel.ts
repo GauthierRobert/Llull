@@ -66,14 +66,15 @@ export function defaultWorkerEntry(): string | null {
 /**
  * Worker bootstrap (evaluated): flags a death in the shared status word from the first
  * instant, then loads the real entry, so even a failed load wakes the blocked server thread.
+ * @invariant the exit hook always writes STATUS_DIED and notifies, whatever the status was
+ *   (READY / REPLY not yet consumed): the server only ever clears it via compareExchange.
  */
 const BOOTSTRAP = `
 const { workerData } = require('node:worker_threads');
 const status = new Int32Array(workerData.statusBuffer);
 process.on('exit', () => {
-  const previous = Atomics.compareExchange(status, 0, 0, ${STATUS_DIED});
-  if (previous === ${STATUS_READY}) Atomics.compareExchange(status, 0, ${STATUS_READY}, ${STATUS_DIED});
-  if (previous === 0 || previous === ${STATUS_READY}) Atomics.notify(status, 0);
+  Atomics.store(status, 0, ${STATUS_DIED});
+  Atomics.notify(status, 0);
 });
 try {
   require(workerData.entry);
@@ -93,6 +94,13 @@ interface LiveWorker {
 
 const errorText = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
+
+class WorkerDiedOnStartError extends Error {
+  constructor() {
+    super('OCC worker died on start');
+    this.name = 'WorkerDiedOnStartError';
+  }
+}
 
 export function createIsolatedKernel(options: IsolatedKernelOptions = {}): IsolatedKernel {
   const entry = options.entry ?? defaultWorkerEntry();
@@ -145,17 +153,29 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
       if (live === candidate) live = null;
       candidate.port.close();
       void candidate.worker.terminate();
-      throw new Error(
-        outcome === 'timed-out' ? 'OCC worker start timed out' : 'OCC worker died on start',
-      );
+      throw outcome === 'timed-out'
+        ? new Error('OCC worker start timed out')
+        : new WorkerDiedOnStartError();
     }
-    Atomics.store(status, 0, 0);
+    Atomics.compareExchange(status, 0, STATUS_READY, 0); // a death since the load stays flagged
     candidate.ready = true;
   };
 
+  /**
+   * @invariant a worker launched in the background (warm restart) that died on start is replaced
+   *   once by a fresh launch; a foreground launch or a start timeout is not retried.
+   */
   const ensureLive = (): LiveWorker => {
+    const launchedInBackground = live !== null;
     live ??= launch();
-    awaitReady(live);
+    try {
+      awaitReady(live);
+    } catch (error) {
+      if (!launchedInBackground || !(error instanceof WorkerDiedOnStartError)) throw error;
+      console.warn('[occt] the background-loaded worker died on start; launching a fresh one');
+      live = launch();
+      awaitReady(live);
+    }
     return live;
   };
 
@@ -182,13 +202,12 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
       return null;
     }
     const { port, status } = target;
-    Atomics.store(status, 0, 0);
     port.postMessage({ op, args });
     const outcome = Atomics.wait(status, 0, 0, callTimeoutMs);
     const state = Atomics.load(status, 0);
     if (outcome !== 'timed-out' && state === STATUS_REPLY) {
       const reply = receiveMessageOnPort(port)?.message as KernelReply | undefined;
-      Atomics.store(status, 0, 0); // idle: a later death can now flag STATUS_DIED
+      Atomics.compareExchange(status, 0, STATUS_REPLY, 0); // idle; a death since the reply stays flagged
       if (reply?.error !== undefined) console.warn(`[occt] ${op} failed: ${reply.error}`);
       if (reply?.recycle === true) {
         recycles++;
