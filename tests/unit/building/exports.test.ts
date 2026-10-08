@@ -404,6 +404,16 @@ describe('extreme model sizes', () => {
     expect(execute(doc, 'export_plan_sheet', { scale: 100 }).summary).not.toMatch(/WARNING/);
   });
 
+  it('elevation sheet warns when a requested scale does not fit, not when auto-fitted', () => {
+    const doc = house();
+    const auto = execute(doc, 'export_elevation_sheet', {});
+    expect((auto.data as { fits: boolean }).fits).toBe(true);
+    expect(auto.summary).not.toMatch(/WARNING/);
+    const tooBig = execute(doc, 'export_elevation_sheet', { scale: 5 });
+    expect((tooBig.data as { fits: boolean }).fits).toBe(false);
+    expect(tooBig.summary).toMatch(/WARNING: the view is larger than the paper at this scale/);
+  });
+
   it('DXF hatch density is capped for a 500 km wall', () => {
     let doc = run(createEmptyDocument(), 'add_level', { name: 'L' });
     doc = run(doc, 'add_wall', { start: [0, 0], end: [500_000_000, 0], thickness: 10_000_000 });
