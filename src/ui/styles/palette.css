@@ -291,6 +291,13 @@
   font-weight: var(--weight-medium);
 }
 
+.palette-form__status {
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--danger);
+}
+
 .palette-form__footer {
   display: flex;
   align-items: center;
