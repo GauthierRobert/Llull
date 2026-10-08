@@ -56,6 +56,9 @@ app.get('/health', (_req, res) => {
 app.use(buildLiveRouter(restLimiter));
 app.use('/export', restLimiter, buildExportRouter(exchange));
 app.use('/mcp', buildMcpRouter(exchange));
+app.use((req, res) => {
+  res.status(404).json({ error: `Not found: ${req.method} ${req.path}` });
+});
 app.use(jsonErrorHandler);
 
 /** Only listen when run as the entry point (tests import `app` and use supertest). */
