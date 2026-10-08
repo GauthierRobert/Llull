@@ -12,7 +12,7 @@ A full CAD stores HOW a model was built, not just final geometry. Commands are p
 ## References
 - Model: `.claude/context/model.md` (Parameter, Constraint, FeatureStep, partition)
 - Signatures: `.claude/context/command-layer.md` (History & regeneration, IDs)
-- Law: `.claude/rules/architecture.md` (L8 parametric, L9 kernel)
+- Law: `.claude/rules/architecture.md` (L8, L9) + `.claude/rules/commands.md` (as built)
 
 ## What exists (extend, don't rebuild)
 | Piece | Where (`packages/core/src/commands/`) |

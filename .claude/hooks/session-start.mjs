@@ -1,24 +1,39 @@
 #!/usr/bin/env node
 /**
- * SessionStart primer — injects llull's invariants so every session starts aligned.
- * Concise by design (token economy). Full rules live in .claude/rules/*.
+ * SessionStart primer — injects only per-session STATE (CLAUDE.md already carries the rules):
+ * branch, uncommitted file count, whether deps are installed, the board's NOW line.
+ * Fails open; target < 50 ms.
  */
-const primer = [
-  'llull — MCP-first 2D + 3D CAD. Read CLAUDE.md. Key invariants:',
-  '1. PRIME DIRECTIVE: never mutate the document outside a command. UI and MCP both call execute(doc,name,params).',
-  '2. One command in registry.ts = a UI button + MCP tool (drivable by Claude or any MCP agent), for free.',
-  '3. Dependency law: ui/server -> app -> plugins/kernels/mcp -> core. packages/* have NO react/DOM/fetch; packages/core imports no other package (PreToolUse-enforced).',
-  '4. Commands: defineCommand + zod params, pure, registered (registry.ts or a plugin), happy/failure tests. Gate 90/85/90/90: packages/core/src/commands/**, packages/domain-aec/src/**.',
-  '5. Tool names are snake_case. `npm run check` must be green before done.',
-  'Agents: command-author, viewport-engineer, mcp-engineer, test-verifier, cad-reviewer (default to multi-agent).',
-  'Skills: add-command, mcp-server, viewport-feature, verify-llull.',
-].join('\n');
+import { spawnSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 
-try {
-  process.stdout.write(JSON.stringify({
-    hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: primer },
-  }));
-} catch {
-  process.stdout.write(primer);
+function git(args) {
+  const r = spawnSync('git', args, { encoding: 'utf8', timeout: 2000 });
+  return r.status === 0 ? r.stdout.trim() : '';
 }
+
+function boardNow() {
+  try {
+    const board = readFileSync('.claude/work/BOARD.md', 'utf8');
+    const section = board.split(/^## NOW.*$/m)[1] ?? '';
+    const line = section.split('\n').find((l) => l.startsWith('- ')) ?? '';
+    return line.length > 280 ? line.slice(0, 277) + '…' : line;
+  } catch {
+    return '';
+  }
+}
+
+const lines = ['llull session state (rules: CLAUDE.md + .claude/rules/):'];
+const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
+if (branch) {
+  const dirty = git(['status', '--porcelain']).split('\n').filter(Boolean).length;
+  lines.push(`- branch: ${branch}${dirty ? ` (${dirty} uncommitted file(s))` : ' (clean)'}`);
+}
+if (!existsSync('node_modules')) lines.push('- node_modules missing: run `npm install` before `npm run check`.');
+const now = boardNow();
+if (now) lines.push(`- board NOW: ${now.slice(2)}`);
+
+process.stdout.write(
+  JSON.stringify({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: lines.join('\n') } }),
+);
 process.exit(0);

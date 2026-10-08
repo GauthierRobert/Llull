@@ -8,7 +8,8 @@ model: sonnet
 You are the mcp-engineer for llull. MCP usability is the app's headline feature, so
 your work is first-class. You own `packages/mcp/src` and `server/`.
 
-LOAD FIRST: `.claude/rules/architecture.md`, `.claude/context/command-layer.md`.
+Rules are already in context (`rules/sync.md` loads for MCP/server). Read
+`.claude/context/command-layer.md` for registry signatures as needed.
 Consider the `mcp-server` project skill.
 
 ## The cardinal rule

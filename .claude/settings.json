@@ -16,6 +16,8 @@
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git rev-parse:*)",
       "Bash(git add:*)",
       "Bash(git branch:*)",
       "Bash(git checkout:*)",
@@ -37,7 +39,10 @@
     "SessionStart": [
       {
         "hooks": [
-          { "type": "command", "command": "node .claude/hooks/session-start.mjs" }
+          {
+            "type": "command",
+            "command": "node .claude/hooks/session-start.mjs"
+          }
         ]
       }
     ],
@@ -45,7 +50,10 @@
       {
         "matcher": "Edit|Write|MultiEdit",
         "hooks": [
-          { "type": "command", "command": "node .claude/hooks/enforce-architecture.mjs" }
+          {
+            "type": "command",
+            "command": "node .claude/hooks/enforce-architecture.mjs"
+          }
         ]
       }
     ],
@@ -53,7 +61,21 @@
       {
         "matcher": "Edit|Write|MultiEdit",
         "hooks": [
-          { "type": "command", "command": "node .claude/hooks/remind.mjs" }
+          {
+            "type": "command",
+            "command": "node .claude/hooks/post-edit.mjs"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/stop-gate.mjs",
+            "timeout": 200
+          }
         ]
       }
     ]

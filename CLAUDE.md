@@ -62,19 +62,19 @@ is blocked, and so is `packages/core` importing `@aec` / `@mcp` / `@kernel-*`.
 @.claude/rules/architecture.md
 @.claude/rules/conventions.md
 @.claude/rules/workflow.md
-@.claude/rules/solid.md
-@.claude/rules/ai-context.md
+
+Path-scoped rules load automatically when you touch matching files: `rules/commands.md`
+(`packages/**`, `tests/**`), `rules/sync.md` (MCP / server / store), `rules/react.md` (`src/ui/**`).
 
 ## DEEP REFERENCES (load on demand, do not inline unless needed)
 
-- React + r3f + Zustand UI best practices (`ui/` work only): `.claude/rules/react.md`
 - Command layer internals & exact signatures: `.claude/context/command-layer.md`
 - Document/entity schema reference: `.claude/context/model.md`
 - Human-prose architecture rationale: `docs/ARCHITECTURE.md`
 - Add-a-tool recipe (prose): `docs/ADD_A_TOOL.md`
 - Roadmap / current milestone: `docs/ROADMAP.md`
 
-## AGENTS (delegate; do not do everything in the main thread)
+## AGENTS (delegate when it pays — see workflow W5)
 
 | Agent              | Use for                                                    |
 | ------------------ | ---------------------------------------------------------- |
@@ -84,18 +84,22 @@ is blocked, and so is `packages/core` importing `@aec` / `@mcp` / `@kernel-*`.
 | `test-verifier`    | Writing tests, hitting the coverage gate, running checks   |
 | `cad-reviewer`     | Reviewing a diff against the architecture laws             |
 
-Multi-agent is the default workflow. Parallelize independent work; converge on review.
+Main thread by default; delegate for ≥ 2 independent lanes or > ~4 files in one lane.
+`cad-reviewer` for diffs touching core / registry / plugins / MCP.
 
 ## SKILLS (invoke when the trigger matches)
 
 - `design-model` — design a complete CAD model/assembly end-to-end by composing existing commands into a validated `build_project` plan, then measure/check/render/export
 - `add-command` — add a CAD operation (the most common task; UI + MCP in one)
+- `add-entity-kind` — add a new 2D shape or 3D solid kind (types → commands → kernels → codegen → UI → tests)
+- `fix-bug` — reproduce first (failing test / golden plan), then fix
 - `draw-2d` — add/extend 2D drafting (lines, arcs, polylines, dimensions, snapping, sketch→solid)
 - `parametric` — parameters, constraints, feature history (edit-and-regenerate)
 - `measure` — read-only measurement/inspection tools (distance, area, volume, mass)
 - `mcp-server` — build/extend the MCP host over the registry
 - `viewport-feature` — implement or change 2D/3D viewport behavior
 - `verify-llull` — run the full verification loop and (optionally) drive the app
+- `continue-working` — resume the build from `.claude/work/BOARD.md`
 
 ## COMMANDS
 
@@ -103,6 +107,7 @@ Multi-agent is the default workflow. Parallelize independent work; converge on r
 npm install          # root + every packages/* workspace
 npm run dev          # app at http://localhost:5173
 npm run check        # typecheck + lint + format:check + test — MUST pass before commit
+npm run claude:lint  # .claude/ references (skills, agents, paths) resolve — run after editing .claude/
 npm run test:coverage
 npm run quality       # import + display quality gates on real CAD files (docs/QUALITY_GATES.md)
 npm run production    # engineering-office job scenarios via /mcp + the browser (docs/PRODUCTION_GATE.md)

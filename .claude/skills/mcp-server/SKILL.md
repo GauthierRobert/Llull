@@ -15,7 +15,7 @@ tools are the discovery meta-tools and the exchange tools (`packages/mcp/src/exc
 backed by the server's Python bridge).
 
 ## References
-- `.claude/context/command-layer.md` (registry API), `.claude/rules/architecture.md` (L1, L5, L6)
+- `.claude/context/command-layer.md` (registry API), `.claude/rules/architecture.md` (L1, L5, L6), `.claude/rules/sync.md`
 - Env + routes: `server/README.md`
 
 ## Layout

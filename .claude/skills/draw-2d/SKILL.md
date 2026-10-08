@@ -12,7 +12,7 @@ across the existing agents; this skill is the playbook.
 
 ## References
 - 2D model design: `.claude/context/model.md` (Shape2DKind, Vec2, work plane, is2D)
-- Command shape: `.claude/context/command-layer.md`, conventions C5
+- Command shape: `.claude/context/command-layer.md`, `.claude/rules/commands.md`
 - Architecture law: `.claude/rules/architecture.md` (L7)
 
 ## The three pieces of any 2D feature

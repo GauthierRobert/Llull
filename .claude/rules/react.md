@@ -1,3 +1,8 @@
+---
+paths:
+  - 'src/ui/**'
+---
+
 # RULE: react (React 18 + TS + r3f + Zustand best practices)
 
 Applies to `src/ui/` ONLY. `packages/*` have no React (architecture L2). Components are presentation +

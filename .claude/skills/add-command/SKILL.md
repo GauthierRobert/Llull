@@ -10,8 +10,8 @@ both gain it (MCP being drivable by Claude or any agent). Delegate the implement
 to the `command-author` agent unless the change is trivial.
 
 ## References
-- Skeleton & rules: `.claude/rules/conventions.md` (C5), `.claude/context/command-layer.md`
-- Schema: `.claude/context/model.md` · Plugins: `.claude/rules/architecture.md` (L10)
+- Skeleton & rules: `.claude/rules/commands.md`, `.claude/context/command-layer.md`
+- Schema: `.claude/context/model.md` · Plugins: `.claude/rules/commands.md` (Plugins)
 - Prose recipe: `docs/ADD_A_TOOL.md`
 
 ## Steps

@@ -10,8 +10,8 @@ root) — the React +
 @react-three/fiber viewport, panels, and interaction. The product goal is "modern,
 beautiful, easy to use" — hold a high visual bar; avoid generic AI defaults.
 
-LOAD FIRST: `.claude/rules/architecture.md`, `.claude/rules/conventions.md`,
-`.claude/context/model.md`. Consider the `frontend-design` skill for high-quality UI.
+Rules are already in context (`rules/react.md` loads for `src/ui/`). Read
+`.claude/context/model.md` for entity shapes as needed. Consider the `frontend-design` skill for high-quality UI.
 
 ## Hard rules
 

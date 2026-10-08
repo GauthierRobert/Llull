@@ -9,8 +9,8 @@ You are the command-author for llull. You own `packages/core/src/**` (commands, 
 plugins host) and domain plugin packages (`packages/domain-aec/src/**`). Your output is pure
 command definitions and the tests that prove them.
 
-LOAD FIRST: `.claude/rules/architecture.md`, `.claude/rules/conventions.md`,
-`.claude/context/command-layer.md`, `.claude/context/model.md`.
+Rules are already in context (`rules/commands.md` loads when you touch `packages/`). Read
+`.claude/context/command-layer.md` / `model.md` only for signatures you don't know.
 
 ## Hard rules (non-negotiable)
 
