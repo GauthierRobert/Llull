@@ -1,7 +1,8 @@
 /**
- * Outbox vs permanent HTTP errors (architecture L6): a command the server refuses with a 4xx
- * other than 408/429 (e.g. 413) is dropped from the outbox and reported, so it can never wedge
- * the flush; transient failures (5xx, 429) keep the entry and retry with backoff.
+ * Outbox vs permanent HTTP errors (architecture L6): a command the server refuses (400/413/422)
+ * is dropped from the outbox and reported, so it can never wedge the flush; transient failures
+ * (5xx, 429, 408) keep the entry and retry with backoff; connection refusals (401/403/404) keep
+ * the whole outbox and the local document.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -159,6 +160,50 @@ describe('outbox — permanent HTTP errors', () => {
     expect(server.applied()).toEqual(['add_box']);
     expect(state().localOutbox).toHaveLength(0);
     expect(state().syncState).toBe('idle');
+  });
+
+  it.each([403, 401, 404])(
+    'a %i on every POST keeps both entries and the local document',
+    async (status) => {
+      resetStore('disconnected');
+      state().dispatch('add_box', { size: [1, 1, 1] });
+      state().dispatch('add_sphere', { radius: 1 });
+      const localOrder = state().document.order;
+      expect(localOrder).toHaveLength(2);
+      const server = scriptedServer(() => status);
+      vi.stubGlobal('fetch', server.fetch);
+
+      state().setLiveStatus('connected');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(state().localOutbox.map((entry) => entry.name)).toEqual(['add_box', 'add_sphere']);
+      expect(state().document.order).toEqual(localOrder);
+      expect(state().hasUnsyncedLocalEdits).toBe(true);
+      expect(state().syncState).toBe('failed');
+      expect(state().lastSummary).toContain('refused the connection (auth/origin)');
+      expect(state().lastSummary).toContain('offline edits kept');
+
+      const callsBeforeRetry = server.fetch.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(server.fetch.mock.calls.length).toBeGreaterThan(callsBeforeRetry);
+      expect(state().localOutbox).toHaveLength(2);
+      expect(state().document.order).toEqual(localOrder);
+      expect(server.applied()).toEqual([]);
+    },
+  );
+
+  it('a grace-run command answered with 403 stays queued and the edit is kept', async () => {
+    resetStore('connecting');
+    const server = scriptedServer(() => 403);
+    vi.stubGlobal('fetch', server.fetch);
+
+    server.holdNext();
+    state().dispatch('add_box', { size: [1, 1, 1] });
+    await vi.advanceTimersByTimeAsync(CONNECT_GRACE_MS);
+    server.release();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(state().localOutbox.map((entry) => entry.name)).toEqual(['add_box']);
+    expect(state().document.order).toHaveLength(1);
+    expect(state().lastSummary).toContain('offline edits kept');
   });
 
   it('a grace-run command answered with a transient 500 stays queued for the flush', async () => {

@@ -8,7 +8,12 @@
 import type { CadDocument, EntityId } from '@core/model/types';
 import { extendIdMap, remapIds } from '@core/commands/regenerate';
 import { errorMessage } from '@lib/errorMessage';
-import { fetchLiveSnapshot, isPermanentHttpError, postCommand } from './serverCommands';
+import {
+  fetchLiveSnapshot,
+  isCommandRefusal,
+  isConnectionRefusal,
+  postCommand,
+} from './serverCommands';
 import type { CadStoreState, StoreGet, StoreSet } from './storeTypes';
 
 const SYNC_RETRY_BASE_MS = 1000;
@@ -102,8 +107,10 @@ function syncedSummary(sentCount: number, rejected: readonly string[]): string {
  * Offline -> online reconcile: replay the outbox to the server as ordinary commands, in
  * order (the server rebases them onto whatever happened meanwhile), then adopt the server
  * snapshot. Commands queued during the flush are sent too. Retries with backoff on a transient
- * failure; an entry the server refuses permanently (4xx other than 408/429) is dropped, reported
- * in the summary, and the flush continues (the post-flush snapshot reconciles the document).
+ * failure; an entry the server refuses (400/413/422) is dropped, reported in the summary, and the
+ * flush continues (the post-flush snapshot reconciles the document).
+ * @invariant a connection refusal (401/403/404) stops the flush and keeps the whole outbox and the
+ *   local document (no snapshot adopted); syncState 'failed', retried with backoff.
  */
 export function flushOutbox(set: StoreSet, get: StoreGet): void {
   if (syncInFlight) return;
@@ -129,7 +136,7 @@ export function flushOutbox(set: StoreSet, get: StoreGet): void {
         sent.push(response.summary);
         extendIdMap(flushIdMap, next.affected, response.affected);
       } catch (err: unknown) {
-        if (!isPermanentHttpError(err)) throw err;
+        if (!isCommandRefusal(err)) throw err;
         rejected.push(`'${next.name}' (${err.message})`);
       }
       set((state) => ({ localOutbox: removeOutboxEntry(state.localOutbox, next.commandId) }));
@@ -160,7 +167,9 @@ export function flushOutbox(set: StoreSet, get: StoreGet): void {
       syncInFlight = false;
       set({
         syncState: 'failed',
-        lastSummary: `Could not sync offline edits (will retry): ${errorMessage(err)}`,
+        lastSummary: isConnectionRefusal(err)
+          ? `Could not sync: server refused the connection (auth/origin), offline edits kept (will retry): ${err.message}`
+          : `Could not sync offline edits (will retry): ${errorMessage(err)}`,
       });
       if (get().liveStatus === 'disconnected') return;
       const delay = Math.min(SYNC_RETRY_BASE_MS * 2 ** syncAttempt, SYNC_RETRY_MAX_MS);

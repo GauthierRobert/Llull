@@ -7,7 +7,8 @@
 
 import type { CadDocument, EntityId } from '@core/model/types';
 import {
-  isPermanentHttpError,
+  isCommandRefusal,
+  isConnectionRefusal,
   postCommand,
   postRedo,
   postUndo,
@@ -88,7 +89,7 @@ function responseChanged(response: ServerCommandResponse): boolean {
 }
 
 /**
- * A grace-run command the server then refused permanently would be re-POSTed forever by the
+ * A grace-run command the server then refused (400/413/422) would be re-POSTed forever by the
  * flush: drop its outbox entry and tell the user (the post-flush snapshot reconciles the document).
  */
 function dropRefusedGraceRun(set: StoreSet, commandId: string, message: string): void {
@@ -176,7 +177,12 @@ export function postDispatch(
       clearTimeout(graceTimer);
       forgetGraceRun(dispatchSeq);
       if (ranLocally) {
-        if (isPermanentHttpError(err)) dropRefusedGraceRun(set, commandId, err.message);
+        if (isCommandRefusal(err)) dropRefusedGraceRun(set, commandId, err.message);
+        else if (isConnectionRefusal(err)) {
+          set({
+            lastSummary: `${err.message} — server refused the connection (auth/origin), offline edits kept.`,
+          });
+        }
         return;
       }
       handlePostFailure(set, get, err, `Command '${name}'`, fallBackLocally, (summary) =>

@@ -47,20 +47,30 @@ export class ServerCommandError extends Error {
   }
 }
 
+const httpStatusOf = (err: unknown): number | undefined =>
+  err instanceof ServerCommandError && err.kind === 'http' ? err.status : undefined;
+
+/** Statuses that refuse ONE command (bad params, too large, unprocessable). */
+const COMMAND_REFUSAL_STATUSES: ReadonlySet<number> = new Set([400, 413, 422]);
+/** Statuses that refuse the REQUEST itself (server/src/security.ts: token, origin, route). */
+const CONNECTION_REFUSAL_STATUSES: ReadonlySet<number> = new Set([401, 403, 404]);
+
 /**
- * The server answered with a 4xx that retrying cannot fix (413, 400, 403, …): drop the request.
- * 408 (timeout) and 429 (rate limit) are transient, like 5xx and network errors.
+ * The server refused this one command and retrying cannot fix it (400, 413, 422): drop the request.
+ * Every other failure (connection refusals, 408, 429, 5xx, network) keeps it.
  */
-export function isPermanentHttpError(err: unknown): err is ServerCommandError {
-  return (
-    err instanceof ServerCommandError &&
-    err.kind === 'http' &&
-    err.status !== undefined &&
-    err.status >= 400 &&
-    err.status < 500 &&
-    err.status !== 408 &&
-    err.status !== 429
-  );
+export function isCommandRefusal(err: unknown): err is ServerCommandError {
+  const status = httpStatusOf(err);
+  return status !== undefined && COMMAND_REFUSAL_STATUSES.has(status);
+}
+
+/**
+ * The server refused the request whatever the command (401, 403, 404: auth, origin, missing
+ * route): stop syncing, keep queued edits, never adopt the server snapshot over them.
+ */
+export function isConnectionRefusal(err: unknown): err is ServerCommandError {
+  const status = httpStatusOf(err);
+  return status !== undefined && CONNECTION_REFUSAL_STATUSES.has(status);
 }
 
 /** GET `path`, or POST it with `postBody` as JSON when given. Resolves to the parsed JSON response. */
