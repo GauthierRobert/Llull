@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import { textLocalBounds } from '@core/commands/sceneBounds';
 import { entityDistSq, textLocalBox } from '../../src/ui/viewport/2d/modifyHelpers';
 import { entitiesInBox } from '../../src/ui/viewport/2d/boxSelect';
 import type { TextEntity } from '@core/model/types';
@@ -26,6 +27,19 @@ describe('textLocalBox', () => {
     const box = textLocalBox(text('AB\nABCDEFGH\nABC', 'left'));
     expect(box.width).toBeCloseTo(8 * 2 * 0.6);
     expect(box.height).toBeCloseTo(2 * (1 + 2 * 1.2));
+  });
+
+  it('projects the core textLocalBounds layout (one source of truth)', () => {
+    for (const anchor of ['left', 'center', 'right'] as const) {
+      const entity = text('AB\nABCDEFGH\nABC', anchor);
+      const { min, max } = textLocalBounds(entity);
+      expect(min[1]).toBeCloseTo(-max[1]);
+      expect(textLocalBox(entity)).toEqual({
+        left: min[0],
+        width: max[0] - min[0],
+        height: max[1] - min[1],
+      });
+    }
   });
 
   it('makes the whole multi-line block pickable and box-selectable', () => {
