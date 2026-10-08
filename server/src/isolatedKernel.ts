@@ -95,6 +95,13 @@ interface LiveWorker {
 const errorText = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
+class WorkerDiedOnStartError extends Error {
+  constructor() {
+    super('OCC worker died on start');
+    this.name = 'WorkerDiedOnStartError';
+  }
+}
+
 export function createIsolatedKernel(options: IsolatedKernelOptions = {}): IsolatedKernel {
   const entry = options.entry ?? defaultWorkerEntry();
   if (entry === null) throw new Error('OCC worker entry not found next to the server modules');
@@ -146,17 +153,29 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
       if (live === candidate) live = null;
       candidate.port.close();
       void candidate.worker.terminate();
-      throw new Error(
-        outcome === 'timed-out' ? 'OCC worker start timed out' : 'OCC worker died on start',
-      );
+      throw outcome === 'timed-out'
+        ? new Error('OCC worker start timed out')
+        : new WorkerDiedOnStartError();
     }
     Atomics.compareExchange(status, 0, STATUS_READY, 0); // a death since the load stays flagged
     candidate.ready = true;
   };
 
+  /**
+   * @invariant a worker launched in the background (warm restart) that died on start is replaced
+   *   once by a fresh launch; a foreground launch or a start timeout is not retried.
+   */
   const ensureLive = (): LiveWorker => {
+    const launchedInBackground = live !== null;
     live ??= launch();
-    awaitReady(live);
+    try {
+      awaitReady(live);
+    } catch (error) {
+      if (!launchedInBackground || !(error instanceof WorkerDiedOnStartError)) throw error;
+      console.warn('[occt] the background-loaded worker died on start; launching a fresh one');
+      live = launch();
+      awaitReady(live);
+    }
     return live;
   };
 
