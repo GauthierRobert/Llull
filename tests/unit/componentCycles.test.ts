@@ -22,6 +22,7 @@ describe('component reference cycles', () => {
       name: 'A again',
       entityIds: [instanceOfA],
       componentId: 'A',
+      replace: true,
     });
     expect(result.document).toBe(doc);
     expect(result.affected).toEqual([]);
@@ -41,6 +42,7 @@ describe('component reference cycles', () => {
       name: 'A rebuilt',
       entityIds: [instanceOfB],
       componentId: 'A',
+      replace: true,
     });
     expect(result.document).toBe(b.document);
     expect(result.summary).toContain('A -> B -> A');
@@ -101,5 +103,40 @@ describe('component reference cycles', () => {
     expect(errors.join('\n')).toContain("component 'A' contains itself");
     const clean = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
     expect(validateDocumentValues(clean)).toEqual([]);
+  });
+
+  describe('reusing a component id', () => {
+    it('is refused unless replace is true', () => {
+      const { doc } = withComponentA();
+      const sphere = execute(doc, 'add_sphere', { radius: 1 });
+      const refused = execute(sphere.document, 'create_component', {
+        name: 'Other',
+        entityIds: [sphere.affected[0]!],
+        componentId: 'A',
+      });
+      expect(refused.document).toBe(sphere.document);
+      expect(refused.summary).toContain('already exists');
+      expect(refused.summary).toContain('replace:true');
+
+      const replaced = execute(sphere.document, 'create_component', {
+        name: 'Other',
+        entityIds: [sphere.affected[0]!],
+        componentId: 'A',
+        replace: true,
+      });
+      expect(replaced.affected).toHaveLength(1);
+      expect(replaced.document.components['A']!.name).toBe('Other');
+    });
+
+    it('a fresh explicit id is unaffected', () => {
+      const { doc } = withComponentA();
+      const sphere = execute(doc, 'add_sphere', { radius: 1 });
+      const made = execute(sphere.document, 'create_component', {
+        name: 'S',
+        entityIds: [sphere.affected[0]!],
+        componentId: 'S',
+      });
+      expect(Object.keys(made.document.components).sort()).toEqual(['A', 'S']);
+    });
   });
 });

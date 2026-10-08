@@ -150,10 +150,18 @@ export const createComponent = defineCommand({
       .optional()
       .describe(
         'Optional explicit component id to assign. When omitted a fresh id is generated via nextId("comp"). ' +
-          'Useful for deterministic agent plans that reference the component id immediately after creation.',
+          'Useful for deterministic agent plans that reference the component id immediately after creation. ' +
+          'An id that already names a component is refused unless replace is true.',
+      ),
+    replace: z
+      .boolean()
+      .optional()
+      .describe(
+        'Set true to overwrite the existing component named by componentId (every instance of it then ' +
+          'shows the new definition). Default false: reusing an existing component id is refused.',
       ),
   }),
-  run: (doc, { name, entityIds, componentId }): CommandResult => {
+  run: (doc, { name, entityIds, componentId, replace = false }): CommandResult => {
     if (entityIds.length === 0) {
       return noop(doc, 'create_component: entityIds must be a non-empty array.');
     }
@@ -167,6 +175,12 @@ export const createComponent = defineCommand({
     }
 
     const compId = componentId ?? nextId('comp');
+    if (!replace && Object.hasOwn(doc.components, compId)) {
+      return noop(
+        doc,
+        `create_component: component "${compId}" already exists; choose another componentId, or pass replace:true to overwrite it (its instances would then show the new definition). Document unchanged.`,
+      );
+    }
     const component: Component = {
       id: compId,
       name,

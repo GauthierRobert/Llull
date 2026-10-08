@@ -3214,7 +3214,7 @@
     "input_schema": {
       "properties": {
         "componentId": {
-          "description": "Optional explicit component id to assign. When omitted a fresh id is generated via nextId(\"comp\"). Useful for deterministic agent plans that reference the component id immediately after creation.",
+          "description": "Optional explicit component id to assign. When omitted a fresh id is generated via nextId(\"comp\"). Useful for deterministic agent plans that reference the component id immediately after creation. An id that already names a component is refused unless replace is true.",
           "type": "string"
         },
         "entityIds": {
@@ -3227,6 +3227,10 @@
         "name": {
           "description": "Human-readable name for the component, e.g. \"Wheel\". Used as the component label.",
           "type": "string"
+        },
+        "replace": {
+          "description": "Set true to overwrite the existing component named by componentId (every instance of it then shows the new definition). Default false: reusing an existing component id is refused.",
+          "type": "boolean"
         }
       },
       "required": [
