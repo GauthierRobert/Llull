@@ -145,6 +145,20 @@ export function replaceEntities(
   return withEntity(withoutEntities(doc, new Set(removedIds)).document, result);
 }
 
+/** Number of constraint, joint and drive-relation records in `doc`. */
+function referenceRecordCount(doc: CadDocument): number {
+  return (
+    Object.keys(doc.constraints).length +
+    Object.keys(doc.joints).length +
+    Object.keys(doc.driveRelations).length
+  );
+}
+
+/** `referenceSuffix` for the records an entity-consuming command dropped between `before` and `after`. */
+export function referenceLossSuffix(before: CadDocument, after: CadDocument): string {
+  return referenceSuffix(Math.max(0, referenceRecordCount(before) - referenceRecordCount(after)));
+}
+
 /** Summary fragment naming how many constraints/joints/drive relations a deletion removed. */
 export function referenceSuffix(prunedReferences: number): string {
   return prunedReferences > 0

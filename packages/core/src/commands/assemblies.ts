@@ -12,7 +12,12 @@ import { defineCommand, vec3, z } from './schema';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import { nextId } from '../lib/id';
 import { commitEntity } from './commitEntity';
-import { replaceEntities, withoutEntities } from './entityOps';
+import {
+  referenceLossSuffix,
+  referenceSuffix,
+  replaceEntities,
+  withoutEntities,
+} from './entityOps';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { noop } from './noop';
 import { EXTRUSION_COLOR } from './geometryShared';
@@ -201,7 +206,7 @@ export const createComponent = defineCommand({
 
     return {
       document: { ...replaced, components: { ...doc.components, [compId]: component } },
-      summary: `Created component "${name}" (id: ${compId}) from ${entityIds.length} entit${entityIds.length === 1 ? 'y' : 'ies'} [${entityIds.join(', ')}]; placed instance ${instanceId}.`,
+      summary: `Created component "${name}" (id: ${compId}) from ${entityIds.length} entit${entityIds.length === 1 ? 'y' : 'ies'} [${entityIds.join(', ')}]; placed instance ${instanceId}.${referenceLossSuffix(doc, replaced)}`,
       affected: [instanceId],
     };
   },
@@ -301,7 +306,7 @@ export const explodeInstance = defineCommand({
     const bakedEntities = expandInstance(entity, component);
 
     const bakedIds = bakedEntities.map((e) => e.id);
-    const { document: rest } = withoutEntities(doc, new Set([id]));
+    const { document: rest, prunedReferences } = withoutEntities(doc, new Set([id]));
     const document = {
       ...rest,
       entities: { ...rest.entities, ...Object.fromEntries(bakedEntities.map((e) => [e.id, e])) },
@@ -310,7 +315,7 @@ export const explodeInstance = defineCommand({
 
     return {
       document,
-      summary: `Exploded instance "${id}" (component "${component.name}", ${entity.componentId}) into ${bakedEntities.length} concrete entit${bakedEntities.length === 1 ? 'y' : 'ies'}: [${bakedIds.join(', ')}].`,
+      summary: `Exploded instance "${id}" (component "${component.name}", ${entity.componentId}) into ${bakedEntities.length} concrete entit${bakedEntities.length === 1 ? 'y' : 'ies'}: [${bakedIds.join(', ')}].${referenceSuffix(prunedReferences)}`,
       affected: bakedIds,
     };
   },

@@ -14,7 +14,7 @@ import { defineCommand, z } from './schema';
 import type { ExecutionContext } from './context';
 import { currentContext } from './context';
 import { nextId } from '../lib/id';
-import { replaceEntities } from './entityOps';
+import { referenceLossSuffix, replaceEntities } from './entityOps';
 import { kernelUnavailable } from './kernelRefusal';
 import { newEntity } from './newEntity';
 import { noop } from './noop';
@@ -78,9 +78,10 @@ function modifyEdges(
   const meshEntity = newEntity('mesh', newId, { mesh: modified }, [0, 0, 0], entity.color, {
     layerId: entity.layerId,
   });
+  const document = replaceEntities(doc, [id], meshEntity);
   return {
-    document: replaceEntities(doc, [id], meshEntity),
-    summary: `${command}: ${pastTense} '${id}' (kind '${entity.kind}', ${amountName} ${amount}) → mesh '${newId}' (${modified.indices.length / 3} triangles). Source entity consumed.`,
+    document,
+    summary: `${command}: ${pastTense} '${id}' (kind '${entity.kind}', ${amountName} ${amount}) → mesh '${newId}' (${modified.indices.length / 3} triangles). Source entity consumed.${referenceLossSuffix(doc, document)}`,
     affected: [newId],
   };
 }

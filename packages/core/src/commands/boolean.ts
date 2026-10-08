@@ -13,7 +13,7 @@ import type { BooleanOp } from '../geometry/kernel';
 import type { ExecutionContext } from './context';
 import { currentContext } from './context';
 import { nextId } from '../lib/id';
-import { replaceEntities } from './entityOps';
+import { referenceLossSuffix, replaceEntities } from './entityOps';
 import { kernelUnavailable } from './kernelRefusal';
 import { newEntity } from './newEntity';
 import { noop } from './noop';
@@ -73,9 +73,10 @@ function runBoolean(
   });
 
   const triangleCount = meshData.indices.length / 3;
+  const document = replaceEntities(doc, [a, b], meshEntity);
   return {
-    document: replaceEntities(doc, [a, b], meshEntity),
-    summary: `${opName}: merged '${a}' and '${b}' into mesh '${newId}' (${triangleCount} triangles). Operands consumed.`,
+    document,
+    summary: `${opName}: merged '${a}' and '${b}' into mesh '${newId}' (${triangleCount} triangles). Operands consumed.${referenceLossSuffix(doc, document)}`,
     affected: [newId],
   };
 }
