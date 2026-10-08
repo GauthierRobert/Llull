@@ -29,14 +29,17 @@ const httpFail = (status: number): FakeResponse => ({
  * Simulated server. `refuse(name)` returns an HTTP status to answer instead of applying the
  * command; `hold` parks the next /command POST until `release()` settles it.
  */
-function scriptedServer(refuse: (name: string, attempt: number) => number | undefined): {
+function scriptedServer(
+  refuse: (name: string, attempt: number) => number | undefined,
+  initialDoc: CadDocument = createEmptyDocument(),
+): {
   fetch: ReturnType<typeof vi.fn>;
   applied: () => string[];
   doc: () => CadDocument;
   holdNext: () => void;
   release: () => void;
 } {
-  let serverDoc = createEmptyDocument();
+  let serverDoc = initialDoc;
   let seq = 0;
   const applied: string[] = [];
   const attempts = new Map<string, number>();
@@ -86,6 +89,7 @@ function resetStore(liveStatus: 'connecting' | 'disconnected'): void {
     syncState: 'idle',
     liveEpoch: null,
     liveSeq: -1,
+    liveBase: createEmptyDocument(),
   });
 }
 
@@ -160,6 +164,85 @@ describe('outbox — permanent HTTP errors', () => {
     expect(server.applied()).toEqual(['add_box']);
     expect(state().localOutbox).toHaveLength(0);
     expect(state().syncState).toBe('idle');
+  });
+
+  it('drops later entries that reference an id created by a refused entry (no server edit)', async () => {
+    const seeded = execute(createEmptyDocument(), 'add_box', { size: [2, 2, 2] });
+    const serverBoxId = seeded.affected[0] ?? '';
+    resetStore('disconnected');
+    state().dispatch('add_box', { size: [1, 1, 1] });
+    const localBoxId = state().localOutbox[0]?.affected[0];
+    expect(localBoxId).toBe(serverBoxId); // the raw local id would hit an unrelated server box
+    state().dispatch('move_entity', { id: localBoxId, delta: [5, 0, 0] });
+    state().dispatch('add_sphere', { radius: 1 });
+    const server = scriptedServer(
+      (name) => (name === 'add_box' ? 413 : undefined),
+      seeded.document,
+    );
+    vi.stubGlobal('fetch', server.fetch);
+
+    state().setLiveStatus('connected');
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(server.applied()).toEqual(['add_sphere']);
+    expect(server.doc().entities[serverBoxId]?.position).toEqual(
+      seeded.document.entities[serverBoxId]?.position,
+    );
+    expect(state().localOutbox).toHaveLength(0);
+    expect(state().syncState).toBe('idle');
+    expect(state().lastSummary).toContain('refused 2');
+    expect(state().lastSummary).toContain("'move_entity' (depends on refused 'add_box')");
+  });
+
+  it('a refused grace-run add_box poisons its id for the queued move_entity', async () => {
+    const seeded = execute(createEmptyDocument(), 'add_box', { size: [2, 2, 2] });
+    const serverBoxId = seeded.affected[0] ?? '';
+    resetStore('connecting');
+    const server = scriptedServer(
+      (name) => (name === 'add_box' ? 413 : undefined),
+      seeded.document,
+    );
+    vi.stubGlobal('fetch', server.fetch);
+
+    server.holdNext();
+    state().dispatch('add_box', { size: [1, 1, 1] });
+    await vi.advanceTimersByTimeAsync(CONNECT_GRACE_MS);
+    const localBoxId = state().localOutbox[0]?.affected[0];
+    expect(localBoxId).toBe(serverBoxId);
+    server.release();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(state().localOutbox).toHaveLength(0);
+
+    state().dispatch('move_entity', { id: localBoxId, delta: [5, 0, 0] });
+    expect(state().localOutbox.map((entry) => entry.name)).toEqual(['move_entity']);
+    state().setLiveStatus('connected');
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(server.applied()).toEqual([]);
+    expect(server.doc().entities[serverBoxId]?.position).toEqual(
+      seeded.document.entities[serverBoxId]?.position,
+    );
+    expect(state().lastSummary).toContain("depends on refused 'add_box'");
+  });
+
+  it('a refused edit of a server-held entity does not poison it for later entries', async () => {
+    const seeded = execute(createEmptyDocument(), 'add_box', { size: [2, 2, 2] });
+    const serverBoxId = seeded.affected[0] ?? '';
+    resetStore('disconnected');
+    useStore.setState({ liveBase: seeded.document, document: seeded.document });
+    state().dispatch('move_entity', { id: serverBoxId, delta: [1, 0, 0] });
+    state().dispatch('move_entity', { id: serverBoxId, delta: [0, 1, 0] });
+    const server = scriptedServer(
+      (name, attempt) => (name === 'move_entity' && attempt === 1 ? 422 : undefined),
+      seeded.document,
+    );
+    vi.stubGlobal('fetch', server.fetch);
+
+    state().setLiveStatus('connected');
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(server.applied()).toEqual(['move_entity']);
+    expect(state().lastSummary).toContain('refused 1');
   });
 
   it.each([403, 401, 404])(

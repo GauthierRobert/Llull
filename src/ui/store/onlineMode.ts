@@ -16,7 +16,7 @@ import {
 } from './serverCommands';
 import type { ServerCommandResponse } from './serverCommands';
 import { measureAfter, statusSummaryFor } from './feedback';
-import { newCommandId, removeOutboxEntry } from './outbox';
+import { newCommandId, poisonDroppedEntry, removeOutboxEntry } from './outbox';
 import { runLocally, selectionAfter, stepLocalHistory } from './localMode';
 import type { CadStoreState, DispatchOptions, StoreGet, StoreSet } from './storeTypes';
 
@@ -90,9 +90,18 @@ function responseChanged(response: ServerCommandResponse): boolean {
 
 /**
  * A grace-run command the server then refused (400/413/422) would be re-POSTed forever by the
- * flush: drop its outbox entry and tell the user (the post-flush snapshot reconciles the document).
+ * flush: drop its outbox entry, poison the ids it created (later entries using them are dropped
+ * by the flush), and tell the user (the post-flush snapshot reconciles the document).
  */
-function dropRefusedGraceRun(set: StoreSet, commandId: string, message: string): void {
+function dropRefusedGraceRun(
+  set: StoreSet,
+  get: StoreGet,
+  commandId: string,
+  message: string,
+): void {
+  const { localOutbox, liveBase } = get();
+  const entry = localOutbox.find((queued) => queued.commandId === commandId);
+  if (entry !== undefined) poisonDroppedEntry(entry, liveBase);
   set((state) => ({
     localOutbox: removeOutboxEntry(state.localOutbox, commandId),
     lastSummary: `${message} — the server refused the command; it will not be synced.`,
@@ -177,7 +186,7 @@ export function postDispatch(
       clearTimeout(graceTimer);
       forgetGraceRun(dispatchSeq);
       if (ranLocally) {
-        if (isCommandRefusal(err)) dropRefusedGraceRun(set, commandId, err.message);
+        if (isCommandRefusal(err)) dropRefusedGraceRun(set, get, commandId, err.message);
         else if (isConnectionRefusal(err)) {
           set({
             lastSummary: `${err.message} — server refused the connection (auth/origin), offline edits kept.`,

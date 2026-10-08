@@ -6,7 +6,7 @@
  */
 
 import type { CadDocument, EntityId } from '@core/model/types';
-import { extendIdMap, remapIds } from '@core/commands/regenerate';
+import { extendIdMap, mapStringLeaves, remapIds } from '@core/commands/regenerate';
 import { errorMessage } from '@lib/errorMessage';
 import {
   fetchLiveSnapshot,
@@ -41,6 +41,13 @@ let syncAttempt = 0;
 /** Local id -> server id for ids minted differently while the entries were replayed (kept across retries). */
 let flushIdMap = new Map<string, string>();
 
+/**
+ * Local id -> name of the refused command that minted it. A refused entry never reaches
+ * `extendIdMap`, so its local ids have no server counterpart and could collide with an unrelated
+ * server entity: later entries referencing one are dropped, never sent.
+ */
+let poisonedIds = new Map<string, string>();
+
 export function newCommandId(): string {
   const cryptoApi = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
   if (typeof cryptoApi?.randomUUID === 'function') return cryptoApi.randomUUID();
@@ -56,6 +63,33 @@ export function resetSyncBookkeeping(): void {
   cancelSyncRetry();
   syncAttempt = 0;
   flushIdMap = new Map();
+  poisonedIds = new Map();
+}
+
+/**
+ * Record the ids a dropped entry created locally (its `affected` ids the server document
+ * `serverBase` does not hold) as poisoned, labelled `refusedName`.
+ * @invariant ids the server already holds are not poisoned (a refused edit of them leaves them valid).
+ */
+export function poisonDroppedEntry(
+  entry: OutboxCommand,
+  serverBase: CadDocument,
+  refusedName: string = entry.name,
+): void {
+  for (const id of entry.affected) {
+    if (!(id in serverBase.entities) && !poisonedIds.has(id)) poisonedIds.set(id, refusedName);
+  }
+}
+
+/** Name of the refused command whose poisoned id `params` references, if any. */
+function refusedDependencyOf(params: unknown): string | undefined {
+  if (poisonedIds.size === 0) return undefined;
+  let refusedName: string | undefined;
+  mapStringLeaves(params, (text) => {
+    refusedName ??= poisonedIds.get(text);
+    return text;
+  });
+  return refusedName;
 }
 
 /** SSE dropped: stop retrying and release a stale 'syncing' state when no push is in flight. */
@@ -127,6 +161,13 @@ export function flushOutbox(set: StoreSet, get: StoreGet): void {
         set((state) => ({ localOutbox: removeOutboxEntry(state.localOutbox, next.commandId) }));
         continue;
       }
+      const refusedDependency = refusedDependencyOf(next.params);
+      if (refusedDependency !== undefined) {
+        rejected.push(`'${next.name}' (depends on refused '${refusedDependency}')`);
+        poisonDroppedEntry(next, get().liveBase, refusedDependency);
+        set((state) => ({ localOutbox: removeOutboxEntry(state.localOutbox, next.commandId) }));
+        continue;
+      }
       try {
         const response = await postCommand(
           next.name,
@@ -138,6 +179,7 @@ export function flushOutbox(set: StoreSet, get: StoreGet): void {
       } catch (err: unknown) {
         if (!isCommandRefusal(err)) throw err;
         rejected.push(`'${next.name}' (${err.message})`);
+        poisonDroppedEntry(next, get().liveBase);
       }
       set((state) => ({ localOutbox: removeOutboxEntry(state.localOutbox, next.commandId) }));
     }
@@ -145,6 +187,7 @@ export function flushOutbox(set: StoreSet, get: StoreGet): void {
     if (get().localOutbox.length > 0) return sendNext();
     const state = get();
     flushIdMap = new Map();
+    poisonedIds = new Map();
     set({
       hasUnsyncedLocalEdits: false,
       syncState: 'idle',
