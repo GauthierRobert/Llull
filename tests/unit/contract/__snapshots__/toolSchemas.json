@@ -3150,7 +3150,7 @@
     "annotations": {
       "destructiveHint": true
     },
-    "description": "Reset the working document to an empty state, removing all entities, groups, animations, parameters, configurations, materials, recipes, and components. Preserves units, camera, and displayPrecision so view framing survives. Set keepLayers=true to also preserve layers and the active layer scheme; by default layers are reset to a single default \"Layer 0\".",
+    "description": "Reset the working document to an empty state, removing all entities, groups, animations, parameters, configurations, materials, recipes, components, constraints, joints, and drive relations. Preserves units, camera, and displayPrecision so view framing survives. Set keepLayers=true to also preserve layers and the active layer scheme; by default layers are reset to a single default \"Layer 0\".",
     "input_schema": {
       "properties": {
         "keepLayers": {
