@@ -173,6 +173,11 @@ export function entityToTriangles(e: Entity, doc: CadDocument): Triangle[] {
     if (!component) return [];
     return expandInstance(e, component).flatMap((child) => entityToTriangles(child, doc));
   }
+  return solidTriangles(e);
+}
+
+/** World-space triangles of one entity without resolving instances (instances and 2D shapes return []). */
+export function solidTriangles(e: Entity): Triangle[] {
   return applyRotationToTriangles(unrotatedTriangles(e), e.position, e.rotation);
 }
 
