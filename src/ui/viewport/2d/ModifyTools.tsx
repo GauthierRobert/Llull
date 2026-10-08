@@ -13,6 +13,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import { Icon } from '@ui/components/Icon';
+import { NumberField } from '@ui/components/NumberField';
 import type { IconName } from '@ui/components/Icon';
 import type { ModifyToolKind } from '@ui/store';
 import type { ModifyToolPhase } from './useModifyTool';
@@ -124,18 +125,14 @@ export function ModifyTools({
             <label className="vp-field-label" htmlFor="modify-value-input">
               {valueLabel(activeTool)}
             </label>
-            <input
+            <NumberField
               id="modify-value-input"
               ref={inputRef}
               className="modify-tool-input"
-              type="number"
               min={0.001}
               step={0.1}
               value={pendingValue}
-              onChange={(e) => {
-                const value = parseFloat(e.target.value);
-                if (!isNaN(value)) onSetValue(value);
-              }}
+              onValueChange={onSetValue}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();

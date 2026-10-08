@@ -24,6 +24,7 @@ import {
   withoutElements,
 } from './model';
 import { noop } from '@core/commands/noop';
+import { duplicateSummary, findTwin, sameRing } from './duplicates';
 import { regenerateBuilding } from './evaluateElements';
 import { resolveOutline } from './structure';
 import { openingFitIssues } from './walls';
@@ -43,7 +44,7 @@ export const addRoom = defineCommand({
   description:
     'Define a room (space) with a name and number from a plan boundary polygon, or from wallIds forming ' +
     'a closed loop (the room then follows the inner wall faces). Draws the outline and an area tag; ' +
-    'rooms feed the room schedule and IFC spaces.',
+    'rooms feed the room schedule and IFC spaces. Refused if a room with the same outline already exists on the level.',
   params: z.object({
     name: z.string().describe('Room name, e.g. "Kitchen".'),
     number: z
@@ -80,6 +81,11 @@ export const addRoom = defineCommand({
     const roomsOnLevel = Object.values(resolution.building.elements).filter(
       (element) => element.category === 'room' && element.levelId === resolution.level.id,
     ).length;
+    const roomTwin = findTwin(resolution.building, 'room', resolution.level.id, (element) =>
+      sameRing(element.boundary, outline),
+    );
+    if (roomTwin)
+      return noop(doc, duplicateSummary('add_room', roomTwin, 'a room with this outline'));
     const room: RoomElement = {
       id: nextElementId(resolution.building, 'room'),
       category: 'room',
@@ -99,6 +105,9 @@ export const addRoom = defineCommand({
     };
   },
 });
+
+const ignoredNote = (ids: ReadonlyArray<string>): string =>
+  ids.length > 0 ? ` Ignored unknown id(s): ${[...new Set(ids)].join(', ')}.` : '';
 
 /**
  * @command delete_building_element
@@ -123,12 +132,13 @@ export const deleteBuildingElement = defineCommand({
     if (known.length === 0) {
       return noop(doc, 'delete_building_element: none of the given ids is a building element.');
     }
+    const ignored = elementIds.filter((id) => building.elements[id] === undefined);
     const doomed = withDependents(building, known);
     const removedEntityIds = [...doomed].flatMap((id) => building.elements[id]?.entityIds ?? []);
     const supports = reconcilePipeSupports(doc, withoutElements(building, doomed));
     return {
       document: regenerateBuilding(doc, supports.building),
-      summary: `Deleted ${doomed.size} building element(s): ${[...doomed].join(', ')}.${reconciliationNote(supports)}`,
+      summary: `Deleted ${doomed.size} building element(s): ${[...doomed].join(', ')}.${ignoredNote(ignored)}${reconciliationNote(supports)}`,
       affected: [
         ...doomed,
         ...removedEntityIds,
@@ -206,10 +216,14 @@ export const moveBuildingElement = defineCommand({
   }),
   run: (doc, { elementIds, delta }): CommandResult => {
     const building = getBuilding(doc);
-    const known = elementIds.filter((id) => building.elements[id] !== undefined);
+    const known = [...new Set(elementIds)].filter((id) => building.elements[id] !== undefined);
     if (known.length === 0) {
       return noop(doc, 'move_building_element: none of the given ids is a building element.');
     }
+    if (delta[0] === 0 && delta[1] === 0) {
+      return noop(doc, 'move_building_element: delta is [0, 0]; nothing to move.');
+    }
+    const ignored = elementIds.filter((id) => building.elements[id] === undefined);
     const strayOpenings = known.filter((id) => {
       const element = building.elements[id];
       const host = element ? hostOf(element) : null;
@@ -262,7 +276,7 @@ export const moveBuildingElement = defineCommand({
     const moved = withDependents(building, known);
     return {
       document,
-      summary: `Moved ${known.length} element(s) by [${delta[0]}, ${delta[1]}]: ${known.join(', ')}.${reconciliationNote(supports)}`,
+      summary: `Moved ${known.length} element(s) by [${delta[0]}, ${delta[1]}]: ${known.join(', ')}.${ignoredNote(ignored)}${reconciliationNote(supports)}`,
       affected: elementAffected(document, [
         ...moved,
         ...[...supports.reattached, ...supports.detached].map((change) => change.id),

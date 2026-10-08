@@ -6,6 +6,7 @@ import { commitEntity } from './commitEntity';
 import { noop } from './noop';
 import { newEntity } from './newEntity';
 import { ROTATION_CONVENTION } from './geometryShared';
+import { MAX_PROFILE_POINTS } from './limits';
 
 /** Default stroke color of every drafted 2D shape. */
 export const DEFAULT_DRAW_COLOR = '#4a90d9';
@@ -43,6 +44,12 @@ export function drawPointSeries(
 ): CommandResult {
   if (points.length < 2) {
     return noop(doc, `draw_${kind}: requires at least 2 points (got ${points.length}).`);
+  }
+  if (points.length > MAX_PROFILE_POINTS) {
+    return noop(
+      doc,
+      `draw_${kind}: ${points.length} points exceeds MAX_PROFILE_POINTS (${MAX_PROFILE_POINTS}).`,
+    );
   }
   const id = nextId(POINT_SERIES_ID_PREFIX[kind]);
   const entity = newEntity(

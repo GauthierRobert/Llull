@@ -147,9 +147,9 @@ export const measurePerimeter = defineCommand({
         perimeter = 2 * Math.PI * e.radius;
         break;
       case 'arc': {
-        // Normalize angle span to [0, 2π].
+        // Arcs sweep CCW; a non-positive span wraps into (0, 2π] (start === end is a full circle, as rendered).
         let span = e.endAngle - e.startAngle;
-        if (span < 0) span += 2 * Math.PI;
+        if (span <= 0) span = ((span % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI) || 2 * Math.PI;
         perimeter = e.radius * span;
         break;
       }

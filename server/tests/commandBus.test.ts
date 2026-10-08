@@ -303,6 +303,30 @@ describe('applyCommand — idempotent commandId', () => {
     expect(getLiveDoc().order).toHaveLength(1);
   });
 
+  it('a replay keeps small result data but drops a huge payload and says so', () => {
+    const plan = (count: number): unknown => ({
+      actions: [
+        {
+          repeat: { count, as: 'row' },
+          step: { command: 'add_box', params: { size: [1, 1, 1], position: ['=$i', 0, 0] } },
+        },
+      ],
+    });
+    const small = applyCommand('build_project', plan(2), 'small');
+    expect(small.data).toBeDefined();
+    expect(applyCommand('build_project', plan(2), 'small')).toEqual(small);
+
+    const big = applyCommand('build_project', plan(400), 'big');
+    expect(JSON.stringify(big.data).length).toBeGreaterThan(64 * 1024);
+    const replay = applyCommand('build_project', plan(400), 'big');
+    expect(replay.data).toBeUndefined();
+    expect(replay.affected).toEqual(big.affected);
+    expect(replay.changed).toBe(true);
+    expect(replay.summary).toContain(big.summary);
+    expect(replay.summary).toContain('result data was not kept');
+    expect(getLiveDoc().order).toHaveLength(2 + 400); // never re-applied
+  });
+
   it('different ids apply independently, and calls without an id are never cached', () => {
     applyCommand('add_box', { size: [1, 1, 1] }, 'a');
     applyCommand('add_box', { size: [1, 1, 1] }, 'b');

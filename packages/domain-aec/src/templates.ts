@@ -231,9 +231,10 @@ export const addBuildingTemplate = defineCommand({
     const building = getBuilding(current);
     const before = new Set(Object.keys(getBuilding(doc).elements));
     const newElements = building.elementOrder.filter((id) => !before.has(id));
+    const newLevels = building.levelOrder.filter((id) => getBuilding(doc).levels[id] === undefined);
     return {
       document: current,
-      summary: `Added ${template} template: ${building.levelOrder.length} level(s), ${newElements.length} building element(s).`,
+      summary: `Added ${template} template: ${building.levelOrder.length} level(s), ${newElements.length} building element(s) added on ${newLevels.length} new level(s).`,
       affected: elementAffected(current, newElements),
       data: { elementIds: newElements },
     };

@@ -291,6 +291,11 @@ async function importCode(
   }
   const language = pythonLanguage(args.language);
   if (language === null) return failure('import_code: language must be "cadquery" or "build123d".');
+  if (args.mode !== undefined && args.mode !== 'replace' && args.mode !== 'append') {
+    return failure(
+      `import_code: mode must be "replace" or "append" (got ${JSON.stringify(args.mode)}); nothing was changed.`,
+    );
+  }
   const mode = args.mode === 'append' ? 'append' : 'replace';
   const source = await readInput(port, stringArg(args, 'code'), stringArg(args, 'path'), 'utf8');
   const run = await port.runProgram({ language, source, step: false });

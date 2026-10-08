@@ -154,6 +154,7 @@ export function setLiveDoc(next: CadDocument, command?: LiveCommand): void {
     broadcast('snapshot', getLiveSnapshot());
     return;
   }
+  if (_subscribers.size === 0) return; // stateHash is a full serialization; nobody to verify it
   const event: LiveCommandEvent = {
     epoch: _epoch,
     seq: _seq,

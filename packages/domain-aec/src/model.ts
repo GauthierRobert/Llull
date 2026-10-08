@@ -188,8 +188,9 @@ export function resolveLevel(
     }
     return { ok: true, building, level };
   }
-  const fallbackId = building.activeLevelId ?? building.levelOrder[0];
-  const fallback = fallbackId !== undefined ? building.levels[fallbackId] : undefined;
+  const fallback =
+    (building.activeLevelId !== null ? building.levels[building.activeLevelId] : undefined) ??
+    building.levels[building.levelOrder[0] ?? ''];
   if (fallback) return { ok: true, building, level: fallback };
   const level: BuildingLevel = {
     id: nextLevelId(building),
@@ -205,8 +206,12 @@ export const existingLevelId = (
   building: BuildingModel,
   requested: string | undefined,
 ): string | undefined => {
-  const levelId = requested ?? building.activeLevelId ?? building.levelOrder[0];
-  return levelId !== undefined && building.levels[levelId] ? levelId : undefined;
+  if (requested !== undefined) return building.levels[requested] ? requested : undefined;
+  const levelId = [building.activeLevelId, building.levelOrder[0]].find(
+    (candidate): candidate is string =>
+      candidate != null && building.levels[candidate] !== undefined,
+  );
+  return levelId;
 };
 
 /** Returns a building with `element` inserted (or replaced) by id. */

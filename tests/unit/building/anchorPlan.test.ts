@@ -49,6 +49,16 @@ describe('export_anchor_plan', () => {
     expect(result.summary).toContain(`${plates.length} base plate(s)`);
   });
 
+  it('warns when a requested scale does not fit, not when auto-fitted', () => {
+    const doc = hall();
+    const auto = anchorPlan.run(doc, {});
+    expect((auto.data as { fits: boolean }).fits).toBe(true);
+    expect(auto.summary).not.toMatch(/WARNING/);
+    const tooBig = anchorPlan.run(doc, { scale: 5 });
+    expect((tooBig.data as { fits: boolean }).fits).toBe(false);
+    expect(tooBig.summary).toMatch(/WARNING: the plan is larger than the paper at this scale/);
+  });
+
   it('gives schedule rows grid refs and dimensions the grid spacing', () => {
     const data = anchorPlan.run(hall(), {}).data as AnchorData;
     const all = texts(data.svg);

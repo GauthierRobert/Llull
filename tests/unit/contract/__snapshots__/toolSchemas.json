@@ -27,7 +27,7 @@
           "type": "number"
         },
         "boltDiameter": {
-          "description": "Bolt diameter. Default 24 mm (M24).",
+          "description": "Bolt diameter, in document units. Default 24 mm (M24).",
           "type": "number"
         },
         "levelId": {
@@ -35,7 +35,7 @@
           "type": "string"
         },
         "margin": {
-          "description": "Plate overhang beyond the profile. Default 100 mm.",
+          "description": "Plate overhang beyond the profile, in document units. Default 100 mm.",
           "type": "number"
         },
         "memberIds": {
@@ -46,7 +46,7 @@
           "type": "array"
         },
         "thickness": {
-          "description": "Plate thickness. Default 25 mm (20 mm for profiles < 300 deep).",
+          "description": "Plate thickness, in document units. Default 25 mm (20 mm for profiles < 300 deep).",
           "type": "number"
         }
       },
@@ -56,11 +56,11 @@
     "name": "add_base_plates"
   },
   {
-    "description": "Add a horizontal beam from start to end (plan [x, y]). Its top sits at the top of the level (elevation + level height) + topOffset — i.e. under the next floor slab by default.",
+    "description": "Add a horizontal beam from start to end (plan [x, y]). Its top sits at the top of the level (elevation + level height) + topOffset — i.e. under the next floor slab by default. Refused if a beam over the same span (either direction) at the same topOffset already exists on the level.",
     "input_schema": {
       "properties": {
         "depth": {
-          "description": "Section depth. Default 500 mm.",
+          "description": "Section depth, in document units. Default 500 mm.",
           "type": "number"
         },
         "end": {
@@ -86,11 +86,11 @@
           "type": "array"
         },
         "topOffset": {
-          "description": "Offset of the beam top from the top of the level. Default 0.",
+          "description": "Offset of the beam top from the top of the level, in document units. Default 0.",
           "type": "number"
         },
         "width": {
-          "description": "Section width. Default 300 mm.",
+          "description": "Section width, in document units. Default 300 mm.",
           "type": "number"
         }
       },
@@ -176,11 +176,11 @@
     "name": "add_building_template"
   },
   {
-    "description": "Route a cable tray (open U section) through 3D points [[x, y, z], …] (z = tray centre above the level) with a width, side height and cable system (power, data, instrumentation…). Lengths feed the takeoff; clashes with steel, pipes and equipment are reported by check_clashes.",
+    "description": "Route a cable tray (open U section) through 3D points [[x, y, z], …] (z = tray centre above the level) with a width, side height and cable system (power, data, instrumentation…). Lengths feed the takeoff; clashes with steel, pipes and equipment are reported by check_clashes. Refused if a tray of the same size already follows the same route (either direction) on the level.",
     "input_schema": {
       "properties": {
         "height": {
-          "description": "Side height. Default 60 mm.",
+          "description": "Side height, in document units. Default 60 mm.",
           "type": "number"
         },
         "levelId": {
@@ -188,7 +188,7 @@
           "type": "string"
         },
         "points": {
-          "description": "Tray centreline [[x, y, z], …], at least 2 points.",
+          "description": "Tray centreline [[x, y, z], …], 2 to 1000 points.",
           "items": {
             "items": {
               "type": "number"
@@ -202,7 +202,7 @@
           "type": "string"
         },
         "width": {
-          "description": "Tray width. Default 300 mm.",
+          "description": "Tray width, in document units. Default 300 mm.",
           "type": "number"
         }
       },
@@ -214,7 +214,7 @@
     "name": "add_cable_tray"
   },
   {
-    "description": "Add a structural column standing on a level, at a plan location or (atGridIntersections: true) at every structural grid intersection. Rectangular width × depth, or circular with diameter = width.",
+    "description": "Add a structural column standing on a level, at a plan location or (atGridIntersections: true) at every structural grid intersection. Rectangular width × depth, or circular with diameter = width. Locations that already hold a column on the level are skipped (listed in the summary); refused when all are occupied.",
     "input_schema": {
       "properties": {
         "atGridIntersections": {
@@ -222,11 +222,11 @@
           "type": "boolean"
         },
         "depth": {
-          "description": "Section depth (rectangular). Default = width.",
+          "description": "Section depth (rectangular), in document units. Default = width.",
           "type": "number"
         },
         "height": {
-          "description": "Column height. Default: the level height.",
+          "description": "Column height, in document units. Default: the level height.",
           "type": "number"
         },
         "levelId": {
@@ -253,7 +253,7 @@
           "type": "string"
         },
         "width": {
-          "description": "Section width (diameter if circular). Default 300 mm.",
+          "description": "Section width (diameter if circular), in document units. Default 300 mm.",
           "type": "number"
         }
       },
@@ -427,7 +427,7 @@
           "type": "string"
         },
         "railHeight": {
-          "description": "Top of the runway beam above the level (> 0).",
+          "description": "Top of the runway beam above the level, in document units (> 0).",
           "type": "number"
         },
         "start": {
@@ -438,7 +438,7 @@
           "type": "array"
         },
         "supportSpacing": {
-          "description": "Distance between supports. Default 6000 mm.",
+          "description": "Distance between supports, in document units (> 0). Default 6000 mm.",
           "type": "number"
         }
       },
@@ -452,7 +452,7 @@
     "name": "add_crane_runway"
   },
   {
-    "description": "Add a curved (arc) wall on a level: its centreline is the circular arc from start through a point on the arc to end (all [x, y]). Thickness, height (default: level height), base offset and material as for add_wall. Counted with the walls in quantities and schedules. Hosts doors and windows (add_door / add_window with its id; offset = distance along the arc).",
+    "description": "Add a curved (arc) wall on a level: its centreline is the circular arc from start through a point on the arc to end (all [x, y]). Thickness, height (default: level height), base offset and material as for add_wall. Counted with the walls in quantities and schedules. Hosts doors and windows (add_door / add_window with its id; offset = distance along the arc). Refused if the same arc (either direction) and base offset already exists on the level.",
     "input_schema": {
       "properties": {
         "baseOffset": {
@@ -486,7 +486,7 @@
           "type": "array"
         },
         "thickness": {
-          "description": "Wall thickness. Default 200 mm.",
+          "description": "Wall thickness, in document units. Default 200 mm.",
           "type": "number"
         },
         "through": {
@@ -582,8 +582,8 @@
           "type": "number"
         },
         "precision": {
-          "description": "Number of decimal places to display for this dimension, overriding the document displayPrecision. Omit to use the document default.",
-          "type": "number"
+          "description": "Number of decimal places to display for this dimension, overriding the document displayPrecision. Must be an integer in [0, 20]. Omit to use the document default.",
+          "type": "integer"
         }
       },
       "required": [
@@ -599,18 +599,18 @@
     "input_schema": {
       "properties": {
         "at": {
-          "description": "Alternative to offset: a plan point [x, y] projected onto the wall.",
+          "description": "Alternative to offset: a plan point [x, y] projected onto the wall to place the opening center. Ignored when offset is given.",
           "items": {
             "type": "number"
           },
           "type": "array"
         },
         "height": {
-          "description": "Opening height. Default 2100 mm.",
+          "description": "Opening height in document units (> 0). Default 2100 mm, limited to the wall height.",
           "type": "number"
         },
         "mark": {
-          "description": "Schedule mark. Default next Dn.",
+          "description": "Schedule mark, unique among doors. Default next Dn.",
           "type": "string"
         },
         "material": {
@@ -618,11 +618,11 @@
           "type": "string"
         },
         "offset": {
-          "description": "Distance along the wall from its start to the opening CENTER. Default: wall midpoint.",
+          "description": "Distance along the wall from its start to the opening CENTER, in document units (arc length on a curved wall). Takes precedence over at. Default: wall midpoint.",
           "type": "number"
         },
         "sillHeight": {
-          "description": "Height of the opening bottom above the wall base. Default 0 mm.",
+          "description": "Height of the opening bottom above the wall base, in document units (>= 0). Default 0 mm.",
           "type": "number"
         },
         "swing": {
@@ -638,7 +638,7 @@
           "type": "string"
         },
         "width": {
-          "description": "Opening width. Default 900 mm.",
+          "description": "Opening width in document units (> 0). Default 900 mm.",
           "type": "number"
         }
       },
@@ -684,7 +684,7 @@
     "name": "add_drive_relation"
   },
   {
-    "description": "Place a machine / process equipment on a level: name, plan centre, size [length, width, height], plan rotation (radians), maintenance clearance around the footprint (checked by check_clashes) and operating weight in kg (for floor loads). Optional `shape` makes it a cylindrical vessel (vertical or horizontal). Shown as a block / cylinder in 3D and with its clearance zone in plan.",
+    "description": "Place a machine / process equipment on a level: name, plan centre, size [length, width, height], plan rotation (radians), maintenance clearance around the footprint (checked by check_clashes) and operating weight in kg (for floor loads). Optional `shape` makes it a cylindrical vessel (vertical or horizontal). Shown as a block / cylinder in 3D and with its clearance zone in plan. An explicit `mark` must be unique among equipment.",
     "input_schema": {
       "properties": {
         "angle": {
@@ -692,7 +692,7 @@
           "type": "number"
         },
         "clearance": {
-          "description": "Maintenance / operating clearance around it. Default 800 mm.",
+          "description": "Maintenance / operating clearance around it, in document units. Default 800 mm.",
           "type": "number"
         },
         "levelId": {
@@ -707,7 +707,7 @@
           "type": "array"
         },
         "mark": {
-          "description": "Equipment tag. Default EQn.",
+          "description": "Equipment tag, unique among equipment (duplicates are refused). Default EQn.",
           "type": "string"
         },
         "name": {
@@ -765,11 +765,11 @@
     "name": "add_equipment_openings"
   },
   {
-    "description": "Add concrete pad footings: one at a plan location, or (underColumns: true) one under every steel and concrete column foot of the level. Top of footing at level + topOffset (default −300 mm); default 1500 × 1500 × 600 mm.",
+    "description": "Add concrete pad footings: one at a plan location, or (underColumns: true) one under every steel and concrete column foot of the level (underColumns wins over location). With underColumns, feet that already carry a footing on the level (within 10 mm) are skipped and the command is refused when none is left; an explicit location that already carries a footing on the level (within 10 mm) is refused. Top of footing at level + topOffset (default −300 mm); default 1500 × 1500 × 600 mm.",
     "input_schema": {
       "properties": {
         "length": {
-          "description": "Size along Y. Default = width.",
+          "description": "Size along Y, in document units. Default = width.",
           "type": "number"
         },
         "levelId": {
@@ -788,19 +788,19 @@
           "type": "string"
         },
         "thickness": {
-          "description": "Depth of the pad. Default 600 mm.",
+          "description": "Depth of the pad, in document units. Default 600 mm.",
           "type": "number"
         },
         "topOffset": {
-          "description": "Top of footing relative to the level. Default −300 mm.",
+          "description": "Top of footing relative to the level, in document units. Default −300 mm.",
           "type": "number"
         },
         "underColumns": {
-          "description": "Place one under each column of the level.",
+          "description": "Place one under each steel or concrete column foot of the level (ignores location).",
           "type": "boolean"
         },
         "width": {
-          "description": "Size along X. Default 1500 mm.",
+          "description": "Size along X, in document units. Default 1500 mm.",
           "type": "number"
         }
       },
@@ -970,7 +970,7 @@
     "name": "add_grid_columns"
   },
   {
-    "description": "Add one structural grid axis from start to end (plan [x, y]) with a labelled bubble at each end, on layer S-GRID. Label defaults to the next free number.",
+    "description": "Add one structural grid axis from start to end (plan [x, y]) with a labelled bubble at each end, on layer S-GRID. Label defaults to the next free number. Refused if an axis with the same end points exists.",
     "input_schema": {
       "properties": {
         "end": {
@@ -1001,7 +1001,7 @@
     "name": "add_grid_line"
   },
   {
-    "description": "Lay out a rectangular structural grid. Numbered axes 1, 2, 3… run parallel to Y and are spaced along X by xSpacings; lettered axes A, B, C… (I and O skipped) run parallel to X, spaced along Y by ySpacings. E.g. xSpacings [6000, 6000] gives axes 1–3 six metres apart.",
+    "description": "Lay out a rectangular structural grid. Numbered axes 1, 2, 3… run parallel to Y and are spaced along X by xSpacings; lettered axes A, B, C… (I and O skipped) run parallel to X, spaced along Y by ySpacings. E.g. xSpacings [6000, 6000] gives axes 1–3 six metres apart. Refused when every axis of the new grid already exists; otherwise labels continue after the existing ones.",
     "input_schema": {
       "properties": {
         "extension": {
@@ -1016,14 +1016,14 @@
           "type": "array"
         },
         "xSpacings": {
-          "description": "Bay widths along X between consecutive numbered axes (each > 0).",
+          "description": "Bay widths along X between consecutive numbered axes (each > 0, at most 100).",
           "items": {
             "type": "number"
           },
           "type": "array"
         },
         "ySpacings": {
-          "description": "Bay widths along Y between consecutive lettered axes (each > 0).",
+          "description": "Bay widths along Y between consecutive lettered axes (each > 0, at most 100).",
           "items": {
             "type": "number"
           },
@@ -1120,7 +1120,7 @@
     "input_schema": {
       "properties": {
         "color": {
-          "description": "Optional hex color string for the layer, e.g. \"#ff0000\". Used by the UI to tint layer contents. Omit to leave unset.",
+          "description": "Optional hex color string #rrggbb for the layer, e.g. \"#ff0000\"; any other format is rejected. Used by the UI to tint layer contents. Omit to leave unset.",
           "type": "string"
         },
         "name": {
@@ -1243,7 +1243,7 @@
     "input_schema": {
       "properties": {
         "boltDiameter": {
-          "description": "Bolt diameter. Default 20 mm (M20).",
+          "description": "Bolt diameter, in document units. Default 20 mm (M20).",
           "type": "number"
         },
         "haunchLength": {
@@ -1255,7 +1255,7 @@
           "type": "string"
         },
         "plateThickness": {
-          "description": "End plate thickness. Default 20 / 25 mm.",
+          "description": "End plate thickness, in document units. Default 20 / 25 mm.",
           "type": "number"
         },
         "rafterIds": {
@@ -1276,7 +1276,7 @@
     "input_schema": {
       "properties": {
         "corners": {
-          "description": "Coplanar corners [[x, y, z], …], at least 3.",
+          "description": "Coplanar corners [[x, y, z], …], 3 to 500.",
           "items": {
             "items": {
               "type": "number"
@@ -1302,7 +1302,7 @@
           "type": "string"
         },
         "thickness": {
-          "description": "Panel thickness. Default 80 mm.",
+          "description": "Panel thickness, in document units. Default 80 mm.",
           "type": "number"
         }
       },
@@ -1314,7 +1314,7 @@
     "name": "add_panel"
   },
   {
-    "description": "Route a pipe through 3D points [[x, y, z], …] (z above the level) with a service / fluid name (compressed air, cooling water, steam, gas…) and line-list data: line number, nominal size DN and from / to ends. Give `dn` (e.g. 100) and the outside diameter is taken from the EN 10220 / ASME B36.10 table (15…400); `diameter` overrides it. Bends are placed at every interior point. Pipe lengths feed the takeoff; the pipe schedule (building_schedule kind \"pipe\") is the line list; clashes are reported by check_clashes. Support it with add_pipe_support and verify the spacing with check_pipe_supports.",
+    "description": "Route a pipe through 3D points [[x, y, z], …] (z above the level) with a service / fluid name (compressed air, cooling water, steam, gas…) and line-list data: line number, nominal size DN and from / to ends. Give `dn` (e.g. 100) and the outside diameter is taken from the EN 10220 / ASME B36.10 table (15…400); `diameter` overrides it. Bends are placed at every interior point. Pipe lengths feed the takeoff; the pipe schedule (building_schedule kind \"pipe\") is the line list; clashes are reported by check_clashes. Support it with add_pipe_support and verify the spacing with check_pipe_supports. Refused if a pipe of the same diameter already follows the same route (either direction) on the level.",
     "input_schema": {
       "properties": {
         "diameter": {
@@ -1338,11 +1338,11 @@
           "type": "string"
         },
         "material": {
-          "description": "Default steel.",
+          "description": "Pipe material. Default \"steel\".",
           "type": "string"
         },
         "points": {
-          "description": "Pipe centreline [[x, y, z], …], at least 2 points.",
+          "description": "Pipe centreline [[x, y, z], …], 2 to 1000 points.",
           "items": {
             "items": {
               "type": "number"
@@ -1372,7 +1372,7 @@
     "input_schema": {
       "properties": {
         "at": {
-          "description": "Absolute support points [[x, y, z], …] in document units (z = elevation, not level-relative), on or near the pipe centreline: each is snapped to the nearest point of the pipe. Give this OR `spacing`.",
+          "description": "Absolute support points [[x, y, z], …] in document units (z = elevation, not level-relative), on or near the pipe centreline: each is snapped to the nearest point of the pipe. At most 500 points per call. Give this OR `spacing`.",
           "items": {
             "items": {
               "type": "number"
@@ -1406,7 +1406,7 @@
           "type": "number"
         },
         "spacing": {
-          "description": "Maximum distance between supports along the pipe, document units, > 0: supports are auto-placed along the pipe (also near free ends and bends). Give this OR `at`. Existing supports are kept and counted.",
+          "description": "Maximum distance between supports along the pipe, document units, > 0: supports are auto-placed along the pipe (also near free ends and bends); refused when pipe length / spacing exceeds 500 supports on a run. Give this OR `at`. Existing supports are kept and counted.",
           "type": "number"
         },
         "type": {
@@ -1434,7 +1434,7 @@
           "type": "boolean"
         },
         "baySpacing": {
-          "description": "Target frame spacing; adjusted to divide the length. Default 6000 mm.",
+          "description": "Target frame spacing; adjusted to divide the length, in document units. Default 6000 mm.",
           "type": "number"
         },
         "braceProfile": {
@@ -1483,7 +1483,7 @@
           "type": "object"
         },
         "eaveHeight": {
-          "description": "Column height to the eaves. Default 7000 mm.",
+          "description": "Column height to the eaves, in document units. Default 7000 mm.",
           "type": "number"
         },
         "floorSlab": {
@@ -1499,7 +1499,7 @@
           "type": "string"
         },
         "length": {
-          "description": "Hall length (Y). Default 48000 mm.",
+          "description": "Hall length (Y), in document units. Default 48000 mm.",
           "type": "number"
         },
         "levelId": {
@@ -1518,7 +1518,7 @@
           "type": "string"
         },
         "purlinSpacing": {
-          "description": "Along the slope. Default 1800 mm.",
+          "description": "Along the slope, in document units. Default 1800 mm.",
           "type": "number"
         },
         "rafterProfile": {
@@ -1530,7 +1530,7 @@
           "type": "string"
         },
         "railSpacing": {
-          "description": "Vertical. Default 1800 mm.",
+          "description": "Vertical, in document units. Default 1800 mm.",
           "type": "number"
         },
         "roofPitch": {
@@ -1546,7 +1546,7 @@
           "type": "string"
         },
         "span": {
-          "description": "Clear span between column axes (X). Default 24000 mm.",
+          "description": "Clear span between column axes (X), in document units. Default 24000 mm.",
           "type": "number"
         },
         "spans": {
@@ -1616,7 +1616,7 @@
     "name": "add_pyramid"
   },
   {
-    "description": "Define a room (space) with a name and number from a plan boundary polygon, or from wallIds forming a closed loop (the room then follows the inner wall faces). Draws the outline and an area tag; rooms feed the room schedule and IFC spaces.",
+    "description": "Define a room (space) with a name and number from a plan boundary polygon, or from wallIds forming a closed loop (the room then follows the inner wall faces). Draws the outline and an area tag; rooms feed the room schedule and IFC spaces. Refused if a room with the same outline already exists on the level.",
     "input_schema": {
       "properties": {
         "boundary": {
@@ -1657,7 +1657,7 @@
     "name": "add_room"
   },
   {
-    "description": "Add a floor, roof or foundation slab whose TOP sits at the level elevation + offset. Give either a plan boundary polygon or wallIds forming a closed loop (edge at the wall centerlines by default, see wallFace).",
+    "description": "Add a floor, roof or foundation slab whose TOP sits at the level elevation + offset. Give either a plan boundary polygon or wallIds forming a closed loop (edge at the wall centerlines by default, see wallFace). Refused if a slab with the same outline, offset and role already exists on the level.",
     "input_schema": {
       "properties": {
         "boundary": {
@@ -1692,7 +1692,7 @@
           "type": "string"
         },
         "thickness": {
-          "description": "Slab thickness (> 0). Default 200 mm.",
+          "description": "Slab thickness (> 0), in document units. Default 200 mm.",
           "type": "number"
         },
         "wallFace": {
@@ -1732,7 +1732,7 @@
           "type": "array"
         },
         "margin": {
-          "description": "With stairId: clearance around the stair footprint. Default 100 mm.",
+          "description": "With stairId: clearance around the stair footprint, in document units. Default 100 mm.",
           "type": "number"
         },
         "slabId": {
@@ -1836,7 +1836,7 @@
         },
         "teeth": {
           "description": "Number of teeth. Must be an integer >= 3. Below ~17 teeth undercut occurs; the profile is approximated by clamping the involute to the root circle.",
-          "type": "number"
+          "type": "integer"
         }
       },
       "required": [
@@ -1849,7 +1849,7 @@
     "name": "add_spur_gear"
   },
   {
-    "description": "Add a straight-run stair climbing one full level. Riser count defaults to the level height ÷ 175 mm (rounded up), so risers are equal; tread default 280 mm. The summary reports the Blondel rule (2R + G, comfortable between 600 and 650 mm).",
+    "description": "Add a straight-run stair climbing one full level. Riser count defaults to the level height ÷ 175 mm (rounded up), so risers are equal; tread default 280 mm. The summary reports the Blondel rule (2R + G, comfortable between 600 and 650 mm). Refused above 200 risers or if a stair with the same start and angle already exists on the level.",
     "input_schema": {
       "properties": {
         "angle": {
@@ -1865,7 +1865,7 @@
           "type": "string"
         },
         "riserCount": {
-          "description": "Number of risers (integer ≥ 2).",
+          "description": "Number of risers (integer, 2 to 200). Default: level height ÷ 175 mm, rounded up.",
           "type": "number"
         },
         "start": {
@@ -1876,11 +1876,11 @@
           "type": "array"
         },
         "treadDepth": {
-          "description": "Tread (going) depth. Default 280 mm.",
+          "description": "Tread (going) depth, in document units. Default 280 mm.",
           "type": "number"
         },
         "width": {
-          "description": "Stair width. Default 1000 mm.",
+          "description": "Stair width, in document units. Default 1000 mm.",
           "type": "number"
         }
       },
@@ -1892,7 +1892,7 @@
     "name": "add_stair"
   },
   {
-    "description": "Add a steel member with a catalogue section (e.g. \"HEA300\", \"IPE400\", \"CHS76.1x3.6\") between two 3D points [x, y, z] (z above the level). Role sets the layer, mark and IFC class: column, rafter, beam, brace, purlin, rail (side rail / girt) or crane (runway beam). Section depth points up for beams and along +X for vertical columns (roll π/2 turns it along +Y); roll (radians) turns it about the axis. Beams may declare startJoint / endJoint \"rigid\" (moment connection to the column they frame into; default pinned) and columns baseFixity \"fixed\" (column foot restrains rotation; default pinned or the base plate fixity): check_steel_members analyses rigidly connected beams and columns as planar moment frames.",
+    "description": "Add a steel member with a catalogue section (e.g. \"HEA300\", \"IPE400\", \"CHS76.1x3.6\") between two 3D points [x, y, z] (z above the level). Role sets the layer, mark and IFC class: column, rafter, beam, brace, purlin, rail (side rail / girt) or crane (runway beam). Section depth points up for beams and along +X for vertical columns (roll π/2 turns it along +Y); roll (radians) turns it about the axis. Beams may declare startJoint / endJoint \"rigid\" (moment connection to the column they frame into; default pinned) and columns baseFixity \"fixed\" (column foot restrains rotation; default pinned or the base plate fixity): check_steel_members analyses rigidly connected beams and columns as planar moment frames. Refused if an identical member (section, role, roll, end points in either direction) already exists on the level.",
     "input_schema": {
       "properties": {
         "baseFixity": {
@@ -2073,11 +2073,11 @@
     "name": "add_torus"
   },
   {
-    "description": "Add a straight wall along its plan centerline from start to end ([x, y], document units) on a building level. Walls meeting at endpoints (L/T/X corners) are joined automatically. Doors and windows are then hosted with add_door / add_window.",
+    "description": "Add a straight wall along its plan centerline from start to end ([x, y], document units) on a building level. Walls meeting at endpoints (L/T/X corners) are joined automatically. Doors and windows are then hosted with add_door / add_window. Refused if a wall with the same end points (either direction) and base offset already exists on the level.",
     "input_schema": {
       "properties": {
         "baseOffset": {
-          "description": "Base offset above the level elevation. Default 0.",
+          "description": "Base offset above the level elevation, in document units. Default 0.",
           "type": "number"
         },
         "end": {
@@ -2170,18 +2170,18 @@
     "input_schema": {
       "properties": {
         "at": {
-          "description": "Alternative to offset: a plan point [x, y] projected onto the wall.",
+          "description": "Alternative to offset: a plan point [x, y] projected onto the wall to place the opening center. Ignored when offset is given.",
           "items": {
             "type": "number"
           },
           "type": "array"
         },
         "height": {
-          "description": "Opening height. Default 1200 mm.",
+          "description": "Opening height in document units (> 0). Default 1200 mm, limited to the wall height.",
           "type": "number"
         },
         "mark": {
-          "description": "Schedule mark. Default next WNn.",
+          "description": "Schedule mark, unique among windows. Default next WNn.",
           "type": "string"
         },
         "material": {
@@ -2189,11 +2189,11 @@
           "type": "string"
         },
         "offset": {
-          "description": "Distance along the wall from its start to the opening CENTER. Default: wall midpoint.",
+          "description": "Distance along the wall from its start to the opening CENTER, in document units (arc length on a curved wall). Takes precedence over at. Default: wall midpoint.",
           "type": "number"
         },
         "sillHeight": {
-          "description": "Height of the opening bottom above the wall base. Default 900 mm.",
+          "description": "Height of the opening bottom above the wall base, in document units (>= 0). Default 900 mm.",
           "type": "number"
         },
         "wallId": {
@@ -2201,7 +2201,7 @@
           "type": "string"
         },
         "width": {
-          "description": "Opening width. Default 1200 mm.",
+          "description": "Opening width in document units (> 0). Default 1200 mm.",
           "type": "number"
         }
       },
@@ -2364,8 +2364,8 @@
     "input_schema": {
       "properties": {
         "count": {
-          "description": "Number of copies to place. Must be >= 1.",
-          "type": "number"
+          "description": "Number of copies to place. Must be an integer >= 1.",
+          "type": "integer"
         },
         "mode": {
           "description": "\"place\" (default): independent copies. \"instance\": treated as place in the current version.",
@@ -2398,7 +2398,7 @@
       "properties": {
         "count": {
           "description": "Total number of instances including the original. Must be an integer >= 2.",
-          "type": "number"
+          "type": "integer"
         },
         "id": {
           "description": "Id of the entity to array.",
@@ -2438,7 +2438,7 @@
         },
         "count": {
           "description": "Total number of instances including the original. Must be an integer >= 2.",
-          "type": "number"
+          "type": "integer"
         },
         "id": {
           "description": "Id of the entity to array.",
@@ -2649,7 +2649,7 @@
         },
         "vertexIndex": {
           "description": "0-based index of the polyline vertex to chamfer. For open polylines: valid range is 1 to N-2. For closed polylines: valid range is 0 to N-1.",
-          "type": "number"
+          "type": "integer"
         }
       },
       "required": [
@@ -2748,7 +2748,7 @@
           "type": "string"
         },
         "tolerance": {
-          "description": "Ignore penetrations up to this depth. Default 5 mm.",
+          "description": "Ignore penetrations up to this depth, in document units (>= 0). Default 5 mm.",
           "type": "number"
         }
       },
@@ -3150,7 +3150,7 @@
     "annotations": {
       "destructiveHint": true
     },
-    "description": "Reset the working document to an empty state, removing all entities, groups, animations, parameters, configurations, materials, recipes, and components. Preserves units, camera, and displayPrecision so view framing survives. Set keepLayers=true to also preserve layers and the active layer scheme; by default layers are reset to a single default \"Layer 0\".",
+    "description": "Reset the working document to an empty state, removing all entities, groups, animations, parameters, configurations, materials, recipes, components, constraints, joints, and drive relations. Preserves units, camera, and displayPrecision so view framing survives. Set keepLayers=true to also preserve layers and the active layer scheme; by default layers are reset to a single default \"Layer 0\".",
     "input_schema": {
       "properties": {
         "keepLayers": {
@@ -3214,7 +3214,7 @@
     "input_schema": {
       "properties": {
         "componentId": {
-          "description": "Optional explicit component id to assign. When omitted a fresh id is generated via nextId(\"comp\"). Useful for deterministic agent plans that reference the component id immediately after creation.",
+          "description": "Optional explicit component id to assign. When omitted a fresh id is generated via nextId(\"comp\"). Useful for deterministic agent plans that reference the component id immediately after creation. An id that already names a component is refused unless replace is true.",
           "type": "string"
         },
         "entityIds": {
@@ -3227,6 +3227,10 @@
         "name": {
           "description": "Human-readable name for the component, e.g. \"Wheel\". Used as the component label.",
           "type": "string"
+        },
+        "replace": {
+          "description": "Set true to overwrite the existing component named by componentId (every instance of it then shows the new definition). Default false: reusing an existing component id is refused.",
+          "type": "boolean"
         }
       },
       "required": [
@@ -3790,7 +3794,7 @@
         },
         "count": {
           "description": "Number of instances to create. Must be a positive integer (>= 1).",
-          "type": "number"
+          "type": "integer"
         },
         "endOffset": {
           "description": "Distance back from the path end where the last instance is placed. Ignored on closed paths. Default: 0. Must be finite and non-negative.",
@@ -3834,8 +3838,8 @@
           "type": "array"
         },
         "count": {
-          "description": "Number of copies to place. Must be >= 1.",
-          "type": "number"
+          "description": "Number of copies to place. Must be an integer >= 1.",
+          "type": "integer"
         },
         "endAngle": {
           "description": "End angle of the arc sweep in radians.",
@@ -4256,11 +4260,11 @@
     "name": "draw_spline"
   },
   {
-    "description": "Draw a chain of joined walls through plan points ([[x, y], …]); closed: true adds the closing wall (e.g. a building perimeter). Same options as add_wall.",
+    "description": "Draw a chain of joined walls through plan points ([[x, y], …]); closed: true adds the closing wall (e.g. a building perimeter). Same options as add_wall. A segment that duplicates an existing wall (same end points either way, same base offset, same level) is skipped and reported, so adjacent rooms can each be drawn as a closed loop sharing an edge; refused only if every segment is a duplicate.",
     "input_schema": {
       "properties": {
         "baseOffset": {
-          "description": "Base offset above the level elevation. Default 0.",
+          "description": "Base offset above the level elevation, in document units. Default 0.",
           "type": "number"
         },
         "closed": {
@@ -4280,7 +4284,7 @@
           "type": "string"
         },
         "points": {
-          "description": "Centerline vertices [[x, y], …], at least 2.",
+          "description": "Centerline vertices [[x, y], …], 2 to 500.",
           "items": {
             "items": {
               "type": "number"
@@ -4300,6 +4304,32 @@
       "type": "object"
     },
     "name": "draw_walls"
+  },
+  {
+    "description": "Clone several entities in one step (one undo), placing each copy at original.position + offset. Same semantics as duplicate_entity applied to each id; group membership is not copied. Ids that do not exist are skipped and listed in the summary; if none exist nothing changes. Returns the new entity ids in affected, in the order of the (de-duplicated) input ids.",
+    "input_schema": {
+      "properties": {
+        "ids": {
+          "description": "Entity ids to duplicate (non-empty, at most 10000). Missing ids are skipped.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "offset": {
+          "description": "Optional [dx, dy, dz] offset applied to every copy. Defaults to [0, 0, 0] (exact overlap).",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "ids"
+      ],
+      "type": "object"
+    },
+    "name": "duplicate_entities"
   },
   {
     "description": "Clone an existing entity to a new id, placing the copy at original.position + offset. Returns the new entity id in affected. Original is untouched.",
@@ -4444,7 +4474,7 @@
           "type": "string"
         },
         "scale": {
-          "description": "Scale denominator N for 1:N (e.g. 100). Default: smallest standard scale that fits the paper.",
+          "description": "Scale denominator N for 1:N (e.g. 100). Default: the smallest standard scale that fits the paper (1-2-5 steps beyond 1:2000).",
           "type": "number"
         }
       },
@@ -4546,7 +4576,7 @@
           "type": "string"
         },
         "scale": {
-          "description": "Scale denominator N for 1:N. Default: smallest standard scale that fits.",
+          "description": "Scale denominator N for 1:N. Default: the smallest standard scale that fits (1-2-5 steps beyond 1:2000).",
           "type": "number"
         },
         "title": {
@@ -4678,7 +4708,7 @@
           "type": "string"
         },
         "scale": {
-          "description": "Scale denominator N for 1:N (e.g. 100). Default: smallest standard scale that fits.",
+          "description": "Scale denominator N for 1:N (e.g. 100). Default: the smallest standard scale that fits (1-2-5 steps beyond 1:2000).",
           "type": "number"
         },
         "title": {
@@ -4825,7 +4855,7 @@
         },
         "vertexIndex": {
           "description": "0-based index of the polyline vertex to fillet. For open polylines: valid range is 1 to N-2 (interior vertices). For closed polylines: valid range is 0 to N-1.",
-          "type": "number"
+          "type": "integer"
         }
       },
       "required": [
@@ -4838,7 +4868,7 @@
     "name": "fillet_2d"
   },
   {
-    "description": "Round (fillet) the edges of a 3D solid entity and replace it with a new mesh entity. The source entity is consumed and replaced by the filleted mesh result. edgeIndices selects which edges to fillet; omit or pass [] to fillet ALL edges (OCC convention: the kernel enumerates edges 0-based and applies radius to each selected edge). Requires a geometry kernel that supports filletEdges (available with ?kernel=occt). With the default Manifold kernel, this command gracefully no-ops (returns unchanged doc). Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, or mesh).",
+    "description": "Round (fillet) the edges of a 3D solid entity and replace it with a new mesh entity. The source entity is consumed and replaced by the filleted mesh result. edgeIndices selects which edges to fillet; omit or pass [] to fillet ALL edges (OCC convention: the kernel enumerates edges 0-based and applies radius to each selected edge). Requires a geometry kernel that supports filletEdges (available with the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server)). With the default Manifold kernel, this command gracefully no-ops (returns unchanged doc). Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, or mesh).",
     "input_schema": {
       "properties": {
         "edgeIndices": {
@@ -4897,7 +4927,7 @@
           "type": "array"
         },
         "kind": {
-          "description": "Filter by entity kind. One of: \"box\", \"cylinder\", \"sphere\", \"extrusion\", \"mesh\", \"cone\", \"torus\", \"wedge\", \"pyramid\", \"line\", \"polyline\", \"arc\", \"circle\", \"rectangle\", \"point\", \"ellipse\", \"spline\". Omit to match all kinds.",
+          "description": "Filter by entity kind. One of: \"box\", \"cylinder\", \"sphere\", \"extrusion\", \"mesh\", \"cone\", \"torus\", \"wedge\", \"pyramid\", \"revolution\", \"line\", \"polyline\", \"arc\", \"circle\", \"rectangle\", \"point\", \"ellipse\", \"spline\", \"text\", \"dimension\", \"instance\". Omit to match all kinds.",
           "enum": [
             "box",
             "cylinder",
@@ -4908,6 +4938,7 @@
             "torus",
             "wedge",
             "pyramid",
+            "revolution",
             "line",
             "polyline",
             "arc",
@@ -4915,7 +4946,10 @@
             "rectangle",
             "point",
             "ellipse",
-            "spline"
+            "spline",
+            "text",
+            "dimension",
+            "instance"
           ],
           "type": "string"
         },
@@ -5238,7 +5272,7 @@
           "type": "number"
         },
         "polar": {
-          "description": "Optional vertical orbit angle in radians (0 = overhead, π/2 = eye-level). Omit to keep the current polar angle.",
+          "description": "Optional vertical orbit angle in radians (0 = overhead, π/2 = eye-level); clamped to (0.01, π−0.01). Omit to keep the current polar angle.",
           "type": "number"
         },
         "target": {
@@ -5296,7 +5330,7 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Compute the mass of a 3D solid from its volume and density. Supported entity kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid'. Density resolution: if the entity has a material assigned (via assign_material) and that material exists in doc.materials, the material's density is used automatically — the density param is ignored for that entity. Otherwise the caller-supplied density param is used (back-compat). The density is in g/(document-unit)³ — e.g. for a document in mm: steel ≈ 0.00785, aluminium ≈ 0.0027. Returns data: { volume, density, mass, unit } where unit describes the mass unit (grams). Does not modify the document.",
+    "description": "Compute the mass of a 3D solid from its volume and density. Supported entity kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', and 'instance' (assembly: the sum over its component solids, each with its own material density, else the instance material, else the density param). Density resolution: if the entity has a material assigned (via assign_material) and that material exists in doc.materials, the material's density is used automatically — the density param is ignored for that entity. Otherwise the caller-supplied density param is used (back-compat). The density is in g/(document-unit)³ — e.g. for a document in mm: steel ≈ 0.00785, aluminium ≈ 0.0027. Returns data: { volume, density, mass, unit } where unit describes the mass unit (grams). Does not modify the document.",
     "input_schema": {
       "properties": {
         "density": {
@@ -5304,7 +5338,7 @@
           "type": "number"
         },
         "entityId": {
-          "description": "Id of the 3D solid entity to compute mass for. Supported kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid'.",
+          "description": "Id of the 3D solid entity to compute mass for. Supported kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution'.",
           "type": "string"
         }
       },
@@ -5453,7 +5487,7 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Compute the volume of a 3D solid entity. Supported kinds: 'box' (w×h×d), 'cylinder' (π r² h), 'sphere' (4/3 π r³), 'extrusion' (profile area × depth), 'mesh' (signed-tetrahedra sum — assumes closed, consistently wound mesh), 'cone' (π r² h / 3), 'torus' (2 π² · ringRadius · tubeRadius²), 'wedge' (w×h×d / 2 — half the enclosing box), 'pyramid' (baseWidth × baseDepth × height / 3), 'revolution' (Pappus's centroid theorem: sweepAngle × |x_centroid| × profileArea; falls back to bounding-box approximation if the profile crosses the revolution axis). Returns data: { volume, unit } where unit is the cubed document unit (e.g. \"mm³\"). 2D shape entities are rejected. Does not modify the document.",
+    "description": "Compute the volume of a 3D solid entity. Supported kinds: 'box' (w×h×d), 'cylinder' (π r² h), 'sphere' (4/3 π r³), 'extrusion' (profile area × depth), 'mesh' (signed-tetrahedra sum — assumes closed, consistently wound mesh), 'cone' (π r² h / 3), 'torus' (2 π² · ringRadius · tubeRadius²), 'wedge' (w×h×d / 2 — half the enclosing box), 'pyramid' (baseWidth × baseDepth × height / 3), 'instance' (sum of its component's solid children, baked with the instance scale), 'revolution' (Pappus's centroid theorem: sweepAngle × |x_centroid| × profileArea; falls back to bounding-box approximation if the profile crosses the revolution axis). Returns data: { volume, unit } where unit is the cubed document unit (e.g. \"mm³\"). 2D shape entities are rejected. Does not modify the document.",
     "input_schema": {
       "properties": {
         "entityId": {
@@ -5517,8 +5551,8 @@
           "type": "number"
         },
         "steps": {
-          "description": "Number of samples across the range (default 24, minimum 2, maximum 360). Non-integers are rounded. Step k = start + (end - start) * k / (steps - 1).",
-          "type": "number"
+          "description": "Number of samples across the range (default 24, minimum 2, maximum 360). Must be an integer. Step k = start + (end - start) * k / (steps - 1).",
+          "type": "integer"
         },
         "target": {
           "description": "What to sweep. For mode=\"joint\": the joint id (must exist in doc.joints). For mode=\"parameter\": the parameter name (must exist in doc.parameters and resolve to a number).",
@@ -5730,7 +5764,7 @@
           "properties": {
             "frames": {
               "description": "Number of frames (1..12). Each frame is a separate rotated view stitched into one wide strip.",
-              "type": "number"
+              "type": "integer"
             }
           },
           "required": [
@@ -5769,8 +5803,8 @@
     "input_schema": {
       "properties": {
         "newIndex": {
-          "description": "Zero-based target index in featureHistory. Clamped to [0, history.length-1]. Moving to the same index is a no-op.",
-          "type": "number"
+          "description": "Zero-based target index in featureHistory. Must be an integer; clamped to [0, history.length-1]. Moving to the same index is a no-op.",
+          "type": "integer"
         },
         "stepId": {
           "description": "Id of the FeatureStep to move (from doc.featureHistory[*].id).",
@@ -5840,8 +5874,8 @@
           "type": "array"
         },
         "segments": {
-          "description": "Number of radial subdivisions for tessellation. Higher = smoother surface. Default: 32. Minimum: 3.",
-          "type": "number"
+          "description": "Number of radial subdivisions for tessellation. Integer; higher = smoother surface. Default: 32. Minimum: 3 (smaller values are raised to 3).",
+          "type": "integer"
         }
       },
       "required": [
@@ -5954,7 +5988,7 @@
           "type": "number"
         },
         "polar": {
-          "description": "Vertical orbit angle in radians. 0 = overhead (along +Z), π/2 = eye-level. Clamped to (0.01, π−0.01) to avoid gimbal lock. Omit to keep current value.",
+          "description": "Vertical orbit angle in radians. 0 = overhead (along +Z), π/2 = eye-level. Clamped to [0.01, π−0.01] to avoid gimbal lock. Omit to keep current value.",
           "type": "number"
         },
         "target": {
@@ -6162,7 +6196,7 @@
           "type": "string"
         },
         "date": {
-          "description": "Issue date, e.g. \"2026-10-01\".",
+          "description": "Issue date as YYYY-MM-DD, e.g. \"2026-10-01\" (other formats are not used for the IFC header).",
           "type": "string"
         },
         "drawingNumber": {
@@ -6215,8 +6249,8 @@
     "input_schema": {
       "properties": {
         "displayPrecision": {
-          "description": "Number of decimal places to show when formatting length values (e.g. 2 → \"12.50 mm\"). Must be a non-negative integer.",
-          "type": "number"
+          "description": "Number of decimal places to show when formatting length values (e.g. 2 → \"12.50 mm\"). Must be an integer in [0, 20].",
+          "type": "integer"
         },
         "units": {
           "description": "Unit of length for the document. Allowed values: 'mm' (millimetres), 'cm' (centimetres), 'm' (metres), 'in' (inches), 'ft' (feet).",
@@ -6244,7 +6278,7 @@
           "items": {
             "properties": {
               "function": {
-                "description": "Default structure.",
+                "description": "Role of the layer. Default \"structure\".",
                 "enum": [
                   "structure",
                   "insulation",
@@ -6255,11 +6289,11 @@
                 "type": "string"
               },
               "material": {
-                "description": "Layer material.",
+                "description": "Layer material name, e.g. \"brick\", \"mineral wool\".",
                 "type": "string"
               },
               "thickness": {
-                "description": "Layer thickness (> 0).",
+                "description": "Layer thickness in document units (> 0).",
                 "type": "number"
               }
             },
@@ -6272,7 +6306,7 @@
           "type": "array"
         },
         "wallIds": {
-          "description": "Wall ids.",
+          "description": "Ids of existing straight walls (e.g. [\"wall-1\"]); curved walls are not accepted.",
           "items": {
             "type": "string"
           },
@@ -6288,7 +6322,28 @@
     "name": "set_wall_layers"
   },
   {
-    "description": "Run the constraint solver and update entity positions so that all declared constraints are satisfied. The solver uses gradient descent on the 2D XY plane (position Z is unchanged). It iterates up to 64 steps, stopping early when the total constraint residual is below 1e-8. Returns convergence info in data: { residual: number, iterations: number, converged: boolean }. Non-convergent results are returned with the best-effort positions and converged:false. No parameters required.",
+    "description": "Hollow out a closed 3D solid, leaving walls of the given thickness (grown inward), and replace it with a new mesh entity. The source entity is consumed. Requires a geometry kernel that supports shellSolid; a kernel without it (or a solid that is too thin for the thickness) makes this a graceful no-op that leaves the document unchanged. Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution or mesh).",
+    "input_schema": {
+      "properties": {
+        "id": {
+          "description": "Id of the closed 3D solid entity to hollow. Must exist and be a 3D solid.",
+          "type": "string"
+        },
+        "thickness": {
+          "description": "Wall thickness in document units. Must be > 0 and smaller than half the solid's thinnest dimension.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "thickness"
+      ],
+      "type": "object"
+    },
+    "name": "shell_solid"
+  },
+  {
+    "description": "Run the constraint solver and update entity positions so that all declared constraints are satisfied. The solver works on the 2D XY plane (position Z is unchanged): point constraints (coincident, distance, tangent) move entity positions; angle, parallel and perpendicular turn line b about its midpoint (line a is the reference). It iterates up to 64 steps, stopping early when the total constraint residual is below 1e-8. Returns convergence info in data: { residual: number, iterations: number, converged: boolean }. Non-convergent results are returned with the best-effort positions and converged:false. No parameters required.",
     "input_schema": {
       "properties": {},
       "required": [],
@@ -6461,7 +6516,7 @@
           "type": "number"
         },
         "clearance": {
-          "description": "New maintenance clearance (>= 0).",
+          "description": "New maintenance clearance in document units (>= 0).",
           "type": "number"
         },
         "currentMark": {
@@ -6534,7 +6589,7 @@
           "type": "string"
         },
         "name": {
-          "description": "New name.",
+          "description": "New level name; blank keeps the current name.",
           "type": "string"
         }
       },
@@ -6550,19 +6605,19 @@
     "input_schema": {
       "properties": {
         "height": {
-          "description": "New height (> 0).",
+          "description": "New height in document units (> 0).",
           "type": "number"
         },
         "mark": {
-          "description": "New schedule mark.",
+          "description": "New schedule mark, unique among doors / windows of the same kind; blank keeps the current one.",
           "type": "string"
         },
         "material": {
-          "description": "New material.",
+          "description": "New material; blank keeps the current one.",
           "type": "string"
         },
         "offset": {
-          "description": "New center distance from the wall start.",
+          "description": "New distance from the wall start to the opening center, in document units.",
           "type": "number"
         },
         "openingId": {
@@ -6570,11 +6625,11 @@
           "type": "string"
         },
         "sillHeight": {
-          "description": "New sill height (>= 0).",
+          "description": "New sill height above the level floor, in document units (>= 0).",
           "type": "number"
         },
         "swing": {
-          "description": "Door hinge side.",
+          "description": "Door hinge side (doors only).",
           "enum": [
             "left",
             "right"
@@ -6582,7 +6637,7 @@
           "type": "string"
         },
         "width": {
-          "description": "New width (> 0).",
+          "description": "New width in document units (> 0).",
           "type": "number"
         }
       },

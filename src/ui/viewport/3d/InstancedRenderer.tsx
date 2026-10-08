@@ -20,6 +20,7 @@ import { useViewportStore } from '@ui/store';
 import type { DisplayMode } from '@ui/store';
 import type { InstanceBatch } from './grouping';
 import { entityIdFromInstanceId } from './grouping';
+import { writeBatchInstances } from './instanceWriter';
 import { buildCylinderGeometry, buildSphereGeometry } from './entities/primitiveGeometry';
 import { useDisposable } from '../useDisposable';
 import { isAdditiveSelect } from '../selectClick';
@@ -59,17 +60,6 @@ export function makeGeometry(batch: InstanceBatch): THREE.BufferGeometry {
     }
   }
 }
-
-/** Selected-highlight tint color (hex). Matches useMaterialProps.ts emissive. */
-const SELECTED_EMISSIVE = new THREE.Color('#3a7bd5');
-const SELECTED_EMISSIVE_INTENSITY = 0.35;
-
-/** White — used as a per-instance color multiplier when we want the base color unchanged. */
-const WHITE = new THREE.Color(1, 1, 1);
-
-/** Scratch objects reused by every batch's matrix/color writes (single-threaded, synchronous). */
-const DUMMY = new THREE.Object3D();
-const SCRATCH_COLOR = new THREE.Color();
 
 const SHADED_MATERIAL_ARGS: THREE.MeshStandardMaterialParameters = {
   roughness: 0.45,
@@ -148,35 +138,8 @@ function InstanceBatchMesh({
 
   useEffect(() => {
     const mesh = meshRef.current;
-    if (!mesh) return;
-
-    // Ensure instance color buffer exists (InstancedMesh lazily creates it).
-    if (!mesh.instanceColor) {
-      // Force creation: set the first color (InstancedMesh allocates on setColorAt).
-      mesh.setColorAt(0, WHITE);
-    }
-
-    batch.entities.forEach((entity, i) => {
-      // Write world-space transform.
-      DUMMY.position.set(entity.position[0], entity.position[1], entity.position[2]);
-      DUMMY.rotation.set(entity.rotation[0], entity.rotation[1], entity.rotation[2]);
-      DUMMY.updateMatrix();
-      mesh.setMatrixAt(i, DUMMY.matrix);
-
-      // Write per-instance color.
-      // In shaded mode with an assigned material, use the material's diffuse color.
-      // Otherwise fall back to the entity's own color.
-      // Selection highlight blends on top of whichever base color is active.
-      SCRATCH_COLOR.set(batch.pbrMaterial ? batch.pbrMaterial.color : entity.color);
-      if (selectionSet.has(entity.id)) {
-        SCRATCH_COLOR.lerp(SELECTED_EMISSIVE, SELECTED_EMISSIVE_INTENSITY);
-      }
-      mesh.setColorAt(i, SCRATCH_COLOR);
-    });
-
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  }, [batch.entities, batch.pbrMaterial, selectionSet]);
+    if (mesh) writeBatchInstances(mesh, batch, selectionSet);
+  }, [batch, selectionSet]);
 
   // For xray, selected instances get a slightly higher opacity. Since THREE
   // InstancedMesh does not support per-instance opacity, we use the uniform

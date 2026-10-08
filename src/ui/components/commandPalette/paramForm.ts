@@ -7,7 +7,7 @@
  * Validation of meaning stays in the command (`execute` + `run`); this only parses input shapes.
  */
 
-import type { ParamSpec, ParamsSchema } from '@core/commands/types';
+import type { ParamSpec, ParamsSchema, ParamType } from '@core/commands/types';
 import type { EntityId } from '@core/model/types';
 
 type FieldKind = 'number' | 'text' | 'enum' | 'boolean' | 'numberList' | 'textList' | 'json';
@@ -40,12 +40,16 @@ export function humanizeName(name: string): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
+function isNumeric(type: ParamType | undefined): boolean {
+  return type === 'number' || type === 'integer';
+}
+
 function fieldKind(spec: ParamSpec): FieldKind {
   if (spec.enum !== undefined && spec.enum.length > 0) return 'enum';
-  if (spec.type === 'number') return 'number';
+  if (isNumeric(spec.type)) return 'number';
   if (spec.type === 'string') return 'text';
   if (spec.type === 'boolean') return 'boolean';
-  if (spec.type === 'array' && spec.items?.type === 'number') return 'numberList';
+  if (spec.type === 'array' && isNumeric(spec.items?.type)) return 'numberList';
   if (spec.type === 'array' && spec.items?.type === 'string' && spec.items.enum === undefined) {
     return 'textList';
   }
@@ -103,6 +107,47 @@ export function initialValues(
     }
   }
   return values;
+}
+
+/**
+ * Option picked by typing into a select: an exact (case-insensitive) match wins over the first
+ * prefix match, so "m" selects "m" rather than "mm". @pure
+ */
+export function matchTypeahead(options: readonly string[], query: string): string | undefined {
+  const needle = query.toLowerCase();
+  if (needle === '') return undefined;
+  return (
+    options.find((option) => option.toLowerCase() === needle) ??
+    options.find((option) => option.toLowerCase().startsWith(needle))
+  );
+}
+
+/** Text for one existing param value, the inverse of `parseField`; unusable values become blank. */
+function formatParam(field: FormField, value: unknown): string {
+  switch (field.kind) {
+    case 'number':
+      return typeof value === 'number' && Number.isFinite(value) ? String(value) : '';
+    case 'boolean':
+      return typeof value === 'boolean' ? String(value) : '';
+    case 'numberList':
+    case 'textList':
+      return Array.isArray(value) ? value.map(String).join(', ') : '';
+    case 'json':
+      return value === undefined ? '' : JSON.stringify(value);
+    case 'enum':
+    case 'text':
+      return typeof value === 'string' ? value : '';
+  }
+}
+
+/** Pre-fill the form from an existing params object (editing a recorded step). @pure */
+export function valuesFromParams(
+  fields: readonly FormField[],
+  params: Readonly<Record<string, unknown>>,
+): FormValues {
+  return Object.fromEntries(
+    fields.map((field) => [field.name, formatParam(field, params[field.name])]),
+  );
 }
 
 function splitList(raw: string): string[] {

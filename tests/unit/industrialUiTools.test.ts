@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultValues, type ElementTool } from '@ui/panels/building/elementToolForm';
+import { defaultValues, isFieldShown, type ElementTool } from '@ui/panels/building/elementToolForm';
 import { INDUSTRIAL_TOOLS } from '@ui/panels/building/industrialTools';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
@@ -38,7 +38,11 @@ describe('industrial tools', () => {
       'tray',
       'basePlates',
     ]) {
-      doc = apply(doc, id, id === 'footing' ? { underColumns: 'false' } : {});
+      doc = apply(
+        doc,
+        id,
+        id === 'footing' ? { underColumns: 'false', x: '9000', y: '-3000' } : {},
+      );
     }
     const categories = new Set(
       Object.values(doc.building!.elements).map((element) => element.category),
@@ -104,6 +108,30 @@ describe('industrial tools', () => {
     const equipment = tool('equipment').build(defaultValues(tool('equipment')), context);
     expect(equipment.ok && 'weight' in equipment.params).toBe(false);
     expect(equipment.ok && 'shape' in equipment.params).toBe(false);
+  });
+
+  it('the footing form has no default location: X/Y show and are required only off-column', () => {
+    const footing = tool('footing');
+    const defaults = defaultValues(footing);
+    expect(defaults['x']).toBe('');
+    expect(defaults['y']).toBe('');
+    const shown = (values: Record<string, string>): string[] =>
+      footing.fields.filter((field) => isFieldShown(field, values)).map((field) => field.key);
+    expect(shown(defaults)).not.toContain('x');
+    expect(shown({ ...defaults, underColumns: 'false' })).toEqual(
+      expect.arrayContaining(['x', 'y']),
+    );
+    expect(footing.build(defaults, context)).toMatchObject({
+      ok: true,
+      params: { underColumns: true },
+    });
+    expect(footing.build({ ...defaults, underColumns: 'false' }, context)).toEqual({
+      ok: false,
+      reason: 'Check: x, y',
+    });
+    expect(
+      footing.build({ ...defaults, underColumns: 'false', x: '1000', y: '2000' }, context),
+    ).toMatchObject({ ok: true, params: { location: [1000, 2000] } });
   });
 
   it('places a vertical vessel from the equipment form', () => {

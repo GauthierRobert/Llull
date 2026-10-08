@@ -9,6 +9,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 // First among the three.js imports: its three-mesh-bvh typings must win over drei's older copy.
 import { ensureBvhSetup } from './bvhSetup';
+import { VIEWPORT_FOV_DEGREES } from '@core/model/viewport';
 import { Canvas, useThree } from '@react-three/fiber';
 import {
   OrbitControls,
@@ -109,7 +110,7 @@ function SceneContents({
       {/* up={[0,0,1]}: world up is +Z (right-handed, Z-up document convention). */}
       <PerspectiveCamera
         makeDefault
-        fov={45}
+        fov={VIEWPORT_FOV_DEGREES}
         near={0.01}
         far={1e8}
         position={initialCamera.position}
@@ -118,7 +119,7 @@ function SceneContents({
       <OrbitControls
         makeDefault
         target={initialCamera.target}
-        minDistance={0.1}
+        minDistance={0.01}
         maxDistance={5e6}
         enableDamping
         dampingFactor={0.06}

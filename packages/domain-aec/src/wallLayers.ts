@@ -79,13 +79,18 @@ export const setWallLayers = defineCommand({
     'finish }. Wall thickness becomes the sum; quantities are reported per layer material; plans show ' +
     'the layer lines; IFC gets a material layer set. layers: null removes the build-up.',
   params: z.object({
-    wallIds: z.array(z.string()).describe('Wall ids.'),
+    wallIds: z
+      .array(z.string())
+      .describe('Ids of existing straight walls (e.g. ["wall-1"]); curved walls are not accepted.'),
     layers: z
       .array(
         z.object({
-          material: z.string().describe('Layer material.'),
-          thickness: z.number().describe('Layer thickness (> 0).'),
-          function: z.enum(WALL_LAYER_FUNCTIONS).optional().describe('Default structure.'),
+          material: z.string().describe('Layer material name, e.g. "brick", "mineral wool".'),
+          thickness: z.number().describe('Layer thickness in document units (> 0).'),
+          function: z
+            .enum(WALL_LAYER_FUNCTIONS)
+            .optional()
+            .describe('Role of the layer. Default "structure".'),
         }),
       )
       .nullable()
@@ -93,10 +98,10 @@ export const setWallLayers = defineCommand({
   }),
   run: (doc, { wallIds, layers }): CommandResult => {
     const building = getBuilding(doc);
-    const walls = wallIds
+    const walls = [...new Set(wallIds)]
       .map((id) => building.elements[id])
       .filter((element): element is WallElement => element?.category === 'wall');
-    if (walls.length === 0 || walls.length !== wallIds.length) {
+    if (walls.length === 0 || walls.length !== new Set(wallIds).size) {
       return noop(doc, 'set_wall_layers failed: wallIds must list existing walls.');
     }
     const ids = walls.map((wall) => wall.id);

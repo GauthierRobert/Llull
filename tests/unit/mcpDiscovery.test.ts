@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   applyDiscoveryToolCall,
   buildDiscoveryToolDefinitions,
+  closestToolNames,
   parseToolsets,
   searchTools,
   toolsetOf,
@@ -24,6 +25,45 @@ describe('discovery tool definitions', () => {
       expect(toolsetOf(name)).toBe('core');
       expect(getCommand(name)).toBeUndefined();
     }
+  });
+});
+
+describe('search_tools summary hint', () => {
+  it('points at enable_toolset only when some result is in a disabled toolset', () => {
+    const everything = new Set<ToolsetName>(parseToolsets('all').enabled);
+    const open = applyDiscoveryToolCall('search_tools', { query: 'wall' }, everything);
+    expect(open?.result.content[0]?.text).not.toContain('Call enable_toolset');
+    const limited = applyDiscoveryToolCall('search_tools', { query: 'wall' }, coreOnly());
+    expect(limited?.result.content[0]?.text).toContain('Call enable_toolset for: building');
+  });
+});
+
+describe('search_tools on natural phrasing', () => {
+  const top = (query: string, count = 3): string[] =>
+    searchTools(query, count, new Set(parseToolsets('all').enabled)).map((r) => r.name);
+
+  it.each([
+    ['cut a hole', 'boolean_subtract'],
+    ['make a hole in a plate', 'boolean_subtract'],
+    ['round the edges', 'fillet_edge'],
+    ['bevel the edges', 'chamfer_edge'],
+    ['how heavy is it', 'mass_properties'],
+    ['take a picture', 'render_view'],
+    ['copy an entity many times in a row', 'duplicate_entity'],
+    ['export to STEP', 'export_step'],
+    ['measure distance between two points', 'measure_distance'],
+  ])('"%s" finds %s in the top results', (query, expected) => {
+    expect(top(query, 4)).toContain(expected);
+  });
+
+  it('ignores stopwords and one-letter words, so filler cannot match tools', () => {
+    expect(top('a the of to')).toEqual([]);
+    expect(top('a')).toEqual([]);
+  });
+
+  it('is plural-insensitive', () => {
+    expect(top('fillets')).toEqual(top('fillet'));
+    expect(top('edges')[0]).toBe(top('edge')[0]);
   });
 });
 
@@ -82,6 +122,22 @@ describe('search_tools', () => {
   });
 });
 
+describe('closestToolNames', () => {
+  it('finds the intended tool for a typo, closest first', () => {
+    expect(closestToolNames('add_boxx', 3)[0]).toBe('add_box');
+    expect(closestToolNames('Boolean_Subtrct', 3)).toContain('boolean_subtract');
+    expect(closestToolNames('add_box', 3)[0]).toBe('add_box');
+  });
+
+  it('returns nothing when no tool name is close', () => {
+    expect(closestToolNames('make_me_a_sandwich_please', 5)).toEqual([]);
+  });
+
+  it('respects the limit', () => {
+    expect(closestToolNames('add_boxx', 1)).toHaveLength(1);
+  });
+});
+
 describe('enable_toolset', () => {
   it('adds the toolset to the session set and flags a tools list change', () => {
     const enabled = coreOnly();
@@ -108,6 +164,22 @@ describe('enable_toolset', () => {
       for (const name of TOOLSET_NAMES) expect(outcome?.result.content[0]?.text).toContain(name);
     }
     expect([...enabled]).toEqual(['core']);
+  });
+
+  it('"all" enables every toolset once, then reports no change', () => {
+    const enabled = coreOnly();
+    const first = applyDiscoveryToolCall('enable_toolset', { toolset: 'ALL' }, enabled);
+    expect(first?.result.isError).toBe(false);
+    expect(first?.toolsListChanged).toBe(true);
+    expect([...enabled].sort()).toEqual([...TOOLSET_NAMES].sort());
+    const again = applyDiscoveryToolCall('enable_toolset', { toolset: 'all' }, enabled);
+    expect(again?.toolsListChanged).toBe(false);
+    expect(again?.result.content[0]?.text).toContain('already enabled');
+  });
+
+  it('a missing toolset argument says so instead of quoting an empty name', () => {
+    const outcome = applyDiscoveryToolCall('enable_toolset', {}, coreOnly());
+    expect(outcome?.result.content[0]?.text).toContain('a "toolset" string argument');
   });
 
   it('returns null for any other tool name', () => {

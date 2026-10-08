@@ -64,7 +64,8 @@ describe('useKeyboardShortcuts', () => {
     fireEvent.keyDown(window, { key: 'Delete' });
     expect(dispatch.mock.calls).toEqual([
       ['delete_building_element', { elementIds: ['wall-1'] }],
-      ['delete_entities', { ids: ['a'] }],
+      // the second command of a mixed delete joins the first one's undo step
+      ['delete_entities', { ids: ['a'] }, { coalesce: true }],
     ]);
   });
 
@@ -114,13 +115,11 @@ describe('useKeyboardShortcuts', () => {
     expect(clearSelection).not.toHaveBeenCalled();
   });
 
-  it('Ctrl+D duplicates every selected entity', () => {
+  it('Ctrl+D duplicates every selected entity in one command', () => {
     render(<Harness />);
     fireEvent.keyDown(window, { key: 'd', ctrlKey: true });
-    expect(dispatch.mock.calls.map((call) => call[0])).toEqual([
-      'duplicate_entity',
-      'duplicate_entity',
-    ]);
+    expect(dispatch.mock.calls.map((call) => call[0])).toEqual(['duplicate_entities']);
+    expect(dispatch.mock.calls[0]?.[1]).toMatchObject({ ids: ['a', 'b'] });
   });
 
   it('arrow keys nudge the whole selection in one command, by 1 or 10 with Shift, and repeat', () => {
@@ -129,7 +128,8 @@ describe('useKeyboardShortcuts', () => {
     fireEvent.keyDown(window, { key: 'ArrowUp', shiftKey: true, repeat: true });
     expect(dispatch.mock.calls).toEqual([
       ['move_entities', { ids: ['a', 'b'], delta: [-1, 0, 0] }],
-      ['move_entities', { ids: ['a', 'b'], delta: [0, 10, 0] }],
+      // a held key's repeat joins the first press's undo step
+      ['move_entities', { ids: ['a', 'b'], delta: [0, 10, 0] }, { coalesce: true }],
     ]);
   });
 
@@ -178,7 +178,7 @@ describe('useKeyboardShortcuts', () => {
     fireEvent.keyDown(window, { key: 'ArrowRight' });
     expect(dispatch.mock.calls).toEqual([
       ['move_building_element', { elementIds: ['wall-1'], delta: [1, 0] }],
-      ['move_entities', { ids: ['a'], delta: [1, 0, 0] }],
+      ['move_entities', { ids: ['a'], delta: [1, 0, 0] }, { coalesce: true }],
     ]);
   });
 });

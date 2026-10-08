@@ -28,13 +28,26 @@ export function refuseDuringSync(set: StoreSet, get: StoreGet): boolean {
   return true;
 }
 
-/** Selection after a command: its affected ids when requested and non-empty, else unchanged. */
+/**
+ * UI policy: a result touching more ids than this (a building template, a big array) is not
+ * auto-selected — selecting hundreds of entities is noise, not a useful selection.
+ */
+export const MAX_AUTO_SELECT = 100;
+
+/**
+ * Selection after a command: its affected ids when requested, non-empty and within
+ * MAX_AUTO_SELECT, else unchanged.
+ */
 export function selectionAfter(
   current: EntityId[],
   affected: readonly EntityId[],
   options: DispatchOptions | undefined,
 ): EntityId[] {
-  return options?.selectAffected === true && affected.length > 0 ? [...affected] : current;
+  return options?.selectAffected === true &&
+    affected.length > 0 &&
+    affected.length <= MAX_AUTO_SELECT
+    ? [...affected]
+    : current;
 }
 
 /** Run a command locally via `execute`. Pushes history only if the doc changed. */

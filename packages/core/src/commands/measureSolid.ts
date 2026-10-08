@@ -1,12 +1,14 @@
-import type { Vec3 } from '../model/types';
+import type { CadDocument, Entity, Vec3 } from '../model/types';
 import { cross3, dot3 } from '../lib/vec3';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { entityBounds, mergeBounds } from './sceneBounds';
+import { entityBounds, entityBoundsInDoc, mergeBounds } from './sceneBounds';
+import { expandInstance } from './instanceExpansion';
 import type { Bounds } from './sceneTypes';
 import { formatLength } from './units';
 import { polygonArea, polygonCentroid } from '../lib/polygon';
 import { noop } from './noop';
+
 interface MeasureBoundingBoxData {
   min: Vec3;
   max: Vec3;
@@ -54,14 +56,14 @@ export const measureBoundingBox = defineCommand({
       if (!e) {
         return noop(doc, `measure_bounding_box: entity '${entityId}' not found.`);
       }
-      bounds = entityBounds(e);
+      bounds = entityBoundsInDoc(doc, e);
     } else {
       const ids = useSelection && doc.selection.length > 0 ? doc.selection : doc.order;
 
       for (const id of ids) {
         const e = doc.entities[id];
         if (!e) continue;
-        const b = entityBounds(e);
+        const b = entityBoundsInDoc(doc, e);
         bounds = bounds ? mergeBounds(bounds, b) : b;
       }
 
@@ -128,6 +130,7 @@ export const measureVolume = defineCommand({
     "'cone' (π r² h / 3), 'torus' (2 π² · ringRadius · tubeRadius²), " +
     "'wedge' (w×h×d / 2 — half the enclosing box), " +
     "'pyramid' (baseWidth × baseDepth × height / 3), " +
+    "'instance' (sum of its component's solid children, baked with the instance scale), " +
     "'revolution' (Pappus's centroid theorem: sweepAngle × |x_centroid| × profileArea; " +
     'falls back to bounding-box approximation if the profile crosses the revolution axis). ' +
     'Returns data: { volume, unit } where unit is the cubed document unit (e.g. "mm³"). ' +
@@ -177,6 +180,27 @@ export const measureVolume = defineCommand({
       case 'pyramid':
         volume = (e.baseWidth * e.baseDepth * e.height) / 3;
         break;
+      case 'instance': {
+        const component = doc.components[e.componentId];
+        if (!component) {
+          return noop(
+            doc,
+            `measure_volume: instance '${entityId}' references missing component '${e.componentId}'.`,
+          );
+        }
+        // Bake the instance (scale, rotation, translation) and sum its solid children.
+        volume = 0;
+        for (const child of expandInstance(e, component)) {
+          const part = measureVolume.run(
+            { ...doc, entities: { [child.id]: child } },
+            {
+              entityId: child.id,
+            },
+          );
+          volume += (part.data as MeasureVolumeData | undefined)?.volume ?? 0;
+        }
+        break;
+      }
       case 'revolution': {
         // Pappus: V = sweepAngle * |centroid x| * profile area; profile x = distance from the axis.
         // A profile crossing the axis falls back to the bounding-box volume.
@@ -225,6 +249,46 @@ interface MassPropertiesData {
 }
 
 /**
+ * Volume and mass of a baked instance: every solid child uses its own material density, else the
+ * instance's material, else `fallbackDensity`. Nested instances recurse; 2D children weigh nothing.
+ */
+function instanceMass(
+  doc: CadDocument,
+  instance: Entity & { kind: 'instance' },
+  fallbackDensity: number,
+): { volume: number; mass: number } | string {
+  const component = doc.components[instance.componentId];
+  if (!component) {
+    return `instance '${instance.id}' references missing component '${instance.componentId}'.`;
+  }
+  let volume = 0;
+  let mass = 0;
+  for (const baked of expandInstance(instance, component)) {
+    const child = baked;
+    const materialId = baked.materialId ?? instance.materialId;
+    const material = materialId ? doc.materials[materialId] : undefined;
+    const density = material?.density ?? fallbackDensity;
+    if (child.kind === 'instance') {
+      const nested = instanceMass(doc, child, density);
+      if (typeof nested === 'string') return nested;
+      volume += nested.volume;
+      mass += nested.mass;
+      continue;
+    }
+    const part = measureVolume.run(
+      { ...doc, entities: { [child.id]: child } },
+      {
+        entityId: child.id,
+      },
+    );
+    const partVolume = (part.data as MeasureVolumeData | undefined)?.volume ?? 0;
+    volume += partVolume;
+    mass += partVolume * density;
+  }
+  return { volume, mass };
+}
+
+/**
  * @command mass_properties
  * @pure
  * @layer core/commands
@@ -244,7 +308,8 @@ export const massProperties = defineCommand({
   description:
     'Compute the mass of a 3D solid from its volume and density. ' +
     "Supported entity kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', " +
-    "'cone', 'torus', 'wedge', 'pyramid'. " +
+    "'cone', 'torus', 'wedge', 'pyramid', 'revolution', and 'instance' (assembly: the sum over its " +
+    'component solids, each with its own material density, else the instance material, else the density param). ' +
     'Density resolution: if the entity has a material assigned (via assign_material) and that ' +
     "material exists in doc.materials, the material's density is used automatically — the density " +
     'param is ignored for that entity. Otherwise the caller-supplied density param is used (back-compat). ' +
@@ -256,7 +321,7 @@ export const massProperties = defineCommand({
       .string()
       .describe(
         "Id of the 3D solid entity to compute mass for. Supported kinds: 'box', 'cylinder', 'sphere', " +
-          "'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid'.",
+          "'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution'.",
       ),
     density: z
       .number()
@@ -274,6 +339,22 @@ export const massProperties = defineCommand({
     const e = doc.entities[entityId];
     if (!e) {
       return noop(doc, `mass_properties: entity '${entityId}' not found.`);
+    }
+
+    if (e.kind === 'instance') {
+      const assembly = instanceMass(doc, e, density);
+      if (typeof assembly === 'string') return noop(doc, `mass_properties: ${assembly}`);
+      const { volume, mass } = assembly;
+      const averageDensity = volume > 0 ? mass / volume : density;
+      const data: MassPropertiesData = { volume, density: averageDensity, mass, unit: 'g' };
+      return {
+        document: doc,
+        summary:
+          `Mass of assembly ${entityId}: volume=${volume.toFixed(doc.displayPrecision)} ${doc.units}³, ` +
+          `mean density=${averageDensity} g/${doc.units}³ (per-part materials, else param), mass=${mass.toFixed(doc.displayPrecision)} g.`,
+        affected: [],
+        data,
+      };
     }
 
     let effectiveDensity = density;

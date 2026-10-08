@@ -105,9 +105,9 @@ export function footingRebarMass(
     footing.length,
   ].map(scale.length) as [number, number, number, number, number];
   const barLength = (extent: number): number => Math.max(0, extent - 2 * cover);
-  const total =
-    (Math.floor((length - 2 * cover) / spacing) + 1) * barLength(width) +
-    (Math.floor((width - 2 * cover) / spacing) + 1) * barLength(length);
+  const barCount = (extent: number): number =>
+    Math.max(0, Math.floor((extent - 2 * cover) / spacing) + 1);
+  const total = barCount(length) * barLength(width) + barCount(width) * barLength(length);
   return total * ((Math.PI * diameter ** 2) / 4) * REBAR_KG_PER_M3 * REBAR_LAP_FACTOR;
 }
 

@@ -10,7 +10,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { topologicalSort } from '../lib/topologicalSort';
 import { noop } from './noop';
-import { evaluateExpression, extractReferences } from './expression';
+import { evaluateExpression, expressionSyntaxError, extractReferences } from './expression';
 import { regenerateParameterDependents } from './dependents';
 
 /** Parameter names ordered by dependency; names in a reference cycle are appended and listed in `cycleSet`. */
@@ -115,6 +115,18 @@ export const setParameter = defineCommand({
     }
     if (expression.trim() === '') {
       return noop(doc, `set_parameter failed: expression must be a non-empty string.`);
+    }
+
+    const syntaxError = expressionSyntaxError(expression);
+    if (syntaxError !== null) {
+      const previous = Object.hasOwn(doc.parameters, name) ? doc.parameters[name] : undefined;
+      return noop(
+        doc,
+        `set_parameter '${name}': expression '${expression}' is invalid — ${syntaxError}. ` +
+          (previous
+            ? `The parameter keeps its previous expression '${previous.expression}' (value ${previous.value}).`
+            : 'The parameter was not created.'),
+      );
     }
 
     const evaluated = reEvaluateAll(withParameterExpression(doc.parameters, name, expression));

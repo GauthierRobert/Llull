@@ -7,7 +7,6 @@
 import type { EntityKind, InstanceEntity } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { expandInstance } from './assemblies';
 
 /** One row in the bill of materials output. */
 interface BomRow {
@@ -18,7 +17,7 @@ interface BomRow {
   /** Number of instances of this component in the document. */
   count: number;
   /**
-   * Count of child entities by kind within the component, computed by expandInstance.
+   * Count of the component's own child entities by kind (independent of any instance scale).
    * Empty for orphan instances where the component cannot be found.
    */
   perEntityKindCounts: Partial<Record<EntityKind, number>>;
@@ -76,10 +75,10 @@ export const billOfMaterials = defineCommand({
           orphan: true,
         };
       }
-      // Instances of one component share its child structure: count kinds on the first.
       const perEntityKindCounts: Partial<Record<EntityKind, number>> = {};
-      for (const child of expandInstance(instances[0] as InstanceEntity, component)) {
-        perEntityKindCounts[child.kind] = (perEntityKindCounts[child.kind] ?? 0) + 1;
+      for (const childId of component.order) {
+        const child = component.entities[childId];
+        if (child) perEntityKindCounts[child.kind] = (perEntityKindCounts[child.kind] ?? 0) + 1;
       }
       return {
         componentId,

@@ -90,26 +90,26 @@ describe('shapeToolCallContent() — pure shaping', () => {
     expect(shaped.structuredContent).toEqual(data);
   });
 
-  it('does NOT set structuredContent for array-type data', () => {
+  it('wraps array-type data as { data } in structuredContent', () => {
     const shaped = shapeToolCallContent({
       summary: 'list result',
       affected: [],
       isError: false,
       data: [1, 2, 3],
     });
-    expect(shaped.structuredContent).toBeUndefined();
+    expect(shaped.structuredContent).toEqual({ data: [1, 2, 3] });
   });
 
-  it('does NOT set structuredContent when data is null', () => {
+  it('wraps null data as { data: null } in structuredContent', () => {
     const shaped = shapeToolCallContent({
       summary: 'null data',
       affected: [],
       isError: false,
       data: null,
     });
-    // null is not a record → no structuredContent
-    expect(shaped.structuredContent).toBeUndefined();
-    // but a json block IS added for null
+    // not a record: wrapped so structuredContent is always the full data
+    expect(shaped.structuredContent).toEqual({ data: null });
+    // and a json block is added too
     expect(shaped.content.length).toBeGreaterThanOrEqual(2);
   });
 
@@ -134,7 +134,7 @@ describe('shapeToolCallContent() — pure shaping', () => {
     expect(shaped.content).toHaveLength(3);
     expect(shaped.content[1]!.text).toMatch(/Affected entity ids/);
     expect(shaped.content[2]!.text).toMatch(/```json/);
-    expect(shaped.structuredContent).toEqual({ x: 1 });
+    expect(shaped.structuredContent).toEqual({ x: 1, affected: ['e-abc'] });
   });
 });
 

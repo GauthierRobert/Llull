@@ -19,8 +19,8 @@ import type { Entity, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { noop } from './noop';
-import { entityBounds } from './sceneBounds';
-import { replaceEntity } from './entityOps';
+import { entityBoundsInDoc } from './sceneBounds';
+import { replaceEntitiesById, replaceEntity } from './entityOps';
 
 type AxisIndex = 0 | 1 | 2;
 
@@ -71,7 +71,8 @@ export const align = defineCommand({
       .string()
       .describe('Id of the entity whose bounding-box edge is the alignment target. Not moved.'),
   }),
-  run: (doc, { targetIds, edge, referenceId }): CommandResult => {
+  run: (doc, { targetIds: requestedIds, edge, referenceId }): CommandResult => {
+    const targetIds = [...new Set(requestedIds)];
     if (targetIds.length === 0) return noop(doc, 'align: targetIds must be a non-empty array.');
     const refEntity = doc.entities[referenceId];
     if (!refEntity) return noop(doc, `align: reference entity "${referenceId}" not found.`);
@@ -87,7 +88,7 @@ export const align = defineCommand({
     const edgeType = edgeMatch[1] as 'min' | 'max' | 'center';
     const axisIndex = axisIndexOf(edgeMatch[2] as 'x' | 'y' | 'z');
     const edgeValue = (e: Entity): number => {
-      const { min, max } = entityBounds(e);
+      const { min, max } = entityBoundsInDoc(doc, e);
       return edgeType === 'min'
         ? min[axisIndex]
         : edgeType === 'max'
@@ -110,7 +111,7 @@ export const align = defineCommand({
       );
     }
     return {
-      document: moved.reduce(replaceEntity, doc),
+      document: replaceEntitiesById(doc, moved),
       summary: `align: moved ${moved.length} entit${plural(moved.length)} to ${edge} of "${referenceId}".`,
       affected: moved.map((e) => e.id),
     };
@@ -147,9 +148,10 @@ export const distribute = defineCommand({
       )
       .optional(),
   }),
-  run: (doc, { targetIds, axis, mode = 'equal-spacing' }): CommandResult => {
+  run: (doc, { targetIds: requestedIds, axis, mode = 'equal-spacing' }): CommandResult => {
+    const targetIds = [...new Set(requestedIds)];
     if (targetIds.length < 2) {
-      return noop(doc, 'distribute: targetIds must contain at least 2 entity ids.');
+      return noop(doc, 'distribute: targetIds must contain at least 2 distinct entity ids.');
     }
     const missingId = targetIds.find((id) => !doc.entities[id]);
     if (missingId) return noop(doc, `distribute: entity "${missingId}" not found.`);
@@ -167,7 +169,7 @@ export const distribute = defineCommand({
     const items = targetIds
       .map((id) => {
         const e = doc.entities[id] as Entity;
-        const { min, max } = entityBounds(e);
+        const { min, max } = entityBoundsInDoc(doc, e);
         return {
           e,
           center: (min[axisIndex] + max[axisIndex]) / 2,
@@ -210,7 +212,7 @@ export const distribute = defineCommand({
       );
     }
     return {
-      document: moved.reduce(replaceEntity, doc),
+      document: replaceEntitiesById(doc, moved),
       summary: `distribute: repositioned ${moved.length} entit${plural(moved.length)} along ${axis} (mode: ${mode}).`,
       affected: moved.map((e) => e.id),
     };
@@ -223,7 +225,7 @@ export const distribute = defineCommand({
  * @layer core/commands
  * @affects moves movingId so its min face along axis meets baseId's max face
  * @invariant +Z up convention; default axis is 'z'
- * @failure missing id -> no-op, affected:[]
+ * @failure missing id or movingId === baseId -> no-op, affected:[]
  */
 export const stackOn = defineCommand({
   name: 'stack_on',
@@ -240,6 +242,12 @@ export const stackOn = defineCommand({
       .optional(),
   }),
   run: (doc, { movingId, baseId, axis = 'z' }): CommandResult => {
+    if (movingId === baseId) {
+      return noop(
+        doc,
+        `stack_on: movingId and baseId are both "${movingId}"; cannot stack an entity on itself.`,
+      );
+    }
     const movingEntity = doc.entities[movingId];
     if (!movingEntity) return noop(doc, `stack_on: moving entity "${movingId}" not found.`);
     const baseEntity = doc.entities[baseId];
@@ -249,7 +257,8 @@ export const stackOn = defineCommand({
     }
     const axisIndex = axisIndexOf(axis);
     const delta =
-      entityBounds(baseEntity).max[axisIndex] - entityBounds(movingEntity).min[axisIndex];
+      entityBoundsInDoc(doc, baseEntity).max[axisIndex] -
+      entityBoundsInDoc(doc, movingEntity).min[axisIndex];
 
     if (Math.abs(delta) < 1e-10) {
       return noop(doc, `stack_on: "${movingId}" is already stacked on "${baseId}" along ${axis}.`);

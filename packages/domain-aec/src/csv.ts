@@ -10,7 +10,7 @@ export function toCsv(
 ): string {
   const cell = (value: string | number): string => {
     const text = String(value);
-    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   };
   return [columns, ...rows].map((row) => row.map(cell).join(',')).join('\n') + '\n';
 }

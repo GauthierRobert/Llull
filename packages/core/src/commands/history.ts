@@ -14,7 +14,11 @@ import { replayHistory } from './replay';
 import { unresolvedExpressionsNote } from './replayStep';
 import { noop } from './noop';
 
-/** Refuse (kernel) or replay `newHistory`; `done` receives "<n> entity|entities". */
+/**
+ * Refuse (kernel) or replay `newHistory`; `done` receives "<n> entity|entities".
+ * @param mustApplyStepId a user-edited step that must change the document when replayed (a known
+ *   command that no-ops or throws means its params are invalid) — otherwise the edit is refused
+ */
 function regenerateWith(
   doc: CadDocument,
   command: string,
@@ -22,16 +26,42 @@ function regenerateWith(
   done: (entityCount: string) => string,
   ctx: ExecutionContext | undefined,
   nextStepNumber?: number,
+  mustApplyStepId?: string,
 ): CommandResult {
   const context = ctx ?? currentContext();
   const refused = kernelRefusal(doc, newHistory, context);
   if (refused !== null) return noop(doc, `${command}: ${refused}`);
-  const replayed = replayHistory(doc, newHistory, context.registry);
+  let inertStep: FeatureStep | undefined;
+  let inertReason = 'its params are invalid for that command';
+  const warnings: string[] = [];
+  const brokenDependents: FeatureStep[] = [];
+  const replayed = replayHistory(doc, newHistory, context.registry, warnings, (event) => {
+    if (!event.inert) return;
+    if (event.step.id === mustApplyStepId) {
+      inertStep = event.step;
+      // Re-run the step on its pre-state to surface the command's own refusal (schema path, etc.).
+      const refusal = context.registry(event.step.name)?.run(event.before, event.params, context);
+      if (refusal !== undefined && refusal.summary !== '') inertReason = refusal.summary;
+    }
+    // A step that used to affect entities but now changes nothing lost an input it depended on.
+    else if ((event.step.affected?.length ?? 0) > 0) brokenDependents.push(event.step);
+  });
+  // Unresolved =expr params are legitimate (the parameter may be defined later); replay_history reports them.
+  if (inertStep !== undefined && warnings.length === 0) {
+    return noop(
+      doc,
+      `${command}: step '${(inertStep as FeatureStep).id}' (${(inertStep as FeatureStep).name}) changed nothing when replayed — ${inertReason} History unchanged.`,
+    );
+  }
   const regenerated = nextStepNumber === undefined ? replayed : { ...replayed, nextStepNumber };
   const count = Object.keys(regenerated.entities).length;
+  const brokenNote =
+    brokenDependents.length > 0
+      ? ` Warning: ${brokenDependents.length} step(s) no longer change the document (a referenced entity or input is gone): ${brokenDependents.map((step) => `${step.id} (${step.name})`).join(', ')}.`
+      : '';
   return {
     document: regenerated,
-    summary: `${command}: ${done(`${count} ${count === 1 ? 'entity' : 'entities'}`)}`,
+    summary: `${command}: ${done(`${count} ${count === 1 ? 'entity' : 'entities'}`)}${brokenNote}`,
     affected: regenerated.order,
   };
 }
@@ -44,7 +74,13 @@ function editStep(
   edit: (
     idx: number,
     step: FeatureStep,
-  ) => string | { history: FeatureStep[]; done: (entityCount: string) => string },
+  ) =>
+    | string
+    | {
+        history: FeatureStep[];
+        done: (entityCount: string) => string;
+        mustApplyStepId?: string | undefined;
+      },
   ctx?: ExecutionContext,
 ): CommandResult {
   const idx = doc.featureHistory.findIndex((s) => s.id === stepId);
@@ -52,7 +88,15 @@ function editStep(
   if (!step) return noop(doc, `${command}: step '${stepId}' not found in featureHistory.`);
   const edited = edit(idx, step);
   if (typeof edited === 'string') return noop(doc, `${command}: ${edited}`);
-  return regenerateWith(doc, command, edited.history, edited.done, ctx);
+  return regenerateWith(
+    doc,
+    command,
+    edited.history,
+    edited.done,
+    ctx,
+    undefined,
+    edited.mustApplyStepId,
+  );
 }
 
 /**
@@ -163,6 +207,7 @@ const editStepParams = defineCommand({
       (idx, step) => ({
         history: doc.featureHistory.map((s, i) => (i === idx ? { ...step, params: newParams } : s)),
         done: (n) => `step '${stepId}' params updated; regenerated ${n}.`,
+        mustApplyStepId: step.suppressed ? undefined : stepId,
       }),
       ctx,
     ),
@@ -185,8 +230,9 @@ const reorderStep = defineCommand({
     stepId: z.string().describe('Id of the FeatureStep to move (from doc.featureHistory[*].id).'),
     newIndex: z
       .number()
+      .int()
       .describe(
-        'Zero-based target index in featureHistory. Clamped to [0, history.length-1]. ' +
+        'Zero-based target index in featureHistory. Must be an integer; clamped to [0, history.length-1]. ' +
           'Moving to the same index is a no-op.',
       ),
   }),
@@ -309,6 +355,7 @@ const insertStep = defineCommand({
       (n) => `step '${newStep.id}' (${cmdName}) inserted; regenerated ${n}.`,
       ctx,
       stepNumber + 1,
+      newStep.id,
     );
   },
 });

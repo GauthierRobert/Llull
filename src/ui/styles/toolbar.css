@@ -34,7 +34,7 @@
   font-weight: var(--weight-medium);
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
-  color: var(--fg-faint);
+  color: var(--fg-subtle);
 }
 
 .tb-sep {
@@ -235,7 +235,16 @@
 }
 
 .unsaved-dot {
+  flex-shrink: 0;
   margin-left: var(--space-2);
   color: var(--accent-text);
   font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+/* The left header column is narrow beside the search box: keep the dot, drop the word. */
+@media (max-width: 1500px) {
+  .unsaved-dot__label {
+    display: none;
+  }
 }

@@ -93,6 +93,10 @@ export const useStore = create<CadStoreState>()((set, get) => {
       set({ lastMeasure: null });
     },
 
+    setStatusMessage(message: string): void {
+      set({ lastSummary: message });
+    },
+
     hydrateLiveDocument(snapshot: LiveSnapshotEvent): void {
       if (get().hasUnsyncedLocalEdits) {
         flushOutbox(set, get);

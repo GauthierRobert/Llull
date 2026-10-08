@@ -1,6 +1,7 @@
 /**
- * Fillet and chamfer: the injected GeometryKernel tessellates a 3D solid and rounds/bevels its
- * edges; the source entity is replaced by the resulting `mesh` entity. A null kernel result is a no-op.
+ * Fillet, chamfer and shell: the injected GeometryKernel tessellates a 3D solid and rounds/bevels its
+ * edges (or hollows it); the source entity is replaced by the resulting `mesh` entity. A null kernel
+ * result is a no-op.
  *
  * @layer core/commands
  */
@@ -13,10 +14,14 @@ import { defineCommand, z } from './schema';
 import type { ExecutionContext } from './context';
 import { currentContext } from './context';
 import { nextId } from '../lib/id';
-import { replaceEntities } from './entityOps';
+import { referenceLossSuffix, replaceEntities } from './entityOps';
 import { kernelUnavailable } from './kernelRefusal';
 import { newEntity } from './newEntity';
 import { noop } from './noop';
+
+/** Surface-neutral pointer to the B-rep kernel (browser URL flag or server env var). */
+const OCC_KERNEL_HINT =
+  'the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server)';
 
 function validateSolidTarget(
   doc: CadDocument,
@@ -30,22 +35,22 @@ function validateSolidTarget(
   if (!is3D(entity)) {
     return noop(
       doc,
-      `${opName}: entity '${id}' is a 2D shape (kind '${entity.kind}'); only 3D solids can be filleted or chamfered.`,
+      `${opName}: entity '${id}' is a 2D shape (kind '${entity.kind}'); only 3D solids can be filleted, chamfered or shelled.`,
     );
   }
   return { entity };
 }
 
 interface EdgeModification {
-  readonly command: 'fillet_edge' | 'chamfer_edge';
+  readonly command: 'fillet_edge' | 'chamfer_edge' | 'shell_solid';
   readonly pastTense: string;
-  readonly amountName: 'radius' | 'distance';
+  readonly amountName: 'radius' | 'distance' | 'thickness';
   readonly amount: number;
   readonly id: string;
   readonly apply: (kernel: GeometryKernel, mesh: MeshData) => MeshData | null;
 }
 
-/** Shared body of fillet_edge / chamfer_edge: validate, tessellate, modify edges, replace the source. */
+/** Shared body of fillet_edge / chamfer_edge / shell_solid: validate, tessellate, modify edges, replace the source. */
 function modifyEdges(
   doc: CadDocument,
   ctx: ExecutionContext | undefined,
@@ -69,7 +74,7 @@ function modifyEdges(
   if (!modified) {
     return noop(
       doc,
-      `${command}: kernel does not support ${command} for this operand (returned null). Try ?kernel=occt or a different operand.`,
+      `${command}: kernel does not support ${command} for this operand (returned null). Use ${OCC_KERNEL_HINT} or a different operand.`,
     );
   }
 
@@ -77,9 +82,10 @@ function modifyEdges(
   const meshEntity = newEntity('mesh', newId, { mesh: modified }, [0, 0, 0], entity.color, {
     layerId: entity.layerId,
   });
+  const document = replaceEntities(doc, [id], meshEntity);
   return {
-    document: replaceEntities(doc, [id], meshEntity),
-    summary: `${command}: ${pastTense} '${id}' (kind '${entity.kind}', ${amountName} ${amount}) → mesh '${newId}' (${modified.indices.length / 3} triangles). Source entity consumed.`,
+    document,
+    summary: `${command}: ${pastTense} '${id}' (kind '${entity.kind}', ${amountName} ${amount}) → mesh '${newId}' (${modified.indices.length / 3} triangles). Source entity consumed.${referenceLossSuffix(doc, document)}`,
     affected: [newId],
   };
 }
@@ -100,7 +106,7 @@ export const filletEdge = defineCommand({
     'The source entity is consumed and replaced by the filleted mesh result. ' +
     'edgeIndices selects which edges to fillet; omit or pass [] to fillet ALL edges ' +
     '(OCC convention: the kernel enumerates edges 0-based and applies radius to each selected edge). ' +
-    'Requires a geometry kernel that supports filletEdges (available with ?kernel=occt). ' +
+    `Requires a geometry kernel that supports filletEdges (available with ${OCC_KERNEL_HINT}). ` +
     'With the default Manifold kernel, this command gracefully no-ops (returns unchanged doc). ' +
     'Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, or mesh).',
   params: z.object({
@@ -169,5 +175,43 @@ export const chamferEdge = defineCommand({
       amount: distance,
       id,
       apply: (kernel, mesh) => kernel.chamferEdges(mesh, edgeIndices, distance),
+    }),
+});
+
+/**
+ * @command shell_solid
+ * @pure
+ * @layer core/commands
+ * @affects removes source entity; creates 1 hollow mesh entity with walls of the given thickness
+ * @invariant target must be a closed 3D solid; thickness > 0; geometry kernel must be injected
+ * @failure missing id, 2D kind, thickness <= 0, kernel absent, or kernel null -> no-op, affected:[]
+ */
+export const shellSolid = defineCommand({
+  name: 'shell_solid',
+  annotations: { requiresKernel: true },
+  description:
+    'Hollow out a closed 3D solid, leaving walls of the given thickness (grown inward), and replace it ' +
+    'with a new mesh entity. The source entity is consumed. ' +
+    'Requires a geometry kernel that supports shellSolid; a kernel without it (or a solid that is too ' +
+    'thin for the thickness) makes this a graceful no-op that leaves the document unchanged. ' +
+    'Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution or mesh).',
+  params: z.object({
+    id: z
+      .string()
+      .describe('Id of the closed 3D solid entity to hollow. Must exist and be a 3D solid.'),
+    thickness: z
+      .number()
+      .describe(
+        "Wall thickness in document units. Must be > 0 and smaller than half the solid's thinnest dimension.",
+      ),
+  }),
+  run: (doc, { id, thickness }, ctx): CommandResult =>
+    modifyEdges(doc, ctx, {
+      command: 'shell_solid',
+      pastTense: 'shelled',
+      amountName: 'thickness',
+      amount: thickness,
+      id,
+      apply: (kernel, mesh) => kernel.shellSolid(mesh, thickness),
     }),
 });

@@ -4,7 +4,7 @@ import type { EllipseEntity } from '@core/model/types';
 import { EllipticalCurve } from './EllipticalCurve';
 
 export function EllipseRenderer({
-  entity: { center, radiusX, radiusY, position, color },
+  entity: { center, radiusX, radiusY, position, rotation, color },
   selected,
 }: {
   entity: EllipseEntity;
@@ -18,6 +18,7 @@ export function EllipseRenderer({
       startAngle={0}
       endAngle={Math.PI * 2}
       position={position}
+      rotation={rotation}
       color={color}
       selected={selected}
     />

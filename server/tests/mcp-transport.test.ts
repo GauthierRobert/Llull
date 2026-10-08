@@ -82,6 +82,29 @@ function nextId(): number {
  * The first POST to /mcp (no mcp-session-id header) carries the `initialize`
  * method.  The server responds with the session id in the `mcp-session-id` header.
  */
+describe('MCP initialize instructions', () => {
+  it('returns the server instructions so agents learn the workflow up front', async () => {
+    const res = await request(app)
+      .post('/mcp')
+      .set('Content-Type', 'application/json')
+      .set('Accept', 'application/json, text/event-stream')
+      .send({
+        jsonrpc: '2.0',
+        id: 9001,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2024-11-05',
+          capabilities: {},
+          clientInfo: { name: 'test-client', version: '0.0.1' },
+        },
+      });
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('instructions');
+    expect(res.text).toContain('cad://conventions');
+    expect(res.text).toContain('search_tools');
+  });
+});
+
 async function mcpInitialize(): Promise<string> {
   const id = nextId();
   const res = await request(app)
@@ -471,6 +494,28 @@ describe('MCP tools/call — unknown tool name', () => {
     expect(result.content.length).toBeGreaterThanOrEqual(1);
     expect(result.content[0]!.type).toBe('text');
     expect(result.content[0]!.text).toMatch(/unknown command/i);
+  });
+
+  it('puts a one-letter typo of a real tool first', async () => {
+    const sessionId = await mcpInitialize();
+    await mcpNotifyInitialized(sessionId);
+
+    const result = await mcpCallTool(sessionId, 'add_boxx', {});
+
+    expect(result.content[0]!.text).toMatch(/Closest tools: add_box[,.]/);
+  });
+
+  it('suggests the closest real tools and points at search_tools', async () => {
+    const sessionId = await mcpInitialize();
+    await mcpNotifyInitialized(sessionId);
+
+    const result = await mcpCallTool(sessionId, 'make_box', {});
+
+    expect(result.isError).toBe(true);
+    const text = result.content[0]!.text ?? '';
+    expect(text).toContain('Unknown command: make_box.');
+    expect(text).toMatch(/Closest tools: .*add_box/);
+    expect(text).toContain('search_tools');
   });
 });
 

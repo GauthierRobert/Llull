@@ -18,7 +18,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { rasterizeSvg, buildImageBlock, stripSvgFromData } from '../src/renderImage';
+import { rasterizeSvg, buildImageBlock, stripSvgFromData, MAX_RASTER_PX } from '../src/renderImage';
 import { shapeToolCallContent } from '@mcp/index';
 
 // ---------------------------------------------------------------------------
@@ -61,6 +61,34 @@ describe('rasterizeSvg — valid SVG', () => {
     expect(Buffer.from(wide as string, 'base64').length).toBeGreaterThan(
       Buffer.from(narrow as string, 'base64').length,
     );
+  });
+});
+
+function pngSize(base64: string): { width: number; height: number } {
+  const bytes = Buffer.from(base64, 'base64');
+  return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+}
+
+describe('rasterizeSvg — size cap', () => {
+  it('keeps the requested width when it is within the cap', () => {
+    expect(pngSize(rasterizeSvg(VALID_SVG, 400) as string)).toEqual({ width: 400, height: 400 });
+  });
+
+  it('scales an enormous width hint down to MAX_RASTER_PX, keeping the aspect', () => {
+    const wide = pngSize(rasterizeSvg(VALID_SVG, 1_000_000) as string);
+    expect(wide).toEqual({ width: MAX_RASTER_PX, height: MAX_RASTER_PX });
+    const tall =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="400"><rect width="100" height="400"/></svg>';
+    const size = pngSize(rasterizeSvg(tall, 100_000) as string);
+    expect(size.height).toBe(MAX_RASTER_PX);
+    expect(size.width).toBe(MAX_RASTER_PX / 4);
+  });
+
+  it('caps an enormous intrinsic size when no width hint is given', () => {
+    const huge =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="200000" height="100000"><rect width="10" height="10"/></svg>';
+    const size = pngSize(rasterizeSvg(huge) as string);
+    expect(size).toEqual({ width: MAX_RASTER_PX, height: MAX_RASTER_PX / 2 });
   });
 });
 

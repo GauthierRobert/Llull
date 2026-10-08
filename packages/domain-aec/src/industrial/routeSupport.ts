@@ -8,6 +8,9 @@ import type { Vec3 } from '@core/model/types';
 import { add3, distance3, dot3, scale3, sub3 } from '@lib/vec3';
 import { toVec3 } from './memberSupport';
 
+/** Most points accepted for one pipe or cable tray run. */
+export const MAX_ROUTE_POINTS = 1000;
+
 /** Route as Vec3 points; null unless there are at least 2 well-formed [x, y, z] points. */
 export function parseRoute(points: ReadonlyArray<unknown>): Vec3[] | null {
   const route = points.map(toVec3);

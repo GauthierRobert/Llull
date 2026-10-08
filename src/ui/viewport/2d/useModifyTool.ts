@@ -189,8 +189,9 @@ export function useModifyTool(): UseModifyToolResult {
               pickedEntityId: entityId,
               phase: 'pick-vertex',
             }));
-          } else if (phase === 'pick-vertex') {
-            // Second pick: the vertex nearest to the click on the already-picked polyline.
+          } else if (phase === 'pick-vertex' && entityId === pickedEntityId) {
+            // Second pick: the vertex nearest to the click on the already-picked polyline
+            // (a click that lands on a different entity must not index into the wrong vertex list).
             const nearest = entityPoints ? nearestVertex(entityPoints, worldPoint) : null;
             if (nearest !== null) {
               setProgress((previous) => ({

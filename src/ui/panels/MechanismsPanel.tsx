@@ -159,22 +159,35 @@ interface JointRowProps {
   onHighlight: (id: string) => void;
 }
 
+const radiansToDegrees = (radians: number): number =>
+  Math.round(((radians * 180) / Math.PI) * 1e6) / 1e6;
+const degreesToRadians = (degrees: number): number => (degrees * Math.PI) / 180;
+
 /** Remounted (see `key`) whenever the document value changes, so the draft never goes stale. */
 function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
 
-  const currentValue = joint.kind === 'revolute' ? joint.angle : joint.displacement;
+  const documentUnits = useStore((s) => s.document.units);
+  const revolute = joint.kind === 'revolute';
+  // Presentation only: revolute angles are shown in degrees (like Properties); the command
+  // keeps radians.
+  const currentValue = revolute ? radiansToDegrees(joint.angle) : joint.displacement;
   const [inputValue, setInputValue] = useState<string>(String(currentValue));
 
   const commitInput = (): void => {
     const parsed = parseFloat(inputValue);
     if (isNaN(parsed)) setInputValue(String(currentValue));
-    else if (parsed !== currentValue) dispatch('set_joint_value', { id: joint.id, value: parsed });
+    else if (parsed !== currentValue) {
+      dispatch('set_joint_value', {
+        id: joint.id,
+        value: revolute ? degreesToRadians(parsed) : parsed,
+      });
+    }
   };
 
   const chipTone = JOINT_CHIP_TONE[joint.kind] ?? 'accent';
   const axisLabel = Array.isArray(joint.axis) ? `[${joint.axis.join(',')}]` : joint.axis;
-  const unit = joint.kind === 'revolute' ? 'rad' : 'mm';
+  const unit = revolute ? '°' : documentUnits;
 
   return (
     <MechanismRow

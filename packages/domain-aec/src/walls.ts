@@ -19,6 +19,7 @@ import {
   elementAffected,
 } from './model';
 import { distance } from '@lib/polygon';
+import { findTwin, sameSegment } from './duplicates';
 import { noop } from '@core/commands/noop';
 import { regenerateBuilding } from './evaluateElements';
 import { builtExtent, openingsOf, wallFrame, type WallExtent } from './wallGeometry';
@@ -68,7 +69,10 @@ const WALL_OPTION_SHAPE = {
     .describe(
       'Level to place the wall on. Default: active level (a "Level 0" is created if none).',
     ),
-  baseOffset: z.number().optional().describe('Base offset above the level elevation. Default 0.'),
+  baseOffset: z
+    .number()
+    .optional()
+    .describe('Base offset above the level elevation, in document units. Default 0.'),
   material: z
     .string()
     .optional()
@@ -80,13 +84,26 @@ const WALL_OPTION_SHAPE = {
 type WallOptions = z.output<z.ZodObject<typeof WALL_OPTION_SHAPE>>;
 
 type WallBuild =
-  | { readonly ok: true; readonly building: BuildingModel; readonly wallIds: string[] }
+  | {
+      readonly ok: true;
+      readonly building: BuildingModel;
+      readonly wallIds: string[];
+      /** Ids of the existing walls that segments were skipped as duplicates of (skip mode). */
+      readonly skippedAs: string[];
+    }
   | { readonly ok: false; readonly reason: string };
+
+/** 'refuse': a duplicate segment fails the build. 'skip': it is left out (refused only if all are). */
+type DuplicatePolicy = 'refuse' | 'skip';
+
+const segmentLabel = ([start, end]: readonly [Vec2, Vec2]): string =>
+  `[${start.join(', ')}]→[${end.join(', ')}]`;
 
 function buildWalls(
   doc: CadDocument,
   segments: ReadonlyArray<readonly [Vec2, Vec2]>,
   options: WallOptions,
+  duplicates: DuplicatePolicy,
 ): WallBuild {
   const thickness = options.thickness ?? fromMm(doc, 200);
   const baseOffset = options.baseOffset ?? 0;
@@ -101,11 +118,26 @@ function buildWalls(
   }
   let building = resolution.building;
   const wallIds: string[] = [];
+  const skippedAs: string[] = [];
   for (const [start, end] of segments) {
     if (distance(start, end) <= 0) {
+      return { ok: false, reason: `segment ${segmentLabel([start, end])} has zero length` };
+    }
+    const twin = findTwin(
+      building,
+      'wall',
+      resolution.level.id,
+      (element) =>
+        element.baseOffset === baseOffset && sameSegment(element.start, element.end, start, end),
+    );
+    if (twin && duplicates === 'skip') {
+      skippedAs.push(twin.id);
+      continue;
+    }
+    if (twin) {
       return {
         ok: false,
-        reason: `segment [${start.join(', ')}]→[${end.join(', ')}] has zero length`,
+        reason: `segment ${segmentLabel([start, end])} duplicates wall ${twin.id} on ${resolution.level.id} (use update_wall to change it)`,
       };
     }
     const wall: WallElement = {
@@ -124,7 +156,19 @@ function buildWalls(
     building = withElement(building, wall);
     wallIds.push(wall.id);
   }
-  return { ok: true, building, wallIds };
+  if (wallIds.length === 0) {
+    return {
+      ok: false,
+      reason: `every segment duplicates an existing wall on ${resolution.level.id} (${skippedAs.join(', ')}); use update_wall to change them`,
+    };
+  }
+  return { ok: true, building, wallIds, skippedAs };
+}
+
+function skippedSuffix(skippedAs: readonly string[]): string {
+  if (skippedAs.length === 0) return '';
+  const noun = skippedAs.length === 1 ? 'segment' : 'segments';
+  return ` Skipped ${skippedAs.length} ${noun} already built as ${skippedAs.join(', ')}.`;
 }
 
 function wallResult(doc: CadDocument, build: Extract<WallBuild, { ok: true }>): CommandResult {
@@ -140,9 +184,13 @@ function wallResult(doc: CadDocument, build: Extract<WallBuild, { ok: true }>): 
     summary:
       `Added ${walls.length} wall(s) ${walls.map((wall) => `${wall.mark} (${wall.id})`).join(', ')} ` +
       `on ${level?.name ?? 'level'}: total length ${totalLength.toFixed(3)} ${doc.units}, ` +
-      `thickness ${first?.thickness ?? 0}, height ${first?.height ?? 0}, ${first?.material ?? ''}.`,
+      `thickness ${first?.thickness ?? 0}, height ${first?.height ?? 0}, ${first?.material ?? ''}.` +
+      skippedSuffix(build.skippedAs),
     affected: elementAffected(document, build.wallIds),
-    data: { wallIds: build.wallIds },
+    data:
+      build.skippedAs.length === 0
+        ? { wallIds: build.wallIds }
+        : { wallIds: build.wallIds, skippedDuplicatesOf: build.skippedAs },
   };
 }
 
@@ -150,38 +198,44 @@ function wallResult(doc: CadDocument, build: Extract<WallBuild, { ok: true }>): 
  * @command add_wall
  * @pure
  * @affects creates 1 wall element (evaluated into box pieces on layer A-WALL)
- * @failure zero length / thickness <= 0 / unknown level -> no-op
+ * @failure zero length / thickness <= 0 / unknown level / duplicate of an existing wall -> no-op
  */
 export const addWall = defineCommand({
   name: 'add_wall',
   description:
     'Add a straight wall along its plan centerline from start to end ([x, y], document units) on a ' +
     'building level. Walls meeting at endpoints (L/T/X corners) are joined automatically. Doors and ' +
-    'windows are then hosted with add_door / add_window.',
+    'windows are then hosted with add_door / add_window. Refused if a wall with the same end points ' +
+    '(either direction) and base offset already exists on the level.',
   params: z.object({
     start: vec2('Centerline start [x, y].'),
     end: vec2('Centerline end [x, y].'),
     ...WALL_OPTION_SHAPE,
   }),
   run: (doc, { start, end, ...options }): CommandResult => {
-    const build = buildWalls(doc, [[start, end]], options);
+    const build = buildWalls(doc, [[start, end]], options, 'refuse');
     return build.ok ? wallResult(doc, build) : noop(doc, `add_wall failed: ${build.reason}.`);
   },
 });
 
+const MAX_WALL_POINTS = 500;
+
 /**
  * @command draw_walls
  * @pure
- * @affects creates (points.length - 1) walls, +1 when closed
- * @failure < 2 points / zero-length segment -> no-op
+ * @affects creates (points.length - 1) walls, +1 when closed, minus segments duplicating a wall (skipped)
+ * @failure < 2 points / zero-length segment / every segment a duplicate -> no-op
  */
 export const drawWalls = defineCommand({
   name: 'draw_walls',
   description:
     'Draw a chain of joined walls through plan points ([[x, y], …]); closed: true adds the closing ' +
-    'wall (e.g. a building perimeter). Same options as add_wall.',
+    'wall (e.g. a building perimeter). Same options as add_wall. A segment that duplicates an ' +
+    'existing wall (same end points either way, same base offset, same level) is skipped and ' +
+    'reported, so adjacent rooms can each be drawn as a closed loop sharing an edge; refused only ' +
+    'if every segment is a duplicate.',
   params: z.object({
-    points: z.array(z.array(z.number())).describe('Centerline vertices [[x, y], …], at least 2.'),
+    points: z.array(z.array(z.number())).describe('Centerline vertices [[x, y], …], 2 to 500.'),
     closed: z
       .boolean()
       .optional()
@@ -195,12 +249,18 @@ export const drawWalls = defineCommand({
         'draw_walls failed: points must be a list of [x, y] (at least 2, or 3 when closed).',
       );
     }
+    if (points.length > MAX_WALL_POINTS) {
+      return noop(
+        doc,
+        `draw_walls failed: at most ${MAX_WALL_POINTS} points per call (got ${points.length}); split the outline.`,
+      );
+    }
     const segments: Array<readonly [Vec2, Vec2]> = [];
     for (let index = 0; index < points.length - 1; index++) {
       segments.push([points[index] as Vec2, points[index + 1] as Vec2]);
     }
     if (closed) segments.push([points[points.length - 1] as Vec2, points[0] as Vec2]);
-    const build = buildWalls(doc, segments, options);
+    const build = buildWalls(doc, segments, options, 'skip');
     return build.ok ? wallResult(doc, build) : noop(doc, `draw_walls failed: ${build.reason}.`);
   },
 });
@@ -261,6 +321,17 @@ export const updateWall = defineCommand({
     };
     if (distance(updated.start, updated.end) <= 0) {
       return noop(doc, 'update_wall failed: start and end would coincide.');
+    }
+    if (
+      updated.start.every((value, index) => value === wall.start[index]) &&
+      updated.end.every((value, index) => value === wall.end[index]) &&
+      updated.thickness === wall.thickness &&
+      updated.height === wall.height &&
+      updated.baseOffset === wall.baseOffset &&
+      updated.material === wall.material &&
+      updated.levelId === wall.levelId
+    ) {
+      return noop(doc, `update_wall: ${wallId} already has these values; nothing changed.`);
     }
     const next = withElement(building, updated);
     const issues = openingFitIssues(next, new Set([wall.levelId, updated.levelId]));

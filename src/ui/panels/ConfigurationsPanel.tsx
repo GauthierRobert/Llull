@@ -8,15 +8,28 @@
 import React, { useRef, useState } from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
-import type { Configuration } from '@core/model/types';
+import type { Configuration, Parameter } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
 import { PanelEmpty, PanelHeader, IconButton } from '@ui/panels/PanelParts';
 
 interface ConfigurationRowProps {
   config: Configuration;
+  /** True when every parameter already holds this configuration's expression. */
+  active: boolean;
 }
 
-function ConfigurationRow({ config }: ConfigurationRowProps): React.ReactElement {
+/** A configuration is active when each of its parameters currently has its expression. */
+function isConfigurationActive(
+  config: Configuration,
+  parameters: Readonly<Record<string, Parameter>>,
+): boolean {
+  const entries = Object.entries(config.parameterValues);
+  return (
+    entries.length > 0 && entries.every(([name, expr]) => parameters[name]?.expression === expr)
+  );
+}
+
+function ConfigurationRow({ config, active }: ConfigurationRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const paramEntries = Object.entries(config.parameterValues);
 
@@ -24,12 +37,14 @@ function ConfigurationRow({ config }: ConfigurationRowProps): React.ReactElement
     <li
       className="config-row"
       data-testid={`config-row-${config.name}`}
-      aria-label={`Configuration: ${config.name}`}
+      aria-label={`Configuration: ${config.name}${active ? ' (active)' : ''}`}
+      aria-current={active ? 'true' : undefined}
     >
       <div className="config-row-header">
         <span className="config-name" title={config.name}>
           {config.name}
         </span>
+        {active && <span className="chip chip--accent">active</span>}
         <button
           type="button"
           className="btn btn--ghost btn--sm"
@@ -236,6 +251,7 @@ interface ConfigurationsPanelProps {
 
 export function ConfigurationsPanel({ className }: ConfigurationsPanelProps): React.ReactElement {
   const configurations = useStore((s) => s.document.configurations);
+  const parameters = useStore((s) => s.document.parameters);
   const configList = Object.values(configurations);
 
   return (
@@ -255,7 +271,11 @@ export function ConfigurationsPanel({ className }: ConfigurationsPanelProps): Re
       ) : (
         <ul className="config-list" aria-label="Configuration list" role="list">
           {configList.map((config) => (
-            <ConfigurationRow key={config.name} config={config} />
+            <ConfigurationRow
+              key={config.name}
+              config={config}
+              active={isConfigurationActive(config, parameters)}
+            />
           ))}
         </ul>
       )}

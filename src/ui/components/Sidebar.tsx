@@ -64,7 +64,7 @@ function RailButton({ spec, active, focusable, onSelect }: RailButtonProps): Rea
       aria-selected={active}
       tabIndex={focusable ? 0 : -1}
       aria-controls={active ? 'sidebar-panel' : undefined}
-      aria-label={spec.label}
+      aria-label={count > 0 ? `${spec.label}, ${count > 99 ? '99+' : count}` : spec.label}
       title={spec.label}
       className={`rail-btn${active ? ' rail-btn--active' : ''}`}
       onClick={() => onSelect(spec.tab)}
@@ -104,7 +104,7 @@ export function Sidebar(): React.ReactElement {
   const ActivePanel = TAB_PANELS[sidebarTab];
 
   return (
-    <div className={`sidebar${sidebarOpen ? '' : ' sidebar--collapsed'}`}>
+    <aside aria-label="Sidebar" className={`sidebar${sidebarOpen ? '' : ' sidebar--collapsed'}`}>
       <nav
         className="rail"
         role="tablist"
@@ -132,6 +132,6 @@ export function Sidebar(): React.ReactElement {
           <ActivePanel className="sidebar-panel" />
         </div>
       )}
-    </div>
+    </aside>
   );
 }

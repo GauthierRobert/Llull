@@ -3,8 +3,8 @@
  * @pure
  * @layer core/commands
  * @affects document-level units and displayPrecision only; affected:[]
- * @invariant units must be one of 'mm'|'cm'|'m'|'in'|'ft'; displayPrecision >= 0 and integer
- * @failure invalid unit or negative/non-integer precision -> no-op, affected:[]
+ * @invariant units must be one of 'mm'|'cm'|'m'|'in'|'ft'; displayPrecision integer in [0, 20]
+ * @failure invalid unit or negative/non-integer/>20 precision -> no-op, affected:[]
  */
 
 import type { CadDocument } from '../model/types';
@@ -12,6 +12,7 @@ import { DOCUMENT_UNITS } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { noop } from './noop';
+import { MAX_DISPLAY_PRECISION } from './limits';
 
 export const setUnits = defineCommand({
   name: 'set_units',
@@ -30,20 +31,21 @@ export const setUnits = defineCommand({
       ),
     displayPrecision: z
       .number()
+      .int()
       .optional()
       .describe(
         'Number of decimal places to show when formatting length values (e.g. 2 → "12.50 mm"). ' +
-          'Must be a non-negative integer.',
+          'Must be an integer in [0, 20].',
       ),
   }),
   run: (doc, { units, displayPrecision }): CommandResult => {
     if (
       displayPrecision !== undefined &&
-      (displayPrecision < 0 || !Number.isInteger(displayPrecision))
+      (displayPrecision < 0 || displayPrecision > MAX_DISPLAY_PRECISION)
     ) {
       return noop(
         doc,
-        `Invalid displayPrecision ${String(displayPrecision)}. Must be a non-negative integer.`,
+        `Invalid displayPrecision ${String(displayPrecision)}. Must be an integer in [0, ${MAX_DISPLAY_PRECISION}].`,
       );
     }
 

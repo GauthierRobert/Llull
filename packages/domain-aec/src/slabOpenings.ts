@@ -132,7 +132,9 @@ export const addSlabOpening = defineCommand({
     margin: z
       .number()
       .optional()
-      .describe('With stairId: clearance around the stair footprint. Default 100 mm.'),
+      .describe(
+        'With stairId: clearance around the stair footprint, in document units. Default 100 mm.',
+      ),
   }),
   run: (doc, { slabId, boundary, stairId, margin }): CommandResult => {
     const building = getBuilding(doc);

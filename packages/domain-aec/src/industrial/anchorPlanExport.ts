@@ -88,7 +88,7 @@ export const exportAnchorPlan = defineCommand({
       .number()
       .optional()
       .describe(
-        'Scale denominator N for 1:N (e.g. 100). Default: smallest standard scale that fits the paper.',
+        'Scale denominator N for 1:N (e.g. 100). Default: the smallest standard scale that fits the paper (1-2-5 steps beyond 1:2000).',
       ),
     paper: z
       .enum(Object.keys(PAPER_MM) as [PaperSize, ...PaperSize[]])
@@ -329,9 +329,15 @@ export const exportAnchorPlan = defineCommand({
       overlays: [scheduleTable(shown, tableX, tableY + 2), clipped],
     });
     const filename = `${fileSlug(building.project.name, 'project')}_${fileSlug(level.name, 'level')}_anchor-plan_${sheetPaper}_1-${sheetScale}.svg`;
+    const fits =
+      (maxX - minX) / sheetScale <= viewport.width && (maxY - minY) / sheetScale <= viewport.height;
     return {
       document: doc,
-      summary: `Anchor plan ${filename}: ${plates.length} base plate(s), ${boltCount} anchor bolt(s), ${vertical.length + horizontal.length} grid line(s) at 1:${sheetScale} on ${sheetPaper}, embedment ${mmText(embedmentMm)} mm.`,
+      summary:
+        `Anchor plan ${filename}: ${plates.length} base plate(s), ${boltCount} anchor bolt(s), ${vertical.length + horizontal.length} grid line(s) at 1:${sheetScale} on ${sheetPaper}, embedment ${mmText(embedmentMm)} mm.` +
+        (fits
+          ? ''
+          : ' WARNING: the plan is larger than the paper at this scale; omit scale to auto-fit or choose a larger paper.'),
       affected: [],
       data: {
         svg: `${svg}\n`,
@@ -341,6 +347,7 @@ export const exportAnchorPlan = defineCommand({
         paper: sheetPaper,
         scale: sheetScale,
         levelId: level.id,
+        fits,
       },
     };
   },

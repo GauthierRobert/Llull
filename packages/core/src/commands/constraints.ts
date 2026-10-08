@@ -20,6 +20,7 @@ import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { runSolver } from './constraintSolver';
 import { noop } from './noop';
+import { expressionSyntaxError } from './expression';
 
 /** Optional named point of a line / arc / circle (`EntityRef.kind`). */
 const SUB_POINT = z.enum(['start', 'end', 'center', 'mid']).optional();
@@ -116,6 +117,25 @@ export const addConstraint = defineCommand({
     const err = validateConstraintShape(constraint);
     if (err !== null) {
       return noop(doc, `add_constraint failed: ${err}.`);
+    }
+
+    const unknownEntity = [constraint.a.entityId, constraint.b.entityId].find(
+      (entityId) => !Object.hasOwn(doc.entities, entityId),
+    );
+    if (unknownEntity !== undefined) {
+      return noop(
+        doc,
+        `add_constraint failed: entity '${unknownEntity}' does not exist in the document; create it first.`,
+      );
+    }
+    if (typeof constraint.value === 'string') {
+      const syntaxError = expressionSyntaxError(constraint.value);
+      if (syntaxError !== null) {
+        return noop(
+          doc,
+          `add_constraint failed: value '${constraint.value}' is not a valid expression — ${syntaxError}.`,
+        );
+      }
     }
 
     const constraintId = id !== undefined && id.length > 0 ? id : nextId('con');
@@ -251,6 +271,12 @@ export const updateConstraint = defineCommand({
           `update_constraint: patch.${key} is not a valid EntityRef — no change made.`,
         );
       }
+      if (!Object.hasOwn(doc.entities, ref.entityId)) {
+        return noop(
+          doc,
+          `update_constraint: patch.${key} entity '${ref.entityId}' does not exist in the document — no change made.`,
+        );
+      }
       updates[key] = ref;
     }
 
@@ -260,6 +286,15 @@ export const updateConstraint = defineCommand({
           doc,
           `update_constraint: constraint '${id}' is kind '${existing.kind}' which has no 'value' field — no change made.`,
         );
+      }
+      if (typeof patch.value === 'string') {
+        const syntaxError = expressionSyntaxError(patch.value);
+        if (syntaxError !== null) {
+          return noop(
+            doc,
+            `update_constraint: value '${patch.value}' is not a valid expression — ${syntaxError}. No change made.`,
+          );
+        }
       }
       updates['value'] = patch.value;
     }
@@ -292,8 +327,9 @@ export const solveConstraints = defineCommand({
   name: 'solve_constraints',
   description:
     'Run the constraint solver and update entity positions so that all declared ' +
-    'constraints are satisfied. The solver uses gradient descent on the 2D XY plane ' +
-    '(position Z is unchanged). It iterates up to 64 steps, stopping early when the ' +
+    'constraints are satisfied. The solver works on the 2D XY plane (position Z is unchanged): ' +
+    'point constraints (coincident, distance, tangent) move entity positions; angle, parallel and ' +
+    'perpendicular turn line b about its midpoint (line a is the reference). It iterates up to 64 steps, stopping early when the ' +
     'total constraint residual is below 1e-8. Returns convergence info in data: ' +
     '{ residual: number, iterations: number, converged: boolean }. ' +
     'Non-convergent results are returned with the best-effort positions and converged:false. ' +

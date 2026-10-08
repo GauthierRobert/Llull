@@ -16,24 +16,35 @@ import { levelIdParam } from '../levelParams';
  * @command add_footing
  * @pure
  * @affects creates 1 pad footing, or one under every column of the level
- * @failure no location / no columns / sizes <= 0 -> no-op
+ * @failure no location / location already has a footing / no columns / sizes <= 0 -> no-op
  */
 export const addFooting = defineCommand({
   name: 'add_footing',
   description:
     'Add concrete pad footings: one at a plan location, or (underColumns: true) one under every steel and ' +
-    'concrete column foot of the level. Top of footing at level + topOffset (default −300 mm); default ' +
-    '1500 × 1500 × 600 mm.',
+    'concrete column foot of the level (underColumns wins over location). With underColumns, feet that ' +
+    'already carry a footing on the level (within 10 mm) are skipped and the command is refused when none ' +
+    'is left; an explicit location that already carries a footing on the level (within 10 mm) is refused. ' +
+    'Top of footing at level + topOffset ' +
+    '(default −300 mm); default 1500 × 1500 × 600 mm.',
   params: z.object({
     location: vec2('Footing centre [x, y].').optional(),
-    underColumns: z.boolean().optional().describe('Place one under each column of the level.'),
-    width: z.number().optional().describe('Size along X. Default 1500 mm.'),
-    length: z.number().optional().describe('Size along Y. Default = width.'),
-    thickness: z.number().optional().describe('Depth of the pad. Default 600 mm.'),
+    underColumns: z
+      .boolean()
+      .optional()
+      .describe(
+        'Place one under each steel or concrete column foot of the level (ignores location).',
+      ),
+    width: z.number().optional().describe('Size along X, in document units. Default 1500 mm.'),
+    length: z.number().optional().describe('Size along Y, in document units. Default = width.'),
+    thickness: z
+      .number()
+      .optional()
+      .describe('Depth of the pad, in document units. Default 600 mm.'),
     topOffset: z
       .number()
       .optional()
-      .describe('Top of footing relative to the level. Default −300 mm.'),
+      .describe('Top of footing relative to the level, in document units. Default −300 mm.'),
     levelId: levelIdParam,
     material: z.string().optional().describe('Default concrete.'),
   }),
@@ -45,19 +56,18 @@ export const addFooting = defineCommand({
     }
     const resolution = resolveLevel(doc, getBuilding(doc), params.levelId);
     if (!resolution.ok) return noop(doc, `add_footing failed: ${resolution.reason}.`);
-    const feet = params.underColumns
-      ? columnFeet(resolution.building, resolution.level.id, fromMm(doc, 10))
-      : [];
-    const locations = params.underColumns
-      ? withoutFootings(resolution.building, resolution.level.id, feet, fromMm(doc, 10))
-      : params.location
-        ? [params.location]
-        : [];
+    const tolerance = fromMm(doc, 10);
+    const levelId = resolution.level.id;
+    const feet = params.underColumns ? columnFeet(resolution.building, levelId, tolerance) : [];
+    const requested = params.underColumns ? feet : params.location ? [params.location] : [];
+    const locations = withoutFootings(resolution.building, levelId, requested, tolerance);
     if (locations.length === 0) {
       return noop(
         doc,
         !params.underColumns
-          ? 'add_footing failed: give location [x, y] (or set underColumns).'
+          ? params.location
+            ? `add_footing failed: level ${levelId} already has a footing at [${params.location.join(', ')}] (within 10 mm).`
+            : 'add_footing failed: give location [x, y] (or set underColumns).'
           : feet.length === 0
             ? 'add_footing failed: the level has no columns.'
             : 'add_footing failed: every column already has a footing.',
@@ -80,6 +90,8 @@ export const addFooting = defineCommand({
   },
 });
 
+const MAX_PANEL_CORNERS = 500;
+
 /**
  * @command add_panel
  * @pure
@@ -93,13 +105,19 @@ export const addPanel = defineCommand({
     'The panel thickness grows along the plane normal (right-hand rule on the corner order). Use for ' +
     'pitched roofs, façades and gables.',
   params: z.object({
-    corners: z.array(z.array(z.number())).describe('Coplanar corners [[x, y, z], …], at least 3.'),
+    corners: z.array(z.array(z.number())).describe('Coplanar corners [[x, y, z], …], 3 to 500.'),
     role: z.enum(['roof', 'wall']).optional().describe('Roofing or wall cladding. Default wall.'),
-    thickness: z.number().optional().describe('Panel thickness. Default 80 mm.'),
+    thickness: z.number().optional().describe('Panel thickness, in document units. Default 80 mm.'),
     levelId: levelIdParam,
     material: z.string().optional().describe('Default sandwich-panel (or steel-sheet, …).'),
   }),
   run: (doc, { corners, role = 'wall', thickness, levelId, material }): CommandResult => {
+    if (corners.length > MAX_PANEL_CORNERS) {
+      return noop(
+        doc,
+        `add_panel failed: at most ${MAX_PANEL_CORNERS} corners (got ${corners.length}); a panel is a planar polygon, split a complex outline.`,
+      );
+    }
     const points = corners.map(toVec3);
     if (points.length < 3 || points.some((point) => point === null)) {
       return noop(doc, 'add_panel failed: corners must be ≥ 3 [x, y, z] points.');

@@ -6,7 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc --noEmit && esbuild src/index.ts --bundle --platform=node --target=node20 --format=cjs --packages=external --sourcemap --outfile=dist/index.js",
+    "build": "tsc --noEmit && esbuild src/index.ts src/occtWorker.ts --bundle --platform=node --target=node20 --format=cjs --packages=external --sourcemap --outdir=dist",
     "start": "node --enable-source-maps dist/index.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config vitest.config.ts",

@@ -183,9 +183,9 @@ const orthographicSetup: PromptTemplate = {
         `   - \`bounds\` tells you the world bounding box of all entities.\n` +
         `   - \`entities[]\` lists every entity id, kind, and world bounds.\n` +
         `   - \`entityCount\` lets you confirm the scene has content.\n\n` +
-        `2. Call \`find_entities\` with a \`filter\` to narrow by kind, layer, or name:\n` +
+        `2. Call \`find_entities\` with filters such as \`kind\`, \`layerId\` or \`name\` to narrow the result:\n` +
         `   \`\`\`json\n` +
-        `   { "filter": { "kind": "box" } }\n` +
+        `   { "kind": "box" }\n` +
         `   \`\`\`\n` +
         `   The result lists matching ids so you can reference them in subsequent commands.\n\n` +
         `3. For a structured read, read the \`cad://scene\` MCP resource — it carries the same\n` +

@@ -1,4 +1,5 @@
-import type { JointKind } from '../model/types';
+import type { Component, JointKind } from '../model/types';
+import { findComponentCycle } from './assemblies';
 import { CONSTRAINT_KINDS } from '../model/types';
 import { isRecord } from '../lib/isRecord';
 import { isFiniteNumber } from '../lib/isFiniteNumber';
@@ -178,6 +179,15 @@ export function validateDocumentValues(v: Record<string, unknown>): string[] {
   for (const selectedId of v['selection'] as string[]) {
     if (!Object.hasOwn(entities, selectedId)) {
       errors.push(`selection: '${selectedId}' does not reference a known entity`);
+    }
+  }
+
+  // Component definitions must not reference themselves (renderers and bounds walk them recursively)
+  const components = v['components'];
+  if (isRecord(components)) {
+    for (const id of Object.keys(components)) {
+      const cycle = findComponentCycle(components as Record<string, Component>, id);
+      if (cycle) errors.push(`component '${id}' contains itself (${cycle.join(' -> ')})`);
     }
   }
 

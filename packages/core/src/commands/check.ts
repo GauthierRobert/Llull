@@ -7,7 +7,7 @@
 import type { CadDocument, Entity } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { boundsCenter, entityBounds } from './sceneBounds';
+import { boundsCenter, entityBoundsInDoc } from './sceneBounds';
 import { len3 } from '../lib/vec3';
 
 /** Severity of a model issue. */
@@ -140,8 +140,8 @@ function checkInsufficientPoints(e: Entity): Issue[] {
 }
 
 /** Far from origin: bounding-box centre beyond `farThreshold` (viewport precision issues). */
-function checkFarFromOrigin(e: Entity, farThreshold: number): Issue[] {
-  const center = boundsCenter(entityBounds(e));
+function checkFarFromOrigin(e: Entity, doc: CadDocument, farThreshold: number): Issue[] {
+  const center = boundsCenter(entityBoundsInDoc(doc, e));
   const dist = len3(center);
   return dist > farThreshold
     ? [
@@ -262,7 +262,7 @@ export function runModelChecks(doc: CadDocument, farThreshold: number): CheckRes
       ...checkDegenerateGeometry(entity),
       ...checkInsufficientPoints(entity),
       ...checkOpenProfile(entity),
-      ...checkFarFromOrigin(entity, farThreshold),
+      ...checkFarFromOrigin(entity, doc, farThreshold),
     ]),
     ...checkEmptyLayers(doc),
     ...checkOrphanedGroupMembers(doc),

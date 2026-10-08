@@ -23,15 +23,15 @@ export function PanelHeader({
   children,
 }: PanelHeaderProps): React.ReactElement {
   return (
-    <header className="panel__header">
+    <div className="panel__header">
       <h2 className="panel__title">{title}</h2>
       {count !== undefined && (
-        <span className="panel__count" aria-label={countLabel}>
+        <span className="panel__count" role="img" aria-label={countLabel}>
           {count}
         </span>
       )}
       {children !== undefined && <div className="panel__actions">{children}</div>}
-    </header>
+    </div>
   );
 }
 

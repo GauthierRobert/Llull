@@ -10,7 +10,7 @@ import { createEmptyDocument } from '@core/model/types';
 import type { InstanceEntity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { rotatedEntityBounds } from '@core/commands/sceneRotatedBounds';
-import { expandInstance } from '@core/commands/assemblies';
+import { expandInstance } from '@core/commands/instanceExpansion';
 import type { Component } from '@core/model/types';
 
 describe('assemblies', () => {

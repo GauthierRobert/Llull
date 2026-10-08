@@ -14,8 +14,13 @@ import { MAX_COPIES_PER_COMMAND } from './limits';
 import { add3, scale3 } from '../lib/vec3';
 import { scale2 } from '../lib/vec2';
 import { rotatePoint2 } from '../lib/polygon';
-import { replaceEntity, withEntity } from './entityOps';
+import { replaceEntity } from './entityOps';
 import { rotateEulerAboutWorldZ } from '../lib/eulerRotation';
+
+/** True for exactly three finite numbers (looseVec3 params are unchecked at the schema level). */
+function isFiniteVec3(v: readonly number[]): boolean {
+  return v.length === 3 && v.every(Number.isFinite);
+}
 
 /**
  * @command rotate_entity
@@ -39,6 +44,12 @@ export const rotateEntity = defineCommand({
     if (!target) {
       return noop(doc, `No entity ${id} to rotate.`);
     }
+    if (!isFiniteVec3(delta)) {
+      return noop(
+        doc,
+        `rotate_entity: delta must be 3 finite numbers [dRx, dRy, dRz] (got [${delta.join(', ')}]); entity ${id} unchanged.`,
+      );
+    }
     const rotated: Entity = { ...target, rotation: add3(target.rotation, delta) };
     return {
       document: replaceEntity(doc, rotated),
@@ -49,7 +60,7 @@ export const rotateEntity = defineCommand({
 });
 
 /** Scaled copy of `e` about its local origin plus the summary fragment describing the result. */
-function scaleGeometry(e: Entity, f: number): { scaled: Entity; dims: string } {
+export function scaleGeometry(e: Entity, f: number): { scaled: Entity; dims: string } {
   switch (e.kind) {
     case 'box':
     case 'wedge': {
@@ -250,14 +261,17 @@ export function addCopies(
   placements: ReadonlyArray<{ position: Vec3; rotation?: Vec3 }>,
   idPrefix: string = source.kind,
 ): { document: CadDocument; newIds: string[] } {
-  let document = doc;
+  // One pass over fresh containers: re-spreading the entity bag per copy would be O(copies²).
+  const entities: CadDocument['entities'] = { ...doc.entities };
+  const order = [...doc.order];
   const newIds: string[] = [];
   for (const { position, rotation = source.rotation } of placements) {
     const id = nextId(idPrefix);
-    document = withEntity(document, { ...source, id, position, rotation });
+    entities[id] = { ...source, id, position, rotation } as Entity;
+    order.push(id);
     newIds.push(id);
   }
-  return { document, newIds };
+  return { document: newIds.length === 0 ? doc : { ...doc, entities, order }, newIds };
 }
 
 /**
@@ -265,7 +279,7 @@ export function addCopies(
  * @pure
  * @affects creates count-1 new copies of the source entity
  * @invariant count >= 2; offset must be finite; each copy k gets position = original.position + k*offset
- * @failure missing id, count < 2, or non-finite offset -> no-op, affected:[]
+ * @failure missing id, count < 2, or offset not 3 finite numbers -> no-op, affected:[]
  */
 export const arrayLinear = defineCommand({
   name: 'array_linear',
@@ -277,6 +291,7 @@ export const arrayLinear = defineCommand({
     id: z.string().describe('Id of the entity to array.'),
     count: z
       .number()
+      .int()
       .describe('Total number of instances including the original. Must be an integer >= 2.'),
     offset: looseVec3(
       'World-space translation vector [dx, dy, dz] between consecutive instances. ' +
@@ -288,10 +303,16 @@ export const arrayLinear = defineCommand({
     if (!target) {
       return noop(doc, `array_linear: No entity ${id}.`);
     }
-    if (!Number.isInteger(count) || count < 2 || count > MAX_COPIES_PER_COMMAND) {
+    if (count < 2 || count > MAX_COPIES_PER_COMMAND) {
       return noop(
         doc,
         `array_linear: count must be an integer in [2, ${MAX_COPIES_PER_COMMAND}] (got ${count}); entity ${id} unchanged.`,
+      );
+    }
+    if (!isFiniteVec3(offset)) {
+      return noop(
+        doc,
+        `array_linear: offset must be 3 finite numbers [dx, dy, dz] (got [${offset.join(', ')}]); entity ${id} unchanged.`,
       );
     }
     const { document, newIds } = addCopies(
@@ -331,6 +352,7 @@ export const arrayPolar = defineCommand({
     id: z.string().describe('Id of the entity to array.'),
     count: z
       .number()
+      .int()
       .describe('Total number of instances including the original. Must be an integer >= 2.'),
     center: looseVec3(
       'World-space center point [cx, cy, cz] for the polar rotation axis (Z axis through this point). ' +
@@ -349,10 +371,16 @@ export const arrayPolar = defineCommand({
     if (!target) {
       return noop(doc, `array_polar: No entity ${id}.`);
     }
-    if (!Number.isInteger(count) || count < 2 || count > MAX_COPIES_PER_COMMAND) {
+    if (count < 2 || count > MAX_COPIES_PER_COMMAND) {
       return noop(
         doc,
         `array_polar: count must be an integer in [2, ${MAX_COPIES_PER_COMMAND}] (got ${count}); entity ${id} unchanged.`,
+      );
+    }
+    if (!isFiniteVec3(center) || !Number.isFinite(angle)) {
+      return noop(
+        doc,
+        `array_polar: center must be 3 finite numbers and angle finite (got center [${center.join(', ')}], angle ${angle}); entity ${id} unchanged.`,
       );
     }
 

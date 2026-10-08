@@ -1,6 +1,6 @@
 /** @layer ui/panels Presentational field primitives for the properties inspector. */
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 
 const AXES = ['x', 'y', 'z'] as const;
 
@@ -55,16 +55,27 @@ export function CommitInput({
   className,
   placeholder,
   inputMode,
+  autoFocus = false,
   onCommit,
+  onFinish,
 }: {
   value: string;
   label: string;
   className: string;
   placeholder?: string;
   inputMode?: 'decimal';
+  autoFocus?: boolean;
   onCommit: (text: string) => void;
+  /** Called after every blur (committed, unchanged or cancelled) so a caller can close the editor. */
+  onFinish?: () => void;
 }): React.ReactElement {
   const [draft, setDraft] = useState(value);
+  const [seenValue, setSeenValue] = useState(value);
+  const cancelledRef = useRef(false);
+  if (value !== seenValue) {
+    setSeenValue(value);
+    setDraft(value);
+  }
   return (
     <input
       className={className}
@@ -73,14 +84,26 @@ export function CommitInput({
       placeholder={placeholder}
       inputMode={inputMode}
       spellCheck={false}
+      autoFocus={autoFocus}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => {
-        if (draft !== value) onCommit(draft);
+        // Escape sets the flag before blurring: the blur handler would otherwise still see the
+        // typed draft in its closure and commit it.
+        const cancelled = cancelledRef.current;
+        cancelledRef.current = false;
+        if (cancelled) setDraft(value);
+        else if (draft !== value) {
+          onCommit(draft);
+          // A rejected edit (unparseable number) leaves the stored value as is: show it again.
+          // An accepted one changes `value`, which the prop sync above turns into the new draft.
+          setDraft(value);
+        }
+        onFinish?.();
       }}
       onKeyDown={(e) => {
         if (e.key === 'Enter') e.currentTarget.blur();
         else if (e.key === 'Escape') {
-          setDraft(value);
+          cancelledRef.current = true;
           e.currentTarget.blur();
         }
       }}

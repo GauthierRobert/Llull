@@ -12,7 +12,7 @@
  * InstancedMesh per geometry+color group; every other kind uses a per-entity mesh branch.
  */
 
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import type { CadDocument, Entity, EntityId, InstanceEntity } from '@core/model/types';
 import { useStore, useViewportStore } from '@ui/store';
 import { animatedEntityIds, findClickAnimationsForEntity } from './animationClickHelpers';
@@ -32,7 +32,7 @@ import { isBatchable, groupEntitiesForInstancing } from './grouping';
 import { InstancedRenderer } from './InstancedRenderer';
 import { GridAnnotations3D } from './GridAnnotations3D';
 import { GRID_LAYER_NAME } from './gridAnnotations';
-import { expandInstance } from '@core/commands/assemblies';
+import { expandInstance } from '@core/commands/instanceExpansion';
 import type { PbrMaterial } from './useMaterialProps';
 
 /**
@@ -97,11 +97,10 @@ function InstanceEntityRenderer({
  * Used only for NON-batchable kinds — batchable kinds (box/cylinder/sphere)
  * are rendered by InstancedRenderer.
  *
- * The `document` prop is required only for the `instance` branch; other branches
- * ignore it. Passing it here keeps the signature uniform and avoids a separate
- * component-level store read inside each branch.
+ * Memoized: `document` is passed ONLY to `instance` entities, so a selection change does not
+ * re-render every other mesh branch.
  */
-function EntityRenderer({
+const EntityRenderer = memo(function EntityRenderer({
   entity,
   selected,
   onSelect,
@@ -112,7 +111,7 @@ function EntityRenderer({
   selected: boolean;
   onSelect: (id: EntityId, additive: boolean) => void;
   pbrMaterial?: PbrMaterial | undefined;
-  document?: CadDocument;
+  document?: CadDocument | undefined;
 }): React.ReactElement | null {
   const shared = { selected, onSelect, pbrMaterial };
   switch (entity.kind) {
@@ -155,7 +154,7 @@ function EntityRenderer({
       // without breaking this branch (architecture L7).
       return null;
   }
-}
+});
 
 export function Entities(): React.ReactElement {
   const document = useStore((s) => s.document);
@@ -232,7 +231,7 @@ export function Entities(): React.ReactElement {
             entity={entity}
             selected={selectionSet.has(entity.id)}
             onSelect={handleSelect}
-            document={document}
+            document={entity.kind === 'instance' ? document : undefined}
             pbrMaterial={material}
           />
         );

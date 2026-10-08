@@ -19,6 +19,7 @@ import {
   withElement,
 } from '../model';
 import { noop } from '@core/commands/noop';
+import { duplicateSummary, findTwin, samePath } from '../duplicates';
 import { regenerateBuilding } from '../evaluateElements';
 import {
   SHAPE_PARAM_TEXT,
@@ -27,7 +28,7 @@ import {
   normaliseEquipmentSize,
 } from './equipmentShape';
 import { PIPE_OUTSIDE_DIAMETER_MM, outsideDiameterMm } from './pipeSizes';
-import { hasRepeatedPoint, parseRoute, routeLength } from './routeSupport';
+import { MAX_ROUTE_POINTS, hasRepeatedPoint, parseRoute, routeLength } from './routeSupport';
 import { levelIdParam } from '../levelParams';
 
 /**
@@ -43,7 +44,8 @@ export const addEquipment = defineCommand({
     'Place a machine / process equipment on a level: name, plan centre, size [length, width, height], ' +
     'plan rotation (radians), maintenance clearance around the footprint (checked by check_clashes) and ' +
     'operating weight in kg (for floor loads). Optional `shape` makes it a cylindrical vessel (vertical or ' +
-    'horizontal). Shown as a block / cylinder in 3D and with its clearance zone in plan.',
+    'horizontal). Shown as a block / cylinder in 3D and with its clearance zone in plan. An explicit `mark` ' +
+    'must be unique among equipment.',
   params: z.object({
     name: z.string().describe('Equipment name, e.g. "CNC lathe", "Compressor".'),
     location: looseVec2('Footprint centre [x, y] (a trailing z is ignored).'),
@@ -56,10 +58,13 @@ export const addEquipment = defineCommand({
     clearance: z
       .number()
       .optional()
-      .describe('Maintenance / operating clearance around it. Default 800 mm.'),
+      .describe('Maintenance / operating clearance around it, in document units. Default 800 mm.'),
     weight: z.number().optional().describe('Operating weight in kg. Default 0 (unknown).'),
     levelId: levelIdParam,
-    mark: z.string().optional().describe('Equipment tag. Default EQn.'),
+    mark: z
+      .string()
+      .optional()
+      .describe('Equipment tag, unique among equipment (duplicates are refused). Default EQn.'),
   }),
   run: (
     doc,
@@ -82,10 +87,20 @@ export const addEquipment = defineCommand({
     }
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_equipment failed: ${resolution.reason}.`);
+    const requestedMark = mark?.trim();
+    const taken = Object.values(resolution.building.elements).find(
+      (element) => element.category === 'equipment' && element.mark === requestedMark,
+    );
+    if (requestedMark && taken) {
+      return noop(
+        doc,
+        `add_equipment failed: tag '${requestedMark}' is already used by ${taken.id}; line-list from/to references need unique tags.`,
+      );
+    }
     const equipment: EquipmentElement = {
       id: nextElementId(resolution.building, 'equipment'),
       category: 'equipment',
-      mark: mark?.trim() || nextMark(resolution.building, 'equipment'),
+      mark: requestedMark || nextMark(resolution.building, 'equipment'),
       entityIds: [],
       levelId: resolution.level.id,
       name: name.trim(),
@@ -123,11 +138,12 @@ export const addPipeRun = defineCommand({
     'from / to ends. Give `dn` (e.g. 100) and the outside diameter is taken from the EN 10220 / ASME ' +
     'B36.10 table (15…400); `diameter` overrides it. Bends are placed at every interior point. ' +
     'Pipe lengths feed the takeoff; the pipe schedule (building_schedule kind "pipe") is the line list; ' +
-    'clashes are reported by check_clashes. Support it with add_pipe_support and verify the spacing with check_pipe_supports.',
+    'clashes are reported by check_clashes. Support it with add_pipe_support and verify the spacing with check_pipe_supports. ' +
+    'Refused if a pipe of the same diameter already follows the same route (either direction) on the level.',
   params: z.object({
     points: z
       .array(z.array(z.number()))
-      .describe('Pipe centreline [[x, y, z], …], at least 2 points.'),
+      .describe('Pipe centreline [[x, y, z], …], 2 to 1000 points.'),
     diameter: z
       .number()
       .optional()
@@ -154,7 +170,7 @@ export const addPipeRun = defineCommand({
       .optional()
       .describe('Line destination: equipment tag or battery-limit / tie-in id.'),
     service: z.string().optional().describe('Fluid / service. Default "process".'),
-    material: z.string().optional().describe('Default steel.'),
+    material: z.string().optional().describe('Pipe material. Default "steel".'),
     levelId: levelIdParam,
   }),
   run: (
@@ -163,6 +179,12 @@ export const addPipeRun = defineCommand({
   ): CommandResult => {
     const path = parseRoute(points);
     if (!path) return noop(doc, 'add_pipe_run failed: points must be ≥ 2 [x, y, z] points.');
+    if (path.length > MAX_ROUTE_POINTS) {
+      return noop(
+        doc,
+        `add_pipe_run failed: at most ${MAX_ROUTE_POINTS} points per run (got ${path.length}); split the line.`,
+      );
+    }
     if (dn !== undefined && !(Number.isInteger(dn) && dn > 0)) {
       return noop(doc, `add_pipe_run failed: dn must be a positive integer (got ${dn}).`);
     }
@@ -180,6 +202,14 @@ export const addPipeRun = defineCommand({
     }
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_pipe_run failed: ${resolution.reason}.`);
+    const pipeTwin = findTwin(
+      resolution.building,
+      'pipe',
+      resolution.level.id,
+      (element) => element.diameter === resolvedDiameter && samePath(element.points, path),
+    );
+    if (pipeTwin)
+      return noop(doc, duplicateSummary('add_pipe_run', pipeTwin, 'a pipe on this route'));
     const text = (value: string | undefined): string | undefined => value?.trim() || undefined;
     const [lineNumber, origin, destination] = [text(line), text(from), text(to)];
     const pipe: PipeElement = {

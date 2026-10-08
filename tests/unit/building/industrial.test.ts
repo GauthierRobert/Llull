@@ -163,6 +163,16 @@ describe('add_footing / add_panel', () => {
     expect(element(result.document, 'footing-2')).toMatchObject({ location: [5000, 0] });
   });
 
+  it('refuses an explicit-location footing that duplicates one on the level (10 mm tolerance)', () => {
+    const doc = run(createEmptyDocument(), 'add_footing', { location: [1000, 2000] });
+    const duplicate = execute(doc, 'add_footing', { location: [1005, 2000], width: 2000 });
+    expect(duplicate.document).toBe(doc);
+    expect(duplicate.affected).toEqual([]);
+    expect(duplicate.summary).toMatch(/already has a footing at \[1005, 2000\]/);
+    const beside = execute(doc, 'add_footing', { location: [1020, 2000] });
+    expect(beside.summary).toMatch(/Added 1 pad footing/);
+  });
+
   it('rejects bad footings', () => {
     const doc = createEmptyDocument();
     expect(execute(doc, 'add_footing', {}).summary).toMatch(/give location/);
@@ -371,6 +381,15 @@ describe('add_crane_runway', () => {
     expect(result.summary).toMatch(/\(5 t\): 2 beam segment\(s\) HEB300, 3 bracket/);
     const beam = element(result.document, 'member-4');
     expect(beam).toMatchObject({ role: 'crane', start: [700, 0, 4850] });
+  });
+
+  it('states the minimum rail height in document units', () => {
+    const params = { start: [0, 0], end: [4, 0], railHeight: 0.2 };
+    const metres = execute({ ...createEmptyDocument(), units: 'm' }, 'add_crane_runway', params);
+    expect(metres.affected).toEqual([]);
+    expect(metres.summary).toMatch(/depth \(0\.5 m\); got 0\.2\./);
+    const mm = execute(createEmptyDocument(), 'add_crane_runway', { ...params, railHeight: 200 });
+    expect(mm.summary).toMatch(/depth \(500 mm\); got 200\./);
   });
 
   it('rejects bad runways', () => {

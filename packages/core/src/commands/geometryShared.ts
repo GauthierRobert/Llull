@@ -9,6 +9,7 @@ import { newEntity } from './newEntity';
 import { noop } from './noop';
 import { compactNumber } from '../lib/compactNumber';
 import { isVec2 } from '../lib/vec2';
+import { polygonArea, polygonPerimeter } from '../lib/polygon';
 
 /** `entity` with its position offset by `delta` (the one translation used by every move command). */
 export function translated(entity: Entity, delta: Vec3): Entity {
@@ -187,6 +188,24 @@ export function rejectBadProfile(
   return noop(
     doc,
     `${command} failed: profile point ${index} must be a finite [x, y] pair, got ${JSON.stringify(profile[index])}; no-op.`,
+  );
+}
+
+/**
+ * Reject a profile whose enclosed area vanishes relative to its perimeter (all points collinear or
+ * coincident): extruding/revolving it yields a zero-volume sheet. `null` when the profile has area.
+ * Expects points already validated by `rejectBadProfile`.
+ */
+export function rejectZeroAreaProfile(
+  doc: CadDocument,
+  command: string,
+  profile: ReadonlyArray<readonly [number, number]>,
+): CommandResult | null {
+  const perimeter = polygonPerimeter(profile);
+  if (polygonArea(profile) > 1e-12 * perimeter * perimeter) return null;
+  return noop(
+    doc,
+    `${command} failed: profile encloses no area (points are collinear or coincident); no-op.`,
   );
 }
 

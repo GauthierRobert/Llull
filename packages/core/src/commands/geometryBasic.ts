@@ -11,12 +11,14 @@ import {
   placeSolid,
   positionField,
   rejectBadProfile,
+  rejectZeroAreaProfile,
   rejectBadSize,
   rotationField,
   translated,
 } from './geometryShared';
 import { ORIGIN, finiteVec3OrZero } from '../lib/vec3';
 import { noop } from './noop';
+import { MAX_PROFILE_POINTS } from './limits';
 
 /**
  * @command add_box
@@ -105,8 +107,16 @@ export const extrude = defineCommand({
         `extrude_profile: profile must be an array of at least 3 [x,y] points; no-op.`,
       );
     }
+    if (profile.length > MAX_PROFILE_POINTS) {
+      return noop(
+        doc,
+        `extrude_profile: profile has ${profile.length} points, exceeding MAX_PROFILE_POINTS (${MAX_PROFILE_POINTS}); no-op.`,
+      );
+    }
     const badProfile = rejectBadProfile(doc, 'extrude_profile', profile);
     if (badProfile) return badProfile;
+    const flatProfile = rejectZeroAreaProfile(doc, 'extrude_profile', profile);
+    if (flatProfile) return flatProfile;
     if (depth <= 0) {
       return noop(
         doc,

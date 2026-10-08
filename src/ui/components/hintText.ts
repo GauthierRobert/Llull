@@ -56,7 +56,7 @@ export function hintText(context: HintContext): string {
   if (selectionCount === 0) {
     return viewMode === '3d'
       ? 'Click an object to select it · drag to orbit, right-drag to pan, scroll to zoom · ? shortcuts.'
-      : 'Click a shape to select it · drag to pan, scroll to zoom · ? shortcuts.';
+      : 'Click a shape to select it · Shift+drag to box-select · drag to pan, scroll to zoom · ? shortcuts.';
   }
   if (viewMode === '2d') {
     return `${selectionCount} selected · M to move · arrows nudge · Ctrl D duplicate · Del delete · Esc deselect.`;

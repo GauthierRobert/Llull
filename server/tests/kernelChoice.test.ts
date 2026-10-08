@@ -3,11 +3,26 @@ import { getGeometryKernel, setGeometryKernel } from '@core/geometry/kernel';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
-import { getActiveKernelName, installGeometryKernel } from '../src/geometryKernel';
+import {
+  getActiveKernelName,
+  installGeometryKernel,
+  occtCallTimeoutMs,
+} from '../src/geometryKernel';
 
 afterEach(() => {
   delete process.env['LLULL_KERNEL'];
   setGeometryKernel(null);
+});
+
+describe('LLULL_OCC_TIMEOUT_MS', () => {
+  it('defaults to 30 s and accepts a positive number of milliseconds', () => {
+    expect(occtCallTimeoutMs({})).toBe(30_000);
+    expect(occtCallTimeoutMs({ LLULL_OCC_TIMEOUT_MS: '5000' })).toBe(5000);
+  });
+
+  it.each(['0', '-5', 'abc', '', 'NaN', 'Infinity'])('ignores the invalid value %j', (value) => {
+    expect(occtCallTimeoutMs({ LLULL_OCC_TIMEOUT_MS: value })).toBe(30_000);
+  });
 });
 
 describe('LLULL_KERNEL', () => {

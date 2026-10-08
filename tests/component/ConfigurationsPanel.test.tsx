@@ -380,3 +380,27 @@ describe('ConfigurationsPanel — parameter row management', () => {
     expect(screen.queryByRole('textbox', { name: /parameter name for row 2/i })).toBeNull();
   });
 });
+
+describe('ConfigurationsPanel — active configuration', () => {
+  beforeEach(() => {
+    resetStore();
+  });
+
+  it('marks the configuration whose parameter expressions are all applied', () => {
+    const doc = useStore.getState().document;
+    useStore.getState().hydrateLiveDocument(
+      liveSnapshot({
+        ...doc,
+        parameters: { w: { name: 'w', expression: '10', value: 10 } },
+        configurations: {
+          small: { name: 'small', parameterValues: { w: '5' } },
+          large: { name: 'large', parameterValues: { w: '10' } },
+        },
+      }),
+    );
+    render(<ConfigurationsPanel />);
+    expect(screen.getByTestId('config-row-large')).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByTestId('config-row-large').textContent).toContain('active');
+    expect(screen.getByTestId('config-row-small')).not.toHaveAttribute('aria-current');
+  });
+});

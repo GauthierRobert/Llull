@@ -54,7 +54,7 @@ export function listMcpResources(): McpResourceDescriptor[] {
       name: 'Scene Snapshot',
       description:
         'Structured read-only snapshot of the document: entity ids, kinds, world bounds, ' +
-        'layers, groups, and the current selection. Orient here before editing.',
+        'layers, groups, and the current selection. Orient here before editing. Models with more than 500 entities get the first 500 plus a `truncated` note (use find_entities, or cad://document for everything).',
       mimeType: 'application/json',
     },
     {
@@ -85,13 +85,38 @@ const jsonResource = (uri: string, text: string): McpResourceContent => ({
   text,
 });
 
+/** Lists in `cad://scene` / `cad://selection` are cut here so a huge model cannot flood a context. */
+export const MAX_RESOURCE_ITEMS = 500;
+
+/** The scene snapshot with long lists cut to `MAX_RESOURCE_ITEMS`; `truncated` says what was cut. */
+function boundedScene(doc: CadDocument): Record<string, unknown> {
+  const snapshot = computeSceneSnapshot(doc);
+  const cut = (items: readonly unknown[]): boolean => items.length > MAX_RESOURCE_ITEMS;
+  if (!cut(snapshot.entities) && !cut(snapshot.selection) && !cut(snapshot.animations)) {
+    return { ...snapshot };
+  }
+  return {
+    ...snapshot,
+    entities: snapshot.entities.slice(0, MAX_RESOURCE_ITEMS),
+    selection: snapshot.selection.slice(0, MAX_RESOURCE_ITEMS),
+    animations: snapshot.animations.slice(0, MAX_RESOURCE_ITEMS),
+    truncated: {
+      entityCount: snapshot.entities.length,
+      entitiesShown: Math.min(snapshot.entities.length, MAX_RESOURCE_ITEMS),
+      selectionCount: snapshot.selection.length,
+      animationCount: snapshot.animations.length,
+      note: `lists are cut to ${MAX_RESOURCE_ITEMS} items; use find_entities with filters, or cad://document for everything`,
+    },
+  };
+}
+
 /** `cad://selection` payload: selected ids with kind/position (`unknown` for a dangling id). */
 function selectionSummary(doc: CadDocument): { count: number; entities: unknown[] } {
-  const entities = doc.selection.map((id) => {
+  const entities = doc.selection.slice(0, MAX_RESOURCE_ITEMS).map((id) => {
     const e = doc.entities[id];
     return e ? { id, kind: e.kind, position: e.position } : { id, kind: 'unknown', position: null };
   });
-  return { count: entities.length, entities };
+  return { count: doc.selection.length, entities };
 }
 
 /**
@@ -106,7 +131,7 @@ export function readMcpResource(doc: CadDocument, uri: string): McpResourceConte
     case CAD_RESOURCE_URIS.document:
       return jsonResource(uri, serializeDocument(doc));
     case CAD_RESOURCE_URIS.scene:
-      return jsonResource(uri, JSON.stringify(computeSceneSnapshot(doc)));
+      return jsonResource(uri, JSON.stringify(boundedScene(doc)));
     case CAD_RESOURCE_URIS.selection:
       return jsonResource(uri, JSON.stringify(selectionSummary(doc)));
     case CAD_RESOURCE_URIS.conventions:

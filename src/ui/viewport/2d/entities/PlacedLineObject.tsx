@@ -22,5 +22,11 @@ export function PlacedLineObject({ object, position }: PlacedLineObjectProps): R
     };
   }, [object]);
 
-  return <primitive object={object} position={position} />;
+  // The object's own position is its float32-safe anchor (see dimensionGeometry); add it in float64.
+  const placed: Vec3 = [
+    position[0] + object.position.x,
+    position[1] + object.position.y,
+    position[2] + object.position.z,
+  ];
+  return <primitive object={object} position={placed} />;
 }

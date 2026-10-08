@@ -140,6 +140,10 @@
   color: var(--fg-subtle);
 }
 
+.palette-item--active .palette-item__hint {
+  color: var(--fg-muted);
+}
+
 .palette-item__group {
   flex-shrink: 0;
   font-size: var(--text-2xs);
@@ -285,6 +289,13 @@
 .palette-field__help strong {
   color: var(--danger);
   font-weight: var(--weight-medium);
+}
+
+.palette-form__status {
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--danger);
 }
 
 .palette-form__footer {

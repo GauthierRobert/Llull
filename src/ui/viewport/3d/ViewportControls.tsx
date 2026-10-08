@@ -11,6 +11,7 @@ import React, { useId } from 'react';
 import { useViewportStore, useStore } from '@ui/store';
 import type { DisplayMode, ClipAxis, QualityOverride } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
+import { NumberField } from '@ui/components/NumberField';
 import type { IconName } from '@ui/components/Icon';
 
 function Divider(): React.ReactElement {
@@ -141,7 +142,14 @@ function SectionPopover(): React.ReactElement | null {
           aria-valuemax={50}
           aria-valuenow={clipPlane.offset}
         />
-        <span className="vp-value">{clipPlane.offset.toFixed(1)}</span>
+        <NumberField
+          className="vp-value vp-value--input"
+          step={0.5}
+          value={clipPlane.offset}
+          onValueChange={(offset) => setClipPlane({ offset })}
+          aria-label="Exact section distance"
+          title="Exact offset in document units (the slider spans -50 to 50)"
+        />
       </div>
 
       <label className="vp-field-label vp-flip">

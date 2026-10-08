@@ -146,7 +146,11 @@ function weldedManifold(
     const prim = m.Manifold.ofMesh(mesh);
     // Tessellated primitives are already world-space; a mesh entity still honours its transform.
     if (entity.kind !== 'mesh') return prim;
-    return applyTransform(prim, entity.position, entity.rotation);
+    try {
+      return applyTransform(prim, entity.position, entity.rotation);
+    } finally {
+      release(prim);
+    }
   } catch {
     return null;
   }
@@ -163,6 +167,16 @@ function signedVolume(vertices: readonly number[], triangles: readonly number[])
     sum += ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx);
   }
   return sum / 6;
+}
+
+/** Shoelace area of a polygon: positive for counter-clockwise, negative for clockwise. */
+function signedArea(outline: ReadonlyArray<readonly [number, number]>): number {
+  let twice = 0;
+  outline.forEach(([x, y], i) => {
+    const [nextX, nextY] = outline[(i + 1) % outline.length] ?? [x, y];
+    twice += x * nextY - nextX * y;
+  });
+  return twice / 2;
 }
 
 /** Corners closer than 1/WELD_SCALE document units are merged into one vertex. */
@@ -186,9 +200,9 @@ function primitiveOf(m: ManifoldModule, entity: Entity): ManifoldShape | null {
       return entity.radius > 0 ? m.Manifold.sphere(entity.radius, 32) : null;
     case 'extrusion': {
       if (entity.profile.length < 3 || entity.depth <= 0) return null;
-      const section = new m.CrossSection([
-        entity.profile.map(([x, y]) => [x, y] as [number, number]),
-      ]);
+      const outline = entity.profile.map(([x, y]) => [x, y] as [number, number]);
+      // Manifold fills counter-clockwise outlines only; a clockwise profile would extrude to nothing.
+      const section = new m.CrossSection([signedArea(outline) < 0 ? outline.reverse() : outline]);
       const prim = section.extrude(entity.depth);
       section.delete();
       return prim;

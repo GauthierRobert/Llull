@@ -1,4 +1,11 @@
-import type { CadDocument, Entity, InstanceEntity, Vec3 } from '../model/types';
+import type {
+  CadDocument,
+  DimensionEntity,
+  Entity,
+  InstanceEntity,
+  TextEntity,
+  Vec3,
+} from '../model/types';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { ORIGIN, add3, sub3 } from '../lib/vec3';
 import { type Bounds } from './sceneTypes';
@@ -50,6 +57,26 @@ const bounds = (min: Vec3, max: Vec3): Bounds => ({ min, max });
 
 /** Axis-aligned box centered on the origin. */
 const centered = (x: number, y: number, z: number): Bounds => bounds([-x, -y, -z], [x, y, z]);
+
+/** Width of a glyph as a fraction of the text height (monospace estimate). */
+export const GLYPH_WIDTH_RATIO = 0.6;
+/** Distance between consecutive text lines as a fraction of the text height. */
+const LINE_SPACING_RATIO = 1.2;
+
+/**
+ * Local AABB of a text block as the viewport lays it out: the longest line sets the width,
+ * `anchor` (left by default) places that width relative to `position`, lines stack at 1.2 em and
+ * the whole block is centred vertically on `position` (drei `anchorY="middle"`).
+ * Single source of the text layout estimate for core bounds and UI picking.
+ * @pure
+ */
+export function textLocalBounds(e: TextEntity): Bounds {
+  const lines = e.content.split('\n');
+  const width = Math.max(...lines.map((line) => line.length)) * e.height * GLYPH_WIDTH_RATIO;
+  const blockHeight = e.height * (1 + (lines.length - 1) * LINE_SPACING_RATIO);
+  const left = e.anchor === 'center' ? -width / 2 : e.anchor === 'right' ? -width : 0;
+  return bounds([left, -blockHeight / 2, 0], [left + width, blockHeight / 2, 0]);
+}
 
 /** Local-space AABB of a `mesh`: its world-space positions re-expressed relative to `position`. */
 function meshLocalBounds(e: Extract<Entity, { kind: 'mesh' }>): Bounds {
@@ -131,8 +158,7 @@ export function localBounds(e: Entity): Bounds {
         [e.center[0] + e.radiusX, e.center[1] + e.radiusY, 0],
       );
     case 'text':
-      // Monospace estimate: each glyph ≈ 0.6×height wide.
-      return bounds(ORIGIN, [e.content.length * e.height * 0.6, e.height, 0]);
+      return textLocalBounds(e);
     case 'dimension': {
       // No own geometry: a small box sized by the witness-line offset.
       const ext = e.offset ?? 5;
@@ -172,6 +198,9 @@ export function boundsOfPoints(points: readonly Vec3[]): Bounds {
   return { min, max };
 }
 
+/** Deepest component-in-component nesting followed when computing instance bounds. */
+const MAX_NESTING = 8;
+
 /**
  * Compute the world AABB of an InstanceEntity by expanding it against its component's
  * child entities. Callers that have access to the document should prefer this over
@@ -181,9 +210,14 @@ export function boundsOfPoints(points: readonly Vec3[]): Bounds {
  *
  * @pure — reads only; does not mutate
  */
-export function instanceBoundsFromDoc(instance: InstanceEntity, doc: CadDocument): Bounds {
+export function instanceBoundsFromDoc(
+  instance: InstanceEntity,
+  doc: CadDocument,
+  depth = 0,
+): Bounds {
   const component = doc.components[instance.componentId];
-  if (!component || component.order.length === 0) {
+  // Past MAX_NESTING a reference cycle is assumed: the instance counts as a point at its position.
+  if (!component || component.order.length === 0 || depth >= MAX_NESTING) {
     return { min: instance.position, max: instance.position };
   }
 
@@ -194,7 +228,7 @@ export function instanceBoundsFromDoc(instance: InstanceEntity, doc: CadDocument
   for (const cid of component.order) {
     const child = component.entities[cid];
     if (!child) continue;
-    for (const c of boundsCorners(entityBounds(child))) {
+    for (const c of boundsCorners(entityBoundsInDoc(doc, child, depth + 1))) {
       const scaled: Vec3 = [c[0] * scale[0], c[1] * scale[1], c[2] * scale[2]];
       // Rotate around the component origin, then translate.
       const rotated = hasRotation ? applyEulerXYZ(scaled, ORIGIN, rotation) : scaled;
@@ -202,6 +236,38 @@ export function instanceBoundsFromDoc(instance: InstanceEntity, doc: CadDocument
     }
   }
   return worldPoints.length > 0 ? boundsOfPoints(worldPoints) : bounds(position, position);
+}
+
+/**
+ * World AABB of `e`. Unlike `entityBounds` it resolves instances through their component in `doc`
+ * (a bare `entityBounds` call on an instance yields a zero-size box at the origin).
+ * @pure
+ */
+export function entityBoundsInDoc(doc: CadDocument, e: Entity, depth = 0): Bounds {
+  if (e.kind === 'instance') return instanceBoundsFromDoc(e, doc, depth);
+  if (e.kind === 'dimension') return dimensionBoundsFromDoc(e, doc);
+  return entityBounds(e);
+}
+
+/**
+ * A dimension has no geometry of its own: its extent is the referenced geometry grown by the
+ * witness-line `offset` (default 5) in X and Y. With no resolvable reference it falls back to
+ * `entityBounds` (a small box around its own position).
+ * @pure
+ */
+function dimensionBoundsFromDoc(dimension: DimensionEntity, doc: CadDocument): Bounds {
+  const referenced = dimension.entityIds.flatMap((id): Bounds[] => {
+    const target = Object.hasOwn(doc.entities, id) ? doc.entities[id] : undefined;
+    return target && target.kind !== 'dimension' ? [entityBoundsInDoc(doc, target)] : [];
+  });
+  const [first, ...rest] = referenced;
+  if (!first) return entityBounds(dimension);
+  const { min, max } = rest.reduce(mergeBounds, first);
+  const offset = Math.abs(dimension.offset ?? 5);
+  return bounds(
+    [min[0] - offset, min[1] - offset, min[2]],
+    [max[0] + offset, max[1] + offset, max[2]],
+  );
 }
 
 /** True when two AABBs overlap (touching counts) on every axis. */

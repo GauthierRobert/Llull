@@ -125,6 +125,7 @@ function EntityDetail({ entity }: { entity: Entity }): React.ReactElement {
         <PropRow label="Color">
           <span className="props-color">
             <span
+              role="img"
               className="props-color-swatch"
               style={{ background: entity.color }}
               aria-label={entity.color}

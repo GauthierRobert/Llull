@@ -13,6 +13,30 @@ export function withEntity(doc: CadDocument, entity: Entity): CadDocument {
 }
 
 /**
+ * `doc` with every entity of `created` stored and appended to `order` (same result as folding
+ * `withEntity`, but one pass instead of re-spreading the entity bag per entity).
+ * @pure
+ */
+export function withEntities(doc: CadDocument, created: ReadonlyArray<Entity>): CadDocument {
+  if (created.length === 0) return doc;
+  const entities: CadDocument['entities'] = { ...doc.entities };
+  for (const entity of created) entities[entity.id] = entity;
+  return { ...doc, entities, order: [...doc.order, ...created.map((entity) => entity.id)] };
+}
+
+/**
+ * `doc` with every entity of `changed` stored under its id (order unchanged); one pass, equal to
+ * folding `replaceEntity`.
+ * @pure
+ */
+export function replaceEntitiesById(doc: CadDocument, changed: ReadonlyArray<Entity>): CadDocument {
+  if (changed.length === 0) return doc;
+  const entities: CadDocument['entities'] = { ...doc.entities };
+  for (const entity of changed) entities[entity.id] = entity;
+  return { ...doc, entities };
+}
+
+/**
  * `doc` with `entity` stored under its id (order unchanged).
  * @pure
  */
@@ -119,6 +143,20 @@ export function replaceEntities(
   result: Entity,
 ): CadDocument {
   return withEntity(withoutEntities(doc, new Set(removedIds)).document, result);
+}
+
+/** Number of constraint, joint and drive-relation records in `doc`. */
+function referenceRecordCount(doc: CadDocument): number {
+  return (
+    Object.keys(doc.constraints).length +
+    Object.keys(doc.joints).length +
+    Object.keys(doc.driveRelations).length
+  );
+}
+
+/** `referenceSuffix` for the records an entity-consuming command dropped between `before` and `after`. */
+export function referenceLossSuffix(before: CadDocument, after: CadDocument): string {
+  return referenceSuffix(Math.max(0, referenceRecordCount(before) - referenceRecordCount(after)));
 }
 
 /** Summary fragment naming how many constraints/joints/drive relations a deletion removed. */

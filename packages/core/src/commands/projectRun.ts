@@ -264,8 +264,11 @@ export function runProject(
     const f = steps.find((x) => x.summary.startsWith('step budget exceeded')) ?? steps[failedAt];
     summary = `Plan aborted at step ${failedAt} (${f?.command ?? '?'}): ${f?.summary ?? ''} — rolled back, document unchanged.`;
   } else {
-    const okCount = steps.filter((s) => s.ok).length;
-    summary = `Plan complete: ${okCount}/${actions.length} step(s) ok, ${affected.length} entit${affected.length === 1 ? 'y' : 'ies'} affected.`;
+    // Plan steps are the input actions; a repeat/for_each action expands to many executed commands.
+    const failedActions = new Set(steps.filter((s) => !s.ok).map((s) => s.index));
+    const okCount = actions.length - failedActions.size;
+    const expanded = steps.length === actions.length ? '' : ` (${steps.length} commands executed)`;
+    summary = `Plan complete: ${okCount}/${actions.length} plan step(s) ok${expanded}, ${affected.length} entit${affected.length === 1 ? 'y' : 'ies'} affected.`;
   }
 
   return {

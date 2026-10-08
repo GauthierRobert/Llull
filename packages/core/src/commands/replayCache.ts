@@ -18,6 +18,8 @@ interface ReplayState {
   readonly doc: CadDocument;
   /** Legacy (pre-step-scoped) id remapping accumulated up to this state. */
   readonly idMap: ReadonlyMap<string, string>;
+  /** The step leading to this state changed nothing (it threw, was rejected, or was a no-op). */
+  readonly inert: boolean;
 }
 
 export type ReplayCache = LruCache<ReplayState>;

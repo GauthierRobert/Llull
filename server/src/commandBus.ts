@@ -101,12 +101,31 @@ export function applyCommand(name: string, params: unknown, commandId?: string):
   }
   const result = runCommand(name, params);
   if (!result.changed || getCommand(name)?.annotations?.readOnly === true) return result;
-  _resultsByCommandId.set(commandId, { requestHash, result });
+  _resultsByCommandId.set(commandId, { requestHash, result: boundedForReplay(result) });
   if (_resultsByCommandId.size > MAX_IDEMPOTENCY_ENTRIES) {
     const oldest = _resultsByCommandId.keys().next();
     if (!oldest.done) _resultsByCommandId.delete(oldest.value);
   }
   return result;
+}
+
+/** Largest `data` payload (JSON characters) kept in the idempotency cache; bigger ones are dropped. */
+const MAX_CACHED_DATA_CHARS = 64 * 1024;
+
+/**
+ * The result to remember for a commandId replay. `data` of a huge result (a build_project report,
+ * a scene snapshot) would pin megabytes per entry, 1000 entries deep; a replay then reports the
+ * same outcome without it and says so.
+ */
+function boundedForReplay(result: CommandBusResult): CommandBusResult {
+  if (result.data === undefined) return result;
+  if ((JSON.stringify(result.data)?.length ?? 0) <= MAX_CACHED_DATA_CHARS) return result;
+  const { data: _dropped, ...rest } = result;
+  void _dropped;
+  return {
+    ...rest,
+    summary: `${result.summary} (replay: the result data was not kept, re-query the scene)`,
+  };
 }
 
 /** `changed` = the live document was replaced by this call. */

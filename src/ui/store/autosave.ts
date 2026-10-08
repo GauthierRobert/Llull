@@ -16,6 +16,8 @@ export interface AutosaveRecord {
   savedAt: number;
   /** `serializeDocument` output. */
   json: string;
+  /** Present when the stored document equals what the user last saved to a file. */
+  clean?: true;
 }
 
 export const AUTOSAVE_KEY = 'llull-autosave';
@@ -58,7 +60,8 @@ export function readAutosave(storage: KeyValueStorage): AutosaveRecord | null {
       typeof parsed.savedAt === 'number' &&
       typeof parsed.json === 'string'
     ) {
-      return { savedAt: parsed.savedAt, json: parsed.json };
+      const clean = 'clean' in parsed && parsed.clean === true;
+      return { savedAt: parsed.savedAt, json: parsed.json, ...(clean ? { clean: true } : {}) };
     }
   } catch {
     // fall through to clearing

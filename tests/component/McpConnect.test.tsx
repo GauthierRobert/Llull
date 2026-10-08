@@ -17,6 +17,7 @@
 
 import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { listCommands } from '@core/commands/registry';
 import { McpConnect, McpConnectButton } from '@ui/components/McpConnect';
 
 // ---------------------------------------------------------------------------
@@ -75,9 +76,9 @@ describe('McpConnect — structure', () => {
     expect(screen.getByText('http://localhost:3001/mcp')).toBeDefined();
   });
 
-  it('shows the "60 tools" capability badge', () => {
+  it('shows the live registry command count as a capability badge', () => {
     render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText('60 tools')).toBeDefined();
+    expect(screen.getByText(`${listCommands().length} commands`)).toBeDefined();
   });
 
   it('shows the "structuredContent" capability badge', () => {
@@ -261,7 +262,7 @@ describe('McpConnect — quickstart content', () => {
 describe('McpConnectButton', () => {
   it('renders a "Connect agent" trigger button', () => {
     render(<McpConnectButton />);
-    expect(screen.getByRole('button', { name: /connect an mcp agent/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /^connect agent/i })).toBeDefined();
   });
 
   it('does not show the modal initially', () => {
@@ -271,13 +272,13 @@ describe('McpConnectButton', () => {
 
   it('opens the modal when the trigger is clicked', () => {
     render(<McpConnectButton />);
-    fireEvent.click(screen.getByRole('button', { name: /connect an mcp agent/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^connect agent/i }));
     expect(screen.getByRole('dialog')).toBeDefined();
   });
 
   it('closes the modal when Esc is pressed inside the modal', () => {
     render(<McpConnectButton />);
-    fireEvent.click(screen.getByRole('button', { name: /connect an mcp agent/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^connect agent/i }));
     const dialog = screen.getByRole('dialog');
     fireEvent.keyDown(dialog, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -285,7 +286,7 @@ describe('McpConnectButton', () => {
 
   it('restores focus to the trigger button after close', async () => {
     render(<McpConnectButton />);
-    const trigger = screen.getByRole('button', { name: /connect an mcp agent/i });
+    const trigger = screen.getByRole('button', { name: /^connect agent/i });
     trigger.focus();
     fireEvent.click(trigger);
 

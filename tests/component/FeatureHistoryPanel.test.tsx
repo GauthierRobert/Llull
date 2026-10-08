@@ -28,11 +28,14 @@ import type { FeatureStep } from '@core/model/types';
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** The store's real dispatch, captured before any test swaps in a spy via `patchDispatch`. */
+const realDispatch = useStore.getState().dispatch;
+
 function resetStore(): void {
-  useStore.setState({
-    document: createEmptyDocument(),
-    lastSummary: null,
-  });
+  useStore.setState({ dispatch: realDispatch });
+  // Also clears local-edit bookkeeping so a local edit in one test can't block the next hydrate.
+  useStore.getState().setDocument(createEmptyDocument());
+  useStore.setState({ lastSummary: null });
 }
 
 /**
@@ -270,5 +273,62 @@ describe('FeatureHistoryPanel — live dispatch (integration smoke)', () => {
     // After an add_box command, featureHistory should have 1+ steps.
     const steps = screen.getAllByRole('listitem');
     expect(steps.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('FeatureHistoryPanel — per-step params editor', () => {
+  beforeEach(() => {
+    resetStore();
+    useStore.setState({ liveStatus: 'disconnected' });
+  });
+
+  function openEditor(): HTMLElement {
+    localDispatch('add_box', { size: [2, 2, 2] });
+    render(<FeatureHistoryPanel />);
+    fireEvent.click(screen.getByRole('button', { name: /edit parameters of step add_box/i }));
+    return screen.getByRole('form', { name: /add box parameters/i });
+  }
+
+  it('opens the param form pre-filled with the recorded params', () => {
+    const form = openEditor();
+    expect((within(form).getByLabelText(/^Size/) as HTMLInputElement).value).toBe('2, 2, 2');
+  });
+
+  it('applies edited params through edit_step_params and closes the form', () => {
+    const form = openEditor();
+    fireEvent.change(within(form).getByLabelText(/^Size/), { target: { value: '4, 5, 6' } });
+    fireEvent.click(within(form).getByRole('button', { name: /^Apply/ }));
+
+    const box = Object.values(useStore.getState().document.entities).find((e) => e?.kind === 'box');
+    expect(box?.kind === 'box' ? box.size : null).toEqual([4, 5, 6]);
+    expect(screen.queryByRole('form', { name: /add box parameters/i })).toBeNull();
+  });
+
+  it('keeps the form open and shows the command refusal summary when the edit is rejected', () => {
+    const form = openEditor();
+    fireEvent.change(within(form).getByLabelText(/^Size/), { target: { value: '0, 0, 0' } });
+    fireEvent.click(within(form).getByRole('button', { name: /^Apply/ }));
+
+    expect(screen.getByRole('form', { name: /add box parameters/i })).toBeDefined();
+    const alerts = screen.getAllByRole('alert').map((alert) => alert.textContent ?? '');
+    expect(alerts.some((text) => /changed nothing when replayed/.test(text))).toBe(true);
+    const box = Object.values(useStore.getState().document.entities).find((e) => e?.kind === 'box');
+    expect(box?.kind === 'box' ? box.size : null).toEqual([2, 2, 2]);
+  });
+
+  it('dispatches a schema-invalid edit and shows the core refusal instead of pre-validating', () => {
+    const form = openEditor();
+    fireEvent.change(within(form).getByLabelText(/^Size/), { target: { value: '1, 2' } });
+    fireEvent.click(within(form).getByRole('button', { name: /^Apply/ }));
+
+    expect(screen.getByRole('form', { name: /add box parameters/i })).toBeDefined();
+    const box = Object.values(useStore.getState().document.entities).find((e) => e?.kind === 'box');
+    expect(box?.kind === 'box' ? box.size : null).toEqual([2, 2, 2]);
+  });
+
+  it('Cancel closes the editor without dispatching', () => {
+    const form = openEditor();
+    fireEvent.click(within(form).getByRole('button', { name: /cancel editing/i }));
+    expect(screen.queryByRole('form', { name: /add box parameters/i })).toBeNull();
   });
 });

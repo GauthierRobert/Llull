@@ -10,6 +10,7 @@ export { shapeToolCallContent } from './dispatch';
 export { listMcpResources, readMcpResource, CAD_RESOURCE_URIS } from './resources';
 export { CONVENTIONS_GUIDE, CONVENTIONS_URI } from './conventions';
 export { listMcpPrompts, getMcpPrompt } from './prompts';
+export { SERVER_INSTRUCTIONS } from './instructions';
 
 export type { CadExchangePort, ProgramRun, PythonLanguage } from './exchangeTools';
 export {
@@ -24,6 +25,7 @@ export {
   buildDiscoveryToolDefinitions,
   applyDiscoveryToolCall,
   searchTools,
+  closestToolNames,
 } from './discovery';
 
 export type { ToolsetName } from './toolsets';

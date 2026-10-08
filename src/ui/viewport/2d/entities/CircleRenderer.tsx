@@ -4,7 +4,7 @@ import type { CircleEntity } from '@core/model/types';
 import { EllipticalCurve } from './EllipticalCurve';
 
 export function CircleRenderer({
-  entity: { center, radius, position, color },
+  entity: { center, radius, position, rotation, color },
   selected,
 }: {
   entity: CircleEntity;
@@ -18,6 +18,7 @@ export function CircleRenderer({
       startAngle={0}
       endAngle={Math.PI * 2}
       position={position}
+      rotation={rotation}
       color={color}
       selected={selected}
     />

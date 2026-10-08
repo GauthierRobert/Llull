@@ -40,6 +40,13 @@ describe('project name', () => {
     expect(projectFileStem(useStore.getState().document, 'x')).toBe('Plant_A_Hall_1');
   });
 
+  it('announces unsaved changes with an accessible name, independent of the visible word', () => {
+    render(<TopBar />);
+    expect(screen.queryByRole('status', { name: 'Unsaved changes' })).toBeNull();
+    act(() => useSessionStore.getState().markDirty());
+    expect(screen.getByRole('status', { name: 'Unsaved changes' })).toBeDefined();
+  });
+
   it('falls back to the timestamp stem without a project name', () => {
     expect(projectFileStem(createEmptyDocument(), 'llull-1')).toBe('llull-1');
   });
@@ -48,6 +55,19 @@ describe('project name', () => {
 describe('ProjectIO', () => {
   beforeEach(resetStores);
   afterEach(() => vi.restoreAllMocks());
+
+  it('Save marks the browser autosave as identical to the saved file', () => {
+    vi.spyOn(download, 'downloadBlob').mockImplementation(() => undefined);
+    window.localStorage.removeItem('llull-autosave');
+    act(() => dispatch('add_box', { size: [1, 1, 1] }));
+    render(<ProjectIO />);
+    fireEvent.click(screen.getByRole('button', { name: /save project/i }));
+    const record = JSON.parse(window.localStorage.getItem('llull-autosave') ?? 'null') as {
+      clean?: boolean;
+    } | null;
+    expect(record?.clean).toBe(true);
+    window.localStorage.removeItem('llull-autosave');
+  });
 
   it('Save names the file after the project and clears the unsaved marker', () => {
     const save = vi.spyOn(download, 'downloadBlob').mockImplementation(() => undefined);

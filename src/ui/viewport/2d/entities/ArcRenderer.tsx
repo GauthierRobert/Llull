@@ -4,7 +4,7 @@ import type { ArcEntity } from '@core/model/types';
 import { EllipticalCurve } from './EllipticalCurve';
 
 export function ArcRenderer({
-  entity: { center, radius, startAngle, endAngle, position, color },
+  entity: { center, radius, startAngle, endAngle, position, rotation, color },
   selected,
 }: {
   entity: ArcEntity;
@@ -18,6 +18,7 @@ export function ArcRenderer({
       startAngle={startAngle}
       endAngle={endAngle}
       position={position}
+      rotation={rotation}
       color={color}
       selected={selected}
     />

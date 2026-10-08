@@ -691,10 +691,11 @@ describe('set_parameter', () => {
     doc = execute(doc, 'set_parameter', { name: 'width', expression: '10' }).document;
     const result = execute(doc, 'set_parameter', { name: 'x', expression: 'width +' });
 
-    const param = result.document.parameters['x']!;
-    expect(param.error).toBeDefined();
-    // Must NOT say "cycle" — the expression is simply malformed.
-    expect(param.error).not.toContain('cycle');
+    // A malformed expression is refused outright (no parameter created), never labeled a cycle.
+    expect(result.document).toBe(doc);
+    expect(result.document.parameters['x']).toBeUndefined();
+    expect(result.summary).toContain('is invalid');
+    expect(result.summary).not.toContain('cycle');
   });
 
   it('rejects an invalid parameter name (starts with digit)', () => {

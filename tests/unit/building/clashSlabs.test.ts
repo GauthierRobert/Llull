@@ -83,6 +83,56 @@ describe('check_clashes: equipment through a floor', () => {
   });
 });
 
+describe('check_clashes: modelled walls', () => {
+  const wallDoc = (): CadDocument => {
+    const doc = execute(createEmptyDocument(), 'add_wall', {
+      start: [0, 0],
+      end: [4000, 0],
+      thickness: 200,
+    }).document;
+    return execute(doc, 'add_equipment', {
+      mark: 'P-1',
+      name: 'Pump',
+      location: [2000, 0],
+      size: [1000, 1000, 1000],
+    }).document;
+  };
+
+  it('reports equipment standing inside a wall and clears once it moves away', () => {
+    const doc = wallDoc();
+    const clashes = clashesOf(doc) as { a: string; b: string; kind: string }[];
+    expect(clashes).toHaveLength(1);
+    expect([clashes[0]?.a, clashes[0]?.b].sort()).toEqual(['equipment-1', 'wall-1']);
+    expect(clashes[0]?.kind).toBe('hard');
+    const moved = execute(doc, 'update_equipment', {
+      elementId: 'equipment-1',
+      location: [2000, 3000],
+    }).document;
+    expect(clashesOf(moved)).toEqual([]);
+  });
+});
+
+describe('check_clashes: summary depth', () => {
+  it('reports a sub-millimetre penetration with decimals and rejects a negative tolerance', () => {
+    let doc = execute(createEmptyDocument(), 'add_wall', {
+      start: [0, 0],
+      end: [4000, 0],
+      thickness: 200,
+    }).document;
+    doc = execute(doc, 'add_equipment', {
+      mark: 'P-1',
+      name: 'Pump',
+      location: [2000, 599.5],
+      size: [1000, 1000, 1000],
+    }).document;
+    const result = execute(doc, 'check_clashes', { tolerance: 0 });
+    expect(result.summary).toMatch(/\(0\.50 mm\)/);
+    const bad = execute(doc, 'check_clashes', { tolerance: -1 });
+    expect(bad.summary).toMatch(/tolerance must be >= 0/);
+    expect(bad.document).toBe(doc);
+  });
+});
+
 describe('add_equipment_openings', () => {
   it('cuts the floor around a vessel and clears the clash', () => {
     const doc = vesselThroughFloor();

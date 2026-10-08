@@ -50,6 +50,8 @@ const EQUIPMENT_SHAPE_OPTIONS: ReadonlyArray<readonly [string, string]> = [
 ];
 const BEAM_ONLY = { key: 'role', values: ['beam'] } as const;
 const COLUMN_ONLY = { key: 'role', values: ['column'] } as const;
+/** Footing X/Y: no default (a fixed one would stack footings), shown only without underColumns. */
+const EXPLICIT_LOCATION = { key: 'underColumns', values: ['false'] } as const;
 
 export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
   {
@@ -161,8 +163,8 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
     group: GROUP,
     fields: [
       checkbox('underColumns', 'Under every column', true),
-      num('x', 'X', '0', true),
-      num('y', 'Y', '0', true),
+      { ...num('x', 'X'), showWhen: EXPLICIT_LOCATION },
+      { ...num('y', 'Y'), showWhen: EXPLICIT_LOCATION },
       num('width', 'Width', '1500'),
       num('thickness', 'Thickness', '600'),
     ],

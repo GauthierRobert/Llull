@@ -47,6 +47,7 @@ interface UseSnapOpts {
 function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult | null {
   const entities = useStore((s) => s.document.entities);
   const order = useStore((s) => s.document.order);
+  const components = useStore((s) => s.document.components);
   const layers = useStore((s) => s.document.layers);
   const hiddenLayerIds = useViewportStore((s) => s.hiddenLayerIds);
   const hiddenEntityIds = useViewportStore((s) => s.hiddenEntityIds);
@@ -80,12 +81,12 @@ function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult | null
   const staticCandidates = useMemo(
     () =>
       collectSnapCandidates(
-        { entities, order },
+        { entities, order, components },
         { ...collectOpts, extensions: false, nearest: false, isVisible },
         drawOrigin ?? null,
         null,
       ),
-    [entities, order, collectOpts, drawOrigin, isVisible],
+    [entities, order, components, collectOpts, drawOrigin, isVisible],
   );
 
   // Cursor-DEPENDENT candidates: extension + nearest only. These do follow the
@@ -123,22 +124,28 @@ function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult | null
   return snap(adjustedCursor, candidates, gridSize, tolerance);
 }
 
+/** Stable identity so useSnap's memo is not rebuilt every render. */
+const ORTHO_ONLY: OrthoPolarOpts = { ortho: true, polar: false };
+
 /** Snap aperture in screen pixels — kept constant across zoom (CAD convention). */
 const SNAP_TOLERANCE_PX = 12;
 
 /**
  * `useSnap` for the ortho 2D view at camera `zoom`: the snap grid tracks the visible adaptive mesh
  * (selectable grid points at every zoom) and the aperture is pixel-constant, so geometric snaps
- * stay grabbable from very zoomed out to very zoomed in.
+ * stay grabbable from very zoomed out to very zoomed in. `ortho` constrains the cursor to the
+ * horizontal/vertical from `drawOrigin` (held Shift while drawing).
  */
 export function useZoomSnap(
   cursor: Vec2 | null,
   zoom: number,
   drawOrigin: Vec2 | null = null,
+  ortho = false,
 ): SnapResult | null {
   return useSnap(cursor, {
     gridSize: adaptiveGridStep(zoom),
     tolerance: pixelsToWorld(SNAP_TOLERANCE_PX, zoom),
     drawOrigin,
+    ...(ortho ? { orthoPolar: ORTHO_ONLY } : {}),
   });
 }

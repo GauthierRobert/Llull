@@ -4,12 +4,22 @@ import { execute } from '@core/commands/registry';
 import { boundsOf, dimensionLabel } from '@aec/planArchitectural';
 import { buildPlanDrawing } from '@aec/planDrawing';
 import { type DxfExport } from '@aec/dxfExport';
-import { dxfLayerName, dxfText } from '@aec/dxfWriter';
+import { DxfWriter, dxfLayerName, dxfText } from '@aec/dxfWriter';
 import { escapeXml } from '@lib/escapeXml';
 import { fitScale, type PlanSheet } from '@aec/sheet';
 import { type IfcExport } from '@aec/ifcBuild';
 import { ifcGuid, ifcReal, ifcString } from '@aec/ifcStep';
 import { fileSlug } from '@aec/model';
+
+/** True for code points XML 1.0 forbids (C0 controls other than tab, LF, CR; U+FFFE; U+FFFF). */
+function isIllegalXmlCharacter(character: string): boolean {
+  const code = character.codePointAt(0) ?? 0;
+  return (
+    (code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d) ||
+    code === 0xfffe ||
+    code === 0xffff
+  );
+}
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {
   return execute(doc, name, params).document;
@@ -195,8 +205,8 @@ describe('export_plan_sheet', () => {
     expect(execute(createEmptyDocument(), 'export_plan_sheet', {}).data).toBeUndefined();
   });
 
-  it('fitScale falls back to the largest scale and escapeXml escapes', () => {
-    expect(fitScale(1e9, 1e9, { x: 0, y: 0, width: 100, height: 100 })).toBe(2000);
+  it('fitScale extends past the standard scales (1-2-5) and escapeXml escapes', () => {
+    expect(fitScale(1e9, 1e9, { x: 0, y: 0, width: 100, height: 100 })).toBe(20_000_000);
     expect(fitScale(1000, 1000, { x: 0, y: 0, width: 100, height: 100 })).toBe(20);
     expect(escapeXml('a&"b')).toBe('a&amp;&quot;b');
   });
@@ -323,6 +333,137 @@ describe('DXF drafting text and extents', () => {
     const dxf = (execute(doc, 'export_dxf', {}).data as DxfExport).dxf;
     expect(dxf).toMatch(/Far note\n50\n90\n72\n2\n11\n50000/);
     expect(dxf).toMatch(/\$EXTMAX\n10\n50000\n20\n20000/);
+  });
+});
+
+describe('DXF layer names', () => {
+  it('keeps layers that differ only by punctuation distinct, in first-seen order', () => {
+    const writer = new DxfWriter();
+    writer.line('A B', [0, 0], [1, 0]);
+    writer.line('A_B', [0, 0], [1, 1]);
+    writer.line('A B', [0, 0], [0, 1]);
+    writer.polyline(
+      'A/B',
+      [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+      ],
+      false,
+    );
+    writer.line('S-GRID', [0, 0], [1, 0]);
+    expect([...writer.layers.keys()]).toEqual(['A_B', 'A_B_2', 'A_B_3', 'S-GRID']);
+    const layerOfEntity = (type: string): string[] =>
+      writer.lines.flatMap((line, index) =>
+        line === type && writer.lines[index - 1] === '0' ? [writer.lines[index + 2] as string] : [],
+      );
+    expect(layerOfEntity('LINE')).toEqual(['A_B', 'A_B_2', 'A_B', 'S-GRID']);
+    expect(layerOfEntity('POLYLINE')).toEqual(['A_B_3']);
+    expect(writer.layers.get('S-GRID')).toBe(1);
+    expect(new DxfWriter().layers.size).toBe(0);
+  });
+});
+
+describe('SVG sheets stay well-formed XML for hostile names', () => {
+  it('escapes markup and drops control characters in plan and elevation sheets', () => {
+    const nasty = `<A&B> "q" 'x' \u0001\u000b é`;
+    let doc = run(createEmptyDocument(), 'set_project_info', { name: nasty, author: nasty });
+    doc = run(doc, 'add_level', { name: nasty });
+    doc = run(doc, 'draw_walls', {
+      points: [
+        [0, 0],
+        [6000, 0],
+        [6000, 5000],
+        [0, 5000],
+      ],
+      closed: true,
+    });
+    doc = run(doc, 'add_room', { name: nasty, wallIds: ['wall-1', 'wall-2', 'wall-3', 'wall-4'] });
+    for (const name of ['export_plan_sheet', 'export_elevation_sheet']) {
+      const svg = (execute(doc, name, {}).data as { svg: string }).svg;
+      expect([...svg].filter(isIllegalXmlCharacter), name).toEqual([]);
+      expect(svg, name).not.toMatch(/&(?!amp;|lt;|gt;|quot;|#)/);
+      expect(svg, name).toContain('&lt;A&amp;B&gt;');
+    }
+  });
+});
+
+describe('extreme model sizes', () => {
+  const viewport = { x: 0, y: 0, width: 400, height: 250 };
+
+  it('fitScale goes beyond the standard scales so the drawing always fits', () => {
+    expect(fitScale(10, 10, viewport)).toBeLessThanOrEqual(20);
+    for (const extent of [5_000_000, 500_000_000, 123_456_789_012]) {
+      const scale = fitScale(extent, extent / 2, viewport);
+      expect(extent / scale, String(extent)).toBeLessThanOrEqual(viewport.width * 0.92);
+      expect(extent / scale, String(extent)).toBeGreaterThan(viewport.width * 0.92 * 0.19);
+      expect([1, 2, 5].includes(scale / 10 ** Math.floor(Math.log10(scale)))).toBe(true);
+    }
+    expect(fitScale(Infinity, 1, viewport)).toBe(2000);
+  });
+
+  it('plan sheet warns when a requested scale does not fit the paper, not when auto-fitted', () => {
+    const doc = house();
+    const auto = execute(doc, 'export_plan_sheet', {});
+    expect((auto.data as PlanSheet).fits).toBe(true);
+    expect(auto.summary).not.toMatch(/WARNING/);
+    const tooBig = execute(doc, 'export_plan_sheet', { scale: 5 });
+    expect((tooBig.data as PlanSheet).fits).toBe(false);
+    expect(tooBig.summary).toMatch(/WARNING: the drawing is larger than the paper at this scale/);
+    expect(execute(doc, 'export_plan_sheet', { scale: 100 }).summary).not.toMatch(/WARNING/);
+  });
+
+  it('elevation sheet warns when a requested scale does not fit, not when auto-fitted', () => {
+    const doc = house();
+    const auto = execute(doc, 'export_elevation_sheet', {});
+    expect((auto.data as { fits: boolean }).fits).toBe(true);
+    expect(auto.summary).not.toMatch(/WARNING/);
+    const tooBig = execute(doc, 'export_elevation_sheet', { scale: 5 });
+    expect((tooBig.data as { fits: boolean }).fits).toBe(false);
+    expect(tooBig.summary).toMatch(/WARNING: the view is larger than the paper at this scale/);
+  });
+
+  it('DXF hatch density is capped for a 500 km wall', () => {
+    let doc = run(createEmptyDocument(), 'add_level', { name: 'L' });
+    doc = run(doc, 'add_wall', { start: [0, 0], end: [500_000_000, 0], thickness: 10_000_000 });
+    const data = execute(doc, 'export_dxf', {}).data as DxfExport;
+    expect(data.entityCount).toBeLessThan(5000);
+  });
+});
+
+describe('export_ifc counts', () => {
+  it('reports elements and IFC products separately and truthfully', () => {
+    const hall = execute(createEmptyDocument(), 'add_portal_frame_building', {
+      span: 12000,
+      length: 12000,
+      baySpacing: 6000,
+    }).document;
+    const result = execute(hall, 'export_ifc', {});
+    const data = result.data as IfcExport;
+    const modelled = Object.keys(hall.building?.elements ?? {}).length;
+    expect(data.elementCount).toBeGreaterThan(0);
+    expect(data.elementCount).toBeLessThanOrEqual(modelled);
+    expect(data.productCount).toBeGreaterThanOrEqual(data.elementCount);
+    expect(result.summary).toContain(
+      `${data.elementCount} building element(s) as ${data.productCount} IFC product(s)`,
+    );
+    const plain = execute(house(), 'export_ifc', {}).data as IfcExport;
+    expect(plain.elementCount).toBeLessThanOrEqual(plain.productCount);
+  });
+});
+
+describe('export_ifc header timestamp', () => {
+  it('uses an ISO project date, and falls back (saying so) for a free-text date', () => {
+    const iso = execute(house(), 'export_ifc', {});
+    expect((iso.data as IfcExport).ifc).toContain("'2026-10-01T00:00:00'");
+    expect(iso.summary).not.toMatch(/not YYYY-MM-DD/);
+    const prose = run(house(), 'set_project_info', { date: '1 Oct 2026' });
+    const fallback = execute(prose, 'export_ifc', {});
+    expect((fallback.data as IfcExport).ifc).toContain("'1970-01-01T00:00:00'");
+    expect((fallback.data as IfcExport).ifc).not.toContain('1 Oct 2026T00');
+    expect(fallback.summary).toMatch(/Project date "1 Oct 2026" is not YYYY-MM-DD/);
+    const explicit = execute(prose, 'export_ifc', { timestamp: '2027-01-02T03:04:05' });
+    expect(explicit.summary).not.toMatch(/not YYYY-MM-DD/);
   });
 });
 

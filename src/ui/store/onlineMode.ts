@@ -6,15 +6,30 @@
  */
 
 import type { CadDocument, EntityId } from '@core/model/types';
-import { postCommand, postRedo, postUndo, ServerCommandError } from './serverCommands';
+import {
+  isCommandRefusal,
+  isConnectionRefusal,
+  postCommand,
+  postRedo,
+  postUndo,
+  ServerCommandError,
+} from './serverCommands';
 import type { ServerCommandResponse } from './serverCommands';
 import { measureAfter, statusSummaryFor } from './feedback';
-import { newCommandId } from './outbox';
+import { newCommandId, poisonDroppedEntry, removeOutboxEntry } from './outbox';
+import { forgetGraceRun, nextDispatchSeq, runEarlierGraceRuns, trackGraceRun } from './graceRuns';
 import { runLocally, selectionAfter, stepLocalHistory } from './localMode';
 import type { CadStoreState, DispatchOptions, StoreGet, StoreSet } from './storeTypes';
 
 const isHttpError = (err: unknown): boolean =>
   err instanceof ServerCommandError && err.kind === 'http';
+
+/**
+ * Before the /live stream has connected once, a POST gets this long to answer; past it the command
+ * runs locally under the same commandId (replayed idempotently on connect). A refused connection
+ * can take seconds to fail, which would otherwise leave the document unchanged that long.
+ */
+export const CONNECT_GRACE_MS = 400;
 
 /** True when a failed POST means "server never reachable": safe to run locally. */
 function sseIsDown(state: CadStoreState): boolean {
@@ -74,6 +89,26 @@ function responseChanged(response: ServerCommandResponse): boolean {
   return response.changed ?? (!response.isError && response.affected.length > 0);
 }
 
+/**
+ * A grace-run command the server then refused (400/413/422) would be re-POSTed forever by the
+ * flush: drop its outbox entry, poison the ids it created (later entries using them are dropped
+ * by the flush), and tell the user (the post-flush snapshot reconciles the document).
+ */
+function dropRefusedGraceRun(
+  set: StoreSet,
+  get: StoreGet,
+  commandId: string,
+  message: string,
+): void {
+  const { localOutbox, liveBase } = get();
+  const entry = localOutbox.find((queued) => queued.commandId === commandId);
+  if (entry !== undefined) poisonDroppedEntry(entry, liveBase, localOutbox);
+  set((state) => ({
+    localOutbox: removeOutboxEntry(state.localOutbox, commandId),
+    lastSummary: `${message} — the server refused the command; it will not be synced.`,
+  }));
+}
+
 /** Fire-and-forget: the document update comes from the /live SSE stream. */
 export function postDispatch(
   set: StoreSet,
@@ -84,8 +119,42 @@ export function postDispatch(
 ): void {
   const selectionAtDispatch = get().document.selection;
   const commandId = newCommandId();
+  const dispatchSeq = nextDispatchSeq();
+  let ranLocally = false;
+  /** The document was replaced while this dispatch was in its grace period (`resetGraceRuns`). */
+  let cancelled = false;
+  const runLocalOnce = (): void => {
+    if (ranLocally || cancelled) return;
+    ranLocally = true;
+    runLocally(set, get, name, params, options, commandId);
+  };
+  const fallBackLocally = (): void => {
+    runEarlierGraceRuns(dispatchSeq);
+    runLocalOnce();
+  };
+  const graceTimer = sseIsDown(get())
+    ? setTimeout(() => {
+        forgetGraceRun(dispatchSeq);
+        if (sseIsDown(get())) fallBackLocally();
+      }, CONNECT_GRACE_MS)
+    : undefined;
+  if (graceTimer !== undefined) {
+    const runNow = (): void => {
+      clearTimeout(graceTimer);
+      runLocalOnce();
+    };
+    const cancel = (): void => {
+      clearTimeout(graceTimer);
+      cancelled = true;
+    };
+    trackGraceRun({ dispatchSeq, runNow, cancel });
+  }
   void postCommand(name, params, commandId)
     .then((response) => {
+      if (cancelled) return;
+      clearTimeout(graceTimer);
+      forgetGraceRun(dispatchSeq);
+      if (ranLocally) return;
       set((state) => ({
         document: selectAffectedIn(state.document, selectionAtDispatch, response.affected, options),
         lastSummary: statusSummaryFor(name, response.summary, options) ?? state.lastSummary,
@@ -96,13 +165,20 @@ export function postDispatch(
       options?.onResult?.({ summary: response.summary, changed: responseChanged(response) });
     })
     .catch((err: unknown) => {
-      handlePostFailure(
-        set,
-        get,
-        err,
-        `Command '${name}'`,
-        () => runLocally(set, get, name, params, options, commandId),
-        (summary) => options?.onResult?.({ summary, changed: false }),
+      if (cancelled) return;
+      clearTimeout(graceTimer);
+      forgetGraceRun(dispatchSeq);
+      if (ranLocally) {
+        if (isCommandRefusal(err)) dropRefusedGraceRun(set, get, commandId, err.message);
+        else if (isConnectionRefusal(err)) {
+          set({
+            lastSummary: `${err.message} — server refused the connection (auth/origin), offline edits kept.`,
+          });
+        }
+        return;
+      }
+      handlePostFailure(set, get, err, `Command '${name}'`, fallBackLocally, (summary) =>
+        options?.onResult?.({ summary, changed: false }),
       );
     });
 }

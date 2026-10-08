@@ -1,7 +1,7 @@
 /**
  * Assembly commands: create_component, insert_instance, explode_instance.
- * Instances reference a component by id; `expandInstance` bakes one into world-space entities
- * (scale -> rotate about origin -> translate; keep in sync with `scene.ts` `instanceBoundsFromDoc`).
+ * Instances reference a component by id; `expandInstance` (./instanceExpansion) bakes one into
+ * world-space entities.
  *
  * @layer core/commands
  */
@@ -10,15 +10,18 @@ import type { Component, Entity, InstanceEntity, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, vec3, z } from './schema';
 import { DEFAULT_LAYER_ID } from '../model/types';
+import { UNIT_SCALE, expandInstance } from './instanceExpansion';
 import { nextId } from '../lib/id';
 import { commitEntity } from './commitEntity';
-import { replaceEntities, withoutEntities } from './entityOps';
-import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
+import {
+  referenceLossSuffix,
+  referenceSuffix,
+  replaceEntities,
+  withoutEntities,
+} from './entityOps';
 import { noop } from './noop';
 import { EXTRUSION_COLOR } from './geometryShared';
-import { ORIGIN, add3 } from '../lib/vec3';
-
-const UNIT_SCALE: Vec3 = [1, 1, 1];
+import { ORIGIN } from '../lib/vec3';
 
 /** A fresh instance of `componentId` (default color `#c8553d`). */
 export function instanceEntity(
@@ -40,39 +43,28 @@ export function instanceEntity(
   };
 }
 
-function expandedId(instanceId: string, sourceEntityId: string): string {
-  return `expanded::${instanceId}::${sourceEntityId}`;
-}
-
 /**
- * Bake an instance into world-space copies of the component's entities (ids `expanded::<instance>::<source>`).
- * Child rotations add the instance's Euler angles (additive, as elsewhere in the command layer).
- * @pure
+ * A component reference cycle reachable from `startId` (e.g. `['A', 'B', 'A']`: A contains an
+ * instance of B which contains an instance of A), or null when the component graph is acyclic.
+ * Missing components are ignored. @pure
  */
-export function expandInstance(instance: InstanceEntity, component: Component): Entity[] {
-  const [sx, sy, sz] = instance.scale ?? UNIT_SCALE;
-  const rot = instance.rotation;
-  const pos = instance.position;
-  const hasRotation = !isZeroRotation(rot);
-
-  return component.order
-    .map((cid) => component.entities[cid])
-    .filter((e): e is Entity => e !== undefined)
-    .map((childEntity): Entity => {
-      const localPos: Vec3 = [
-        childEntity.position[0] * sx,
-        childEntity.position[1] * sy,
-        childEntity.position[2] * sz,
-      ];
-      const rotatedPos: Vec3 = hasRotation ? applyEulerXYZ(localPos, [0, 0, 0], rot) : localPos;
-
-      return {
-        ...childEntity,
-        id: expandedId(instance.id, childEntity.id),
-        position: add3(rotatedPos, pos),
-        rotation: add3(childEntity.rotation, rot),
-      } as Entity;
-    });
+export function findComponentCycle(
+  components: Readonly<Record<string, Component>>,
+  startId: string,
+): string[] | null {
+  const visit = (id: string, path: string[]): string[] | null => {
+    const component = Object.hasOwn(components, id) ? components[id] : undefined;
+    if (!component) return null;
+    for (const child of Object.values(component.entities)) {
+      if (child.kind !== 'instance') continue;
+      if (child.componentId === startId) return [...path, id, startId];
+      if (path.includes(child.componentId) || child.componentId === id) continue;
+      const found = visit(child.componentId, [...path, id]);
+      if (found) return found;
+    }
+    return null;
+  };
+  return visit(startId, []);
 }
 
 /**
@@ -110,10 +102,18 @@ export const createComponent = defineCommand({
       .optional()
       .describe(
         'Optional explicit component id to assign. When omitted a fresh id is generated via nextId("comp"). ' +
-          'Useful for deterministic agent plans that reference the component id immediately after creation.',
+          'Useful for deterministic agent plans that reference the component id immediately after creation. ' +
+          'An id that already names a component is refused unless replace is true.',
+      ),
+    replace: z
+      .boolean()
+      .optional()
+      .describe(
+        'Set true to overwrite the existing component named by componentId (every instance of it then ' +
+          'shows the new definition). Default false: reusing an existing component id is refused.',
       ),
   }),
-  run: (doc, { name, entityIds, componentId }): CommandResult => {
+  run: (doc, { name, entityIds, componentId, replace = false }): CommandResult => {
     if (entityIds.length === 0) {
       return noop(doc, 'create_component: entityIds must be a non-empty array.');
     }
@@ -127,19 +127,33 @@ export const createComponent = defineCommand({
     }
 
     const compId = componentId ?? nextId('comp');
+    if (!replace && Object.hasOwn(doc.components, compId)) {
+      return noop(
+        doc,
+        `create_component: component "${compId}" already exists; choose another componentId, or pass replace:true to overwrite it (its instances would then show the new definition). Document unchanged.`,
+      );
+    }
     const component: Component = {
       id: compId,
       name,
       entities: Object.fromEntries(entityIds.map((id) => [id, doc.entities[id] as Entity])),
       order: [...entityIds],
     };
+    const cycle = findComponentCycle({ ...doc.components, [compId]: component }, compId);
+    if (cycle) {
+      return noop(
+        doc,
+        `create_component: component "${compId}" would contain itself (${cycle.join(' -> ')}); ` +
+          'a component cannot (indirectly) hold an instance of itself. Document unchanged.',
+      );
+    }
     const instanceId = nextId('instance');
     const instance = instanceEntity(instanceId, compId, ORIGIN, ORIGIN);
     const replaced = replaceEntities(doc, entityIds, instance);
 
     return {
       document: { ...replaced, components: { ...doc.components, [compId]: component } },
-      summary: `Created component "${name}" (id: ${compId}) from ${entityIds.length} entit${entityIds.length === 1 ? 'y' : 'ies'} [${entityIds.join(', ')}]; placed instance ${instanceId}.`,
+      summary: `Created component "${name}" (id: ${compId}) from ${entityIds.length} entit${entityIds.length === 1 ? 'y' : 'ies'} [${entityIds.join(', ')}]; placed instance ${instanceId}.${referenceLossSuffix(doc, replaced)}`,
       affected: [instanceId],
     };
   },
@@ -239,7 +253,7 @@ export const explodeInstance = defineCommand({
     const bakedEntities = expandInstance(entity, component);
 
     const bakedIds = bakedEntities.map((e) => e.id);
-    const { document: rest } = withoutEntities(doc, new Set([id]));
+    const { document: rest, prunedReferences } = withoutEntities(doc, new Set([id]));
     const document = {
       ...rest,
       entities: { ...rest.entities, ...Object.fromEntries(bakedEntities.map((e) => [e.id, e])) },
@@ -248,7 +262,7 @@ export const explodeInstance = defineCommand({
 
     return {
       document,
-      summary: `Exploded instance "${id}" (component "${component.name}", ${entity.componentId}) into ${bakedEntities.length} concrete entit${bakedEntities.length === 1 ? 'y' : 'ies'}: [${bakedIds.join(', ')}].`,
+      summary: `Exploded instance "${id}" (component "${component.name}", ${entity.componentId}) into ${bakedEntities.length} concrete entit${bakedEntities.length === 1 ? 'y' : 'ies'}: [${bakedIds.join(', ')}].${referenceSuffix(prunedReferences)}`,
       affected: bakedIds,
     };
   },

@@ -1,4 +1,4 @@
-import type { CadDocument, Constraint, EntityRef, Vec3 } from '../model/types';
+import type { CadDocument, Constraint, EntityRef, Vec2, Vec3 } from '../model/types';
 import { len2 } from '../lib/vec2';
 import { resolveNumeric } from './expression';
 
@@ -52,6 +52,36 @@ function resolveRadius(doc: CadDocument, ref: EntityRef): number | null {
 /** Per-entity 2D position deltas accumulated in one solver iteration. */
 type Delta = Map<string, [number, number]>;
 
+/** Per-line rotation (radians, CCW, about the line midpoint) accumulated in one solver iteration. */
+type Turns = Map<string, number>;
+
+/** Fraction of the angular error corrected per iteration (keeps coupled constraints stable). */
+const TURN_RELAXATION = 0.5;
+
+/** `angle` wrapped into (-π, π]. */
+function wrapAngle(angle: number): number {
+  return angle - 2 * Math.PI * Math.round(angle / (2 * Math.PI));
+}
+
+/** Smallest signed distance from `angle` to the nearest multiple of `period` (offset by `phase`). */
+function distanceToLattice(angle: number, phase: number, period: number): number {
+  const shifted = angle - phase;
+  return shifted - period * Math.round(shifted / period);
+}
+
+/** Line endpoints rotated by `turn` about their midpoint. */
+function turnedLine(start: Vec2, end: Vec2, turn: number): { start: Vec2; end: Vec2 } {
+  const mx = (start[0] + end[0]) / 2;
+  const my = (start[1] + end[1]) / 2;
+  const cos = Math.cos(turn);
+  const sin = Math.sin(turn);
+  const rotate = (p: Vec2): Vec2 => [
+    mx + (p[0] - mx) * cos - (p[1] - my) * sin,
+    my + (p[0] - mx) * sin + (p[1] - my) * cos,
+  ];
+  return { start: rotate(start), end: rotate(end) };
+}
+
 /**
  * Compute the gradient contribution of one constraint and accumulate the position
  * delta into `deltas`. Each entity in the constraint receives a push that reduces
@@ -66,8 +96,13 @@ function applyConstraintGradient(
   doc: CadDocument,
   c: Constraint,
   deltas: Delta,
+  turns: Turns,
   stepSize: number,
 ): number {
+  function addTurn(entityId: string, angle: number): void {
+    turns.set(entityId, (turns.get(entityId) ?? 0) + angle);
+  }
+
   function addDelta(entityId: string, dx: number, dy: number): void {
     const existing = deltas.get(entityId) ?? [0, 0];
     deltas.set(entityId, [existing[0] + dx, existing[1] + dy]);
@@ -125,36 +160,34 @@ function applyConstraintGradient(
       // Angle from da to db (z-component of cross product + dot product).
       const cross = da[0] * db[1] - da[1] * db[0]; // da × db
       const dot = da[0] * db[0] + da[1] * db[1]; // da · db
-      const angle = Math.atan2(cross, dot);
-      const err = angle - target;
-      const err2 = err * err;
-      // Move entity b's position to rotate its direction (approximate gradient).
-      // We perturb the entity position to change the line direction.
-      addDelta(c.b.entityId, -stepSize * err * da[1], stepSize * err * da[0]);
-      return err2;
+      const err = wrapAngle(Math.atan2(cross, dot) - target);
+      // Line b turns about its midpoint (translating a line never changes its direction).
+      addTurn(c.b.entityId, -TURN_RELAXATION * err);
+      return err * err;
     }
 
     case 'parallel': {
       const da = resolveDirection(doc, c.a);
       const db = resolveDirection(doc, c.b);
       if (!da || !db) return 0;
-      // Error: (da × db)²  — the z-component of the cross product.
+      // Error: signed angle from b to the nearest parallel (or anti-parallel) direction of a.
       const cross = da[0] * db[1] - da[1] * db[0];
-      const err2 = cross * cross;
-      // Gradient: rotate b direction toward a's direction.
-      addDelta(c.b.entityId, -stepSize * cross * da[1], stepSize * cross * da[0]);
-      return err2;
+      const dot = da[0] * db[0] + da[1] * db[1];
+      const err = distanceToLattice(Math.atan2(cross, dot), 0, Math.PI);
+      addTurn(c.b.entityId, -TURN_RELAXATION * err);
+      return err * err;
     }
 
     case 'perpendicular': {
       const da = resolveDirection(doc, c.a);
       const db = resolveDirection(doc, c.b);
       if (!da || !db) return 0;
-      // Error: (da · db)².
+      // Error: signed angle from b to the nearest perpendicular direction of a.
+      const cross = da[0] * db[1] - da[1] * db[0];
       const dot = da[0] * db[0] + da[1] * db[1];
-      const err2 = dot * dot;
-      addDelta(c.b.entityId, -stepSize * dot * da[0], -stepSize * dot * da[1]);
-      return err2;
+      const err = distanceToLattice(Math.atan2(cross, dot), Math.PI / 2, Math.PI);
+      addTurn(c.b.entityId, -TURN_RELAXATION * err);
+      return err * err;
     }
 
     case 'tangent': {
@@ -198,8 +231,10 @@ function applyConstraintGradient(
  * Run the constraint solver and return a new document with updated entity positions.
  *
  * The solver is a 2D projected gradient descent / Newton-style iteration:
- * - Only entity.position[0] and position[1] are adjusted (2D XY plane).
- * - position[2] (Z) is preserved.
+ * - Points are pulled by adjusting entity.position[0] and position[1] (2D XY plane); position[2] (Z)
+ *   is preserved.
+ * - angle/parallel/perpendicular turn line b about its midpoint (its start/end change, not position).
+ * - `residual` and `converged` describe the returned document, not the previous iterate.
  * - Iterates up to MAX_ITERATIONS steps, stopping early when residual < RESIDUAL_THRESHOLD
  *   or step delta < DELTA_THRESHOLD.
  *
@@ -227,14 +262,28 @@ export function runSolver(doc: CadDocument): {
     positions.set(id, entity.position);
   }
 
-  /** Build a document with the current working positions applied. */
+  // Working line endpoints for lines turned by angle/parallel/perpendicular constraints.
+  const lineEnds = new Map<string, { start: Vec2; end: Vec2 }>();
+
+  /** Build a document with the current working positions and line endpoints applied. */
   function buildDoc(): CadDocument {
     const newEntities: CadDocument['entities'] = {};
     for (const [id, entity] of Object.entries(doc.entities)) {
       const pos = positions.get(id) ?? entity.position;
-      newEntities[id] = { ...entity, position: pos };
+      const ends = entity.kind === 'line' ? lineEnds.get(id) : undefined;
+      newEntities[id] = ends ? { ...entity, ...ends, position: pos } : { ...entity, position: pos };
     }
     return { ...doc, entities: newEntities };
+  }
+
+  /** Total squared constraint error of `target` (gradient output discarded). */
+  function totalResidual(target: CadDocument): number {
+    const scratch: Delta = new Map();
+    const scratchTurns: Turns = new Map();
+    return constraints.reduce(
+      (sum, c) => sum + applyConstraintGradient(target, c, scratch, scratchTurns, BASE_STEP),
+      0,
+    );
   }
 
   let residual = Infinity;
@@ -243,10 +292,11 @@ export function runSolver(doc: CadDocument): {
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
     const workingDoc = buildDoc();
     const deltas: Delta = new Map();
+    const turns: Turns = new Map();
     let totalError = 0;
 
     for (const c of constraints) {
-      totalError += applyConstraintGradient(workingDoc, c, deltas, BASE_STEP);
+      totalError += applyConstraintGradient(workingDoc, c, deltas, turns, BASE_STEP);
     }
 
     residual = totalError;
@@ -264,9 +314,20 @@ export function runSolver(doc: CadDocument): {
       maxDelta = Math.max(maxDelta, Math.abs(dx), Math.abs(dy));
     }
 
+    for (const [id, turn] of turns) {
+      const line = workingDoc.entities[id];
+      if (line?.kind !== 'line') continue;
+      const current = lineEnds.get(id) ?? { start: line.start, end: line.end };
+      lineEnds.set(id, turnedLine(current.start, current.end, turn));
+      maxDelta = Math.max(maxDelta, Math.abs(turn));
+    }
+
     if (maxDelta < DELTA_THRESHOLD) break;
   }
 
+  const document = buildDoc();
+  // The loop measures the error BEFORE each update; report the error of the document returned.
+  residual = totalResidual(document);
   const converged = residual < RESIDUAL_THRESHOLD;
-  return { document: buildDoc(), residual, iterations, converged };
+  return { document, residual, iterations, converged };
 }

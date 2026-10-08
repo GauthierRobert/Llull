@@ -104,6 +104,7 @@ export const fillet2D = defineCommand({
     radius: z.number().describe('Fillet radius. Must be > 0.'),
     vertexIndex: z
       .number()
+      .int()
       .describe(
         '0-based index of the polyline vertex to fillet. ' +
           'For open polylines: valid range is 1 to N-2 (interior vertices). ' +
@@ -213,6 +214,7 @@ export const chamfer2D = defineCommand({
       ),
     vertexIndex: z
       .number()
+      .int()
       .describe(
         '0-based index of the polyline vertex to chamfer. ' +
           'For open polylines: valid range is 1 to N-2. ' +

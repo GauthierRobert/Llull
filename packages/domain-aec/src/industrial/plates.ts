@@ -44,13 +44,21 @@ export const addBasePlates = defineCommand({
       .optional()
       .describe('Steel column ids. Default: every unplated steel column of the level.'),
     levelId: existingLevelIdParam,
-    margin: z.number().optional().describe('Plate overhang beyond the profile. Default 100 mm.'),
+    margin: z
+      .number()
+      .optional()
+      .describe('Plate overhang beyond the profile, in document units. Default 100 mm.'),
     thickness: z
       .number()
       .optional()
-      .describe('Plate thickness. Default 25 mm (20 mm for profiles < 300 deep).'),
+      .describe(
+        'Plate thickness, in document units. Default 25 mm (20 mm for profiles < 300 deep).',
+      ),
     boltCount: z.number().optional().describe('Anchor bolts, even, 2–12. Default 4.'),
-    boltDiameter: z.number().optional().describe('Bolt diameter. Default 24 mm (M24).'),
+    boltDiameter: z
+      .number()
+      .optional()
+      .describe('Bolt diameter, in document units. Default 24 mm (M24).'),
   }),
   run: (doc, params): CommandResult => {
     const { margin, thickness, boltDiameter } = params;

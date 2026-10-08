@@ -32,6 +32,8 @@ export interface ElevationSheet {
   readonly paper: PaperSize;
   readonly scale: number;
   readonly faces: number;
+  /** False when the view extents exceed the view area of the paper at this scale. */
+  readonly fits: boolean;
 }
 
 /** Space kept around the view for grid bubbles (top) and level marks (right), paper mm. */
@@ -168,6 +170,7 @@ function buildElevationSheet(
     paper,
     scale,
     faces: drawing.items.length,
+    fits: (maxU - minU) * k <= viewport.width + 1e-9 && (maxZ - minZ) * k <= viewport.height + 1e-9,
   };
 }
 
@@ -207,7 +210,9 @@ export const exportElevationSheet = defineCommand({
     scale: z
       .number()
       .optional()
-      .describe('Scale denominator N for 1:N. Default: smallest standard scale that fits.'),
+      .describe(
+        'Scale denominator N for 1:N. Default: the smallest standard scale that fits (1-2-5 steps beyond 1:2000).',
+      ),
     title: z.string().optional().describe('Drawing title. Default "<Direction> elevation".'),
   }),
   run: (
@@ -223,7 +228,7 @@ export const exportElevationSheet = defineCommand({
     }
     return {
       document: doc,
-      summary: `Elevation sheet ${sheet.filename}: ${sheet.faces} visible face(s) at 1:${sheet.scale} on ${sheet.paper}.`,
+      summary: `Elevation sheet ${sheet.filename}: ${sheet.faces} visible face(s) at 1:${sheet.scale} on ${sheet.paper}.${sheet.fits ? '' : ' WARNING: the view is larger than the paper at this scale; omit scale to auto-fit or choose a larger paper.'}`,
       affected: [],
       data: sheet,
     };

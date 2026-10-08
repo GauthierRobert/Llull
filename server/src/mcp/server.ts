@@ -24,12 +24,16 @@ import {
   readMcpResource,
   listMcpPrompts,
   getMcpPrompt,
+  SERVER_INSTRUCTIONS,
   applyExchangeToolCall,
   applyDiscoveryToolCall,
   isPromptEnabled,
+  closestToolNames,
   isToolEnabled,
+  searchTools,
   toolsetOf,
 } from '@mcp/index';
+import { getCommand } from '@core/commands/registry';
 import type { ToolsetName } from '@mcp/index';
 import { errorMessage } from '@lib/errorMessage';
 import { getLiveDoc } from '../liveDocument';
@@ -39,6 +43,22 @@ import { buildImageBlock, stripSvgFromData } from '../renderImage';
 
 function makeErrorResult(message: string): CallToolResult {
   return shapeToolCallContent({ summary: message, affected: [], isError: true });
+}
+
+/** Unknown tool: same "Unknown command" text as `execute`, plus the closest tool names. */
+function unknownToolResult(
+  name: string,
+  enabledToolsets: ReadonlySet<ToolsetName>,
+): CallToolResult {
+  const typoMatches = closestToolNames(name, 5);
+  const suggestions =
+    typoMatches.length > 0
+      ? typoMatches
+      : searchTools(name.replace(/_/g, ' '), 5, enabledToolsets).map((r) => r.name);
+  const hint = suggestions.length > 0 ? ` Closest tools: ${suggestions.join(', ')}.` : '';
+  return makeErrorResult(
+    `Unknown command: ${name}.${hint} Use search_tools to find tools by keyword.`,
+  );
 }
 
 /** Tool list for a session: registry tools + exchange/discovery meta-tools, filtered by toolset. */
@@ -63,7 +83,10 @@ export function buildMcpServer(
 ): Server {
   const server = new Server(
     { name: 'llull', version: '0.1.0' },
-    { capabilities: { tools: { listChanged: true }, resources: {}, prompts: {} } },
+    {
+      capabilities: { tools: { listChanged: true }, resources: {}, prompts: {} },
+      instructions: SERVER_INSTRUCTIONS,
+    },
   );
   /** Per-session: the configured set, grown by the `enable_toolset` discovery tool. */
   const enabledToolsets = new Set<ToolsetName>(configuredToolsets);
@@ -97,6 +120,8 @@ export function buildMcpServer(
       allowCodeExecution: exchange.allowCodeExecution,
     });
     if (exchangeResult !== null) return exchangeResult;
+
+    if (getCommand(name) === undefined) return unknownToolResult(name, enabledToolsets);
 
     const busResult = applyCommand(name, args ?? {});
 

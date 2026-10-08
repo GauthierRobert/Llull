@@ -7,17 +7,32 @@
  * command (react R1: gather params -> dispatch). Escape / Back returns to the command list.
  */
 
-import React, { useId, useMemo, useState } from 'react';
+import React, { useId, useMemo, useRef, useState } from 'react';
 import type { CommandDefinition } from '@core/commands/types';
 import { useStore } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
-import { fieldsFromSchema, humanizeName, initialValues, parseFormValues } from './paramForm';
+import {
+  fieldsFromSchema,
+  humanizeName,
+  initialValues,
+  matchTypeahead,
+  parseFormValues,
+  valuesFromParams,
+} from './paramForm';
 import type { FormField, FormValues } from './paramForm';
 
 interface CommandParamFormProps {
   command: CommandDefinition<unknown>;
   onBack: () => void;
   onSubmit: (params: Record<string, unknown>) => void;
+  /** Edit mode: pre-fill from these params instead of the selection. */
+  initialParams?: Readonly<Record<string, unknown>>;
+  /** Label of the submit button (default "Run"). */
+  submitLabel?: string;
+  /** Label of the back/cancel button (default "Back to commands"). */
+  backLabel?: string;
+  /** A refusal / result message from the last submit, shown above the footer. */
+  statusMessage?: string | null;
 }
 
 const PLACEHOLDERS: Readonly<Record<FormField['kind'], string>> = {
@@ -40,6 +55,53 @@ interface FieldControlProps {
   onChange: (value: string) => void;
 }
 
+/** Typed characters accumulate for this long before a new search starts. */
+const TYPEAHEAD_RESET_MS = 700;
+
+interface TypeaheadSelectProps {
+  common: React.SelectHTMLAttributes<HTMLSelectElement>;
+  value: string;
+  options: readonly string[];
+  optional: boolean;
+  onChange: (value: string) => void;
+}
+
+/** `<select>` whose type-to-select prefers an exact option over the first prefix match. */
+function TypeaheadSelect({
+  common,
+  value,
+  options,
+  optional,
+  onChange,
+}: TypeaheadSelectProps): React.ReactElement {
+  const typed = useRef({ text: '', at: 0 });
+  return (
+    <select
+      {...common}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey || e.key === ' ') return;
+        const now = Date.now();
+        const text =
+          now - typed.current.at > TYPEAHEAD_RESET_MS ? e.key : typed.current.text + e.key;
+        typed.current = { text, at: now };
+        const match = matchTypeahead(options, text);
+        if (match === undefined) return;
+        e.preventDefault();
+        onChange(match);
+      }}
+    >
+      {optional && <option value="">Default</option>}
+      {options.map((option) => (
+        <option key={option} value={option}>
+          {option}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function FieldControl({
   field,
   id,
@@ -59,14 +121,13 @@ function FieldControl({
   if (field.kind === 'enum' || field.kind === 'boolean') {
     const options = field.kind === 'boolean' ? ['true', 'false'] : field.options;
     return (
-      <select {...common} value={value} onChange={(e) => onChange(e.target.value)}>
-        {!field.required && <option value="">Default</option>}
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
+      <TypeaheadSelect
+        common={common}
+        value={value}
+        options={options}
+        optional={!field.required}
+        onChange={onChange}
+      />
     );
   }
   if (field.kind === 'json') {
@@ -99,10 +160,16 @@ export function CommandParamForm({
   command,
   onBack,
   onSubmit,
+  initialParams,
+  submitLabel = 'Run',
+  backLabel = 'Back to commands',
+  statusMessage = null,
 }: CommandParamFormProps): React.ReactElement {
   const fields = useMemo(() => fieldsFromSchema(command.paramsSchema), [command]);
   const [values, setValues] = useState<FormValues>(() =>
-    initialValues(fields, useStore.getState().document.selection),
+    initialParams === undefined
+      ? initialValues(fields, useStore.getState().document.selection)
+      : valuesFromParams(fields, initialParams),
   );
   const [errors, setErrors] = useState<Readonly<Record<string, string>>>({});
   const baseId = useId();
@@ -136,7 +203,7 @@ export function CommandParamForm({
       }}
     >
       <header className="palette-form__header">
-        <button type="button" className="icon-btn" onClick={onBack} aria-label="Back to commands">
+        <button type="button" className="icon-btn" onClick={onBack} aria-label={backLabel}>
           <Icon name="arrowLeft" size={14} />
         </button>
         <div className="palette-form__heading">
@@ -202,6 +269,12 @@ export function CommandParamForm({
         </div>
       )}
 
+      {statusMessage !== null && (
+        <p className="palette-form__status" role="alert">
+          {statusMessage}
+        </p>
+      )}
+
       <footer className="palette-form__footer">
         <span className="palette-form__meta">
           {fields.length === 0
@@ -215,7 +288,7 @@ export function CommandParamForm({
           className={`btn ${destructive ? 'btn--destructive' : 'btn--primary'}`}
           autoFocus={fields.length === 0}
         >
-          Run
+          {submitLabel}
           <kbd className="kbd kbd--on-accent">Ctrl ↵</kbd>
         </button>
       </footer>

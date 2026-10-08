@@ -1,4 +1,4 @@
-import type { CadDocument, Vec3 } from '../model/types';
+import type { CadDocument, Entity, Vec3 } from '../model/types';
 import { ORIGIN, add3 } from '../lib/vec3';
 import { computeSceneSnapshot } from './scene';
 import { boundsCenter, boundsRadius } from './sceneBounds';
@@ -6,6 +6,18 @@ import type { RenderViewData, Polygon3D } from './renderTypes';
 import { type ViewName, cameraForView, cameraBasis, projectPoint } from './renderCamera';
 import { tessellateEntity } from './renderTessellation';
 import { MAX_POLYGONS, buildSvg } from './renderSvg';
+import { expandInstance } from './instanceExpansion';
+
+/** Component instances nested deeper than this are not drawn (guards against reference cycles). */
+const MAX_INSTANCE_DEPTH = 4;
+
+/** `e` itself, or for an instance the baked entities of its component (recursively). */
+function drawableEntities(doc: CadDocument, e: Entity, depth = 0): Entity[] {
+  if (e.kind !== 'instance') return [e];
+  const component = doc.components[e.componentId];
+  if (!component || depth >= MAX_INSTANCE_DEPTH) return [];
+  return expandInstance(e, component).flatMap((child) => drawableEntities(doc, child, depth + 1));
+}
 
 function centroid3(verts: Vec3[]): Vec3 {
   if (verts.length === 0) return [0, 0, 0];
@@ -33,10 +45,12 @@ export function renderDocument(
   collect: for (const id of doc.order) {
     const e = doc.entities[id];
     if (!e) continue;
-    for (const p of tessellateEntity(e)) {
-      if (polygons.length >= MAX_POLYGONS) break collect;
-      const [, , depth] = projectPoint(centroid3(p.verts), cam, basis);
-      polygons.push({ ...p, depth });
+    for (const drawable of drawableEntities(doc, e)) {
+      for (const p of tessellateEntity(drawable)) {
+        if (polygons.length >= MAX_POLYGONS) break collect;
+        const [, , depth] = projectPoint(centroid3(p.verts), cam, basis);
+        polygons.push({ ...p, depth });
+      }
     }
   }
 

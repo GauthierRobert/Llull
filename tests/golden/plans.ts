@@ -428,6 +428,97 @@ export const plans: Record<string, GoldenAction[]> = {
     { command: 'add_level', params: { name: 'First' } },
     { command: 'update_wall', params: { wallId: 'wall-1', height: 2800 } },
   ],
+  building_mixed_model_edited: [
+    { command: 'add_level', params: { name: 'Ground', height: 4000 } },
+    {
+      command: 'draw_walls',
+      params: {
+        points: [
+          [0, 0],
+          [6000, 0],
+          [6000, 5000],
+          [0, 5000],
+        ],
+        closed: true,
+        thickness: 200,
+      },
+    },
+    { command: 'add_door', params: { wallId: 'wall-1', offset: 1500 } },
+    { command: 'add_window', params: { wallId: 'wall-2', offset: 2500 } },
+    {
+      command: 'add_curved_wall',
+      params: { start: [7000, 0], through: [8000, 1000], end: [9000, 0], thickness: 200 },
+    },
+    { command: 'add_slab', params: { wallIds: ['wall-1', 'wall-2', 'wall-3', 'wall-4'] } },
+    {
+      command: 'add_slab_opening',
+      params: {
+        slabId: 'slab-1',
+        boundary: [
+          [1000, 1000],
+          [2000, 1000],
+          [2000, 2000],
+          [1000, 2000],
+        ],
+      },
+    },
+    { command: 'add_column', params: { location: [3000, 2500] } },
+    { command: 'add_beam', params: { start: [0, 2500], end: [6000, 2500] } },
+    { command: 'add_stair', params: { start: [4000, 500], angle: 0 } },
+    {
+      command: 'add_room',
+      params: { name: 'Hall', wallIds: ['wall-1', 'wall-2', 'wall-3', 'wall-4'] },
+    },
+    { command: 'update_wall', params: { wallId: 'wall-3', thickness: 250 } },
+    { command: 'update_opening', params: { openingId: 'door-1', width: 1000 } },
+    { command: 'move_building_element', params: { elementIds: ['column-1'], delta: [200, 0] } },
+    { command: 'update_level', params: { levelId: 'level-1', height: 4200 } },
+    { command: 'delete_building_element', params: { elementIds: ['room-1'] } },
+  ],
+  industrial_hall_piping_equipment: [
+    {
+      command: 'add_portal_frame_building',
+      params: {
+        span: 12000,
+        length: 12000,
+        baySpacing: 6000,
+        eaveHeight: 6000,
+        purlinSpacing: 3000,
+        railSpacing: 3000,
+        cladding: false,
+        floorSlab: false,
+        footings: false,
+        basePlates: false,
+      },
+    },
+    {
+      command: 'add_equipment',
+      params: { name: 'Pump', mark: 'P-1', location: [3000, 3000], size: [1500, 800, 900] },
+    },
+    {
+      command: 'add_pipe_run',
+      params: {
+        points: [
+          [1000, 3000, 1500],
+          [9000, 3000, 1500],
+        ],
+        dn: 100,
+        line: 'L-1',
+        from: 'P-1',
+      },
+    },
+    { command: 'add_pipe_support', params: { pipeId: 'pipe-1', spacing: 4000 } },
+    {
+      command: 'add_cable_tray',
+      params: {
+        points: [
+          [1000, 5000, 3000],
+          [9000, 5000, 3000],
+        ],
+      },
+    },
+    { command: 'update_equipment', params: { elementId: 'equipment-1', location: [3500, 3000] } },
+  ],
   industrial_portal_frame: [
     {
       command: 'add_portal_frame_building',
