@@ -352,9 +352,18 @@ describe('import_code', () => {
     expect(h.state.doc.order).toHaveLength(2);
   });
 
-  it('treats any unknown mode as replace', async () => {
+  it('rejects an unknown mode instead of silently replacing the model', async () => {
     const h = makeHarness({ run: traced });
-    await applyExchangeToolCall('import_code', { code: 'x', mode: 'merge' }, h.deps);
+    const result = await applyExchangeToolCall('import_code', { code: 'x', mode: 'merge' }, h.deps);
+    expect(result?.isError).toBe(true);
+    expect(textOf(result)).toContain('mode must be "replace" or "append" (got "merge")');
+    expect(h.port.runCalls).toHaveLength(0);
+    expect(h.applied).toHaveLength(0);
+  });
+
+  it('defaults to replace when mode is omitted', async () => {
+    const h = makeHarness({ run: traced });
+    await applyExchangeToolCall('import_code', { code: 'x' }, h.deps);
     expect(h.applied[0]?.params).toMatchObject({ mode: 'replace' });
   });
 

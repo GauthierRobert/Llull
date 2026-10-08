@@ -15,17 +15,22 @@ interface ImageContentBlock {
   mimeType: 'image/png';
 }
 
+/** Longest side of a rasterized image: bounds pixmap memory whatever a command's svg asks for. */
+export const MAX_RASTER_PX = 4096;
+
 /**
  * Rasterize a complete SVG document to a base64 PNG, `width` px wide (height scales; intrinsic
- * width when omitted or ≤ 0).
+ * width when omitted or ≤ 0). The longest side is capped at `MAX_RASTER_PX`, keeping the aspect.
  * @failure rasterization error → null (never throws): callers fall back to text-only content
  */
 export function rasterizeSvg(svg: string, width?: number): string | null {
   try {
-    const opts =
-      typeof width === 'number' && width > 0
-        ? { fitTo: { mode: 'width' as const, value: width } }
-        : {};
+    const intrinsic = new Resvg(svg);
+    const wantedWidth = typeof width === 'number' && width > 0 ? width : intrinsic.width;
+    const wantedHeight = (intrinsic.height * wantedWidth) / Math.max(intrinsic.width, 1);
+    const scale = Math.min(1, MAX_RASTER_PX / Math.max(wantedWidth, wantedHeight, 1));
+    const fitWidth = Math.max(1, Math.floor(wantedWidth * scale));
+    const opts = { fitTo: { mode: 'width' as const, value: fitWidth } };
     return new Resvg(svg, opts).render().asPng().toString('base64');
   } catch {
     return null;

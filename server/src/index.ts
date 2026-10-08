@@ -33,8 +33,9 @@ import {
 const app = express();
 
 app.use(hostAllowlist());
-app.use(express.json({ limit: process.env['LLULL_BODY_LIMIT'] ?? '2mb' }));
 // Disallowed origins simply get no CORS headers (the browser blocks them); no error is raised.
+// Before the body parser so its 400/413 JSON errors also carry CORS headers (the browser UI can
+// then read them instead of seeing an opaque network failure).
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -44,6 +45,7 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization'],
   }),
 );
+app.use(express.json({ limit: process.env['LLULL_BODY_LIMIT'] ?? '2mb' }));
 
 const restLimiter = buildRestRateLimiter();
 const exchange = exchangeOptionsFromEnv();
@@ -54,6 +56,9 @@ app.get('/health', (_req, res) => {
 app.use(buildLiveRouter(restLimiter));
 app.use('/export', restLimiter, buildExportRouter(exchange));
 app.use('/mcp', buildMcpRouter(exchange));
+app.use((req, res) => {
+  res.status(404).json({ error: `Not found: ${req.method} ${req.path}` });
+});
 app.use(jsonErrorHandler);
 
 /** Only listen when run as the entry point (tests import `app` and use supertest). */

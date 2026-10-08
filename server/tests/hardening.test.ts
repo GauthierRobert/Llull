@@ -94,6 +94,22 @@ describe('JSON error handling', () => {
     expect(res.status).toBe(413);
     expect(res.body.error).toMatch(/too large/);
   });
+
+  it('body-parser errors still carry CORS headers for an allowed origin', async () => {
+    const malformed = await request(app)
+      .post('/command')
+      .set('Origin', 'http://localhost:5173')
+      .set('Content-Type', 'application/json')
+      .send('{"name": ');
+    expect(malformed.status).toBe(400);
+    expect(malformed.headers['access-control-allow-origin']).toBe('http://localhost:5173');
+    const oversized = await request(app)
+      .post('/command')
+      .set('Origin', 'http://localhost:5173')
+      .send({ name: 'add_box', params: { pad: 'x'.repeat(3 * 1024 * 1024) } });
+    expect(oversized.status).toBe(413);
+    expect(oversized.headers['access-control-allow-origin']).toBe('http://localhost:5173');
+  });
 });
 
 describe('mutation guard (/command, /undo, /redo)', () => {

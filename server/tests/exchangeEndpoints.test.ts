@@ -54,6 +54,16 @@ async function loadServer(env: Record<string, string | undefined>): Promise<Load
   };
 }
 
+/**
+ * The first import of the whole server graph is a cold transform (seconds, much more under a
+ * parallel run); do it once here, under a generous hook timeout, so no test pays for it against
+ * the 5 s test timeout. Later `vi.resetModules()` + imports reuse the transformed modules.
+ */
+beforeAll(async () => {
+  await import('../src/index');
+  await import('../src/geometryKernel');
+}, 120_000);
+
 afterEach(() => {
   vi.unstubAllEnvs();
 });
