@@ -16,7 +16,7 @@ import { levelIdParam } from '../levelParams';
  * @command add_footing
  * @pure
  * @affects creates 1 pad footing, or one under every column of the level
- * @failure no location / no columns / sizes <= 0 -> no-op
+ * @failure no location / location already has a footing / no columns / sizes <= 0 -> no-op
  */
 export const addFooting = defineCommand({
   name: 'add_footing',
@@ -24,7 +24,8 @@ export const addFooting = defineCommand({
     'Add concrete pad footings: one at a plan location, or (underColumns: true) one under every steel and ' +
     'concrete column foot of the level (underColumns wins over location). With underColumns, feet that ' +
     'already carry a footing on the level (within 10 mm) are skipped and the command is refused when none ' +
-    'is left; an explicit location always adds a footing. Top of footing at level + topOffset ' +
+    'is left; an explicit location that already carries a footing on the level (within 10 mm) is refused. ' +
+    'Top of footing at level + topOffset ' +
     '(default −300 mm); default 1500 × 1500 × 600 mm.',
   params: z.object({
     location: vec2('Footing centre [x, y].').optional(),
@@ -55,19 +56,18 @@ export const addFooting = defineCommand({
     }
     const resolution = resolveLevel(doc, getBuilding(doc), params.levelId);
     if (!resolution.ok) return noop(doc, `add_footing failed: ${resolution.reason}.`);
-    const feet = params.underColumns
-      ? columnFeet(resolution.building, resolution.level.id, fromMm(doc, 10))
-      : [];
-    const locations = params.underColumns
-      ? withoutFootings(resolution.building, resolution.level.id, feet, fromMm(doc, 10))
-      : params.location
-        ? [params.location]
-        : [];
+    const tolerance = fromMm(doc, 10);
+    const levelId = resolution.level.id;
+    const feet = params.underColumns ? columnFeet(resolution.building, levelId, tolerance) : [];
+    const requested = params.underColumns ? feet : params.location ? [params.location] : [];
+    const locations = withoutFootings(resolution.building, levelId, requested, tolerance);
     if (locations.length === 0) {
       return noop(
         doc,
         !params.underColumns
-          ? 'add_footing failed: give location [x, y] (or set underColumns).'
+          ? params.location
+            ? `add_footing failed: level ${levelId} already has a footing at [${params.location.join(', ')}] (within 10 mm).`
+            : 'add_footing failed: give location [x, y] (or set underColumns).'
           : feet.length === 0
             ? 'add_footing failed: the level has no columns.'
             : 'add_footing failed: every column already has a footing.',
