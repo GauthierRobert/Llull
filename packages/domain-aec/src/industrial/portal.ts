@@ -61,10 +61,15 @@ export const addCraneRunway = defineCommand({
   params: z.object({
     start: vec2('Runway start [x, y].'),
     end: vec2('Runway end [x, y].'),
-    railHeight: z.number().describe('Top of the runway beam above the level (> 0).'),
+    railHeight: z
+      .number()
+      .describe('Top of the runway beam above the level, in document units (> 0).'),
     profile: z.string().optional().describe('Runway beam section. Default HEB300.'),
     capacity: z.number().optional().describe('Crane capacity in tonnes (for notes). Default 10.'),
-    supportSpacing: z.number().optional().describe('Distance between supports. Default 6000 mm.'),
+    supportSpacing: z
+      .number()
+      .optional()
+      .describe('Distance between supports, in document units (> 0). Default 6000 mm.'),
     bracketProfile: z.string().optional().describe('Bracket section. Default HEB200.'),
     levelId: levelIdParam,
   }),
@@ -83,7 +88,7 @@ export const addCraneRunway = defineCommand({
     if (params.railHeight <= fromMm(doc, profile.h + bracket.h)) {
       return noop(
         doc,
-        `add_crane_runway failed: railHeight must exceed the runway beam + bracket depth (${profile.h + bracket.h} mm).`,
+        `add_crane_runway failed: railHeight must exceed the runway beam + bracket depth (${fromMm(doc, profile.h + bracket.h)} ${doc.units}); got ${params.railHeight}.`,
       );
     }
     if (length / spacing > MAX_GENERATED_MEMBERS) {

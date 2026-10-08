@@ -21,6 +21,8 @@ export interface IfcExport {
   readonly ifc: string;
   readonly entityCount: number;
   readonly productCount: number;
+  /** Building elements that produced at least one product (a pipe or hall member may yield several). */
+  readonly elementCount: number;
 }
 
 /** Every IFC product of one element placed on `level`, in export order (hosted openings follow their wall). */
@@ -127,6 +129,7 @@ function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
   const storeys: string[] = [];
   const byMaterial = new Map<string, string[]>();
   let productCount = 0;
+  let elementCount = 0;
   for (const levelId of building.levelOrder) {
     const level = building.levels[levelId];
     if (!level) continue;
@@ -145,7 +148,9 @@ function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
     const spaces: string[] = [];
     for (const element of orderedElements(building)) {
       if (!('levelId' in element) || element.levelId !== level.id) continue;
-      for (const exported of exportElement(context, doc, element, level, storeyPlacement)) {
+      const exportedProducts = exportElement(context, doc, element, level, storeyPlacement);
+      if (exportedProducts.length > 0) elementCount += 1;
+      for (const exported of exportedProducts) {
         (element.category === 'room' ? spaces : contained).push(exported.ref);
         productCount += 1;
         if (exported.material === null) continue;
@@ -191,7 +196,7 @@ function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
     'END-ISO-10303-21;',
     '',
   ].join('\n');
-  return { filename: `${name}.ifc`, ifc, entityCount: writer.count, productCount };
+  return { filename: `${name}.ifc`, ifc, entityCount: writer.count, productCount, elementCount };
 }
 
 /**
@@ -224,13 +229,17 @@ export const exportIfc = defineCommand({
         'export_ifc: the building model has no levels (add_level / add_wall first).',
       );
     }
+    const isoDate = /^\d{4}-\d{2}-\d{2}$/.test(building.project.date);
     const stamp =
-      timestamp ??
-      (building.project.date ? `${building.project.date}T00:00:00` : '1970-01-01T00:00:00');
+      timestamp ?? (isoDate ? `${building.project.date}T00:00:00` : '1970-01-01T00:00:00');
     const result = buildIfc(doc, stamp);
+    const dateNote =
+      timestamp === undefined && building.project.date !== '' && !isoDate
+        ? ` Project date "${building.project.date}" is not YYYY-MM-DD, so the header uses ${stamp}.`
+        : '';
     return {
       document: doc,
-      summary: `IFC4 ${result.filename}: ${result.productCount} building element(s) on ${building.levelOrder.length} storey(s), ${result.entityCount} STEP entities.`,
+      summary: `IFC4 ${result.filename}: ${result.elementCount} building element(s) as ${result.productCount} IFC product(s) on ${building.levelOrder.length} storey(s), ${result.entityCount} STEP entities.${dateNote}`,
       affected: [],
       data: result,
     };

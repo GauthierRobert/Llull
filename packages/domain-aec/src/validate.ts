@@ -285,6 +285,13 @@ function elementErrors(
     errors.push(`building element ${key}: role must be roof or wall`);
   }
   const textFields: Partial<Record<string, ReadonlyArray<string>>> = {
+    wall: ['material'],
+    door: ['material'],
+    window: ['material'],
+    slab: ['material'],
+    column: ['material'],
+    beam: ['material'],
+    stair: ['material'],
     member: ['material'],
     footing: ['material'],
     panel: ['material'],

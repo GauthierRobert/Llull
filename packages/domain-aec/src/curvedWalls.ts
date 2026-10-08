@@ -17,6 +17,7 @@ import {
   withElement,
 } from './model';
 import { noop } from '@core/commands/noop';
+import { duplicateSummary, findTwin, samePoint, sameSegment } from './duplicates';
 import { regenerateBuilding } from './evaluateElements';
 import { curvedWallArc, curvedWallBand, curvedWallLength } from './curvedWallGeometry';
 import { levelIdParam } from './levelParams';
@@ -33,12 +34,13 @@ export const addCurvedWall = defineCommand({
     'Add a curved (arc) wall on a level: its centreline is the circular arc from start through a point ' +
     'on the arc to end (all [x, y]). Thickness, height (default: level height), base offset and ' +
     'material as for add_wall. Counted with the walls in quantities and schedules. Hosts doors and ' +
-    'windows (add_door / add_window with its id; offset = distance along the arc).',
+    'windows (add_door / add_window with its id; offset = distance along the arc). Refused if the same ' +
+    'arc (either direction) and base offset already exists on the level.',
   params: z.object({
     start: vec2('Arc start [x, y].'),
     through: vec2('Any point on the arc between start and end [x, y] (sets the curvature).'),
     end: vec2('Arc end [x, y].'),
-    thickness: z.number().optional().describe('Wall thickness. Default 200 mm.'),
+    thickness: z.number().optional().describe('Wall thickness, in document units. Default 200 mm.'),
     height: z.number().optional().describe('Wall height. Default: the level height.'),
     baseOffset: z.number().optional().describe('Base above the level. Default 0.'),
     material: z.string().optional().describe('Default concrete.'),
@@ -72,6 +74,18 @@ export const addCurvedWall = defineCommand({
     }
     if (!curvedWallBand(wall)) {
       return noop(doc, 'add_curved_wall failed: thickness must be smaller than the diameter.');
+    }
+    const twin = findTwin(
+      resolution.building,
+      'curvedWall',
+      resolution.level.id,
+      (element) =>
+        element.baseOffset === wall.baseOffset &&
+        samePoint(element.through, wall.through) &&
+        sameSegment(element.start, element.end, wall.start, wall.end),
+    );
+    if (twin) {
+      return noop(doc, duplicateSummary('add_curved_wall', twin, 'a curved wall on this arc'));
     }
     const document = regenerateBuilding(doc, withElement(resolution.building, wall));
     return {

@@ -165,5 +165,6 @@ describe('cost estimate', () => {
     expect(rateFor({ '*.brick.m2': 3 }, takeoffLine)).toBe(3);
     expect(rateFor({}, takeoffLine)).toBeNull();
     expect(toCsv(['a'], [['x,"y"']])).toBe('a\n"x,""y"""\n');
+    expect(toCsv(['a'], [['x\ry']])).toBe('a\n"x\ry"\n');
   });
 });

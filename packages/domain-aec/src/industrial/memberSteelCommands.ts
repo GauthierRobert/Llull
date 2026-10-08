@@ -15,6 +15,7 @@ import {
   withElement,
 } from '../model';
 import { noop } from '@core/commands/noop';
+import { duplicateSummary, findTwin, sameSegment } from '../duplicates';
 import { regenerateBuilding } from '../evaluateElements';
 import { distance3 } from '@lib/vec3';
 import { findProfile, type SteelProfile } from '../steel/profiles';
@@ -62,7 +63,8 @@ export const addSteelMember = defineCommand({
     'along +X for vertical columns (roll π/2 turns it along +Y); roll (radians) turns it about the axis. ' +
     'Beams may declare startJoint / endJoint "rigid" (moment connection to the column they frame into; ' +
     'default pinned) and columns baseFixity "fixed" (column foot restrains rotation; default pinned or the ' +
-    'base plate fixity): check_steel_members analyses rigidly connected beams and columns as planar moment frames.',
+    'base plate fixity): check_steel_members analyses rigidly connected beams and columns as planar moment frames. ' +
+    'Refused if an identical member (section, role, roll, end points in either direction) already exists on the level.',
   params: z.object({
     profile: z.string().describe('Catalogue section name (list_steel_profiles).'),
     start: looseVec3('Axis start [x, y, z], z relative to the level; [x, y] means z = 0.'),
@@ -112,6 +114,26 @@ export const addSteelMember = defineCommand({
     if (problem) return noop(doc, `add_steel_member failed: ${problem}.`);
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_steel_member failed: ${resolution.reason}.`);
+    const memberTwin = findTwin(
+      resolution.building,
+      'member',
+      resolution.level.id,
+      (element) =>
+        element.profile === (findProfile(profile)?.name ?? profile) &&
+        element.role === role &&
+        element.roll === roll &&
+        sameSegment(element.start, element.end, from, to),
+    );
+    if (memberTwin) {
+      return noop(
+        doc,
+        duplicateSummary(
+          'add_steel_member',
+          memberTwin,
+          `a ${role} ${profile} between these points`,
+        ),
+      );
+    }
     const added = appendMembers(resolution.building, resolution.level.id, [
       {
         role,
@@ -262,6 +284,15 @@ export const updateSteelMember = defineCommand({
       material: material?.trim() || member.material,
       ...(note !== undefined ? { note } : {}),
     };
+    const sameFields = (Object.keys(updated) as Array<keyof SteelMemberElement>).every(
+      (key) => JSON.stringify(updated[key]) === JSON.stringify(member[key]),
+    );
+    if (sameFields && Object.keys(member).length === Object.keys(updated).length) {
+      return noop(
+        doc,
+        `update_steel_member: ${memberId} already has these values; nothing changed.`,
+      );
+    }
     const refit = refitPlates(doc, withElement(building, updated), updated, member.profile);
     const stale = dropStaleConnections(refit.building, memberId, fromMm(doc, 10));
     const supports = reconcilePipeSupports(doc, stale.building);

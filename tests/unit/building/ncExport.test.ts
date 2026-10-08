@@ -161,17 +161,17 @@ describe('export_nc_files', () => {
 
   it('splits members of different length into separate uniquely named files', () => {
     let doc = createEmptyDocument();
-    const add = (end: number): void => {
+    const add = (end: number, y = 0): void => {
       doc = execute(doc, 'add_steel_member', {
         profile: 'IPE300',
         role: 'beam',
-        start: [0, 0, 3000],
-        end: [end, 0, 3000],
+        start: [0, y, 3000],
+        end: [end, y, 3000],
       }).document;
     };
     add(4000);
-    add(4000);
-    add(5000);
+    add(4000, 1000);
+    add(5000, 2000);
     const result = files(doc);
     expect(result.map((file) => file.quantity).sort()).toEqual([1, 2]);
     expect(new Set(result.map((file) => file.name)).size).toBe(2);

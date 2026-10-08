@@ -4,7 +4,12 @@
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
-import type { CurvedWallElement, OpeningElement, WallElement } from '@core/model/building';
+import type {
+  BuildingModel,
+  CurvedWallElement,
+  OpeningElement,
+  WallElement,
+} from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
 import { projectOntoSegment } from '@lib/polygon';
@@ -44,6 +49,19 @@ function resolveOffset(
   return at ? projectOntoSegment(at, wall.start, wall.end).t * length : length / 2;
 }
 
+/** Another door / window (same category) already carrying `mark`. */
+function markHolder(
+  building: BuildingModel,
+  category: OpeningKind,
+  mark: string,
+  exceptId?: string,
+): OpeningElement | undefined {
+  return Object.values(building.elements).find(
+    (element): element is OpeningElement =>
+      element.category === category && element.mark === mark && element.id !== exceptId,
+  );
+}
+
 function addOpening(doc: CadDocument, kind: OpeningKind, params: AddOpeningParams): CommandResult {
   const name = `add_${kind}`;
   const building = getBuilding(doc);
@@ -62,10 +80,18 @@ function addOpening(doc: CadDocument, kind: OpeningKind, params: AddOpeningParam
   if (width <= 0 || height <= 0 || sillHeight < 0) {
     return noop(doc, `${name} failed: width/height must be > 0, sillHeight >= 0.`);
   }
+  const requestedMark = params.mark?.trim();
+  const markOwner = requestedMark ? markHolder(building, kind, requestedMark) : undefined;
+  if (markOwner) {
+    return noop(
+      doc,
+      `${name} failed: mark '${requestedMark ?? ''}' is already used by ${markOwner.id}; schedule marks must be unique per category.`,
+    );
+  }
   const opening: OpeningElement = {
     id: nextElementId(building, kind),
     category: kind,
-    mark: params.mark?.trim() || nextMark(building, kind),
+    mark: requestedMark || nextMark(building, kind),
     entityIds: [],
     hostId: wall.id,
     offset,
@@ -114,20 +140,34 @@ function openingShape(kind: OpeningKind): OpeningShape {
       .number()
       .optional()
       .describe(
-        'Distance along the wall from its start to the opening CENTER. Default: wall midpoint.',
+        'Distance along the wall from its start to the opening CENTER, in document units (arc length on a curved wall). Takes precedence over at. Default: wall midpoint.',
       ),
-    at: vec2('Alternative to offset: a plan point [x, y] projected onto the wall.').optional(),
-    width: z.number().optional().describe(`Opening width. Default ${defaults.width} mm.`),
-    height: z.number().optional().describe(`Opening height. Default ${defaults.height} mm.`),
+    at: vec2(
+      'Alternative to offset: a plan point [x, y] projected onto the wall to place the opening center. Ignored when offset is given.',
+    ).optional(),
+    width: z
+      .number()
+      .optional()
+      .describe(`Opening width in document units (> 0). Default ${defaults.width} mm.`),
+    height: z
+      .number()
+      .optional()
+      .describe(
+        `Opening height in document units (> 0). Default ${defaults.height} mm, limited to the wall height.`,
+      ),
     sillHeight: z
       .number()
       .optional()
-      .describe(`Height of the opening bottom above the wall base. Default ${defaults.sill} mm.`),
+      .describe(
+        `Height of the opening bottom above the wall base, in document units (>= 0). Default ${defaults.sill} mm.`,
+      ),
     material: z.string().optional().describe(`Material. Default ${defaults.material}.`),
     mark: z
       .string()
       .optional()
-      .describe(`Schedule mark. Default next ${kind === 'door' ? 'D' : 'WN'}n.`),
+      .describe(
+        `Schedule mark, unique among ${kind}s. Default next ${kind === 'door' ? 'D' : 'WN'}n.`,
+      ),
   };
 }
 
@@ -188,13 +228,24 @@ export const updateOpening = defineCommand({
     'material or mark. The host wall is re-cut.',
   params: z.object({
     openingId: z.string().describe('Door/window element id, e.g. "door-1".'),
-    offset: z.number().optional().describe('New center distance from the wall start.'),
-    width: z.number().optional().describe('New width (> 0).'),
-    height: z.number().optional().describe('New height (> 0).'),
-    sillHeight: z.number().optional().describe('New sill height (>= 0).'),
-    swing: z.enum(['left', 'right']).optional().describe('Door hinge side.'),
-    material: z.string().optional().describe('New material.'),
-    mark: z.string().optional().describe('New schedule mark.'),
+    offset: z
+      .number()
+      .optional()
+      .describe('New distance from the wall start to the opening center, in document units.'),
+    width: z.number().optional().describe('New width in document units (> 0).'),
+    height: z.number().optional().describe('New height in document units (> 0).'),
+    sillHeight: z
+      .number()
+      .optional()
+      .describe('New sill height above the level floor, in document units (>= 0).'),
+    swing: z.enum(['left', 'right']).optional().describe('Door hinge side (doors only).'),
+    material: z.string().optional().describe('New material; blank keeps the current one.'),
+    mark: z
+      .string()
+      .optional()
+      .describe(
+        'New schedule mark, unique among doors / windows of the same kind; blank keeps the current one.',
+      ),
   }),
   run: (
     doc,
@@ -221,6 +272,16 @@ export const updateOpening = defineCommand({
     };
     if (updated.width <= 0 || updated.height <= 0 || updated.sillHeight < 0) {
       return noop(doc, 'update_opening failed: width/height must be > 0, sillHeight >= 0.');
+    }
+    const markOwner = markHolder(building, opening.category, updated.mark, opening.id);
+    if (markOwner) {
+      return noop(
+        doc,
+        `update_opening failed: mark '${updated.mark}' is already used by ${markOwner.id}; schedule marks must be unique per category.`,
+      );
+    }
+    if (JSON.stringify(updated) === JSON.stringify(opening)) {
+      return noop(doc, `update_opening: ${openingId} already has these values; nothing changed.`);
     }
     const fitError = openingFitError(
       wall,

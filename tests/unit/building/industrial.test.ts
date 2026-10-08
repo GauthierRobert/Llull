@@ -373,6 +373,15 @@ describe('add_crane_runway', () => {
     expect(beam).toMatchObject({ role: 'crane', start: [700, 0, 4850] });
   });
 
+  it('states the minimum rail height in document units', () => {
+    const params = { start: [0, 0], end: [4, 0], railHeight: 0.2 };
+    const metres = execute({ ...createEmptyDocument(), units: 'm' }, 'add_crane_runway', params);
+    expect(metres.affected).toEqual([]);
+    expect(metres.summary).toMatch(/depth \(0\.5 m\); got 0\.2\./);
+    const mm = execute(createEmptyDocument(), 'add_crane_runway', { ...params, railHeight: 200 });
+    expect(mm.summary).toMatch(/depth \(500 mm\); got 200\./);
+  });
+
   it('rejects bad runways', () => {
     const doc = createEmptyDocument();
     for (const params of [

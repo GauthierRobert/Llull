@@ -91,7 +91,7 @@ export const updateLevel = defineCommand({
     'columns at full storey height and stairs climbing the storey follow a new height.',
   params: z.object({
     levelId: z.string().describe('Level id, e.g. "level-2".'),
-    name: z.string().optional().describe('New name.'),
+    name: z.string().optional().describe('New level name; blank keeps the current name.'),
     elevation: z.number().optional().describe('New finished-floor elevation (document units).'),
     height: z.number().optional().describe('New floor-to-floor height (> 0, document units).'),
   }),
@@ -108,6 +108,13 @@ export const updateLevel = defineCommand({
       elevation: elevation ?? level.elevation,
       height: height ?? level.height,
     };
+    if (
+      updated.name === level.name &&
+      updated.elevation === level.elevation &&
+      updated.height === level.height
+    ) {
+      return noop(doc, `update_level: level ${levelId} "${level.name}" already has these values.`);
+    }
     const levels = { ...building.levels, [levelId]: updated };
     const elements = Object.fromEntries(
       Object.entries(building.elements).map(([id, element]) => [
@@ -232,7 +239,12 @@ export const setProjectInfo = defineCommand({
     author: z.string().optional().describe('Drawn by (company or person).'),
     drawingNumber: z.string().optional().describe('Drawing number, e.g. "A-101".'),
     revision: z.string().optional().describe('Revision, e.g. "B".'),
-    date: z.string().optional().describe('Issue date, e.g. "2026-10-01".'),
+    date: z
+      .string()
+      .optional()
+      .describe(
+        'Issue date as YYYY-MM-DD, e.g. "2026-10-01" (other formats are not used for the IFC header).',
+      ),
   }),
   run: (doc, params): CommandResult => {
     const building = getBuilding(doc);
@@ -247,6 +259,13 @@ export const setProjectInfo = defineCommand({
         doc,
         `set_project_info: no fields given (allowed: ${PROJECT_FIELDS.join(', ')}).`,
       );
+    }
+    if (
+      Object.entries(changes).every(
+        ([field, value]) => building.project[field as keyof ProjectInfo] === value,
+      )
+    ) {
+      return noop(doc, 'set_project_info: the given fields already hold these values.');
     }
     return {
       document: { ...doc, building: { ...building, project: { ...building.project, ...changes } } },
