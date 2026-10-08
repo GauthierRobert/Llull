@@ -3,11 +3,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ModifyTools } from '@ui/viewport/2d/ModifyTools';
 
-function renderTools(
-  pendingValue: number,
-  onSetValue: (value: number) => void,
-): ReturnType<typeof render> {
-  return render(
+function tools(pendingValue: number, onSetValue: (value: number) => void): React.ReactElement {
+  return (
     <ModifyTools
       activeTool="fillet"
       phase="enter-value"
@@ -15,28 +12,35 @@ function renderTools(
       onSelectTool={vi.fn()}
       onSetValue={onSetValue}
       onCommitValue={vi.fn()}
-    />,
+    />
   );
 }
 
 describe('ModifyTools value input', () => {
-  it('keeps what the user typed when the pending value round-trips through the parent', () => {
+  it('keeps the typed text while the pending value round-trips through the parent', () => {
     const onSetValue = vi.fn();
-    const view = renderTools(1, onSetValue);
+    const view = render(tools(1, onSetValue));
     const input = screen.getByRole<HTMLInputElement>('spinbutton');
-    fireEvent.change(input, { target: { value: '0.5' } });
-    expect(onSetValue).toHaveBeenLastCalledWith(0.5);
-    // The parent re-renders with the intermediate value the user passed through (0).
-    view.rerender(
-      <ModifyTools
-        activeTool="fillet"
-        phase="enter-value"
-        pendingValue={0}
-        onSelectTool={vi.fn()}
-        onSetValue={onSetValue}
-        onCommitValue={vi.fn()}
-      />,
-    );
-    expect(input.value).toBe('0.5');
+    for (const [typed, reported] of [
+      ['0', 0],
+      ['0.5', 0.5],
+      ['0.50', 0.5],
+    ] as const) {
+      fireEvent.change(input, { target: { value: typed } });
+      expect(onSetValue).toHaveBeenLastCalledWith(reported);
+      view.rerender(tools(reported, onSetValue));
+      expect(input.value).toBe(typed);
+    }
+  });
+
+  it('shows a reset pending value coming from the parent', () => {
+    const view = render(tools(0.5, vi.fn()));
+    view.rerender(tools(1, vi.fn()));
+    expect(screen.getByRole<HTMLInputElement>('spinbutton').value).toBe('1');
+  });
+
+  it('focuses the value input when the enter-value phase opens', () => {
+    render(tools(1, vi.fn()));
+    expect(document.activeElement).toBe(screen.getByRole('spinbutton'));
   });
 });
