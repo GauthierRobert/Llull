@@ -16,7 +16,7 @@
  * - The hook is purely React state + callbacks — no three.js here.
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { Vec2 } from '@core/model/types';
 import { useStore, useToolStore } from '@ui/store';
 import type { DrawToolKind } from '@ui/store';
@@ -26,6 +26,7 @@ import {
   CHAIN_DRAW_TOOLS,
   rectParamsFromCorners,
   circleRadiusFromPoints,
+  dropRepeatedPoints,
   ellipseParamsFromCenterCorner,
 } from './drawHelpers';
 
@@ -87,12 +88,18 @@ export function useDrawTool(): UseDrawToolResult {
   const [progress, setProgress] = useState<DrawProgress>(EMPTY_PROGRESS);
   const collectedPoints = progress.tool === activeTool ? progress.points : EMPTY_POINTS;
   const inProgress = collectedPoints.length > 0;
+  // Synchronous mirror of `progress`: a fast double-click delivers click, click, dblclick before the
+  // canvas root re-renders, so finishChain must not read the points from its render closure.
+  const progressRef = useRef<DrawProgress>(EMPTY_PROGRESS);
   const setCollectedPoints = useCallback(
     (next: Vec2[] | ((previous: Vec2[]) => Vec2[])) => {
-      setProgress((previous) => {
-        const current = previous.tool === activeTool ? previous.points : EMPTY_POINTS;
-        return { tool: activeTool, points: typeof next === 'function' ? next(current) : next };
-      });
+      const previous = progressRef.current;
+      const current = previous.tool === activeTool ? previous.points : EMPTY_POINTS;
+      progressRef.current = {
+        tool: activeTool,
+        points: typeof next === 'function' ? next(current) : next,
+      };
+      setProgress(progressRef.current);
     },
     [activeTool],
   );
@@ -106,14 +113,22 @@ export function useDrawTool(): UseDrawToolResult {
   );
 
   const finishChain = useCallback(() => {
-    if (collectedPoints.length >= 2) {
-      if (activeTool === 'wall') dispatch('draw_walls', wallChainParams(collectedPoints, false));
-      else if (activeTool === 'spline')
-        dispatch('draw_spline', { points: collectedPoints, closed: false });
-      else dispatch('draw_polyline', { points: collectedPoints, closed: false });
+    const livePoints =
+      progressRef.current.tool === activeTool ? progressRef.current.points : EMPTY_POINTS;
+    if (livePoints.length >= 2) {
+      if (activeTool === 'wall') dispatch('draw_walls', wallChainParams(livePoints, false));
+      else {
+        const points = dropRepeatedPoints(livePoints);
+        if (points.length >= 2) {
+          dispatch(activeTool === 'spline' ? 'draw_spline' : 'draw_polyline', {
+            points,
+            closed: false,
+          });
+        }
+      }
     }
     setCollectedPoints([]);
-  }, [activeTool, collectedPoints, dispatch, setCollectedPoints]);
+  }, [activeTool, dispatch, setCollectedPoints]);
 
   const handleClick = useCallback(
     (point: Vec2) => {

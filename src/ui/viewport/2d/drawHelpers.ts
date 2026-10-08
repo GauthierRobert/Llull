@@ -58,6 +58,26 @@ export function circleRadiusFromPoints(center: Vec2, rim: Vec2): number | null {
   return r > 0 ? r : null;
 }
 
+/**
+ * Drop consecutive near-duplicate vertices (a double-click to finish a chain records its last
+ * point twice). "Near" = within 0.1% of the chain's bounding diagonal.
+ *
+ * @pure
+ */
+export function dropRepeatedPoints(points: ReadonlyArray<Vec2>): Vec2[] {
+  const xs = points.map((point) => point[0]);
+  const ys = points.map((point) => point[1]);
+  const diagonal = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  const tolerance = Math.max(diagonal * 1e-3, 1e-9);
+  return points.filter((point, index) => {
+    const previous = points[index - 1];
+    return (
+      previous === undefined ||
+      Math.hypot(point[0] - previous[0], point[1] - previous[1]) > tolerance
+    );
+  });
+}
+
 interface EllipseParams {
   center: Vec2;
   radiusX: number;

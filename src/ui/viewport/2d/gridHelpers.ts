@@ -149,6 +149,19 @@ export function pixelsToWorld(pixels: number, zoom: number): number {
 }
 
 /**
+ * Label for a scale-bar length: exactly as many decimals as the value needs (0.005 -> "0.005",
+ * 20 -> "20"). A fixed document precision would round tiny bars to "0.00"/"0.01" when zoomed in.
+ *
+ * @pure deterministic
+ * @failure non-finite or non-positive length -> "0"
+ */
+export function formatScaleBarLength(worldLength: number): string {
+  if (!Number.isFinite(worldLength) || worldLength <= 0) return '0';
+  const decimals = Math.min(Math.max(0, -Math.floor(Math.log10(worldLength))), 12);
+  return worldLength.toFixed(decimals);
+}
+
+/**
  * Choose a "nice" real-world length for the scale-bar overlay.
  *
  * The scale bar should be between `targetPx` × 0.5 and `targetPx` × 1.5 pixels

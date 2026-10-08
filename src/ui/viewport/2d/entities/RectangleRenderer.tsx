@@ -10,7 +10,7 @@ import { flattenPoints } from '../../lineGeometry';
 import { ShapeLine } from './ShapeLine';
 
 export function RectangleRenderer({
-  entity: { width, height, position, color },
+  entity: { width, height, position, rotation, color },
   selected,
 }: {
   entity: RectangleEntity;
@@ -27,5 +27,13 @@ export function RectangleRenderer({
       ]),
     [width, height],
   );
-  return <ShapeLine positions={positions} position={position} color={color} selected={selected} />;
+  return (
+    <ShapeLine
+      positions={positions}
+      position={position}
+      rotation={rotation}
+      color={color}
+      selected={selected}
+    />
+  );
 }

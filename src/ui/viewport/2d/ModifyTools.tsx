@@ -131,7 +131,11 @@ export function ModifyTools({
               type="number"
               min={0.001}
               step={0.1}
-              value={pendingValue}
+              // Uncontrolled: a controlled number input rewrites "0." to "0" mid-typing, so a
+              // decimal such as 0.5 could never be entered. The input only exists in this phase,
+              // so `defaultValue` is always the freshly reset pending value.
+              key={activeTool}
+              defaultValue={pendingValue}
               onChange={(e) => {
                 const value = parseFloat(e.target.value);
                 if (!isNaN(value)) onSetValue(value);

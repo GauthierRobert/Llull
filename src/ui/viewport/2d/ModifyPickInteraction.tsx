@@ -12,6 +12,7 @@
 
 import { useThree } from '@react-three/fiber';
 import type { Vec2 } from '@core/model/types';
+import { is2D } from '@core/model/types';
 import { useStore, useViewportStore } from '@ui/store';
 import { PICK_RADIUS_PX, nearestEntityId } from './modifyHelpers';
 import { isEntityVisible } from '../entityVisibility';
@@ -53,8 +54,14 @@ export function ModifyPickInteraction({
         const worldPick = toDocumentPoint(e.point);
         const tolerance = PICK_RADIUS_PX / (zoom > 0 ? zoom : 1);
         const { hiddenLayerIds, hiddenEntityIds } = useViewportStore.getState();
-        const bestId = nearestEntityId(document, worldPick, tolerance, (entity) =>
-          isEntityVisible(entity, document.layers, hiddenLayerIds, hiddenEntityIds),
+        // Modify tools (trim, extend, offset, fillet, ...) only make sense for 2D shapes.
+        const bestId = nearestEntityId(
+          document,
+          worldPick,
+          tolerance,
+          (entity) =>
+            is2D(entity) &&
+            isEntityVisible(entity, document.layers, hiddenLayerIds, hiddenEntityIds),
         );
         if (bestId === null) return;
 

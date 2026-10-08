@@ -15,6 +15,7 @@ import { buildPlanDrawing, CATEGORY_LAYER, fromMm, type PlanPrimitive } from '@a
 import { useStore } from '@ui/store';
 import { useThemeStore } from '@ui/store/themeStore';
 import { TEXT_FONT_URL } from '@ui/viewport/textFont';
+import { planAnchor } from './planAnchor';
 import { useMinScreenSize } from './useMinScreenSize';
 
 const ARC_SEGMENTS = 32;
@@ -49,8 +50,11 @@ class SegmentBuffer {
   readonly positions: number[] = [];
   readonly colors: number[] = [];
 
+  constructor(private readonly anchor: Vec2) {}
+
   add(a: Vec2, b: Vec2, color: THREE.Color): void {
-    this.positions.push(a[0], a[1], 0, b[0], b[1], 0);
+    const [ax, ay] = this.anchor;
+    this.positions.push(a[0] - ax, a[1] - ay, 0, b[0] - ax, b[1] - ay, 0);
     this.colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
   }
 
@@ -71,8 +75,8 @@ class SegmentBuffer {
   }
 }
 
-function shapeOf(points: ReadonlyArray<Vec2>): THREE.Shape {
-  return new THREE.Shape(points.map(([x, y]) => new THREE.Vector2(x, y)));
+function shapeOf(points: ReadonlyArray<Vec2>, anchor: Vec2): THREE.Shape {
+  return new THREE.Shape(points.map(([x, y]) => new THREE.Vector2(x - anchor[0], y - anchor[1])));
 }
 
 function arcPoints(center: Vec2, radius: number, start: number, end: number): Vec2[] {
@@ -88,6 +92,7 @@ function addDimension(
   buffer: SegmentBuffer,
   labels: PlanLabel[],
   index: number,
+  anchor: Vec2,
 ): void {
   const color = new THREE.Color(DIMENSION_COLOR);
   const dx = primitive.b[0] - primitive.a[0];
@@ -119,7 +124,10 @@ function addDimension(
   const lift = primitive.offset * 0.22;
   labels.push({
     key: `dimension-${index}`,
-    at: [(a[0] + b[0]) / 2 - Math.sin(angle) * lift, (a[1] + b[1]) / 2 + Math.cos(angle) * lift],
+    at: [
+      (a[0] + b[0]) / 2 - Math.sin(angle) * lift - anchor[0],
+      (a[1] + b[1]) / 2 + Math.cos(angle) * lift - anchor[1],
+    ],
     height: primitive.offset * 0.25,
     content: primitive.label,
     color: DIMENSION_COLOR,
@@ -133,9 +141,10 @@ function buildGeometry(
   wallFill: string,
   wallStroke: string,
   dashSize: number,
+  anchor: Vec2,
 ): PlanGeometry {
-  const solid = new SegmentBuffer();
-  const dashed = new SegmentBuffer();
+  const solid = new SegmentBuffer(anchor);
+  const dashed = new SegmentBuffer(anchor);
   const shapes: THREE.Shape[] = [];
   const labels: PlanLabel[] = [];
   primitives.forEach((primitive, index) => {
@@ -145,7 +154,7 @@ function buildGeometry(
     switch (primitive.type) {
       case 'polygon':
         target.ring(primitive.points, true, color);
-        if (primitive.style === 'cut') shapes.push(shapeOf(primitive.points));
+        if (primitive.style === 'cut') shapes.push(shapeOf(primitive.points, anchor));
         break;
       case 'polyline':
         target.ring(primitive.points, false, color);
@@ -163,13 +172,13 @@ function buildGeometry(
       case 'circle': {
         const points = arcPoints(primitive.center, primitive.radius, 0, Math.PI * 2).slice(0, -1);
         target.ring(points, true, color);
-        if (primitive.style === 'cut') shapes.push(shapeOf(points));
+        if (primitive.style === 'cut') shapes.push(shapeOf(points, anchor));
         break;
       }
       case 'text':
         labels.push({
           key: `text-${index}`,
-          at: primitive.at,
+          at: [primitive.at[0] - anchor[0], primitive.at[1] - anchor[1]],
           height: primitive.height,
           content: primitive.content,
           color: `#${color.getHexString()}`,
@@ -177,7 +186,7 @@ function buildGeometry(
         });
         break;
       case 'dimension':
-        addDimension(primitive, solid, labels, index);
+        addDimension(primitive, solid, labels, index, anchor);
         break;
     }
   });
@@ -232,6 +241,8 @@ export function BuildingPlan2D(): React.ReactElement | null {
     () => (building ? buildPlanDrawing({ building, units }, undefined) : null),
     [building, units],
   );
+  // Vertices are stored relative to this point (float32 precision); the group re-adds it.
+  const anchor = useMemo(() => (plan ? planAnchor(plan.primitives) : ([0, 0] as Vec2)), [plan]);
   const geometry = useMemo(() => {
     if (!plan) return null;
     const visibleLayer = (layer: string): boolean => layers[`layer-${layer}`]?.visible !== false;
@@ -243,14 +254,15 @@ export function BuildingPlan2D(): React.ReactElement | null {
       wallFill,
       wallStroke,
       fromMm({ units }, 150),
+      anchor,
     );
-  }, [plan, layers, theme, units]);
+  }, [plan, layers, theme, units, anchor]);
 
   useEffect(() => (geometry ? () => disposeGeometry(geometry) : undefined), [geometry]);
 
   if (!geometry) return null;
   return (
-    <group name="building-plan-2d">
+    <group name="building-plan-2d" position={[anchor[0], anchor[1], 0]}>
       <primitive object={geometry.fill} />
       <primitive object={geometry.solid} />
       <primitive object={geometry.dashed} />

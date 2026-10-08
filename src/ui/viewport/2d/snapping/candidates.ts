@@ -5,15 +5,23 @@
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
-import { is2D } from '@core/model/types';
+import { is3D } from '@core/model/types';
+import { solidSnapPoints } from '../solidOutline';
 import type { CollectOpts, SnapPoint, SnapType } from './types';
 import {
+  curveCurveIntersections,
+  segmentCurveIntersections,
+  type CircularCurve,
+} from './curveIntersections';
+import { allSegmentIntersections } from './segmentSweep';
+import {
   entityToSegments,
+  isAngleOnArc,
+  localToWorld2D,
   mid,
   nearestOnArc,
   nearestOnSegment,
   normalizeAngle,
-  segmentIntersection,
   snapExtension,
   snapPerpendicular,
   snapTangentToCircle,
@@ -30,7 +38,7 @@ import {
  * @pure deterministic, no side effects
  */
 export function collectSnapCandidates(
-  document: Pick<CadDocument, 'entities' | 'order'>,
+  document: Pick<CadDocument, 'entities' | 'order'> & Partial<Pick<CadDocument, 'components'>>,
   opts: CollectOpts = {},
   fromPoint?: Vec2 | null,
   cursorPoint?: Vec2 | null,
@@ -55,6 +63,7 @@ export function collectSnapCandidates(
 
   // Collect all line segments first (needed for intersection computation).
   const allSegments: Segment[] = [];
+  const allCurves: CircularCurve[] = [];
 
   /** Perpendicular / extension / nearest snaps for each segment, then register it for intersections. */
   const addSegmentSnaps = (segments: ReadonlyArray<Segment>): void => {
@@ -83,7 +92,14 @@ export function collectSnapCandidates(
     endAngle: number,
     full: boolean,
   ): void => {
-    if (doTangents) candidates.push(...snapTangentToCircle(from, cx, cy, r));
+    allCurves.push({ cx, cy, r, startAngle, endAngle, full });
+    if (doTangents) {
+      for (const snap of snapTangentToCircle(from, cx, cy, r)) {
+        if (full || isAngleOnArc(Math.atan2(snap.y - cy, snap.x - cx), startAngle, endAngle)) {
+          candidates.push(snap);
+        }
+      }
+    }
     if (doNearest && cursor !== null) {
       add('nearest', ...nearestOnArc(cursor[0], cursor[1], cx, cy, r, startAngle, endAngle, full));
     }
@@ -91,17 +107,16 @@ export function collectSnapCandidates(
 
   for (const id of document.order) {
     const entity = document.entities[id];
-    if (!entity || !is2D(entity) || !isVisible(entity)) continue;
+    if (!entity || !isVisible(entity)) continue;
 
-    const ox = entity.position[0];
-    const oy = entity.position[1];
+    // Entity-local -> world XY (rotation about Z, then position).
+    const world = (lx: number, ly: number): [number, number] => localToWorld2D(entity, lx, ly);
+    const rotationZ = entity.rotation[2] ?? 0;
 
     switch (entity.kind) {
       case 'line': {
-        const ax = entity.start[0] + ox;
-        const ay = entity.start[1] + oy;
-        const bx = entity.end[0] + ox;
-        const by = entity.end[1] + oy;
+        const [ax, ay] = world(entity.start[0], entity.start[1]);
+        const [bx, by] = world(entity.end[0], entity.end[1]);
 
         if (doEndpoints) {
           add('endpoint', ax, ay);
@@ -115,26 +130,26 @@ export function collectSnapCandidates(
       case 'polyline': {
         const pts = entity.points;
         pts.forEach((p, i) => {
-          const px = p[0] + ox;
-          const py = p[1] + oy;
+          const [px, py] = world(p[0], p[1]);
 
           if (doEndpoints) add('endpoint', px, py);
           const q = pts[i + 1];
-          if (doMidpoints && q) add('midpoint', ...mid(px, py, q[0] + ox, q[1] + oy));
+          if (doMidpoints && q) add('midpoint', ...mid(px, py, ...world(q[0], q[1])));
         });
         const first = pts[0];
         const last = pts[pts.length - 1];
         if (entity.closed && doMidpoints && pts.length >= 2 && first && last) {
-          add('midpoint', ...mid(first[0] + ox, first[1] + oy, last[0] + ox, last[1] + oy));
+          add('midpoint', ...mid(...world(first[0], first[1]), ...world(last[0], last[1])));
         }
         addSegmentSnaps(entityToSegments(entity));
         break;
       }
 
       case 'arc': {
-        const cx = entity.center[0] + ox;
-        const cy = entity.center[1] + oy;
-        const { radius: r, startAngle, endAngle } = entity;
+        const [cx, cy] = world(entity.center[0], entity.center[1]);
+        const { radius: r } = entity;
+        const startAngle = entity.startAngle + rotationZ;
+        const endAngle = entity.endAngle + rotationZ;
         const onArc = (angle: number): [number, number] => [
           cx + r * Math.cos(angle),
           cy + r * Math.sin(angle),
@@ -154,64 +169,91 @@ export function collectSnapCandidates(
       }
 
       case 'circle': {
-        const cx = entity.center[0] + ox;
-        const cy = entity.center[1] + oy;
+        const [cx, cy] = world(entity.center[0], entity.center[1]);
         const r = entity.radius;
 
         if (doCenters) add('center', cx, cy);
-        // Cardinal points as endpoints (useful snaps for circles).
+        // Cardinal points (in the entity's local axes) as endpoints.
         if (doEndpoints) {
-          add('endpoint', cx + r, cy);
-          add('endpoint', cx - r, cy);
-          add('endpoint', cx, cy + r);
-          add('endpoint', cx, cy - r);
+          add('endpoint', ...world(entity.center[0] + r, entity.center[1]));
+          add('endpoint', ...world(entity.center[0] - r, entity.center[1]));
+          add('endpoint', ...world(entity.center[0], entity.center[1] + r));
+          add('endpoint', ...world(entity.center[0], entity.center[1] - r));
         }
         addCurveSnaps(cx, cy, r, 0, 0, true);
         break;
       }
 
       case 'rectangle': {
-        const x0 = ox;
-        const y0 = oy;
-        const x1 = ox + entity.width;
-        const y1 = oy + entity.height;
+        const { width, height } = entity;
 
         if (doEndpoints) {
-          add('endpoint', x0, y0);
-          add('endpoint', x1, y0);
-          add('endpoint', x1, y1);
-          add('endpoint', x0, y1);
+          add('endpoint', ...world(0, 0));
+          add('endpoint', ...world(width, 0));
+          add('endpoint', ...world(width, height));
+          add('endpoint', ...world(0, height));
         }
         if (doMidpoints) {
-          add('midpoint', (x0 + x1) / 2, y0);
-          add('midpoint', x1, (y0 + y1) / 2);
-          add('midpoint', (x0 + x1) / 2, y1);
-          add('midpoint', x0, (y0 + y1) / 2);
+          add('midpoint', ...world(width / 2, 0));
+          add('midpoint', ...world(width, height / 2));
+          add('midpoint', ...world(width / 2, height));
+          add('midpoint', ...world(0, height / 2));
         }
-        if (doCenters) add('center', (x0 + x1) / 2, (y0 + y1) / 2);
+        if (doCenters) add('center', ...world(width / 2, height / 2));
         addSegmentSnaps(entityToSegments(entity));
         break;
       }
 
-      case 'point': {
-        if (doEndpoints) add('endpoint', ox, oy);
+      case 'ellipse': {
+        const [lx, ly] = entity.center;
+        const { radiusX, radiusY } = entity;
+
+        if (doCenters) add('center', ...world(lx, ly));
+        if (doEndpoints) {
+          add('endpoint', ...world(lx + radiusX, ly));
+          add('endpoint', ...world(lx - radiusX, ly));
+          add('endpoint', ...world(lx, ly + radiusY));
+          add('endpoint', ...world(lx, ly - radiusY));
+        }
         break;
       }
 
-      // 3D solids have no 2D snap geometry — already filtered by is2D above.
+      case 'spline': {
+        if (doEndpoints) for (const p of entity.points) add('endpoint', ...world(p[0], p[1]));
+        break;
+      }
+
+      case 'point': {
+        if (doEndpoints) add('endpoint', ...world(0, 0));
+        break;
+      }
+
+      // Text and dimensions have no snap geometry; 3D solids snap to their top-view outline.
       default:
+        if (is3D(entity) && entity.tags?.includes('bim') !== true) {
+          for (const snap of solidSnapPoints(document, entity)) {
+            const wanted =
+              snap.type === 'endpoint'
+                ? doEndpoints
+                : snap.type === 'midpoint'
+                  ? doMidpoints
+                  : doCenters;
+            if (wanted) candidates.push(snap);
+          }
+        }
         break;
     }
   }
 
   // Segment × segment intersections.
   if (doIntersections) {
-    for (let i = 0; i < allSegments.length; i++) {
-      for (let j = i + 1; j < allSegments.length; j++) {
-        const a = allSegments[i];
-        const b = allSegments[j];
-        const pt = a && b ? segmentIntersection(...a, ...b) : null;
-        if (pt) add('intersection', ...pt);
+    for (const pt of allSegmentIntersections(allSegments)) add('intersection', ...pt);
+    for (const [i, curve] of allCurves.entries()) {
+      for (const segment of allSegments) {
+        for (const pt of segmentCurveIntersections(segment, curve)) add('intersection', ...pt);
+      }
+      for (const other of allCurves.slice(i + 1)) {
+        for (const pt of curveCurveIntersections(curve, other)) add('intersection', ...pt);
       }
     }
   }

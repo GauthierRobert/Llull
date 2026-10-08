@@ -5,7 +5,7 @@ import type { LineEntity } from '@core/model/types';
 import { ShapeLine } from './ShapeLine';
 
 export function LineRenderer({
-  entity: { start, end, position, color },
+  entity: { start, end, position, rotation, color },
   selected,
 }: {
   entity: LineEntity;
@@ -19,6 +19,7 @@ export function LineRenderer({
       positions={positions}
       segments
       position={position}
+      rotation={rotation}
       color={color}
       selected={selected}
     />

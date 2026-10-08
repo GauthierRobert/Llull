@@ -10,7 +10,19 @@
  */
 
 import { distance, pointInPolygon, polygonArea, projectOntoSegment } from '@lib/polygon';
-import type { CadDocument, Entity, EntityId, Vec2 } from '@core/model/types';
+import type * as THREE from 'three';
+import type {
+  CadDocument,
+  DimensionEntity,
+  Entity,
+  EntityId,
+  TextEntity,
+  Vec2,
+} from '@core/model/types';
+import { is3D } from '@core/model/types';
+import { DEFAULT_OFFSET, dimensionDrawing } from './entities/dimensionGeometry';
+import { nearestOnArc } from './snapping/geometry';
+import { ringsDistSq, solidOutline } from './solidOutline';
 
 /** Pick radius in screen pixels (selection and modify-tool picks). */
 export const PICK_RADIUS_PX = 10;
@@ -96,7 +108,7 @@ function pointToSegDistSq(p: Vec2, a: Vec2, b: Vec2): number {
  * is the work-plane origin in world space. The world-space pick is shifted into
  * the entity's local frame and all geometry is compared in that frame.
  *
- * Handles: line, polyline, circle, rectangle, point, arc (as its full circle),
+ * Handles: line, polyline, circle, rectangle, point, arc (swept range only),
  * ellipse (sampled), spline (through its control points).
  * Returns Infinity for unsupported kinds.
  *
@@ -121,9 +133,19 @@ export function entityDistSq(entity: Entity, worldPick: Vec2): number {
       return d * d;
     }
     case 'arc': {
-      // An arc is picked as its full circle.
-      const d = distance(pick, entity.center) - entity.radius;
-      return d * d;
+      // Distance to the nearest point on the swept arc (not its full circle).
+      const [cx, cy] = entity.center;
+      const [nx, ny] = nearestOnArc(
+        pick[0],
+        pick[1],
+        cx,
+        cy,
+        entity.radius,
+        entity.startAngle,
+        entity.endAngle,
+        false,
+      );
+      return distance(pick, [nx, ny]) ** 2;
     }
     case 'rectangle': {
       // Rectangle corners are in local space (lower-left at local origin).
@@ -141,6 +163,12 @@ export function entityDistSq(entity: Entity, worldPick: Vec2): number {
     }
     case 'point':
       return distance(pick, [0, 0]) ** 2;
+    case 'text': {
+      const { left, width, height } = textLocalBox(entity);
+      const dx = Math.max(left - pick[0], 0, pick[0] - (left + width));
+      const dy = Math.max(Math.abs(pick[1]) - height / 2, 0);
+      return dx * dx + dy * dy;
+    }
     case 'ellipse': {
       const { center, radiusX, radiusY } = entity;
       const samples = Array.from({ length: ELLIPSE_PICK_SAMPLES + 1 }, (_, i): Vec2 => {
@@ -152,6 +180,25 @@ export function entityDistSq(entity: Entity, worldPick: Vec2): number {
     default:
       return Infinity;
   }
+}
+
+/** Average glyph advance as a fraction of the text height, used to estimate a text pick box. */
+const TEXT_PICK_EM_WIDTH = 0.6;
+
+/** Line pitch as a multiple of the text height (troika's default line height is about 1.2 em). */
+const TEXT_LINE_PITCH = 1.2;
+
+/**
+ * Estimated entity-local box of a text entity (no font metrics here): the longest line at about
+ * 0.6 em per character, lines stacked at 1.2 em, block centred vertically on the entity origin
+ * (anchorY 'middle') and placed horizontally by the anchor.
+ * @pure
+ */
+export function textLocalBox(entity: TextEntity): { left: number; width: number; height: number } {
+  const lines = entity.content.split('\n');
+  const width = Math.max(...lines.map((line) => line.length)) * entity.height * TEXT_PICK_EM_WIDTH;
+  const left = entity.anchor === 'center' ? -width / 2 : entity.anchor === 'right' ? -width : 0;
+  return { left, width, height: entity.height * (1 + (lines.length - 1) * TEXT_LINE_PITCH) };
 }
 
 /** Segments used to approximate an ellipse outline for picking. */
@@ -173,6 +220,72 @@ function chainDistSq(pick: Vec2, points: ReadonlyArray<Vec2>, closed: boolean): 
   return best;
 }
 
+/** Dimension label height (world units) used for picking — matches DimensionRenderer2D. */
+const DIMENSION_LABEL_HEIGHT = 0.5;
+
+interface LabelBox {
+  /** World-space centre of the label. */
+  readonly center: Vec2;
+  readonly halfWidth: number;
+  readonly halfHeight: number;
+}
+
+/**
+ * World-space box of a dimension's label (width estimated from the label text).
+ * Dimensions are associative, so the label position comes from the referenced entities.
+ * @failure dangling or wrong-kind references -> null
+ */
+export function dimensionLabelBox(
+  document: CadDocument,
+  dimension: DimensionEntity,
+): LabelBox | null {
+  const drawing = dimensionDrawing(
+    dimension.dimensionKind,
+    dimension.entityIds.map((id) => document.entities[id]),
+    dimension.offset ?? DEFAULT_OFFSET,
+    dimension.color,
+  );
+  if (drawing === null) return null;
+  drawing.lines?.geometry.dispose();
+  (drawing.lines?.material as THREE.Material | undefined)?.dispose();
+  const text =
+    dimension.label ||
+    (dimension.dimensionKind === 'angular'
+      ? `${drawing.value.toFixed(1)}°`
+      : drawing.value.toFixed(dimension.precision ?? document.displayPrecision));
+  return {
+    center: [dimension.position[0] + drawing.textX, dimension.position[1] + drawing.textY],
+    halfWidth: (text.length * DIMENSION_LABEL_HEIGHT * TEXT_PICK_EM_WIDTH) / 2,
+    halfHeight: DIMENSION_LABEL_HEIGHT / 2,
+  };
+}
+
+/**
+ * Squared distance from `worldPick` to a dimension's label box.
+ * @failure dangling or wrong-kind references -> Infinity (not pickable)
+ */
+export function dimensionLabelDistSq(
+  document: CadDocument,
+  dimension: DimensionEntity,
+  worldPick: Vec2,
+): number {
+  const box = dimensionLabelBox(document, dimension);
+  if (box === null) return Infinity;
+  const dx = Math.max(Math.abs(worldPick[0] - box.center[0]) - box.halfWidth, 0);
+  const dy = Math.max(Math.abs(worldPick[1] - box.center[1]) - box.halfHeight, 0);
+  return dx * dx + dy * dy;
+}
+
+/**
+ * Squared distance to a 3D solid's top-view footprint outline; derived building geometry
+ * (`bim` tag, drawn per level elsewhere) is not pickable here.
+ */
+function solidOutlineDistSq(document: CadDocument, solid: Entity, worldPick: Vec2): number {
+  if (solid.tags?.includes('bim') === true) return Infinity;
+  const rings = solidOutline(document, solid);
+  return rings === null ? Infinity : ringsDistSq(rings, worldPick);
+}
+
 /**
  * Id of the entity nearest to `worldPick` within `tolerance` world units, or null.
  * Entities rejected by `isPickable` (e.g. hidden ones) are ignored.
@@ -190,7 +303,12 @@ export function nearestEntityId(
   for (const id of document.order) {
     const entity = document.entities[id];
     if (!entity || !isPickable(entity)) continue;
-    const dSq = entityDistSq(entity, worldPick);
+    const dSq =
+      entity.kind === 'dimension'
+        ? dimensionLabelDistSq(document, entity, worldPick)
+        : is3D(entity)
+          ? solidOutlineDistSq(document, entity, worldPick)
+          : entityDistSq(entity, worldPick);
     if (dSq < toleranceSq && dSq < bestDist) {
       bestDist = dSq;
       bestId = id;

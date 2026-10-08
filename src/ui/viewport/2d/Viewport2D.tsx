@@ -1,7 +1,7 @@
 /**
  * @layer ui/viewport/2d
  * 2D drafting viewport: the same three.js scene through an orthographic top-down camera
- * (MapControls pan/zoom, disabled while a draw tool is active), an adaptive grid, a ScaleBar HUD
+ * (MapControls pan/zoom; pan disabled while a tool is armed, wheel zoom stays), an adaptive grid, a ScaleBar HUD
  * and floating-origin rendering. `frameloop="demand"`; presentational only, changes go through
  * dispatch.
  */
@@ -13,6 +13,7 @@ import * as THREE from 'three';
 import type { Vec2 } from '@core/model/types';
 import { useStore } from '@ui/store';
 import type { DrawToolKind, ModifyToolKind } from '@ui/store';
+import { cameraGestures, MAP_CONTROLS_CONFIG } from './cameraControlsPolicy';
 import { ZoomExtents2D } from './ZoomExtents2D';
 import { Entities2D } from './Entities2D';
 import { BuildingPlan2D } from './BuildingPlan2D';
@@ -24,6 +25,7 @@ import { useModifyTool } from './useModifyTool';
 import type { ModifyToolPhase } from './useModifyTool';
 import { ModifyPickInteraction } from './ModifyPickInteraction';
 import { SelectPickInteraction } from './SelectPickInteraction';
+import { BoxSelectInteraction } from './BoxSelectInteraction';
 import { ScaleBar } from './ScaleBar';
 import { AdaptiveGrid2D } from './AdaptiveGrid2D';
 import { MeasureBBoxRect2D } from './MeasureBBoxRect2D';
@@ -86,11 +88,8 @@ function SceneContents2D({
 
       <MapControls
         makeDefault
-        enabled={!isDrawing && !isModifying}
-        enableRotate={false}
-        screenSpacePanning={true}
-        zoomSpeed={1.2}
-        panSpeed={1.0}
+        {...MAP_CONTROLS_CONFIG}
+        {...cameraGestures(isDrawing || isModifying)}
       />
 
       <StoreInvalidator />
@@ -120,6 +119,7 @@ function SceneContents2D({
         {/* Snap indicator + click-to-select: shown when no draw or modify tool is active */}
         {!isDrawing && !isModifying && <SnapIndicator zoom={zoom} />}
         {!isDrawing && !isModifying && <SelectPickInteraction zoom={zoom} />}
+        {!isDrawing && !isModifying && <BoxSelectInteraction zoom={zoom} />}
 
         {/* Draw interaction: click-capture + rubber-band preview */}
         <DrawInteraction

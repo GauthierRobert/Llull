@@ -11,7 +11,7 @@ import { ShapeLine } from './ShapeLine';
 const SPLINE_SEGMENTS_PER_POINT = 16;
 
 export function SplineRenderer({
-  entity: { points, closed, position, color },
+  entity: { points, closed, position, rotation, color },
   selected,
 }: {
   entity: SplineEntity;
@@ -31,5 +31,13 @@ export function SplineRenderer({
   }, [points, closed]);
 
   if (!positions) return null;
-  return <ShapeLine positions={positions} position={position} color={color} selected={selected} />;
+  return (
+    <ShapeLine
+      positions={positions}
+      position={position}
+      rotation={rotation}
+      color={color}
+      selected={selected}
+    />
+  );
 }

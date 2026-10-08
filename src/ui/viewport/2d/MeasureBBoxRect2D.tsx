@@ -11,9 +11,9 @@
  */
 
 import type { Vec3 } from '@core/model/types';
-import { flattenPoints, positionsGeometry } from '../lineGeometry';
+import { anchoredGeometry } from '../lineGeometry';
+import { useEffect, useMemo } from 'react';
 import { useBoundingBoxMeasure } from '../useBoundingBoxMeasure';
-import { useDisposable } from '../useDisposable';
 import { useOverlayMaterial } from '../useOverlayMaterial';
 
 /** Draw height: slightly above the entities. */
@@ -23,25 +23,31 @@ function RectLines2D({ min, max }: { min: Vec3; max: Vec3 }): React.ReactElement
   const [x0, y0] = min;
   const [x1, y1] = max;
 
-  const geometry = useDisposable(
+  const anchored = useMemo(
     () =>
-      positionsGeometry(
-        flattenPoints(
-          [
-            [x0, y0],
-            [x1, y0],
-            [x1, y1],
-            [x0, y1],
-          ],
-          RECT_Z,
-        ),
+      anchoredGeometry(
+        [
+          [x0, y0],
+          [x1, y0],
+          [x1, y1],
+          [x0, y1],
+        ],
+        RECT_Z,
       ),
     [x0, y0, x1, y1],
   );
+  useEffect(() => () => anchored.geometry.dispose(), [anchored]);
   const material = useOverlayMaterial('#60a5fa', 0.9);
 
   // lineLoop closes the last→first segment automatically.
-  return <lineLoop geometry={geometry} material={material} renderOrder={999} />;
+  return (
+    <lineLoop
+      geometry={anchored.geometry}
+      position={anchored.anchor}
+      material={material}
+      renderOrder={999}
+    />
+  );
 }
 
 export function MeasureBBoxRect2D(): React.ReactElement | null {

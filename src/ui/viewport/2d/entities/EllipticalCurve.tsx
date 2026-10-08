@@ -19,6 +19,7 @@ interface EllipticalCurveProps {
   startAngle: number;
   endAngle: number;
   position: Vec3;
+  rotation: Vec3;
   color: string;
   selected: boolean;
 }
@@ -30,6 +31,7 @@ export function EllipticalCurve({
   startAngle,
   endAngle,
   position,
+  rotation,
   color,
   selected,
 }: EllipticalCurveProps): React.ReactElement {
@@ -48,5 +50,13 @@ export function EllipticalCurve({
     return curve.getPoints(CURVE_SEGMENTS).flatMap(({ x, y }) => [x, y, 0]);
   }, [centerX, centerY, radiusX, radiusY, startAngle, endAngle]);
 
-  return <ShapeLine positions={positions} position={position} color={color} selected={selected} />;
+  return (
+    <ShapeLine
+      positions={positions}
+      position={position}
+      rotation={rotation}
+      color={color}
+      selected={selected}
+    />
+  );
 }
