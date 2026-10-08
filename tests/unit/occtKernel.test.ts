@@ -80,6 +80,7 @@ describe('OcctKernel — static contract tests (always run)', () => {
 describe('GeometryKernel — interface conformance', () => {
   it('GeometryKernel type has evaluate, tessellate, topology, exportStep', () => {
     const stub = {
+      supports: () => true,
       evaluate: () => null,
       tessellate: () => null,
       topology: () => null,
@@ -95,6 +96,7 @@ describe('GeometryKernel — interface conformance', () => {
   it('evaluate accepts a recipe tree (boolean over two solid leaves) and may refuse with null', () => {
     const recipes: ShapeRecipe[] = [];
     const stub: GeometryKernel = {
+      supports: () => true,
       evaluate: (recipe) => {
         recipes.push(recipe);
         return null;

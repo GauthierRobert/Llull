@@ -2,7 +2,13 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { BoxEntity, Entity } from '@core/model/types';
 import type { ShapeRecipe } from '@core/geometry/shapeRecipe';
-import { kernelFromOps, type KernelOps } from '@core/geometry/shapeKernel';
+import {
+  handleOf,
+  keyOnlyHandle,
+  kernelFromOps,
+  SHAPE_NOT_CACHED,
+  type KernelOps,
+} from '@core/geometry/shapeKernel';
 import type { MeshData, ShapeTopology } from '@core/geometry/kernel';
 import { TETRA } from '../../helpers/fakeKernel';
 
@@ -135,7 +141,7 @@ describe('kernelFromOps', () => {
     expect(kernel.cachedShapeCount()).toBe(0);
   });
 
-  it('never releases a shape an evaluation still needs (tree larger than the cache)', () => {
+  it('defers eviction to the end of the outermost call (tree larger than the cache)', () => {
     const { ops, released, built } = countingOps();
     const kernel = kernelFromOps(ops, 1);
     const left = union(leaf(box('a')), leaf(box('b', 1)));
@@ -171,6 +177,38 @@ describe('kernelFromOps', () => {
     expect(refusing.tessellate(stale)).toBeNull();
     expect(refusing.topology(stale)).toBeNull();
     expect(refusing.exportStep([stale])).toBeNull();
+  });
+
+  it('retries cached failures once the native module reports degradation', () => {
+    let epoch = 0;
+    let healthy = false;
+    const { ops } = countingOps({
+      failureEpoch: () => epoch,
+      solid: (entity) => (healthy ? { serial: 1, label: entity.id } : null),
+    });
+    const kernel = kernelFromOps(ops);
+    expect(kernel.evaluate(leaf(box('a')))).toBeNull();
+    healthy = true;
+    expect(kernel.evaluate(leaf(box('a')))).toBeNull(); // cached refusal
+    epoch++;
+    expect(kernel.evaluate(leaf(box('a')))).not.toBeNull();
+  });
+
+  it('reports its capability gaps', () => {
+    const kernel = kernelFromOps(countingOps({ unsupported: new Set(['fillet']) }).ops);
+    expect(kernel.supports('fillet')).toBe(false);
+    expect(kernel.supports('boolean')).toBe(true);
+  });
+
+  it('serves key-only handles from the cache and asks for the recipe on a miss', () => {
+    const { ops } = countingOps();
+    const kernel = kernelFromOps(ops);
+    const handle = kernel.evaluate(leaf(box('a')))!;
+    expect(kernel.topology(keyOnlyHandle(handle))).toBe(TOPOLOGY);
+    expect(handleOf(leaf(box('a')))).toEqual(handle);
+    kernel.clear();
+    expect(() => kernel.topology(keyOnlyHandle(handle))).toThrow(SHAPE_NOT_CACHED);
+    expect(kernel.topology(handle)).toBe(TOPOLOGY);
   });
 
   it('survives a release that throws', () => {

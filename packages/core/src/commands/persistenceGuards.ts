@@ -105,7 +105,7 @@ export function validateEntityValue(v: unknown): string | null {
     case 'mesh': {
       const brep = v['brep'];
       if (brep === undefined) break;
-      const problem = validateShapeRecipe(brep);
+      const problem = validateShapeRecipe(brep, validateEntityValue);
       if (problem !== null) return `entity ${id} (mesh): brep recipe invalid — ${problem}`;
       break;
     }

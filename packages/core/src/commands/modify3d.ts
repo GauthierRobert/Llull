@@ -8,6 +8,7 @@
 
 import type { CadDocument, Entity } from '../model/types';
 import type { ShapeRecipe } from '../geometry/shapeRecipe';
+import type { ShapeTopology } from '../geometry/kernel';
 import { is3D } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
@@ -16,7 +17,13 @@ import { currentContext } from './context';
 import { nextId } from '../lib/id';
 import { referenceLossSuffix, replaceEntities } from './entityOps';
 import { kernelUnavailable } from './kernelRefusal';
-import { evaluateRecipe, kernelResultEntity, operandRecipe, topologySuffix } from './kernelShape';
+import {
+  evaluateRecipe,
+  fallbackSuffix,
+  kernelResultEntity,
+  operandRecipe,
+  topologySuffix,
+} from './kernelShape';
 import { noop } from './noop';
 
 /** Surface-neutral pointer to the B-rep kernel (browser URL flag or server env var). */
@@ -38,6 +45,12 @@ function validateSolidTarget(
       `${opName}: entity '${id}' is a 2D shape (kind '${entity.kind}'); only 3D solids can be filleted, chamfered or shelled.`,
     );
   }
+  if (entity.kind === 'instance') {
+    return noop(
+      doc,
+      `${opName}: entity '${id}' is a component instance; run explode_instance first to get solids.`,
+    );
+  }
   return { entity };
 }
 
@@ -47,8 +60,35 @@ interface EdgeModification {
   readonly amountName: 'radius' | 'distance' | 'thickness';
   readonly amount: number;
   readonly id: string;
+  /** Selected unique-edge indices (fillet / chamfer); checked against the exact topology. */
+  readonly edges?: readonly number[];
   /** The modification node over the operand's exact recipe. */
   readonly recipe: (source: ShapeRecipe) => ShapeRecipe;
+}
+
+/**
+ * Why `edges` cannot be selected on a shape of `topology` (out of range, repeated, seam or degenerate),
+ * or null; a kernel without exact topology (null) cannot check, so it accepts.
+ */
+function edgeSelectionProblem(
+  topology: ShapeTopology | null,
+  edges: readonly number[],
+): string | null {
+  if (topology === null) return null;
+  const count = topology.edges.length;
+  const outOfRange = edges.filter((index) => index >= count);
+  if (outOfRange.length > 0) {
+    return `edge index ${outOfRange.join(', ')} out of range (the solid has ${count} edges, 0..${count - 1}; inspect_topology lists them)`;
+  }
+  const repeated = edges.filter((index, at) => edges.indexOf(index) !== at);
+  if (repeated.length > 0) return `edge index ${[...new Set(repeated)].join(', ')} selected twice`;
+  const unroundable = edges.filter((index) => {
+    const edge = topology.edges[index];
+    return edge !== undefined && (edge.seam || edge.degenerate);
+  });
+  return unroundable.length > 0
+    ? `edge ${unroundable.join(', ')} is a seam or degenerate edge (no corner to round)`
+    : null;
 }
 
 /**
@@ -58,7 +98,7 @@ interface EdgeModification {
 function modifyEdges(
   doc: CadDocument,
   ctx: ExecutionContext | undefined,
-  { command, pastTense, amountName, amount, id, recipe }: EdgeModification,
+  { command, pastTense, amountName, amount, id, edges = [], recipe }: EdgeModification,
 ): CommandResult {
   if (amount <= 0) return noop(doc, `${command}: ${amountName} must be > 0 (got ${amount}).`);
   const validation = validateSolidTarget(doc, command, id);
@@ -68,12 +108,16 @@ function modifyEdges(
   const kernel = (ctx ?? currentContext()).kernel;
   if (!kernel) return noop(doc, kernelUnavailable(command));
   const source = operandRecipe(kernel, entity);
-  if (kernel.evaluate(source) === null) {
+  const sourceShape = kernel.evaluate(source);
+  if (sourceShape === null) {
     return noop(
       doc,
       `${command}: kernel could not build entity '${id}' (kind '${entity.kind}'). The entity may have degenerate geometry or an unsupported kind for this kernel.`,
     );
   }
+  const badEdges = edgeSelectionProblem(kernel.topology(sourceShape), edges);
+  if (badEdges !== null)
+    return noop(doc, `${command}: ${badEdges} on '${id}'; document unchanged.`);
   const result = evaluateRecipe(kernel, recipe(source));
   if (typeof result === 'string') {
     return noop(
@@ -87,7 +131,7 @@ function modifyEdges(
   const document = replaceEntities(doc, [id], meshEntity);
   return {
     document,
-    summary: `${command}: ${pastTense} '${id}' (kind '${entity.kind}', ${amountName} ${amount}) → mesh '${newId}' (${result.mesh.indices.length / 3} triangles). Source entity consumed.${topologySuffix(kernel, result.shape)}${referenceLossSuffix(doc, document)}`,
+    summary: `${command}: ${pastTense} '${id}' (kind '${entity.kind}', ${amountName} ${amount}) → mesh '${newId}' (${result.mesh.indices.length / 3} triangles). Source entity consumed.${fallbackSuffix(kernel, [entity])}${topologySuffix(kernel, result.shape)}${referenceLossSuffix(doc, document)}`,
     affected: [newId],
   };
 }
@@ -131,6 +175,7 @@ export const filletEdge = defineCommand({
       amountName: 'radius',
       amount: radius,
       id,
+      edges: edgeIndices,
       recipe: (source) => ({ op: 'fillet', source, edges: edgeIndices, size: radius }),
     }),
 });
@@ -173,6 +218,7 @@ export const chamferEdge = defineCommand({
       amountName: 'distance',
       amount: distance,
       id,
+      edges: edgeIndices,
       recipe: (source) => ({ op: 'chamfer', source, edges: edgeIndices, size: distance }),
     }),
 });

@@ -12,15 +12,40 @@ import type { ShapeRecipe } from '../geometry/shapeRecipe';
 import { meshRecipeOf, recipeOf } from '../geometry/shapeRecipe';
 import { newEntity } from './newEntity';
 
+/** The first op of `recipe` this kernel cannot perform at all, or null. */
+function unsupportedOp(kernel: GeometryKernel, recipe: ShapeRecipe): ShapeRecipe['op'] | null {
+  if (!kernel.supports(recipe.op)) return recipe.op;
+  switch (recipe.op) {
+    case 'solid':
+      return null;
+    case 'boolean':
+      return unsupportedOp(kernel, recipe.a) ?? unsupportedOp(kernel, recipe.b);
+    default:
+      return unsupportedOp(kernel, recipe.source);
+  }
+}
+
 /**
- * Recipe of an operand entity: its exact construction tree, or — when this kernel cannot rebuild
- * that tree (a fillet recipe loaded under a kernel without fillets) — its stored triangles.
+ * Recipe of an operand entity: its exact construction tree, or — only when this kernel lacks an op
+ * of that tree (a fillet recipe loaded under Manifold) — its stored triangles. A transient refusal
+ * never downgrades the exact tree.
  */
 export function operandRecipe(kernel: GeometryKernel, entity: Entity): ShapeRecipe {
-  const exact = recipeOf(entity);
   const fallback = meshRecipeOf(entity);
-  if (fallback === null || kernel.evaluate(exact) !== null) return exact;
-  return fallback;
+  if (fallback !== null && unsupportedOp(kernel, recipeOf(entity)) !== null) return fallback;
+  return recipeOf(entity);
+}
+
+/** Summary suffix naming operands used as triangles because this kernel lacks an op of their tree. */
+export function fallbackSuffix(kernel: GeometryKernel, operands: readonly Entity[]): string {
+  const notes = operands.flatMap((entity) => {
+    if (meshRecipeOf(entity) === null) return [];
+    const op = unsupportedOp(kernel, recipeOf(entity));
+    return op === null ? [] : [`'${entity.id}' (its exact tree needs ${op})`];
+  });
+  return notes.length === 0
+    ? ''
+    : ` This kernel cannot rebuild ${notes.join(', ')}: used its stored triangles, so the result is faceted there.`;
 }
 
 export interface KernelResult {

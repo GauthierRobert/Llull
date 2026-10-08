@@ -89,6 +89,18 @@ describe('occt chamfer / fillet on true B-rep edges', () => {
     expect(topology?.volume).toBeCloseTo(64, 6);
   });
 
+  it('flags the seam of a cylinder and the poles of a sphere (nothing to round there)', () => {
+    const round = (kind: string, extra: object): Entity =>
+      ({ ...cubeEntity(1), kind, ...extra }) as unknown as Entity;
+    const cylinder = occt.topology(
+      occt.evaluate(leaf(round('cylinder', { radius: 1, height: 2 })))!,
+    )!;
+    expect(cylinder.edges.filter((edge) => edge.seam)).toHaveLength(1);
+    expect(cylinder.edges.filter((edge) => edge.curve === 'circle' && !edge.seam)).toHaveLength(2);
+    const sphere = occt.topology(occt.evaluate(leaf(round('sphere', { radius: 1 })))!)!;
+    expect(sphere.edges.some((edge) => edge.degenerate && edge.length === 0)).toBe(true);
+  });
+
   it('cuts material off any edge: volume drops by d^2/2 times the edge length', () => {
     const chamfered = occt.evaluate(chamfer(cube, [0], 0.25));
     expect(chamfered).not.toBeNull();

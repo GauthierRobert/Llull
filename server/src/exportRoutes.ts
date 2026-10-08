@@ -98,11 +98,11 @@ export function buildExportRouter(exchange: ExchangeOptions): Router {
     const port = exchange.port;
     const name = safeFileName(req.query['name'], 'model');
     if (port === null) {
-      const data = applyCommand('export_step_exact', {}).data as ExportStepExactData | undefined;
+      const exact = applyCommand('export_step_exact', {});
+      const data = exact.data as ExportStepExactData | undefined;
       if (data === undefined) {
         res.status(503).json({
-          error:
-            'STEP export needs the Python bridge (LLULL_PYTHON is off) or the exact OCC kernel (LLULL_KERNEL=occt).',
+          error: `STEP export needs the Python bridge (LLULL_PYTHON is off) or the exact OCC kernel (LLULL_KERNEL=occt). Kernel export: ${exact.summary}`,
         });
         return;
       }

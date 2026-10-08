@@ -148,6 +148,30 @@ describe('validateShapeRecipe', () => {
     expect(validateShapeRecipe(value)).toMatch(message);
   });
 
+  it.each([
+    ['a 2D leaf', { op: 'solid', entity: { kind: 'line' } }, /kind 'line', expected a 3D solid/],
+    ['an instance leaf', { op: 'solid', entity: { kind: 'instance' } }, /kind 'instance'/],
+    [
+      'a mesh leaf with ragged positions',
+      { op: 'solid', entity: { kind: 'mesh', mesh: { positions: [0, 0], indices: [] } } },
+      /positions must be finite xyz triples/,
+    ],
+    [
+      'a mesh leaf indexing past its vertices',
+      { op: 'solid', entity: { kind: 'mesh', mesh: { positions: [0, 0, 0], indices: [0, 1, 2] } } },
+      /indices must be integers within the vertex range/,
+    ],
+  ])('rejects %s', (_label, value, message) => {
+    expect(validateShapeRecipe(value)).toMatch(message);
+  });
+
+  it('runs the injected leaf validator on every leaf', () => {
+    const tree = { op: 'boolean', boolean: 'union', a: leaf, b: leaf };
+    expect(
+      validateShapeRecipe(tree, (entity) => (entity['id'] === 'a' ? 'bad leaf a' : null)),
+    ).toBe('bad leaf a');
+  });
+
   it('rejects a tree nested deeper than the limit', () => {
     let deep: ShapeRecipe = leaf;
     for (let i = 0; i < 300; i++) deep = { op: 'scale', source: deep, factor: 1 };

@@ -88,9 +88,13 @@ const BOOLEAN_BUILDERS: Readonly<Record<BooleanOp, string>> = {
  * (`WebAssembly.RuntimeError`) or a thrown non-Error always counts; other JS Errors are
  * binding/programming faults that do not touch module state.
  */
+/** `WebAssembly.RuntimeError` (a trap), read from the global: not every TS lib declares the value. */
+const TrapError = (globalThis as { WebAssembly?: { RuntimeError?: new () => Error } }).WebAssembly
+  ?.RuntimeError;
+
 function degradesModule(error: unknown, operation: OperationClass): boolean {
   if (!(error instanceof Error)) return true;
-  if (error.constructor.name === 'RuntimeError') return true; // WebAssembly.RuntimeError (a trap)
+  if (TrapError !== undefined && error instanceof TrapError) return true; // a WASM trap
   return (
     operation === 'fragile' && error instanceof ReferenceError && /___cxa_/.test(error.message)
   );
@@ -135,7 +139,7 @@ export function nativeFailureCount(): number {
 /**
  * Fillet or chamfer the selected unique edges of an exact solid (both builders share
  * `Add_2(size, edge)`); the input shape is left untouched.
- * @failure size <= 0, no selected edge exists, builder not done -> null
+ * @failure size <= 0, a selected index out of range, no edge, builder not done -> null
  */
 function roundEdges(
   api: OccApi,
@@ -147,9 +151,13 @@ function roundEdges(
   if (!(size > 0)) return null;
   return guarded('refusal', (own) => {
     const edges = uniqueSubShapes(api, shape, 'TopAbs_EDGE').map(own);
+    if (edgeIndices.some((index) => edges[index] === undefined)) return null;
     const selected =
       edgeIndices.length > 0
-        ? edgeIndices.flatMap((index) => (edges[index] ? [edges[index]] : []))
+        ? edgeIndices.flatMap((index) => {
+            const edge = edges[index];
+            return edge === undefined ? [] : [edge];
+          })
         : edges;
     if (selected.length === 0) return null;
     const maker = own(makeBuilder(shape));
@@ -168,7 +176,7 @@ function roundEdges(
 /** Closed hollow: the solid minus its inward offset by `thickness` (a sealed internal cavity). */
 function hollow(api: OccApi, solid: OccShape, thickness: number): OccShape | null {
   if (!(thickness > 0)) return null;
-  return guarded('refusal', (own) => {
+  const cavity = guarded('refusal', (own) => {
     const offset = own(new api.BRepOffsetAPI_MakeOffsetShape_1() as OccOffsetMaker);
     offset.PerformByJoin(
       solid,
@@ -180,8 +188,12 @@ function hollow(api: OccApi, solid: OccShape, thickness: number): OccShape | nul
       api.GeomAbs_JoinType.GeomAbs_Arc,
       false,
     );
-    if (!offset.IsDone()) return null;
-    const cavity = own(offset.Shape());
+    return offset.IsDone() ? offset.Shape() : null;
+  });
+  if (cavity === null) return null;
+  // The cut is a boolean: a native failure there may degrade the module (see degradesModule).
+  return guarded('fragile', (own) => {
+    own(cavity);
     const cut = own(new api.BRepAlgoAPI_Cut_3(solid, cavity) as OccBuilder);
     cut.Build();
     return cut.IsDone() ? cut.Shape() : null;
@@ -210,6 +222,7 @@ function untangle(a: ShapeRecipe, b: ShapeRecipe): [ShapeRecipe, ShapeRecipe] {
 /** Native OCC operations behind the recipe evaluator. */
 export function occtOps(api: OccApi): KernelOps<OccShape> {
   return {
+    failureEpoch: nativeFailureCount,
     solid: (entity) => guarded('refusal', () => entityToOccShape(api, entity)),
     prepareBoolean: untangle,
     boolean: (op: BooleanOp, a, b) =>

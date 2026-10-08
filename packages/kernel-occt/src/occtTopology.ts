@@ -2,7 +2,7 @@
  * @layer kernel
  * Exact B-rep topology of an OCC shape: unique sub-shapes (an edge shared by two faces counted once,
  * in explorer order — the numbering `fillet` / `chamfer` select by), face surface types and areas,
- * edge curve types, lengths and points, solid volume.
+ * edge curve types, lengths and points, seam / degenerate flags, solid volume.
  */
 
 import type {
@@ -90,8 +90,52 @@ function pointAt(adaptor: { Value(u: number): OccPoint }, parameter: number): Ve
   return xyz;
 }
 
-function edgeInfo(api: OccApi, shape: OccShape, index: number): ShapeEdge {
+/** Number of distinct faces each unique edge bounds (1 = a seam), indexed like `edges`. */
+function adjacentFaceCounts(
+  api: OccApi,
+  faces: readonly OccShape[],
+  edges: readonly OccShape[],
+): number[] {
+  const buckets = new Map<number, number[]>();
+  edges.forEach((edge, index) => {
+    const hash = edge.HashCode(HASH_BOUND);
+    buckets.set(hash, [...(buckets.get(hash) ?? []), index]);
+  });
+  const facesOf = edges.map(() => new Set<number>());
+  faces.forEach((face, faceIndex) => {
+    const exp = explorer(api, face, 'TopAbs_EDGE');
+    for (; exp.More(); exp.Next()) {
+      const current = exp.Current();
+      const match = buckets
+        .get(current.HashCode(HASH_BOUND))
+        ?.find((index) => edges[index]?.IsSame(current));
+      if (match !== undefined) facesOf[match]?.add(faceIndex);
+      release(current);
+    }
+    exp.delete();
+  });
+  return facesOf.map((set) => set.size);
+}
+
+function edgeInfo(api: OccApi, shape: OccShape, index: number, faceCount: number): ShapeEdge {
   const edge = api.TopoDS.Edge_1(shape) as OccShape;
+  const degenerate = api.BRep_Tool.Degenerated(edge) === true;
+  if (degenerate) {
+    const vertex = api.TopoDS.Vertex_1(api.TopExp.FirstVertex(edge, false)) as OccShape;
+    const point = api.BRep_Tool.Pnt(vertex) as OccPoint;
+    const at: Vec3 = [point.X(), point.Y(), point.Z()];
+    [point, vertex, edge].forEach(release);
+    return {
+      index,
+      curve: 'other',
+      length: 0,
+      start: at,
+      end: at,
+      mid: at,
+      seam: false,
+      degenerate,
+    };
+  }
   const adaptor = new api.BRepAdaptor_Curve_2(edge) as OccHandle & {
     GetType(): unknown;
     FirstParameter(): number;
@@ -108,6 +152,8 @@ function edgeInfo(api: OccApi, shape: OccShape, index: number): ShapeEdge {
     start: pointAt(adaptor, first),
     end: pointAt(adaptor, last),
     mid: pointAt(adaptor, (first + last) / 2),
+    seam: faceCount === 1,
+    degenerate,
   };
   [props, adaptor, edge].forEach(release);
   return info;
@@ -136,12 +182,13 @@ export function shapeTopology(api: OccApi, shape: OccShape): ShapeTopology {
   };
   const faces = uniqueSubShapes(api, shape, 'TopAbs_FACE');
   const edges = uniqueSubShapes(api, shape, 'TopAbs_EDGE');
+  const faceCounts = adjacentFaceCounts(api, faces, edges);
   const volumeProps = new api.GProp_GProps_1() as GProps;
   api.BRepGProp.VolumeProperties_1(shape, volumeProps, false, false, false);
   const topology: ShapeTopology = {
     solids: count('TopAbs_SOLID'),
     faces: faces.map((face, index) => faceInfo(api, face, index)),
-    edges: edges.map((edge, index) => edgeInfo(api, edge, index)),
+    edges: edges.map((edge, index) => edgeInfo(api, edge, index, faceCounts[index] ?? 0)),
     vertices: count('TopAbs_VERTEX'),
     volume: Math.abs(volumeProps.Mass()),
   };

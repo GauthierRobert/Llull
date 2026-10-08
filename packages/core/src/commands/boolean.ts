@@ -17,7 +17,13 @@ import { currentContext } from './context';
 import { nextId } from '../lib/id';
 import { referenceLossSuffix, replaceEntities } from './entityOps';
 import { kernelUnavailable } from './kernelRefusal';
-import { evaluateRecipe, kernelResultEntity, operandRecipe, topologySuffix } from './kernelShape';
+import {
+  evaluateRecipe,
+  fallbackSuffix,
+  kernelResultEntity,
+  operandRecipe,
+  topologySuffix,
+} from './kernelShape';
 import { noop } from './noop';
 
 function runBoolean(
@@ -80,7 +86,7 @@ function runBoolean(
   const document = replaceEntities(doc, [a, b], meshEntity);
   return {
     document,
-    summary: `${opName}: merged '${a}' and '${b}' into mesh '${newId}' (${triangleCount} triangles). Operands consumed.${topologySuffix(kernel, result.shape)}${referenceLossSuffix(doc, document)}`,
+    summary: `${opName}: merged '${a}' and '${b}' into mesh '${newId}' (${triangleCount} triangles). Operands consumed.${fallbackSuffix(kernel, [entA, entB])}${topologySuffix(kernel, result.shape)}${referenceLossSuffix(doc, document)}`,
     affected: [newId],
   };
 }

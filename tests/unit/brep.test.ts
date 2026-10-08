@@ -24,6 +24,8 @@ const TOPOLOGY: ShapeTopology = {
     start: [0, 0, 0] as const,
     end: [2, 0, 0] as const,
     mid: [1, 0, 0] as const,
+    seam: index === 29,
+    degenerate: false,
   })),
   vertices: 8,
   volume: 8,
@@ -90,8 +92,11 @@ describe('kernel results keep their exact construction', () => {
     const { doc, a, b } = twoBoxes();
     const filleted = run(doc, 'fillet_edge', { id: a, radius: 0.2 }, fakeKernel({ fillet: TETRA }));
     const id = filleted.affected[0]!;
-    const meshOnly = fakeKernel({ boolean: TETRA, fillet: null });
+    const meshOnly = fakeKernel({ boolean: TETRA, unsupported: ['fillet', 'chamfer', 'shell'] });
     const unioned = run(filleted.document, 'boolean_union', { a: id, b }, meshOnly);
+    expect(unioned.summary).toContain(
+      `This kernel cannot rebuild '${id}' (its exact tree needs fillet)`,
+    );
     const mesh = unioned.document.entities[unioned.affected[0]!] as MeshSolidEntity;
     expect(mesh.brep).toMatchObject({
       op: 'boolean',
@@ -99,6 +104,46 @@ describe('kernel results keep their exact construction', () => {
     });
     const fallback = mesh.brep?.op === 'boolean' ? mesh.brep.a : null;
     expect(fallback?.op === 'solid' && 'brep' in fallback.entity).toBe(false);
+  });
+
+  it('a transient refusal of an exact tree never downgrades it to triangles', () => {
+    const { doc, a, b } = twoBoxes();
+    const filleted = run(doc, 'fillet_edge', { id: a, radius: 0.2 }, fakeKernel({ fillet: TETRA }));
+    const id = filleted.affected[0]!;
+    const flaky = fakeKernel({ boolean: TETRA, fillet: null });
+    const unioned = run(filleted.document, 'boolean_union', { a: id, b }, flaky);
+    expect(unioned.affected).toEqual([]);
+    expect(unioned.summary).toMatch(/kernel returned null/);
+  });
+
+  it('fillet_edge checks edge indices against the exact topology', () => {
+    const { doc, a } = twoBoxes();
+    const kernel = fakeKernel({ fillet: TETRA, topology: TOPOLOGY });
+    const cases: Array<[number[], RegExp]> = [
+      [[0, 57], /edge index 57 out of range \(the solid has 30 edges, 0\.\.29/],
+      [[3, 3], /edge index 3 selected twice/],
+      [[29], /edge 29 is a seam or degenerate edge/],
+    ];
+    for (const [edgeIndices, message] of cases) {
+      const result = run(doc, 'chamfer_edge', { id: a, edgeIndices, distance: 0.1 }, kernel);
+      expect(result.summary).toMatch(message);
+      expect(result.document).toBe(doc);
+    }
+    expect(
+      run(doc, 'fillet_edge', { id: a, edgeIndices: [0, 28], radius: 0.1 }, kernel).affected,
+    ).toHaveLength(1);
+  });
+
+  it('fillet_edge on a component instance asks to explode it first', () => {
+    const { doc, a } = twoBoxes();
+    const instance = { ...doc.entities[a]!, id: 'inst', kind: 'instance', componentId: 'c' };
+    const withInstance = {
+      ...doc,
+      entities: { ...doc.entities, inst: instance },
+      order: [...doc.order, 'inst'],
+    } as CadDocument;
+    const result = run(withInstance, 'fillet_edge', { id: 'inst', radius: 0.1 }, fakeKernel());
+    expect(result.summary).toMatch(/component instance; run explode_instance first/);
   });
 
   it('scale_entity on a kernel result scales its recipe too', () => {

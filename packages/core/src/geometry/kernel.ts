@@ -54,6 +54,10 @@ export interface ShapeEdge {
   readonly end: Vec3;
   /** Point at the parameter midpoint (on the curve, not the chord). */
   readonly mid: Vec3;
+  /** Bounds a single face (a cylinder's seam): no corner to fillet or chamfer. */
+  readonly seam: boolean;
+  /** Zero-length (a sphere or cone pole): no corner to fillet or chamfer. */
+  readonly degenerate: boolean;
 }
 
 export interface ShapeFace {
@@ -80,6 +84,9 @@ export interface ShapeTopology {
  * @pure
  */
 export interface GeometryKernel {
+  /** Whether this kernel can perform recipe nodes of `op` at all (Manifold: no fillet/chamfer/shell). */
+  supports(op: ShapeRecipe['op']): boolean;
+
   /** Build (or reuse, by `recipeKey`) the kernel shape of a recipe. */
   evaluate(recipe: ShapeRecipe): ShapeHandle | null;
 

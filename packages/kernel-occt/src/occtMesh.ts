@@ -26,54 +26,56 @@ export function extractMeshData(api: OccApi, shape: OccShape): MeshData | null {
   let vertexOffset = 0;
 
   const exp = explorer(api, shape, 'TopAbs_FACE');
+  try {
+    while (exp.More()) {
+      const current = exp.Current();
+      const face = (api.TopoDS as OccTopoDS).Face_1(current);
+      const loc = new api.TopLoc_Location_1() as OccHandle & { Transformation(): OccHandle };
+      const triangulation = api.BRep_Tool.Triangulation(face, loc) as OccTriangulation;
 
-  while (exp.More()) {
-    const current = exp.Current();
-    const face = (api.TopoDS as OccTopoDS).Face_1(current);
-    const loc = new api.TopLoc_Location_1() as OccHandle & { Transformation(): OccHandle };
-    const triangulation = api.BRep_Tool.Triangulation(face, loc) as OccTriangulation;
+      if (!triangulation.IsNull()) {
+        const tri = triangulation.get();
+        const nNodes = tri.NbNodes();
+        const nTris = tri.NbTriangles();
 
-    if (!triangulation.IsNull()) {
-      const tri = triangulation.get();
-      const nNodes = tri.NbNodes();
-      const nTris = tri.NbTriangles();
+        // Nodes are stored in the face's own frame; `loc` carries the shape's placement (a prism's
+        // top face, a transformed shape's faces), so bring them into world space.
+        const placement = loc.Transformation();
+        for (let i = 1; i <= nNodes; i++) {
+          const node = tri.Node(i);
+          node.Transform(placement);
+          positions.push(node.X(), node.Y(), node.Z());
+          release(node);
+        }
+        release(placement);
 
-      // Nodes are stored in the face's own frame; `loc` carries the shape's placement (a prism's
-      // top face, a transformed shape's faces), so bring them into world space.
-      const placement = loc.Transformation();
-      for (let i = 1; i <= nNodes; i++) {
-        const node = tri.Node(i);
-        node.Transform(placement);
-        positions.push(node.X(), node.Y(), node.Z());
-        release(node);
+        // A REVERSED face's stored triangles wind against the solid's outward normal: flip them.
+        const reversed =
+          face.Orientation_1().value === api.TopAbs_Orientation.TopAbs_REVERSED.value;
+        for (let i = 1; i <= nTris; i++) {
+          const t = tri.Triangle(i);
+          const [first, second, third] = [t.Value(1), t.Value(2), t.Value(3)];
+          indices.push(
+            vertexOffset + first - 1,
+            vertexOffset + (reversed ? third : second) - 1,
+            vertexOffset + (reversed ? second : third) - 1,
+          );
+          release(t);
+        }
+
+        vertexOffset += nNodes;
       }
-      release(placement);
 
-      // A REVERSED face's stored triangles wind against the solid's outward normal: flip them.
-      const reversed = face.Orientation_1().value === api.TopAbs_Orientation.TopAbs_REVERSED.value;
-      for (let i = 1; i <= nTris; i++) {
-        const t = tri.Triangle(i);
-        const [first, second, third] = [t.Value(1), t.Value(2), t.Value(3)];
-        indices.push(
-          vertexOffset + first - 1,
-          vertexOffset + (reversed ? third : second) - 1,
-          vertexOffset + (reversed ? second : third) - 1,
-        );
-        release(t);
-      }
-
-      vertexOffset += nNodes;
+      release(triangulation);
+      release(face);
+      release(current);
+      loc.delete();
+      exp.Next();
     }
-
-    release(triangulation);
-    release(face);
-    release(current);
-    loc.delete();
-    exp.Next();
+  } finally {
+    exp.delete();
+    mesher.delete();
   }
-
-  exp.delete();
-  mesher.delete();
 
   if (positions.length === 0) return null;
   return { positions, indices };

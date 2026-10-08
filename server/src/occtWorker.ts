@@ -8,7 +8,8 @@
  */
 
 import { workerData, type MessagePort } from 'node:worker_threads';
-import type { GeometryKernel } from '@core/geometry/kernel';
+import type { GeometryKernel, ShapeHandle } from '@core/geometry/kernel';
+import { keyOnlyHandle } from '@core/geometry/shapeKernel';
 import { errorMessage } from '@lib/errorMessage';
 import { nativeFailureCount } from '@kernel-occt/occtKernel';
 import { createNodeOcctKernel } from './occtNode';
@@ -61,7 +62,11 @@ function run(kernel: GeometryKernel, request: KernelRequest, testHooks: boolean)
     for (;;);
   }
   const method = kernel[request.op] as (...args: unknown[]) => unknown;
-  return method.apply(kernel, [...request.args]);
+  const result = method.apply(kernel, [...request.args]);
+  // The server rebuilds the full handle from its own recipe: never clone the tree back.
+  return request.op === 'evaluate' && result !== null
+    ? keyOnlyHandle(result as ShapeHandle)
+    : result;
 }
 
 main().catch((error: unknown) => {

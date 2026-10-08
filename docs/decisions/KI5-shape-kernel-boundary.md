@@ -35,10 +35,23 @@ was mostly decorative.
 - OCC booleans take every operand as an exact solid. A fillet on a boolean result rounds a true
   edge: a drilled cube's hole lip becomes a torus face. STEP exports carry `CYLINDRICAL_SURFACE`
   and `ADVANCED_FACE`s, not triangles.
-- Edge indices are stable and meaningful: a box has 12 edges, not 18 triangle edges.
+- Edge indices mean something now: a box has 12 edges, not 18 triangle edges. Seam edges (a
+  cylinder's) and degenerate edges (a sphere's poles) are flagged, and `fillet_edge` rejects
+  them along with out-of-range or repeated indices.
+- Open issue (topological naming): an index is stable only for an unchanged source recipe. After an
+  upstream parametric edit (a box resized, steps reordered) a stored `edges: [3]` can name a
+  different edge. Persistent naming, for example selecting by geometric query, is future work.
 - Replay is cheap: the kernel cache spans steps, so editing step k rebuilds only the nodes whose
   recipe changed.
-- The server's worker-isolated kernel proxies four calls. Handles cross the thread as plain data.
+- Fallback to triangles happens only for a capability gap (`GeometryKernel.supports`), never
+  because of a transient refusal, and the summary names the faceted operand.
+- A cached failure is dropped when the native module reports degradation (`failureEpoch`).
+- The server's worker-isolated kernel proxies these calls. `evaluate` replies with a key-only
+  handle, and output calls send key-only handles, resending the recipe only when the worker no
+  longer caches the shape (`SHAPE_NOT_CACHED`). Recipes are therefore cloned across the thread
+  once per evaluation, not on every call.
+- Recipes loaded from files or snapshots are validated down to their leaves (3D solid kinds,
+  persisted-entity checks, well-formed mesh arrays) before any kernel sees them.
 - Documents grow: a result embeds its operands' definitions. That is the recipe, by design (L8).
 - Manifold stays mesh-only: fillet/chamfer/shell recipes, `topology` and `exportStep` return
   null, and the commands no-op as before.

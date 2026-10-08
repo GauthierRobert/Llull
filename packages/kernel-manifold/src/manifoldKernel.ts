@@ -298,6 +298,7 @@ const COMBINE = { union: 'add', subtract: 'subtract', intersect: 'intersect' } a
  */
 export function manifoldOps(mod: ManifoldModule): KernelOps<ManifoldShape> {
   return {
+    unsupported: new Set(['fillet', 'chamfer', 'shell']),
     solid: (entity) => withSolids(() => entityToManifold(mod, entity)),
     boolean: (op: BooleanOp, a, b) => withSolids(() => a[COMBINE[op]](b)),
     fillet: () => null,

@@ -3,7 +3,7 @@
  * native ops, so commands exercise recipes, caching and handles without WASM.
  */
 import type { MeshData, ShapeTopology } from '@core/geometry/kernel';
-import type { BooleanOp } from '@core/geometry/shapeRecipe';
+import type { BooleanOp, ShapeRecipe } from '@core/geometry/shapeRecipe';
 import { kernelFromOps, type CachingKernel } from '@core/geometry/shapeKernel';
 import type { Entity } from '@core/model/types';
 
@@ -28,6 +28,8 @@ export interface FakeKernelSpec {
   readonly shell?: MeshData | null;
   readonly topology?: ShapeTopology | null;
   readonly step?: string | null;
+  /** Recipe ops this kernel lacks entirely (Manifold: fillet, chamfer, shell). */
+  readonly unsupported?: ReadonlyArray<ShapeRecipe['op']>;
 }
 
 export interface FakeCall {
@@ -46,6 +48,7 @@ export function fakeKernel(spec: FakeKernelSpec = {}): FakeKernel {
   const shape = (mesh: MeshData | null | undefined): FakeShape | null =>
     mesh === null || mesh === undefined ? null : { mesh };
   const kernel = kernelFromOps<FakeShape>({
+    unsupported: new Set(spec.unsupported ?? []),
     solid: (entity) => {
       calls.push({ op: 'solid', operands: [] });
       const mesh = spec.solid === undefined ? TETRA : spec.solid;
@@ -67,8 +70,8 @@ export function fakeKernel(spec: FakeKernelSpec = {}): FakeKernel {
       calls.push({ op: 'shell', operands: [source], size: thickness });
       return shape(spec.shell);
     },
-    place: (source) => source,
-    scale: (source) => source,
+    place: (source) => ({ ...source }),
+    scale: (source) => ({ ...source }),
     tessellate: (native) => native.mesh,
     topology: () => spec.topology ?? null,
     exportStep: () => spec.step ?? null,
