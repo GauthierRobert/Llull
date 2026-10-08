@@ -65,9 +65,10 @@ export function duplicateSelection(): void {
   if (selection.length === 0) return;
   const offset = duplicateOffset();
   const selectAffected = selection.length === 1;
-  for (const id of selection) {
-    state.dispatch('duplicate_entity', { id, offset }, { selectAffected });
-  }
+  // One duplicate command per entity; locally they fold into one undo step.
+  selection.forEach((id, index) => {
+    state.dispatch('duplicate_entity', { id, offset }, { selectAffected, coalesce: index > 0 });
+  });
 }
 
 /**
