@@ -4260,7 +4260,7 @@
     "name": "draw_spline"
   },
   {
-    "description": "Draw a chain of joined walls through plan points ([[x, y], …]); closed: true adds the closing wall (e.g. a building perimeter). Same options as add_wall; the whole chain is refused if any segment duplicates an existing wall.",
+    "description": "Draw a chain of joined walls through plan points ([[x, y], …]); closed: true adds the closing wall (e.g. a building perimeter). Same options as add_wall. A segment that duplicates an existing wall (same end points either way, same base offset, same level) is skipped and reported, so adjacent rooms can each be drawn as a closed loop sharing an edge; refused only if every segment is a duplicate.",
     "input_schema": {
       "properties": {
         "baseOffset": {
