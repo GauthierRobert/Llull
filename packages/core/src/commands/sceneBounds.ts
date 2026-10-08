@@ -51,6 +51,24 @@ const bounds = (min: Vec3, max: Vec3): Bounds => ({ min, max });
 /** Axis-aligned box centered on the origin. */
 const centered = (x: number, y: number, z: number): Bounds => bounds([-x, -y, -z], [x, y, z]);
 
+/** Width of a glyph as a fraction of the text height (monospace estimate). */
+const GLYPH_WIDTH_RATIO = 0.6;
+/** Distance between consecutive text lines as a fraction of the text height. */
+const LINE_SPACING_RATIO = 1.2;
+
+/**
+ * Local AABB of a text block as the viewport lays it out: the longest line sets the width,
+ * `anchor` (left by default) places that width relative to `position`, lines stack at 1.2 em and
+ * the whole block is centred vertically on `position` (drei `anchorY="middle"`).
+ */
+function textLocalBounds(e: Extract<Entity, { kind: 'text' }>): Bounds {
+  const lines = e.content.split('\n');
+  const width = Math.max(...lines.map((line) => line.length)) * e.height * GLYPH_WIDTH_RATIO;
+  const blockHeight = e.height * (1 + (lines.length - 1) * LINE_SPACING_RATIO);
+  const left = e.anchor === 'center' ? -width / 2 : e.anchor === 'right' ? -width : 0;
+  return bounds([left, -blockHeight / 2, 0], [left + width, blockHeight / 2, 0]);
+}
+
 /** Local-space AABB of a `mesh`: its world-space positions re-expressed relative to `position`. */
 function meshLocalBounds(e: Extract<Entity, { kind: 'mesh' }>): Bounds {
   const p = e.mesh.positions;
@@ -131,8 +149,7 @@ export function localBounds(e: Entity): Bounds {
         [e.center[0] + e.radiusX, e.center[1] + e.radiusY, 0],
       );
     case 'text':
-      // Monospace estimate: each glyph ≈ 0.6×height wide.
-      return bounds(ORIGIN, [e.content.length * e.height * 0.6, e.height, 0]);
+      return textLocalBounds(e);
     case 'dimension': {
       // No own geometry: a small box sized by the witness-line offset.
       const ext = e.offset ?? 5;
