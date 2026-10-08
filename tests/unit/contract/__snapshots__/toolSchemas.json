@@ -970,7 +970,7 @@
     "name": "add_grid_columns"
   },
   {
-    "description": "Add one structural grid axis from start to end (plan [x, y]) with a labelled bubble at each end, on layer S-GRID. Label defaults to the next free number.",
+    "description": "Add one structural grid axis from start to end (plan [x, y]) with a labelled bubble at each end, on layer S-GRID. Label defaults to the next free number. Refused if an axis with the same end points exists.",
     "input_schema": {
       "properties": {
         "end": {
@@ -1001,7 +1001,7 @@
     "name": "add_grid_line"
   },
   {
-    "description": "Lay out a rectangular structural grid. Numbered axes 1, 2, 3… run parallel to Y and are spaced along X by xSpacings; lettered axes A, B, C… (I and O skipped) run parallel to X, spaced along Y by ySpacings. E.g. xSpacings [6000, 6000] gives axes 1–3 six metres apart.",
+    "description": "Lay out a rectangular structural grid. Numbered axes 1, 2, 3… run parallel to Y and are spaced along X by xSpacings; lettered axes A, B, C… (I and O skipped) run parallel to X, spaced along Y by ySpacings. E.g. xSpacings [6000, 6000] gives axes 1–3 six metres apart. Refused when every axis of the new grid already exists; otherwise labels continue after the existing ones.",
     "input_schema": {
       "properties": {
         "extension": {

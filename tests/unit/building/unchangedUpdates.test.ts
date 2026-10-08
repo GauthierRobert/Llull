@@ -219,6 +219,34 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
     expect(again.summary).toMatch(/every column already has a footing/);
   });
 
+  it('grid commands refuse an axis or a whole grid that already exists', () => {
+    let doc = execute(createEmptyDocument(), 'add_grid_line', {
+      start: [0, 0],
+      end: [0, 5000],
+    }).document;
+    for (const [start, end] of [
+      [
+        [0, 0],
+        [0, 5000],
+      ],
+      [
+        [0, 5000],
+        [0, 0],
+      ],
+    ]) {
+      const again = execute(doc, 'add_grid_line', { start, end, label: 'X' });
+      expect(again.document).toBe(doc);
+      expect(again.summary).toMatch(/axis 1 \(grid-1\) already runs between these points/);
+    }
+    doc = execute(doc, 'add_grid_system', { xSpacings: [6000], ySpacings: [4000] }).document;
+    const params = { xSpacings: [6000], ySpacings: [4000] };
+    const twin = execute(doc, 'add_grid_system', params);
+    expect(twin.document).toBe(doc);
+    expect(twin.summary).toMatch(/every axis of this grid already exists/);
+    const shifted = execute(doc, 'add_grid_system', { ...params, origin: [100000, 0] });
+    expect(shifted.affected.length).toBeGreaterThan(0);
+  });
+
   it('set_project_info', () => {
     const doc = execute(createEmptyDocument(), 'set_project_info', { name: 'Hall' }).document;
     expectNoOp(doc, 'set_project_info', { name: 'Hall' });
