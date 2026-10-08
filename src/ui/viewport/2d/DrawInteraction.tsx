@@ -15,6 +15,7 @@
  */
 
 import { useState } from 'react';
+import { flushSync } from '@react-three/fiber';
 import type { Vec2 } from '@core/model/types';
 import type { DrawToolKind } from '@ui/store';
 import { useZoomSnap } from './useSnap';
@@ -58,10 +59,14 @@ export function DrawInteraction({
           setRawCursor(toDocumentPoint(e.point));
         }}
         // Touch/pen taps deliver no preceding pointermove: take the cursor from the press so the
-        // click lands where the pointer is, not at the last hover position.
+        // click lands where the pointer is, not at the last hover position. Flushed synchronously:
+        // a tap's pointerdown and click arrive within one frame, before an async render commits.
         onPointerDown={(e) => {
-          setOrthoHeld(e.shiftKey);
-          setRawCursor(toDocumentPoint(e.point));
+          const point = toDocumentPoint(e.point);
+          flushSync(() => {
+            setOrthoHeld(e.shiftKey);
+            setRawCursor(point);
+          });
         }}
         onPointerLeave={() => setRawCursor(null)}
         onClick={(e) => {
