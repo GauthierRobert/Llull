@@ -91,7 +91,8 @@ function SceneContents2D({
         {...cameraGestures(isDrawing || isModifying)}
         enableRotate={false}
         screenSpacePanning={true}
-        zoomSpeed={1.2}
+        zoomToCursor
+        zoomSpeed={1.6}
         panSpeed={1.0}
       />
 
