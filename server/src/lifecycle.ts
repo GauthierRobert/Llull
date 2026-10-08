@@ -45,8 +45,22 @@ export async function startServer(app: Express, port: number, host: string): Pro
     );
   }
   await installGeometryKernel();
-  const server = app.listen(port, host, () => {
-    console.warn(`[llull-server] listening on http://${host}:${port}`);
+  const server = app.listen(port, host);
+  await new Promise<void>((resolve, reject) => {
+    server.once('listening', () => {
+      console.warn(`[llull-server] listening on http://${host}:${port}`);
+      resolve();
+    });
+    server.once('error', (error: NodeJS.ErrnoException) => {
+      reject(
+        error.code === 'EADDRINUSE'
+          ? new Error(
+              `port ${port} on ${host} is already in use (another llull server?). ` +
+                'Stop it or set PORT to a free port.',
+            )
+          : error,
+      );
+    });
   });
   let stopping = false;
   const onSignal = (signal: string): void => {
