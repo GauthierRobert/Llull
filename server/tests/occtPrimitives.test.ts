@@ -110,3 +110,59 @@ describe.each(shapes)('occt %s', (name, make, analyticVolume) => {
     expect(occt.tessellate(degenerate)).toBeNull();
   });
 });
+
+// Native OCC torus (exact surface). Manifold's torus is a coarser polygon, so volumes are compared
+// to the analytic value for OCC and to Manifold within the chord tolerance of that polygon.
+describe('occt torus', () => {
+  const torus = (position: Vec3, rotation: Vec3): Entity =>
+    ({
+      id: 't',
+      kind: 'torus',
+      position,
+      rotation,
+      ringRadius: 3,
+      tubeRadius: 1,
+      ...common,
+    }) as Entity;
+  const analyticVolume = 2 * Math.PI ** 2 * 3 * 1 ** 2;
+
+  it.each(placements)(
+    'has the analytic volume and Manifold bounds (%s)',
+    (_label, position, rotation) => {
+      const entity = torus(position, rotation);
+      const [fromOcct, fromManifold] = [occt.tessellate(entity), manifold.tessellate(entity)];
+      expect(fromOcct).not.toBeNull();
+      expect(fromManifold).not.toBeNull();
+      expect(volume(fromOcct!) / analyticVolume).toBeGreaterThan(0.95);
+      expect(volume(fromOcct!) / analyticVolume).toBeLessThan(1.01);
+      const [a, b] = [bounds(fromOcct!), bounds(fromManifold!)];
+      for (let k = 0; k < 3; k++) {
+        expect(Math.abs((a.min[k] ?? 0) - (b.min[k] ?? 0))).toBeLessThan(CHORD_TOLERANCE);
+        expect(Math.abs((a.max[k] ?? 0) - (b.max[k] ?? 0))).toBeLessThan(CHORD_TOLERANCE);
+      }
+    },
+  );
+
+  it.each(['union', 'subtract', 'intersect'] as const)(
+    '%s with a box agrees with Manifold',
+    (op) => {
+      const entity = torus([0.3, 0.2, 0.1], [0.2, -0.1, 0.4]);
+      const cutter = box([1.3, 0.7, 1.9], [3.1, 2.3, 2.7]);
+      const [fromOcct, fromManifold] = [
+        occt.booleanOp(op, entity, cutter),
+        manifold.booleanOp(op, entity, cutter),
+      ];
+      expect(fromOcct).not.toBeNull();
+      expect(volume(fromOcct!) / volume(fromManifold!)).toBeGreaterThan(0.92);
+      expect(volume(fromOcct!) / volume(fromManifold!)).toBeLessThan(1.08);
+    },
+  );
+
+  it.each([
+    ['a zero tube radius', { tubeRadius: 0 }],
+    ['a tube radius not smaller than the ring radius', { tubeRadius: 3 }],
+  ])('rejects %s', (_label, change) => {
+    const entity = { ...torus([0, 0, 0], [0, 0, 0]), ...change } as Entity;
+    expect(occt.tessellate(entity)).toBeNull();
+  });
+});

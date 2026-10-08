@@ -1,6 +1,6 @@
 /**
  * @layer server/tests
- * Live OpenCascade vs Manifold: torus, wedge, pyramid and revolution (no exact OCC maker; their
+ * Live OpenCascade vs Manifold: wedge, pyramid and revolution (no exact OCC maker; their
  * triangles are sewn into a solid) are valid boolean operands that agree with Manifold, which
  * works from the same triangles.
  */
@@ -22,10 +22,6 @@ const at = (
 });
 
 const shapes: Array<[string, (position: Vec3, rotation: Vec3) => Entity]> = [
-  [
-    'torus',
-    (p, r) => ({ id: 't', kind: 'torus', ringRadius: 3, tubeRadius: 1, ...at(p, r) }) as Entity,
-  ],
   ['wedge', (p, r) => ({ id: 'w', kind: 'wedge', size: [4, 3, 5], ...at(p, r) }) as Entity],
   [
     'pyramid',

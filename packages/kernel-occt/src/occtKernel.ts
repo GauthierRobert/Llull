@@ -346,7 +346,7 @@ function placed(api: OccApi, shape: OccShape, placement: OccHandle): OccShape {
 }
 
 /**
- * Cylinder (centered, axis +Z), sphere (centered) and cone (base-center, apex +height) built at the
+ * Cylinder (centered, axis +Z), sphere and torus (centered) and cone (base-center, apex +height) built at the
  * origin then placed with the entity's rotation and position; non-positive sizes -> null.
  */
 function revolvedPrimitive(api: OccApi, entity: Entity): OccShape | null {
@@ -362,6 +362,9 @@ function revolvedPrimitive(api: OccApi, entity: Entity): OccShape | null {
   } else if (entity.kind === 'cone') {
     if (!(entity.radius > 0 && entity.height > 0)) return null;
     maker = new api.BRepPrimAPI_MakeCone_1(entity.radius, 0, entity.height);
+  } else if (entity.kind === 'torus') {
+    if (!(entity.tubeRadius > 0 && entity.ringRadius > entity.tubeRadius)) return null;
+    maker = new api.BRepPrimAPI_MakeTorus_1(entity.ringRadius, entity.tubeRadius);
   } else {
     return null;
   }
@@ -402,12 +405,7 @@ function meshSolid(api: OccApi, entity: Entity): OccShape | null {
 }
 
 /** Kinds with no exact OCC maker here: their world-space triangles are sewn into a solid. */
-const TRIANGULATED_KINDS: ReadonlySet<Entity['kind']> = new Set([
-  'torus',
-  'wedge',
-  'pyramid',
-  'revolution',
-]);
+const TRIANGULATED_KINDS: ReadonlySet<Entity['kind']> = new Set(['wedge', 'pyramid', 'revolution']);
 
 /** Primitive tessellation never reads components; instances are not boolean operands. */
 const NO_COMPONENTS = createEmptyDocument();
