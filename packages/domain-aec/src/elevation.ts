@@ -8,7 +8,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { elementsOf, fileSlug, getBuilding, toMetres, toMm } from './model';
 import { noop } from '@core/commands/noop';
-import { escapeXml } from './xmlText';
+import { escapeXml } from '@lib/escapeXml';
 import { sub2 } from '@lib/vec2';
 import {
   ELEVATION_DIRECTIONS,
