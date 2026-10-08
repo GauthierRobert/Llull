@@ -63,7 +63,7 @@ describe('toParamsSchema', () => {
       'empty',
       'items',
     ]);
-    expect(schema.properties['count']).toEqual({ type: 'number', description: 'How many' });
+    expect(schema.properties['count']).toEqual({ type: 'integer', description: 'How many' });
     expect(schema.properties['flag']).toEqual({ type: 'boolean', description: 'Flag' });
     expect(schema.properties['mode']).toEqual({
       type: 'string',
@@ -104,6 +104,23 @@ describe('toParamsSchema', () => {
       properties: { id: { type: 'string', description: 'Id' } },
       required: ['id'],
     });
+  });
+
+  it('advertises int-checked numbers as integer, plain and float numbers as number', () => {
+    const schema = toParamsSchema(
+      z.object({
+        steps: z.int().describe('Steps'),
+        bounded: z.number().int().min(1).max(64).describe('Bounded'),
+        indices: z.array(z.number().int().nonnegative()).describe('Indices'),
+        maybe: z.number().int().optional().describe('Maybe'),
+        ratio: z.number().min(0).describe('Ratio'),
+      }),
+    );
+    expect(schema.properties['steps']).toEqual({ type: 'integer', description: 'Steps' });
+    expect(schema.properties['bounded']?.type).toBe('integer');
+    expect(schema.properties['indices']?.items).toEqual({ type: 'integer' });
+    expect(schema.properties['maybe']?.type).toBe('integer');
+    expect(schema.properties['ratio']?.type).toBe('number');
   });
 
   it('requires a description on every top-level property', () => {

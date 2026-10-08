@@ -7,7 +7,7 @@
  * Validation of meaning stays in the command (`execute` + `run`); this only parses input shapes.
  */
 
-import type { ParamSpec, ParamsSchema } from '@core/commands/types';
+import type { ParamSpec, ParamsSchema, ParamType } from '@core/commands/types';
 import type { EntityId } from '@core/model/types';
 
 type FieldKind = 'number' | 'text' | 'enum' | 'boolean' | 'numberList' | 'textList' | 'json';
@@ -40,12 +40,16 @@ export function humanizeName(name: string): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
+function isNumeric(type: ParamType | undefined): boolean {
+  return type === 'number' || type === 'integer';
+}
+
 function fieldKind(spec: ParamSpec): FieldKind {
   if (spec.enum !== undefined && spec.enum.length > 0) return 'enum';
-  if (spec.type === 'number') return 'number';
+  if (isNumeric(spec.type)) return 'number';
   if (spec.type === 'string') return 'text';
   if (spec.type === 'boolean') return 'boolean';
-  if (spec.type === 'array' && spec.items?.type === 'number') return 'numberList';
+  if (spec.type === 'array' && isNumeric(spec.items?.type)) return 'numberList';
   if (spec.type === 'array' && spec.items?.type === 'string' && spec.items.enum === undefined) {
     return 'textList';
   }

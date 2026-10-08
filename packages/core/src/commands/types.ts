@@ -76,7 +76,7 @@ export interface ParamsSchema {
 }
 
 /** The JSON-schema value kinds a parameter (or nested element) may take. */
-export type ParamType = 'number' | 'string' | 'boolean' | 'array' | 'object';
+export type ParamType = 'number' | 'integer' | 'string' | 'boolean' | 'array' | 'object';
 
 /** Array element / nested schema: the `description` is optional. */
 export interface ParamItemSpec {
