@@ -86,14 +86,16 @@ export const addPipeSupport = defineCommand({
       .optional()
       .describe(
         'Absolute support points [[x, y, z], …] in document units (z = elevation, not level-relative), on or near ' +
-          'the pipe centreline: each is snapped to the nearest point of the pipe. Give this OR `spacing`.',
+          'the pipe centreline: each is snapped to the nearest point of the pipe. At most 500 points per call. ' +
+          'Give this OR `spacing`.',
       ),
     spacing: z
       .number()
       .optional()
       .describe(
         'Maximum distance between supports along the pipe, document units, > 0: supports are auto-placed along ' +
-          'the pipe (also near free ends and bends). Give this OR `at`. Existing supports are kept and counted.',
+          'the pipe (also near free ends and bends); refused when pipe length / spacing exceeds 500 supports on a run. ' +
+          'Give this OR `at`. Existing supports are kept and counted.',
       ),
     type: z
       .enum(SUPPORT_TYPES)
