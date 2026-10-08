@@ -35,7 +35,7 @@ export function occtCallTimeoutMs(env: NodeJS.ProcessEnv = process.env): number 
 /**
  * OCC in a worker thread, so a WASM abort kills the worker, not the server. Null (in-process OCC is
  * used instead, with a warning) when `LLULL_OCC_ISOLATION=off`, when the worker entry is not
- * shipped (the esbuild bundle) or when the worker cannot start.
+ * shipped (`npm run build` emits dist/occtWorker.js) or when the worker cannot start.
  */
 function startIsolatedOcct(): GeometryKernel | null {
   if (process.env['LLULL_OCC_ISOLATION'] === 'off' || defaultWorkerEntry() === null) return null;
