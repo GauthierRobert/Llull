@@ -41,6 +41,7 @@ import { renderView } from './render';
 import { makeTubeBetween } from './composite';
 import { addText, addDimension } from './annotate';
 import { filletEdge, chamferEdge, shellSolid } from './modify3d';
+import { inspectTopology, exportStepExact } from './brep';
 import { instantiateTemplate } from './templates';
 import { historyCommands } from './history';
 import { createConfiguration, activateConfiguration } from './configurations';
@@ -151,6 +152,8 @@ const rawDefinitions = [
   filletEdge,
   chamferEdge,
   shellSolid,
+  inspectTopology,
+  exportStepExact,
   instantiateTemplate,
   ...historyCommands,
   createConfiguration,

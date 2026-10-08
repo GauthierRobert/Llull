@@ -1,7 +1,28 @@
 import { describe, expect, it, beforeAll } from 'vitest';
 import type { Entity } from '@core/model/types';
 import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
+import type { BooleanOp } from '@core/geometry/shapeRecipe';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
+
+function meshOf(kernel: GeometryKernel, entity: Entity): MeshData | null {
+  const shape = kernel.evaluate({ op: 'solid', entity });
+  return shape === null ? null : kernel.tessellate(shape);
+}
+
+function booleanMesh(
+  kernel: GeometryKernel,
+  boolean: BooleanOp,
+  a: Entity,
+  b: Entity,
+): MeshData | null {
+  const shape = kernel.evaluate({
+    op: 'boolean',
+    boolean,
+    a: { op: 'solid', entity: a },
+    b: { op: 'solid', entity: b },
+  });
+  return shape === null ? null : kernel.tessellate(shape);
+}
 
 const base = { layerId: 'layer-default', color: '#888888', rotation: [0, 0, 0] };
 const extrusion = (profile: number[][], depth: number): Entity =>
@@ -48,8 +69,8 @@ describe('manifold kernel extrusion profile winding', () => {
   const clockwise = [...counterClockwise].reverse();
 
   it('extrudes a clockwise profile to the same solid as a counter-clockwise one', () => {
-    const ccw = kernel.tessellate(extrusion(counterClockwise, 4));
-    const cw = kernel.tessellate(extrusion(clockwise, 4));
+    const ccw = meshOf(kernel, extrusion(counterClockwise, 4));
+    const cw = meshOf(kernel, extrusion(clockwise, 4));
     expect(ccw).not.toBeNull();
     expect(cw).not.toBeNull();
     expect(volume(ccw!)).toBeCloseTo(24, 6);
@@ -58,14 +79,15 @@ describe('manifold kernel extrusion profile winding', () => {
 
   it('boolean operations accept a clockwise extrusion operand', () => {
     // The 2x2x2 box spans x 2..4; the extrusion covers x 0..3, so a 1x2x2 slab is removed.
-    const cut = kernel.booleanOp('subtract', box([3, 1, 2]), extrusion(clockwise, 4));
+    const cut = booleanMesh(kernel, 'subtract', box([3, 1, 2]), extrusion(clockwise, 4));
     expect(cut).not.toBeNull();
     expect(volume(cut!)).toBeCloseTo(4, 6);
   });
 
   it('still rejects a degenerate (zero-area) profile', () => {
     expect(
-      kernel.tessellate(
+      meshOf(
+        kernel,
         extrusion(
           [
             [0, 0],

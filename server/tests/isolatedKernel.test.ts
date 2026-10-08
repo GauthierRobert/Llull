@@ -10,6 +10,8 @@ import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import type { Entity } from '@core/model/types';
 import { createIsolatedKernel, type IsolatedKernel } from '../src/isolatedKernel';
+import { handleOf } from '@core/geometry/shapeKernel';
+import { booleanMesh, leaf, meshOf } from './kernelTestSupport';
 
 const box = (size: number): Entity =>
   ({
@@ -37,29 +39,43 @@ afterAll(() => kernels.forEach((kernel) => kernel.dispose()));
 describe('isolated OCC kernel', () => {
   it('tessellates and runs booleans through the worker', () => {
     const kernel = make();
-    expect(kernel.tessellate(box(2))?.indices).toHaveLength(36);
-    const union = kernel.booleanOp('union', box(2), { ...box(2), position: [1, 0, 0] } as Entity);
+    expect(meshOf(kernel, box(2))?.indices).toHaveLength(36);
+    const union = booleanMesh(kernel, 'union', box(2), {
+      ...box(2),
+      position: [1, 0, 0],
+    } as Entity);
     expect(union).not.toBeNull();
     expect(kernel.crashCount()).toBe(0);
   }, 120_000);
 
-  it('survives a forced abort: null result, process alive, worker respawned', () => {
+  it('keeps a shape handle valid across a worker restart (rebuilt from its recipe)', () => {
     const kernel = make();
-    expect(kernel.tessellate(box(2))).not.toBeNull();
+    const handle = kernel.evaluate({ op: 'fillet', source: leaf(box(4)), edges: [0], size: 0.5 });
+    expect(handle).not.toBeNull();
+    const before = kernel.tessellate(handle!);
     kernel.forceFailure('__abort');
     expect(kernel.crashCount()).toBe(1);
-    expect(kernel.tessellate(box(3))?.indices).toHaveLength(36);
+    expect(kernel.tessellate(handle!)?.positions).toEqual(before?.positions);
+    expect(kernel.topology(handle!)?.faces).toHaveLength(7);
+  }, 180_000);
+
+  it('survives a forced abort: null result, process alive, worker respawned', () => {
+    const kernel = make();
+    expect(meshOf(kernel, box(2))).not.toBeNull();
+    kernel.forceFailure('__abort');
+    expect(kernel.crashCount()).toBe(1);
+    expect(meshOf(kernel, box(3))?.indices).toHaveLength(36);
     kernel.forceFailure('__abort');
     expect(kernel.crashCount()).toBe(2);
-    expect(kernel.tessellate(box(4))).not.toBeNull();
+    expect(meshOf(kernel, box(4))).not.toBeNull();
   }, 180_000);
 
   it('kills a hung worker after the call timeout and recovers', () => {
     const kernel = make(1_500);
-    expect(kernel.tessellate(box(2))).not.toBeNull();
+    expect(meshOf(kernel, box(2))).not.toBeNull();
     kernel.forceFailure('__hang');
     expect(kernel.crashCount()).toBe(1);
-    expect(kernel.tessellate(box(2))).not.toBeNull();
+    expect(meshOf(kernel, box(2))).not.toBeNull();
   }, 180_000);
 
   it('replaces a worker whose OCC call failed natively, so later calls are not poisoned', () => {
@@ -78,24 +94,25 @@ describe('isolated OCC kernel', () => {
         color: '#888888',
       }) as Entity;
     const floor = { ...box(8), position: [0, 0, -4] } as Entity;
-    kernel.booleanOp('union', cone(3), floor);
-    kernel.booleanOp('intersect', cone(3), floor);
+    booleanMesh(kernel, 'union', cone(3), floor);
+    booleanMesh(kernel, 'intersect', cone(3), floor);
     expect(kernel.recycleCount()).toBeGreaterThanOrEqual(1);
     for (let attempt = 0; attempt < 3; attempt++) {
-      expect(kernel.tessellate(box(2)), 'tessellate').not.toBeNull();
-      expect(kernel.booleanOp('union', cone(2.99), floor), 'union').not.toBeNull();
-      expect(kernel.booleanOp('intersect', cone(2.99), floor), 'intersect').not.toBeNull();
+      expect(meshOf(kernel, box(2)), 'tessellate').not.toBeNull();
+      expect(booleanMesh(kernel, 'union', cone(2.99), floor), 'union').not.toBeNull();
+      expect(booleanMesh(kernel, 'intersect', cone(2.99), floor), 'intersect').not.toBeNull();
     }
   }, 180_000);
 
   it('does not recycle the worker for a graceful refusal such as an oversized fillet', () => {
     const kernel = make();
-    const mesh = kernel.tessellate(box(10));
-    expect(mesh).not.toBeNull();
-    expect(kernel.filletEdges(mesh!, [], 50)).toBeNull();
+    expect(meshOf(kernel, box(10))).not.toBeNull();
+    expect(
+      kernel.evaluate({ op: 'fillet', source: leaf(box(10)), edges: [], size: 50 }),
+    ).toBeNull();
     expect(kernel.recycleCount()).toBe(0);
     expect(kernel.crashCount()).toBe(0);
-    expect(kernel.tessellate(box(2))).not.toBeNull();
+    expect(meshOf(kernel, box(2))).not.toBeNull();
   }, 120_000);
 
   it('reloads a recycled worker in the background so the next call is not slow', async () => {
@@ -111,11 +128,11 @@ describe('isolated OCC kernel', () => {
       color: '#888888',
     } as Entity;
     const floor = { ...box(8), position: [0, 0, -4] } as Entity;
-    kernel.booleanOp('union', cone, floor);
+    booleanMesh(kernel, 'union', cone, floor);
     expect(kernel.recycleCount()).toBe(1);
     await new Promise((resolve) => setTimeout(resolve, 15_000)); // the replacement loads meanwhile
     const started = Date.now();
-    expect(kernel.tessellate(box(2))).not.toBeNull();
+    expect(meshOf(kernel, box(2))).not.toBeNull();
     expect(Date.now() - started).toBeLessThan(1_000);
   }, 120_000);
 
@@ -125,21 +142,21 @@ describe('isolated OCC kernel', () => {
 
     it('is replaced on the next call (event loop blocked: status word flags the death)', () => {
       const kernel = make(20_000);
-      expect(kernel.tessellate(box(2))).not.toBeNull();
+      expect(meshOf(kernel, box(2))).not.toBeNull();
       kernel.forceFailure('__exitIdle');
       sleepSync(1_500); // the worker exits; its 'exit' event cannot run on this blocked thread
       const started = Date.now();
-      expect(kernel.tessellate(box(3))?.indices).toHaveLength(36);
+      expect(meshOf(kernel, box(3))?.indices).toHaveLength(36);
       expect(Date.now() - started).toBeLessThan(15_000);
     }, 120_000);
 
     it('is replaced on the next call (exit event handled)', async () => {
       const kernel = make(20_000);
-      expect(kernel.tessellate(box(2))).not.toBeNull();
+      expect(meshOf(kernel, box(2))).not.toBeNull();
       kernel.forceFailure('__exitIdle');
       await new Promise((resolve) => setTimeout(resolve, 1_500));
       const started = Date.now();
-      expect(kernel.tessellate(box(3))?.indices).toHaveLength(36);
+      expect(meshOf(kernel, box(3))?.indices).toHaveLength(36);
       expect(Date.now() - started).toBeLessThan(15_000);
     }, 120_000);
   });
@@ -152,7 +169,7 @@ describe('isolated OCC kernel', () => {
     });
     kernels.push(kernel);
     const started = Date.now();
-    expect(kernel.tessellate(box(2))).toBeNull();
+    expect(kernel.evaluate(leaf(box(2)))).toBeNull();
     expect(Date.now() - started).toBeLessThan(10_000);
     expect(kernel.crashCount()).toBe(1);
   }, 60_000);
@@ -167,10 +184,10 @@ describe('isolated OCC kernel', () => {
     });
     kernels.push(kernel);
     try {
-      expect(kernel.tessellate(box(2))).toEqual({ loads: 0 });
+      expect(kernel.topology(handleOf(leaf(box(2))))).toEqual({ loads: 0 });
       kernel.forceFailure('__abort'); // the warm restart (load #1) dies on start
       expect(kernel.crashCount()).toBe(1);
-      expect(kernel.tessellate(box(2))).toEqual({ loads: 2 });
+      expect(kernel.topology(handleOf(leaf(box(2))))).toEqual({ loads: 2 });
     } finally {
       rmSync(counterFile, { force: true });
     }
@@ -182,7 +199,7 @@ describe('isolated OCC kernel', () => {
       startTimeoutMs: 30_000,
     });
     const started = Date.now();
-    expect(kernel.tessellate(box(2))).toBeNull();
+    expect(meshOf(kernel, box(2))).toBeNull();
     expect(Date.now() - started).toBeLessThan(15_000);
     kernel.dispose();
   }, 60_000);

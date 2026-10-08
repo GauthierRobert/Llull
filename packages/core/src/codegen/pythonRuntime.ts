@@ -5,8 +5,8 @@
  * @invariant the TRACE half is backend-independent: every helper records the llull command it maps
  *   to (`LLULL_TRACE`), so running the script reproduces the llull feature history exactly.
  * @invariant a BACKEND block only wraps library calls (`_polygon_face`, `_extrude`, `_revolve`,
- *   `_solid_from_faces`, `_make_box`…`_make_torus`, `_place`, `_assemble`); SHARED_GEOMETRY holds the
- *   llull frame conventions once for both libraries.
+ *   `_solid_from_faces`, `_make_box`…`_make_torus`, `_place`, `_wrap`, `_assemble`); SHARED_GEOMETRY
+ *   holds the llull frame conventions and the OCP fillet / chamfer / shell once for both libraries.
  * @see apply_code_trace (consumes LLULL_TRACE), server/python/llull_bridge.py (runs the script)
  */
 
@@ -214,6 +214,36 @@ def intersect(a, b):
     return _combine("boolean_intersect", a, b, "intersect")
 
 
+def _round(command, size_key, solid, edges, size, near, make):
+    params = {"id": {"ref": solid.ref}, "edgeIndices": [int(e) for e in edges], size_key: _term(size)}
+    feature = _record(command, params)
+    shape = make(solid.shape, [int(e) for e in edges], near, float(size))
+    rounded = Solid(solid.ref, shape, solid.color, solid.name)
+    LLULL_LIVE.pop(solid.ref, None)
+    feature["ref"] = rounded.ref = "f%d" % len(LLULL_TRACE["features"])
+    LLULL_LIVE[rounded.ref] = rounded
+    return rounded
+
+
+def fillet(solid, edges, radius, near=None):
+    """Round edges (llull unique-edge indices; near = their mid points, preferred when given)."""
+    return _round("fillet_edge", "radius", solid, edges, radius, near, _fillet)
+
+
+def chamfer(solid, edges, distance, near=None):
+    return _round("chamfer_edge", "distance", solid, edges, distance, near, _chamfer)
+
+
+def shell(solid, thickness):
+    """Hollow inward: the solid minus its inward offset (a sealed cavity)."""
+    feature = _record("shell_solid", {"id": {"ref": solid.ref}, "thickness": _term(thickness)})
+    hollow = Solid(solid.ref, _shell(solid.shape, float(thickness)), solid.color, solid.name)
+    LLULL_LIVE.pop(solid.ref, None)
+    feature["ref"] = hollow.ref = "f%d" % len(LLULL_TRACE["features"])
+    LLULL_LIVE[hollow.ref] = hollow
+    return hollow
+
+
 def translate(solid, delta):
     _record("move_entity", {"id": {"ref": solid.ref}, "delta": _terms(delta)})
     moved = Solid(solid.ref, _translate(solid.shape, [float(d) for d in delta]), solid.color, solid.name)
@@ -266,6 +296,72 @@ def _make_revolution(profile, axis, angle):
     else:
         points, direction = [(r, 0, a) for r, a in profile], (0, 0, 1)
     return _revolve(_polygon_face(points), direction, angle)
+
+
+def _unique_edges(topods):
+    from OCP.TopAbs import TopAbs_EDGE
+    from OCP.TopExp import TopExp
+    from OCP.TopoDS import TopoDS
+    from OCP.TopTools import TopTools_IndexedMapOfShape
+
+    edges = TopTools_IndexedMapOfShape()
+    TopExp.MapShapes_s(topods, TopAbs_EDGE, edges)
+    return [TopoDS.Edge_s(edges.FindKey(i)) for i in range(1, edges.Extent() + 1)]
+
+
+def _edge_mid(edge):
+    from OCP.BRepAdaptor import BRepAdaptor_Curve
+
+    curve = BRepAdaptor_Curve(edge)
+    point = curve.Value((curve.FirstParameter() + curve.LastParameter()) / 2)
+    return (point.X(), point.Y(), point.Z())
+
+
+def _select_edges(topods, edges, near):
+    """llull edge selection: by mid point when given (robust across OCC builds), else by index."""
+    unique = _unique_edges(topods)
+    if near:
+        mids = [_edge_mid(edge) for edge in unique]
+        distance = lambda a, b: sum((x - y) ** 2 for x, y in zip(a, b))
+        return [unique[min(range(len(unique)), key=lambda i: distance(mids[i], p))] for p in near]
+    return [unique[i] for i in edges] if edges else unique
+
+
+def _round_with(maker, shape, edges, near, size):
+    topods = _shape_of(shape).wrapped
+    builder = maker(topods)
+    for edge in _select_edges(topods, edges, near):
+        builder.Add(size, edge)
+    builder.Build()
+    if not builder.IsDone():
+        raise ValueError("llull: the kernel refused to round these edges")
+    return _wrap(builder.Shape())
+
+
+def _fillet(shape, edges, near, radius):
+    from OCP.BRepFilletAPI import BRepFilletAPI_MakeFillet
+
+    return _round_with(BRepFilletAPI_MakeFillet, shape, edges, near, radius)
+
+
+def _chamfer(shape, edges, near, distance):
+    from OCP.BRepFilletAPI import BRepFilletAPI_MakeChamfer
+
+    return _round_with(BRepFilletAPI_MakeChamfer, shape, edges, near, distance)
+
+
+def _shell(shape, thickness):
+    from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
+    from OCP.BRepOffset import BRepOffset_Skin
+    from OCP.BRepOffsetAPI import BRepOffsetAPI_MakeOffsetShape
+    from OCP.GeomAbs import GeomAbs_Arc
+
+    topods = _shape_of(shape).wrapped
+    offset = BRepOffsetAPI_MakeOffsetShape()
+    offset.PerformByJoin(topods, -thickness, 1e-4, BRepOffset_Skin, False, False, GeomAbs_Arc, False)
+    cut = BRepAlgoAPI_Cut(topods, offset.Shape())
+    cut.Build()
+    return _wrap(cut.Shape())
 
 
 def _make_mesh(positions):
@@ -327,6 +423,10 @@ def _make_cone(r, h):
 
 def _make_torus(ring, tube):
     return cq.Solid.makeTorus(ring, tube)
+
+
+def _wrap(topods):
+    return cq.Shape.cast(topods)
 
 
 def _shape_of(shape):
@@ -400,6 +500,14 @@ def _make_cone(r, h):
 
 def _make_torus(ring, tube):
     return bd.Solid.make_torus(ring, tube)
+
+
+def _wrap(topods):
+    return bd.Shape.cast(topods)
+
+
+def _shape_of(shape):
+    return shape
 
 
 def _triangles(shape, tolerance=0.01):

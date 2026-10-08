@@ -13,13 +13,14 @@
  * Always-run tests verify:
  *   - Entity structure contracts (used by kernel internals).
  *   - GeometryKernel interface conformance (TypeScript compile-time gate).
- *   - filletEdges / chamferEdges / shellSolid exist on the interface.
- *   - meshDataToTopoDSShape helper exists (static check).
+ *   - evaluate / tessellate / topology / exportStep exist on the interface.
+ *   - occtOps exposes the native ops and refuses non-positive sizes.
  */
 
 import { describe, it, expect } from 'vitest';
 import type { BoxEntity } from '@core/model/types';
-import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
+import type { GeometryKernel } from '@core/geometry/kernel';
+import type { ShapeRecipe } from '@core/geometry/shapeRecipe';
 
 // ---------------------------------------------------------------------------
 // Test entities — two 2×2×2 boxes (as in docs/decisions/KI4-occt-spike.md).
@@ -73,107 +74,86 @@ describe('OcctKernel — static contract tests (always run)', () => {
 
 // ---------------------------------------------------------------------------
 // GeometryKernel interface conformance — compile-time check via `satisfies`.
-// If any of the three new methods are missing from the interface, tsc fails.
-// This test runs at zero cost (no WASM) and confirms L9 wiring.
+// A stub missing any of the four methods fails tsc; no WASM needed.
 // ---------------------------------------------------------------------------
 
 describe('GeometryKernel — interface conformance', () => {
-  it('GeometryKernel type has booleanOp, filletEdges, chamferEdges, shellSolid', () => {
-    // Build a minimal conforming stub. TypeScript will error at compile time if
-    // any method is missing from the interface — that is the real assertion here.
-    const _stub: GeometryKernel = {
-      booleanOp: () => null,
-      filletEdges: () => null,
-      chamferEdges: () => null,
-      shellSolid: () => null,
+  it('GeometryKernel type has evaluate, tessellate, topology, exportStep', () => {
+    const stub = {
+      supports: () => true,
+      evaluate: () => null,
       tessellate: () => null,
+      topology: () => null,
+      exportStep: () => null,
     } satisfies GeometryKernel;
 
-    // Confirm each method key exists at runtime too.
-    expect(typeof _stub.booleanOp).toBe('function');
-    expect(typeof _stub.filletEdges).toBe('function');
-    expect(typeof _stub.chamferEdges).toBe('function');
-    expect(typeof _stub.shellSolid).toBe('function');
+    expect(typeof stub.evaluate).toBe('function');
+    expect(typeof stub.tessellate).toBe('function');
+    expect(typeof stub.topology).toBe('function');
+    expect(typeof stub.exportStep).toBe('function');
   });
 
-  it('filletEdges signature accepts MeshData + edgeIndices + radius', () => {
-    const mesh: MeshData = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] };
+  it('evaluate accepts a recipe tree (boolean over two solid leaves) and may refuse with null', () => {
+    const recipes: ShapeRecipe[] = [];
     const stub: GeometryKernel = {
-      booleanOp: () => null,
-      filletEdges: (shape, edgeIndices, radius) => {
-        expect(shape.positions.length).toBeGreaterThan(0);
-        expect(Array.isArray(edgeIndices)).toBe(true);
-        expect(typeof radius).toBe('number');
+      supports: () => true,
+      evaluate: (recipe) => {
+        recipes.push(recipe);
         return null;
       },
-      chamferEdges: () => null,
-      shellSolid: () => null,
       tessellate: () => null,
+      topology: () => null,
+      exportStep: () => null,
     };
-    const result = stub.filletEdges(mesh, [], 0.2);
-    expect(result).toBeNull(); // Manifold/stub returns null — graceful no-op
-  });
-
-  it('chamferEdges signature accepts MeshData + edgeIndices + distance', () => {
-    const mesh: MeshData = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] };
-    const stub: GeometryKernel = {
-      booleanOp: () => null,
-      filletEdges: () => null,
-      chamferEdges: (_shape, _edgeIndices, _distance) => null,
-      shellSolid: () => null,
-      tessellate: () => null,
+    const recipe: ShapeRecipe = {
+      op: 'fillet',
+      source: {
+        op: 'boolean',
+        boolean: 'union',
+        a: { op: 'solid', entity: BOX_A },
+        b: { op: 'solid', entity: BOX_B },
+      },
+      edges: [],
+      size: 0.2,
     };
-    expect(stub.chamferEdges(mesh, [], 0.1)).toBeNull();
-  });
-
-  it('shellSolid signature accepts MeshData + thickness', () => {
-    const mesh: MeshData = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] };
-    const stub: GeometryKernel = {
-      booleanOp: () => null,
-      filletEdges: () => null,
-      chamferEdges: () => null,
-      shellSolid: (_shape, _thickness) => null,
-      tessellate: () => null,
-    };
-    expect(stub.shellSolid(mesh, 0.5)).toBeNull();
+    expect(stub.evaluate(recipe)).toBeNull();
+    expect(recipes).toEqual([recipe]);
   });
 });
 
 // ---------------------------------------------------------------------------
-// meshDataToTopoDSShape — static contract test (no WASM required).
-// The helper is private (module-internal), so we test it indirectly via
-// filletEdges behavior, and verify the module exports the kernel factory.
+// occtOps / createOcctKernel — static contract tests (no WASM required).
 // ---------------------------------------------------------------------------
 
-describe('meshDataToTopoDSShape — static / contract tests', () => {
-  it('filletEdges returns null for empty mesh input (guards zero-length check)', () => {
-    // Build a stub kernel that mirrors the guard logic in filletEdges.
-    const emptyMesh: MeshData = { positions: [], indices: [] };
-    const stub: GeometryKernel = {
-      booleanOp: () => null,
-      filletEdges: (shape, _edgeIndices, radius) => {
-        // Mirrors the real guard: radius <= 0 || positions empty → null.
-        if (radius <= 0 || shape.positions.length === 0) return null;
-        return null;
-      },
-      chamferEdges: () => null,
-      shellSolid: () => null,
-      tessellate: () => null,
-    };
-    expect(stub.filletEdges(emptyMesh, [], 0.2)).toBeNull();
+describe('occtOps — static / contract tests', () => {
+  it('occtOps exposes every native operation of the recipe evaluator', async () => {
+    const { occtOps } = await import('@kernel-occt/occtKernel');
+    const ops = occtOps({} as never);
+    for (const name of [
+      'solid',
+      'boolean',
+      'fillet',
+      'chamfer',
+      'shell',
+      'place',
+      'scale',
+      'tessellate',
+      'topology',
+      'exportStep',
+      'release',
+    ] as const) {
+      expect(typeof ops[name], name).toBe('function');
+    }
   });
 
-  it('filletEdges returns null for radius <= 0 (guard check)', () => {
-    const mesh: MeshData = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] };
-    const stub: GeometryKernel = {
-      booleanOp: () => null,
-      filletEdges: (_shape, _edgeIndices, radius) => (radius <= 0 ? null : null),
-      chamferEdges: () => null,
-      shellSolid: () => null,
-      tessellate: () => null,
-    };
-    expect(stub.filletEdges(mesh, [], 0)).toBeNull();
-    expect(stub.filletEdges(mesh, [], -1)).toBeNull();
+  it('fillet / chamfer / shell refuse a non-positive size without touching OCC', async () => {
+    const { occtOps } = await import('@kernel-occt/occtKernel');
+    const ops = occtOps({} as never);
+    const shape = {} as never;
+    expect(ops.fillet(shape, [], 0)).toBeNull();
+    expect(ops.fillet(shape, [], -1)).toBeNull();
+    expect(ops.chamfer(shape, [], 0)).toBeNull();
+    expect(ops.shell(shape, 0)).toBeNull();
   });
 
   it('createOcctKernel is exported from occtKernel module (import check)', async () => {
@@ -191,81 +171,36 @@ describe('meshDataToTopoDSShape — static / contract tests', () => {
 // ---------------------------------------------------------------------------
 
 describe.skip('OcctKernel live WASM (requires node env + 63 MB opencascade.js)', () => {
-  it('booleanOp union of two boxes returns mesh', async () => {
+  const solid = (entity: BoxEntity): ShapeRecipe => ({ op: 'solid', entity });
+
+  it('boolean union of two boxes evaluates and tessellates', async () => {
     const { createOcctKernel } = await import('@kernel-occt/occtKernel');
     const kernel = await createOcctKernel();
-    const result = kernel.booleanOp('union', BOX_A, BOX_B);
+    const shape = kernel.evaluate({
+      op: 'boolean',
+      boolean: 'union',
+      a: solid(BOX_A),
+      b: solid(BOX_B),
+    });
+    expect(shape).not.toBeNull();
+    const result = kernel.tessellate(shape!);
     expect(result).not.toBeNull();
     expect(result!.positions.length).toBeGreaterThan(0);
     expect(result!.indices.length).toBeGreaterThan(0);
   });
 
-  it('filletEdges on a closed box mesh uses sewing path and returns a fillet result', async () => {
-    // filletEdges uses meshDataToTopoDSShape (BRepBuilderAPI_Sewing). This mesh is a closed manifold box — sewing
-    // should produce a solid and the fillet should succeed.
+  it('fillet of a box on the exact B-rep adds geometry', async () => {
     const { createOcctKernel } = await import('@kernel-occt/occtKernel');
     const kernel = await createOcctKernel();
-    // 8-vertex closed box mesh (manifold — all 12 triangles close the surface).
-    const boxMesh: MeshData = {
-      positions: [
-        -1, -1, -1, 1, -1, -1, 1, 1, -1, -1, 1, -1, -1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1, 1,
-      ],
-      indices: [
-        0,
-        1,
-        2,
-        0,
-        2,
-        3, // bottom
-        4,
-        6,
-        5,
-        4,
-        7,
-        6, // top
-        0,
-        4,
-        1,
-        4,
-        5,
-        1, // front
-        1,
-        5,
-        2,
-        5,
-        6,
-        2, // right
-        2,
-        6,
-        3,
-        6,
-        7,
-        3, // back
-        3,
-        7,
-        0,
-        7,
-        4,
-        0, // left
-      ],
-    };
-    const result = kernel.filletEdges(boxMesh, [], 0.2);
-    expect(result).not.toBeNull();
+    const shape = kernel.evaluate({ op: 'fillet', source: solid(BOX_A), edges: [], size: 0.2 });
+    expect(shape).not.toBeNull();
     // Fillet of a box adds significant geometry — measured 628 triangles.
-    expect(result!.indices.length / 3).toBeGreaterThan(12);
+    expect(kernel.tessellate(shape!)!.indices.length / 3).toBeGreaterThan(12);
   });
 
-  it('filletEdges on an open (non-manifold) mesh gracefully returns null', async () => {
-    // An open mesh (single triangle) — sewing produces an open shell, not a solid.
-    // meshDataToTopoDSShape returns null → filletEdges returns null.
+  it('fillet with an oversized radius is refused with null', async () => {
     const { createOcctKernel } = await import('@kernel-occt/occtKernel');
     const kernel = await createOcctKernel();
-    const openMesh: MeshData = {
-      positions: [0, 0, 0, 1, 0, 0, 0, 1, 0],
-      indices: [0, 1, 2],
-    };
-    const result = kernel.filletEdges(openMesh, [], 0.1);
-    // Non-manifold mesh: sewing → open shell → MakeSolid fails → null.
-    expect(result).toBeNull();
+    expect(kernel.evaluate({ op: 'fillet', source: solid(BOX_A), edges: [], size: 50 })).toBeNull();
   });
 });

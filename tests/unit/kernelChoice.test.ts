@@ -5,6 +5,7 @@ import { defaultContext, type ExecutionContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
 import { type IdSource } from '@lib/id';
+import { fakeKernel } from '../helpers/fakeKernel';
 
 describe('parseKernelChoice', () => {
   it.each([
@@ -24,13 +25,7 @@ describe('parseKernelChoice', () => {
 const FILLETED: MeshData = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] };
 
 function makeKernel(): GeometryKernel {
-  return {
-    booleanOp: () => null,
-    filletEdges: () => FILLETED,
-    chamferEdges: () => null,
-    shellSolid: () => null,
-    tessellate: () => FILLETED,
-  };
+  return fakeKernel({ solid: FILLETED, boolean: null, fillet: FILLETED });
 }
 
 function makeContext(kernel: GeometryKernel): ExecutionContext {

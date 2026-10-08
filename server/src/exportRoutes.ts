@@ -7,6 +7,7 @@
 import { Router, type Response } from 'express';
 import { exportStepFile } from '@mcp/index';
 import type { ExportStlData } from '@core/commands/export';
+import type { ExportStepExactData } from '@core/commands/brep';
 import { errorMessage } from '@lib/errorMessage';
 import { applyCommand } from './commandBus';
 import { getLiveDoc } from './liveDocument';
@@ -89,14 +90,25 @@ export function buildExportRouter(exchange: ExchangeOptions): Router {
     sendDownload(res, data.fileName, 'text/plain; charset=utf-8', data.text);
   });
 
-  /** Query: name; language = cadquery (default) | build123d. 503 without the Python bridge. */
+  /**
+   * Query: name; language = cadquery (default) | build123d. Without the Python bridge, the exact
+   * B-rep kernel writes the STEP itself (export_step_exact); 503 when neither is available.
+   */
   router.get('/step', (req, res) => {
     const port = exchange.port;
+    const name = safeFileName(req.query['name'], 'model');
     if (port === null) {
-      res.status(503).json({ error: 'STEP export needs the Python bridge (LLULL_PYTHON is off).' });
+      const exact = applyCommand('export_step_exact', {});
+      const data = exact.data as ExportStepExactData | undefined;
+      if (data === undefined) {
+        res.status(503).json({
+          error: `STEP export needs the Python bridge (LLULL_PYTHON is off) or the exact OCC kernel (LLULL_KERNEL=occt). Kernel export: ${exact.summary}`,
+        });
+        return;
+      }
+      sendDownload(res, `${name}.step`, 'model/step', data.step);
       return;
     }
-    const name = safeFileName(req.query['name'], 'model');
     exportStepFile(getLiveDoc, port, { name, language: req.query['language'], save: false })
       .then((file) => {
         if ('error' in file) {

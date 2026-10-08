@@ -34,6 +34,8 @@ Delegate in parallel when large: Lane 1 (`command-author`) model→codegen, Lane
 - Optional: `sceneRotatedBounds.ts`, `instanceExpansion.ts`, `renderLabels.ts`.
 
 ## 4. Kernels (mandatory for 3D booleans)
+- Kernel input is a `ShapeRecipe` whose leaves are any `SOLID_KINDS` entity — no recipe change;
+  each kernel's native maker below must handle the kind.
 - `packages/kernel-manifold/src/manifoldKernel.ts` `primitiveOf` / `entityToManifold` (or the
   welded `entityToTriangles` group).
 - `packages/kernel-occt/src/occtShapes.ts` `entityToOccShape` is an if-chain that falls through to

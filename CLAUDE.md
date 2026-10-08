@@ -38,7 +38,7 @@ packages/core/src/          @core  Framework-agnostic brain. NO react / DOM / wi
   model/                           types.ts (CadDocument, Entity) · partition.ts · building.ts (types)
   commands/                        THE command layer — schema.ts (defineCommand), context.ts,
                                    registry.ts, types.ts, one file per domain
-  geometry/                        kernel.ts (GeometryKernel) · kernelCache.ts · kernelChoice.ts
+  geometry/                        kernel.ts (GeometryKernel) · shapeRecipe.ts · shapeKernel.ts · kernelChoice.ts
   plugins/                         plugin.ts (CadPlugin) · host.ts (installPlugin)
   codegen/                         CadQuery / build123d / OpenSCAD / FreeCAD emitters
   lib/                      @lib   Tiny pure helpers (id, hash, polygon, triangulate, lruCache)

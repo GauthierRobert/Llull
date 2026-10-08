@@ -67,8 +67,9 @@ guards) and re-derived on load. Keep it incremental — do NOT break the `Comman
 
 three.js renders; it is NOT a CAD kernel. `GeometryKernel` (`@core/geometry/kernel`) is
 implemented by `packages/kernel-manifold` (default) and `packages/kernel-occt`. Commands read it
-ONLY from `ctx.kernel` and declare `annotations: { requiresKernel: true }`. Installing a kernel is
-the composition root's job, never a command's.
+ONLY from `ctx.kernel` and declare `annotations: { requiresKernel: true }`. The boundary is a SHAPE,
+not a mesh: commands pass a `ShapeRecipe` and get an opaque `ShapeHandle`; meshes only come OUT.
+Installing a kernel is the composition root's job, never a command's.
 
 ## L10 — Domains are plugins
 

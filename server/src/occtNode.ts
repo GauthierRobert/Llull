@@ -8,10 +8,10 @@
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
-import type { GeometryKernel } from '@core/geometry/kernel';
+import type { CachingKernel } from '@core/geometry/shapeKernel';
 import { createOcctKernel, type OcctFactory } from '@kernel-occt/occtKernel';
 
-export async function createNodeOcctKernel(): Promise<GeometryKernel> {
+export async function createNodeOcctKernel(): Promise<CachingKernel> {
   const distDir = join(dirname(createRequire(__filename).resolve('opencascade.js')), 'dist');
   const gluePath = join(distDir, 'opencascade.wasm.js');
   const glueSource = (await readFile(gluePath, 'utf8')).replace(

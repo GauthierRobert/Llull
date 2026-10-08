@@ -69,8 +69,14 @@ export const fooThing = defineCommand({
 
 ## Kernel (L9, as built)
 
-- Kernel only from `ctx.kernel`, memoized per installed kernel (`kernelCache.ts`). Never import a
-  concrete kernel or call `getGeometryKernel()` in a command.
+- Shape boundary: commands pass a `ShapeRecipe` (`@core/geometry/shapeRecipe`) and get an opaque
+  `ShapeHandle`; kernels implement `KernelOps<S>` on their native shape and wrap it with
+  `kernelFromOps` (`@core/geometry/shapeKernel`: cache by `recipeKey`, rebuild on eviction). Meshes
+  only come OUT (`tessellate`). Results store their recipe as `mesh.brep`; never feed a mesh back
+  into the kernel when a recipe exists (`kernelShape.ts` `operandRecipe`).
+- Kernel only from `ctx.kernel` (it caches its own shapes by recipe key). Never import a concrete
+  kernel or call `getGeometryKernel()` in a command.
+- Prefer deriving evaluated geometry from the document rather than storing it (L8).
 - `requiresKernel` command with `ctx.kernel === null` ⇒ "kernel not available" summary; replay
   refuses rather than silently dropping geometry.
 - Kernel choice (`@core/geometry/kernelChoice`): browser `?kernel=occt`, server

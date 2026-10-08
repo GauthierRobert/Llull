@@ -4,15 +4,16 @@ import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import type { GeometryKernel } from '@core/geometry/kernel';
+import { fakeKernel } from '../helpers/fakeKernel';
 
 const MESH = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] };
-const kernel: GeometryKernel = {
-  booleanOp: () => MESH,
-  filletEdges: () => MESH,
-  chamferEdges: () => MESH,
-  shellSolid: () => MESH,
-  tessellate: () => MESH,
-};
+const kernel: GeometryKernel = fakeKernel({
+  solid: MESH,
+  boolean: MESH,
+  fillet: MESH,
+  chamfer: MESH,
+  shell: MESH,
+});
 
 function constrainedBoxes(): { doc: CadDocument; a: string; b: string } {
   const first = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });

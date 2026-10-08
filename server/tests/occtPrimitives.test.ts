@@ -10,6 +10,7 @@ import type { Entity, Vec3 } from '@core/model/types';
 import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createNodeOcctKernel } from '../src/occtNode';
+import { booleanMesh, meshOf } from './kernelTestSupport';
 
 const common = { layerId: 'layer-default', color: '#888888' };
 const cylinder = (position: Vec3, rotation: Vec3): Entity =>
@@ -76,7 +77,7 @@ const shapes: Array<[string, (position: Vec3, rotation: Vec3) => Entity, number]
 describe.each(shapes)('occt %s', (name, make, analyticVolume) => {
   it.each(placements)('tessellates like Manifold (%s)', (_label, position, rotation) => {
     const entity = make(position, rotation);
-    const [fromOcct, fromManifold] = [occt.tessellate(entity), manifold.tessellate(entity)];
+    const [fromOcct, fromManifold] = [meshOf(occt, entity), meshOf(manifold, entity)];
     expect(fromOcct, name).not.toBeNull();
     expect(fromManifold, name).not.toBeNull();
     const [a, b] = [bounds(fromOcct!), bounds(fromManifold!)];
@@ -95,8 +96,8 @@ describe.each(shapes)('occt %s', (name, make, analyticVolume) => {
       // Box top z=2.7 stays clear of the sphere pole (z=3): tangent contact can hang OCC booleans.
       const cutter = box([2, 1, 1], [5, 3, 3.4]);
       const [fromOcct, fromManifold] = [
-        occt.booleanOp(op, entity, cutter),
-        manifold.booleanOp(op, entity, cutter),
+        booleanMesh(occt, op, entity, cutter),
+        booleanMesh(manifold, op, entity, cutter),
       ];
       expect(fromOcct, `${name} ${op}`).not.toBeNull();
       expect(fromManifold, `${name} ${op}`).not.toBeNull();
@@ -107,7 +108,7 @@ describe.each(shapes)('occt %s', (name, make, analyticVolume) => {
 
   it('rejects a non-positive size', () => {
     const degenerate = { ...make([0, 0, 0], [0, 0, 0]), radius: 0 } as Entity;
-    expect(occt.tessellate(degenerate)).toBeNull();
+    expect(meshOf(occt, degenerate)).toBeNull();
   });
 });
 
@@ -130,7 +131,7 @@ describe('occt torus', () => {
     'has the analytic volume and Manifold bounds (%s)',
     (_label, position, rotation) => {
       const entity = torus(position, rotation);
-      const [fromOcct, fromManifold] = [occt.tessellate(entity), manifold.tessellate(entity)];
+      const [fromOcct, fromManifold] = [meshOf(occt, entity), meshOf(manifold, entity)];
       expect(fromOcct).not.toBeNull();
       expect(fromManifold).not.toBeNull();
       expect(volume(fromOcct!) / analyticVolume).toBeGreaterThan(0.95);
@@ -149,8 +150,8 @@ describe('occt torus', () => {
       const entity = torus([0.3, 0.2, 0.1], [0.2, -0.1, 0.4]);
       const cutter = box([1.3, 0.7, 1.9], [3.1, 2.3, 2.7]);
       const [fromOcct, fromManifold] = [
-        occt.booleanOp(op, entity, cutter),
-        manifold.booleanOp(op, entity, cutter),
+        booleanMesh(occt, op, entity, cutter),
+        booleanMesh(manifold, op, entity, cutter),
       ];
       expect(fromOcct).not.toBeNull();
       expect(volume(fromOcct!) / volume(fromManifold!)).toBeGreaterThan(0.92);
@@ -163,6 +164,6 @@ describe('occt torus', () => {
     ['a tube radius not smaller than the ring radius', { tubeRadius: 3 }],
   ])('rejects %s', (_label, change) => {
     const entity = { ...torus([0, 0, 0], [0, 0, 0]), ...change } as Entity;
-    expect(occt.tessellate(entity)).toBeNull();
+    expect(meshOf(occt, entity)).toBeNull();
   });
 });

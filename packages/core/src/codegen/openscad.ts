@@ -145,6 +145,13 @@ export function emitOpenScad(program: FeatureProgram): string {
         const right = current(feature.right);
         return `module ${next(v)}() ${OPERATIONS[feature.kind]}() { ${left}(); ${right}(); }`;
       }
+      case 'fillet':
+      case 'chamfer':
+      case 'shell': {
+        // OpenSCAD has no fillets: the exact result's triangles stand in.
+        if (feature.mesh === undefined) return `// ${v}: ${feature.op} not expressible in OpenSCAD`;
+        return `module ${next(v)}() ${shapeSource({ kind: 'mesh', positions: feature.mesh })};`;
+      }
       case 'translate': {
         const previous = current(v);
         return `module ${next(v)}() translate(${vector(feature.delta)}) ${previous}();`;

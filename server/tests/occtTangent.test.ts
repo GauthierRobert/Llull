@@ -10,6 +10,7 @@ import type { Entity, Vec3 } from '@core/model/types';
 import type { MeshData } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createNodeOcctKernel } from '../src/occtNode';
+import { booleanMesh } from './kernelTestSupport';
 
 const common = { layerId: 'layer-default', color: '#888888' };
 const sphere = (rotation: Vec3): Entity =>
@@ -51,8 +52,8 @@ describe.each([
     async (op) => {
       const occt = await createNodeOcctKernel();
       const manifold = await createManifoldKernel();
-      const fromOcct = occt.booleanOp(op, sphere(rotation), tangentBox);
-      const fromManifold = manifold.booleanOp(op, sphere(rotation), tangentBox);
+      const fromOcct = booleanMesh(occt, op, sphere(rotation), tangentBox);
+      const fromManifold = booleanMesh(manifold, op, sphere(rotation), tangentBox);
       expect(fromOcct).not.toBeNull();
       expect(fromManifold).not.toBeNull();
       const ratio = volume(fromOcct!) / volume(fromManifold!);

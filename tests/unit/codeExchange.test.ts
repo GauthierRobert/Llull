@@ -7,6 +7,7 @@ import { MAX_TRACE_FEATURES } from '@core/commands/limits';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
+import { fakeKernel } from '../helpers/fakeKernel';
 
 interface CodeData {
   format: string;
@@ -84,16 +85,10 @@ const cannedMesh: MeshData = {
   indices: [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3],
 };
 
-const fakeKernel: GeometryKernel = {
-  booleanOp: () => cannedMesh,
-  filletEdges: () => null,
-  chamferEdges: () => null,
-  shellSolid: () => null,
-  tessellate: () => null,
-};
+const cannedKernel: GeometryKernel = fakeKernel({ boolean: cannedMesh });
 
 beforeEach(() => {
-  setGeometryKernel(fakeKernel);
+  setGeometryKernel(cannedKernel);
 });
 
 afterEach(() => {

@@ -11,17 +11,12 @@ import { currentContext, defaultContext } from '@core/commands/context';
 import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import type { IdSource } from '@lib/id';
+import { fakeKernel } from '../../helpers/fakeKernel';
 
 const TRIANGLE: MeshData = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] };
 
-function fakeKernel(): GeometryKernel {
-  return {
-    booleanOp: () => TRIANGLE,
-    filletEdges: () => TRIANGLE,
-    chamferEdges: () => TRIANGLE,
-    shellSolid: () => null,
-    tessellate: () => TRIANGLE,
-  };
+function triangleKernel(): GeometryKernel {
+  return fakeKernel({ solid: TRIANGLE, boolean: TRIANGLE, fillet: TRIANGLE, chamfer: TRIANGLE });
 }
 
 function prefixedIds(tag: string): IdSource {
@@ -78,7 +73,12 @@ describe('ExecutionContext', () => {
 
   it('uses ctx.kernel even when no process kernel is installed', () => {
     const { doc, a, b } = twoBoxes();
-    const result = execute(doc, 'boolean_union', { a, b }, contextWith({ kernel: fakeKernel() }));
+    const result = execute(
+      doc,
+      'boolean_union',
+      { a, b },
+      contextWith({ kernel: triangleKernel() }),
+    );
     const created = result.document.entities[result.affected[0] ?? ''] as MeshSolidEntity;
     expect(created.kind).toBe('mesh');
   });
@@ -93,7 +93,12 @@ describe('ExecutionContext', () => {
 
   it('replay refuses to regenerate kernel-dependent history without a kernel', () => {
     const { doc, a, b } = twoBoxes();
-    const unioned = execute(doc, 'boolean_union', { a, b }, contextWith({ kernel: fakeKernel() }));
+    const unioned = execute(
+      doc,
+      'boolean_union',
+      { a, b },
+      contextWith({ kernel: triangleKernel() }),
+    );
     const replayed = execute(unioned.document, 'replay_history', {});
     expect(Object.keys(replayed.document.entities)).toEqual(Object.keys(unioned.document.entities));
   });

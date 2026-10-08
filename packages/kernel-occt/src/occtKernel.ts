@@ -2,18 +2,25 @@
  * OpenCascade.js (OCC WASM) geometry kernel, opt-in via `?kernel=occt` / `LLULL_KERNEL=occt`
  * (Manifold is the default). Measurements and API notes: docs/decisions/KI4-occt-spike.md.
  *
+ * The kernel boundary is the exact shape: recipes evaluate to TopoDS_Shapes cached by recipe key
+ * (`kernelFromOps`); booleans, fillets, chamfers and shells run on those B-reps (true edges and faces,
+ * never re-sewn triangles); meshes only come out for display; STEP is written from the B-rep.
+ *
  * @layer kernel
- * @invariant implemented: booleanOp (every solid kind), filletEdges, chamferEdges, shellSolid (mesh -> sewn solid), tessellate (every solid kind)
+ * @invariant exact for every solid kind but `mesh` without `brep` and `pyramid` (sewn planar triangles)
  * @failure unsupported kind / non-manifold mesh / OCC refusal or failure -> null
  */
 
-import type { GeometryKernel, MeshData, BooleanOp } from '@core/geometry/kernel';
-import type { Entity } from '@core/model/types';
+import type { BooleanOp, ShapeRecipe } from '@core/geometry/shapeRecipe';
+import type { Vec3 } from '@core/model/types';
+import { kernelFromOps, type CachingKernel, type KernelOps } from '@core/geometry/shapeKernel';
 import { errorMessage } from '@lib/errorMessage';
 import { clearTangentContact } from './tangentGuard';
-import { entityToOccShape, meshDataToTopoDSShape } from './occtShapes';
+import { entityToOccShape, placementTransform, transformedCopy } from './occtShapes';
+import { extractMeshData } from './occtMesh';
+import { shapeTopology, uniqueSubShapes } from './occtTopology';
+import { writeStep } from './occtStep';
 import {
-  explorer,
   release,
   type OccApi,
   type OccBuilder,
@@ -21,8 +28,6 @@ import {
   type OccHandle,
   type OccOffsetMaker,
   type OccShape,
-  type OccTopoDS,
-  type OccTriangulation,
 } from './occtTypes';
 
 /** Injected loader inputs: core never fetches; the caller supplies WASM bytes or a locator. */
@@ -58,75 +63,12 @@ async function getOccModule(options: OcctKernelOptions): Promise<OccApi> {
     const opts: Record<string, unknown> = {};
     if (options.wasmBinary) opts['wasmBinary'] = options.wasmBinary;
     if (options.locateFile) opts['locateFile'] = options.locateFile;
+    opts['print'] = () => undefined; // OCC's stdout chatter (STEP transfer statistics)
 
     return factory(opts);
   })();
 
   return _modulePromise;
-}
-
-function extractMeshData(api: OccApi, shape: OccShape): MeshData | null {
-  const mesher = new api.BRepMesh_IncrementalMesh_2(shape, 0.1, false, 0.5, false) as OccHandle & {
-    Perform(): void;
-  };
-  mesher.Perform();
-
-  const positions: number[] = [];
-  const indices: number[] = [];
-  let vertexOffset = 0;
-
-  const exp = explorer(api, shape, 'TopAbs_FACE');
-
-  while (exp.More()) {
-    const current = exp.Current();
-    const face = (api.TopoDS as OccTopoDS).Face_1(current);
-    const loc = new api.TopLoc_Location_1() as OccHandle & { Transformation(): OccHandle };
-    const triangulation = api.BRep_Tool.Triangulation(face, loc) as OccTriangulation;
-
-    if (!triangulation.IsNull()) {
-      const tri = triangulation.get();
-      const nNodes = tri.NbNodes();
-      const nTris = tri.NbTriangles();
-
-      // Nodes are stored in the face's own frame; `loc` carries the shape's placement (a prism's
-      // top face, a transformed shape's faces), so bring them into world space.
-      const placement = loc.Transformation();
-      for (let i = 1; i <= nNodes; i++) {
-        const node = tri.Node(i);
-        node.Transform(placement);
-        positions.push(node.X(), node.Y(), node.Z());
-        release(node);
-      }
-      release(placement);
-
-      // A REVERSED face's stored triangles wind against the solid's outward normal: flip them.
-      const reversed = face.Orientation_1().value === api.TopAbs_Orientation.TopAbs_REVERSED.value;
-      for (let i = 1; i <= nTris; i++) {
-        const t = tri.Triangle(i);
-        const [first, second, third] = [t.Value(1), t.Value(2), t.Value(3)];
-        indices.push(
-          vertexOffset + first - 1,
-          vertexOffset + (reversed ? third : second) - 1,
-          vertexOffset + (reversed ? second : third) - 1,
-        );
-        release(t);
-      }
-
-      vertexOffset += nNodes;
-    }
-
-    release(triangulation);
-    release(face);
-    release(current);
-    loc.delete();
-    exp.Next();
-  }
-
-  exp.delete();
-  mesher.delete();
-
-  if (positions.length === 0) return null;
-  return { positions, indices };
 }
 
 const BOOLEAN_BUILDERS: Readonly<Record<BooleanOp, string>> = {
@@ -140,26 +82,32 @@ const BOOLEAN_BUILDERS: Readonly<Record<BooleanOp, string>> = {
  * OCC gracefully refusing the input. This build has no C++ exception support, so ANY thrown C++
  * exception (StdFail_NotDone, e.g. a fillet radius that is too large) surfaces as a JS
  * `ReferenceError` for a missing `___cxa_*` import; those are graceful refusals for fillet/chamfer/
- * shell. Booleans on near-tangent input are different: the same `___cxa_*` failure there leaves the
- * module returning spurious nulls (cone apex on a face), so it counts. A WASM trap
+ * shell. Booleans on near-tangent input are different: the same `___cxa_*` failure there (while
+ * building, or later while meshing / exploring / writing the suspect result) leaves the module
+ * returning spurious nulls (cone apex on a face), so it counts. A WASM trap
  * (`WebAssembly.RuntimeError`) or a thrown non-Error always counts; other JS Errors are
  * binding/programming faults that do not touch module state.
  */
+/** `WebAssembly.RuntimeError` (a trap), read from the global: not every TS lib declares the value. */
+const TrapError = (globalThis as { WebAssembly?: { RuntimeError?: new () => Error } }).WebAssembly
+  ?.RuntimeError;
+
 function degradesModule(error: unknown, operation: OperationClass): boolean {
   if (!(error instanceof Error)) return true;
-  if (error.constructor.name === 'RuntimeError') return true; // WebAssembly.RuntimeError (a trap)
+  if (TrapError !== undefined && error instanceof TrapError) return true; // a WASM trap
   return (
-    operation === 'boolean' && error instanceof ReferenceError && /___cxa_/.test(error.message)
+    operation === 'fragile' && error instanceof ReferenceError && /___cxa_/.test(error.message)
   );
 }
 
-type OperationClass = 'boolean' | 'round';
+/** 'refusal': a C++ exception is a graceful no; 'fragile': it may have degraded the module. */
+type OperationClass = 'fragile' | 'refusal';
 
 /** Run `body`, mapping any OCC exception to null and releasing every handle it registered. */
-function withHandles(
+function guarded<T>(
   operation: OperationClass,
-  body: (own: <T extends OccHandle | null>(handle: T) => T) => MeshData | null,
-): MeshData | null {
+  body: (own: <H extends OccHandle | null>(handle: H) => H) => T | null,
+): T | null {
   const owned: Array<OccHandle | null> = [];
   try {
     return body((handle) => {
@@ -189,112 +137,130 @@ export function nativeFailureCount(): number {
 }
 
 /**
- * Fillet or chamfer the selected edges of a closed mesh solid (both builders share `Add_2(size,
- * edge)`): rebuild a sewn solid, add the edges, build, mesh the result.
- * @failure size <= 0, empty or non-closed mesh, builder not done -> null
+ * Fillet or chamfer the selected unique edges of an exact solid (both builders share
+ * `Add_2(size, edge)`); the input shape is left untouched.
+ * @failure size <= 0, a selected index out of range, no edge, builder not done -> null
  */
 function roundEdges(
   api: OccApi,
-  label: string,
-  mesh: MeshData,
-  edgeIndices: number[],
+  shape: OccShape,
+  edgeIndices: readonly number[],
   size: number,
   makeBuilder: (solid: OccShape) => OccFilletMaker,
-): MeshData | null {
-  if (!(size > 0) || mesh.positions.length === 0) return null;
-  return withHandles('round', (own) => {
-    const solid = own(meshDataToTopoDSShape(api, mesh));
-    if (!solid) {
-      console.warn(
-        `[occtKernel] ${label}: could not reconstruct a manifold solid from MeshData ` +
-          '(non-manifold mesh, open shell, or degenerate triangles). Returning null.',
-      );
-      return null;
-    }
-    const maker = own(makeBuilder(solid));
-    const edgeExp = explorer(api, solid, 'TopAbs_EDGE');
-    const edgeSet = edgeIndices.length > 0 ? new Set(edgeIndices) : null;
-    for (let edgeIdx = 0; edgeExp.More(); edgeIdx++, edgeExp.Next()) {
-      if (edgeSet && !edgeSet.has(edgeIdx)) continue;
-      const current = edgeExp.Current();
-      const edge = (api.TopoDS as OccTopoDS).Edge_1(current);
+): OccShape | null {
+  if (!(size > 0)) return null;
+  return guarded('refusal', (own) => {
+    const edges = uniqueSubShapes(api, shape, 'TopAbs_EDGE').map(own);
+    if (edgeIndices.some((index) => edges[index] === undefined)) return null;
+    const selected =
+      edgeIndices.length > 0
+        ? edgeIndices.flatMap((index) => {
+            const edge = edges[index];
+            return edge === undefined ? [] : [edge];
+          })
+        : edges;
+    if (selected.length === 0) return null;
+    const maker = own(makeBuilder(shape));
+    for (const current of selected) {
       try {
-        maker.Add_2(size, edge);
+        maker.Add_2(size, own(api.TopoDS.Edge_1(current) as OccShape));
       } catch {
         // Degenerate or seam edge: skip.
       }
-      release(edge);
-      release(current);
     }
-    edgeExp.delete();
     maker.Build();
-    return maker.IsDone() ? extractMeshData(api, own(maker.Shape())) : null;
+    return maker.IsDone() ? maker.Shape() : null;
   });
+}
+
+/** Closed hollow: the solid minus its inward offset by `thickness` (a sealed internal cavity). */
+function hollow(api: OccApi, solid: OccShape, thickness: number): OccShape | null {
+  if (!(thickness > 0)) return null;
+  const cavity = guarded('refusal', (own) => {
+    const offset = own(new api.BRepOffsetAPI_MakeOffsetShape_1() as OccOffsetMaker);
+    offset.PerformByJoin(
+      solid,
+      -thickness,
+      1e-4,
+      api.BRepOffset_Mode.BRepOffset_Skin,
+      false,
+      false,
+      api.GeomAbs_JoinType.GeomAbs_Arc,
+      false,
+    );
+    return offset.IsDone() ? offset.Shape() : null;
+  });
+  if (cavity === null) return null;
+  // The cut is a boolean: a native failure there may degrade the module (see degradesModule).
+  return guarded('fragile', (own) => {
+    own(cavity);
+    const cut = own(new api.BRepAlgoAPI_Cut_3(solid, cavity) as OccBuilder);
+    cut.Build();
+    return cut.IsDone() ? cut.Shape() : null;
+  });
+}
+
+/** Copy of `shape` under a transform built by `makeTransform` (released afterwards). */
+function transformed(
+  api: OccApi,
+  shape: OccShape,
+  makeTransform: () => OccHandle,
+): OccShape | null {
+  return guarded('refusal', (own) => transformedCopy(api, shape, own(makeTransform())));
+}
+
+/** Booleans of two primitive leaves: open a hair-gap at a sphere/box point contact (tangentGuard). */
+function untangle(a: ShapeRecipe, b: ShapeRecipe): [ShapeRecipe, ShapeRecipe] {
+  if (a.op !== 'solid' || b.op !== 'solid') return [a, b];
+  const [entityA, entityB] = clearTangentContact(a.entity, b.entity);
+  return [
+    entityA === a.entity ? a : { op: 'solid', entity: entityA },
+    entityB === b.entity ? b : { op: 'solid', entity: entityB },
+  ];
+}
+
+/** Native OCC operations behind the recipe evaluator. */
+export function occtOps(api: OccApi): KernelOps<OccShape> {
+  return {
+    failureEpoch: nativeFailureCount,
+    solid: (entity) => guarded('refusal', () => entityToOccShape(api, entity)),
+    prepareBoolean: untangle,
+    boolean: (op: BooleanOp, a, b) =>
+      guarded('fragile', (own) => {
+        const builder = own(new api[BOOLEAN_BUILDERS[op]](a, b) as OccBuilder);
+        return builder.IsDone() ? builder.Shape() : null;
+      }),
+    fillet: (shape, edges, radius) =>
+      roundEdges(api, shape, edges, radius, (solid) => {
+        return new api.BRepFilletAPI_MakeFillet(solid, api.ChFi3d_FilletShape.ChFi3d_Rational);
+      }),
+    chamfer: (shape, edges, distance) =>
+      roundEdges(api, shape, edges, distance, (solid) => new api.BRepFilletAPI_MakeChamfer(solid)),
+    shell: (shape, thickness) => hollow(api, shape, thickness),
+    place: (shape, position: Vec3, rotation: Vec3) =>
+      transformed(api, shape, () => placementTransform(api, rotation, position)),
+    scale: (shape, factor) =>
+      factor > 0
+        ? transformed(api, shape, () => {
+            const transform = new api.gp_Trsf_1();
+            const origin: OccHandle = new api.gp_Pnt_3(0, 0, 0);
+            transform.SetScale(origin, factor);
+            release(origin);
+            return transform as OccHandle;
+          })
+        : null,
+    tessellate: (shape) => guarded('fragile', () => extractMeshData(api, shape)),
+    topology: (shape) => guarded('fragile', () => shapeTopology(api, shape)),
+    exportStep: (shapes) => guarded('fragile', () => writeStep(api, shapes)),
+    release,
+  };
 }
 
 /**
  * Create an OCC-backed geometry kernel.
  * @param options injected `wasmBinary` / `locateFile` (see OcctKernelOptions)
  */
-export async function createOcctKernel(options: OcctKernelOptions = {}): Promise<GeometryKernel> {
+export async function createOcctKernel(options: OcctKernelOptions = {}): Promise<CachingKernel> {
   const api = await getOccModule(options);
-
-  return {
-    booleanOp(op: BooleanOp, a: Entity, b: Entity): MeshData | null {
-      const [operandA, operandB] = clearTangentContact(a, b);
-      return withHandles('boolean', (own) => {
-        const shapeA = own(entityToOccShape(api, operandA));
-        const shapeB = shapeA && own(entityToOccShape(api, operandB));
-        if (!shapeA || !shapeB) return null;
-        const builder = own(new api[BOOLEAN_BUILDERS[op]](shapeA, shapeB) as OccBuilder);
-        return builder.IsDone() ? extractMeshData(api, own(builder.Shape())) : null;
-      });
-    },
-
-    /** @param edgeIndices 0-based edge indices to fillet; empty = all edges */
-    filletEdges(shape: MeshData, edgeIndices: number[], radius: number): MeshData | null {
-      return roundEdges(api, 'filletEdges', shape, edgeIndices, radius, (solid) => {
-        return new api.BRepFilletAPI_MakeFillet(solid, api.ChFi3d_FilletShape.ChFi3d_Rational);
-      });
-    },
-
-    /** @param edgeIndices 0-based edge indices to chamfer; empty = all edges */
-    chamferEdges(shape: MeshData, edgeIndices: number[], distance: number): MeshData | null {
-      return roundEdges(api, 'chamferEdges', shape, edgeIndices, distance, (solid) => {
-        return new api.BRepFilletAPI_MakeChamfer(solid);
-      });
-    },
-
-    /** Closed hollow: the solid minus its inward offset by `thickness` (a sealed internal cavity). */
-    shellSolid(shape: MeshData, thickness: number): MeshData | null {
-      if (!(thickness > 0) || shape.positions.length === 0) return null;
-      return withHandles('round', (own) => {
-        const solid = own(meshDataToTopoDSShape(api, shape));
-        if (!solid) return null;
-        const offset = own(new api.BRepOffsetAPI_MakeOffsetShape_1() as OccOffsetMaker);
-        offset.PerformByJoin(
-          solid,
-          -thickness,
-          1e-4,
-          api.BRepOffset_Mode.BRepOffset_Skin,
-          false,
-          false,
-          api.GeomAbs_JoinType.GeomAbs_Arc,
-          false,
-        );
-        if (!offset.IsDone()) return null;
-        const cavity = own(offset.Shape());
-        const cut = own(new api.BRepAlgoAPI_Cut_3(solid, cavity) as OccBuilder);
-        cut.Build();
-        return cut.IsDone() ? extractMeshData(api, own(cut.Shape())) : null;
-      });
-    },
-
-    tessellate(entity: Entity): MeshData | null {
-      return withHandles('round', (own) => {
-        const shape = own(entityToOccShape(api, entity));
-        return shape && extractMeshData(api, shape);
-      });
-    },
-  };
+  return kernelFromOps(occtOps(api));
 }

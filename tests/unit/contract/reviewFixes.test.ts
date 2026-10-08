@@ -10,15 +10,14 @@ import { installPlugin } from '@core/plugins/host';
 import { defineCommand, z } from '@core/commands/schema';
 import type { CommandDefinition } from '@core/commands/types';
 import { nextId, withIdSource } from '@lib/id';
+import { fakeKernel } from '../../helpers/fakeKernel';
 
 const TRIANGLE: MeshData = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] };
-const fakeKernel: GeometryKernel = {
-  booleanOp: () => TRIANGLE,
-  filletEdges: () => TRIANGLE,
-  chamferEdges: () => null,
-  shellSolid: () => null,
-  tessellate: () => TRIANGLE,
-};
+const triangleKernel: GeometryKernel = fakeKernel({
+  solid: TRIANGLE,
+  boolean: TRIANGLE,
+  fillet: TRIANGLE,
+});
 
 function boxOf(doc: CadDocument): BoxEntity {
   return Object.values(doc.entities).find((e) => e.kind === 'box') as BoxEntity;
@@ -62,7 +61,7 @@ describe('S3: set_parameter regenerates through recipes and constraints', () => 
 describe('S4/S7: history operations refuse without a kernel instead of reporting success', () => {
   function unionHistory(): CadDocument {
     let doc = createEmptyDocument();
-    const ctx = { ...defaultContext(), kernel: fakeKernel };
+    const ctx = { ...defaultContext(), kernel: triangleKernel };
     const a = execute(doc, 'add_box', { size: [2, 2, 2] }, ctx);
     doc = a.document;
     const b = execute(doc, 'add_box', { size: [2, 2, 2], position: [1, 0, 0] }, ctx);

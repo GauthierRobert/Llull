@@ -11,12 +11,13 @@ import type { Feature, FeatureProgram } from './program';
 import {
   featureLinesWithHeadings,
   formatNumber,
+  formatTerm,
   parameterLines,
   provenance,
   quote,
   sectionBanner,
 } from './format';
-import { placementKwargs, pythonTuple, shapeCallOpen } from './pythonCalls';
+import { placementKwargs, pythonTuple, roundArguments, shapeCallOpen } from './pythonCalls';
 import { pythonRuntime, type PythonBackend } from './pythonRuntime';
 
 const LIBRARY: Readonly<Record<PythonBackend, string>> = {
@@ -34,6 +35,11 @@ function featureLine(feature: Feature): string {
     }
     case 'boolean':
       return `${v} = ${feature.kind}(${feature.left}, ${feature.right})`;
+    case 'fillet':
+    case 'chamfer':
+      return `${v} = ${feature.op}(${v}, ${roundArguments(feature)})`;
+    case 'shell':
+      return `${v} = shell(${v}, ${formatTerm(feature.thickness)})`;
     case 'translate':
       return `${v} = translate(${v}, ${pythonTuple(feature.delta)})`;
     case 'remove':

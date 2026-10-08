@@ -10,6 +10,7 @@ import type { Entity, Vec3 } from '@core/model/types';
 import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createNodeOcctKernel } from '../src/occtNode';
+import { booleanMesh, meshOf } from './kernelTestSupport';
 
 const common = { layerId: 'layer-default', color: '#888888' };
 const at = (
@@ -82,7 +83,7 @@ describe.each(shapes)('occt %s', (name, make) => {
     ['moved and turned', [2, -1, 3], [0.3, -0.4, 0.9]],
   ] as Array<[string, Vec3, Vec3]>)('tessellates with the Manifold volume (%s)', (_l, p, r) => {
     const entity = make(p, r);
-    const [fromOcct, fromManifold] = [occt.tessellate(entity), manifold.tessellate(entity)];
+    const [fromOcct, fromManifold] = [meshOf(occt, entity), meshOf(manifold, entity)];
     expect(fromOcct, name).not.toBeNull();
     expect(fromManifold, name).not.toBeNull();
     expect(volume(fromOcct!)).toBeGreaterThan(0);
@@ -95,8 +96,8 @@ describe.each(shapes)('occt %s', (name, make) => {
       const entity = make([0.3, 0.2, 0.1], [0.2, -0.1, 0.4]);
       const other = box([1.3, 0.7, 1.9], [3.1, 2.3, 2.7]);
       const [fromOcct, fromManifold] = [
-        occt.booleanOp(op, entity, other),
-        manifold.booleanOp(op, entity, other),
+        booleanMesh(occt, op, entity, other),
+        booleanMesh(manifold, op, entity, other),
       ];
       expect(fromOcct, `${name} ${op}`).not.toBeNull();
       expect(fromManifold, `${name} ${op}`).not.toBeNull();
@@ -154,7 +155,7 @@ describe('occt revolution frames', () => {
   ] as Array<[string, Vec3, number]>)('%s matches Manifold', (_label, axis, angle) => {
     for (const profile of [ring, [...ring].reverse()]) {
       const entity = revolution(profile, axis, angle);
-      const [fromOcct, fromManifold] = [occt.tessellate(entity), manifold.tessellate(entity)];
+      const [fromOcct, fromManifold] = [meshOf(occt, entity), meshOf(manifold, entity)];
       expect(fromOcct).not.toBeNull();
       expect(fromManifold).not.toBeNull();
       const ratio = volume(fromOcct!) / volume(fromManifold!);
@@ -172,10 +173,10 @@ describe('occt revolution frames', () => {
       [1, 0],
       [2, 0],
     ];
-    expect(occt.tessellate(revolution(flat, [0, 0, 1], Math.PI))).toBeNull();
-    expect(occt.tessellate(revolution(ring, [0, 0, 1], 0))).toBeNull();
+    expect(meshOf(occt, revolution(flat, [0, 0, 1], Math.PI))).toBeNull();
+    expect(meshOf(occt, revolution(ring, [0, 0, 1], 0))).toBeNull();
     expect(
-      occt.tessellate({ ...revolution(ring, [0, 0, 1], Math.PI), segments: 2 } as Entity),
+      meshOf(occt, { ...revolution(ring, [0, 0, 1], Math.PI), segments: 2 } as Entity),
     ).toBeNull();
   });
 });

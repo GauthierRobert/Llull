@@ -11,12 +11,13 @@ import {
   commentText,
   featureLinesWithHeadings,
   formatNumber,
+  formatTerm,
   parameterLines,
   provenance,
   quote,
   sectionBanner,
 } from './format';
-import { placementKwargs, pythonTuple, shapeCallOpen } from './pythonCalls';
+import { placementKwargs, pythonTuple, roundArguments, shapeCallOpen } from './pythonCalls';
 
 const HELPERS = String.raw`
 import math
@@ -110,6 +111,28 @@ def _color(hex_color):
     return tuple(int(value[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
 
 
+def _select_edges(shape, edges, near):
+    # Shape.Edges is llull's unique-edge order; mid points (when given) are robust across OCC builds.
+    unique = shape.Edges
+    if near:
+        mid = lambda e: e.valueAt((e.FirstParameter + e.LastParameter) / 2)
+        return [min(unique, key=lambda e: (mid(e) - _vec(*p)).Length) for p in near]
+    return [unique[i] for i in edges] if edges else unique
+
+
+def fillet(shape, edges, radius, near=None):
+    return shape.makeFillet(float(radius), _select_edges(shape, edges, near))
+
+
+def chamfer(shape, edges, distance, near=None):
+    return shape.makeChamfer(float(distance), _select_edges(shape, edges, near))
+
+
+def shell(shape, thickness):
+    # llull shell: the solid minus its inward offset (a sealed cavity).
+    return shape.cut(shape.makeOffsetShape(-float(thickness), 1e-4, join=0))
+
+
 def show(shape, name, color):
     feature = doc.addObject("Part::Feature", name)
     feature.Label = name
@@ -134,6 +157,11 @@ function featureLine(feature: Feature): string {
     }
     case 'boolean':
       return `${v} = ${feature.left}.${OPERATIONS[feature.kind]}(${feature.right}).removeSplitter()`;
+    case 'fillet':
+    case 'chamfer':
+      return `${v} = ${feature.op}(${v}, ${roundArguments(feature)})`;
+    case 'shell':
+      return `${v} = shell(${v}, ${formatTerm(feature.thickness)})`;
     case 'translate':
       return `${v} = ${v}.translated(_vec${pythonTuple(feature.delta)})`;
     case 'remove':
