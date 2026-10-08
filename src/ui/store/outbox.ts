@@ -8,7 +8,7 @@
 import type { CadDocument, EntityId } from '@core/model/types';
 import { extendIdMap, remapIds } from '@core/commands/regenerate';
 import { errorMessage } from '@lib/errorMessage';
-import { fetchLiveSnapshot, postCommand } from './serverCommands';
+import { fetchLiveSnapshot, isPermanentHttpError, postCommand } from './serverCommands';
 import type { CadStoreState, StoreGet, StoreSet } from './storeTypes';
 
 const SYNC_RETRY_BASE_MS = 1000;
@@ -84,10 +84,26 @@ export function withLocalSelection(doc: CadDocument, selection: readonly EntityI
   return { ...doc, selection: selection.filter((id) => id in doc.entities) };
 }
 
+export function removeOutboxEntry(
+  outbox: readonly OutboxCommand[],
+  commandId: string,
+): OutboxCommand[] {
+  return outbox.filter((entry) => entry.commandId !== commandId);
+}
+
+function syncedSummary(sentCount: number, rejected: readonly string[]): string {
+  const synced = `Synced ${sentCount} offline command${sentCount === 1 ? '' : 's'} to the server.`;
+  return rejected.length === 0
+    ? synced
+    : `${synced} The server refused ${rejected.length} (dropped): ${rejected.join('; ')}.`;
+}
+
 /**
  * Offline -> online reconcile: replay the outbox to the server as ordinary commands, in
  * order (the server rebases them onto whatever happened meanwhile), then adopt the server
- * snapshot. Commands queued during the flush are sent too. Retries with backoff on failure.
+ * snapshot. Commands queued during the flush are sent too. Retries with backoff on a transient
+ * failure; an entry the server refuses permanently (4xx other than 408/429) is dropped, reported
+ * in the summary, and the flush continues (the post-flush snapshot reconciles the document).
  */
 export function flushOutbox(set: StoreSet, get: StoreGet): void {
   if (syncInFlight) return;
@@ -95,26 +111,28 @@ export function flushOutbox(set: StoreSet, get: StoreGet): void {
   syncInFlight = true;
   set({ syncState: 'syncing' });
   const sent: string[] = [];
+  const rejected: string[] = [];
   const sendNext = async (): Promise<void> => {
     for (;;) {
       const next = get().localOutbox[0];
       if (next === undefined) break;
       if (next.localOnly === true) {
-        set((state) => ({
-          localOutbox: state.localOutbox.filter((entry) => entry.commandId !== next.commandId),
-        }));
+        set((state) => ({ localOutbox: removeOutboxEntry(state.localOutbox, next.commandId) }));
         continue;
       }
-      const response = await postCommand(
-        next.name,
-        remapIds(next.params, flushIdMap),
-        next.commandId,
-      );
-      sent.push(response.summary);
-      extendIdMap(flushIdMap, next.affected, response.affected);
-      set((state) => ({
-        localOutbox: state.localOutbox.filter((entry) => entry.commandId !== next.commandId),
-      }));
+      try {
+        const response = await postCommand(
+          next.name,
+          remapIds(next.params, flushIdMap),
+          next.commandId,
+        );
+        sent.push(response.summary);
+        extendIdMap(flushIdMap, next.affected, response.affected);
+      } catch (err: unknown) {
+        if (!isPermanentHttpError(err)) throw err;
+        rejected.push(`'${next.name}' (${err.message})`);
+      }
+      set((state) => ({ localOutbox: removeOutboxEntry(state.localOutbox, next.commandId) }));
     }
     const snapshot = await fetchLiveSnapshot();
     if (get().localOutbox.length > 0) return sendNext();
@@ -130,7 +148,7 @@ export function flushOutbox(set: StoreSet, get: StoreGet): void {
       liveSeq: snapshot.seq,
       liveEpoch: snapshot.epoch,
       document: withLocalSelection(snapshot.document, state.document.selection),
-      lastSummary: `Synced ${sent.length} offline command${sent.length === 1 ? '' : 's'} to the server.`,
+      lastSummary: syncedSummary(sent.length, rejected),
     });
   };
   void sendNext()

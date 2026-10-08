@@ -6,10 +6,16 @@
  */
 
 import type { CadDocument, EntityId } from '@core/model/types';
-import { postCommand, postRedo, postUndo, ServerCommandError } from './serverCommands';
+import {
+  isPermanentHttpError,
+  postCommand,
+  postRedo,
+  postUndo,
+  ServerCommandError,
+} from './serverCommands';
 import type { ServerCommandResponse } from './serverCommands';
 import { measureAfter, statusSummaryFor } from './feedback';
-import { newCommandId } from './outbox';
+import { newCommandId, removeOutboxEntry } from './outbox';
 import { runLocally, selectionAfter, stepLocalHistory } from './localMode';
 import type { CadStoreState, DispatchOptions, StoreGet, StoreSet } from './storeTypes';
 
@@ -81,6 +87,17 @@ function responseChanged(response: ServerCommandResponse): boolean {
   return response.changed ?? (!response.isError && response.affected.length > 0);
 }
 
+/**
+ * A grace-run command the server then refused permanently would be re-POSTed forever by the
+ * flush: drop its outbox entry and tell the user (the post-flush snapshot reconciles the document).
+ */
+function dropRefusedGraceRun(set: StoreSet, commandId: string, message: string): void {
+  set((state) => ({
+    localOutbox: removeOutboxEntry(state.localOutbox, commandId),
+    lastSummary: `${message} — the server refused the command; it will not be synced.`,
+  }));
+}
+
 /** Fire-and-forget: the document update comes from the /live SSE stream. */
 export function postDispatch(
   set: StoreSet,
@@ -117,7 +134,10 @@ export function postDispatch(
     })
     .catch((err: unknown) => {
       clearTimeout(graceTimer);
-      if (ranLocally) return;
+      if (ranLocally) {
+        if (isPermanentHttpError(err)) dropRefusedGraceRun(set, commandId, err.message);
+        return;
+      }
       handlePostFailure(set, get, err, `Command '${name}'`, runLocalOnce, (summary) =>
         options?.onResult?.({ summary, changed: false }),
       );
