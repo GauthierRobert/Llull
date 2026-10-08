@@ -32,11 +32,17 @@ function regenerateWith(
   const refused = kernelRefusal(doc, newHistory, context);
   if (refused !== null) return noop(doc, `${command}: ${refused}`);
   let inertStep: FeatureStep | undefined;
+  let inertReason = 'its params are invalid for that command';
   const warnings: string[] = [];
   const brokenDependents: FeatureStep[] = [];
   const replayed = replayHistory(doc, newHistory, context.registry, warnings, (event) => {
     if (!event.inert) return;
-    if (event.step.id === mustApplyStepId) inertStep = event.step;
+    if (event.step.id === mustApplyStepId) {
+      inertStep = event.step;
+      // Re-run the step on its pre-state to surface the command's own refusal (schema path, etc.).
+      const refusal = context.registry(event.step.name)?.run(event.before, event.params, context);
+      if (refusal !== undefined && refusal.summary !== '') inertReason = refusal.summary;
+    }
     // A step that used to affect entities but now changes nothing lost an input it depended on.
     else if ((event.step.affected?.length ?? 0) > 0) brokenDependents.push(event.step);
   });
@@ -44,7 +50,7 @@ function regenerateWith(
   if (inertStep !== undefined && warnings.length === 0) {
     return noop(
       doc,
-      `${command}: step '${(inertStep as FeatureStep).id}' (${(inertStep as FeatureStep).name}) changed nothing when replayed — its params are invalid for that command; history unchanged.`,
+      `${command}: step '${(inertStep as FeatureStep).id}' (${(inertStep as FeatureStep).name}) changed nothing when replayed — ${inertReason} History unchanged.`,
     );
   }
   const regenerated = nextStepNumber === undefined ? replayed : { ...replayed, nextStepNumber };

@@ -18,6 +18,28 @@ describe('edit_step_params / insert_step refuse params that make the step a no-o
     expect(result.summary).toContain("step 'step-1' (add_box) changed nothing");
   });
 
+  it('edit_step_params reports the schema path for a type-invalid value', () => {
+    const result = execute(doc, 'edit_step_params', { stepId: boxStepId, params: { size: 'x' } });
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('invalid params');
+    expect(result.summary).toContain('size');
+  });
+
+  it('edit_step_params reports the command refusal for a wrong-length vector', () => {
+    const result = execute(doc, 'edit_step_params', {
+      stepId: boxStepId,
+      params: { size: [1, 2] },
+    });
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('size must be 3 components');
+  });
+
+  it('insert_step reports the schema path for type-invalid params', () => {
+    const result = execute(doc, 'insert_step', { name: 'add_box', params: { size: 'x' } });
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('invalid params');
+  });
+
   it('edit_step_params with valid params still regenerates', () => {
     const result = execute(doc, 'edit_step_params', {
       stepId: boxStepId,
