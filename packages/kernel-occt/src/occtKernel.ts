@@ -3,8 +3,8 @@
  * (Manifold is the default). Measurements and API notes: docs/decisions/KI4-occt-spike.md.
  *
  * @layer kernel
- * @invariant implemented: booleanOp (box operands), filletEdges (mesh -> sewn solid -> fillet), tessellate (box)
- * @failure unsupported kind / non-manifold mesh / OCC failure / chamferEdges / shellSolid -> null
+ * @invariant implemented: booleanOp (every solid kind), filletEdges, chamferEdges, shellSolid (mesh -> sewn solid), tessellate (every solid kind)
+ * @failure unsupported kind / non-manifold mesh / OCC refusal or failure -> null
  */
 
 import type { GeometryKernel, MeshData, BooleanOp } from '@core/geometry/kernel';
