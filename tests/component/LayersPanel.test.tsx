@@ -1,13 +1,13 @@
 /**
- * Component tests for <LayersPanel /> — viewer mode (read-only).
+ * Component tests for <LayersPanel />.
  *
  * Asserts observable behavior (workflow W3, react R11):
  *   - Panel renders a row per layer in layerOrder.
  *   - Layer name, entity count, and color swatch are displayed.
  *   - The local viewport visibility toggle button toggles useViewportStore.hiddenLayerIds
  *     without dispatching any command to the document.
- *   - Lock state is shown as a read-only indicator.
- *   - No add/rename/delete/undo-redo controls are present.
+ *   - Add / rename / lock / delete (confirmed) dispatch the layer commands; the default layer
+ *     cannot be deleted.
  *
  * No geometry math or internals are asserted — behavioral testing only.
  */
@@ -25,10 +25,9 @@ import { localDispatch } from '../helpers/storeTestHelpers';
 // ---------------------------------------------------------------------------
 
 function resetStore(): void {
-  useStore.setState({
-    document: createEmptyDocument(),
-    lastSummary: null,
-  });
+  // setDocument also clears local-edit bookkeeping left by a previous test.
+  useStore.getState().setDocument(createEmptyDocument());
+  useStore.setState({ lastSummary: null });
   useViewportStore.setState({ hiddenLayerIds: new Set<string>() });
 }
 
@@ -135,30 +134,86 @@ describe('LayersPanel — read-only viewer', () => {
 
   // -- No mutation controls present -------------------------------------------
 
-  it('does NOT render an "Add" button', () => {
-    render(<LayersPanel />);
-    expect(screen.queryByRole('button', { name: /^add layer$/i })).toBeNull();
-  });
-
-  it('does NOT render an undo button', () => {
+  it('does NOT render undo / redo controls', () => {
     render(<LayersPanel />);
     expect(screen.queryByRole('button', { name: /^undo$/i })).toBeNull();
-  });
-
-  it('does NOT render a redo button', () => {
-    render(<LayersPanel />);
     expect(screen.queryByRole('button', { name: /^redo$/i })).toBeNull();
   });
+});
 
-  it('does NOT render a delete button on any row', () => {
-    addLayer('ToKeep');
-    render(<LayersPanel />);
-    expect(screen.queryByRole('button', { name: /delete layer/i })).toBeNull();
+describe('LayersPanel — layer commands', () => {
+  beforeEach(() => {
+    resetStore();
+    useStore.setState({ liveStatus: 'disconnected' });
   });
 
-  it('does NOT render a rename input for layer names', () => {
+  const layerNames = (): string[] =>
+    Object.values(useStore.getState().document.layers).map((layer) => layer.name);
+
+  it('adds a layer through add_layer and clears the field', () => {
     render(<LayersPanel />);
-    // Layer name is a plain span, not a button that reveals an input
+    const input = screen.getByLabelText('New layer name') as HTMLInputElement;
+    expect(screen.getByRole('button', { name: 'Add layer' })).toHaveProperty('disabled', true);
+    fireEvent.change(input, { target: { value: 'Walls' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add layer' }));
+    expect(layerNames()).toContain('Walls');
+    expect(input.value).toBe('');
+  });
+
+  it('toggles the document lock through set_layer_lock', () => {
+    const id = addLayer('Locky');
+    render(<LayersPanel />);
+    fireEvent.click(screen.getByRole('button', { name: 'Lock layer Locky' }));
+    expect(useStore.getState().document.layers[id]?.locked).toBe(true);
+    const unlock = screen.getByRole('button', { name: 'Unlock layer Locky' });
+    expect(unlock.getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(unlock);
+    expect(useStore.getState().document.layers[id]?.locked).toBe(false);
+  });
+
+  it('renames a layer through rename_layer (Enter commits, Escape cancels)', () => {
+    const id = addLayer('Old');
+    render(<LayersPanel />);
+    fireEvent.click(screen.getByRole('button', { name: 'Rename layer Old' }));
+    const field = screen.getByRole('textbox', { name: 'Rename layer Old' });
+    fireEvent.change(field, { target: { value: 'New' } });
+    fireEvent.blur(field);
+    expect(useStore.getState().document.layers[id]?.name).toBe('New');
     expect(screen.queryByRole('textbox', { name: /rename layer/i })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rename layer New' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Rename layer New' }), {
+      target: { value: 'Discarded' },
+    });
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Rename layer New' }), {
+      key: 'Escape',
+    });
+    expect(useStore.getState().document.layers[id]?.name).toBe('New');
+  });
+
+  it('deletes a layer only after confirmation, moving its entities to the default layer', () => {
+    const id = addLayer('Temp');
+    const box = localDispatch('add_box', { size: [1, 1, 1] }).affected[0]!;
+    localDispatch('set_entity_layer', { entityId: box, layerId: id });
+    render(<LayersPanel />);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete layer Temp' }));
+    expect(useStore.getState().document.layers[id]).toBeDefined();
+    expect(screen.getByRole('dialog').textContent).toContain('1 entity moves to the default layer');
+    fireEvent.click(screen.getByRole('button', { name: 'Delete layer' }));
+    expect(useStore.getState().document.layers[id]).toBeUndefined();
+    expect(useStore.getState().document.entities[box]?.layerId).toBe(DEFAULT_LAYER_ID);
+  });
+
+  it('cancelling the confirmation keeps the layer; the default layer cannot be deleted', () => {
+    const id = addLayer('Keep');
+    render(<LayersPanel />);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete layer Keep' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(useStore.getState().document.layers[id]).toBeDefined();
+    const defaultName = useStore.getState().document.layers[DEFAULT_LAYER_ID]!.name;
+    expect(screen.getByRole('button', { name: `Delete layer ${defaultName}` })).toHaveProperty(
+      'disabled',
+      true,
+    );
   });
 });

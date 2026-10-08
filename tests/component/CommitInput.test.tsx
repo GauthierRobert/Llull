@@ -49,7 +49,10 @@ describe('CommitInput', () => {
   it('Escape reverts the draft without committing', () => {
     render(<Harness />);
     fireEvent.change(input(), { target: { value: '9' } });
+    // A real Escape blurs the focused field; the blur must not commit the typed draft.
+    input().focus();
     fireEvent.keyDown(input(), { key: 'Escape' });
     expect(screen.getByLabelText('stored').textContent).toBe('2');
+    expect(input().value).toBe('2');
   });
 });
