@@ -466,7 +466,7 @@ describe('shapeToolCallContent code blocks', () => {
       data: [1, 2],
     });
     expect(array.content).toHaveLength(2);
-    expect(array.structuredContent).toBeUndefined();
+    expect(array.structuredContent).toEqual({ data: [1, 2] });
     const nullData = shapeToolCallContent({
       summary: 's',
       affected: [],

@@ -13,7 +13,8 @@ interface McpTextContent {
 }
 
 /**
- * MCP CallToolResult minus the document. `structuredContent` only for record-typed `data`.
+ * MCP CallToolResult minus the document. `structuredContent` = the full `data` (non-records wrapped
+ * as `{ data }`) + all `affected` ids; absent when there is neither data nor an over-cap id list.
  * @invariant a type alias, not an interface: only an alias is assignable to the SDK's
  *            index-signatured CallToolResult (server/src/mcp/server.ts relies on it, no casts).
  */
@@ -28,6 +29,15 @@ function codeText(data: unknown): string | null {
   return isRecord(data) && data.format === 'code' && typeof data.text === 'string'
     ? data.text
     : null;
+}
+
+/**
+ * The full machine-readable result: a record `data` as is, anything else as `{ data }`, plus every
+ * affected id under `affected` (unless the record already has its own `affected` key).
+ */
+function structuredOf(data: unknown, affected: string[]): Record<string, unknown> {
+  const record = isRecord(data) ? data : { data };
+  return affected.length > 0 && !('affected' in record) ? { ...record, affected } : record;
 }
 
 /**
@@ -78,11 +88,16 @@ export function shapeToolCallContent(result: {
       type: 'text',
       text:
         more > 0
-          ? `Affected entity ids (first ${MAX_AFFECTED_IDS_SHOWN} of ${affected.length}; ${more} more not listed, use find_entities or describe_scene to enumerate): ${shown}`
+          ? `Affected entity ids (first ${MAX_AFFECTED_IDS_SHOWN} of ${affected.length}; ${more} more not listed: all ids are in structuredContent.affected, or use find_entities or describe_scene): ${shown}`
           : `Affected entity ids: ${shown}`,
     });
   }
-  if (data === undefined) return { content, isError };
+  if (data === undefined) {
+    // Ids past the text cap would otherwise be in no channel at all.
+    return affected.length > MAX_AFFECTED_IDS_SHOWN
+      ? { content, isError, structuredContent: { affected } }
+      : { content, isError };
+  }
 
   // Source code (export_code) is shown verbatim so agents read it as code, not as a JSON string.
   const code = codeText(data);
@@ -95,5 +110,5 @@ export function shapeToolCallContent(result: {
       text: clip(code, MAX_CODE_TEXT_CHARS, 'the full source is in structuredContent.text'),
     });
   }
-  return isRecord(data) ? { content, isError, structuredContent: data } : { content, isError };
+  return { content, isError, structuredContent: structuredOf(data, affected) };
 }
