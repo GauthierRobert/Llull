@@ -57,6 +57,10 @@ interface PanelSectionProps {
   count?: number;
   countLabel?: string;
   collapsible?: boolean;
+  /** Workflow step number shown before the title (1 = do this first). */
+  step?: number;
+  /** One plain-language line under the header: what this section is for. */
+  hint?: string;
   testId?: string;
   children: React.ReactNode;
 }
@@ -66,6 +70,8 @@ export function PanelSection({
   count,
   countLabel,
   collapsible = false,
+  step,
+  hint,
   testId,
   children,
 }: PanelSectionProps): React.ReactElement {
@@ -73,6 +79,11 @@ export function PanelSection({
   const label = (
     <>
       {collapsible && <Icon name={open ? 'chevronDown' : 'chevronRight'} size={12} />}
+      {step !== undefined && (
+        <span className="panel__step" aria-label={`Step ${step}:`}>
+          {step}
+        </span>
+      )}
       <span className="panel__section-title">{title}</span>
       {count !== undefined && (
         <span className="panel__count" aria-label={countLabel}>
@@ -95,7 +106,12 @@ export function PanelSection({
       ) : (
         <h3 className="panel__section-header">{label}</h3>
       )}
-      {open && <div className="panel__section-body">{children}</div>}
+      {open && (
+        <div className="panel__section-body">
+          {hint !== undefined && <p className="panel__section-hint">{hint}</p>}
+          {children}
+        </div>
+      )}
     </section>
   );
 }

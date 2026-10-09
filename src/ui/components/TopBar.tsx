@@ -124,10 +124,6 @@ export function TopBar(): React.ReactElement {
         <span className="topbar__sep" aria-hidden="true" />
 
         <nav className="file-crumbs" aria-label="File location">
-          <span className="file-crumb">Workshop</span>
-          <span className="file-crumb-sep" aria-hidden="true">
-            /
-          </span>
           <span className="file-crumb file-crumb--active">{projectName ?? 'Untitled'}</span>
           {isDirty && (
             <span

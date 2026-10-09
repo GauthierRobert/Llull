@@ -10,16 +10,23 @@ import type { IconName } from '@ui/components/Icon';
 export interface SidebarTabSpec {
   tab: SidebarTab;
   label: string;
+  /** Caption printed under the rail icon (fits the rail width). */
+  shortLabel: string;
   icon: IconName;
 }
 
 export const SIDEBAR_TAB_SPECS: readonly SidebarTabSpec[] = [
-  { tab: 'building', label: 'Building', icon: 'building' },
-  { tab: 'layers', label: 'Layers', icon: 'layers' },
-  { tab: 'assembly', label: 'Assembly', icon: 'assembly' },
-  { tab: 'mechanisms', label: 'Mechanisms', icon: 'mechanism' },
-  { tab: 'parameters', label: 'Parameters', icon: 'parameters' },
-  { tab: 'history', label: 'History', icon: 'history' },
-  { tab: 'configurations', label: 'Configurations', icon: 'configurations' },
-  { tab: 'materials', label: 'Materials', icon: 'materials' },
+  { tab: 'building', label: 'Building', shortLabel: 'Building', icon: 'building' },
+  { tab: 'layers', label: 'Layers', shortLabel: 'Layers', icon: 'layers' },
+  { tab: 'assembly', label: 'Assembly', shortLabel: 'Parts', icon: 'assembly' },
+  { tab: 'mechanisms', label: 'Mechanisms', shortLabel: 'Motion', icon: 'mechanism' },
+  { tab: 'parameters', label: 'Parameters', shortLabel: 'Params', icon: 'parameters' },
+  { tab: 'history', label: 'History', shortLabel: 'History', icon: 'history' },
+  {
+    tab: 'configurations',
+    label: 'Configurations',
+    shortLabel: 'Variants',
+    icon: 'configurations',
+  },
+  { tab: 'materials', label: 'Materials', shortLabel: 'Materials', icon: 'materials' },
 ];

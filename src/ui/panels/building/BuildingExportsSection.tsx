@@ -58,7 +58,13 @@ export function BuildingExportsSection(): React.ReactElement {
   };
 
   return (
-    <PanelSection title="Deliverables" collapsible testId="building-exports">
+    <PanelSection
+      title="Deliverables"
+      step={5}
+      hint="Drawing sheets (plan, elevations) and files for other software: DXF for AutoCAD, IFC for BIM, DSTV for the fabricator."
+      collapsible
+      testId="building-exports"
+    >
       <div className="building-inline-form">
         <OptionSelect value={paper} options={PAPERS} label="Paper size" onChange={setPaper} />
         <OptionSelect

@@ -71,6 +71,7 @@ export function ModelExport(): React.ReactElement {
         value={format}
         onChange={(e) => setFormat(e.target.value as ExportFormat)}
         aria-label="Export format"
+        title="Export the 3D model as script code or STEP. Building drawings, DXF and IFC are in the Building panel › Deliverables."
       >
         {FORMATS.map((f) => (
           <option key={f.value} value={f.value}>

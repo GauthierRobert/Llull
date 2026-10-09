@@ -114,7 +114,13 @@ export function QuantitiesSection(): React.ReactElement {
     downloadCsv('building_schedule', { kind: schedule }, `${schedule}-schedule.csv`);
 
   return (
-    <PanelSection title="Quantities & cost" collapsible testId="building-quantities">
+    <PanelSection
+      title="Quantities & cost"
+      step={4}
+      hint="Material take-off (steel tonnage, concrete, areas) and schedules, as CSV for Excel."
+      collapsible
+      testId="building-quantities"
+    >
       {estimate === null ? (
         <p className="panel__empty-hint" role="status">
           {estimateResult.summary}

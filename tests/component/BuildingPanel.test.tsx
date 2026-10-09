@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { useStore } from '@ui/store';
+import { useStore, useViewportStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { BuildingPanel } from '@ui/panels/building/BuildingPanel';
 import { localDispatch } from '../helpers/storeTestHelpers';
@@ -21,18 +21,39 @@ beforeEach(() => {
 });
 
 describe('BuildingPanel', () => {
-  it('shows the empty state and dispatches starter templates and zoom extents', () => {
+  it('shows the empty state and dispatches starter templates', () => {
     const dispatch = spyDispatch();
     render(<BuildingPanel />);
     expect(screen.getByText('No building yet')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Zoom to building' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Starter house' }));
     fireEvent.click(screen.getByRole('button', { name: 'Starter office' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Zoom extents' }));
     expect(dispatch.mock.calls).toEqual([
       ['add_building_template', { template: 'house' }],
       ['add_building_template', { template: 'office' }],
-      ['fit_view', { direction: 'iso' }],
     ]);
+  });
+
+  it('swaps the templates for view actions once the building has elements', () => {
+    localDispatch('add_portal_frame_building', {});
+    const dispatch = spyDispatch();
+    render(<BuildingPanel />);
+    expect(screen.queryByRole('button', { name: 'Steel hall' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom to building' }));
+    expect(dispatch).toHaveBeenCalledWith('fit_view', { direction: 'iso' });
+  });
+
+  it('hides and shows the cladding layer in the viewport without touching the document', () => {
+    localDispatch('add_portal_frame_building', {});
+    const before = useStore.getState().document;
+    render(<BuildingPanel />);
+    const claddingLayer = Object.values(before.layers).find((layer) => layer.name === 'A-CLAD');
+    if (!claddingLayer) throw new Error('steel hall has no cladding layer');
+    fireEvent.click(screen.getByRole('button', { name: 'Hide cladding (see the frame)' }));
+    expect(useViewportStore.getState().hiddenLayerIds.has(claddingLayer.id)).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Show cladding' }));
+    expect(useViewportStore.getState().hiddenLayerIds.has(claddingLayer.id)).toBe(false);
+    expect(useStore.getState().document).toBe(before);
   });
 
   it('adds a level with name and height', () => {
@@ -244,6 +265,21 @@ describe('BuildingPanel', () => {
       snowLoad: 1,
       windPressure: 0.6,
     });
+  });
+
+  it('points to auto-size when a check fails, and drops the hint once the design passes', () => {
+    localDispatch('add_portal_frame_building', {});
+    const { unmount } = render(<BuildingPanel />);
+    fireEvent.click(screen.getByTestId('frame-check'));
+    expect(screen.getAllByText('FAIL').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('frame-check-next-step')).toHaveTextContent(/Auto-size/);
+    unmount();
+
+    localDispatch('design_portal_frames', { deadLoad: 0.5, snowLoad: 0.8, windPressure: 0 });
+    render(<BuildingPanel />);
+    fireEvent.click(screen.getByTestId('frame-check'));
+    expect(screen.queryByText('FAIL')).toBeNull();
+    expect(screen.queryByTestId('frame-check-next-step')).toBeNull();
   });
 
   it('runs the bracing, foundation and crane runway checks', () => {
