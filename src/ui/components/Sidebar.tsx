@@ -70,6 +70,9 @@ function RailButton({ spec, active, focusable, onSelect }: RailButtonProps): Rea
       onClick={() => onSelect(spec.tab)}
     >
       <Icon name={spec.icon} size={18} />
+      <span className="rail-btn__caption" aria-hidden="true">
+        {spec.shortLabel}
+      </span>
       {count > 0 && (
         <span className="rail-btn__badge" aria-hidden="true">
           {count > 99 ? '99+' : count}

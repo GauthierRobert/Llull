@@ -44,7 +44,12 @@ export function ClashSection(): React.ReactElement {
   ];
 
   return (
-    <PanelSection title="Clash detection" collapsible testId="building-clashes">
+    <PanelSection
+      title="Clash detection"
+      hint="Find elements that overlap (e.g. a pipe through a beam). Read-only."
+      collapsible
+      testId="building-clashes"
+    >
       <div className="building-actions">
         <button
           type="button"

@@ -116,8 +116,8 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     id: 'grid',
     label: 'Structural grid',
     fields: [
-      txt('xSpacings', 'Bays along X', '6000, 6000'),
-      txt('ySpacings', 'Bays along Y', '5000'),
+      txt('xSpacings', 'X bay spans ({unit}, comma-separated)', '6000, 6000'),
+      txt('ySpacings', 'Y bay spans ({unit}, comma-separated)', '5000'),
     ],
     build: (values) => {
       const reader = new FieldReader(values);

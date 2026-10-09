@@ -4,7 +4,7 @@
  * Asserts observable behavior (workflow W3, react R11):
  *   - The rail lists every browser panel as a tab.
  *   - Selecting a tab shows that panel; re-selecting the open tab collapses the sidebar.
- *   - Rail badges reflect document counts.
+ *   - Rail badges reflect document counts; every rail icon has a visible caption.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -34,6 +34,15 @@ describe('Sidebar', () => {
     render(<Sidebar />);
     for (const label of TAB_LABELS) {
       expect(screen.getByRole('tab', { name: new RegExp('^' + label) })).toBeDefined();
+    }
+  });
+
+  it('prints a visible caption under every rail icon', () => {
+    render(<Sidebar />);
+    const motion = screen.getByRole('tab', { name: /^Mechanisms/ });
+    expect(motion).toHaveTextContent('Motion');
+    for (const tab of screen.getAllByRole('tab')) {
+      expect(tab.querySelector('.rail-btn__caption')?.textContent).toBeTruthy();
     }
   });
 

@@ -44,6 +44,10 @@ const CHECKS = [
 
 type CheckCommand = (typeof CHECKS)[number]['command'];
 
+function isFailing(row: ReportRow): boolean {
+  return row.utilisation > 1 || !row.ok;
+}
+
 /** Multi-storey / rack check: its loads come from the model (slabs, equipment, pipes), not the form. */
 const loadsFromModel: ReadonlySet<CheckCommand> = new Set([
   'check_steel_members',
@@ -136,7 +140,13 @@ export function StructuralSection(): React.ReactElement {
   };
 
   return (
-    <PanelSection title="Structural check" collapsible testId="building-structure">
+    <PanelSection
+      title="Structural check"
+      step={3}
+      hint="Enter the design loads, then verify. Click a result to select that member in the model."
+      collapsible
+      testId="building-structure"
+    >
       <div className="building-inline-form">
         <label className="field" title="Roof dead load, kN/m²">
           <span className="field__label">Roof dead load (kN/m²)</span>
@@ -162,6 +172,9 @@ export function StructuralSection(): React.ReactElement {
             onChange={(event) => setWindPressure(event.target.value)}
           />
         </label>
+      </div>
+      <p className="building-subhead">Verify (read-only, the model is not changed)</p>
+      <div className="building-inline-form">
         {CHECKS.map((check) => (
           <button
             key={check.command}
@@ -173,6 +186,9 @@ export function StructuralSection(): React.ReactElement {
             {check.label}
           </button>
         ))}
+      </div>
+      <p className="building-subhead">Auto-size (changes member sizes · Ctrl Z to undo)</p>
+      <div className="building-inline-form">
         <button
           type="button"
           className="btn btn--ghost btn--sm"
@@ -209,6 +225,11 @@ export function StructuralSection(): React.ReactElement {
           <p className="building-summary" role="status" data-testid="frame-check-summary">
             {report.summary}
           </p>
+          {report.rows.some(isFailing) && (
+            <p className="building-subhead" role="note" data-testid="frame-check-next-step">
+              Some members fail: use Auto-size above to up-size them, then verify again.
+            </p>
+          )}
           <ul className="panel__list" aria-label="Utilisations">
             {report.rows.map((row) => (
               <li key={row.key} className="panel__row">
@@ -218,7 +239,11 @@ export function StructuralSection(): React.ReactElement {
                   onClick={() => select(building?.elements[row.elementId]?.entityIds ?? [])}
                   data-testid="frame-check-row"
                 >
-                  <span className="chip">{row.utilisation > 1 || !row.ok ? 'FAIL' : 'OK'}</span>
+                  {isFailing(row) ? (
+                    <span className="chip chip--danger">FAIL</span>
+                  ) : (
+                    <span className="chip chip--success">OK</span>
+                  )}
                   <span className="panel__row-main">{row.label}</span>
                   <span className="panel__row-meta">
                     {row.detail !== '' ? row.detail : row.utilisation.toFixed(2)}

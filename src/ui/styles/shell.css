@@ -109,10 +109,6 @@
   font-weight: var(--weight-medium);
 }
 
-.file-crumb-sep {
-  color: var(--fg-faint);
-}
-
 /* Command palette trigger — centered search field (Ctrl/Cmd+K) */
 .search-trigger {
   display: inline-flex;
@@ -284,10 +280,12 @@
 .rail-btn {
   position: relative;
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  gap: 2px;
+  width: calc(var(--rail-w) - 8px);
+  height: 44px;
   border-radius: var(--radius);
   color: var(--fg-subtle);
   transition: var(--transition-colors);
@@ -303,12 +301,22 @@
   color: var(--accent-text);
 }
 
+.rail-btn__caption {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 9.5px;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .rail-btn--active::before {
   content: '';
   position: absolute;
-  left: -6px;
-  top: 9px;
-  bottom: 9px;
+  left: -4px;
+  top: 11px;
+  bottom: 11px;
   width: 2px;
   border-radius: 0 2px 2px 0;
   background: var(--accent);
@@ -507,8 +515,6 @@
    ========================================================================== */
 
 @media (max-width: 1180px) {
-  .file-crumbs .file-crumb:not(.file-crumb--active),
-  .file-crumbs .file-crumb-sep,
   .project-io__btn span,
   .agent-pill__text {
     display: none;

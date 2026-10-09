@@ -224,9 +224,14 @@ export function ElementToolsSection(): React.ReactElement {
   const lastSummary = useStore((s) => s.lastSummary);
   const tool = ALL_TOOLS.find((candidate) => candidate.id === toolId) ?? ALL_TOOLS[0];
   return (
-    <PanelSection title="Add element" testId="building-tools">
+    <PanelSection
+      title="Add element"
+      step={2}
+      hint="Usual order: structural grid → columns → beams → bracing → slabs and walls. Pick what to add, check the values, then press the blue button."
+      testId="building-tools"
+    >
       <label className="field building-tool-picker">
-        <span className="field__label">Tool</span>
+        <span className="field__label">What to add</span>
         <select
           value={toolId}
           onChange={(event) => setToolId(event.target.value)}

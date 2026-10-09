@@ -25,6 +25,29 @@
   padding: var(--space-2) var(--space-3);
 }
 
+/* Engineering labels carry units and formats ("Top of steel vs floor (mm)"): give them room. */
+.building-panel .field__label {
+  flex-basis: 42%;
+}
+
+.building-actions__label {
+  flex-basis: 100%;
+  color: var(--fg-subtle);
+  font-size: var(--text-xs);
+}
+
+.building-level-form input[type='text'] {
+  flex-basis: 100%;
+}
+
+.building-subhead {
+  margin: var(--space-1) 0 0;
+  padding: 0 var(--space-3);
+  color: var(--fg-subtle);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
 .building-inline-form input,
 .building-inline-form select {
   flex: 1 1 80px;

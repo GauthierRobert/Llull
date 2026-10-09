@@ -95,6 +95,7 @@ function AddLevelForm(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const [name, setName] = useState('');
   const [height, setHeight] = useState('');
+  const units = useStore((s) => s.document.units);
 
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
@@ -107,20 +108,25 @@ function AddLevelForm(): React.ReactElement {
   };
 
   return (
-    <form className="building-inline-form" onSubmit={handleSubmit} aria-label="Add level">
+    <form
+      className="building-inline-form building-level-form"
+      onSubmit={handleSubmit}
+      aria-label="Add level"
+    >
       <input
         type="text"
-        placeholder="New level name"
+        placeholder="Level name, e.g. First floor"
         value={name}
         onChange={(event) => setName(event.target.value)}
         aria-label="New level name"
       />
       <input
         type="number"
-        placeholder="Height"
+        placeholder={`Storey height (${units})`}
         value={height}
         onChange={(event) => setHeight(event.target.value)}
         aria-label="New level height"
+        title={`Floor-to-floor height in ${units}; leave empty for the default (3 m)`}
       />
       <button type="submit" className="btn btn--ghost btn--sm">
         Add level
@@ -136,6 +142,8 @@ export function LevelsSection(): React.ReactElement {
   return (
     <PanelSection
       title="Levels"
+      step={1}
+      hint="Floors of the building. Click a level to make it active: new elements go on the active level."
       count={levels.length}
       countLabel={`${levels.length} levels`}
       testId="building-levels"

@@ -76,10 +76,17 @@ export function EmptyState(): React.ReactElement | null {
         </div>
 
         <div className="empty-state__actions empty-state__actions--structure">
-          <button type="button" className="empty-state__action" onClick={showBuildingTab}>
+          <button
+            type="button"
+            className="empty-state__action"
+            onClick={() => {
+              showBuildingTab();
+              setDismissed(true);
+            }}
+          >
             <Icon name="building" size={18} />
             <span className="empty-state__action-title">Start a steel structure</span>
-            <span className="empty-state__action-sub">levels, grid and templates</span>
+            <span className="empty-state__action-sub">step by step: levels, grid, members</span>
           </button>
           <button
             type="button"

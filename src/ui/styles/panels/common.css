@@ -87,6 +87,29 @@
   letter-spacing: 0;
 }
 
+.panel__step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.panel__section-hint {
+  margin: 0 0 var(--space-2);
+  padding: 0 var(--space-3);
+  color: var(--fg-muted);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
 .panel__section-body {
   padding-bottom: var(--space-2);
 }

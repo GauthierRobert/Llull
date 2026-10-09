@@ -106,10 +106,11 @@ describe('EmptyState — structure option', () => {
     useLayoutStore.setState({ sidebarTab: 'layers', sidebarOpen: true });
   });
 
-  it('"Start a steel structure" switches the sidebar to the Building tab', () => {
+  it('"Start a steel structure" switches the sidebar to the Building tab and clears the card', () => {
     render(<EmptyState />);
     fireEvent.click(screen.getByRole('button', { name: /start a steel structure/i }));
     expect(useLayoutStore.getState().sidebarTab).toBe('building');
+    expect(screen.queryByRole('region', { name: 'Get started' })).toBeNull();
   });
 
   it('"Steel hall template" adds the hall', () => {
