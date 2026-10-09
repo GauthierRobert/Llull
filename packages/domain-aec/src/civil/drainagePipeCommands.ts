@@ -18,7 +18,7 @@ import {
   withObject,
 } from './model';
 import { regenerateCivil } from './evaluate';
-import { flowsTo, pipePlanLength } from './drainageNetwork';
+import { flowsTo, pipePlanLength } from './drainageTopology';
 
 const pipeFields = {
   diameter: z

@@ -63,6 +63,17 @@ function sectionError(value: unknown): string | null {
   return ok ? null : 'section needs laneWidth > 0, shoulderWidth >= 0, crossfall, slopes > 0';
 }
 
+function superelevationError(value: unknown): string | null {
+  if (value === undefined) return null;
+  const ok =
+    isRecord(value) &&
+    finite(value['maxRate']) &&
+    (value['maxRate'] as number) > 0 &&
+    (value['maxRate'] as number) <= 0.15 &&
+    optional(value['runoffLength'], positive);
+  return ok ? null : 'superelevation needs maxRate in (0, 0.15] and runoffLength > 0';
+}
+
 const CHECKS: Readonly<Record<(typeof CIVIL_CATEGORIES)[number], readonly Check[]>> = {
   pointGroup: [
     (o) =>
@@ -109,8 +120,17 @@ const CHECKS: Readonly<Record<(typeof CIVIL_CATEGORIES)[number], readonly Check[
         'radii must be numbers',
       ),
     (o) =>
+      demand(
+        optional(o['spirals'], (spirals) => Array.isArray(spirals) && spirals.every(finite)),
+        'spirals must be numbers',
+      ),
+    (o) =>
       isVecList(o['points'], 2, 2) && Array.isArray(o['radii'])
-        ? validateHorizontal(o['points'] as Vec2[], o['radii'] as number[])
+        ? validateHorizontal(
+            o['points'] as Vec2[],
+            o['radii'] as number[],
+            (o['spirals'] as number[] | undefined) ?? [],
+          )
         : null,
     (o) => demand(finite(o['startStation']), 'startStation must be a number'),
     (o) => demand(positive(o['stationInterval']), 'stationInterval must be > 0'),
@@ -121,6 +141,7 @@ const CHECKS: Readonly<Record<(typeof CIVIL_CATEGORIES)[number], readonly Check[
       ),
     (o) => profileError(o['profile']),
     (o) => sectionError(o['section']),
+    (o) => superelevationError(o['superelevation']),
   ],
   manhole: [
     (o) => demand(isVecList([o['position']], 2, 1), 'position must be [x, y]'),
@@ -143,6 +164,11 @@ const CHECKS: Readonly<Record<(typeof CIVIL_CATEGORIES)[number], readonly Check[
       demand(
         optional(o['inflow'], (inflow) => finite(inflow) && (inflow as number) >= 0),
         'inflow must be >= 0',
+      ),
+    (o) =>
+      demand(
+        optional(o['entryTimeMin'], (entry) => positive(entry)),
+        'entryTimeMin must be > 0',
       ),
   ],
   pipe: [
@@ -171,6 +197,31 @@ function pointTotalErrors(objects: Record<string, unknown>): string[] {
   return errors;
 }
 
+function crsErrors(raw: unknown): string[] {
+  if (raw === undefined) return [];
+  if (!isRecord(raw) || typeof raw['name'] !== 'string') return ['civil.crs needs a name'];
+  const errors: string[] = [];
+  if (!optional(raw['epsg'], (code) => Number.isInteger(code) && (code as number) > 0)) {
+    errors.push('civil.crs.epsg must be a positive integer');
+  }
+  if (!optional(raw['verticalDatum'], (datum) => typeof datum === 'string')) {
+    errors.push('civil.crs.verticalDatum must be a string');
+  }
+  const calibration = raw['calibration'];
+  if (
+    calibration !== undefined &&
+    !(
+      isRecord(calibration) &&
+      isVecList([calibration['localOrigin'], calibration['gridOrigin']], 2, 2) &&
+      finite(calibration['rotationDeg']) &&
+      positive(calibration['scaleFactor'])
+    )
+  ) {
+    errors.push('civil.crs.calibration needs 2 origins, rotationDeg and scaleFactor > 0');
+  }
+  return errors;
+}
+
 /** Errors in a raw civil model (empty when valid). */
 export function civilErrors(raw: unknown): string[] {
   if (!isRecord(raw)) return ['civil must be an object'];
@@ -182,7 +233,7 @@ export function civilErrors(raw: unknown): string[] {
   if (!isRecord(counters) || !Object.values(counters).every(finite)) {
     return ['civil.counters must map prefixes to numbers'];
   }
-  const errors: string[] = [];
+  const errors: string[] = crsErrors(raw['crs']);
   const ids = order as string[];
   if (new Set(ids).size !== ids.length) errors.push('civil.order lists an id twice');
   for (const id of ids) {

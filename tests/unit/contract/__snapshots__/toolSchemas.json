@@ -19,7 +19,7 @@
     "name": "activate_configuration"
   },
   {
-    "description": "Create a road / channel alignment from points of intersection (PIs, document units). Each interior PI can carry a simple circular curve of the given radius (0 = sharp corner). Draws the centreline, station ticks labelled km+mmm.mm every `stationInterval`, and PC / PT / R labels. Add a design profile with set_alignment_profile and a road template with set_road_section to get the corridor, batters to daylight and earthworks; report with alignment_report.",
+    "description": "Create a road / channel alignment from points of intersection (PIs, document units). Each interior PI can carry a simple circular curve of the given radius (0 = sharp corner). Draws the centreline, station ticks labelled km+mmm.mm every `stationInterval`, and PC / PT / R labels. Optional `spirals` adds a symmetric clothoid transition (TS-SC ... CS-ST, length Ls each side) per curved PI; the deflection must be at least twice the spiral angle Ls / (2 R). Add a design profile with set_alignment_profile and a road template with set_road_section to get the corridor, batters to daylight and earthworks; report with alignment_report.",
     "input_schema": {
       "properties": {
         "name": {
@@ -39,6 +39,13 @@
         },
         "radii": {
           "description": "Curve radius per interior PI (length = points - 2); 0 = no curve. Default all 0.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "spirals": {
+          "description": "Clothoid length on each side of the circular curve per interior PI (length = points - 2); 0 = no spiral; needs radius > 0. Default all 0.",
           "items": {
             "type": "number"
           },
@@ -1208,7 +1215,7 @@
     "name": "add_level"
   },
   {
-    "description": "Add a drainage manhole / inspection chamber / outfall at a plan position. Give `invertElevation` and either `rimElevation` or a `surfaceId` (rim = ground level there). Optional catchment (area in ha, runoff coefficient) and point inflow feed the network check. Connect manholes with add_pipe.",
+    "description": "Add a drainage manhole / inspection chamber / outfall at a plan position. Give `invertElevation` and either `rimElevation` or a `surfaceId` (rim = ground level there). Optional catchment (area in ha, runoff coefficient), point inflow and `entryTimeMin` (inlet time, default 5 min) feed the network check. Connect manholes with add_pipe.",
     "input_schema": {
       "properties": {
         "catchmentAreaHa": {
@@ -1217,6 +1224,10 @@
         },
         "diameter": {
           "description": "Chamber internal diameter in document units (> 0). Default 1200 mm.",
+          "type": "number"
+        },
+        "entryTimeMin": {
+          "description": "Inlet (entry) time in minutes (> 0) of this manhole's catchment for the time of concentration. Default 5.",
           "type": "number"
         },
         "inflowLps": {
@@ -3099,9 +3110,40 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "Hydraulic check of the whole gravity network. Rational-method flows (catchments) and point inflows are accumulated downstream through the pipes; each pipe reports length, slope, design and full-bore (Manning) flow, utilisation, depth ratio, velocity and cover at both ends, and passes or fails against the limits. Manholes report depth and drop. Returns data { pipes, manholes, failures, csv }.",
+    "description": "Hydraulic check of the whole gravity network. Rational-method flows (catchments) and point inflows are accumulated downstream through the pipes; each pipe reports length, slope, design and full-bore (Manning) flow, utilisation, depth ratio, velocity and cover at both ends, and passes or fails against the limits. Modified rational method: Tc at each pipe = max over upstream paths of (manhole `entryTimeMin`, default 5 min, + pipe travel times L/v, v = part-full velocity), intensity from `idf` (i = a/(t+b)^c) or the constant intensity, flow = i * sum(C A) + inflows. A manhole with several outgoing pipes splits its flow by full-bore capacity share. The hydraulic grade line runs upstream from the outfall (most downstream manhole; tailwater `outfallLevel`, default the outlet pipe normal depth): friction slope (Q n / (A R^(2/3)))^2 or normal depth, whichever is higher, plus K v^2/2g at manholes where the pipe is pressurised; pipes get hglUpM / hglDownM / surcharged (HGL above obvert) / flooding (HGL above rim - freeboard); manholes get hglM / flooding. Each pipe row reports tcMin, intensityMmH, sumCAHa, designLps. Returns data { pipes, manholes, failures, diverging, csv }.",
     "input_schema": {
       "properties": {
+        "freeboardM": {
+          "description": "Required freeboard below the rim in metres (>= 0) before flooding is flagged. Default 0.3.",
+          "type": "number"
+        },
+        "idf": {
+          "description": "Intensity-duration-frequency curve i = a / (t + b)^c (mm/h, t = time of concentration in minutes) replacing the constant intensity: each pipe uses i at its own Tc (modified rational method). Do not combine with `rainfallIntensityMmH`.",
+          "properties": {
+            "a": {
+              "description": "IDF coefficient a (> 0): i = a / (t + b)^c in mm/h.",
+              "type": "number"
+            },
+            "b": {
+              "description": "IDF offset b in minutes (>= 0).",
+              "type": "number"
+            },
+            "c": {
+              "description": "IDF exponent c (> 0).",
+              "type": "number"
+            }
+          },
+          "required": [
+            "a",
+            "b",
+            "c"
+          ],
+          "type": "object"
+        },
+        "manholeLossK": {
+          "description": "Manhole head-loss coefficient K in K v^2/2g (>= 0). Default 0.5.",
+          "type": "number"
+        },
         "maxDepthRatio": {
           "description": "Maximum design flow depth / diameter, 0 to 1. Default 0.8.",
           "type": "number"
@@ -3118,8 +3160,12 @@
           "description": "Minimum self-cleansing velocity, m/s. Default 0.6.",
           "type": "number"
         },
+        "outfallLevel": {
+          "description": "Tailwater elevation at the outfall(s) in document units, same datum as invert levels. Default: normal-depth water level of the outlet pipe.",
+          "type": "number"
+        },
         "rainfallIntensityMmH": {
-          "description": "Design rainfall intensity in mm/h (> 0). Default 50.",
+          "description": "Constant design rainfall intensity in mm/h (> 0). Default 50. Do not combine with `idf`.",
           "type": "number"
         }
       },
@@ -4917,11 +4963,69 @@
     },
     "description": "Export every civil-generated entity as DXF (AutoCAD R12) on its C-* layer: survey POINTs, contours and linework as POLYLINE / LINE at their elevation, labels as TEXT and the TIN, platforms, corridors and drainage meshes as 3DFACE triangles. data.text holds the file.",
     "input_schema": {
-      "properties": {},
+      "properties": {
+        "coordinates": {
+          "description": "Plan coordinates: \"grid\" (projected CRS via the site calibration) or \"local\". Default grid when set_site_calibration was called, else local.",
+          "enum": [
+            "local",
+            "grid"
+          ],
+          "type": "string"
+        }
+      },
       "required": [],
       "type": "object"
     },
     "name": "export_civil_dxf"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Printable civil plan drawing (SVG in real millimetres, print to PDF at 100 %): every civil entity (contours with labels, survey points, pads and daylight lines, alignment centreline with stations, corridor edges, manholes and pipes with labels) at a true scale 1:N on ISO paper A4-A0 landscape, clipped to the drawing viewport, with the title block from set_project_info, north arrow, scale bar, layer legend and, on a calibrated site (set_site_calibration), grid coordinate ticks. data.text holds the file, data.fileName its name.",
+    "input_schema": {
+      "properties": {
+        "center": {
+          "description": "Plan point [x, y] (document units) at the centre of the viewport.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "layers": {
+          "description": "Civil layer names to draw, e.g. [\"C-TOPO-MAJR\", \"C-ROAD-CNTR\"]. Default: all.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "paper": {
+          "description": "Paper size, landscape: A4, A3, A2, A1 or A0.",
+          "enum": [
+            "A4",
+            "A3",
+            "A2",
+            "A1",
+            "A0"
+          ],
+          "type": "string"
+        },
+        "scale": {
+          "description": "Scale denominator N for 1:N, e.g. 500 for 1:500 (> 0). Default: smallest standard scale that fits.",
+          "type": "number"
+        },
+        "title": {
+          "description": "Drawing title. Default \"Civil plan\".",
+          "type": "string"
+        }
+      },
+      "required": [
+        "paper"
+      ],
+      "type": "object"
+    },
+    "name": "export_civil_plan_sheet"
   },
   {
     "annotations": {
@@ -4976,6 +5080,69 @@
       "type": "object"
     },
     "name": "export_cross_sections"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Long section of a drainage pipe run as SVG text in `data.text` (`data.fileName`): ground (rim) line, manholes with labels, pipe invert and obvert, the hydraulic grade line (same method as check_drainage_network) and a table band of chainage, rim, invert, pipe (diameter, slope, length) and HGL. The run starts at `fromManholeId` and ends at `toManholeId`, or, when omitted, follows the largest pipe at each fork down to the outfall. Returns data { text, fileName, pipeIds, manholeIds }.",
+    "input_schema": {
+      "properties": {
+        "freeboardM": {
+          "description": "Flooding freeboard below rim in metres. Default 0.3.",
+          "type": "number"
+        },
+        "fromManholeId": {
+          "description": "Upstream manhole id where the run starts, e.g. \"manhole-1\".",
+          "type": "string"
+        },
+        "idf": {
+          "description": "Intensity-duration-frequency curve i = a / (t + b)^c (mm/h, t = time of concentration in minutes) replacing the constant intensity: each pipe uses i at its own Tc (modified rational method). Do not combine with `rainfallIntensityMmH`.",
+          "properties": {
+            "a": {
+              "description": "IDF coefficient a (> 0): i = a / (t + b)^c in mm/h.",
+              "type": "number"
+            },
+            "b": {
+              "description": "IDF offset b in minutes (>= 0).",
+              "type": "number"
+            },
+            "c": {
+              "description": "IDF exponent c (> 0).",
+              "type": "number"
+            }
+          },
+          "required": [
+            "a",
+            "b",
+            "c"
+          ],
+          "type": "object"
+        },
+        "manholeLossK": {
+          "description": "Manhole loss coefficient K (>= 0). Default 0.5.",
+          "type": "number"
+        },
+        "outfallLevel": {
+          "description": "Tailwater elevation at the outfall(s), document units. Default: outlet normal depth.",
+          "type": "number"
+        },
+        "rainfallIntensityMmH": {
+          "description": "Constant design rainfall intensity in mm/h (> 0). Default 50. Do not combine with `idf`.",
+          "type": "number"
+        },
+        "toManholeId": {
+          "description": "Downstream manhole id where the run ends. Default: follow the main run to the outfall.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "fromManholeId"
+      ],
+      "type": "object"
+    },
+    "name": "export_drainage_long_section"
   },
   {
     "annotations": {
@@ -5103,6 +5270,14 @@
     "description": "Export the civil model as LandXML 1.2 (Civil 3D, BricsCAD, 12d, Trimble Business Center…): survey point groups (CgPoints), TIN surfaces (points + faces), alignments and the storm pipe network (structures + pipes). Coordinates are \"northing easting elevation\" in metres. data.text holds the file, data.fileName its name.",
     "input_schema": {
       "properties": {
+        "coordinates": {
+          "description": "Plan coordinates: \"grid\" (projected CRS via the site calibration) or \"local\". Default grid when set_site_calibration was called, else local.",
+          "enum": [
+            "local",
+            "grid"
+          ],
+          "type": "string"
+        },
         "date": {
           "description": "Header date yyyy-mm-dd. Default: the project date, else 1970-01-01.",
           "type": "string"
@@ -5193,6 +5368,45 @@
       "type": "object"
     },
     "name": "export_obj"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Printable plan-and-profile sheet of an alignment (SVG, print to PDF at 100 %): a stationed plan strip (road edges, station ticks, horizontal curves with radius) above the long section (ground, design, PVIs, table band), both at the horizontal scale 1:N so stations line up. Needs set_alignment_profile. data.text holds the file, data.fileName its name.",
+    "input_schema": {
+      "properties": {
+        "alignmentId": {
+          "description": "Alignment id, e.g. \"alignment-1\".",
+          "type": "string"
+        },
+        "paper": {
+          "description": "Paper size, landscape. Default A3.",
+          "enum": [
+            "A4",
+            "A3",
+            "A2",
+            "A1",
+            "A0"
+          ],
+          "type": "string"
+        },
+        "scale": {
+          "description": "Horizontal scale denominator N for 1:N (> 0). Default: smallest standard scale that fits.",
+          "type": "number"
+        },
+        "verticalExaggeration": {
+          "description": "Vertical / horizontal scale ratio (> 0). Default 10.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "alignmentId"
+      ],
+      "type": "object"
+    },
+    "name": "export_plan_profile_sheet"
   },
   {
     "annotations": {
@@ -5725,6 +5939,14 @@
     "description": "Import survey points (topographic survey, total station / GNSS export) as a named point group. Give `text` (CSV / TXT file content, one point per line; header and # comment lines skipped) in `format` PENZD (default: number, easting, northing, elevation, description), PNEZD, PENZ, PNEZ, ENZ or NEZ, and/or `points` [{ x, y, z }]. Coordinates are in `sourceUnit` (default m) and are converted to the document unit. Then build a terrain with create_surface.",
     "input_schema": {
       "properties": {
+        "coordinates": {
+          "description": "Coordinate frame of the input. \"grid\" (projected CRS) is converted to local with the site calibration (set_site_calibration) and is refused without one. Default \"local\".",
+          "enum": [
+            "local",
+            "grid"
+          ],
+          "type": "string"
+        },
         "format": {
           "description": "Column order of `text`. Default PENZD.",
           "enum": [
@@ -6795,6 +7017,30 @@
     "name": "set_camera"
   },
   {
+    "description": "Declare the coordinate reference system of the civil model (projected grid), e.g. name \"RGF93 / Lambert-93\", epsg 2154, verticalDatum \"NGF-IGN69\". Written to LandXML (<CoordinateSystem>). Keeps an existing site calibration (set_site_calibration).",
+    "input_schema": {
+      "properties": {
+        "epsg": {
+          "description": "EPSG code of the projected CRS (positive integer), e.g. 2154.",
+          "type": "number"
+        },
+        "name": {
+          "description": "CRS name, e.g. \"RGF93 / Lambert-93\". Must not be empty.",
+          "type": "string"
+        },
+        "verticalDatum": {
+          "description": "Vertical datum name, e.g. \"NGF-IGN69\".",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "name": "set_coordinate_system"
+  },
+  {
     "description": "Store unit rates (price per unit) in the project for estimate_cost. Keys are takeoff keys \"<category>.<material>.<unit>\" (e.g. \"wall.concrete.m3\": 180, \"door.timber.ea\": 450) or wildcards \"wall.*.m2\", \"slab-roof.*.m3\" (slab groups: slab-floor, slab-roof, slab-foundation) or \"*.concrete.m3\". Price ONE unit per category to avoid double counting.",
     "input_schema": {
       "properties": {
@@ -7044,6 +7290,41 @@
     "name": "set_road_section"
   },
   {
+    "description": "Calibrate the local site coordinates to the projected grid with a 2D similarity (Helmert): grid = gridOrigin + scaleFactor * R(rotationDeg) * (local - localOrigin), R counter-clockwise. Coordinates are in document units; elevations are unchanged. Used by transform_coordinates, import_survey_points (coordinates \"grid\") and the LandXML / DXF / sheet exports.",
+    "input_schema": {
+      "properties": {
+        "gridOrigin": {
+          "description": "[easting, northing] of the same control point in grid coordinates.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "localOrigin": {
+          "description": "[x, y] of a control point in local (document) coordinates.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "rotationDeg": {
+          "description": "Counter-clockwise rotation of local axes into grid axes, degrees. Default 0.",
+          "type": "number"
+        },
+        "scaleFactor": {
+          "description": "Combined scale factor k = grid distance / local distance, > 0. Default 1.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "localOrigin",
+        "gridOrigin"
+      ],
+      "type": "object"
+    },
+    "name": "set_site_calibration"
+  },
+  {
     "annotations": {
       "idempotentHint": true
     },
@@ -7066,6 +7347,31 @@
       "type": "object"
     },
     "name": "set_step_suppressed"
+  },
+  {
+    "description": "Set the superelevation (banking) of an alignment: `maxRate` is the full rate on circular curves as a ratio (0.07 = 7 %, at most 0.15; 0 removes the design). The section rotates about the centreline with the outer side raised: normal crown on tangents, the adverse side runs out to flat then up to the full rate at a constant rotation rate, reaching it at the SC / CS of a spiral (or 30 % of the runoff inside a curve without spiral). `runoffLength` (document units, > 0) is the ramp length from flat to full rate at each curve end; default the spiral length, or the length that keeps the lane-edge relative gradient at 0.5 % (maxRate x laneWidth / 0.005). A rate below the crossfall is raised to the crossfall. Corridor, cross sections, volumes and alignment_report follow.",
+    "input_schema": {
+      "properties": {
+        "alignmentId": {
+          "description": "Alignment id, e.g. \"alignment-1\".",
+          "type": "string"
+        },
+        "maxRate": {
+          "description": "Full superelevation rate on curves, ratio 0..0.15 (0.07 = 7 %). 0 removes it.",
+          "type": "number"
+        },
+        "runoffLength": {
+          "description": "Runoff length per curve end, document units (> 0). Default: spiral length or 0.5 % gradient.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "alignmentId",
+        "maxRate"
+      ],
+      "type": "object"
+    },
+    "name": "set_superelevation"
   },
   {
     "annotations": {
@@ -7169,7 +7475,7 @@
     "name": "shell_solid"
   },
   {
-    "description": "Automatic pipe sizing: sets each pipe diameter to the smallest commercial size that carries its accumulated design flow at its current slope within `maxDepthRatio` (and `minVelocity` when given). Pipes that fail even at the largest size, or have no downhill slope, are reported and left unchanged.",
+    "description": "Automatic pipe sizing: sets each pipe diameter to the smallest commercial size that carries its accumulated design flow at its current slope within `maxDepthRatio` (and `minVelocity` when given). Flows follow the modified rational method of check_drainage_network (entry times, travel times, optional `idf` curve, diverging manholes split by capacity share); sizing and velocities are iterated to convergence (max 10 passes). Pipes that fail even at the largest size, or have no downhill slope, are reported and left unchanged.",
     "input_schema": {
       "properties": {
         "diameters": {
@@ -7178,6 +7484,29 @@
             "type": "number"
           },
           "type": "array"
+        },
+        "idf": {
+          "description": "Intensity-duration-frequency curve i = a / (t + b)^c (mm/h, t = time of concentration in minutes) replacing the constant intensity: each pipe uses i at its own Tc (modified rational method). Do not combine with `rainfallIntensityMmH`.",
+          "properties": {
+            "a": {
+              "description": "IDF coefficient a (> 0): i = a / (t + b)^c in mm/h.",
+              "type": "number"
+            },
+            "b": {
+              "description": "IDF offset b in minutes (>= 0).",
+              "type": "number"
+            },
+            "c": {
+              "description": "IDF exponent c (> 0).",
+              "type": "number"
+            }
+          },
+          "required": [
+            "a",
+            "b",
+            "c"
+          ],
+          "type": "object"
         },
         "maxDepthRatio": {
           "description": "Maximum flow depth / diameter, 0 to 1. Default 0.8.",
@@ -7188,7 +7517,7 @@
           "type": "number"
         },
         "rainfallIntensityMmH": {
-          "description": "Design rainfall intensity in mm/h (> 0). Default 50.",
+          "description": "Constant design rainfall intensity in mm/h (> 0). Default 50. Do not combine with `idf`.",
           "type": "number"
         }
       },
@@ -7305,6 +7634,42 @@
     "name": "surface_report"
   },
   {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Convert [x, y] points between local site coordinates and the projected grid using the site calibration (set_site_calibration). Document units. data.points holds the converted points in the same order.",
+    "input_schema": {
+      "properties": {
+        "direction": {
+          "description": "\"localToGrid\": local -> grid; \"gridToLocal\": grid -> local.",
+          "enum": [
+            "localToGrid",
+            "gridToLocal"
+          ],
+          "type": "string"
+        },
+        "points": {
+          "description": "Points to convert.",
+          "items": {
+            "description": "[x, y] point to convert.",
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "points",
+        "direction"
+      ],
+      "type": "object"
+    },
+    "name": "transform_coordinates"
+  },
+  {
     "description": "Shorten a line entity so it ends exactly at its intersection with a boundary line. Both id and boundaryId must be line entities. The endpoint of id that is closer to the intersection is moved to the intersection point (the shorter side is trimmed; the longer side is preserved). No-op if either entity is not a line, they do not intersect within segment bounds, or if the entities are the same.",
     "input_schema": {
       "properties": {
@@ -7342,7 +7707,7 @@
     "name": "ungroup_entities"
   },
   {
-    "description": "Edit an alignment: new PI `points`, curve `radii`, `startStation`, `stationInterval`, linked `surfaceId` (\"\" removes the link) or `name`. Profile, road section and everything derived (corridor, batters, report) follow. If `points` changes length without `radii`, radii are padded with 0 / truncated.",
+    "description": "Edit an alignment: new PI `points`, curve `radii`, `startStation`, `stationInterval`, linked `surfaceId` (\"\" removes the link) or `name`. `spirals` sets the clothoid length on each side of each curve (per interior PI, 0 = none; deflection must be >= 2 x Ls / (2 R)). Profile, road section and everything derived (corridor, batters, report) follow. If `points` changes length without `radii`, radii are padded with 0 / truncated.",
     "input_schema": {
       "properties": {
         "alignmentId": {
@@ -7366,6 +7731,13 @@
         },
         "radii": {
           "description": "New radii (length = points - 2).",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "spirals": {
+          "description": "New clothoid lengths per interior PI (length = points - 2); 0 = no spiral.",
           "items": {
             "type": "number"
           },
@@ -7558,7 +7930,7 @@
     "name": "update_level"
   },
   {
-    "description": "Edit a manhole: move it, change invert / rim (or re-take the rim from `surfaceId`), diameter, catchment (`catchmentAreaHa` 0 removes it), point inflow (0 removes it) or name. Connected pipes stay connected and keep their inverts; pipes whose invert would fall below the new manhole invert are reported.",
+    "description": "Edit a manhole: move it, change invert / rim (or re-take the rim from `surfaceId`), diameter, catchment (`catchmentAreaHa` 0 removes it), point inflow (0 removes it), `entryTimeMin` or name. Connected pipes stay connected and keep their inverts; pipes whose invert would fall below the new manhole invert are reported.",
     "input_schema": {
       "properties": {
         "catchmentAreaHa": {
@@ -7567,6 +7939,10 @@
         },
         "diameter": {
           "description": "Chamber internal diameter in document units (> 0). Default 1200 mm.",
+          "type": "number"
+        },
+        "entryTimeMin": {
+          "description": "Inlet (entry) time in minutes (> 0) of this manhole's catchment for the time of concentration. Default 5.",
           "type": "number"
         },
         "inflowLps": {

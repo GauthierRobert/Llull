@@ -10,6 +10,7 @@ import type { Vec2 } from '@core/model/types';
 import type { AlignmentObject, RoadSection } from '@core/model/civil';
 import { elevationAt, type Tin } from './tin';
 import { pointAtStation } from './alignmentGeometry';
+import { crossSlopesAt, type CrossSlopes } from './superelevation';
 
 export interface SectionNode {
   readonly offset: number;
@@ -37,13 +38,20 @@ export interface SectionAreas {
   readonly groundCentre: number | null;
 }
 
-/** Template nodes for a centreline elevation, ascending offset. */
-export function templateNodes(section: RoadSection, designZ: number): SectionNode[] {
+/**
+ * Template nodes for a centreline elevation, ascending offset. `slopes` overrides the normal crown
+ * (superelevation): left of travel is positive offset.
+ */
+export function templateNodes(
+  section: RoadSection,
+  designZ: number,
+  slopes: CrossSlopes = { left: section.crossfall, right: section.crossfall },
+): SectionNode[] {
   const lane = section.laneWidth;
   const edge = lane + section.shoulderWidth;
   const at = (offset: number): SectionNode => ({
     offset,
-    z: designZ - section.crossfall * Math.abs(offset),
+    z: designZ - (offset >= 0 ? slopes.left : slopes.right) * Math.abs(offset),
   });
   return [at(-edge), at(-lane), at(0), at(lane), at(edge)];
 }
@@ -110,7 +118,8 @@ export function crossSectionAt(
 ): RoadCrossSection | null {
   const placed = pointAtStation(alignment, station);
   if (!placed) return null;
-  const template = templateNodes(section, designZ);
+  const slopes = crossSlopesAt(alignment, section.crossfall, section.laneWidth, station);
+  const template = templateNodes(section, designZ, slopes);
   const normal: Vec2 = [-Math.sin(placed.direction), Math.cos(placed.direction)];
   const rule: Rule = {
     section,

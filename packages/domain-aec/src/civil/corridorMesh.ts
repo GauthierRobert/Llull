@@ -11,6 +11,7 @@ import { civilMesh, civilPolyline } from './entities';
 import { sampleStations } from './alignmentGeometry';
 import { designElevation, validateProfile, verticalCurveStations } from './profileGeometry';
 import { crossSectionAt, type RoadCrossSection, type SectionNode } from './roadSection';
+import { superelevationStations } from './superelevation';
 import { surfaceTinById } from './surfaceTin';
 import type { CivilContext } from './context';
 import { toMetres } from '../model';
@@ -72,11 +73,10 @@ export function evaluateCorridor(context: CivilContext, alignment: AlignmentObje
   const tin = alignment.surfaceId ? surfaceTinById(context.civil, alignment.surfaceId) : null;
   const unitsPerMetre = 1 / toMetres(context.doc, 1);
   const sections: RoadCrossSection[] = [];
-  for (const station of sampleStations(
-    alignment,
-    alignment.stationInterval,
-    verticalCurveStations(profile),
-  )) {
+  for (const station of sampleStations(alignment, alignment.stationInterval, [
+    ...verticalCurveStations(profile),
+    ...superelevationStations(alignment, section.crossfall, section.laneWidth),
+  ])) {
     const designZ = designElevation(profile, station);
     if (designZ === null) continue;
     const cross = crossSectionAt(alignment, section, tin, station, designZ, unitsPerMetre);

@@ -33,6 +33,7 @@ export function withObject(civil: CivilModel, object: CivilObject): CivilModel {
       ? { ...civil.counters, [match[1] ?? '']: Number(match[2]) }
       : civil.counters;
   return {
+    ...civil,
     objects: { ...civil.objects, [object.id]: object },
     order: exists ? civil.order : [...civil.order, object.id],
     counters,

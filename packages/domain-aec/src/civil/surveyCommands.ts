@@ -23,6 +23,7 @@ import {
   MAX_SURFACE_POINTS,
 } from './model';
 import { regenerateCivil } from './evaluate';
+import { gridToLocal } from './crs';
 import { parseSurvey, SURVEY_FORMATS } from './surveyParse';
 import { surfacePoints, surfaceTin } from './surfaceTin';
 import { triangleCount } from './tin';
@@ -61,12 +62,29 @@ export const importSurveyPoints = defineCommand({
       .enum(DOCUMENT_UNITS)
       .optional()
       .describe('Unit of the coordinates in `text` / `points`. Default m.'),
+    coordinates: z
+      .enum(['local', 'grid'])
+      .optional()
+      .describe(
+        'Coordinate frame of the input. "grid" (projected CRS) is converted to local with the ' +
+          'site calibration (set_site_calibration) and is refused without one. Default "local".',
+      ),
   }),
-  run: (doc, { name, text, format = 'PENZD', points = [], sourceUnit = 'm' }): CommandResult => {
+  run: (
+    doc,
+    { name, text, format = 'PENZD', points = [], sourceUnit = 'm', coordinates = 'local' },
+  ): CommandResult => {
+    const calibration = getCivil(doc).crs?.calibration;
+    if (coordinates === 'grid' && !calibration) {
+      return noop(
+        doc,
+        'import_survey_points failed: coordinates "grid" needs a site calibration (set_site_calibration).',
+      );
+    }
     const parsed =
       text !== undefined ? parseSurvey(text, format) : { points: [], rejectedLines: [] };
     const convert = (value: number): number => fromUnit(doc, value, sourceUnit);
-    const surveyPoints: SurveyPoint[] = [
+    const gathered: SurveyPoint[] = [
       ...parsed.points.map((point) => ({
         number: point.number,
         position: [
@@ -82,6 +100,13 @@ export const importSurveyPoints = defineCommand({
         ...(point.code !== undefined ? { code: point.code } : {}),
       })),
     ];
+    const surveyPoints =
+      coordinates === 'grid' && calibration
+        ? gathered.map((point) => {
+            const [x, y] = gridToLocal(calibration, [point.position[0], point.position[1]]);
+            return { ...point, position: [x, y, point.position[2]] as Vec3 };
+          })
+        : gathered;
     if (surveyPoints.length === 0) {
       return noop(
         doc,

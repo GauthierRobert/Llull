@@ -19,7 +19,8 @@ import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { parseToolsets } from '@mcp/index';
 import { errorMessage } from '@lib/errorMessage';
 import type { ToolsetName } from '@mcp/index';
-import { exchangeOptionsFromEnv, type ExchangeOptions } from './pythonExchange';
+import type { ExchangeOptions } from './pythonExchange';
+import { exchangeOptionsWithDwg } from './dwgConvert';
 import { evictForCapacity, sessions, startSessionSweep } from './mcp/sessions';
 import { buildAuthMiddleware, buildMcpRateLimiter } from './mcp/middleware';
 import { buildMcpServer } from './mcp/server';
@@ -40,7 +41,7 @@ export function toolsetsFromEnv(
  * @param enabledToolsets - starting toolsets for each session (defaults to `LLULL_TOOLSETS`).
  */
 export function buildMcpRouter(
-  exchange: ExchangeOptions = exchangeOptionsFromEnv(),
+  exchange: ExchangeOptions = exchangeOptionsWithDwg(),
   enabledToolsets: ReadonlySet<ToolsetName> = toolsetsFromEnv(),
 ): Router {
   startSessionSweep();

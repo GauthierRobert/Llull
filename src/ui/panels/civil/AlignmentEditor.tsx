@@ -156,6 +156,23 @@ export function AlignmentEditor({ alignment }: { alignment: AlignmentObject }): 
             >
               Cross sections SVG
             </button>
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={() =>
+                setStatus(
+                  downloadQuery(
+                    'export_plan_profile_sheet',
+                    params,
+                    'text',
+                    `${alignment.id}-plan-profile.svg`,
+                    'image/svg+xml',
+                  ),
+                )
+              }
+            >
+              Plan-profile sheet
+            </button>
           </div>
           <CivilStatus text={status} testId={`civil-alignment-status-${alignment.id}`} />
         </div>

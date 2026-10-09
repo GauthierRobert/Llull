@@ -24,6 +24,7 @@ import {
 } from './model';
 import { regenerateCivil } from './evaluate';
 import { roadReportCommands } from './roadReportCommands';
+import { setSuperelevation } from './roadSuperelevationCommand';
 import { toMetres } from '../model';
 
 function pointsInput(): z.ZodArray<z.ZodTuple<[z.ZodNumber, z.ZodNumber], null>> {
@@ -36,6 +37,10 @@ function findAlignment(doc: CadDocument, alignmentId: string): AlignmentObject |
 
 function commit(doc: CadDocument, alignment: AlignmentObject): CadDocument {
   return regenerateCivil(doc, withObject(getCivil(doc), alignment));
+}
+
+function spiralsOrNone(spirals: ReadonlyArray<number>): { spirals?: readonly number[] } {
+  return spirals.some((length) => length > 0) ? { spirals } : {};
 }
 
 function surfaceProblem(doc: CadDocument, surfaceId: string | undefined): string | null {
@@ -55,6 +60,8 @@ export const addAlignment = defineCommand({
     'Create a road / channel alignment from points of intersection (PIs, document units). Each ' +
     'interior PI can carry a simple circular curve of the given radius (0 = sharp corner). Draws the ' +
     'centreline, station ticks labelled km+mmm.mm every `stationInterval`, and PC / PT / R labels. ' +
+    'Optional `spirals` adds a symmetric clothoid transition (TS-SC ... CS-ST, length Ls each side) per ' +
+    'curved PI; the deflection must be at least twice the spiral angle Ls / (2 R). ' +
     'Add a design profile with set_alignment_profile and a road template with set_road_section to get ' +
     'the corridor, batters to daylight and earthworks; report with alignment_report.',
   params: z.object({
@@ -63,6 +70,13 @@ export const addAlignment = defineCommand({
       .array(z.number())
       .optional()
       .describe('Curve radius per interior PI (length = points - 2); 0 = no curve. Default all 0.'),
+    spirals: z
+      .array(z.number())
+      .optional()
+      .describe(
+        'Clothoid length on each side of the circular curve per interior PI (length = points - 2); ' +
+          '0 = no spiral; needs radius > 0. Default all 0.',
+      ),
     startStation: z
       .number()
       .optional()
@@ -77,7 +91,8 @@ export const addAlignment = defineCommand({
   run: (doc, params): CommandResult => {
     const civil = getCivil(doc);
     const radii = params.radii ?? params.points.slice(2).map(() => 0);
-    const problem = validateHorizontal(params.points, radii);
+    const spirals = params.spirals ?? radii.map(() => 0);
+    const problem = validateHorizontal(params.points, radii, spirals);
     if (problem !== null) return noop(doc, `add_alignment failed: ${problem}`);
     const interval = params.stationInterval ?? fromMetres(doc, 20);
     if (!(interval > 0)) return noop(doc, 'add_alignment failed: stationInterval must be > 0.');
@@ -94,6 +109,7 @@ export const addAlignment = defineCommand({
       entityIds: [],
       points: params.points,
       radii,
+      ...spiralsOrNone(spirals),
       startStation,
       stationInterval: interval,
       ...(params.surfaceId ? { surfaceId: params.surfaceId } : {}),
@@ -105,7 +121,8 @@ export const addAlignment = defineCommand({
       document,
       summary:
         `Created alignment ${alignment.name} (${id}): ${params.points.length} PIs, ` +
-        `${radii.filter((radius) => radius > 0).length} curve(s), length ${lengthM.toFixed(2)} m, ` +
+        `${radii.filter((radius) => radius > 0).length} curve(s)` +
+        `${spirals.some((length) => length > 0) ? ` (${spirals.filter((length) => length > 0).length} with spirals)` : ''}, length ${lengthM.toFixed(2)} m, ` +
         `stations ${formatStation(toMetres(doc, startStation))} to ${formatStation(toMetres(doc, endStation(alignment)))}.`,
       affected: civilAffected(document, [id]),
       data: { alignmentId: id, lengthM: Number(lengthM.toFixed(3)) },
@@ -123,13 +140,18 @@ export const updateAlignment = defineCommand({
   name: 'update_alignment',
   description:
     'Edit an alignment: new PI `points`, curve `radii`, `startStation`, `stationInterval`, linked ' +
-    '`surfaceId` ("" removes the link) or `name`. Profile, road section and everything derived ' +
+    '`surfaceId` ("" removes the link) or `name`. `spirals` sets the clothoid length on each side of ' +
+    'each curve (per interior PI, 0 = none; deflection must be >= 2 x Ls / (2 R)). Profile, road section and everything derived ' +
     '(corridor, batters, report) follow. If `points` changes length without `radii`, radii are padded ' +
     'with 0 / truncated.',
   params: z.object({
     alignmentId: z.string().describe('Alignment id, e.g. "alignment-1".'),
     points: pointsInput().optional().describe('New PIs, at least 2.'),
     radii: z.array(z.number()).optional().describe('New radii (length = points - 2).'),
+    spirals: z
+      .array(z.number())
+      .optional()
+      .describe('New clothoid lengths per interior PI (length = points - 2); 0 = no spiral.'),
     startStation: z.number().optional().describe('New start station, document units.'),
     stationInterval: z.number().optional().describe('New station spacing (> 0).'),
     surfaceId: z.string().optional().describe('Ground surface id; "" removes the link.'),
@@ -145,7 +167,10 @@ export const updateAlignment = defineCommand({
       (_, i) => alignment.radii[i] ?? 0,
     );
     const radii = params.radii ?? fitted;
-    const problem = validateHorizontal(points, radii);
+    const spirals =
+      params.spirals ??
+      fitted.map((_, i) => ((radii[i] ?? 0) > 0 ? (alignment.spirals?.[i] ?? 0) : 0));
+    const problem = validateHorizontal(points, radii, spirals);
     if (problem !== null) return noop(doc, `update_alignment failed: ${problem}`);
     const interval = params.stationInterval ?? alignment.stationInterval;
     if (!(interval > 0)) return noop(doc, 'update_alignment failed: stationInterval must be > 0.');
@@ -163,11 +188,13 @@ export const updateAlignment = defineCommand({
       entityIds: alignment.entityIds,
       points,
       radii,
+      ...spiralsOrNone(spirals),
       startStation,
       stationInterval: interval,
       ...(surfaceId !== undefined ? { surfaceId } : {}),
       profile: alignment.profile,
       ...(alignment.section ? { section: alignment.section } : {}),
+      ...(alignment.superelevation ? { superelevation: alignment.superelevation } : {}),
     };
     if (JSON.stringify(updated) === JSON.stringify(alignment)) {
       return noop(doc, `update_alignment: nothing to change on ${alignment.id}.`);
@@ -329,5 +356,6 @@ export const roadCommands = [
   updateAlignment,
   setAlignmentProfile,
   setRoadSection,
+  setSuperelevation,
   ...roadReportCommands,
 ] as ReadonlyArray<CommandDefinition<unknown>>;

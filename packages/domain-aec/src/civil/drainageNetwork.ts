@@ -10,22 +10,10 @@ import type { CivilModel, ManholeObject, PipeObject } from '@core/model/civil';
 import { toMetres, toMm } from '../model';
 import { civilObjectsOf, civilObject } from './model';
 import { manningFullFlow, rationalFlowLps, solvePartialFlow } from './hydraulics';
-
-export interface DrainageCriteria {
-  readonly rainfallIntensityMmH: number;
-  readonly minVelocity: number;
-  readonly maxVelocity: number;
-  readonly minCoverM: number;
-  readonly maxDepthRatio: number;
-}
-
-export const DEFAULT_CRITERIA: DrainageCriteria = {
-  rainfallIntensityMmH: 50,
-  minVelocity: 0.6,
-  maxVelocity: 3,
-  minCoverM: 0.9,
-  maxDepthRatio: 0.8,
-};
+import { DEFAULT_ENTRY_TIME_MIN, intensityAt, type DrainageCriteria } from './drainageCriteria';
+import { computeFlows, type PipeFlow } from './drainageFlow';
+import { computeHgl, type ManholeHgl, type PipeHgl } from './drainageHgl';
+import { pipePlanLength, pipeSlope } from './drainageTopology';
 
 export interface PipeRow {
   readonly id: string;
@@ -36,6 +24,11 @@ export interface PipeRow {
   readonly slopePct: number;
   readonly diameterMm: number;
   readonly material: string;
+  /** Time of concentration at the upstream end (min). */
+  readonly tcMin: number;
+  readonly intensityMmH: number;
+  /** Accumulated runoff coefficient x area (ha). */
+  readonly sumCAHa: number;
   readonly designLps: number;
   readonly fullLps: number;
   readonly utilisation: number;
@@ -43,6 +36,10 @@ export interface PipeRow {
   readonly velocity: number;
   readonly coverFromM: number;
   readonly coverToM: number;
+  readonly hglUpM: number;
+  readonly hglDownM: number;
+  readonly surcharged: boolean;
+  readonly flooding: boolean;
   readonly status: 'pass' | 'fail';
   readonly reasons: string[];
 }
@@ -53,22 +50,11 @@ export interface ManholeRow {
   readonly depthM: number;
   readonly dropM: number | null;
   readonly localLps: number;
+  readonly entryTimeMin: number;
+  readonly hglM: number;
+  readonly flooding: boolean;
   readonly status: 'pass' | 'fail';
   readonly reasons: string[];
-}
-
-/** Plan distance between a pipe's two structures in document units; null when an end is missing. */
-export function pipePlanLength(civil: CivilModel, pipe: PipeObject): number | null {
-  const from = civilObject(civil, pipe.fromId, 'manhole');
-  const to = civilObject(civil, pipe.toId, 'manhole');
-  if (!from || !to) return null;
-  return Math.hypot(to.position[0] - from.position[0], to.position[1] - from.position[1]);
-}
-
-/** Slope (drop per plan length, dimensionless); negative when adverse. */
-export function pipeSlope(civil: CivilModel, pipe: PipeObject): number {
-  const length = pipePlanLength(civil, pipe);
-  return length !== null && length > 0 ? (pipe.invertFrom - pipe.invertTo) / length : 0;
 }
 
 /** Runoff plus point inflow generated at a manhole itself (L/s). */
@@ -79,41 +65,6 @@ export function localFlowLps(manhole: ManholeObject, intensityMmH: number): numb
   return runoff + (manhole.inflow ?? 0);
 }
 
-/** True when a path of pipes leads from `startId` to `targetId`. */
-export function flowsTo(civil: CivilModel, startId: string, targetId: string): boolean {
-  const pipes = civilObjectsOf(civil, 'pipe');
-  const seen = new Set<string>();
-  const stack = [startId];
-  while (stack.length > 0) {
-    const current = stack.pop() ?? '';
-    if (current === targetId) return true;
-    if (seen.has(current)) continue;
-    seen.add(current);
-    for (const pipe of pipes) if (pipe.fromId === current) stack.push(pipe.toId);
-  }
-  return false;
-}
-
-/** Design flow (L/s) carried by each pipe: every upstream manhole's local flow, accumulated. */
-export function pipeDesignFlows(civil: CivilModel, intensityMmH: number): Map<string, number> {
-  const pipes = civilObjectsOf(civil, 'pipe');
-  const memo = new Map<string, number>();
-  const visiting = new Set<string>();
-  const nodeTotal = (id: string): number => {
-    const cached = memo.get(id);
-    if (cached !== undefined) return cached;
-    const manhole = civilObject(civil, id, 'manhole');
-    if (!manhole || visiting.has(id)) return 0;
-    visiting.add(id);
-    let total = localFlowLps(manhole, intensityMmH);
-    for (const pipe of pipes) if (pipe.toId === id) total += nodeTotal(pipe.fromId);
-    visiting.delete(id);
-    memo.set(id, total);
-    return total;
-  };
-  return new Map(pipes.map((pipe) => [pipe.id, nodeTotal(pipe.fromId)]));
-}
-
 function round(value: number, digits: number): number {
   return Number(value.toFixed(digits));
 }
@@ -122,9 +73,11 @@ function pipeRow(
   doc: CadDocument,
   civil: CivilModel,
   pipe: PipeObject,
-  designLps: number,
+  flowInfo: PipeFlow | undefined,
+  hgl: PipeHgl | undefined,
   criteria: DrainageCriteria,
 ): PipeRow {
+  const designLps = flowInfo?.designLps ?? 0;
   const from = civilObject(civil, pipe.fromId, 'manhole');
   const to = civilObject(civil, pipe.toId, 'manhole');
   const lengthM = toMetres(doc, pipePlanLength(civil, pipe) ?? 0);
@@ -155,6 +108,7 @@ function pipeRow(
       reasons.push(`${end} cover ${cover.toFixed(2)} m < ${criteria.minCoverM} m`);
     }
   }
+  if (hgl?.surcharged && !flow.surcharged) reasons.push('HGL above obvert (surcharged)');
   return {
     id: pipe.id,
     name: pipe.name,
@@ -164,6 +118,9 @@ function pipeRow(
     slopePct: round(slope * 100, 3),
     diameterMm: round(toMm(doc, pipe.diameter), 1),
     material: pipe.material,
+    tcMin: round(flowInfo?.tcMin ?? DEFAULT_ENTRY_TIME_MIN, 2),
+    intensityMmH: round(flowInfo?.intensityMmH ?? intensityAt(criteria, DEFAULT_ENTRY_TIME_MIN), 2),
+    sumCAHa: round(flowInfo?.sumCAHa ?? 0, 4),
     designLps: round(designLps, 2),
     fullLps: round(fullLps, 2),
     utilisation: fullLps > 0 ? round(designLps / fullLps, 3) : designLps > 0 ? 999 : 0,
@@ -171,6 +128,10 @@ function pipeRow(
     velocity: round(flow.velocity, 3),
     coverFromM: round(coverFromM, 3),
     coverToM: round(coverToM, 3),
+    hglUpM: round(hgl?.hglUpM ?? 0, 3),
+    hglDownM: round(hgl?.hglDownM ?? 0, 3),
+    surcharged: hgl?.surcharged ?? false,
+    flooding: hgl?.flooding ?? false,
     status: reasons.length === 0 ? 'pass' : 'fail',
     reasons,
   };
@@ -180,8 +141,10 @@ function manholeRow(
   doc: CadDocument,
   civil: CivilModel,
   manhole: ManholeObject,
-  intensityMmH: number,
+  hgl: ManholeHgl | undefined,
+  criteria: DrainageCriteria,
 ): ManholeRow {
+  const entryTimeMin = manhole.entryTimeMin ?? DEFAULT_ENTRY_TIME_MIN;
   const pipes = civilObjectsOf(civil, 'pipe');
   const incoming = pipes.filter((pipe) => pipe.toId === manhole.id).map((pipe) => pipe.invertTo);
   const outgoing = pipes
@@ -195,30 +158,47 @@ function manholeRow(
   if (dropM !== null && dropM < 0)
     reasons.push(`outgoing invert ${(-dropM).toFixed(3)} m above incoming`);
   if (!(manhole.rimElevation > manhole.invertElevation)) reasons.push('rim not above invert');
+  if (hgl?.flooding) {
+    reasons.push(
+      `HGL ${hgl.hglM.toFixed(3)} m above rim - freeboard ${criteria.freeboardM} m: flooding risk`,
+    );
+  }
   return {
     id: manhole.id,
     name: manhole.name,
     depthM: round(toMetres(doc, manhole.rimElevation - manhole.invertElevation), 3),
     dropM,
-    localLps: round(localFlowLps(manhole, intensityMmH), 2),
+    localLps: round(localFlowLps(manhole, intensityAt(criteria, entryTimeMin)), 2),
+    entryTimeMin,
+    hglM: round(hgl?.hglM ?? 0, 3),
+    flooding: hgl?.flooding ?? false,
     status: reasons.length === 0 ? 'pass' : 'fail',
     reasons,
   };
+}
+
+export interface NetworkAnalysis {
+  readonly pipes: PipeRow[];
+  readonly manholes: ManholeRow[];
+  /** Manholes with several outgoing pipes (flow split by full-bore capacity share). */
+  readonly diverging: readonly string[];
 }
 
 export function analyseNetwork(
   doc: CadDocument,
   civil: CivilModel,
   criteria: DrainageCriteria,
-): { pipes: PipeRow[]; manholes: ManholeRow[] } {
-  const flows = pipeDesignFlows(civil, criteria.rainfallIntensityMmH);
+): NetworkAnalysis {
+  const flows = computeFlows(doc, civil, criteria);
+  const hgl = computeHgl(doc, civil, criteria, flows);
   return {
     pipes: civilObjectsOf(civil, 'pipe').map((pipe) =>
-      pipeRow(doc, civil, pipe, flows.get(pipe.id) ?? 0, criteria),
+      pipeRow(doc, civil, pipe, flows.pipes.get(pipe.id), hgl.pipes.get(pipe.id), criteria),
     ),
     manholes: civilObjectsOf(civil, 'manhole').map((manhole) =>
-      manholeRow(doc, civil, manhole, criteria.rainfallIntensityMmH),
+      manholeRow(doc, civil, manhole, hgl.manholes.get(manhole.id), criteria),
     ),
+    diverging: flows.diverging,
   };
 }
 

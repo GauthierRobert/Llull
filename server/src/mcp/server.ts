@@ -115,6 +115,7 @@ export function buildMcpServer(
     // changes still go through registry commands on the command bus.
     const exchangeResult = await applyExchangeToolCall(name, args, {
       port: exchange.port,
+      dwg: exchange.dwg ?? null,
       getDoc: getLiveDoc,
       applyCommand,
       allowCodeExecution: exchange.allowCodeExecution,

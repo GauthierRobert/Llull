@@ -22,9 +22,10 @@ import {
 import { regenerateCivil } from './evaluate';
 import { surfaceTinById } from './surfaceTin';
 import { elevationAt } from './tin';
-import { pipePlanLength } from './drainageNetwork';
+import { pipePlanLength } from './drainageTopology';
 import { drainageAnalysisCommands } from './drainageAnalysisCommands';
 import { drainagePipeCommands } from './drainagePipeCommands';
+import { exportDrainageLongSection } from './drainageLongSectionCommand';
 
 const manholeFields = {
   invertElevation: z.number().describe('Invert (lowest internal) elevation of the chamber.'),
@@ -49,6 +50,12 @@ const manholeFields = {
     .optional()
     .describe('Runoff coefficient C, 0 to 1. Default 0.9 when a catchment area is given.'),
   inflowLps: z.number().optional().describe('Additional point inflow in litres per second (>= 0).'),
+  entryTimeMin: z
+    .number()
+    .optional()
+    .describe(
+      "Inlet (entry) time in minutes (> 0) of this manhole's catchment for the time of concentration. Default 5.",
+    ),
   name: z.string().optional().describe('Display name. Default "MH<n>".'),
 };
 
@@ -57,6 +64,7 @@ function checkOptions(options: {
   catchmentAreaHa?: number | undefined;
   runoffCoefficient?: number | undefined;
   inflowLps?: number | undefined;
+  entryTimeMin?: number | undefined;
 }): string | null {
   if (options.diameter !== undefined && !(options.diameter > 0)) return 'diameter must be > 0.';
   if (options.catchmentAreaHa !== undefined && options.catchmentAreaHa < 0) {
@@ -65,6 +73,9 @@ function checkOptions(options: {
   const c = options.runoffCoefficient;
   if (c !== undefined && !(c >= 0 && c <= 1)) return 'runoffCoefficient must be between 0 and 1.';
   if (options.inflowLps !== undefined && options.inflowLps < 0) return 'inflowLps must be >= 0.';
+  if (options.entryTimeMin !== undefined && !(options.entryTimeMin > 0)) {
+    return 'entryTimeMin must be > 0.';
+  }
   return null;
 }
 
@@ -100,7 +111,7 @@ export const addManhole = defineCommand({
   description:
     'Add a drainage manhole / inspection chamber / outfall at a plan position. Give `invertElevation` ' +
     'and either `rimElevation` or a `surfaceId` (rim = ground level there). Optional catchment ' +
-    '(area in ha, runoff coefficient) and point inflow feed the network check. Connect manholes with add_pipe.',
+    '(area in ha, runoff coefficient), point inflow and `entryTimeMin` (inlet time, default 5 min) feed the network check. Connect manholes with add_pipe.',
   params: z.object({
     location: vec2('Plan position [x, y] of the chamber centre, document units.'),
     ...manholeFields,
@@ -140,6 +151,7 @@ export const addManhole = defineCommand({
       diameter: params.diameter ?? fromMm(doc, 1200),
       ...(catchment ? { catchment } : {}),
       ...(params.inflowLps ? { inflow: params.inflowLps } : {}),
+      ...(params.entryTimeMin ? { entryTimeMin: params.entryTimeMin } : {}),
     };
     const document = regenerateCivil(doc, withObject(civil, manhole));
     return {
@@ -164,7 +176,7 @@ export const updateManhole = defineCommand({
   name: 'update_manhole',
   description:
     'Edit a manhole: move it, change invert / rim (or re-take the rim from `surfaceId`), diameter, ' +
-    'catchment (`catchmentAreaHa` 0 removes it), point inflow (0 removes it) or name. Connected pipes ' +
+    'catchment (`catchmentAreaHa` 0 removes it), point inflow (0 removes it), `entryTimeMin` or name. Connected pipes ' +
     'stay connected and keep their inverts; pipes whose invert would fall below the new manhole invert are reported.',
   params: z.object({
     manholeId: z.string().describe('Manhole id, e.g. "manhole-1".'),
@@ -195,6 +207,7 @@ export const updateManhole = defineCommand({
       manhole.catchment,
     );
     const inflow = params.inflowLps === undefined ? manhole.inflow : params.inflowLps;
+    const entryTimeMin = params.entryTimeMin ?? manhole.entryTimeMin;
     const updated: ManholeObject = {
       id: manhole.id,
       category: 'manhole',
@@ -206,6 +219,7 @@ export const updateManhole = defineCommand({
       diameter: params.diameter ?? manhole.diameter,
       ...(catchment ? { catchment } : {}),
       ...(inflow ? { inflow } : {}),
+      ...(entryTimeMin ? { entryTimeMin } : {}),
     };
     if (JSON.stringify(updated) === JSON.stringify(manhole)) {
       return noop(doc, `update_manhole: nothing to change on ${manhole.id}.`);
@@ -245,4 +259,5 @@ export const drainageCommands = [
   updateManhole,
   ...drainagePipeCommands,
   ...drainageAnalysisCommands,
+  exportDrainageLongSection,
 ] as ReadonlyArray<CommandDefinition<unknown>>;

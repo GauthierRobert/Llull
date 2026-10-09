@@ -68,13 +68,52 @@ function normaliseAngle(angle: number): number {
   return a;
 }
 
-function curveAnnotations(context: CivilContext, alignment: AlignmentObject): Entity[] {
+function spiralAnnotations(
+  context: CivilContext,
+  alignment: AlignmentObject,
+  elements: ReturnType<typeof horizontalElements>,
+): Entity[] {
   const height = labelHeight(context.doc);
+  const station = (s: number): string => formatStation(toMetres(context.doc, s));
   const entities: Entity[] = [];
   let index = 0;
-  for (const element of horizontalElements(alignment)) {
-    if (element.kind !== 'arc') continue;
+  for (const element of elements) {
+    if (element.kind !== 'spiral') continue;
+    const j = index++;
+    const entry = element.radiusStart === Infinity;
+    const at = (p: Vec2): [number, number, number] => [p[0], p[1] + height * 2, 0];
+    entities.push(
+      civilText(
+        alignment,
+        `sp${j}_start`,
+        `${entry ? 'TS' : 'CS'} ${station(element.startStation)}`,
+        'annotation',
+        at(element.start),
+        height,
+      ),
+      civilText(
+        alignment,
+        `sp${j}_end`,
+        `${entry ? 'SC' : 'ST'} ${station(element.startStation + element.length)}`,
+        'annotation',
+        at(element.end),
+        height,
+      ),
+    );
+  }
+  return entities;
+}
+
+function curveAnnotations(context: CivilContext, alignment: AlignmentObject): Entity[] {
+  const height = labelHeight(context.doc);
+  const elements = horizontalElements(alignment);
+  const entities: Entity[] = [];
+  let index = 0;
+  elements.forEach((element, position) => {
+    if (element.kind !== 'arc') return;
     const i = index++;
+    const transition =
+      elements[position - 1]?.kind === 'spiral' || elements[position + 1]?.kind === 'spiral';
     const mid = elementPointAt(element, element.startStation + element.length / 2).point;
     const outward = (p: Vec2): Vec2 => {
       const length = Math.hypot(p[0] - element.center[0], p[1] - element.center[1]);
@@ -91,22 +130,26 @@ function curveAnnotations(context: CivilContext, alignment: AlignmentObject): En
         element.pi[1],
         0,
       ]),
-      civilText(
-        alignment,
-        `pc${i}`,
-        `PC ${station(element.startStation)}`,
-        'annotation',
-        place(element.start),
-        height,
-      ),
-      civilText(
-        alignment,
-        `pt${i}`,
-        `PT ${station(element.startStation + element.length)}`,
-        'annotation',
-        place(element.end),
-        height,
-      ),
+      ...(transition
+        ? []
+        : [
+            civilText(
+              alignment,
+              `pc${i}`,
+              `PC ${station(element.startStation)}`,
+              'annotation',
+              place(element.start),
+              height,
+            ),
+            civilText(
+              alignment,
+              `pt${i}`,
+              `PT ${station(element.startStation + element.length)}`,
+              'annotation',
+              place(element.end),
+              height,
+            ),
+          ]),
       civilText(
         alignment,
         `r${i}`,
@@ -116,8 +159,8 @@ function curveAnnotations(context: CivilContext, alignment: AlignmentObject): En
         height,
       ),
     );
-  }
-  return entities;
+  });
+  return [...entities, ...spiralAnnotations(context, alignment, elements)];
 }
 
 export function evaluateAlignment(context: CivilContext, alignment: AlignmentObject): Entity[] {

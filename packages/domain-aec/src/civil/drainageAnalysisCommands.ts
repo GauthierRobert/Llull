@@ -6,37 +6,59 @@
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
-import { fromMm, toMetres } from '../model';
-import { civilAffected, civilObject, civilObjectsOf, getCivil, withObject } from './model';
+import { toMetres } from '../model';
+import { civilAffected, civilObjectsOf, getCivil } from './model';
 import { regenerateCivil } from './evaluate';
-import {
-  analyseNetwork,
-  DEFAULT_CRITERIA,
-  pipeDesignFlows,
-  pipePlanLength,
-  pipeSlope,
-  toCsv,
-  type DrainageCriteria,
-} from './drainageNetwork';
-import { solvePartialFlow } from './hydraulics';
+import { analyseNetwork, toCsv } from './drainageNetwork';
+import { pipePlanLength, pipeSlope } from './drainageTopology';
+import { DEFAULT_CRITERIA, idfError, type DrainageCriteria, type Idf } from './drainageCriteria';
+import { sizeNetwork } from './drainageSizing';
 
 export const COMMERCIAL_DIAMETERS_MM = [150, 225, 300, 375, 450, 525, 600, 750, 900, 1050, 1200];
 
-const intensityField = z
+export const intensityField = z
   .number()
   .optional()
-  .describe('Design rainfall intensity in mm/h (> 0). Default 50.');
+  .describe(
+    'Constant design rainfall intensity in mm/h (> 0). Default 50. Do not combine with `idf`.',
+  );
 
-type CriteriaInput = { [K in keyof DrainageCriteria]?: number | undefined };
+export const idfField = z
+  .object({
+    a: z.number().describe('IDF coefficient a (> 0): i = a / (t + b)^c in mm/h.'),
+    b: z.number().describe('IDF offset b in minutes (>= 0).'),
+    c: z.number().describe('IDF exponent c (> 0).'),
+  })
+  .optional()
+  .describe(
+    'Intensity-duration-frequency curve i = a / (t + b)^c (mm/h, t = time of concentration in ' +
+      'minutes) replacing the constant intensity: each pipe uses i at its own Tc (modified rational ' +
+      'method). Do not combine with `rainfallIntensityMmH`.',
+  );
 
-function criteriaFrom(params: CriteriaInput): DrainageCriteria | string {
+type CriteriaInput = {
+  [K in keyof Omit<DrainageCriteria, 'idf' | 'outfallLevel'>]?: number | undefined;
+} & { idf?: Idf | undefined; outfallLevel?: number | undefined };
+
+export function criteriaFrom(params: CriteriaInput): DrainageCriteria | string {
   const criteria: DrainageCriteria = {
     rainfallIntensityMmH: params.rainfallIntensityMmH ?? DEFAULT_CRITERIA.rainfallIntensityMmH,
+    idf: params.idf ? { a: params.idf.a, b: params.idf.b, c: params.idf.c } : null,
     minVelocity: params.minVelocity ?? DEFAULT_CRITERIA.minVelocity,
     maxVelocity: params.maxVelocity ?? DEFAULT_CRITERIA.maxVelocity,
     minCoverM: params.minCoverM ?? DEFAULT_CRITERIA.minCoverM,
     maxDepthRatio: params.maxDepthRatio ?? DEFAULT_CRITERIA.maxDepthRatio,
+    manholeLossK: params.manholeLossK ?? DEFAULT_CRITERIA.manholeLossK,
+    freeboardM: params.freeboardM ?? DEFAULT_CRITERIA.freeboardM,
+    outfallLevel: params.outfallLevel ?? null,
   };
+  if (criteria.idf && params.rainfallIntensityMmH !== undefined) {
+    return 'give either rainfallIntensityMmH or idf, not both.';
+  }
+  if (criteria.idf) {
+    const problem = idfError(criteria.idf);
+    if (problem !== null) return problem;
+  }
   if (!(criteria.rainfallIntensityMmH > 0)) return 'rainfallIntensityMmH must be > 0.';
   if (!(criteria.maxDepthRatio > 0 && criteria.maxDepthRatio <= 1)) {
     return 'maxDepthRatio must be in (0, 1].';
@@ -44,7 +66,16 @@ function criteriaFrom(params: CriteriaInput): DrainageCriteria | string {
   if (criteria.minVelocity < 0 || criteria.maxVelocity < criteria.minVelocity) {
     return 'velocity limits must satisfy 0 <= minVelocity <= maxVelocity.';
   }
+  if (criteria.manholeLossK < 0) return 'manholeLossK must be >= 0.';
+  if (criteria.freeboardM < 0) return 'freeboardM must be >= 0.';
   return criteria;
+}
+
+function rainfallText(criteria: DrainageCriteria): string {
+  const idf = criteria.idf;
+  return idf
+    ? `IDF i=${idf.a}/(t+${idf.b})^${idf.c} mm/h`
+    : `${criteria.rainfallIntensityMmH} mm/h`;
 }
 
 /**
@@ -59,11 +90,20 @@ export const checkDrainageNetwork = defineCommand({
     'Hydraulic check of the whole gravity network. Rational-method flows (catchments) and point ' +
     'inflows are accumulated downstream through the pipes; each pipe reports length, slope, design ' +
     'and full-bore (Manning) flow, utilisation, depth ratio, velocity and cover at both ends, and ' +
-    'passes or fails against the limits. Manholes report depth and drop. Returns data { pipes, ' +
-    'manholes, failures, csv }.',
+    'passes or fails against the limits. Modified rational method: Tc at each pipe = max over upstream ' +
+    'paths of (manhole `entryTimeMin`, default 5 min, + pipe travel times L/v, v = part-full velocity), ' +
+    'intensity from `idf` (i = a/(t+b)^c) or the constant intensity, flow = i * sum(C A) + inflows. A ' +
+    'manhole with several outgoing pipes splits its flow by full-bore capacity share. The hydraulic grade ' +
+    'line runs upstream from the outfall (most downstream manhole; tailwater `outfallLevel`, default the ' +
+    'outlet pipe normal depth): friction slope (Q n / (A R^(2/3)))^2 or normal depth, whichever is higher, ' +
+    'plus K v^2/2g at manholes where the pipe is pressurised; pipes get hglUpM / hglDownM / surcharged ' +
+    '(HGL above obvert) / flooding (HGL above rim - freeboard); manholes get hglM / flooding. Each pipe ' +
+    'row reports tcMin, intensityMmH, sumCAHa, designLps. Returns data { pipes, manholes, failures, ' +
+    'diverging, csv }.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
     rainfallIntensityMmH: intensityField,
+    idf: idfField,
     minVelocity: z
       .number()
       .optional()
@@ -77,6 +117,23 @@ export const checkDrainageNetwork = defineCommand({
       .number()
       .optional()
       .describe('Maximum design flow depth / diameter, 0 to 1. Default 0.8.'),
+    outfallLevel: z
+      .number()
+      .optional()
+      .describe(
+        'Tailwater elevation at the outfall(s) in document units, same datum as invert levels. ' +
+          'Default: normal-depth water level of the outlet pipe.',
+      ),
+    manholeLossK: z
+      .number()
+      .optional()
+      .describe('Manhole head-loss coefficient K in K v^2/2g (>= 0). Default 0.5.'),
+    freeboardM: z
+      .number()
+      .optional()
+      .describe(
+        'Required freeboard below the rim in metres (>= 0) before flooding is flagged. Default 0.3.',
+      ),
   }),
   run: (doc, params): CommandResult => {
     const criteria = criteriaFrom(params);
@@ -86,7 +143,7 @@ export const checkDrainageNetwork = defineCommand({
     if (civilObjectsOf(civil, 'pipe').length === 0) {
       return noop(doc, 'check_drainage_network: the document has no drainage pipes.');
     }
-    const { pipes, manholes } = analyseNetwork(doc, civil, criteria);
+    const { pipes, manholes, diverging } = analyseNetwork(doc, civil, criteria);
     const failures = [
       ...pipes
         .filter((row) => row.status === 'fail')
@@ -111,6 +168,13 @@ export const checkDrainageNetwork = defineCommand({
         'velocity_ms',
         'cover_from_m',
         'cover_to_m',
+        'tc_min',
+        'intensity_mmh',
+        'sum_CA_ha',
+        'hgl_up_m',
+        'hgl_down_m',
+        'surcharged',
+        'flooding',
         'status',
       ],
       pipes.map((r) => [
@@ -128,18 +192,35 @@ export const checkDrainageNetwork = defineCommand({
         r.velocity,
         r.coverFromM,
         r.coverToM,
+        r.tcMin,
+        r.intensityMmH,
+        r.sumCAHa,
+        r.hglUpM,
+        r.hglDownM,
+        r.surcharged,
+        r.flooding,
         r.status,
       ]),
     );
     const worst = failures.slice(0, 5).join(' | ');
+    const tcs = pipes.map((r) => r.tcMin);
+    const flooded = manholes.filter((r) => r.flooding).length;
+    const surcharged = pipes.filter((r) => r.surcharged).length;
+    const split =
+      diverging.length > 0
+        ? ` Diverging at ${diverging.join(', ')}: flow split by full-bore capacity share.`
+        : '';
     return {
       document: doc,
       summary:
-        `Drainage check at ${criteria.rainfallIntensityMmH} mm/h: ${pipes.length} pipes ` +
+        `Drainage check at ${rainfallText(criteria)}: ${pipes.length} pipes ` +
         `(${pipes.filter((r) => r.status === 'pass').length} pass), ${manholes.length} manholes; ` +
-        (failures.length === 0 ? 'no failures.' : `${failures.length} failure(s): ${worst}`),
+        `Tc ${Math.min(...tcs)}-${Math.max(...tcs)} min; HGL: ${surcharged} surcharged pipe(s), ` +
+        `${flooded} flooding manhole(s). ` +
+        (failures.length === 0 ? 'No failures.' : `${failures.length} failure(s): ${worst}`) +
+        split,
       affected: [],
-      data: { pipes, manholes, failures, csv },
+      data: { pipes, manholes, failures, diverging, csv },
     };
   },
 });
@@ -222,9 +303,13 @@ export const sizeDrainagePipes = defineCommand({
   description:
     'Automatic pipe sizing: sets each pipe diameter to the smallest commercial size that carries ' +
     'its accumulated design flow at its current slope within `maxDepthRatio` (and `minVelocity` when ' +
-    'given). Pipes that fail even at the largest size, or have no downhill slope, are reported and left unchanged.',
+    'given). Flows follow the modified rational method of check_drainage_network (entry times, travel ' +
+    'times, optional `idf` curve, diverging manholes split by capacity share); sizing and velocities ' +
+    'are iterated to convergence (max 10 passes). Pipes that fail even at the largest size, or have no ' +
+    'downhill slope, are reported and left unchanged.',
   params: z.object({
     rainfallIntensityMmH: intensityField,
+    idf: idfField,
     diameters: z
       .array(z.number())
       .optional()
@@ -240,6 +325,7 @@ export const sizeDrainagePipes = defineCommand({
   run: (doc, params): CommandResult => {
     const criteria = criteriaFrom({
       rainfallIntensityMmH: params.rainfallIntensityMmH,
+      idf: params.idf,
       maxDepthRatio: params.maxDepthRatio,
       minVelocity: params.minVelocity ?? 0,
     });
@@ -248,50 +334,35 @@ export const sizeDrainagePipes = defineCommand({
     if (candidates.length === 0 || candidates.some((d) => !(d > 0))) {
       return noop(doc, 'size_drainage_pipes failed: diameters must be positive millimetres.');
     }
-    let civil = getCivil(doc);
-    const pipes = civilObjectsOf(civil, 'pipe');
-    if (pipes.length === 0) return noop(doc, 'size_drainage_pipes: the document has no pipes.');
-    const flows = pipeDesignFlows(civil, criteria.rainfallIntensityMmH);
-    const changed: string[] = [];
-    const unsized: string[] = [];
-    for (const pipe of pipes) {
-      const slope = pipeSlope(civil, pipe);
-      const flow = (flows.get(pipe.id) ?? 0) / 1000;
-      const pick = candidates.find((mm) => {
-        const result = solvePartialFlow(mm / 1000, slope, pipe.manningN, flow);
-        return (
-          slope > 0 &&
-          !result.surcharged &&
-          result.depthRatio <= criteria.maxDepthRatio &&
-          (flow === 0 || result.velocity >= criteria.minVelocity)
-        );
-      });
-      if (pick === undefined) {
-        unsized.push(pipe.id);
-        continue;
-      }
-      const diameter = fromMm(doc, pick);
-      if (Math.abs(diameter - pipe.diameter) < 1e-9) continue;
-      const current = civilObject(civil, pipe.id, 'pipe') ?? pipe;
-      civil = withObject(civil, { ...current, diameter });
-      changed.push(`${pipe.id} -> Ø${pick}`);
+    const civil = getCivil(doc);
+    if (civilObjectsOf(civil, 'pipe').length === 0) {
+      return noop(doc, 'size_drainage_pipes: the document has no pipes.');
     }
+    const sized = sizeNetwork(doc, civil, criteria, candidates);
     const note =
-      unsized.length > 0
-        ? ` Cannot size ${unsized.join(', ')} (adverse slope or flow exceeds the largest size); left unchanged.`
+      sized.unsized.length > 0
+        ? ` Cannot size ${sized.unsized.join(', ')} (adverse slope or flow exceeds the largest size); left unchanged.`
         : '';
-    if (changed.length === 0) {
+    const passes = `${sized.iterations} pass(es)${sized.converged ? '' : ', NOT converged'}`;
+    if (sized.changed.length === 0) {
       return noop(doc, `size_drainage_pipes: no diameter change needed.${note}`);
     }
-    const document = regenerateCivil(doc, civil);
+    const document = regenerateCivil(doc, sized.civil);
     return {
       document,
-      summary: `Resized ${changed.length} pipe(s) at ${criteria.rainfallIntensityMmH} mm/h: ${changed.join(', ')}.${note}`,
+      summary:
+        `Resized ${sized.changed.length} pipe(s) at ${rainfallText(criteria)} (${passes}): ` +
+        `${sized.changed.join(', ')}.${note}`,
       affected: civilAffected(
         document,
-        changed.map((entry) => entry.split(' ')[0] ?? ''),
+        sized.changed.map((entry) => entry.split(' ')[0] ?? ''),
       ),
-      data: { resized: changed, unsized },
+      data: {
+        resized: sized.changed,
+        unsized: sized.unsized,
+        iterations: sized.iterations,
+        converged: sized.converged,
+      },
     };
   },
 });

@@ -170,6 +170,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'import_dxf',
     'export_step',
     'import_step',
+    'import_dwg',
     'import_code',
   ],
   /** Contributed by the installed building + industrial plugins. */

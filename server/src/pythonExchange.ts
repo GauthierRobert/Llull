@@ -16,7 +16,7 @@
 import { spawn } from 'node:child_process';
 import { lstat, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { CadExchangePort, ProgramRun, PythonLanguage } from '@mcp/index';
+import type { CadExchangePort, DwgConverterPort, ProgramRun, PythonLanguage } from '@mcp/index';
 
 /** Response size cap (it is JSON.parse'd in memory). ~96 MB of STEP once base64-encoded. */
 const MAX_OUTPUT_BYTES = 128 * 1024 * 1024;
@@ -37,6 +37,8 @@ export function bridgeEnvironment(env: NodeJS.ProcessEnv = process.env): NodeJS.
 /** STEP / parametric-code exchange wiring (Python bridge), injected into each MCP server. */
 export interface ExchangeOptions {
   readonly port: CadExchangePort | null;
+  /** DWG -> DXF converter (LibreDWG / ODA); null when none is configured. */
+  readonly dwg?: DwgConverterPort | null;
   readonly allowCodeExecution: boolean;
 }
 
@@ -163,7 +165,7 @@ export function resolveInside(root: string, relative: string): string {
  * Resolve `relative` inside `root` and re-check after following symlinks, so a link placed in the
  * exchange directory cannot read or write outside it. Writes refuse an existing symlink target.
  */
-async function confinedPath(
+export async function confinedPath(
   root: string,
   relative: string,
   mode: 'read' | 'write',
@@ -185,7 +187,7 @@ async function confinedPath(
 }
 
 /** A FIFO limiter: at most `limit` tasks in flight. */
-function concurrencyLimiter(limit: number): <T>(task: () => Promise<T>) => Promise<T> {
+export function concurrencyLimiter(limit: number): <T>(task: () => Promise<T>) => Promise<T> {
   let active = 0;
   const waiting: Array<() => void> = [];
   return async <T>(task: () => Promise<T>): Promise<T> => {

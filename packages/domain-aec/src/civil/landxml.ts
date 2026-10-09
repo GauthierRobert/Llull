@@ -19,6 +19,7 @@ import { toMetres } from '../model';
 import { civilObjectsOf, getCivil } from './model';
 import { surfaceTin } from './surfaceTin';
 import { alignmentsXml } from './landxmlAlignments';
+import { gridCivil, resolveFrame, type CoordinateFrame } from './crs';
 
 export const LANDXML_NAMESPACE = 'http://www.landxml.org/schema/LandXML-1.2';
 
@@ -183,20 +184,36 @@ export interface LandXmlOptions {
   readonly projectName: string;
   /** ISO date (yyyy-mm-dd) of the header. */
   readonly date: string;
+  /** Plan coordinates frame; default grid when the site is calibrated. */
+  readonly coordinates?: CoordinateFrame;
+}
+
+function coordinateSystemXml(doc: Doc, frame: CoordinateFrame): string[] {
+  const crs = doc.civil?.crs;
+  if (!crs || (crs.calibration && frame === 'local')) return [];
+  return [
+    `  <CoordinateSystem${attr('name', crs.name)}` +
+      `${crs.epsg !== undefined ? attr('epsgCode', String(crs.epsg)) : ''}` +
+      `${crs.verticalDatum !== undefined ? attr('verticalDatum', crs.verticalDatum) : ''}/>`,
+  ];
 }
 
 /** The LandXML 1.2 document of the civil model, with element counts. */
 export function buildLandXml(
   doc: Doc,
-  { projectName, date }: LandXmlOptions,
+  { projectName, date, coordinates }: LandXmlOptions,
 ): { text: string; counts: LandXmlCounts } {
-  const civil = getCivil(doc);
+  const frame = resolveFrame(doc, coordinates);
+  const calibration = doc.civil?.crs?.calibration;
+  const source = getCivil(doc);
+  const civil = frame === 'grid' && calibration ? gridCivil(source, calibration) : source;
+  const written: Doc = { ...doc, civil };
   const groups = civilObjectsOf(civil, 'pointGroup');
   const surfaces = civilObjectsOf(civil, 'surface');
   const manholes = civilObjectsOf(civil, 'manhole');
   const pipes = civilObjectsOf(civil, 'pipe');
-  const surfaceLines = surfaces.flatMap((surface) => surfaceXml(doc, civil, surface));
-  const alignments = alignmentsXml(doc);
+  const surfaceLines = surfaces.flatMap((surface) => surfaceXml(written, civil, surface));
+  const alignments = alignmentsXml(written);
   const lines = [
     '<?xml version="1.0" encoding="UTF-8"?>',
     `<LandXML xmlns="${LANDXML_NAMESPACE}" version="1.2"${attr('date', date)} time="00:00:00">`,
@@ -205,12 +222,13 @@ export function buildLandXml(
       'temperatureUnit="celsius" pressureUnit="milliBars" diameterUnit="millimeter" ' +
       'angularUnit="decimal degrees" directionUnit="decimal degrees"/>',
     '  </Units>',
+    ...coordinateSystemXml(doc, frame),
     `  <Project${attr('name', projectName)}/>`,
     '  <Application name="llull" manufacturer="llull" version="1.0"/>',
-    ...cgPointsXml(doc, groups),
+    ...cgPointsXml(written, groups),
     ...(alignments !== '' ? [alignments.replace(/\n$/, '')] : []),
     ...(surfaces.length > 0 ? ['  <Surfaces>', ...surfaceLines, '  </Surfaces>'] : []),
-    ...pipeNetworkXml(doc, manholes, pipes),
+    ...pipeNetworkXml(written, manholes, pipes),
     '</LandXML>',
   ];
   return {

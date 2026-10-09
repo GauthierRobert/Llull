@@ -17,7 +17,8 @@ import {
 } from './roadSection';
 import { surfaceTinById } from './surfaceTin';
 import { elevationAt } from './tin';
-import { formatStation } from './model';
+import { crossSlopesAt, hasSuperelevation, superelevationRate } from './superelevation';
+import { formatStation, fromMetres } from './model';
 import { toMetres } from '../model';
 
 export interface StationAnalysis {
@@ -43,6 +44,8 @@ export interface ReportRow {
   readonly cumulativeFillM3: number;
   /** Cumulative cut minus cumulative fill (no bulking / shrinkage). */
   readonly massHaulM3: number;
+  /** Signed superelevation (+ = banked for a left-hand curve); null without a superelevation design. */
+  readonly superelevationPercent: number | null;
 }
 
 const roundTo = (value: number, digits: number): number => Number(value.toFixed(digits));
@@ -93,6 +96,8 @@ export function reportRows(
   let cut = 0;
   let fill = 0;
   let previous: StationAnalysis | null = null;
+  const crossfall = alignment.section?.crossfall ?? 0.025;
+  const laneWidth = alignment.section?.laneWidth ?? fromMetres(doc, 3.5);
   return analysis.map((entry) => {
     if (previous?.areas && entry.areas) {
       const length = (entry.station - previous.station) * metre;
@@ -116,6 +121,12 @@ export function reportRows(
       cumulativeCutM3: roundTo(cut, 2),
       cumulativeFillM3: roundTo(fill, 2),
       massHaulM3: roundTo(cut - fill, 2),
+      superelevationPercent: hasSuperelevation(alignment)
+        ? roundTo(
+            superelevationRate(crossSlopesAt(alignment, crossfall, laneWidth, entry.station)) * 100,
+            3,
+          )
+        : null,
     };
   });
 }
@@ -132,6 +143,7 @@ const CSV_COLUMNS = [
   'cumulativeCutM3',
   'cumulativeFillM3',
   'massHaulM3',
+  'superelevationPercent',
 ] as const;
 
 export function reportCsv(rows: ReadonlyArray<ReportRow>): string {

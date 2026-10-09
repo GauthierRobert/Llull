@@ -20,6 +20,8 @@ import { earthworksCommands } from './earthworksCommands';
 import { roadCommands } from './roadCommands';
 import { drainageCommands } from './drainageCommands';
 import { civilExchangeCommands } from './exchangeCommands';
+import { crsCommands } from './crsCommands';
+import { civilSheetCommands } from './civilSheetCommands';
 
 function derivedEntityIds(doc: CadDocument): Set<string> {
   const ids = new Set<string>();
@@ -93,6 +95,8 @@ export const civilCommands = [
   ...roadCommands,
   ...drainageCommands,
   ...civilExchangeCommands,
+  ...crsCommands,
+  ...civilSheetCommands,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 export const civilPlugin: CadPlugin = {

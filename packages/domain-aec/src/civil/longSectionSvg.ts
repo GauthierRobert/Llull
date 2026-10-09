@@ -22,7 +22,8 @@ import { formatStation } from './model';
 import { niceStep, svgDocument, svgLine, svgPolyline, svgRect, svgText } from './roadSvg';
 import { toMetres } from '../model';
 
-const LEFT = 90;
+export const LONG_SECTION_LEFT = 90;
+const LEFT = LONG_SECTION_LEFT;
 const TOP = 60;
 const ROW_HEIGHT = 16;
 const MAX_PLOT_WIDTH = 1000;
@@ -64,6 +65,7 @@ export function longSectionSvg(
   alignment: AlignmentObject,
   rows: ReadonlyArray<ReportRow>,
   verticalExaggeration: number,
+  horizontalScale?: number,
 ): string | null {
   if (validateProfile(alignment.profile) !== null) return null;
   const { ground, design } = samples(doc, civil, alignment);
@@ -75,10 +77,9 @@ export function longSectionSvg(
   const gridMax = Math.max(...all);
   const pad = Math.max((gridMax - gridMin) * 0.1, 0.5);
   const rangeM = gridMax - gridMin + 2 * pad;
-  const hScale = Math.min(
-    MAX_PLOT_WIDTH / lengthM,
-    MAX_PLOT_HEIGHT / (rangeM * verticalExaggeration),
-  );
+  const hScale =
+    horizontalScale ??
+    Math.min(MAX_PLOT_WIDTH / lengthM, MAX_PLOT_HEIGHT / (rangeM * verticalExaggeration));
   const vScale = hScale * verticalExaggeration;
   const plotWidth = lengthM * hScale;
   const plotHeight = rangeM * vScale;

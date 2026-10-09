@@ -98,6 +98,11 @@ export interface AlignmentObject extends CivilObjectBase {
   readonly points: readonly Vec2[];
   /** Circular curve radius per interior PI (0 = no curve). Length = points.length - 2. */
   readonly radii: readonly number[];
+  /**
+   * Clothoid transition length on each side of the circular curve per interior PI (0 = none).
+   * Same length as `radii`; absent = no spirals.
+   */
+  readonly spirals?: readonly number[];
   readonly startStation: number;
   /** Station tick / cross-section interval (document units). */
   readonly stationInterval: number;
@@ -106,6 +111,13 @@ export interface AlignmentObject extends CivilObjectBase {
   /** Design profile (sorted by station); empty = none. */
   readonly profile: readonly ProfilePvi[];
   readonly section?: RoadSection;
+  /** Superelevation design: full-rate banking on curves, rotated about the centreline. */
+  readonly superelevation?: {
+    /** Full superelevation rate on circular curves (ratio, e.g. 0.07). */
+    readonly maxRate: number;
+    /** Runoff length per curve end; default the spiral length or a 0.5 % relative gradient. */
+    readonly runoffLength?: number;
+  };
 }
 
 /** Drainage structure (manhole / inspection chamber / outfall). */
@@ -125,6 +137,8 @@ export interface ManholeObject extends CivilObjectBase {
   };
   /** Additional point inflow (litres per second), e.g. foul flow. */
   readonly inflow?: number;
+  /** Inlet (entry) time in minutes for the time of concentration; default 5. */
+  readonly entryTimeMin?: number;
 }
 
 /** Gravity pipe between two structures (flow from `fromId` to `toId`). */
@@ -149,7 +163,30 @@ export type CivilObject =
   | ManholeObject
   | PipeObject;
 
+/** 2D similarity (Helmert) between local site coordinates and the projected grid. */
+export interface SiteCalibration {
+  /** Local (document-unit) point that maps onto `gridOrigin`. */
+  readonly localOrigin: Vec2;
+  /** Grid easting / northing of `localOrigin` (document units). */
+  readonly gridOrigin: Vec2;
+  /** Counter-clockwise rotation of local axes into grid axes, degrees. */
+  readonly rotationDeg: number;
+  /** Uniform scale factor k (grid distance / local distance), > 0. */
+  readonly scaleFactor: number;
+}
+
+/** Coordinate reference system of the civil model, with an optional local-to-grid calibration. */
+export interface CivilCrs {
+  /** EPSG code of the projected CRS, e.g. 2154. */
+  readonly epsg?: number;
+  readonly name: string;
+  /** Vertical datum name, e.g. "NGF-IGN69". */
+  readonly verticalDatum?: string;
+  readonly calibration?: SiteCalibration;
+}
+
 export interface CivilModel {
+  readonly crs?: CivilCrs;
   readonly objects: Readonly<Record<string, CivilObject>>;
   /** Creation / evaluation order. */
   readonly order: readonly string[];

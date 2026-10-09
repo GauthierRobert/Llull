@@ -7,14 +7,14 @@ panel and MCP agents (toolset `civil`, prompt `design_site`) use the same ones.
 
 ## Model
 
-| Object      | Created by                                        | Generates (layers, NCS)                                    |
-| ----------- | ------------------------------------------------- | ---------------------------------------------------------- |
-| Point group | `import_survey_points`, `import_survey_dxf`       | point markers (`C-TOPO-PNTS`, up to 2000 points drawn)     |
-| Surface     | `create_surface`, `update_surface`                | TIN mesh (`C-TOPO-TINN`), minor / major contours, labels   |
-| Platform    | `add_platform`, `update_platform`, `balance_platform` | pad, outline, cut / fill batters, daylight line (`C-GRAD`) |
+| Object      | Created by                                                                       | Generates (layers, NCS)                                          |
+| ----------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Point group | `import_survey_points`, `import_survey_dxf`                                      | point markers (`C-TOPO-PNTS`, up to 2000 points drawn)           |
+| Surface     | `create_surface`, `update_surface`                                               | TIN mesh (`C-TOPO-TINN`), minor / major contours, labels         |
+| Platform    | `add_platform`, `update_platform`, `balance_platform`                            | pad, outline, cut / fill batters, daylight line (`C-GRAD`)       |
 | Alignment   | `add_alignment`, `update_alignment`, `set_alignment_profile`, `set_road_section` | centreline, stations, curve data, corridor + batters (`C-ROAD*`) |
-| Manhole     | `add_manhole`, `update_manhole`                   | chamber, plan symbol, label (`C-STRM-STRC`)                |
-| Pipe        | `add_pipe`, `update_pipe`, `size_drainage_pipes`  | pipe barrel, plan line, "Ø300 PVC 1.00 %" label (`C-STRM-PIPE`) |
+| Manhole     | `add_manhole`, `update_manhole`                                                  | chamber, plan symbol, label (`C-STRM-STRC`)                      |
+| Pipe        | `add_pipe`, `update_pipe`, `size_drainage_pipes`                                 | pipe barrel, plan line, "Ø300 PVC 1.00 %" label (`C-STRM-PIPE`)  |
 
 The civil model (`CadDocument.civil`) is the source of truth; generated entities are read-only
 (edit the object, or `delete_civil_object` — `cascade: true` also removes dependents) and are
@@ -51,6 +51,26 @@ m², m³, L/s. Work in metres (`set_units { units: 'm' }`) for real survey coord
    Line / Curve geometry and the design profile, storm pipe network) for Civil 3D, 12d, Trimble
    Business Center, OpenRoads; `export_civil_dxf` (points, contours at their elevation, labels,
    TIN / corridor / pad meshes as 3DFACEs).
+
+## DWG import (via the server)
+
+DWG is proprietary, so llull converts it to ASCII DXF on the server (core stays pure) and then runs
+`import_dxf` / `import_survey_dxf` through the normal command path (live document, undo, live sync).
+Install one converter on the server host:
+
+- **LibreDWG** (free): `apt install libredwg-tools` (provides `dwg2dxf`). `LLULL_DWG2DXF=<path>`
+  overrides the executable, `off` disables it.
+- **ODA File Converter**: set `LLULL_ODA_CONVERTER=<executable>`; run as
+  `<exe> in-dir out-dir ACAD2018 DXF 0 1 *.DWG` (used when `dwg2dxf` is missing).
+
+`LLULL_DWG_TIMEOUT_MS` (default 60000) and `LLULL_DWG_MAX_BYTES` (default 50 MB) bound each
+conversion; every request uses a private temp dir that is always removed.
+
+- HTTP: `POST /import/dwg?target=drawing|survey&sourceUnit=m&layers=A,B` with the raw bytes
+  (`application/octet-stream`) or JSON `{ "base64": "...", "target": "survey", "name": "..." }`.
+  400 not a DWG (`AC10xx` header), 413 too large, 503 no converter installed, 504 timeout.
+- MCP: `import_dwg { dwgBase64 | path, target, sourceUnit, layers, ... }` (toolset `exchange`).
+- UI: Civil / Site panel › DWG file inputs (needs the server).
 
 ## Engineering assumptions (state them in your reports)
 

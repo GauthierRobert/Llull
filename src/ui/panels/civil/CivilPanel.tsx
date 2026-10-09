@@ -11,6 +11,7 @@ import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
 import { PanelEmpty, PanelHeader } from '@ui/panels/PanelParts';
 import { SurveySection } from './SurveySection';
+import { CivilCrsSection } from './CivilCrsSection';
 import { TerrainSection } from './TerrainSection';
 import { EarthworksSection } from './EarthworksSection';
 import { RoadsSection } from './RoadsSection';
@@ -35,6 +36,7 @@ export function CivilPanel({ className }: { className?: string }): React.ReactEl
         />
       )}
       <SurveySection />
+      <CivilCrsSection />
       <TerrainSection />
       <EarthworksSection />
       <RoadsSection />

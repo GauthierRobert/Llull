@@ -10,6 +10,7 @@
  *
  *   export_step  doc → export_code (CadQuery) → port runs it → exact B-rep STEP
  *   import_step  STEP → port tessellates (names + colours kept) → import_mesh
+ *   import_dwg   DWG → DwgConverterPort (LibreDWG / ODA) → ASCII DXF → import_dxf | import_survey_dxf
  *   import_code  CadQuery/build123d source → port runs it → LLULL_TRACE → apply_code_trace
  *
  * Their schemas are hand-written because they are transport-level tools, not registry commands;
@@ -49,6 +50,13 @@ export interface CadExchangePort {
   writeExchangeFile?(fileName: string, base64: string): Promise<string>;
 }
 
+/** Port to a DWG → ASCII DXF converter (implemented in `server/`). Throws Error with an agent-readable message. */
+export interface DwgConverterPort {
+  convertDwg(dwgBase64: string): Promise<string>;
+  /** Read a file from the configured exchange directory as base64. */
+  readExchangeFile?(path: string): Promise<string>;
+}
+
 export interface ExchangeCommandResult {
   summary: string;
   affected: string[];
@@ -59,6 +67,8 @@ export interface ExchangeCommandResult {
 export interface ExchangeDeps {
   /** null when Python/CadQuery is not configured; tools then explain how to enable it. */
   readonly port: CadExchangePort | null;
+  /** null/absent when no DWG converter is configured; import_dwg then explains how to enable it. */
+  readonly dwg?: DwgConverterPort | null;
   readonly getDoc: () => CadDocument;
   /** The server command bus (records undo + broadcasts). */
   readonly applyCommand: (name: string, params: unknown) => ExchangeCommandResult;
@@ -109,6 +119,46 @@ export function buildExchangeToolDefinitions(): McpToolDefinition[] {
         properties: {
           stepBase64: { type: 'string', description: 'The STEP file content, base64-encoded.' },
           path: { type: 'string', description: 'File path inside the server exchange directory.' },
+        },
+        required: [],
+      },
+    },
+    {
+      name: 'import_dwg',
+      description:
+        'Import an AutoCAD DWG file: the server converts it to ASCII DXF (LibreDWG dwg2dxf or the ODA File ' +
+        'Converter) and runs import_dxf (target "drawing": editable 2D entities on their layers) or ' +
+        'import_survey_dxf (target "survey": a terrain point group). Pass dwgBase64, or path relative to the ' +
+        'server exchange directory. Needs a DWG converter installed on the server.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          dwgBase64: { type: 'string', description: 'The DWG file content, base64-encoded.' },
+          path: { type: 'string', description: 'File path inside the server exchange directory.' },
+          target: {
+            type: 'string',
+            description: '"drawing" (default; import_dxf) or "survey" (import_survey_dxf).',
+            enum: ['drawing', 'survey'],
+          },
+          sourceUnit: {
+            type: 'string',
+            description: 'Drawing unit when $INSUNITS is missing or wrong (e.g. "m", "mm", "ft").',
+          },
+          layers: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Only import these layers (case-insensitive). Default: every layer.',
+          },
+          name: { type: 'string', description: 'Survey point group name (target "survey").' },
+          sources: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Survey: what becomes a point (points, vertices, faces, text).',
+          },
+          keepZeroElevation: {
+            type: 'boolean',
+            description: 'Survey: keep points at z = 0. Default false.',
+          },
         },
         required: [],
       },
@@ -278,6 +328,46 @@ async function importStep(
   return importOutcome(`import_step: ${result.summary}`, result);
 }
 
+const DWG_COMMAND_PARAMS = {
+  drawing: ['sourceUnit', 'layers'],
+  survey: ['name', 'layers', 'sources', 'sourceUnit', 'keepZeroElevation'],
+} as const;
+
+const NO_DWG =
+  'requires a DWG converter on the server host: install LibreDWG (`apt install libredwg-tools`) or the ' +
+  'ODA File Converter (LLULL_ODA_CONVERTER=<executable>) and leave LLULL_DWG2DXF unset/not "off" ' +
+  '(see docs/CAD_EXCHANGE.md). Alternatively save the drawing as ASCII DXF and use import_dxf.';
+
+async function importDwg(
+  deps: ExchangeDeps,
+  dwg: DwgConverterPort,
+  args: Record<string, unknown>,
+): Promise<McpShapedResult> {
+  const target = args.target ?? 'drawing';
+  if (target !== 'drawing' && target !== 'survey') {
+    return failure('import_dwg: target must be "drawing" or "survey"; nothing was changed.');
+  }
+  let dwgBase64 = stringArg(args, 'dwgBase64');
+  if (dwgBase64 === undefined) {
+    const file = stringArg(args, 'path');
+    if (file === undefined) return failure('import_dwg: provide dwgBase64 or path.');
+    if (dwg.readExchangeFile === undefined) {
+      return failure(
+        'import_dwg: path is unavailable: the server has no exchange directory (LLULL_EXCHANGE_DIR).',
+      );
+    }
+    dwgBase64 = await dwg.readExchangeFile(file);
+  }
+  const text = await dwg.convertDwg(dwgBase64);
+  const params: Record<string, unknown> = { text };
+  for (const key of DWG_COMMAND_PARAMS[target]) {
+    if (args[key] !== undefined) params[key] = args[key];
+  }
+  const command = target === 'survey' ? 'import_survey_dxf' : 'import_dxf';
+  const result = deps.applyCommand(command, params);
+  return importOutcome(`import_dwg (${command}): ${result.summary}`, result);
+}
+
 async function importCode(
   deps: ExchangeDeps,
   port: CadExchangePort,
@@ -323,6 +413,14 @@ export async function applyExchangeToolCall(
   rawArgs: unknown,
   deps: ExchangeDeps,
 ): Promise<McpShapedResult | null> {
+  if (toolName === 'import_dwg') {
+    if (deps.dwg === undefined || deps.dwg === null) return failure(`import_dwg ${NO_DWG}`);
+    try {
+      return await importDwg(deps, deps.dwg, isRecord(rawArgs) ? rawArgs : {});
+    } catch (error) {
+      return failure(`import_dwg failed: ${errorMessage(error)}`);
+    }
+  }
   const handler = EXCHANGE_HANDLERS.get(toolName);
   if (handler === undefined) return null;
   if (deps.port === null) return failure(`${toolName} ${NO_PYTHON}`);
