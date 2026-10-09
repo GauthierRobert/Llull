@@ -59,7 +59,7 @@ geometry, save / load round trips, and the repository's coverage gate (≥ 90 / 
 3. **Native DWG without a server converter**, true projection transforms (EPSG library), lane
    widenings / intersections, breakline-enforced TINs, foul-water design.
 
-## Gaps closed in the first pass (kept for history)
+## Gaps listed after the first pass (closed by the second pass; kept for history)
 
 
 1. **DWG** — only ASCII DXF is read and written. Most clients send DWG; a DWG reader (e.g. a
