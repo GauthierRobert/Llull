@@ -13,6 +13,7 @@ import { PALETTE_SHORTCUT_LABEL } from '@ui/hooks/shortcuts';
 import { Icon } from '@ui/components/Icon';
 import { SOLID_PRESETS } from '@ui/components/toolbar/solidPresets';
 import { createSolid } from '@ui/actions/createSolid';
+import { startCivilSite } from '@ui/actions/civilStarter';
 
 export function EmptyState(): React.ReactElement | null {
   const entityCount = useStore((s) => s.document.order.length);
@@ -20,6 +21,7 @@ export function EmptyState(): React.ReactElement | null {
   const setDrawTool = useToolStore((s) => s.setDrawTool);
   const drawToolArmed = useToolStore((s) => s.drawTool !== 'none');
   const [dismissed, setDismissed] = useState(false);
+  const [civilLoading, setCivilLoading] = useState(false);
 
   // Hidden while a 2D tool is armed so the card never covers the drawing area.
   if (entityCount > 0 || dismissed || drawToolArmed) return null;
@@ -29,6 +31,12 @@ export function EmptyState(): React.ReactElement | null {
     if (sidebarTab !== 'building' || !sidebarOpen) selectSidebarTab('building');
   };
   const boxPreset = SOLID_PRESETS[0];
+  const startCivil = (): void => {
+    const { sidebarTab, sidebarOpen, selectSidebarTab } = useLayoutStore.getState();
+    if (sidebarTab !== 'civil' || !sidebarOpen) selectSidebarTab('civil');
+    setCivilLoading(true);
+    void startCivilSite().finally(() => setCivilLoading(false));
+  };
 
   return (
     <div className="empty-state" role="region" aria-label="Get started">
@@ -97,8 +105,21 @@ export function EmptyState(): React.ReactElement | null {
             }}
           >
             <Icon name="building" size={18} />
-            <span className="empty-state__action-title">Steel hall template</span>
-            <span className="empty-state__action-sub">portal-frame hall in one click</span>
+            <span className="empty-state__action-title">Portal-frame hall template</span>
+            <span className="empty-state__action-sub">a ready-made frame set in one click</span>
+          </button>
+          <button
+            type="button"
+            className="empty-state__action empty-state__action--wide"
+            onClick={startCivil}
+            disabled={civilLoading}
+            aria-busy={civilLoading}
+          >
+            <Icon name="terrain" size={18} />
+            <span className="empty-state__action-title">Civil site starter</span>
+            <span className="empty-state__action-sub">
+              {civilLoading ? 'loading the sample survey…' : 'survey, terrain, pad, road, drainage'}
+            </span>
           </button>
         </div>
 

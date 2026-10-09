@@ -37,6 +37,8 @@ import { getCommand } from '@core/commands/registry';
 import type { ToolsetName } from '@mcp/index';
 import { errorMessage } from '@lib/errorMessage';
 import { getLiveDoc } from '../liveDocument';
+import { ANONYMOUS_ACTOR, type Actor } from '../audit';
+import type { Role } from '../users';
 import { applyCommand } from '../commandBus';
 import type { ExchangeOptions } from '../pythonExchange';
 import { buildImageBlock, stripSvgFromData } from '../renderImage';
@@ -77,9 +79,21 @@ function listTools(enabledToolsets: ReadonlySet<ToolsetName>): {
   };
 }
 
+/** Who is on the other end of an MCP session; `role: null` = no named-user auth (full access). */
+interface McpCaller {
+  readonly actor: Actor;
+  readonly role: Role | null;
+}
+
+/** Tool names a viewer may call: registry `readOnly` annotation (`readOnlyHint` on the wire). */
+function isReadOnlyTool(name: string): boolean {
+  return buildAllMcpTools().find((t) => t.name === name)?.annotations?.readOnlyHint === true;
+}
+
 export function buildMcpServer(
   exchange: ExchangeOptions,
   configuredToolsets: ReadonlySet<ToolsetName>,
+  caller: McpCaller = { actor: ANONYMOUS_ACTOR('mcp'), role: null },
 ): Server {
   const server = new Server(
     { name: 'llull', version: '0.1.0' },
@@ -91,7 +105,15 @@ export function buildMcpServer(
   /** Per-session: the configured set, grown by the `enable_toolset` discovery tool. */
   const enabledToolsets = new Set<ToolsetName>(configuredToolsets);
 
-  server.setRequestHandler(ListToolsRequestSchema, () => listTools(enabledToolsets));
+  server.setRequestHandler(ListToolsRequestSchema, () => {
+    const listed = listTools(enabledToolsets);
+    if (caller.role !== 'viewer') return listed;
+    return {
+      tools: listed.tools.filter(
+        (tool) => tool.name === 'enable_toolset' || isReadOnlyTool(tool.name),
+      ),
+    };
+  });
 
   const handleToolCall = async (req: CallToolRequest): Promise<CallToolResult> => {
     const { name, arguments: args } = req.params;
@@ -111,19 +133,28 @@ export function buildMcpServer(
       return discovery.result;
     }
 
+    if (caller.role === 'viewer' && !isReadOnlyTool(name)) {
+      return makeErrorResult(
+        `Forbidden — role "viewer" may only call read-only tools; ${name} can change the document. ` +
+          'Ask an administrator for the "editor" role.',
+      );
+    }
+
     // export_step / import_step / import_code: Python I/O behind the injected port; document
     // changes still go through registry commands on the command bus.
     const exchangeResult = await applyExchangeToolCall(name, args, {
       port: exchange.port,
+      dwg: exchange.dwg ?? null,
       getDoc: getLiveDoc,
-      applyCommand,
+      applyCommand: (commandName, params) =>
+        applyCommand(commandName, params, undefined, caller.actor),
       allowCodeExecution: exchange.allowCodeExecution,
     });
     if (exchangeResult !== null) return exchangeResult;
 
     if (getCommand(name) === undefined) return unknownToolResult(name, enabledToolsets);
 
-    const busResult = applyCommand(name, args ?? {});
+    const busResult = applyCommand(name, args ?? {}, undefined, caller.actor);
 
     // Vision loop: the PNG replaces the multi-KB SVG in the text/structured content.
     const imageBlock = buildImageBlock(busResult.data);

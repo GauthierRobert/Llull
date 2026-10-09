@@ -9,23 +9,15 @@
  */
 
 import { useMemo } from 'react';
+import { is2D } from '@core/model/types';
 import type { Entity, EntityId, LineEntity } from '@core/model/types';
 import { useStore, useViewportStore } from '@ui/store';
 import { isEntityVisible } from '../entityVisibility';
 import { BatchedLines2D } from './BatchedLines2D';
+import { Shape2DRenderer } from './Shape2DRenderer';
 import { SolidFootprintRenderer } from './entities/SolidFootprintRenderer';
-import { LineRenderer } from './entities/LineRenderer';
-import { PolylineRenderer } from './entities/PolylineRenderer';
-import { CircleRenderer } from './entities/CircleRenderer';
-import { ArcRenderer } from './entities/ArcRenderer';
-import { RectangleRenderer } from './entities/RectangleRenderer';
-import { PointRenderer } from './entities/PointRenderer';
-import { EllipseRenderer } from './entities/EllipseRenderer';
-import { SplineRenderer } from './entities/SplineRenderer';
-import { TextRenderer2D } from './entities/TextRenderer2D';
-import { DimensionRenderer2D } from './entities/DimensionRenderer2D';
 
-/** Pure render branch for a single 2D entity; one case per Shape2DKind. */
+/** Pure render branch for a single 2D entity; 2D shapes via `Shape2DRenderer`, solids as footprints. */
 function Entity2DRenderer({
   entity,
   selected,
@@ -33,31 +25,9 @@ function Entity2DRenderer({
   entity: Entity;
   selected: boolean;
 }): React.ReactElement | null {
-  switch (entity.kind) {
-    case 'line':
-      return <LineRenderer entity={entity} selected={selected} />;
-    case 'polyline':
-      return <PolylineRenderer entity={entity} selected={selected} />;
-    case 'circle':
-      return <CircleRenderer entity={entity} selected={selected} />;
-    case 'arc':
-      return <ArcRenderer entity={entity} selected={selected} />;
-    case 'rectangle':
-      return <RectangleRenderer entity={entity} selected={selected} />;
-    case 'point':
-      return <PointRenderer entity={entity} selected={selected} />;
-    case 'ellipse':
-      return <EllipseRenderer entity={entity} selected={selected} />;
-    case 'spline':
-      return <SplineRenderer entity={entity} selected={selected} />;
-    case 'text':
-      return <TextRenderer2D entity={entity} selected={selected} />;
-    case 'dimension':
-      return <DimensionRenderer2D entity={entity} selected={selected} />;
-    // 3D solids appear in the top view as their XY footprint outline.
-    default:
-      return <SolidFootprintRenderer entity={entity} selected={selected} />;
-  }
+  // 3D solids appear in the top view as their XY footprint outline.
+  if (!is2D(entity)) return <SolidFootprintRenderer entity={entity} selected={selected} />;
+  return <Shape2DRenderer entity={entity} selected={selected} />;
 }
 
 export function Entities2D(): React.ReactElement {

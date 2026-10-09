@@ -26,6 +26,13 @@ generator (frames, purlins, rails, bracing, footings, cladding, crane runway), p
 and pipe runs, clash detection, steel tonnage / cut lists, and elevation / section sheets. See
 [`docs/INDUSTRIAL.md`](docs/INDUSTRIAL.md).
 
+For civil / site engineers: survey import (CSV / TXT / DXF), existing-ground TIN surfaces with
+contours, building pads with cut / fill volumes and cut-fill balancing, road alignments (curves,
+vertical profile, road template, corridor, long and cross sections, earthwork volumes and mass
+haul, design-speed checks), gravity storm networks (Manning, rational method, automatic pipe
+sizing), and LandXML 1.2 / DXF exchange with Civil 3D, 12d and BricsCAD. Any ASCII DXF drawing
+imports as editable entities. See [`docs/CIVIL.md`](docs/CIVIL.md).
+
 ## Stack
 
 | Concern        | Choice                                   | Why |

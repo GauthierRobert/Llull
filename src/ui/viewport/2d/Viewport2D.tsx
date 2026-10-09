@@ -14,6 +14,7 @@ import type { Vec2 } from '@core/model/types';
 import { useStore } from '@ui/store';
 import type { DrawToolKind, ModifyToolKind } from '@ui/store';
 import { cameraGestures, MAP_CONTROLS_CONFIG } from './cameraControlsPolicy';
+import { computePlanDepth, PLAN_CAMERA_HEIGHT } from './planDepth';
 import { ZoomExtents2D } from './ZoomExtents2D';
 import { Entities2D } from './Entities2D';
 import { BuildingPlan2D } from './BuildingPlan2D';
@@ -77,14 +78,24 @@ function SceneContents2D({
   const palette = useViewportPalette();
 
   // Render-only floating origin: shifts the entity group, so pointer hits and snaps stay in document space.
+  const order = useStore((s) => s.document.order);
+  const entities = useStore((s) => s.document.entities);
+  // Lifted work planes (contours, DXF elevations) are brought into the camera's depth range.
+  const planDepth = useMemo(() => computePlanDepth(order, entities), [order, entities]);
   const groupOffset = useMemo(
-    () => new THREE.Vector3(-renderOrigin[0], -renderOrigin[1], 0),
-    [renderOrigin],
+    () => new THREE.Vector3(-renderOrigin[0], -renderOrigin[1], -planDepth.top),
+    [renderOrigin, planDepth.top],
   );
 
   return (
     <>
-      <OrthographicCamera makeDefault position={[0, 0, 100]} near={0.01} far={10000} zoom={50} />
+      <OrthographicCamera
+        makeDefault
+        position={[0, 0, PLAN_CAMERA_HEIGHT]}
+        near={0.01}
+        far={planDepth.far}
+        zoom={50}
+      />
 
       <MapControls
         makeDefault
@@ -107,6 +118,7 @@ function SceneContents2D({
         key={`${palette.grid2dMinor}-${palette.grid2dMajor}`}
         minorColor={palette.grid2dMinor}
         majorColor={palette.grid2dMajor}
+        baseZ={planDepth.floor}
       />
 
       {/* ---- Entities, snap indicator, and draw interaction are all inside

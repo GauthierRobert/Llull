@@ -379,12 +379,63 @@ const designFactory: PromptTemplate = {
   },
 };
 
+/**
+ * @prompt design_site
+ * Civil / site workflow: survey → terrain → platforms + balance → road alignment, profile and
+ * template → storm drainage sizing and check → LandXML / DXF deliverables.
+ */
+const designSite: PromptTemplate = {
+  descriptor: {
+    name: 'design_site',
+    description:
+      'Workflow for a civil / site-engineering project: import the topographic survey, build the ' +
+      'terrain (TIN + contours), grade and balance building platforms, lay out a road (alignment, ' +
+      'profile, cross-section template, report), design the storm drainage network (manholes, ' +
+      'pipes, sizing, hydraulic check) and export LandXML / DXF.',
+    arguments: [
+      {
+        name: 'brief',
+        description: 'The site to design, e.g. "logistics platform 120 x 80 m with access road".',
+        required: false,
+      },
+    ],
+  },
+  buildMessages({ brief = 'a 60 m x 40 m building platform with a 300 m access road' }) {
+    return conversation(
+      `Design ${brief} in llull and produce the civil deliverables.`,
+      `**Site workflow (lengths and elevations in document units — set \`set_units\` { units: "m" } first)**\n\n` +
+        `1. Survey: \`import_survey_points\` { text, format: "PENZD" | "PNEZD" | …, sourceUnit } with the ` +
+        `survey file content (or \`import_survey_dxf\` { text } for a DXF survey).\n` +
+        `2. Terrain: \`create_surface\` { contourInterval, majorEvery, maxEdgeLength? }; check it with ` +
+        `\`surface_report\` { surfaceId } and \`surface_elevation\` { surfaceId, points }.\n` +
+        `3. Earthworks: \`add_platform\` { surfaceId, boundary, elevation, cutSlope, fillSlope } per pad, ` +
+        `read cut / fill with \`platform_earthworks\` { platformId }, then \`balance_platform\` ` +
+        `{ platformId, swellFactor } to set the level where cut and fill balance; \`compare_surfaces\` for surface-to-surface volumes.\n` +
+        `4. Road: \`add_alignment\` { points, radii, surfaceId, stationInterval } for the centreline, ` +
+        `\`set_alignment_profile\` { alignmentId, pvis: [{ station, elevation, curveLength }] } for the design ` +
+        `profile, \`set_road_section\` { alignmentId, laneWidth, shoulderWidth, crossfall, cutSlope, fillSlope } ` +
+        `for the template, then \`alignment_report\` { alignmentId, designSpeedKmh } (curve radii, grades, ` +
+        `K-values) and \`export_long_section\` / \`export_cross_sections\` for the drawings.\n` +
+        `5. Drainage: \`add_manhole\` { location, invertElevation, surfaceId, catchmentAreaHa, runoffCoefficient } ` +
+        `at each structure, \`add_pipe\` { fromId, toId } downstream, then \`size_drainage_pipes\` ` +
+        `{ rainfallIntensityMmH } and \`check_drainage_network\` (velocity, cover, capacity); fix every failure ` +
+        `with \`update_manhole\` / \`update_pipe\` and re-check; \`drainage_schedule\` for the structure / pipe tables.\n` +
+        `6. Deliver: \`export_landxml\` (points, surfaces, alignments, pipe network for Civil 3D / 12d) and ` +
+        `\`export_civil_dxf\` (TIN as 3D faces, contours at their elevation).\n\n` +
+        `Edit parametrically (\`update_surface\`, \`update_platform\`, \`update_alignment\`, …) — never edit the ` +
+        `generated entities (ids "<objectId>:<part>"); \`describe_civil\` lists the model and ` +
+        `\`delete_civil_object\` removes an object.`,
+    );
+  },
+};
+
 const TEMPLATES: ReadonlyArray<PromptTemplate> = [
   modelBracket,
   orthographicSetup,
   parametricPart,
   designBuilding,
   designFactory,
+  designSite,
 ];
 
 /** @pure */

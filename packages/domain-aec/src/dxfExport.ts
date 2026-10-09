@@ -91,7 +91,10 @@ type Group = readonly [code: number, value: string | number];
 const flatten = (groups: ReadonlyArray<Group>): string[] =>
   groups.flatMap(([code, value]) => [String(code), String(value)]);
 
-function header(doc: CadDocument, bounds: readonly [number, number, number, number]): string[] {
+function header(
+  doc: Pick<CadDocument, 'units'>,
+  bounds: readonly [number, number, number, number],
+): string[] {
   return flatten([
     [0, 'SECTION'],
     [2, 'HEADER'],
@@ -158,6 +161,23 @@ function tables(layers: ReadonlyMap<string, number>): string[] {
   return flatten(groups);
 }
 
+/** The complete R12 file text (header, layer table, entities) of everything `writer` holds. */
+export function assembleDxf(doc: Pick<CadDocument, 'units'>, writer: DxfWriter): string {
+  return [
+    ...header(doc, writer.bounds()),
+    ...tables(writer.layers),
+    ...flatten([
+      [0, 'SECTION'],
+      [2, 'ENTITIES'],
+    ]),
+    ...writer.lines,
+    ...flatten([
+      [0, 'ENDSEC'],
+      [0, 'EOF'],
+    ]),
+  ].join('\n');
+}
+
 export interface DxfExport {
   readonly filename: string;
   readonly dxf: string;
@@ -185,19 +205,7 @@ function buildDxf(
     levelLabel = plan.level.name;
   }
   if (includeDrafting) writeDrafting(writer, doc);
-  const dxf = [
-    ...header(doc, writer.bounds()),
-    ...tables(writer.layers),
-    ...flatten([
-      [0, 'SECTION'],
-      [2, 'ENTITIES'],
-    ]),
-    ...writer.lines,
-    ...flatten([
-      [0, 'ENDSEC'],
-      [0, 'EOF'],
-    ]),
-  ].join('\n');
+  const dxf = assembleDxf(doc, writer);
   return {
     filename: `${fileSlug(building.project.name, 'project')}_${fileSlug(levelLabel, 'plan')}.dxf`,
     dxf: `${dxf}\n`,

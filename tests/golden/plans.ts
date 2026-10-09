@@ -413,6 +413,67 @@ export const plans: Record<string, GoldenAction[]> = {
     { command: 'set_entity_layer', params: { entityId: '$w1', layerId: '$lw' } },
   ],
   building_house_template: [{ command: 'add_building_template', params: { template: 'house' } }],
+  civil_site_terrain_road_drainage: [
+    { command: 'set_units', params: { units: 'm' } },
+    {
+      command: 'import_survey_points',
+      params: {
+        name: 'Topo',
+        points: [0, 20, 40, 60].flatMap((x) =>
+          [0, 20, 40, 60].map((y) => ({ x, y, z: 100 + x * 0.05 + y * 0.02 })),
+        ),
+      },
+    },
+    { command: 'create_surface', params: { contourInterval: 1, majorEvery: 2 } },
+    {
+      command: 'add_platform',
+      params: {
+        surfaceId: 'surface-1',
+        boundary: [
+          [20, 20],
+          [35, 20],
+          [35, 35],
+          [20, 35],
+        ],
+        elevation: 102,
+      },
+    },
+    { command: 'balance_platform', params: { platformId: 'platform-1' } },
+    {
+      command: 'add_alignment',
+      params: {
+        points: [
+          [5, 5],
+          [50, 5],
+          [50, 55],
+        ],
+        radii: [15],
+        surfaceId: 'surface-1',
+      },
+    },
+    {
+      command: 'set_alignment_profile',
+      params: {
+        alignmentId: 'alignment-1',
+        pvis: [
+          { station: 0, elevation: 100.5 },
+          { station: 45, elevation: 102.5, curveLength: 20 },
+          { station: 88, elevation: 103 },
+        ],
+      },
+    },
+    { command: 'set_road_section', params: { alignmentId: 'alignment-1' } },
+    {
+      command: 'add_manhole',
+      params: { location: [10, 50], invertElevation: 99.5, surfaceId: 'surface-1' },
+    },
+    {
+      command: 'add_manhole',
+      params: { location: [40, 50], invertElevation: 99.2, surfaceId: 'surface-1' },
+    },
+    { command: 'add_pipe', params: { fromId: 'manhole-1', toId: 'manhole-2' } },
+    { command: 'size_drainage_pipes', params: {} },
+  ],
   building_walls_openings_slab: [
     { command: 'set_units', params: { units: 'mm' } },
     { command: 'add_grid_system', params: { xSpacings: [5000, 5000], ySpacings: [4000] } },

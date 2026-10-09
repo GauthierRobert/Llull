@@ -66,6 +66,7 @@ import { exportObj, exportGltf } from './export_formats';
 import { exportCode } from './code_exchange';
 import { applyCodeTrace } from './code_trace';
 import { importMesh } from './import_mesh';
+import { importDxf } from './import_dxf';
 import { createComponent, insertInstance, explodeInstance } from './assemblies';
 import { clearDocument } from './document';
 import { setCamera, lookAt, fitView } from './camera';
@@ -166,6 +167,7 @@ const rawDefinitions = [
   exportCode,
   applyCodeTrace,
   importMesh,
+  importDxf,
   saveRecipe,
   instantiateRecipe,
   createComponent,

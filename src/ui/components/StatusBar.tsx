@@ -5,8 +5,9 @@
  * entity + selection counts, units. Presentation only (PRIME DIRECTIVE).
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useStore } from '@ui/store';
+import { SERVER_BASE } from '@ui/serverConfig';
 
 interface StatusItemProps {
   label: string;
@@ -55,6 +56,38 @@ function LiveIndicator(): React.ReactElement {
   );
 }
 
+/** License mode from the public `GET /license`; renders nothing offline / on any failure. */
+function LicenseBadge(): React.ReactElement | null {
+  const liveStatus = useStore((s) => s.liveStatus);
+  const [license, setLicense] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (liveStatus !== 'connected' || typeof fetch !== 'function') {
+      setLicense(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(`${SERVER_BASE}/license`)
+      .then((response) => (response.ok ? (response.json() as Promise<unknown>) : null))
+      .then((body) => {
+        const label = (body as { label?: unknown } | null)?.label;
+        if (!cancelled && typeof label === 'string') setLicense(label);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [liveStatus]);
+
+  if (license === null) return null;
+  return (
+    <>
+      <StatusItem label="License" value={license} />
+      <span className="status-divider" aria-hidden="true" />
+    </>
+  );
+}
+
 export function StatusBar(): React.ReactElement {
   const units = useStore((s) => s.document.units);
   const displayPrecision = useStore((s) => s.document.displayPrecision);
@@ -90,6 +123,7 @@ export function StatusBar(): React.ReactElement {
         )}
       </div>
       <div className="status-bar-bottom__right">
+        <LicenseBadge />
         <StatusItem label="Entities" value={entityLabel} aria-label={`Entities: ${entityLabel}`} />
         <span className="status-divider" aria-hidden="true" />
         <StatusItem

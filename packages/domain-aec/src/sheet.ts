@@ -273,7 +273,7 @@ function titleBlock(
   ].join('');
 }
 
-function northArrow(x: number, y: number): string {
+export function northArrow(x: number, y: number): string {
   return (
     `<g id="north-arrow"><circle cx="${n(x)}" cy="${n(y)}" r="6" class="frame-thin"/>` +
     `<polygon points="${n(x)},${n(y - 6)} ${n(x - 2.5)},${n(y + 3)} ${n(x)},${n(y + 1.5)} ${n(x + 2.5)},${n(y + 3)}" class="solid"/>` +

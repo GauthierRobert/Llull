@@ -14,6 +14,8 @@ import { adaptiveGridStep, majorGridStep, localGridPatch } from './gridHelpers';
 interface AdaptiveGrid2DProps {
   minorColor: number;
   majorColor: number;
+  /** Render-space z of the lowest drawn plane; the grid sits just beneath it. */
+  baseZ: number;
 }
 
 /** A flat grid helper lying on the XY plane. */
@@ -45,6 +47,7 @@ function resizeGrid(
 export function AdaptiveGrid2D({
   minorColor,
   majorColor,
+  baseZ,
 }: AdaptiveGrid2DProps): React.ReactElement {
   const minorGrid = useMemo(() => createFlatGrid(100, 10, minorColor), [minorColor]);
   const majorGrid = useMemo(() => createFlatGrid(100, 10, majorColor), [majorColor]);
@@ -85,8 +88,8 @@ export function AdaptiveGrid2D({
     // Snapped to the step so lines stay aligned to world-step multiples (matching the snap grid).
     const snapX = Math.round(ortho.position.x / step) * step;
     const snapY = Math.round(ortho.position.y / step) * step;
-    minorGrid.position.set(snapX, snapY, -0.01);
-    majorGrid.position.set(snapX, snapY, -0.02);
+    minorGrid.position.set(snapX, snapY, baseZ - 0.01);
+    majorGrid.position.set(snapX, snapY, baseZ - 0.02);
   });
 
   return (

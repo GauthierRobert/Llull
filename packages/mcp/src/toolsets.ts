@@ -22,6 +22,7 @@ export const TOOLSET_NAMES = [
   'assembly',
   'exchange',
   'building',
+  'civil',
 ] as const;
 
 export type ToolsetName = (typeof TOOLSET_NAMES)[number];
@@ -166,13 +167,19 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'export_code',
     'apply_code_trace',
     'import_mesh',
+    'import_dxf',
     'export_step',
     'import_step',
+    'import_dwg',
     'import_code',
   ],
   /** Contributed by the installed building + industrial plugins. */
   get building(): readonly string[] {
     return pluginToolNames('building');
+  },
+  /** Contributed by the installed civil (site / terrain / roads / drainage) plugin. */
+  get civil(): readonly string[] {
+    return pluginToolNames('civil');
   },
 };
 
@@ -224,6 +231,7 @@ export function isToolEnabled(toolName: string, enabled: ReadonlySet<ToolsetName
 const PROMPT_TOOLSETS: Readonly<Record<string, ToolsetName>> = {
   design_building: 'building',
   design_factory: 'building',
+  design_site: 'civil',
 };
 
 /** True when the MCP prompt `promptName` only references enabled tools. */

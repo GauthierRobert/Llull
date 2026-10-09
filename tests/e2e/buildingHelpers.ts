@@ -4,9 +4,21 @@ import { expect, type Download, type Page } from '@playwright/test';
 
 export async function openBuilding(page: Page): Promise<void> {
   await captureDownloads(page);
-  await page.goto('/');
-  await page.evaluate(() => window.localStorage.clear());
-  await page.reload();
+  // Clear storage before the app boots: clearing a live page and reloading lets its pagehide
+  // autosave flush re-write the previous document.
+  await page.addInitScript(() => {
+    if (location.search.includes('fresh=1')) window.localStorage.clear();
+  });
+  // The old page's pagehide autosave can run concurrently with the next navigation (Chromium
+  // unloads the old document in parallel), so disarm its storage writes before leaving.
+  await page
+    .evaluate(() => {
+      window.localStorage.clear();
+      Storage.prototype.setItem = () => undefined;
+    })
+    .catch(() => undefined);
+  await page.goto('about:blank');
+  await page.goto('/?fresh=1');
   await page.getByRole('tab', { name: 'Building' }).click();
   await expect(page.getByTestId('building-panel')).toBeVisible();
 }
@@ -33,7 +45,7 @@ export function elementRows(page: Page, prefix: string): ReturnType<Page['locato
 }
 
 /** Records the text of every blob download the app triggers (read back in-page; no Node APIs). */
-async function captureDownloads(page: Page): Promise<void> {
+export async function captureDownloads(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const captured: Array<Promise<string>> = [];
     Object.assign(window, { __downloads: captured });

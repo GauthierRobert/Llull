@@ -12,7 +12,7 @@
  * Playwright / screenshot verification.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
@@ -196,5 +196,27 @@ describe('StatusBar — entity count', () => {
     createBox();
     render(<StatusBar />);
     expect(screen.getByLabelText('Entities: 2')).toBeDefined();
+  });
+});
+
+describe('StatusBar — license mode', () => {
+  beforeEach(resetStore);
+
+  it('shows the license label from GET /license when connected', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ mode: 'evaluation', label: 'Evaluation — 3 users' })),
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    useStore.setState({ liveStatus: 'connected' });
+    render(<StatusBar />);
+    expect(await screen.findByLabelText('License: Evaluation — 3 users')).toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+
+  it('shows nothing in offline local mode', () => {
+    render(<StatusBar />);
+    expect(screen.queryByLabelText(/^License:/)).not.toBeInTheDocument();
   });
 });

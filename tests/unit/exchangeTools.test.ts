@@ -102,9 +102,14 @@ function textOf(result: { content: Array<{ text: string }> } | null): string {
 }
 
 describe('buildExchangeToolDefinitions', () => {
-  it('defines export_step, import_step and import_code with annotations', () => {
+  it('defines export_step, import_step, import_dwg and import_code with annotations', () => {
     const tools = buildExchangeToolDefinitions();
-    expect(tools.map((t) => t.name)).toEqual(['export_step', 'import_step', 'import_code']);
+    expect(tools.map((t) => t.name)).toEqual([
+      'export_step',
+      'import_step',
+      'import_dwg',
+      'import_code',
+    ]);
     const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
     expect(byName.export_step?.annotations).toEqual({ idempotentHint: true });
     expect(byName.import_step?.annotations).toBeUndefined();

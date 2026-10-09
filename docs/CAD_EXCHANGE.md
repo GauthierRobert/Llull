@@ -127,6 +127,26 @@ a hostile document loaded with `load_document` cannot inject code into `export_s
 HTTP downloads for the browser: `GET /export/code?language=cadquery|build123d|openscad|freecad`
 and `GET /export/step` (503 when the bridge is not configured).
 
+## DWG import (optional converter)
+
+DWG is proprietary, so llull converts it to ASCII DXF on the server (core stays pure) and then runs
+`import_dxf` / `import_survey_dxf` through the normal command path (live document, undo, live sync).
+Install one converter on the server host:
+
+- **LibreDWG** (free): `apt install libredwg-tools` (provides `dwg2dxf`). `LLULL_DWG2DXF=<path>`
+  overrides the executable, `off` disables it.
+- **ODA File Converter**: set `LLULL_ODA_CONVERTER=<executable>`; run as
+  `<exe> in-dir out-dir ACAD2018 DXF 0 1 *.DWG` (used when `dwg2dxf` is missing).
+
+`LLULL_DWG_TIMEOUT_MS` (default 60000) and `LLULL_DWG_MAX_BYTES` (default 50 MB) bound each
+conversion; every request uses a private temp dir that is always removed.
+
+- HTTP: `POST /import/dwg?target=drawing|survey&sourceUnit=m&layers=A,B` with the raw bytes
+  (`application/octet-stream`) or JSON `{ "base64": "...", "target": "survey", "name": "..." }`.
+  400 not a DWG (`AC10xx` header), 413 too large, 503 no converter installed, 504 timeout.
+- MCP: `import_dwg { dwgBase64 | path, target, sourceUnit, layers, ... }` (toolset `exchange`).
+- UI: Civil / Site panel › DWG file inputs (needs the server).
+
 ## Limits and known gaps
 
 - STEP import gives meshes. Recognising analytic primitives and features in an arbitrary

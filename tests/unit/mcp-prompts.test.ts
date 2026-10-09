@@ -24,8 +24,8 @@ describe('listMcpPrompts()', () => {
     expect(listMcpPrompts().length).toBeGreaterThanOrEqual(1);
   });
 
-  it('returns exactly 5 registered templates', () => {
-    expect(listMcpPrompts()).toHaveLength(5);
+  it('returns exactly 6 registered templates', () => {
+    expect(listMcpPrompts()).toHaveLength(6);
   });
 
   it('includes model_bracket', () => {
@@ -447,6 +447,19 @@ describe('design_factory prompt', () => {
     const named = [...text.matchAll(/`([a-z_]+)`/g)].map((match) => match[1] as string);
     expect(named).toContain('add_portal_frame_building');
     expect(named).toContain('check_clashes');
+    for (const name of named) expect(getCommand(name), name).toBeDefined();
+  });
+});
+
+describe('design_site prompt', () => {
+  it('walks through the civil workflow and names only registered commands', async () => {
+    const { getCommand } = await import('@core/commands/registry');
+    const result = getMcpPrompt('design_site', { brief: 'a depot yard' });
+    expect(result!.messages[0]!.content.text).toContain('a depot yard');
+    const text = result!.messages[1]!.content.text;
+    const named = [...text.matchAll(/`([a-z_]+)`/g)].map((match) => match[1] as string);
+    expect(named).toContain('balance_platform');
+    expect(named).toContain('export_landxml');
     for (const name of named) expect(getCommand(name), name).toBeDefined();
   });
 });

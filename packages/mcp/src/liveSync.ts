@@ -23,6 +23,9 @@ export interface LiveCommandEvent {
   readonly params: unknown;
   /** `documentHash` of the server document after the command. */
   readonly stateHash: string;
+  /** Named user who ran the command (server in named-user mode only); clients may ignore it. */
+  readonly userId?: string;
+  readonly userName?: string;
 }
 
 /** SSE `snapshot` event and `GET /live/snapshot` body: the full server document at `seq`. */

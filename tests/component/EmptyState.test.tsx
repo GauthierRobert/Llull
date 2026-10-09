@@ -4,12 +4,14 @@
  * Asserts observable behavior (workflow W3, react R11):
  *   - Shown when document.order is empty; absent once any entity exists or a 2D tool is armed.
  *   - "Add a 3D box" creates a selected box; "Draw a 2D rectangle" arms the rectangle tool.
+ *   - "Civil site starter" loads the sample survey and builds the whole site in one plan.
  *   - Dismiss hides the card without changing the document.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { useStore, useToolStore } from '@ui/store';
+import { readFileSync } from 'node:fs';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { useLayoutStore, useStore, useToolStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { EmptyState } from '@ui/components/EmptyState';
 import { localDispatch } from '../helpers/storeTestHelpers';
@@ -74,6 +76,60 @@ describe('EmptyState — quick starts', () => {
     render(<EmptyState />);
     expect(screen.getByText(/move things:/i)).toBeDefined();
     expect(screen.getByText(/let ai build it/i)).toBeDefined();
+  });
+});
+
+describe('EmptyState — civil site starter', () => {
+  beforeEach(() => {
+    resetStores();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const civilCounts = (): Record<string, number> => {
+    const civil = useStore.getState().document.civil;
+    const counts: Record<string, number> = {};
+    for (const id of civil?.order ?? []) {
+      const category = civil?.objects[id]?.category ?? '?';
+      counts[category] = (counts[category] ?? 0) + 1;
+    }
+    return counts;
+  };
+
+  it('fetches the sample survey and builds survey, terrain, pad, road and a sized storm network', async () => {
+    const csv = readFileSync('public/samples/pilot-site-survey.csv', 'utf8');
+    const fetchMock = vi.fn(() => Promise.resolve(new Response(csv, { status: 200 })));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<EmptyState />);
+    fireEvent.click(screen.getByRole('button', { name: /civil site starter/i }));
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/samples\/pilot-site-survey\.csv$/));
+    expect(useLayoutStore.getState().sidebarTab).toBe('civil');
+    await waitFor(() => expect(civilCounts()['pipe']).toBe(3));
+    expect(civilCounts()).toEqual({
+      pointGroup: 1,
+      surface: 1,
+      platform: 1,
+      alignment: 1,
+      manhole: 4,
+      pipe: 3,
+    });
+    expect(useStore.getState().document.units).toBe('m');
+    expect(useStore.getState().lastSummary).toMatch(/Plan complete/);
+  });
+
+  it('reports a survey that cannot be loaded and leaves the document unchanged', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response('missing', { status: 404 }))),
+    );
+    const before = useStore.getState().document;
+    render(<EmptyState />);
+    fireEvent.click(screen.getByRole('button', { name: /civil site starter/i }));
+    await waitFor(() =>
+      expect(useStore.getState().lastSummary).toMatch(/could not load the sample survey \(HTTP 404\)/),
+    );
+    expect(useStore.getState().document).toBe(before);
   });
 });
 

@@ -58,6 +58,7 @@ export const clearDocument = defineCommand({
       ].every((table) => Object.keys(table).length === 0) &&
       doc.featureHistory.length === 0 &&
       doc.building === undefined &&
+      doc.civil === undefined &&
       (keepLayers || isLayersDefault);
 
     if (isAlreadyEmpty) {
@@ -91,6 +92,7 @@ export const clearDocument = defineCommand({
           }),
     };
     delete nextDoc.building;
+    delete nextDoc.civil;
 
     const layerPart = keepLayers
       ? `kept ${layerCount} layer${layerCount === 1 ? '' : 's'}`

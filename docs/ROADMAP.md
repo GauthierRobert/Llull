@@ -60,7 +60,7 @@ AI control — there is no in-app AI bridge).**
 ## v0.8 — Interop & persistence
 
 - [x] Native save/load + document versioning (llull-document v2; v1 still read)
-- [ ] 2D: DXF / DWG import + export
+- [x] 2D: DXF import (`import_dxf`) + export (`export_dxf`, `export_civil_dxf`); DWG still open
 - [x] 3D exchange: STEP export (exact B-rep, via CadQuery/OpenCascade) + STEP import (as meshes) — docs/CAD_EXCHANGE.md
 - [x] Parametric code exchange: CadQuery / build123d (round-trip), OpenSCAD + FreeCAD macro (export)
 - [ ] IGES; STEP feature recognition (import as editable primitives)
@@ -75,6 +75,14 @@ AI control — there is no in-app AI bridge).**
 
 - [ ] 2D drawings generated from 3D: orthographic / section / detail views
 - [ ] GD&T, dimension styles, title blocks, sheets (paper space)
+
+## Civil / site engineering — see docs/CIVIL.md, docs/MARKET_READINESS.md
+
+- [x] Survey import, TIN surfaces + contours, platforms + cut/fill balance, surface volumes
+- [x] Road alignments, profiles, templates, corridor volumes, long / cross sections
+- [x] Storm drainage networks: Manning, rational method, sizing, schedules
+- [x] LandXML 1.2 + civil DXF export
+- [ ] DWG, spirals + superelevation, CRS, civil plan sheets (see MARKET_READINESS gaps)
 
 ## Construction (AEC / BIM) — see docs/CONSTRUCTION_PLAN.md
 

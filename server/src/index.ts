@@ -4,7 +4,9 @@
  * change goes through the command registry (architecture L1, L6).
  *
  *   GET /health            liveness + active kernel
+ *   /license /admin/*      `adminRoutes.ts` (license status; admin: users, audit, license)
  *   /live /command /undo /redo   `liveRoutes.ts`      /export/*   `exportRoutes.ts`
+ *   POST /import/dwg       `importRoutes.ts` (DWG -> DXF converter, then import_dxf)
  *   ALL /mcp               `mcp.ts` (Streamable HTTP; bearer auth + rate limit)
  *
  * Env: PORT (3001), HOST (127.0.0.1: llull is a local tool and /command is unauthenticated for the
@@ -14,13 +16,16 @@
 
 import './plugins'; // must stay first: installs domain plugins before liveDocument loads
 import './loadEnv';
+import path from 'path';
 import express from 'express';
 import cors from 'cors';
 import { buildMcpRouter } from './mcp';
-import { exchangeOptionsFromEnv } from './pythonExchange';
+import { exchangeOptionsWithDwg } from './dwgConvert';
+import { buildImportRouter } from './importRoutes';
 import { getActiveKernelName } from './geometryKernel';
 import { buildLiveRouter } from './liveRoutes';
 import { buildExportRouter } from './exportRoutes';
+import { buildAdminRouter } from './adminRoutes';
 import { errorMessage } from '@lib/errorMessage';
 import { startServer } from './lifecycle';
 import {
@@ -45,17 +50,29 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization'],
   }),
 );
-app.use(express.json({ limit: process.env['LLULL_BODY_LIMIT'] ?? '2mb' }));
+const jsonBody = express.json({ limit: process.env['LLULL_BODY_LIMIT'] ?? '2mb' });
+// /import/dwg parses its own (much larger) body; the default JSON limit must not reject it first.
+app.use((req, res, next) => (req.path === '/import/dwg' ? next() : jsonBody(req, res, next)));
 
 const restLimiter = buildRestRateLimiter();
-const exchange = exchangeOptionsFromEnv();
+const exchange = exchangeOptionsWithDwg();
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', kernel: getActiveKernelName() });
 });
 app.use(buildLiveRouter(restLimiter));
+app.use(buildAdminRouter(restLimiter));
 app.use('/export', restLimiter, buildExportRouter(exchange));
+app.use('/import', buildImportRouter(restLimiter));
 app.use('/mcp', buildMcpRouter(exchange));
+// On-prem: serve the built web app (`LLULL_STATIC_DIR`, e.g. /app/dist) from the same origin.
+const staticDir = process.env['LLULL_STATIC_DIR'];
+if (staticDir !== undefined && staticDir !== '') {
+  app.use(express.static(staticDir));
+  app.get('*', (req, res, next) =>
+    req.accepts('html') === 'html' ? res.sendFile(path.resolve(staticDir, 'index.html')) : next(),
+  );
+}
 app.use((req, res) => {
   res.status(404).json({ error: `Not found: ${req.method} ${req.path}` });
 });

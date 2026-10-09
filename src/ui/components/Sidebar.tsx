@@ -2,7 +2,7 @@
  * @layer ui/components
  *
  * Sidebar — vertical icon rail + the one document browser panel it selects
- * (building, layers, assembly, mechanisms, parameters, history, configurations, materials).
+ * (building, civil, layers, assembly, mechanisms, parameters, history, configurations, materials).
  * Tab state lives in useLayoutStore (presentation only — never document state).
  */
 
@@ -19,11 +19,13 @@ import { FeatureHistoryPanel } from '@ui/panels/FeatureHistoryPanel';
 import { ConfigurationsPanel } from '@ui/panels/ConfigurationsPanel';
 import { MaterialsPanel } from '@ui/panels/MaterialsPanel';
 import { BuildingPanel } from '@ui/panels/building/BuildingPanel';
+import { CivilPanel } from '@ui/panels/civil/CivilPanel';
 import { SIDEBAR_TAB_SPECS } from './sidebarTabs';
 import type { SidebarTabSpec } from './sidebarTabs';
 
 const TAB_PANELS: Readonly<Record<SidebarTab, React.ComponentType<{ className?: string }>>> = {
   building: BuildingPanel,
+  civil: CivilPanel,
   layers: LayersPanel,
   assembly: AssemblyPanel,
   mechanisms: MechanismsPanel,
@@ -36,6 +38,7 @@ const TAB_PANELS: Readonly<Record<SidebarTab, React.ComponentType<{ className?: 
 /** Item count shown as a badge on each rail button. */
 const TAB_COUNTS: Readonly<Record<SidebarTab, (doc: CadDocument) => number>> = {
   building: (doc) => doc.building?.elementOrder.length ?? 0,
+  civil: (doc) => doc.civil?.order.length ?? 0,
   layers: (doc) => doc.layerOrder.length,
   assembly: (doc) => Object.keys(doc.components).length,
   mechanisms: (doc) =>

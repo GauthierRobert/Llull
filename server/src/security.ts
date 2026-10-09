@@ -8,6 +8,7 @@
 import crypto from 'crypto';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import rateLimit from 'express-rate-limit';
+import { isUserMode, requireRole, type Role } from './users';
 
 const DEFAULT_ALLOWED_ORIGINS: readonly string[] = [
   'http://localhost:5173',
@@ -76,11 +77,11 @@ function isLocalPeer(req: Request): boolean {
  * Opt out with `LLULL_ALLOW_UNAUTHENTICATED=true`.
  */
 export function checkBindSafety(host: string, env: NodeJS.ProcessEnv = process.env): string | null {
-  if (isLoopbackAddress(host) || env['MCP_AUTH_TOKEN']) return null;
+  if (isLoopbackAddress(host) || env['MCP_AUTH_TOKEN'] || env['LLULL_USERS_FILE']) return null;
   if (env['LLULL_ALLOW_UNAUTHENTICATED'] === 'true') return null;
   return (
     `Refusing to start: HOST=${host} is not loopback and MCP_AUTH_TOKEN is not set. ` +
-    'Set MCP_AUTH_TOKEN, bind to 127.0.0.1, or set LLULL_ALLOW_UNAUTHENTICATED=true.'
+    'Set MCP_AUTH_TOKEN (or LLULL_USERS_FILE), bind to 127.0.0.1, or set LLULL_ALLOW_UNAUTHENTICATED=true.'
   );
 }
 
@@ -142,7 +143,7 @@ export function hostAllowlist(): RequestHandler {
  *   6. otherwise (allowed browser origin, or no token configured)   -> allow
  */
 export function guardMutation(): RequestHandler {
-  return buildGuard(false);
+  return buildGuard(false, 'editor');
 }
 
 /**
@@ -151,11 +152,42 @@ export function guardMutation(): RequestHandler {
  * `?access_token=<token>` for EventSource / plain browser downloads. No token configured -> open.
  */
 export function guardRead(): RequestHandler {
-  return buildGuard(true);
+  return buildGuard(true, 'viewer');
 }
 
-function buildGuard(acceptQueryToken: boolean): RequestHandler {
+/**
+ * Guard for `/admin/*`. Named-user mode: role `admin`. Single-token mode: the shared token (it is
+ * all-powerful). No token configured: loopback peers only.
+ */
+export function guardAdmin(): RequestHandler {
+  const userGuard = requireRole('admin', false);
   return (req: Request, res: Response, next: NextFunction): void => {
+    if (isUserMode()) {
+      userGuard(req, res, next);
+      return;
+    }
+    const token = process.env['MCP_AUTH_TOKEN'];
+    if (token ? hasValidBearer(req, token) : isLocalPeer(req)) {
+      next();
+      return;
+    }
+    res
+      .status(token ? 401 : 403)
+      .json(
+        token
+          ? UNAUTHORIZED_BODY
+          : { error: 'Admin endpoints need MCP_AUTH_TOKEN or a loopback peer.' },
+      );
+  };
+}
+
+function buildGuard(acceptQueryToken: boolean, role: Role): RequestHandler {
+  const userGuard = requireRole(role, acceptQueryToken);
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (isUserMode()) {
+      userGuard(req, res, next);
+      return;
+    }
     const token = process.env['MCP_AUTH_TOKEN'];
     if (!token && acceptQueryToken) {
       next();

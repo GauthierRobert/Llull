@@ -96,6 +96,11 @@ describe('isPromptEnabled()', () => {
     expect(isPromptEnabled('design_building', parseToolsets('building').enabled)).toBe(true);
   });
 
+  it('hides the site workflow without the civil toolset', () => {
+    expect(isPromptEnabled('design_site', parseToolsets('building').enabled)).toBe(false);
+    expect(isPromptEnabled('design_site', parseToolsets('civil').enabled)).toBe(true);
+  });
+
   it('every prompt is enabled when all toolsets are', () => {
     const all = parseToolsets('all').enabled;
     for (const prompt of listMcpPrompts()) expect(isPromptEnabled(prompt.name, all)).toBe(true);
