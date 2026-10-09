@@ -42,11 +42,13 @@ export class BuildingPanel {
     const { page } = this.session;
     const row = page.getByRole('button', { name: `Edit equipment ${mark}`, exact: true });
     if ((await row.getAttribute('aria-pressed')) !== 'true') await row.click();
+    // The element inspector shows the same editor for a selected equipment: use the section's.
+    const section = page.getByTestId('building-equipment');
     for (const [key, value] of Object.entries(fields)) {
-      await page.getByTestId(`equipment-edit-${key}`).fill(value);
+      await section.getByTestId(`equipment-edit-${key}`).fill(value);
     }
     return this.session.acting(`edit equipment ${mark}`, () =>
-      page.getByTestId('equipment-save').click(),
+      section.getByTestId('equipment-save').click(),
     );
   }
 

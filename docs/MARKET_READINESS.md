@@ -49,11 +49,31 @@ geometry, save / load round trips, and the repository's coverage gate (≥ 90 / 
 | Civil drawings | true-scale civil plan sheets and plan-profile sheets with title block |
 | Drainage depth | time of concentration, IDF curves, iterated sizing, HGL with surcharge / flooding, drainage long sections |
 
+## Deployment verification (2026-10-09)
+
+- **Docker image built and run** (`docker build` with `WITH_DWG=0`; base images from a registry
+  mirror): the image serves the web app, `/health` is healthy, `/license` reports evaluation mode,
+  requests without a token get 401, a viewer's mutation gets 403, an editor's commands apply and
+  land in the audit trail under the user's name.
+- **Real DWG import verified end to end** inside that container: an AutoCAD 2000 (AC1015) DWG
+  produced with LibreDWG `dxf2dwg`, converted by the real `dwg2dxf` (LibreDWG 0.11 from
+  conda-forge, mounted for the test), imported as survey points, triangulated and exported to
+  LandXML — every step in the audit trail. The test exposed and fixed two issues: LibreDWG 0.11
+  repeats polyline vertices after SEQEND (now ignored), and the old Dockerfile's `libredwg-tools`
+  apt package does not exist in Debian stable (now built from a pinned GNU release, 0.14).
+- **Not verified here:** the LibreDWG 0.14 source build stage (ftp.gnu.org is unreachable from this
+  sandbox) — build once with `LIBREDWG_SHA256` set before shipping the image.
+
+- **LandXML pipe slope convention resolved:** pipes are now written in percent (1 = 1 %), as the
+  LandXML 2.0 schema annotation and the buildingSMART InfraModel profile of LandXML 1.2 specify;
+  the previous ratio output would have read as 100× too flat in percent-reading software.
+
 ## Gaps that still limit sales (priority order)
 
 1. **Validation with real users** — no pilot customer has used it yet; the next step is a pilot with
    two or three site-development offices, measuring time to first deliverable and collecting their
-   national-standard presets (design speed tables, IDF curves, pipe catalogues).
+   national-standard presets (design speed tables, IDF curves, pipe catalogues). The pilot kit for
+   this is in [`PILOT.md`](PILOT.md).
 2. **Commercial readiness** — user accounts, licensing / billing, multi-user permissions, per-user
    audit trail; engineering checks must still be signed by a qualified engineer.
 3. **Native DWG without a server converter**, true projection transforms (EPSG library), lane
@@ -84,4 +104,7 @@ geometry, save / load round trips, and the repository's coverage gate (≥ 90 / 
 2. Spirals + superelevation in `alignmentGeometry` / `roadSection` (same command surface).
 3. CRS metadata on the document and LandXML `CoordinateSystem` output.
 4. Civil plan / profile sheets reusing the building sheet engine.
-5. Pilot with two or three site-development offices; measure time-to-first-deliverable.
+5. Pilot with two or three site-development offices; measure time-to-first-deliverable. The pilot
+   kit is ready: [`PILOT.md`](PILOT.md) (sample survey CSV / DXF, one-click civil site starter,
+   45-minute tutorial, comparison checklist, success criteria, in-app feedback) and the automated
+   `civil-site-development` production-gate scenario ([`PRODUCTION_GATE.md`](PRODUCTION_GATE.md)).

@@ -39,7 +39,11 @@ async function shutdown(server: Server): Promise<void> {
 export async function startServer(app: Express, port: number, host: string): Promise<Server> {
   const refusal = checkBindSafety(host);
   if (refusal !== null) throw new Error(refusal);
-  if (!isLoopbackAddress(host) && !process.env['MCP_AUTH_TOKEN']) {
+  if (
+    !isLoopbackAddress(host) &&
+    !process.env['MCP_AUTH_TOKEN'] &&
+    !process.env['LLULL_USERS_FILE']
+  ) {
     console.warn(
       '[llull-server] WARNING: network-exposed without MCP_AUTH_TOKEN (LLULL_ALLOW_UNAUTHENTICATED=true).',
     );

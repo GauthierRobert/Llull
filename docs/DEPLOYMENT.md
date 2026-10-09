@@ -91,11 +91,16 @@ Set `LLULL_PUBLIC_URL=https://cad.example.com` and `LLULL_ALLOWED_HOSTS=cad.exam
 
 ## 5. DWG converter
 
-The image installs `libredwg-tools` (provides `dwg2dxf`) when the Debian base carries it; the build
-prints a warning and continues otherwise. Check with
-`docker compose exec llull dwg2dxf --version`. Alternatives: mount the ODA File Converter and set
-`LLULL_ODA_CONVERTER=<executable>`, or set `LLULL_DWG2DXF=off`. Without a converter `POST /import/dwg`
-answers 503; DXF import is unaffected.
+The image builds LibreDWG's `dwg2dxf` from a pinned GNU release (`LIBREDWG_VERSION`, default
+0.14 — Debian stable does not package LibreDWG, and Debian's tracker lists CVEs up to 0.13.4).
+Verify the download by passing the published checksum:
+`docker build --build-arg LIBREDWG_SHA256=<sha256 from ftp.gnu.org/gnu/libredwg> …`. Build without
+DWG support with `--build-arg WITH_DWG=0`. Check with `docker compose exec llull dwg2dxf --version`.
+Alternatives: mount the ODA File Converter and set `LLULL_ODA_CONVERTER=<executable>`, or set
+`LLULL_DWG2DXF=off`. Without a converter `POST /import/dwg` answers 503; DXF import is unaffected.
+
+LibreDWG is GPL-3.0: it runs as a separate program, never linked into llull. Keep it that way
+(do not bundle a LibreDWG WebAssembly/library build into the app) unless llull's licence allows it.
 
 ## 6. Backup
 

@@ -30,7 +30,7 @@ if (command === 'keygen') {
   const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
   fs.writeFileSync(out, privateKey.export({ type: 'pkcs8', format: 'pem' }), { mode: 0o600 });
   console.error(`Private key written to ${out} (keep it secret, never commit it). Public key:`);
-  console.log(publicKey.export({ type: 'spki', format: 'pem' }));
+  process.stdout.write(`${publicKey.export({ type: 'spki', format: 'pem' })}\n`);
 } else if (command === 'sign') {
   const payloadFile = rest[0];
   if (!payloadFile || payloadFile.startsWith('--')) fail('usage: license.mjs sign <payload.json>');
@@ -57,7 +57,7 @@ if (command === 'keygen') {
     }),
   );
   const signature = crypto.sign(null, bytes, privateKey);
-  console.log(`${bytes.toString('base64url')}.${signature.toString('base64url')}`);
+  process.stdout.write(`${bytes.toString('base64url')}.${signature.toString('base64url')}\n`);
 } else {
   fail('usage: license.mjs keygen [--out file] | sign <payload.json> [--key file]');
 }

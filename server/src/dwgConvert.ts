@@ -34,9 +34,11 @@ const MAX_CONCURRENT_CONVERSIONS = 2;
 const MAX_STDERR_BYTES = 16 * 1024;
 
 export const NO_DWG_CONVERTER_MESSAGE =
-  'DWG import needs a converter on the server host: install LibreDWG (`apt install libredwg-tools`, ' +
-  'provides dwg2dxf) or the ODA File Converter and set LLULL_ODA_CONVERTER=<executable>. ' +
-  'Alternatively save the drawing as ASCII DXF (see docs/CAD_EXCHANGE.md).';
+  'DWG import needs a converter on the server host: LibreDWG 0.14+ (provides dwg2dxf; the llull ' +
+  'Docker image builds it, elsewhere build it from ftp.gnu.org/gnu/libredwg because distribution ' +
+  'packages are often missing or outdated) or the ODA File Converter with ' +
+  'LLULL_ODA_CONVERTER=<executable>. Alternatively save the drawing as ASCII DXF ' +
+  '(see docs/CAD_EXCHANGE.md).';
 
 /** HTTP-mappable conversion failure. */
 export class DwgConvertError extends Error {

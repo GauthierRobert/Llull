@@ -2,14 +2,17 @@
  * @layer ui/panels/civil
  *
  * AlignmentEditor — one road alignment: design profile PVIs (`set_alignment_profile`), road
- * template (`set_road_section`) and its deliverables (report CSV, long / cross section SVG).
+ * template (`set_road_section`), superelevation (`set_superelevation`) and its deliverables
+ * (report CSV, long / cross section SVG, plan-profile sheet on the chosen paper).
  */
 
 import React, { useState } from 'react';
 import type { AlignmentObject } from '@core/model/civil';
+import { PAPER_SIZES, type PaperSize } from '@aec/sheet';
 import { useStore } from '@ui/store';
+import { OptionSelect } from '@ui/panels/OptionSelect';
 import { CivilObjectRow, CivilStatus } from './CivilParts';
-import { optionalNumber, parsePvis } from './civilInput';
+import { optionalNumber, parseNumber, parsePvis } from './civilInput';
 import { downloadQuery } from './civilQuery';
 
 const SECTION_FIELDS = [
@@ -42,6 +45,10 @@ export function AlignmentEditor({ alignment }: { alignment: AlignmentObject }): 
     fillSlope: '',
   });
   const [designSpeed, setDesignSpeed] = useState('');
+  const [superelevation, setSuperelevation] = useState(() =>
+    alignment.superelevation ? String(alignment.superelevation.maxRate) : '',
+  );
+  const [paper, setPaper] = useState<PaperSize>('A3');
   const [status, setStatus] = useState('');
   const label = alignment.name;
 
@@ -63,6 +70,16 @@ export function AlignmentEditor({ alignment }: { alignment: AlignmentObject }): 
         {},
       ),
     });
+  };
+
+  const applySuperelevation = (): void => {
+    const maxRate = parseNumber(superelevation);
+    if (maxRate === undefined) {
+      setStatus('Superelevation: the full rate on curves as a ratio, e.g. 0.06 (0 removes it).');
+      return;
+    }
+    dispatch('set_superelevation', { alignmentId: alignment.id, maxRate });
+    setStatus('');
   };
 
   const params = { alignmentId: alignment.id };
@@ -95,6 +112,18 @@ export function AlignmentEditor({ alignment }: { alignment: AlignmentObject }): 
             ))}
             <button type="button" className="btn btn--ghost btn--sm" onClick={applySection}>
               Set road section
+            </button>
+          </div>
+          <div className="building-inline-form">
+            <input
+              type="number"
+              value={superelevation}
+              placeholder="Superelevation (0.06)"
+              aria-label={`Superelevation of ${label}`}
+              onChange={(event) => setSuperelevation(event.target.value)}
+            />
+            <button type="button" className="btn btn--ghost btn--sm" onClick={applySuperelevation}>
+              Set superelevation
             </button>
           </div>
           <div className="building-actions">
@@ -163,7 +192,7 @@ export function AlignmentEditor({ alignment }: { alignment: AlignmentObject }): 
                 setStatus(
                   downloadQuery(
                     'export_plan_profile_sheet',
-                    params,
+                    { ...params, paper },
                     'text',
                     `${alignment.id}-plan-profile.svg`,
                     'image/svg+xml',
@@ -173,6 +202,12 @@ export function AlignmentEditor({ alignment }: { alignment: AlignmentObject }): 
             >
               Plan-profile sheet
             </button>
+            <OptionSelect
+              value={paper}
+              options={PAPER_SIZES}
+              label={`Sheet paper of ${label}`}
+              onChange={setPaper}
+            />
           </div>
           <CivilStatus text={status} testId={`civil-alignment-status-${alignment.id}`} />
         </div>

@@ -91,7 +91,7 @@ describe('export_landxml', () => {
     expect(xml).toContain('<Invert elev="99" flowDir="out" refPipe="P1"/>');
     expect(xml).toContain('<Invert elev="98.5" flowDir="in" refPipe="P1"/>');
     expect(xml).toContain(
-      '<Pipe name="P1" refStart="MH1 (manhole-1)" refEnd="MH1 (manhole-2)" length="50" slope="0.01">',
+      '<Pipe name="P1" refStart="MH1 (manhole-1)" refEnd="MH1 (manhole-2)" length="50" slope="1">',
     );
     expect(xml).toContain('<CircPipe diameter="300" material="PVC" mannings="0.013"/>');
     expect(xml).not.toContain('<Surfaces>');

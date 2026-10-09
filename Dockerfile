@@ -15,14 +15,32 @@ ENV VITE_LLULL_SERVER_URL=${LLULL_PUBLIC_URL}
 RUN npm run build && npm --prefix server run build
 RUN npm --prefix server prune --omit=dev
 
+# ---- DWG converter -------------------------------------------------------------------------
+# LibreDWG's dwg2dxf gives DWG import. Debian stable does not package it (and Debian lists CVEs
+# up to 0.13.4), so a pinned release is built from the GNU tarball. WITH_DWG=0 skips it; set
+# LIBREDWG_SHA256 to the published checksum to verify the download.
+FROM debian:bookworm-slim AS dwg
+ARG WITH_DWG=1
+ARG LIBREDWG_VERSION=0.14
+ARG LIBREDWG_SHA256=
+RUN mkdir -p /out/bin /out/lib && if [ "$WITH_DWG" = "1" ]; then \
+      apt-get update \
+      && apt-get install -y --no-install-recommends build-essential ca-certificates curl xz-utils \
+      && curl -fsSL -o /tmp/libredwg.tar.xz \
+         "https://ftp.gnu.org/gnu/libredwg/libredwg-${LIBREDWG_VERSION}.tar.xz" \
+      && if [ -n "$LIBREDWG_SHA256" ]; then \
+           echo "$LIBREDWG_SHA256  /tmp/libredwg.tar.xz" | sha256sum -c -; fi \
+      && mkdir /tmp/src && tar -xJf /tmp/libredwg.tar.xz -C /tmp/src --strip-components=1 \
+      && cd /tmp/src && ./configure --prefix=/usr/local --disable-bindings --disable-static \
+      && make -j"$(nproc)" && make install \
+      && cp /usr/local/bin/dwg2dxf /out/bin/ && cp -P /usr/local/lib/libredwg.so* /out/lib/; \
+    fi
+
 # ---- runtime -------------------------------------------------------------------------------
 FROM node:22-bookworm-slim
-# LibreDWG gives DWG import (dwg2dxf). Debian ships it as libredwg-tools; if your base image's
-# distro does not, the build continues without it (see docs/DEPLOYMENT.md, "DWG converter").
-RUN apt-get update \
-    && (apt-get install -y --no-install-recommends libredwg-tools \
-        || echo "WARNING: libredwg-tools not available - DWG import disabled") \
-    && rm -rf /var/lib/apt/lists/*
+COPY --from=dwg /out/bin/ /usr/local/bin/
+COPY --from=dwg /out/lib/ /usr/local/lib/
+RUN ldconfig
 WORKDIR /app
 COPY --from=build /src/server/dist ./server/dist
 COPY --from=build /src/server/node_modules ./server/node_modules

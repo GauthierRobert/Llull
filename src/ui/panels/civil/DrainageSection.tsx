@@ -2,8 +2,9 @@
  * @layer ui/panels/civil
  *
  * DrainageSection — storm network: manhole / pipe forms and lists, network check
- * (`check_drainage_network`: failures + CSV), automatic sizing (`size_drainage_pipes`) and the
- * structure / pipe schedule CSV (`drainage_schedule`).
+ * (`check_drainage_network`: failures + CSV, design storm as a constant intensity or an IDF curve,
+ * outfall tailwater for the HGL), automatic sizing (`size_drainage_pipes`) and the structure / pipe
+ * schedule CSV (`drainage_schedule`).
  */
 
 import React, { useState } from 'react';
@@ -13,7 +14,7 @@ import { isCsvData } from '@ui/resultData';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { CivilObjectRow, CivilStatus, useCivilObjects } from './CivilParts';
 import { ManholeForm, PipeForm } from './DrainageForms';
-import { optionalNumber } from './civilInput';
+import { optionalNumber, parseNumber } from './civilInput';
 import { downloadQuery, runQuery } from './civilQuery';
 
 function failuresOf(data: unknown): string[] {
@@ -24,21 +25,37 @@ function failuresOf(data: unknown): string[] {
     : [];
 }
 
+const IDF_FIELDS = ['a', 'b', 'c'] as const;
+
+/** Design storm params: the IDF curve when a, b and c are all given, else the constant intensity. */
+function stormParams(
+  rainfall: string,
+  idf: Record<(typeof IDF_FIELDS)[number], string>,
+): Record<string, unknown> {
+  const [a, b, c] = IDF_FIELDS.map((key) => parseNumber(idf[key]));
+  return a !== undefined && b !== undefined && c !== undefined
+    ? { idf: { a, b, c } }
+    : optionalNumber('rainfallIntensityMmH', rainfall);
+}
+
 function NetworkChecks(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const [rainfall, setRainfall] = useState('');
+  const [idf, setIdf] = useState({ a: '', b: '', c: '' });
+  const [outfall, setOutfall] = useState('');
   const [status, setStatus] = useState('');
   const [failures, setFailures] = useState<string[]>([]);
-  const rainfallParams = optionalNumber('rainfallIntensityMmH', rainfall);
+  const rainfallParams = stormParams(rainfall, idf);
+  const checkParams = { ...rainfallParams, ...optionalNumber('outfallLevel', outfall) };
 
   const check = (): void => {
-    const result = runQuery('check_drainage_network', rainfallParams);
+    const result = runQuery('check_drainage_network', checkParams);
     setStatus(result.summary);
     setFailures(failuresOf(result.data));
   };
 
   const checkCsv = (): void => {
-    const result = runQuery('check_drainage_network', rainfallParams);
+    const result = runQuery('check_drainage_network', checkParams);
     if (isCsvData(result.data)) downloadText(result.data.csv, 'drainage-check.csv', 'text/csv');
     setStatus(result.summary);
   };
@@ -52,6 +69,25 @@ function NetworkChecks(): React.ReactElement {
           placeholder="Rainfall mm/h (50)"
           aria-label="Rainfall intensity"
           onChange={(event) => setRainfall(event.target.value)}
+        />
+        {IDF_FIELDS.map((key) => (
+          <input
+            key={key}
+            type="number"
+            value={idf[key]}
+            placeholder={`IDF ${key}`}
+            title="IDF curve i = a / (t + b)^c mm/h (replaces the constant intensity)"
+            aria-label={`IDF ${key}`}
+            onChange={(event) => setIdf((prev) => ({ ...prev, [key]: event.target.value }))}
+          />
+        ))}
+        <input
+          type="number"
+          value={outfall}
+          placeholder="Outfall level"
+          title="Tailwater level at the outfall for the hydraulic grade line"
+          aria-label="Outfall level"
+          onChange={(event) => setOutfall(event.target.value)}
         />
         <button type="button" className="btn btn--primary btn--sm" onClick={check}>
           Check network

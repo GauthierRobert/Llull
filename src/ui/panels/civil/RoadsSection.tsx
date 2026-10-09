@@ -2,7 +2,7 @@
  * @layer ui/panels/civil
  *
  * RoadsSection — `add_alignment` (PIs typed or taken from the selected polyline, curve radii,
- * ground surface) and one AlignmentEditor per alignment.
+ * clothoid spiral lengths, ground surface) and one AlignmentEditor per alignment.
  */
 
 import React, { useState } from 'react';
@@ -24,6 +24,7 @@ export function RoadsSection(): React.ReactElement {
   const alignments = useCivilObjects('alignment');
   const [points, setPoints] = useState('');
   const [radii, setRadii] = useState('');
+  const [spirals, setSpirals] = useState('');
   const [surface, setSurface] = useState('');
   const [interval, setIntervalText] = useState('');
   const [name, setName] = useState('');
@@ -43,6 +44,7 @@ export function RoadsSection(): React.ReactElement {
     event.preventDefault();
     const parsed = parsePoints(points);
     const radiusList = parseNumberList(radii);
+    const spiralList = parseNumberList(spirals);
     if (parsed === null || parsed.length < 2) {
       setError('Points: at least 2 points "x,y; x,y".');
       return;
@@ -51,9 +53,14 @@ export function RoadsSection(): React.ReactElement {
       setError('Radii: numbers separated by commas, one per interior point.');
       return;
     }
+    if (spiralList === null) {
+      setError('Spirals: lengths separated by commas, one per interior point (0 = none).');
+      return;
+    }
     dispatch('add_alignment', {
       points: parsed,
       ...(radiusList.length > 0 ? { radii: radiusList } : {}),
+      ...(spiralList.length > 0 ? { spirals: spiralList } : {}),
       ...(surfaceId !== '' ? { surfaceId } : {}),
       ...optionalNumber('stationInterval', interval),
       ...(name.trim() !== '' ? { name: name.trim() } : {}),
@@ -89,6 +96,12 @@ export function RoadsSection(): React.ReactElement {
             placeholder="Radii per interior PI"
             aria-label="Curve radii"
             onChange={(event) => setRadii(event.target.value)}
+          />
+          <input
+            value={spirals}
+            placeholder="Spiral lengths (clothoid)"
+            aria-label="Spiral lengths"
+            onChange={(event) => setSpirals(event.target.value)}
           />
           <CivilObjectSelect
             objects={surfaces}

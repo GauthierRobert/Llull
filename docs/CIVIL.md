@@ -58,7 +58,9 @@ DWG is proprietary, so llull converts it to ASCII DXF on the server (core stays 
 `import_dxf` / `import_survey_dxf` through the normal command path (live document, undo, live sync).
 Install one converter on the server host:
 
-- **LibreDWG** (free): `apt install libredwg-tools` (provides `dwg2dxf`). `LLULL_DWG2DXF=<path>`
+- **LibreDWG** (free, GPL-3.0, run as a separate program): version 0.14 or later provides `dwg2dxf`.
+  The llull Docker image builds it; elsewhere build it from the GNU release (Debian stable does not
+  package it, and versions up to 0.13.4 have known CVEs). `LLULL_DWG2DXF=<path>`
   overrides the executable, `off` disables it.
 - **ODA File Converter**: set `LLULL_ODA_CONVERTER=<executable>`; run as
   `<exe> in-dir out-dir ACAD2018 DXF 0 1 *.DWG` (used when `dwg2dxf` is missing).
@@ -111,8 +113,8 @@ conversion; every request uses a private temp dir that is always removed.
   editing; the plan-profile sheet's plan strip is straightened along the alignment.
 - Breaklines are not enforced in the TIN (they contribute vertices only); TIN meshes are not drawn
   on plan sheets (contours are).
-- No foul-water design; storm pipes only in LandXML. LandXML pipe `slope` is written as a ratio
-  (0.01 = 1 %) — check against your target software.
+- No foul-water design; storm pipes only in LandXML. LandXML pipe `slope` is written in percent
+  (1 = 1 %, per the LandXML 2.0 annotation and the buildingSMART InfraModel profile).
 - Site calibration is a 2D similarity transform (no projection library): use the calibration your
   surveyor provides for the national grid.
 - DWG needs the server with LibreDWG (`dwg2dxf`) or the ODA File Converter installed.

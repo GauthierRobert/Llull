@@ -296,3 +296,31 @@ describe('import_survey_dxf', () => {
     expect(kept.affected[0]).toBe('pointGroup-1');
   });
 });
+
+describe('converter quirks', () => {
+  it('ignores VERTEX records repeated after SEQEND (LibreDWG 0.11 dwg2dxf)', () => {
+    const vertices = (z: number): Array<[number, string | number]> => [
+      [0, 'VERTEX'],
+      [10, 0],
+      [20, 0],
+      [30, z],
+      [0, 'VERTEX'],
+      [10, 5],
+      [20, 0],
+      [30, z],
+    ];
+    const text = dxf(
+      [0, 'SECTION'],
+      [2, 'ENTITIES'],
+      [0, 'POLYLINE'],
+      [8, 'CONTOURS'],
+      [70, 8],
+      ...vertices(100),
+      [0, 'SEQEND'],
+      ...vertices(100),
+      [0, 'ENDSEC'],
+    );
+    const result = execute(createEmptyDocument(), 'import_dxf', { text, sourceUnit: 'mm' });
+    expect(result.summary).toBe('Imported DXF (mm): 1 polyline. new layers: CONTOURS.');
+  });
+});

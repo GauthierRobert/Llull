@@ -133,7 +133,9 @@ DWG is proprietary, so llull converts it to ASCII DXF on the server (core stays 
 `import_dxf` / `import_survey_dxf` through the normal command path (live document, undo, live sync).
 Install one converter on the server host:
 
-- **LibreDWG** (free): `apt install libredwg-tools` (provides `dwg2dxf`). `LLULL_DWG2DXF=<path>`
+- **LibreDWG** (free, GPL-3.0, run as a separate program): version 0.14 or later provides `dwg2dxf`.
+  The llull Docker image builds it; elsewhere build it from the GNU release (Debian stable does not
+  package it, and versions up to 0.13.4 have known CVEs). `LLULL_DWG2DXF=<path>`
   overrides the executable, `off` disables it.
 - **ODA File Converter**: set `LLULL_ODA_CONVERTER=<executable>`; run as
   `<exe> in-dir out-dir ACAD2018 DXF 0 1 *.DWG` (used when `dwg2dxf` is missing).
