@@ -11,10 +11,11 @@ but a civil engineer's daily work (survey → terrain → earthworks → roads �
 no survey import, no terrain, no volumes, no alignments, no drainage, no LandXML, and no way to
 open the DXF drawings every civil project starts from.
 
-**After this review: sellable as a focused product to small and mid-size site / civil offices**
+**After this review: sellable as a focused product to small and mid-size site / civil offices, and technically credible for road and drainage design offices**
 (site development, platforms and access roads, storm drainage, early design and tender
 quantities), and to firms that want AI agents to drive design through MCP. It is **not yet** a
-replacement for Civil 3D / 12d on large highway or utility projects (see gaps).
+replacement for Civil 3D / 12d on large highway or utility projects, and it has not yet been
+validated by a pilot customer (see gaps).
 
 ## What a civil office can now do in llull
 
@@ -25,9 +26,9 @@ replacement for Civil 3D / 12d on large highway or utility projects (see gaps).
 | Existing-ground model + contours      | Ready  | `create_surface`, `surface_report`, `surface_elevation` |
 | Platform cut / fill, balance level    | Ready  | `add_platform`, `platform_earthworks`, `balance_platform` |
 | Surface-to-surface volumes            | Ready  | `compare_surfaces` |
-| Access road: alignment, profile, template, volumes, mass haul | Ready (no spirals / superelevation) | `add_alignment`, `set_alignment_profile`, `set_road_section`, `alignment_report` |
+| Access road: alignment, profile, template, volumes, mass haul | Ready (spirals, superelevation) | `add_alignment`, `set_alignment_profile`, `set_road_section`, `alignment_report` |
 | Long section and cross-section sheets | Ready (SVG) | `export_long_section`, `export_cross_sections` |
-| Storm network design and check        | Ready (gravity, rational method) | `add_manhole`, `add_pipe`, `check_drainage_network`, `size_drainage_pipes`, `drainage_schedule` |
+| Storm network design and check        | Ready (Tc / IDF, HGL, surcharge) | `add_manhole`, `add_pipe`, `check_drainage_network`, `size_drainage_pipes`, `drainage_schedule` |
 | Exchange with Civil 3D / 12d / TBC    | Ready  | `export_landxml`, `export_civil_dxf` |
 | Buildings on the site (BIM, IFC4)     | Ready  | building workspace ([`CONSTRUCTION.md`](CONSTRUCTION.md)) |
 | Steel halls, footings, checks         | Ready  | industrial workspace ([`INDUSTRIAL.md`](INDUSTRIAL.md)) |
@@ -38,7 +39,28 @@ invariants, analytic volumes within 2 %, Manning / rational method against hand 
 alignment and vertical-curve geometry), a golden `build_project` plan replayed to identical
 geometry, save / load round trips, and the repository's coverage gate (≥ 90 / 85 / 90 / 90).
 
+## Second pass (same day): blockers closed in code
+
+| Former gap | Now |
+| ---------- | --- |
+| DWG | `POST /import/dwg` + MCP `import_dwg` via LibreDWG / ODA File Converter on the server (503 with install steps when absent) |
+| Highway geometry | clothoid spirals, superelevation runoff / runout, spiral-length and e-demand checks, LandXML spirals |
+| Coordinate systems | CRS metadata, Helmert site calibration, grid-coordinate import / export |
+| Civil drawings | true-scale civil plan sheets and plan-profile sheets with title block |
+| Drainage depth | time of concentration, IDF curves, iterated sizing, HGL with surcharge / flooding, drainage long sections |
+
 ## Gaps that still limit sales (priority order)
+
+1. **Validation with real users** — no pilot customer has used it yet; the next step is a pilot with
+   two or three site-development offices, measuring time to first deliverable and collecting their
+   national-standard presets (design speed tables, IDF curves, pipe catalogues).
+2. **Commercial readiness** — user accounts, licensing / billing, multi-user permissions, per-user
+   audit trail; engineering checks must still be signed by a qualified engineer.
+3. **Native DWG without a server converter**, true projection transforms (EPSG library), lane
+   widenings / intersections, breakline-enforced TINs, foul-water design.
+
+## Gaps closed in the first pass (kept for history)
+
 
 1. **DWG** — only ASCII DXF is read and written. Most clients send DWG; a DWG reader (e.g. a
    server-side ODA / LibreDWG converter) is the single biggest adoption barrier left.

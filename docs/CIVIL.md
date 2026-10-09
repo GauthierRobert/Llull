@@ -84,9 +84,35 @@ conversion; every request uses a private temp dir that is always removed.
   is per pipe at its current slope (downstream pipes are not forced larger than upstream ones).
 - These are design aids for a qualified engineer, not a substitute for one.
 
+## Design depth added after the first review
+
+- **Roads** — clothoid transition spirals per curve (`spirals` on `add_alignment` /
+  `update_alignment`, TS / SC / CS / ST, exact Fresnel series; refused when Δ < 2θs) and
+  superelevation (`set_superelevation { maxRate, runoffLength? }`: crown runout, runoff through the
+  spiral, full rate on the circle, applied to the corridor, sections, volumes and
+  `alignment_report`). Design checks add the minimum spiral length Ls ≥ V³ / (46.656 C R), C = 0.6
+  m/s³, and the superelevation demand against `maxRate`. LandXML writes `<Spiral spiType="clothoid">`.
+- **Drainage** — modified rational method: per-manhole `entryTimeMin`, time of concentration along
+  every upstream path, IDF curve `idf { a, b, c }` (i = a / (t + b)^c), sizing iterated to
+  convergence, flows split at diverging manholes by full-bore capacity share. Hydraulic grade line
+  from the outfall (`outfallLevel`, friction slope, manhole losses `manholeLossK`), surcharge and
+  flooding flags (`freeboardM`), and `export_drainage_long_section` (SVG with HGL and data band).
+- **Coordinates** — `set_coordinate_system { name, epsg?, verticalDatum? }`,
+  `set_site_calibration` (2D Helmert: grid = gridOrigin + k·R(θ)·(local − localOrigin)),
+  `transform_coordinates`; survey import in grid coordinates; LandXML (`<CoordinateSystem>`) and
+  civil DXF export in grid coordinates when calibrated.
+- **Sheets** — `export_civil_plan_sheet { paper, scale }` (true-scale plan with title block, north
+  arrow, scale bar, legend, grid ticks) and `export_plan_profile_sheet { alignmentId }` (station-
+  aligned plan strip over the long section). Print the SVG to PDF at 100 %.
+
 ## Known limits
 
-- No spirals (clothoids) or superelevation transitions in alignments; one symmetric road template.
-- Breaklines are not enforced in the TIN (they contribute vertices only).
-- No foul-water design, hydraulic grade line or surcharge analysis; storm pipes only in LandXML.
-- DWG and binary DXF must be saved as ASCII DXF first.
+- One symmetric road template per alignment; no lane widenings, intersections or 3D breakline
+  editing; the plan-profile sheet's plan strip is straightened along the alignment.
+- Breaklines are not enforced in the TIN (they contribute vertices only); TIN meshes are not drawn
+  on plan sheets (contours are).
+- No foul-water design; storm pipes only in LandXML. LandXML pipe `slope` is written as a ratio
+  (0.01 = 1 %) — check against your target software.
+- Site calibration is a 2D similarity transform (no projection library): use the calibration your
+  surveyor provides for the national grid.
+- DWG needs the server with LibreDWG (`dwg2dxf`) or the ODA File Converter installed.
