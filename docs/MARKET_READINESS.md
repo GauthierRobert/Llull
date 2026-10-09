@@ -49,6 +49,21 @@ geometry, save / load round trips, and the repository's coverage gate (≥ 90 / 
 | Civil drawings | true-scale civil plan sheets and plan-profile sheets with title block |
 | Drainage depth | time of concentration, IDF curves, iterated sizing, HGL with surcharge / flooding, drainage long sections |
 
+## Deployment verification (2026-10-09)
+
+- **Docker image built and run** (`docker build` with `WITH_DWG=0`; base images from a registry
+  mirror): the image serves the web app, `/health` is healthy, `/license` reports evaluation mode,
+  requests without a token get 401, a viewer's mutation gets 403, an editor's commands apply and
+  land in the audit trail under the user's name.
+- **Real DWG import verified end to end** inside that container: an AutoCAD 2000 (AC1015) DWG
+  produced with LibreDWG `dxf2dwg`, converted by the real `dwg2dxf` (LibreDWG 0.11 from
+  conda-forge, mounted for the test), imported as survey points, triangulated and exported to
+  LandXML — every step in the audit trail. The test exposed and fixed two issues: LibreDWG 0.11
+  repeats polyline vertices after SEQEND (now ignored), and the old Dockerfile's `libredwg-tools`
+  apt package does not exist in Debian stable (now built from a pinned GNU release, 0.14).
+- **Not verified here:** the LibreDWG 0.14 source build stage (ftp.gnu.org is unreachable from this
+  sandbox) — build once with `LIBREDWG_SHA256` set before shipping the image.
+
 ## Gaps that still limit sales (priority order)
 
 1. **Validation with real users** — no pilot customer has used it yet; the next step is a pilot with

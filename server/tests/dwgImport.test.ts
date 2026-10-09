@@ -148,7 +148,7 @@ describe('POST /import/dwg', () => {
       .set('Content-Type', 'application/octet-stream')
       .send(DWG);
     expect(res.status).toBe(503);
-    expect(res.body.error).toMatch(/libredwg-tools/);
+    expect(res.body.error).toMatch(/LibreDWG 0\.14\+/);
   }, 60_000);
 
   it('answers 503 when the configured executable does not exist', async () => {

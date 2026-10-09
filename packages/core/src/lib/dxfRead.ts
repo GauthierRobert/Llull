@@ -84,8 +84,9 @@ function groupPolylines(raw: readonly DxfRecord[]): DxfRecord[] {
   const result: DxfRecord[] = [];
   let open: { type: string; codes: DxfRecord['codes']; vertices: DxfRecord[] } | null = null;
   for (const record of raw) {
-    if (record.type === 'VERTEX' && open) {
-      open.vertices.push(record);
+    if (record.type === 'VERTEX') {
+      // A VERTEX outside POLYLINE…SEQEND has no meaning of its own (LibreDWG 0.11 repeats them).
+      open?.vertices.push(record);
       continue;
     }
     if (record.type === 'SEQEND') {
