@@ -181,4 +181,32 @@ describe('exports use grid coordinates when calibrated', () => {
     ).text;
     expect(local).not.toContain('2020');
   });
+
+  it('LandXML moves alignments, structures, surfaces and pads into the grid', () => {
+    let doc = calibrated(surveyedDocument());
+    doc = execute(doc, 'add_alignment', {
+      points: [
+        [50, 100],
+        [150, 100],
+      ],
+    }).document;
+    doc = execute(doc, 'add_manhole', {
+      location: [20, 30],
+      invertElevation: 90,
+      rimElevation: 92,
+    }).document;
+    doc = execute(doc, 'add_platform', {
+      surfaceId: 'surface-1',
+      boundary: [
+        [40, 40],
+        [60, 40],
+        [60, 60],
+        [40, 60],
+      ],
+      elevation: 100,
+    }).document;
+    const text = (execute(doc, 'export_landxml', {}).data as { text: string }).text;
+    expect(text).toContain('<Start>2100 800</Start>');
+    expect(text).toContain('<Center>2040 940</Center>');
+  });
 });

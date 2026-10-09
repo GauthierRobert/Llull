@@ -30,7 +30,7 @@ const POINTS: [number, number][] = [
   [300, 0],
   [300, 300],
 ];
-const flat = () => 100;
+const flat = (): number => 100;
 
 function spiralDoc(extra: Record<string, unknown> = {}): { doc: CadDocument; id: string } {
   const base = surveyedDocument(flat, 31, 20);
@@ -254,7 +254,7 @@ describe('superelevation', () => {
       SpiralElement,
     ];
     const c = 0.025;
-    const at = (s: number) => crossSlopesAt(a, c, 3.5, s);
+    const at = (s: number): ReturnType<typeof crossSlopesAt> => crossSlopesAt(a, c, 3.5, s);
     expect(at(10)).toEqual({ left: c, right: c });
     const runout = (c * LS) / 0.07;
     expect(at(entry.startStation - runout - 1)).toEqual({ left: c, right: c });
@@ -401,7 +401,7 @@ describe('superelevation', () => {
     const report = (d: CadDocument): unknown =>
       execute(d, 'alignment_report', { alignmentId: id }).data;
     expect(report(loaded)).toEqual(report(doc));
-    const withObject = (patch: Record<string, unknown>) => {
+    const withObject = (patch: Record<string, unknown>): NonNullable<CadDocument['civil']> => {
       const civil = doc.civil as NonNullable<typeof doc.civil>;
       return {
         ...civil,
@@ -424,15 +424,16 @@ describe('superelevation', () => {
 describe('design checks and LandXML', () => {
   it('checks spiral length (Barnett) and required superelevation against maxRate', () => {
     const { doc, id } = designedSpiral(0.04);
-    const run = (speed: number) =>
-      execute(doc, 'alignment_report', { alignmentId: id, designSpeedKmh: speed }).data as {
-        checks: {
-          assumptions: string;
-          spirals: Array<{ lengthM: number; minLengthM: number; ok: boolean }>;
-          horizontal: Array<{ requiredSuperelevation: number; ok: boolean }>;
-          failures: string[];
-        };
+    interface Report {
+      checks: {
+        assumptions: string;
+        spirals: Array<{ lengthM: number; minLengthM: number; ok: boolean }>;
+        horizontal: Array<{ requiredSuperelevation: number; ok: boolean }>;
+        failures: string[];
       };
+    }
+    const run = (speed: number): Report =>
+      execute(doc, 'alignment_report', { alignmentId: id, designSpeedKmh: speed }).data as Report;
     const slow = run(40).checks;
     expect(slow.spirals).toHaveLength(2);
     expect(slow.spirals[0]?.minLengthM).toBeCloseTo(40 ** 3 / (46.656 * 0.6 * 100), 1);
