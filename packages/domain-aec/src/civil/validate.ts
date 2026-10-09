@@ -129,7 +129,9 @@ const CHECKS: Readonly<Record<(typeof CIVIL_CATEGORIES)[number], readonly Check[
         ? validateHorizontal(
             o['points'] as Vec2[],
             o['radii'] as number[],
-            (o['spirals'] as number[] | undefined) ?? [],
+            Array.isArray(o['spirals']) && (o['spirals'] as unknown[]).every(finite)
+              ? (o['spirals'] as number[])
+              : [],
           )
         : null,
     (o) => demand(finite(o['startStation']), 'startStation must be a number'),

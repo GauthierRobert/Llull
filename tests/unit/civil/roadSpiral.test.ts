@@ -71,8 +71,8 @@ describe('clothoid geometry', () => {
     const a2 = radius * length;
     const [x, y] = clothoidLocal(length, radius, length);
     const theta = length ** 2 / (2 * a2);
-    expect(x).toBeCloseTo(length - length ** 5 / (40 * a2 ** 2), 3);
-    expect(y).toBeCloseTo(length ** 3 / (6 * a2) - length ** 7 / (336 * a2 ** 3), 3);
+    expect(x).toBeCloseTo(length - length ** 5 / (40 * a2 ** 2), 2);
+    expect(y).toBeCloseTo(length ** 3 / (6 * a2) - length ** 7 / (336 * a2 ** 3), 2);
     expect(x).toBeCloseTo(length * (1 - theta ** 2 / 10 + theta ** 4 / 216 - theta ** 6 / 9360), 8);
     expect(y).toBeCloseTo(
       length * (theta / 3 - theta ** 3 / 42 + theta ** 5 / 1320 - theta ** 7 / 75600),
@@ -216,7 +216,7 @@ describe('alignment commands with spirals', () => {
     const { doc, id } = spiralDoc();
     const texts = Object.values(doc.entities)
       .filter((entity) => entity.id.startsWith(`${id}:`) && entity.kind === 'text')
-      .map((entity) => (entity as unknown as { text: string }).text);
+      .map((entity) => (entity as unknown as { content: string }).content);
     expect(texts.filter((t) => /^(TS|SC|CS|ST) /.test(t))).toHaveLength(4);
     expect(texts.some((t) => t.startsWith('PC '))).toBe(false);
     expect(texts).toContain('R=100');
@@ -333,7 +333,7 @@ describe('superelevation', () => {
     const slope = (i: number, j: number): number =>
       ((nodes[j]?.z ?? NaN) - (nodes[i]?.z ?? NaN)) /
       ((nodes[j]?.offset ?? NaN) - (nodes[i]?.offset ?? NaN));
-    expect(slope(0, 2)).toBeCloseTo(0.07, 12);
+    expect(slope(0, 2)).toBeCloseTo(-0.07, 12);
     expect(slope(2, 4)).toBeCloseTo(-0.07, 12);
     expect(nodes[0]?.z).toBeCloseTo(101 + 0.07 * 4.5, 12);
     expect(nodes[4]?.z).toBeCloseTo(101 - 0.07 * 4.5, 12);

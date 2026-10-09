@@ -1,7 +1,8 @@
 /**
  * @layer ui/panels/civil
  *
- * Drainage input forms: `add_manhole` (position, invert, rim or ground surface, catchment) and
+ * Drainage input forms: `add_manhole` (position, invert, rim or ground surface, catchment, entry
+ * time) and
  * `add_pipe` (upstream / downstream manholes, diameter, material, Manning n).
  */
 
@@ -16,6 +17,7 @@ const MANHOLE_FIELDS = [
   ['catchmentAreaHa', 'Catchment ha'],
   ['runoffCoefficient', 'Runoff C'],
   ['inflowLps', 'Inflow l/s'],
+  ['entryTimeMin', 'Entry time min'],
 ] as const;
 
 type ManholeKey = (typeof MANHOLE_FIELDS)[number][0];
@@ -26,6 +28,7 @@ const EMPTY_MANHOLE: Record<ManholeKey, string> = {
   catchmentAreaHa: '',
   runoffCoefficient: '',
   inflowLps: '',
+  entryTimeMin: '',
 };
 
 export function ManholeForm(): React.ReactElement {

@@ -84,7 +84,7 @@ function rampsOf(
 function outerFall(ramps: CurveRamps, station: number, crossfall: number, full: number): number {
   const entering = -full + (full * (ramps.fullIn - station)) / ramps.runoffIn;
   const leaving = -full + (full * (station - ramps.fullOut)) / ramps.runoffOut;
-  return Math.min(Math.max(Math.min(entering, leaving), -full), crossfall);
+  return Math.min(Math.max(entering, leaving, -full), crossfall);
 }
 
 /**
