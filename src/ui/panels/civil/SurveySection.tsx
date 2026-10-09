@@ -1,8 +1,9 @@
 /**
  * @layer ui/panels/civil
  *
- * SurveySection — load a survey file (.csv / .txt, or paste it), choose its column format and
- * unit, dispatch `import_survey_points`; lists the point groups.
+ * SurveySection — switch the document to metres (`set_units`) for real survey coordinates, load a
+ * survey file (.csv / .txt, or paste it), choose its column format and unit, dispatch
+ * `import_survey_points`; lists the point groups.
  */
 
 import React, { useState } from 'react';
@@ -27,6 +28,7 @@ const FORMAT_HINT: Readonly<Record<(typeof FORMATS)[number], string>> = {
 export function SurveySection(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const groups = useCivilObjects('pointGroup');
+  const documentUnit = useStore((s) => s.document.units);
   const [text, setText] = useState('');
   const [name, setName] = useState('');
   const [format, setFormat] = useState<(typeof FORMATS)[number]>('PENZD');
@@ -61,6 +63,20 @@ export function SurveySection(): React.ReactElement {
       collapsible
       testId="civil-survey"
     >
+      {documentUnit !== 'm' && (
+        <div className="building-actions">
+          <span className="panel__empty-hint">
+            The document is in {documentUnit}; site work reads best in metres.
+          </span>
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            onClick={() => dispatch('set_units', { units: 'm' })}
+          >
+            Work in metres
+          </button>
+        </div>
+      )}
       <form className="civil-form" onSubmit={handleSubmit} aria-label="Import survey points">
         <input type="file" accept=".csv,.txt,.xyz" aria-label="Survey file" onChange={loadFile} />
         <textarea

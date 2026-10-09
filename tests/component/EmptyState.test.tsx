@@ -103,7 +103,9 @@ describe('EmptyState — civil site starter', () => {
     vi.stubGlobal('fetch', fetchMock);
     render(<EmptyState />);
     fireEvent.click(screen.getByRole('button', { name: /civil site starter/i }));
-    expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/samples\/pilot-site-survey\.csv$/));
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/samples\/pilot-site-survey\.csv$/),
+    );
     expect(useLayoutStore.getState().sidebarTab).toBe('civil');
     await waitFor(() => expect(civilCounts()['pipe']).toBe(3));
     expect(civilCounts()).toEqual({
@@ -127,7 +129,9 @@ describe('EmptyState — civil site starter', () => {
     render(<EmptyState />);
     fireEvent.click(screen.getByRole('button', { name: /civil site starter/i }));
     await waitFor(() =>
-      expect(useStore.getState().lastSummary).toMatch(/could not load the sample survey \(HTTP 404\)/),
+      expect(useStore.getState().lastSummary).toMatch(
+        /could not load the sample survey \(HTTP 404\)/,
+      ),
     );
     expect(useStore.getState().document).toBe(before);
   });

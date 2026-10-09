@@ -31,7 +31,9 @@ contours, building pads with cut / fill volumes and cut-fill balancing, road ali
 vertical profile, road template, corridor, long and cross sections, earthwork volumes and mass
 haul, design-speed checks), gravity storm networks (Manning, rational method, automatic pipe
 sizing), and LandXML 1.2 / DXF exchange with Civil 3D, 12d and BricsCAD. Any ASCII DXF drawing
-imports as editable entities. See [`docs/CIVIL.md`](docs/CIVIL.md).
+imports as editable entities. See [`docs/CIVIL.md`](docs/CIVIL.md). Evaluating llull for a civil
+office? Click **Civil site starter** on the empty app for a complete sample site, then follow the
+45-minute pilot guide with your own survey: [`docs/PILOT.md`](docs/PILOT.md).
 
 ## Stack
 

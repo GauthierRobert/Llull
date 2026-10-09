@@ -1,4 +1,5 @@
 import type { Scenario } from '../contract';
+import { civilSite } from './civilSite';
 import { extractionBuilding } from './extractionBuilding';
 import { extractionRevision } from './extractionRevision';
 import { pipeRack } from './pipeRack';
@@ -8,7 +9,12 @@ import { pipeRack } from './pipeRack';
  *
  * Every production scenario, in run order (a scenario's `startsFrom` comes before it).
  */
-export const SCENARIOS: readonly Scenario[] = [extractionBuilding, extractionRevision, pipeRack];
+export const SCENARIOS: readonly Scenario[] = [
+  extractionBuilding,
+  extractionRevision,
+  pipeRack,
+  civilSite,
+];
 
 export function scenarioById(id: string): Scenario {
   const scenario = SCENARIOS.find((s) => s.id === id);

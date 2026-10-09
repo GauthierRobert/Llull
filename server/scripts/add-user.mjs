@@ -41,6 +41,6 @@ const tokenSha256 = crypto.createHash('sha256').update(token).digest('hex');
 users.push({ id, name, role, tokenSha256 });
 fs.writeFileSync(file, `${JSON.stringify(users, null, 2)}\n`, { mode: 0o600 });
 
-console.log(`Added ${role} "${name}" (${id}) to ${file}.`);
-console.log('Token (shown once, store it safely):');
-console.log(token);
+process.stdout.write(`Added ${role} "${name}" (${id}) to ${file}.\n`);
+process.stdout.write('Token (shown once, store it safely):\n');
+process.stdout.write(`${token}\n`);

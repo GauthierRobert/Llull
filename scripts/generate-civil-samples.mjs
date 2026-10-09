@@ -18,14 +18,14 @@ import { fileURLToPath } from 'node:url';
 const OUT_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'samples');
 
 /** Site origin (local grid) and extent, metres. */
-export const ORIGIN = { e: 1000, n: 5000 };
-export const SIZE = { e: 240, n: 180 };
+const ORIGIN = { e: 1000, n: 5000 };
+const SIZE = { e: 240, n: 180 };
 
 /** Stream centreline easting (site-relative) at a site-relative northing. */
 const streamAxis = (y) => 55 + 12 * Math.sin(y / 28);
 
 /** Existing-ground elevation at site-relative (x, y), metres. */
-export function ground(x, y) {
+function ground(x, y) {
   const slope = 100 + 0.045 * y + 0.025 * x;
   const undulation = 0.8 * Math.sin(x / 35) * Math.cos(y / 45);
   const valley = 2.5 * Math.exp(-(((x - streamAxis(y)) / 14) ** 2));
@@ -76,7 +76,9 @@ function surveyPoints() {
 function surveyCsv(points) {
   const lines = ['P,E,N,Z,D'];
   for (const p of points) {
-    lines.push(`${p.number},${fixed(ORIGIN.e + p.x)},${fixed(ORIGIN.n + p.y)},${fixed(p.z)},${p.code}`);
+    lines.push(
+      `${p.number},${fixed(ORIGIN.e + p.x)},${fixed(ORIGIN.n + p.y)},${fixed(p.z)},${p.code}`,
+    );
   }
   return `${lines.join('\n')}\n`;
 }

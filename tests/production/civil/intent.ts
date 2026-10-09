@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
 import type { Vec2 } from '@core/model/types';
 
 /**
@@ -21,6 +22,8 @@ export interface CivilManholeIntent {
 export interface CivilIntent {
   project: { name: string; client: string; drawingNumber: string; revision: string; date: string };
   surveyFile: string;
+  /** Absolute path of the survey file on disk (the UI driver picks it in the file input). */
+  surveyPath: string;
   surveyText: string;
   pad: { name: string; boundary: Vec2[]; swellFactor: number; cutSlope: number; fillSlope: number };
   road: {
@@ -53,10 +56,17 @@ export interface CivilIntent {
 }
 
 const SURVEY_FILE = 'pilot-site-survey.csv';
-const surveyText = readFileSync(
-  new URL(`../../../public/samples/${SURVEY_FILE}`, import.meta.url),
-  'utf8',
-);
+/** Repo root: nearest ancestor of the working directory with public/samples (server runs from server/). */
+function samplesDir(from: string = process.cwd()): string {
+  const candidate = path.join(from, 'public', 'samples');
+  if (existsSync(path.join(candidate, SURVEY_FILE))) return candidate;
+  const parent = path.dirname(from);
+  if (parent === from) throw new Error(`public/samples/${SURVEY_FILE} not found`);
+  return samplesDir(parent);
+}
+
+const surveyPath = path.join(samplesDir(), SURVEY_FILE);
+const surveyText = readFileSync(surveyPath, 'utf8');
 
 /** Local site grid origin of the survey. */
 const at = (east: number, north: number): Vec2 => [1000 + east, 5000 + north];
@@ -70,6 +80,7 @@ export const civilSiteIntent: CivilIntent = {
     date: '2026-10-09',
   },
   surveyFile: SURVEY_FILE,
+  surveyPath,
   surveyText,
   pad: {
     name: 'Building pad',
@@ -93,7 +104,7 @@ export const civilSiteIntent: CivilIntent = {
     pvis: [
       { station: 0, elevation: 103.0 },
       { station: 70, elevation: 105.5, curveLength: 40 },
-      { station: 128, elevation: 109.4 },
+      { station: 130, elevation: 109.5 },
     ],
   },
   drainage: {

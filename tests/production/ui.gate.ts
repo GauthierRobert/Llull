@@ -4,6 +4,7 @@ import { installDefaultPlugins } from '@app/plugins';
 import { extractionBuildingFlow } from './ui/extractionBuilding.flow';
 import { extractionRevisionFlow } from './ui/extractionRevision.flow';
 import { pipeRackFlow } from './ui/pipeRack.flow';
+import { civilSiteFlow } from './ui/civilSite.flow';
 import { gradeUiRun } from './ui/grading';
 import { UiSession } from './ui/session';
 
@@ -34,5 +35,9 @@ test.describe('production scenarios (UI driver)', () => {
 
   test('desmet-pipe-rack', async ({ page }) => {
     gradeUiRun(await pipeRackFlow(new UiSession(page)));
+  });
+
+  test('civil-site-development', async ({ page }) => {
+    gradeUiRun(await civilSiteFlow(new UiSession(page)));
   });
 });

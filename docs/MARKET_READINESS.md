@@ -53,7 +53,8 @@ geometry, save / load round trips, and the repository's coverage gate (≥ 90 / 
 
 1. **Validation with real users** — no pilot customer has used it yet; the next step is a pilot with
    two or three site-development offices, measuring time to first deliverable and collecting their
-   national-standard presets (design speed tables, IDF curves, pipe catalogues).
+   national-standard presets (design speed tables, IDF curves, pipe catalogues). The pilot kit for
+   this is in [`PILOT.md`](PILOT.md).
 2. **Commercial readiness** — user accounts, licensing / billing, multi-user permissions, per-user
    audit trail; engineering checks must still be signed by a qualified engineer.
 3. **Native DWG without a server converter**, true projection transforms (EPSG library), lane
@@ -84,4 +85,7 @@ geometry, save / load round trips, and the repository's coverage gate (≥ 90 / 
 2. Spirals + superelevation in `alignmentGeometry` / `roadSection` (same command surface).
 3. CRS metadata on the document and LandXML `CoordinateSystem` output.
 4. Civil plan / profile sheets reusing the building sheet engine.
-5. Pilot with two or three site-development offices; measure time-to-first-deliverable.
+5. Pilot with two or three site-development offices; measure time-to-first-deliverable. The pilot
+   kit is ready: [`PILOT.md`](PILOT.md) (sample survey CSV / DXF, one-click civil site starter,
+   45-minute tutorial, comparison checklist, success criteria, in-app feedback) and the automated
+   `civil-site-development` production-gate scenario ([`PRODUCTION_GATE.md`](PRODUCTION_GATE.md)).

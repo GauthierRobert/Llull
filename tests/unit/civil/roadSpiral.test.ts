@@ -466,3 +466,37 @@ describe('design checks and LandXML', () => {
     );
   });
 });
+
+describe('set_alignment_profile end snapping', () => {
+  it('snaps a PVI typed from a rounded end station onto the alignment end', async () => {
+    const { execute } = await import('@core/commands/registry');
+    const { metricDocument } = await import('./fixtures');
+    const doc = execute(metricDocument(), 'add_alignment', {
+      points: [
+        [0, 0],
+        [100.0135, 0],
+      ],
+    }).document;
+    const snapped = execute(doc, 'set_alignment_profile', {
+      alignmentId: 'alignment-1',
+      pvis: [
+        { station: 0, elevation: 10 },
+        { station: 100.05, elevation: 11 },
+      ],
+    });
+    const alignment = snapped.document.civil?.objects['alignment-1'];
+    expect(alignment?.category === 'alignment' && alignment.profile[1]?.station).toBeCloseTo(
+      100.0135,
+      9,
+    );
+    const far = execute(doc, 'set_alignment_profile', {
+      alignmentId: 'alignment-1',
+      pvis: [
+        { station: 0, elevation: 10 },
+        { station: 100.2, elevation: 11 },
+      ],
+    });
+    expect(far.document).toBe(doc);
+    expect(far.summary).toMatch(/alignment runs 0 to 100.0135/);
+  });
+});

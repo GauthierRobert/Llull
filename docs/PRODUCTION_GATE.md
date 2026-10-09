@@ -5,7 +5,8 @@ handles real CAD files. The production gate asks the question a client asks: **c
 d'études do a real job with llull and issue the deliverables?**
 
 The first client profile is a process-plant EPC office (Desmet type: oilseed extraction, refining,
-biodiesel plants). Each scenario is one real job: a brief from the lead engineer, the model to
+biodiesel plants); the second is a civil / site engineering office (site development: survey,
+earthworks, access road, storm drainage — see the [pilot kit](PILOT.md)). Each scenario is one real job: a brief from the lead engineer, the model to
 build, and the acceptance criteria the office checks before anything leaves the building.
 
 ```bash
@@ -56,6 +57,7 @@ stay green.
 | `desmet-extraction-building`   | Solvent extraction building of a 2 000 t/d soybean plant: 24 × 15 m, 4 levels (±0, +6, +12, +18), HEB300 columns, IPE450 / IPE300 floor beams under 30 mm gratings, 36 CHS bracing diagonals, extractor / desolventizer-toaster / miscella tank / conditioner (162 t operating), floor openings, two stair flights, four process lines with battery-limit tie-ins. Issue: IFC, DXF and plan sheet per level, south elevation, schedules, takeoff, project file. |
 | `desmet-extraction-revision-b` | Change order on the issued model: extractor uprated (18 m, 72 t), pump E-502 and line L-105 added, revision B. The office edits the model; every untouched element must keep its id, mark and IFC GlobalId.                                                                                                                                                                                                                                                     |
 | `desmet-pipe-rack`             | Inter-unit pipe rack: 54 m, 10 moment-frame bents (HEB240 / IPE300, rigid joints) with tiers at +5.0 and +6.5 m, IPE240 stringers and mid-bay tier beams (a shoe every 3 m), nine lines DN50–DN300 battery limit to battery limit, a 600 mm cable tray, a road crossing needing 4.5 m clear. Rack checks: every line supported at every bent, clear height, line spacing, line metres per DN across design / takeoff / schedule.                                |
+| `civil-site-development`       | Civil office job on the pilot sample survey (911 points, local grid, metres): existing-ground TIN, 50 × 40 m building pad balanced with swell 1.1, 130 m access road (R 60 m, 40 m clothoids, profile, 3 m lanes, 6 % superelevation, 40 km/h), four-manhole storm network sized against an IDF curve with an HGL check from the stream tailwater. Issue: plan-profile sheet (A2), LandXML, project file. |
 
 ## Acceptance criteria
 
@@ -67,6 +69,7 @@ stay green.
 | coordination / engineering | clash-free, stair flights (rise, 2R+G, wells), every steel member verified and passing, every storey braced or framed in both directions                                                                                                      |
 | deliverables               | IFC (well-formed, unique GlobalIds, counts, profiles, storeys + containment, equipment weights), DXF plans (cut columns, equipment, grid), plan sheets (ISO paper, standard scale, title block, tags), elevation datums, schedules vs takeoff |
 | data integrity             | save → reopen identical, history replay identical; revisions keep ids, marks and GlobalIds                                                                                                                                                    |
+| civil (survey → drainage)  | every survey point at its E/N/Z with its code; TIN over the survey hull (±1 %) with the exact z range; pad on the brief outline balanced (\|cut × swell − fill\| < 1 % of fill, level within 0.5 m of the mean surveyed ground); road through the brief PIs with clothoids ≥ Barnett's minimum, the brief template and superelevation, no `alignment_report` design-check failure at the design speed, grades ≤ 8 %, full banking reached, profile over the whole road; storm network falling pipe by pipe to the outfall in commercial sizes, no surcharged pipe / flooding manhole / check failure under the IDF storm and tailwater, Manning full-bore capacity (computed independently) ≥ design flow; plan-profile sheet on ISO A2 at a standard scale with title block; LandXML well-formed (independent reader) with CgPoints, TIN Surface, Alignment (spirals + profile) and PipeNetwork, pipe slopes = invert drop / length as ratios |
 
 ## Results (2026-10)
 
@@ -75,6 +78,7 @@ stay green.
 | extraction building | 27 / 27  | 27 / 27 | not run (needs API credentials) |
 | revision B          | 30 / 30  | 30 / 30 | not run                         |
 | pipe rack           | 28 / 28  | 28 / 28 | not run                         |
+| civil site          | 11 / 11  | 11 / 11 | not run                         |
 
 Every acceptance criterion passes through `/mcp` and through the browser; `knownIssues` is empty
 for both drivers. The structure, equipment, lines, openings and stairs are modelled exactly; the
@@ -84,6 +88,21 @@ both directions; every line is carried on supports within its standard span; the
 equipment weights; DXF plans and plan sheets show the columns crossing each level and a complete
 title block; the line list carries line number, DN, from and to; schedules agree with the takeoff;
 the project reopens and replays identically; a revision keeps every id, mark and IFC GlobalId.
+
+The civil scenario (added with the [pilot kit](PILOT.md)) passes all 11 criteria in-process
+(`npx vitest run tests/production`), through `/mcp` (`npm run production:scripted`, 23 calls) and in
+the browser (`npm run production:ui`, 23 / 23 calls through Civil / Site panel controls, no palette
+detour). Its UI report still lists four `uiGaps`: the panel has no field for `minVelocity` /
+`diameters` on sizing or `minCoverM` / `minVelocity` on the check — the defaults equal the brief's
+values here, so the outcome is unaffected. Balance residual 0.01 %; design checks at 40 km/h all
+pass; no surcharged or flooding pipe (Ø225 / Ø300 / Ø375); LandXML 911 CgPoints, 1 705 faces, 2
+spirals, 4 structures / 3 pipes.
+
+Run of 2026-10-09 (`npm run production`): scripted 4 / 4 scenarios green; UI 3 / 4 on the first
+pass — `desmet-extraction-revision-b` failed in the harness, not the product: the element inspector
+now renders the same equipment editor as the Equipment section, so `equipment-edit-*` matched two
+inputs (Playwright strict mode). The UI driver now scopes the editor to the Equipment section
+(`tests/production/ui/panel.ts`); re-run: revision B 30 / 30.
 
 ### Gaps the gate found, and how they were closed
 
@@ -100,6 +119,8 @@ the project reopens and replays identically; a revision keeps every id, mark and
 | 9   | Only braced frames: a pipe rack's bents had no verifiable transverse stability           | `lateral-stability`   | rigid joints / base fixity on steel members; `check_steel_members` solves moment frames (N+M, sway, αcr)         |
 | 10  | Design: 6 m rack bents exceed the support span of 7 of 9 lines                           | `pipe-supports`       | the rack design was corrected: stringers and mid-bay tier beams, a shoe every 3 m                                |
 | 11  | Risers were not checked; supports kept a dangling member after edits; no plan symbol     | `pipe-supports`       | riser rule (guide spacing, weight carried), supports re-attach on delete / move / copy, P-SUPP plan symbols      |
+| 12  | Civil UI: no spiral, superelevation, IDF, outfall-level, sheet-paper or document-unit control | (UI driver, civil)    | Civil / Site panel: Spiral lengths, Superelevation, IDF a / b / c, Outfall level, Sheet paper, Work in metres     |
+| 13  | Civil: the profile cannot end exactly at the road end (end station shown to 1 cm, a PVI past it is refused) | `road-design-checks`  | closed: `set_alignment_profile` snaps end PVIs within 5 cm onto the alignment start / end (the scenario's 130.00 m PVI still passes; the criterion's 5 cm tolerance is kept) |
 
 `check_steel_members` warnings left are informational: equipment standing on grade (carried by
 foundations, not by the steel). The two long risers (into the extractor, out of the desolventizer)

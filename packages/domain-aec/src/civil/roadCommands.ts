@@ -230,11 +230,14 @@ function gradeSummary(doc: CadDocument, profile: ReadonlyArray<ProfilePvi>): str
   return `Grades: ${gradeText}.${curves ? ` Vertical curves: ${curves}.` : ' No vertical curves.'}`;
 }
 
+/** PVIs this close outside the alignment (metres) are snapped onto its start / end. */
+const PVI_END_SNAP_M = 0.05;
+
 /**
  * @command set_alignment_profile
  * @pure
  * @affects replaces the design profile of 1 alignment (corridor, batters regenerate)
- * @failure unknown alignment / fewer than 2 PVIs / unordered or overlapping PVIs / PVIs outside the alignment -> no-op
+ * @failure unknown alignment / fewer than 2 PVIs / unordered or overlapping PVIs / PVIs more than 5 cm outside the alignment -> no-op
  */
 export const setAlignmentProfile = defineCommand({
   name: 'set_alignment_profile',
@@ -258,25 +261,26 @@ export const setAlignmentProfile = defineCommand({
   run: (doc, { alignmentId, pvis }): CommandResult => {
     const alignment = findAlignment(doc, alignmentId);
     if (!alignment) return noop(doc, `set_alignment_profile failed: no alignment ${alignmentId}.`);
+    const start = alignment.startStation;
+    const end = endStation(alignment);
+    // End PVIs typed from a rounded station (e.g. 130.01 for 130.0135) snap onto the alignment ends.
+    const snap = fromMetres(doc, PVI_END_SNAP_M);
     const profile = pvis
-      .map(
-        (pvi): ProfilePvi => ({
-          station: pvi.station,
-          elevation: pvi.elevation,
-          curveLength: pvi.curveLength ?? 0,
-        }),
-      )
+      .map((pvi): ProfilePvi => {
+        const outside = pvi.station < start ? start - pvi.station : pvi.station - end;
+        const station =
+          outside > 0 && outside <= snap ? (pvi.station < start ? start : end) : pvi.station;
+        return { station, elevation: pvi.elevation, curveLength: pvi.curveLength ?? 0 };
+      })
       .sort((a, b) => a.station - b.station);
     const problem = validateProfile(profile);
     if (problem !== null) return noop(doc, `set_alignment_profile failed: ${problem}`);
-    const start = alignment.startStation;
-    const end = endStation(alignment);
     const first = profile[0] as ProfilePvi;
     const last = profile[profile.length - 1] as ProfilePvi;
     if (first.station < start - 1e-6 || last.station > end + 1e-6) {
       return noop(
         doc,
-        `set_alignment_profile failed: PVIs span ${first.station} to ${last.station} but the alignment runs ${start} to ${end}.`,
+        `set_alignment_profile failed: PVIs span ${first.station} to ${last.station} but the alignment runs ${start} to ${Number(end.toFixed(4))}.`,
       );
     }
     const document = commit(doc, { ...alignment, profile });

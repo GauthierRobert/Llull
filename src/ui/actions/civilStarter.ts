@@ -82,7 +82,7 @@ export function civilStarterActions(surveyText: string): PlanAction[] {
         pvis: [
           { station: 0, elevation: 103.0 },
           { station: 70, elevation: 105.5, curveLength: 40 },
-          { station: 128, elevation: 109.4 },
+          { station: 130, elevation: 109.5 },
         ],
       },
     },
