@@ -29,7 +29,10 @@ export const describeCivil = defineCommand({
     const civil = getCivil(doc);
     const objects = civil.order
       .map((id) => civil.objects[id])
-      .filter((object) => object !== undefined && (category === undefined || object.category === category))
+      .filter(
+        (object) =>
+          object !== undefined && (category === undefined || object.category === category),
+      )
       .map((object) => ({
         id: object?.id ?? '',
         category: object?.category ?? 'pointGroup',

@@ -48,8 +48,7 @@ const CHECKS: Readonly<Record<(typeof CIVIL_CATEGORIES)[number], readonly Check[
     (o) => demand(isVecList(o['extraPoints'], 3, 0), 'extraPoints must be [x, y, z] points'),
     (o) => demand(positive(o['contourInterval']), 'contourInterval must be > 0'),
     (o) => demand(finite(o['majorEvery']) && (o['majorEvery'] as number) >= 0, 'bad majorEvery'),
-    (o) =>
-      demand(o['boundary'] === undefined || isVecList(o['boundary'], 2, 3), 'bad boundary'),
+    (o) => demand(o['boundary'] === undefined || isVecList(o['boundary'], 2, 3), 'bad boundary'),
   ],
   platform: [
     (o) => demand(typeof o['surfaceId'] === 'string', 'surfaceId must be a string'),

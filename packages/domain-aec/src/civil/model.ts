@@ -91,7 +91,11 @@ const MM_PER_UNIT: Readonly<Record<DocumentUnit, number>> = {
 };
 
 /** Converts a length given in `unit` into the document's units. */
-export function fromUnit(doc: Pick<CadDocument, 'units'>, value: number, unit: DocumentUnit): number {
+export function fromUnit(
+  doc: Pick<CadDocument, 'units'>,
+  value: number,
+  unit: DocumentUnit,
+): number {
   return fromMm(doc, value * MM_PER_UNIT[unit]);
 }
 

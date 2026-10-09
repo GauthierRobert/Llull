@@ -62,12 +62,17 @@ export const importSurveyPoints = defineCommand({
       .describe('Unit of the coordinates in `text` / `points`. Default m.'),
   }),
   run: (doc, { name, text, format = 'PENZD', points = [], sourceUnit = 'm' }): CommandResult => {
-    const parsed = text !== undefined ? parseSurvey(text, format) : { points: [], rejectedLines: [] };
+    const parsed =
+      text !== undefined ? parseSurvey(text, format) : { points: [], rejectedLines: [] };
     const convert = (value: number): number => fromUnit(doc, value, sourceUnit);
     const surveyPoints: SurveyPoint[] = [
       ...parsed.points.map((point) => ({
         number: point.number,
-        position: [convert(point.easting), convert(point.northing), convert(point.elevation)] as Vec3,
+        position: [
+          convert(point.easting),
+          convert(point.northing),
+          convert(point.elevation),
+        ] as Vec3,
         ...(point.code !== undefined ? { code: point.code } : {}),
       })),
       ...points.map((point, index) => ({

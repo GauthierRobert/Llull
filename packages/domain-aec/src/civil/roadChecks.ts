@@ -19,7 +19,7 @@ export const MAX_SUPERELEVATION = 0.07;
 
 /** Speed km/h -> [side friction f, minimum crest K, minimum sag K]. */
 const SPEED_TABLE: ReadonlyArray<readonly [number, number, number, number]> = [
-  [20, 0.18, 1, 3],
+  [20, 0.35, 1, 3],
   [30, 0.28, 2, 6],
   [40, 0.23, 4, 9],
   [50, 0.19, 7, 13],

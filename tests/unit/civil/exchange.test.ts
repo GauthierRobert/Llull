@@ -113,6 +113,35 @@ describe('export_landxml', () => {
     expect(data.text).toContain('date="2026-01-02"');
   });
 
+  it('writes alignments with lines, curves and the design profile', () => {
+    const base = surveyedDocument();
+    const aligned = execute(base, 'add_alignment', {
+      points: [
+        [0, 0],
+        [60, 0],
+        [60, 60],
+      ],
+      radii: [20],
+    }).document;
+    const profiled = execute(aligned, 'set_alignment_profile', {
+      alignmentId: 'alignment-1',
+      pvis: [
+        { station: 0, elevation: 100 },
+        { station: 50, elevation: 102, curveLength: 20 },
+        { station: 100, elevation: 101 },
+      ],
+    }).document;
+    const text = (execute(profiled, 'export_landxml', {}).data as { text: string }).text;
+    expect(text).toMatch(/<Alignments name="Alignments">/);
+    expect(text).toMatch(/<Alignment name="Alignment 1" length="[\d.]+" staStart="0">/);
+    expect(text.match(/<Line /g)).toHaveLength(2);
+    expect(text).toMatch(/<Curve rot="ccw" crvType="arc" radius="20" delta="90"/);
+    expect(text).toMatch(/<PVI>0 100<\/PVI>/);
+    expect(text).toMatch(/<ParaCurve length="20">50 102<\/ParaCurve>/);
+    // Start of the first line: northing 0, easting 0; end of the arc lies on x = 60.
+    expect(text).toMatch(/<Start>0 0<\/Start>/);
+  });
+
   it('refuses an empty civil model', () => {
     const doc = metricDocument();
     const result = execute(doc, 'export_landxml', {});

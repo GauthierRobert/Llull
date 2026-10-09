@@ -42,7 +42,9 @@ function midpoint(line: ReadonlyArray<Vec2>): { at: Vec2; angle: number } {
 export function evaluateSurface(context: CivilContext, surface: SurfaceObject): Entity[] {
   const tin = surfaceTin(context.civil, surface);
   if (tin.triangles.length === 0) return [];
-  const entities: Entity[] = [civilMesh(surface, 'tin', `${surface.name} TIN`, 'tin', tinMesh(tin))];
+  const entities: Entity[] = [
+    civilMesh(surface, 'tin', `${surface.name} TIN`, 'tin', tinMesh(tin)),
+  ];
   const height = labelHeight(context.doc);
   let lines = 0;
   contourLevels(tin, surface.contourInterval).forEach((level) => {

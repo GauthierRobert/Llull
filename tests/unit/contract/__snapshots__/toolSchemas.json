@@ -19,6 +19,52 @@
     "name": "activate_configuration"
   },
   {
+    "description": "Create a road / channel alignment from points of intersection (PIs, document units). Each interior PI can carry a simple circular curve of the given radius (0 = sharp corner). Draws the centreline, station ticks labelled km+mmm.mm every `stationInterval`, and PC / PT / R labels. Add a design profile with set_alignment_profile and a road template with set_road_section to get the corridor, batters to daylight and earthworks; report with alignment_report.",
+    "input_schema": {
+      "properties": {
+        "name": {
+          "description": "Alignment name. Default \"Alignment <n>\".",
+          "type": "string"
+        },
+        "points": {
+          "description": "PIs from start to end, at least 2: [[x, y], ...].",
+          "items": {
+            "description": "Point of intersection [x, y] in document units.",
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "radii": {
+          "description": "Curve radius per interior PI (length = points - 2); 0 = no curve. Default all 0.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "startStation": {
+          "description": "Station of the first point, document units. Default 0.",
+          "type": "number"
+        },
+        "stationInterval": {
+          "description": "Station tick / section spacing (> 0). Default 20 m.",
+          "type": "number"
+        },
+        "surfaceId": {
+          "description": "Existing-ground surface id (from create_surface).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "points"
+      ],
+      "type": "object"
+    },
+    "name": "add_alignment"
+  },
+  {
     "description": "Add steel base plates with anchor bolts under steel columns (the given memberIds, or every steel column of the level that has none yet). Plate = column profile + margin on each side; follows its column when it moves and is deleted / copied with it. Plate mass and bolt counts feed the takeoff.",
     "input_schema": {
       "properties": {
@@ -1162,6 +1208,58 @@
     "name": "add_level"
   },
   {
+    "description": "Add a drainage manhole / inspection chamber / outfall at a plan position. Give `invertElevation` and either `rimElevation` or a `surfaceId` (rim = ground level there). Optional catchment (area in ha, runoff coefficient) and point inflow feed the network check. Connect manholes with add_pipe.",
+    "input_schema": {
+      "properties": {
+        "catchmentAreaHa": {
+          "description": "Contributing catchment area in hectares (> 0) for the rational method.",
+          "type": "number"
+        },
+        "diameter": {
+          "description": "Chamber internal diameter in document units (> 0). Default 1200 mm.",
+          "type": "number"
+        },
+        "inflowLps": {
+          "description": "Additional point inflow in litres per second (>= 0).",
+          "type": "number"
+        },
+        "invertElevation": {
+          "description": "Invert (lowest internal) elevation of the chamber.",
+          "type": "number"
+        },
+        "location": {
+          "description": "Plan position [x, y] of the chamber centre, document units.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "name": {
+          "description": "Display name. Default \"MH<n>\".",
+          "type": "string"
+        },
+        "rimElevation": {
+          "description": "Rim (cover level) elevation; must be above the invert. Overrides `surfaceId`.",
+          "type": "number"
+        },
+        "runoffCoefficient": {
+          "description": "Runoff coefficient C, 0 to 1. Default 0.9 when a catchment area is given.",
+          "type": "number"
+        },
+        "surfaceId": {
+          "description": "Surface id; when `rimElevation` is omitted the rim is the ground level there.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "location",
+        "invertElevation"
+      ],
+      "type": "object"
+    },
+    "name": "add_manhole"
+  },
+  {
     "description": "Add a mechanical mate (joint) between two InstanceEntity frames. A mate is stored as an ordinary constraint in doc.constraints so solve_constraints applies it with no extra steps. Supported kinds: \"coincident\" (two instance origins share the same position in XY), \"parallel\" (a named axis of instance A is parallel to a named axis of instance B), \"distance\" (the distance between two instance origins equals value). \"a\" and \"b\" identify the instances and the frame: { instanceId: \"<id>\", frame?: \"origin\"|\"axis-x\"|\"axis-y\"|\"axis-z\" }. frame defaults to \"origin\". value is required for kind=\"distance\" and may be a number or a parameter expression string. Returns the new constraint id in affected[0]. Call solve_constraints afterward to move instances to satisfy the mate.",
     "input_schema": {
       "properties": {
@@ -1314,6 +1412,51 @@
     "name": "add_panel"
   },
   {
+    "description": "Add a gravity pipe from the upstream manhole `fromId` to the downstream manhole `toId` (flow direction). Inverts default to the manhole inverts; diameter 300 mm, PVC, n 0.013. Refuses self-loops, duplicates and loops in the network; warns on adverse (uphill) slope. Then run check_drainage_network or size_drainage_pipes.",
+    "input_schema": {
+      "properties": {
+        "diameter": {
+          "description": "Pipe internal diameter in document units (> 0). Default 300 mm.",
+          "type": "number"
+        },
+        "fromId": {
+          "description": "Upstream manhole id, e.g. \"manhole-1\".",
+          "type": "string"
+        },
+        "invertFrom": {
+          "description": "Invert elevation at the upstream end. Default: upstream manhole invert.",
+          "type": "number"
+        },
+        "invertTo": {
+          "description": "Invert elevation at the downstream end. Default: downstream manhole invert.",
+          "type": "number"
+        },
+        "manningN": {
+          "description": "Manning roughness n (> 0). Default 0.013 (PVC).",
+          "type": "number"
+        },
+        "material": {
+          "description": "Pipe material label, e.g. \"PVC\", \"HDPE\", \"Concrete\".",
+          "type": "string"
+        },
+        "name": {
+          "description": "Display name. Default \"P<n>\".",
+          "type": "string"
+        },
+        "toId": {
+          "description": "Downstream manhole id.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "fromId",
+        "toId"
+      ],
+      "type": "object"
+    },
+    "name": "add_pipe"
+  },
+  {
     "description": "Route a pipe through 3D points [[x, y, z], …] (z above the level) with a service / fluid name (compressed air, cooling water, steam, gas…) and line-list data: line number, nominal size DN and from / to ends. Give `dn` (e.g. 100) and the outside diameter is taken from the EN 10220 / ASME B36.10 table (15…400); `diameter` overrides it. Bends are placed at every interior point. Pipe lengths feed the takeoff; the pipe schedule (building_schedule kind \"pipe\") is the line list; clashes are reported by check_clashes. Support it with add_pipe_support and verify the spacing with check_pipe_supports. Refused if a pipe of the same diameter already follows the same route (either direction) on the level.",
     "input_schema": {
       "properties": {
@@ -1424,6 +1567,51 @@
       "type": "object"
     },
     "name": "add_pipe_support"
+  },
+  {
+    "description": "Grade a flat building pad (platform) into an existing-ground surface. Give the pad outline `boundary` (plan polygon, >= 3 simple [x, y] vertices inside the surface) and the finished level `elevation`, both in document units. Cut and fill batters (side slopes, horizontal per 1 vertical; defaults 1.5 cut, 2 fill) are projected to the ground, producing the pad, its daylight line and cut / fill volumes. Returns data { platformId, cutM3, fillM3, netM3 }. Edit later with update_platform; find the balancing level with balance_platform.",
+    "input_schema": {
+      "properties": {
+        "boundary": {
+          "description": "Closed pad outline in plan (>= 3 vertices, simple polygon; any winding).",
+          "items": {
+            "description": "Pad outline vertex [x, y].",
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "cutSlope": {
+          "description": "Cut batter, horizontal per 1 vertical. Default 1.5.",
+          "type": "number"
+        },
+        "elevation": {
+          "description": "Finished pad level (document units).",
+          "type": "number"
+        },
+        "fillSlope": {
+          "description": "Fill batter, horizontal per 1 vertical. Default 2.",
+          "type": "number"
+        },
+        "name": {
+          "description": "Pad name. Default \"Platform <n>\".",
+          "type": "string"
+        },
+        "surfaceId": {
+          "description": "Existing-ground surface id, e.g. \"surface-1\".",
+          "type": "string"
+        }
+      },
+      "required": [
+        "surfaceId",
+        "boundary",
+        "elevation"
+      ],
+      "type": "object"
+    },
+    "name": "add_platform"
   },
   {
     "description": "Generate a pre-engineered steel hall (factory / warehouse) in one step: portal frames every baySpacing along Y (columns + pitched rafters spanning X; several spans side by side with spans: [...]), gable posts, purlins and side rails, X-bracing in the end bays (roof and walls), pad footings under every column, roof / wall / gable cladding, a ground slab and optionally an overhead crane runway on brackets. All sizes in document units, roofPitch in degrees. Defaults: 24 m span, 48 m long, 6 m bays, 7 m eaves, 6° roof, HEA400 columns, IPE450 rafters.",
@@ -2242,6 +2430,34 @@
     "name": "align"
   },
   {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Station-by-station report of an alignment (metres): x, y, ground, design, cut/fill (design - ground, + = fill), cross-section cut / fill areas (m2, need profile + road section + surface), cumulative cut / fill volumes (m3, average-end-area method) and the mass-haul ordinate (cum. cut - cum. fill, no bulking). Also `data.csv`. With `designSpeedKmh` it checks horizontal curve radii against R = V^2 / (127 (e + f)) with e = 0.07 and f from a simple speed table (0.28 at 30 .. 0.09 at 120 km/h), and vertical curve K against minimum crest / sag K (AASHTO-style stopping sight distance table), plus grade breaks over 0.5 % without a vertical curve; failures are listed.",
+    "input_schema": {
+      "properties": {
+        "alignmentId": {
+          "description": "Alignment id, e.g. \"alignment-1\".",
+          "type": "string"
+        },
+        "designSpeedKmh": {
+          "description": "Design speed (km/h, > 0) to enable the geometric checks.",
+          "type": "number"
+        },
+        "interval": {
+          "description": "Row spacing, document units. Default: the alignment station interval.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "alignmentId"
+      ],
+      "type": "object"
+    },
+    "name": "alignment_report"
+  },
+  {
     "description": "Attach a sinusoidal oscillation animation to an entity or group. The motion follows sin(2π·frequency·t) · amplitude. amplitude is the peak displacement: radians for the rotation channel, document units for position. frequency is cycles per second (Hz); must be > 0. axis is the world-space direction vector ([0,1,0] = Y axis); it need not be unit-length — the viewport normalizes it. pivot is the world-space rotation pivot; when omitted the player uses the target position. trigger 'auto' runs under the global Play button; 'click' toggles when the user clicks the part.",
     "input_schema": {
       "properties": {
@@ -2489,6 +2705,26 @@
       "type": "object"
     },
     "name": "bake_motion"
+  },
+  {
+    "description": "Set a platform to the finished level where earthworks balance: cut volume x swellFactor = fill volume (bisection between the lowest and highest existing ground in the pad). Mutates the platform elevation (undoable). Summary and data { platformId, elevationM, cutM3, fillM3, residualM3 } report the new level and the remaining imbalance.",
+    "input_schema": {
+      "properties": {
+        "platformId": {
+          "description": "Platform id, e.g. \"platform-1\".",
+          "type": "string"
+        },
+        "swellFactor": {
+          "description": "Bulking factor: fill needed = cut x swellFactor (> 0). Default 1.0.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "platformId"
+      ],
+      "type": "object"
+    },
+    "name": "balance_platform"
   },
   {
     "annotations": {
@@ -2863,6 +3099,40 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
+    "description": "Hydraulic check of the whole gravity network. Rational-method flows (catchments) and point inflows are accumulated downstream through the pipes; each pipe reports length, slope, design and full-bore (Manning) flow, utilisation, depth ratio, velocity and cover at both ends, and passes or fails against the limits. Manholes report depth and drop. Returns data { pipes, manholes, failures, csv }.",
+    "input_schema": {
+      "properties": {
+        "maxDepthRatio": {
+          "description": "Maximum design flow depth / diameter, 0 to 1. Default 0.8.",
+          "type": "number"
+        },
+        "maxVelocity": {
+          "description": "Maximum velocity, m/s. Default 3.0.",
+          "type": "number"
+        },
+        "minCoverM": {
+          "description": "Minimum cover over the pipe crown, metres. Default 0.9.",
+          "type": "number"
+        },
+        "minVelocity": {
+          "description": "Minimum self-cleansing velocity, m/s. Default 0.6.",
+          "type": "number"
+        },
+        "rainfallIntensityMmH": {
+          "description": "Design rainfall intensity in mm/h (> 0). Default 50.",
+          "type": "number"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "check_drainage_network"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
     "description": "Preliminary foundation check of the portal-frame columns of a level, from the characteristic base reactions of the same frame analysis as check_portal_frames (same deadLoad / snowLoad / windPressure / craneCapacity inputs). For every column with a pad footing (location at the column base) and/or a base plate: (1) soil bearing under SLS G+S, G+S+0.6W (either way), G+W, G+C, pressure = (V + footing 25 kN/m³ + backfill 18 kN/m³ above the footing up to the level) / area, with load eccentricity from H × (footing depth + backfill) reducing the width to B′ = B − 2e (Meyerhof) against `soilBearing` (kPa, default 150); (2) uplift EQU, 0.9 × (footing + backfill weight) vs net uplift under 0.9G + 1.5W (only with windPressure > 0); (3) sliding, H vs μ = 0.45 × (V + weights) / γR,h (γR,h = 1.1, EN 1997 DA2) under 1.0G + 1.5 S / W / 1.35 C, with the thrust shared across the frame columns when thrustTie (a tie or slab is assumed to take the gravity thrust, checked against tieCapacity under 1.35G + 1.5S / crane without wind, and the ground slab weight adds its friction, shared per column); (4) base plate: concrete bearing under 1.35G + 1.5S / wind / crane combinations vs fjd = 2/3 × 1.5 × fcd (C25/30, fcd 16.7 N/mm²) over the whole plate area, anchor tension (uplift shared by all bolts vs 0.9 fub As / 1.25) and bolt shear + tension interaction (shear αbc fub As / 1.25 with αbc = 0.44 − 0.0003 fyb, threads in the shear plane, EN 1993-1-8 §6.2.2(7); Ft/1.4), always grade 8.8. Fixed column bases (base plates with fixity 'fixed', add_portal_frame_building columnBase) add the base moment: bearing eccentricity e = (M + H·lever) / (V + W), an overturning EQU row (stabilising 0.9G·B/2 vs destabilising moment) and a 'base plate M+N' row (concrete bearing block fjd, tension anchor bolts Ft = (M − N zc)/z, plate bending; EN 1993-1-8 §6.2.8 simplified; design_portal_frames sizes the plate). Simplifications: pinned bases have no moment, horizontal force taken at the plate level, bending in the smaller footing side, no biaxial effects, no backfill reduction for the column, no friction in the anchor shear check, no footing reinforcement or punching (see design_footings). (5) Elastic settlement of each pad under SLS G+S, s = q B (1 − ν²) Is / Es (net pressure q − 18 kN/m³ × founding depth, i.e. footing + backfill weight replaces excavated soil; Is 0.88 rigid square, ν 0.3, Es = `soilModulus`, default 20 MPa) vs 25 mm, plus the worst differential settlement between adjacent columns of a frame vs L/500. With the optional `clayLayer` the primary consolidation of a clay layer below the footing (5 sublayers, groundwater at the founding level, γ′ = unitWeight − 9.81, σ′0 = 18 kN/m³ × founding depth + γ′ z, Δσ by 2:1 spreading, s = Σ Cc h/(1+e0) log10((σ′0+Δσ)/σ′0), Cr up to preconsolidationPressure and Cc beyond) is added to the elastic settlement (same 25 mm limit, row text gives both parts) and feeds the differential row. Returns one row per check and column (worst combination); utilisation > 1 fails. Not a substitute for a geotechnical or structural engineer.",
     "input_schema": {
       "properties": {
@@ -3175,6 +3445,35 @@
     "name": "clear_document"
   },
   {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Volume difference between two TIN surfaces by the grid method over their shared extent: cut where the comparison surface lies below the base (e.g. base = existing ground, comparison = design ground), fill where above. Read-only; data { cutM3, fillM3, netM3 (cut - fill), cutAreaM2, fillAreaM2, areaM2, gridSpacingM, samples, samplesOutsideTin }.",
+    "input_schema": {
+      "properties": {
+        "baseSurfaceId": {
+          "description": "Base surface id (usually existing ground).",
+          "type": "string"
+        },
+        "comparisonSurfaceId": {
+          "description": "Comparison surface id (usually design ground).",
+          "type": "string"
+        },
+        "gridSpacing": {
+          "description": "Grid cell size (document units). Default ~40000 cells.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "baseSurfaceId",
+        "comparisonSurfaceId"
+      ],
+      "type": "object"
+    },
+    "name": "compare_surfaces"
+  },
+  {
     "description": "Repeat a floor: copy every wall (with its doors/windows), slab, column, beam, stair and room of the source level onto each target level (typical floors of a multi-storey building). Optionally restrict to some categories. Copied pipes bring their pipe supports, re-attached to the steel found at their new position (unattached when none is in reach).",
     "input_schema": {
       "properties": {
@@ -3317,6 +3616,61 @@
     "name": "create_material"
   },
   {
+    "description": "Build an existing-ground terrain surface (Delaunay TIN) from survey point groups and/or extra [x, y, z] points, with minor and major contours (labelled with elevations in m). Optional plan `boundary` clips the TIN; `maxEdgeLength` drops long hull triangles on concave sites. Defaults: every point group, 1 m contour interval, every 5th contour major.",
+    "input_schema": {
+      "properties": {
+        "boundary": {
+          "description": "Outer boundary.",
+          "items": {
+            "description": "Boundary vertex [x, y].",
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "contourInterval": {
+          "description": "Minor contour interval (> 0). Default 1 m.",
+          "type": "number"
+        },
+        "majorEvery": {
+          "description": "Every n-th contour is major. Default 5.",
+          "type": "integer"
+        },
+        "maxEdgeLength": {
+          "description": "Drop triangles with a longer plan edge (> 0).",
+          "type": "number"
+        },
+        "name": {
+          "description": "Surface name. Default \"EG <n>\" (existing ground).",
+          "type": "string"
+        },
+        "pointGroupIds": {
+          "description": "Point groups to triangulate. Default: every point group.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "points": {
+          "description": "Extra points.",
+          "items": {
+            "description": "Extra [x, y, z] point.",
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "create_surface"
+  },
+  {
     "annotations": {
       "destructiveHint": true
     },
@@ -3337,6 +3691,29 @@
       "type": "object"
     },
     "name": "delete_building_element"
+  },
+  {
+    "annotations": {
+      "destructiveHint": true
+    },
+    "description": "Delete a civil object (point group, surface, platform, alignment, manhole or pipe) and its generated geometry. Refused when other objects reference it unless `cascade` is true, which deletes those dependents too (e.g. the pipes of a manhole).",
+    "input_schema": {
+      "properties": {
+        "cascade": {
+          "description": "Also delete dependent objects. Default false.",
+          "type": "boolean"
+        },
+        "id": {
+          "description": "Civil object id, e.g. \"manhole-2\".",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "delete_civil_object"
   },
   {
     "annotations": {
@@ -3552,6 +3929,32 @@
       "type": "object"
     },
     "name": "describe_building"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List the civil / site model: point groups, surfaces, platforms, alignments, manholes and pipes with their ids, names and the objects they reference. Optional `category` filter.",
+    "input_schema": {
+      "properties": {
+        "category": {
+          "description": "Only list objects of this category.",
+          "enum": [
+            "pointGroup",
+            "surface",
+            "platform",
+            "alignment",
+            "manhole",
+            "pipe"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "describe_civil"
   },
   {
     "annotations": {
@@ -3888,6 +4291,19 @@
       "type": "object"
     },
     "name": "distribute_on_arc"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Manhole and pipe schedules as CSV: ids, names, coordinates, rim and invert levels, depth, diameter, length, slope and material (metres). Returns data { manholeCsv, pipeCsv, csv }.",
+    "input_schema": {
+      "properties": {},
+      "required": [],
+      "type": "object"
+    },
+    "name": "drainage_schedule"
   },
   {
     "description": "Draw a circular arc in the local 2D work plane, defined by center, radius, and start/end angles in radians. Angles are measured counter-clockwise from the +X axis. radius must be > 0.",
@@ -4499,6 +4915,19 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
+    "description": "Export every civil-generated entity as DXF (AutoCAD R12) on its C-* layer: survey POINTs, contours and linework as POLYLINE / LINE at their elevation, labels as TEXT and the TIN, platforms, corridors and drainage meshes as 3DFACE triangles. data.text holds the file.",
+    "input_schema": {
+      "properties": {},
+      "required": [],
+      "type": "object"
+    },
+    "name": "export_civil_dxf"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
     "description": "Export the model as parametric source code: CadQuery or build123d (Python), OpenSCAD, or a FreeCAD macro. Parameters become named variables, parameter-driven dimensions stay expressions, and every feature (primitive, boolean, fillet, chamfer, shell, move, delete, rename) appears in feature-history order — kernel results are rebuilt from their exact construction, not triangles — so the code states exact dimensions and build order. CadQuery/build123d output can be edited and re-imported with import_code. Read-only: returns data.text (plus fileName, language, source, counts).",
     "input_schema": {
       "properties": {
@@ -4523,6 +4952,30 @@
       "type": "object"
     },
     "name": "export_code"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Cross-section sheet of an alignment as SVG text in `data.text` (`data.fileName`): one panel per station with the existing ground, the road template with batters to daylight, and the cut / fill areas (m2), all at one 1:1 scale. Needs set_alignment_profile and set_road_section; ground and areas need a linked surface. At most 60 stations are drawn (the spacing is widened).",
+    "input_schema": {
+      "properties": {
+        "alignmentId": {
+          "description": "Alignment id, e.g. \"alignment-1\".",
+          "type": "string"
+        },
+        "interval": {
+          "description": "Section spacing, document units. Default: the station interval.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "alignmentId"
+      ],
+      "type": "object"
+    },
+    "name": "export_cross_sections"
   },
   {
     "annotations": {
@@ -4641,6 +5094,52 @@
       "type": "object"
     },
     "name": "export_ifc"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Export the civil model as LandXML 1.2 (Civil 3D, BricsCAD, 12d, Trimble Business Center…): survey point groups (CgPoints), TIN surfaces (points + faces), alignments and the storm pipe network (structures + pipes). Coordinates are \"northing easting elevation\" in metres. data.text holds the file, data.fileName its name.",
+    "input_schema": {
+      "properties": {
+        "date": {
+          "description": "Header date yyyy-mm-dd. Default: the project date, else 1970-01-01.",
+          "type": "string"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "export_landxml"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Long section (profile) drawing of an alignment as SVG text in `data.text` (`data.fileName`): ground line, design line, PVIs with vertical-curve length / K / high-low point, grades, and a table band (station, ground, design, cut/fill) under the plot. Needs set_alignment_profile; ground needs a linked surface. Vertical exaggeration scales the vertical axis against the horizontal one.",
+    "input_schema": {
+      "properties": {
+        "alignmentId": {
+          "description": "Alignment id, e.g. \"alignment-1\".",
+          "type": "string"
+        },
+        "interval": {
+          "description": "Table column spacing, document units. Default: the station interval.",
+          "type": "number"
+        },
+        "verticalExaggeration": {
+          "description": "Vertical / horizontal scale ratio (> 0). Default 10.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "alignmentId"
+      ],
+      "type": "object"
+    },
+    "name": "export_long_section"
   },
   {
     "annotations": {
@@ -5115,6 +5614,40 @@
     "name": "group_entities"
   },
   {
+    "description": "Import an ASCII DXF drawing (AutoCAD, Civil 3D, BricsCAD, QCAD, survey software exports) as editable 2D entities on their DXF layers: LINE, LWPOLYLINE (bulges as arcs), POLYLINE, ARC, CIRCLE, POINT, TEXT, MTEXT, block INSERTs (exploded) and 3DFACE (one mesh per layer). Elevations are kept as the entity plane height. Units come from $INSUNITS unless `sourceUnit` is given. Binary DXF and DWG are not supported (save as ASCII DXF). For terrain from survey DXFs use import_survey_dxf.",
+    "input_schema": {
+      "properties": {
+        "layers": {
+          "description": "Only import these DXF layers (case-insensitive). Default: every layer.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "sourceUnit": {
+          "description": "Drawing unit when $INSUNITS is missing or wrong. Default: $INSUNITS, else the document unit.",
+          "enum": [
+            "mm",
+            "cm",
+            "m",
+            "in",
+            "ft"
+          ],
+          "type": "string"
+        },
+        "text": {
+          "description": "DXF file content (ASCII).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "type": "object"
+    },
+    "name": "import_dxf"
+  },
+  {
     "description": "Create mesh solids from world-space triangle data — the landing point for STEP import and for code-imported shapes that have no analytic llull primitive. Each body becomes one mesh entity (optionally named and coloured). Meshes render, measure and export but have no editable dimensions.",
     "input_schema": {
       "properties": {
@@ -5132,6 +5665,136 @@
       "type": "object"
     },
     "name": "import_mesh"
+  },
+  {
+    "description": "Extract survey points from a topographic DXF into a point group, ready for create_surface: POINT entities, vertices of 3D polylines / elevated contours / lines (breaklines), 3DFACE corners and, optionally, numeric spot-height TEXT (\"123.45\" placed at the level). Filter by DXF `layers` (e.g. [\"TOPO_PTS\", \"CONTOURS\"]). Points at elevation 0 are ignored unless `keepZeroElevation`. Units from $INSUNITS unless `sourceUnit`.",
+    "input_schema": {
+      "properties": {
+        "keepZeroElevation": {
+          "description": "Keep points at z = 0. Default false.",
+          "type": "boolean"
+        },
+        "layers": {
+          "description": "Only these DXF layers (case-insensitive). Default: every layer.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "name": {
+          "description": "Point group name. Default \"DXF survey <n>\".",
+          "type": "string"
+        },
+        "sourceUnit": {
+          "description": "Drawing unit when $INSUNITS is missing. Default: $INSUNITS, else m.",
+          "enum": [
+            "mm",
+            "cm",
+            "m",
+            "in",
+            "ft"
+          ],
+          "type": "string"
+        },
+        "sources": {
+          "description": "What becomes a point: points, vertices, faces, text. Default points, vertices, faces.",
+          "items": {
+            "enum": [
+              "points",
+              "vertices",
+              "faces",
+              "text"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "text": {
+          "description": "DXF file content (ASCII).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "type": "object"
+    },
+    "name": "import_survey_dxf"
+  },
+  {
+    "description": "Import survey points (topographic survey, total station / GNSS export) as a named point group. Give `text` (CSV / TXT file content, one point per line; header and # comment lines skipped) in `format` PENZD (default: number, easting, northing, elevation, description), PNEZD, PENZ, PNEZ, ENZ or NEZ, and/or `points` [{ x, y, z }]. Coordinates are in `sourceUnit` (default m) and are converted to the document unit. Then build a terrain with create_surface.",
+    "input_schema": {
+      "properties": {
+        "format": {
+          "description": "Column order of `text`. Default PENZD.",
+          "enum": [
+            "PENZD",
+            "PNEZD",
+            "PENZ",
+            "PNEZ",
+            "ENZ",
+            "NEZ"
+          ],
+          "type": "string"
+        },
+        "name": {
+          "description": "Point group name. Default \"Survey <n>\".",
+          "type": "string"
+        },
+        "points": {
+          "description": "Points given directly.",
+          "items": {
+            "properties": {
+              "code": {
+                "description": "Field code, e.g. \"TOPO\", \"EP\", \"TREE\".",
+                "type": "string"
+              },
+              "number": {
+                "description": "Point number / name. Default: running index.",
+                "type": "string"
+              },
+              "x": {
+                "description": "Easting.",
+                "type": "number"
+              },
+              "y": {
+                "description": "Northing.",
+                "type": "number"
+              },
+              "z": {
+                "description": "Elevation.",
+                "type": "number"
+              }
+            },
+            "required": [
+              "x",
+              "y",
+              "z"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "sourceUnit": {
+          "description": "Unit of the coordinates in `text` / `points`. Default m.",
+          "enum": [
+            "mm",
+            "cm",
+            "m",
+            "in",
+            "ft"
+          ],
+          "type": "string"
+        },
+        "text": {
+          "description": "Survey file content (comma, tab, ; or space separated).",
+          "type": "string"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "import_survey_points"
   },
   {
     "description": "Place a new InstanceEntity referencing an existing Component definition. The instance carries its own world-space transform (position, rotation, scale). Editing the component later automatically updates all its instances. componentId must exist in doc.components. Returns the new instance id in affected.",
@@ -5734,6 +6397,30 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
+    "description": "Earthworks report of a graded platform by the grid method: cut and fill volumes (m³), net (cut - fill, positive = surplus to export), cut / fill plan areas (m²), pad area, maximum cut / fill depth, grid spacing and the number of samples outside the TIN, plus the daylight line vertices. Read-only; data { platformId, cutM3, fillM3, netM3, cutAreaM2, fillAreaM2, padAreaM2, maxCutDepthM, maxFillDepthM, gridSpacingM, samples, samplesOutsideTin, daylight }.",
+    "input_schema": {
+      "properties": {
+        "gridSpacing": {
+          "description": "Grid cell size (document units). Default: about 2500 cells over the pad.",
+          "type": "number"
+        },
+        "platformId": {
+          "description": "Platform id, e.g. \"platform-1\".",
+          "type": "string"
+        }
+      },
+      "required": [
+        "platformId"
+      ],
+      "type": "object"
+    },
+    "name": "platform_earthworks"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
     "description": "Read-only bill of quantities of the building model, metric: wall length / net face area / volume, slab area / volume, column and beam volume, stair volume, door and window counts and areas, room floor area — grouped by category and material. Each line has a key like \"wall.concrete.m3\" used by estimate_cost. data.csv is spreadsheet-ready.",
     "input_schema": {
       "properties": {},
@@ -6034,6 +6721,48 @@
     "name": "set_active_level"
   },
   {
+    "description": "Set the vertical design profile of an alignment from PVIs [{ station, elevation, curveLength? }] (document units). Grades are straight between PVIs; an interior PVI with `curveLength` > 0 gets a symmetric parabolic vertical curve centred on it (first / last PVI cannot). The first and last PVI stations must lie within the alignment stations. The summary lists grades and K values.",
+    "input_schema": {
+      "properties": {
+        "alignmentId": {
+          "description": "Alignment id, e.g. \"alignment-1\".",
+          "type": "string"
+        },
+        "pvis": {
+          "description": "At least 2 PVIs; sorted by station automatically.",
+          "items": {
+            "properties": {
+              "curveLength": {
+                "description": "Vertical curve length (>= 0). Default 0.",
+                "type": "number"
+              },
+              "elevation": {
+                "description": "Design elevation at the PVI, document units.",
+                "type": "number"
+              },
+              "station": {
+                "description": "PVI station, document units.",
+                "type": "number"
+              }
+            },
+            "required": [
+              "station",
+              "elevation"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "alignmentId",
+        "pvis"
+      ],
+      "type": "object"
+    },
+    "name": "set_alignment_profile"
+  },
+  {
     "annotations": {
       "idempotentHint": true
     },
@@ -6279,6 +7008,42 @@
     "name": "set_project_info"
   },
   {
+    "description": "Set the symmetric road template of an alignment: carriageway `laneWidth` and `shoulderWidth` each side of the centreline (document units), `crossfall` (ratio falling away from the centreline, 0.025 = 2.5 %), and the `cutSlope` / `fillSlope` batters (horizontal per 1 vertical). Defaults: 3.5 m lane, 1.0 m shoulder, 0.025, 1.5, 2.0 - or the current template values. With a profile the corridor is drawn; with a surface too, batters run to daylight.",
+    "input_schema": {
+      "properties": {
+        "alignmentId": {
+          "description": "Alignment id, e.g. \"alignment-1\".",
+          "type": "string"
+        },
+        "crossfall": {
+          "description": "Crossfall ratio 0..0.3. Default 0.025.",
+          "type": "number"
+        },
+        "cutSlope": {
+          "description": "Cut batter H per 1 V (> 0). Default 1.5.",
+          "type": "number"
+        },
+        "fillSlope": {
+          "description": "Fill batter H per 1 V (> 0). Default 2.0.",
+          "type": "number"
+        },
+        "laneWidth": {
+          "description": "Carriageway width each side (> 0). Default 3.5 m.",
+          "type": "number"
+        },
+        "shoulderWidth": {
+          "description": "Shoulder width each side (>= 0). Default 1.0 m.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "alignmentId"
+      ],
+      "type": "object"
+    },
+    "name": "set_road_section"
+  },
+  {
     "annotations": {
       "idempotentHint": true
     },
@@ -6404,6 +7169,35 @@
     "name": "shell_solid"
   },
   {
+    "description": "Automatic pipe sizing: sets each pipe diameter to the smallest commercial size that carries its accumulated design flow at its current slope within `maxDepthRatio` (and `minVelocity` when given). Pipes that fail even at the largest size, or have no downhill slope, are reported and left unchanged.",
+    "input_schema": {
+      "properties": {
+        "diameters": {
+          "description": "Candidate diameters in millimetres. Default 150,225,300,375,450,525,600,750,900,1050,1200.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "maxDepthRatio": {
+          "description": "Maximum flow depth / diameter, 0 to 1. Default 0.8.",
+          "type": "number"
+        },
+        "minVelocity": {
+          "description": "Minimum velocity in m/s. Default: not enforced.",
+          "type": "number"
+        },
+        "rainfallIntensityMmH": {
+          "description": "Design rainfall intensity in mm/h (> 0). Default 50.",
+          "type": "number"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "size_drainage_pipes"
+  },
+  {
     "description": "Run the constraint solver and update entity positions so that all declared constraints are satisfied. The solver works on the 2D XY plane (position Z is unchanged): point constraints (coincident, distance, tangent) move entity positions; angle, parallel and perpendicular turn line b about its midpoint (line a is the reference). It iterates up to 64 steps, stopping early when the total constraint residual is below 1e-8. Returns convergence info in data: { residual: number, iterations: number, converged: boolean }. Non-convergent results are returned with the best-effort positions and converged:false. No parameters required.",
     "input_schema": {
       "properties": {},
@@ -6459,6 +7253,58 @@
     "name": "stop_animation"
   },
   {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Spot elevations and slopes of a terrain surface at plan points. data.points lists { at, elevation (document units, null outside the TIN), slopePercent }.",
+    "input_schema": {
+      "properties": {
+        "points": {
+          "description": "Plan points to sample.",
+          "items": {
+            "description": "Plan point [x, y].",
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "surfaceId": {
+          "description": "Surface id, e.g. \"surface-1\".",
+          "type": "string"
+        }
+      },
+      "required": [
+        "surfaceId",
+        "points"
+      ],
+      "type": "object"
+    },
+    "name": "surface_elevation"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Statistics of a terrain surface: point and triangle counts, plan area (m²), minimum / maximum / mean elevation (m) and mean slope (%).",
+    "input_schema": {
+      "properties": {
+        "surfaceId": {
+          "description": "Surface id, e.g. \"surface-1\".",
+          "type": "string"
+        }
+      },
+      "required": [
+        "surfaceId"
+      ],
+      "type": "object"
+    },
+    "name": "surface_report"
+  },
+  {
     "description": "Shorten a line entity so it ends exactly at its intersection with a boundary line. Both id and boundaryId must be line entities. The endpoint of id that is closer to the intersection is moved to the intersection point (the shorter side is trimmed; the longer side is preserved). No-op if either entity is not a line, they do not intersect within segment bounds, or if the entities are the same.",
     "input_schema": {
       "properties": {
@@ -6494,6 +7340,56 @@
       "type": "object"
     },
     "name": "ungroup_entities"
+  },
+  {
+    "description": "Edit an alignment: new PI `points`, curve `radii`, `startStation`, `stationInterval`, linked `surfaceId` (\"\" removes the link) or `name`. Profile, road section and everything derived (corridor, batters, report) follow. If `points` changes length without `radii`, radii are padded with 0 / truncated.",
+    "input_schema": {
+      "properties": {
+        "alignmentId": {
+          "description": "Alignment id, e.g. \"alignment-1\".",
+          "type": "string"
+        },
+        "name": {
+          "description": "New name.",
+          "type": "string"
+        },
+        "points": {
+          "description": "New PIs, at least 2.",
+          "items": {
+            "description": "Point of intersection [x, y] in document units.",
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "radii": {
+          "description": "New radii (length = points - 2).",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "startStation": {
+          "description": "New start station, document units.",
+          "type": "number"
+        },
+        "stationInterval": {
+          "description": "New station spacing (> 0).",
+          "type": "number"
+        },
+        "surfaceId": {
+          "description": "Ground surface id; \"\" removes the link.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "alignmentId"
+      ],
+      "type": "object"
+    },
+    "name": "update_alignment"
   },
   {
     "description": "Update a mutable field of an existing constraint. Supported patch fields: \"value\" (dimensional constraints only — a number or parameter expression), \"a\" and \"b\" (EntityRef objects to retarget the constraint to different entity points). The constraint kind cannot be changed; delete and re-add to change the kind. Call solve_constraints after updating to propagate the new constraint value to entity positions.",
@@ -6662,6 +7558,61 @@
     "name": "update_level"
   },
   {
+    "description": "Edit a manhole: move it, change invert / rim (or re-take the rim from `surfaceId`), diameter, catchment (`catchmentAreaHa` 0 removes it), point inflow (0 removes it) or name. Connected pipes stay connected and keep their inverts; pipes whose invert would fall below the new manhole invert are reported.",
+    "input_schema": {
+      "properties": {
+        "catchmentAreaHa": {
+          "description": "Contributing catchment area in hectares (> 0) for the rational method.",
+          "type": "number"
+        },
+        "diameter": {
+          "description": "Chamber internal diameter in document units (> 0). Default 1200 mm.",
+          "type": "number"
+        },
+        "inflowLps": {
+          "description": "Additional point inflow in litres per second (>= 0).",
+          "type": "number"
+        },
+        "invertElevation": {
+          "description": "Invert (lowest internal) elevation of the chamber.",
+          "type": "number"
+        },
+        "location": {
+          "description": "New plan position [x, y].",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "manholeId": {
+          "description": "Manhole id, e.g. \"manhole-1\".",
+          "type": "string"
+        },
+        "name": {
+          "description": "Display name. Default \"MH<n>\".",
+          "type": "string"
+        },
+        "rimElevation": {
+          "description": "Rim (cover level) elevation; must be above the invert. Overrides `surfaceId`.",
+          "type": "number"
+        },
+        "runoffCoefficient": {
+          "description": "Runoff coefficient C, 0 to 1. Default 0.9 when a catchment area is given.",
+          "type": "number"
+        },
+        "surfaceId": {
+          "description": "Surface id; when `rimElevation` is omitted the rim is the ground level there.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "manholeId"
+      ],
+      "type": "object"
+    },
+    "name": "update_manhole"
+  },
+  {
     "description": "Edit a door or window: slide it along its wall (offset), resize it, change sill height, swing, material or mark. The host wall is re-cut.",
     "input_schema": {
       "properties": {
@@ -6708,6 +7659,89 @@
       "type": "object"
     },
     "name": "update_opening"
+  },
+  {
+    "description": "Edit a drainage pipe: diameter, material, Manning n, end invert elevations or name. Endpoints (fromId / toId) cannot change; delete and re-add the pipe instead.",
+    "input_schema": {
+      "properties": {
+        "diameter": {
+          "description": "Pipe internal diameter in document units (> 0). Default 300 mm.",
+          "type": "number"
+        },
+        "invertFrom": {
+          "description": "Invert elevation at the upstream end. Default: upstream manhole invert.",
+          "type": "number"
+        },
+        "invertTo": {
+          "description": "Invert elevation at the downstream end. Default: downstream manhole invert.",
+          "type": "number"
+        },
+        "manningN": {
+          "description": "Manning roughness n (> 0). Default 0.013 (PVC).",
+          "type": "number"
+        },
+        "material": {
+          "description": "Pipe material label, e.g. \"PVC\", \"HDPE\", \"Concrete\".",
+          "type": "string"
+        },
+        "name": {
+          "description": "Display name. Default \"P<n>\".",
+          "type": "string"
+        },
+        "pipeId": {
+          "description": "Pipe id, e.g. \"pipe-1\".",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pipeId"
+      ],
+      "type": "object"
+    },
+    "name": "update_pipe"
+  },
+  {
+    "description": "Edit a graded platform: change its finished level, outline, batter slopes or name. Geometry and volumes are regenerated; returns data { platformId, cutM3, fillM3, netM3 }. Only the given fields change; the call is a no-op when nothing differs.",
+    "input_schema": {
+      "properties": {
+        "boundary": {
+          "description": "New pad outline (>= 3 vertices, simple polygon, inside the surface).",
+          "items": {
+            "description": "Pad outline vertex [x, y].",
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "cutSlope": {
+          "description": "Cut batter, horizontal per 1 vertical (> 0).",
+          "type": "number"
+        },
+        "elevation": {
+          "description": "New finished level (document units).",
+          "type": "number"
+        },
+        "fillSlope": {
+          "description": "Fill batter, horizontal per 1 vertical (> 0).",
+          "type": "number"
+        },
+        "name": {
+          "description": "New name.",
+          "type": "string"
+        },
+        "platformId": {
+          "description": "Platform id, e.g. \"platform-1\".",
+          "type": "string"
+        }
+      },
+      "required": [
+        "platformId"
+      ],
+      "type": "object"
+    },
+    "name": "update_platform"
   },
   {
     "description": "Edit a steel member: change its section (e.g. upsize IPE400 → IPE450; a horizontal member with roll 0 or π keeps its top of steel, other rolls keep the axis height), end points, role, roll, grade, note, beam joints (startJoint / endJoint pinned | rigid) or column baseFixity (pinned | fixed). Pipe supports bearing on the member re-check their reach: kept (pedestal / rod updated), re-attached to other steel, or unattached (the summary says which).",
@@ -6795,6 +7829,60 @@
       "type": "object"
     },
     "name": "update_steel_member"
+  },
+  {
+    "description": "Edit a terrain surface: rename, change contour interval / major frequency, boundary, max edge length, or add more [x, y, z] points. Platforms and alignments on it update automatically.",
+    "input_schema": {
+      "properties": {
+        "addPoints": {
+          "description": "Points to add.",
+          "items": {
+            "description": "Extra [x, y, z] point.",
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "boundary": {
+          "description": "New outer boundary ([] removes it).",
+          "items": {
+            "description": "Boundary vertex [x, y].",
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "contourInterval": {
+          "description": "Minor contour interval (> 0).",
+          "type": "number"
+        },
+        "majorEvery": {
+          "description": "Every n-th contour is major (0 = none).",
+          "type": "integer"
+        },
+        "maxEdgeLength": {
+          "description": "Max plan edge length (0 removes the limit).",
+          "type": "number"
+        },
+        "name": {
+          "description": "New name.",
+          "type": "string"
+        },
+        "surfaceId": {
+          "description": "Surface id, e.g. \"surface-1\".",
+          "type": "string"
+        }
+      },
+      "required": [
+        "surfaceId"
+      ],
+      "type": "object"
+    },
+    "name": "update_surface"
   },
   {
     "description": "Edit a wall parametrically: move its endpoints, change thickness, height, base offset, material or level. Hosted doors/windows stay attached (refused if one would no longer fit).",
