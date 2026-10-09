@@ -80,7 +80,14 @@ export function SolidMeshShell({
       castShadow
       receiveShadow
     >
-      <meshStandardMaterial {...matProps} side={doubleSided ? THREE.DoubleSide : matProps.side} />
+      {/* Pushed back slightly so lines drawn on the surface (contours, outlines) stay visible. */}
+      <meshStandardMaterial
+        {...matProps}
+        side={doubleSided ? THREE.DoubleSide : matProps.side}
+        polygonOffset
+        polygonOffsetFactor={1}
+        polygonOffsetUnits={1}
+      />
     </mesh>
   );
 }

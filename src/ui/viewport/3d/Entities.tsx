@@ -3,7 +3,7 @@
  *
  * Maps `document.order` → a render branch per entity `kind` (architecture L7: every kind has one).
  * Layer-hidden and render-only hidden entities (UI store) are skipped; selection state is passed
- * to each branch. 2D kinds belong to the 2D viewport and render nothing here.
+ * to each branch. 2D kinds draw on their work plane via Shape2DRenderer.
  *
  * Click: plain click → select([id]); Shift/Ctrl/Meta click → toggleSelection(id). A click also
  * toggles the `trigger:'click'` animations that target the entity (directly or through a group).
@@ -28,6 +28,7 @@ import { WedgeMesh } from './entities/WedgeMesh';
 import { PyramidMesh } from './entities/PyramidMesh';
 import { RevolutionMesh } from './entities/RevolutionMesh';
 import { TextMesh } from './entities/TextMesh';
+import { Shape2DRenderer } from '../2d/Shape2DRenderer';
 import { isBatchable, groupEntitiesForInstancing } from './grouping';
 import { InstancedRenderer } from './InstancedRenderer';
 import { GridAnnotations3D } from './GridAnnotations3D';
@@ -149,10 +150,9 @@ const EntityRenderer = memo(function EntityRenderer({
         />
       );
     default:
-      // 2D shape kinds (line/arc/circle/…) are drawn by the 2D viewport (Viewport2D),
-      // not in the 3D scene. Keeping a tolerant default lets the Entity union grow
-      // without breaking this branch (architecture L7).
-      return null;
+      // Remaining 2D shape kinds (line/arc/circle/point/…) draw on their own work plane, at its
+      // elevation, through the same renderers as the 2D view (architecture L7).
+      return <Shape2DRenderer entity={entity} selected={selected} />;
   }
 });
 

@@ -4,9 +4,13 @@ import { expect, type Download, type Page } from '@playwright/test';
 
 export async function openBuilding(page: Page): Promise<void> {
   await captureDownloads(page);
-  await page.goto('/');
-  await page.evaluate(() => window.localStorage.clear());
-  await page.reload();
+  // Clear storage before the app boots: clearing a live page and reloading lets its pagehide
+  // autosave flush re-write the previous document.
+  await page.addInitScript(() => {
+    if (location.search.includes('fresh=1')) window.localStorage.clear();
+  });
+  await page.goto('about:blank');
+  await page.goto('/?fresh=1');
   await page.getByRole('tab', { name: 'Building' }).click();
   await expect(page.getByTestId('building-panel')).toBeVisible();
 }

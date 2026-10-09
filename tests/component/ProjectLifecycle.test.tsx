@@ -113,9 +113,9 @@ describe('EmptyState — structure option', () => {
     expect(screen.queryByRole('region', { name: 'Get started' })).toBeNull();
   });
 
-  it('"Steel hall template" adds the hall', () => {
+  it('"Portal-frame hall template" adds the hall', () => {
     render(<EmptyState />);
-    fireEvent.click(screen.getByRole('button', { name: /steel hall template/i }));
+    fireEvent.click(screen.getByRole('button', { name: /portal-frame hall template/i }));
     expect(useStore.getState().document.order.length).toBeGreaterThan(0);
   });
 });

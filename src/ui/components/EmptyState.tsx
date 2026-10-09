@@ -97,8 +97,8 @@ export function EmptyState(): React.ReactElement | null {
             }}
           >
             <Icon name="building" size={18} />
-            <span className="empty-state__action-title">Steel hall template</span>
-            <span className="empty-state__action-sub">portal-frame hall in one click</span>
+            <span className="empty-state__action-title">Portal-frame hall template</span>
+            <span className="empty-state__action-sub">a ready-made frame set in one click</span>
           </button>
         </div>
 
