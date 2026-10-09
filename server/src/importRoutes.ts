@@ -16,6 +16,7 @@ import { isRecord } from '@lib/isRecord';
 import { applyCommand } from './commandBus';
 import { convertDwgToDxf, dwgConfigFromEnv, DwgConvertError } from './dwgConvert';
 import { guardMutation } from './security';
+import { actorOf } from './audit';
 
 const LIST_KEYS = new Set(['layers', 'sources']);
 const BOOLEAN_KEYS = new Set(['keepZeroElevation']);
@@ -77,7 +78,12 @@ export function buildImportRouter(restLimiter: RequestHandler): Router {
     convertDwgToDxf(bytes)
       .then((text) => {
         const command = target === 'survey' ? 'import_survey_dxf' : 'import_dxf';
-        const result = applyCommand(command, commandParams(target, source, text));
+        const result = applyCommand(
+          command,
+          commandParams(target, source, text),
+          undefined,
+          actorOf(res, 'rest'),
+        );
         res.status(200).json({ ...result, command, dxfBytes: Buffer.byteLength(text) });
       })
       .catch((error: unknown) => {

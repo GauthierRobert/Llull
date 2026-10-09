@@ -19,6 +19,7 @@ import {
   MAX_LIVE_SUBSCRIBERS,
 } from './liveDocument';
 import { guardMutation, guardRead } from './security';
+import { actorOf } from './audit';
 
 const KEEPALIVE_MS = 25_000;
 
@@ -65,15 +66,15 @@ export function buildLiveRouter(restLimiter: RequestHandler): Router {
       res.status(400).json({ error: '"commandId" must be a non-empty string when present.' });
       return;
     }
-    res.status(200).json(applyCommand(name, params ?? {}, commandId));
+    res.status(200).json(applyCommand(name, params ?? {}, commandId, actorOf(res, 'rest')));
   });
 
   router.post('/undo', restLimiter, mutationGuard, (_req, res) => {
-    res.status(200).json(undo());
+    res.status(200).json(undo(actorOf(res, 'rest')));
   });
 
   router.post('/redo', restLimiter, mutationGuard, (_req, res) => {
-    res.status(200).json(redo());
+    res.status(200).json(redo(actorOf(res, 'rest')));
   });
 
   return router;

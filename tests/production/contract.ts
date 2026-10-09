@@ -26,7 +26,8 @@ export interface ToolCall {
 /**
  * A deliverable the office issues, produced from the final document:
  * `ifc` · `dxf:<levelId>` · `plan:<levelId>` · `elevation:<direction>` · `schedule:<kind>` ·
- * `takeoff` · `save` (serialized document).
+ * `takeoff` · `save` (serialized document) · civil: `landxml` ·
+ * `plan-profile:<alignmentId>:<paper>`.
  */
 export type DeliverableId = string;
 
@@ -55,7 +56,11 @@ export type CriterionArea =
   | 'coordination'
   | 'engineering'
   | 'deliverables'
-  | 'data-integrity';
+  | 'data-integrity'
+  | 'survey'
+  | 'earthworks'
+  | 'roads'
+  | 'drainage';
 
 export interface Criterion {
   /** kebab-case, unique per scenario; the id used in `knownIssues`. */

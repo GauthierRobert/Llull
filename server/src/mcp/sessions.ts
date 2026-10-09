@@ -9,6 +9,8 @@ interface SessionEntry {
   transport: StreamableHTTPServerTransport;
   /** Epoch-ms of the last request routed to this session. */
   lastSeenMs: number;
+  /** Named user that opened the session (named-user mode); other users cannot reuse the id. */
+  userId?: string;
 }
 
 /** Session id -> entry. Removed on DELETE, on transport close, or by the idle sweep. */

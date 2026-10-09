@@ -24,6 +24,8 @@ import { exchangeOptionsWithDwg } from './dwgConvert';
 import { evictForCapacity, sessions, startSessionSweep } from './mcp/sessions';
 import { buildAuthMiddleware, buildMcpRateLimiter } from './mcp/middleware';
 import { buildMcpServer } from './mcp/server';
+import { requestUser } from './users';
+import { actorOf } from './audit';
 
 /** Toolsets from `LLULL_TOOLSETS` (comma-separated; unset = core only, `all` = everything). Warns on unknown names. */
 export function toolsetsFromEnv(
@@ -50,11 +52,15 @@ export function buildMcpRouter(
   router.use(buildMcpRateLimiter());
 
   /** Transport + bound `Server`; the session registers itself once the SDK assigns its id. */
-  const allocateSession = (): StreamableHTTPServerTransport => {
+  const allocateSession = (userId: string | undefined): StreamableHTTPServerTransport => {
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
       onsessioninitialized: (sessionId) => {
-        sessions.set(sessionId, { transport, lastSeenMs: Date.now() });
+        sessions.set(sessionId, {
+          transport,
+          lastSeenMs: Date.now(),
+          ...(userId !== undefined ? { userId } : {}),
+        });
       },
       onsessionclosed: (sessionId) => {
         sessions.delete(sessionId);
@@ -78,6 +84,11 @@ export function buildMcpRouter(
       res.status(404).json({ error: `Unknown or expired session: ${sessionId}` });
       return true;
     }
+    const caller = requestUser(res);
+    if (entry.userId !== undefined && caller?.id !== entry.userId) {
+      res.status(403).json({ error: 'This MCP session belongs to another user.' });
+      return true;
+    }
     entry.lastSeenMs = Date.now(); // keeps the idle sweep away from active sessions
     try {
       await entry.transport.handleRequest(req, res, req.body as unknown);
@@ -92,9 +103,12 @@ export function buildMcpRouter(
     void (async () => {
       if (await routeToExistingSession(req, res)) return;
       evictForCapacity();
-      const transport = allocateSession();
+      const transport = allocateSession(requestUser(res)?.id);
       try {
-        await buildMcpServer(exchange, enabledToolsets).connect(transport as Transport);
+        await buildMcpServer(exchange, enabledToolsets, {
+          actor: actorOf(res, 'mcp'),
+          role: requestUser(res)?.role ?? null,
+        }).connect(transport as Transport);
         await transport.handleRequest(req, res, req.body as unknown);
       } catch (err: unknown) {
         console.error('[/mcp] new session error:', errorMessage(err));

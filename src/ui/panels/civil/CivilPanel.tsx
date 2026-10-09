@@ -17,6 +17,7 @@ import { EarthworksSection } from './EarthworksSection';
 import { RoadsSection } from './RoadsSection';
 import { DrainageSection } from './DrainageSection';
 import { CivilExportsSection } from './CivilExportsSection';
+import { CivilFeedback } from './CivilFeedback';
 
 export function CivilPanel({ className }: { className?: string }): React.ReactElement {
   const objectCount = useStore((s) => s.document.civil?.order.length ?? 0);
@@ -26,7 +27,9 @@ export function CivilPanel({ className }: { className?: string }): React.ReactEl
         title="Civil / Site"
         count={objectCount}
         countLabel={`${objectCount} civil objects`}
-      />
+      >
+        <CivilFeedback />
+      </PanelHeader>
       {objectCount === 0 && (
         <PanelEmpty
           icon="terrain"

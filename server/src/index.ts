@@ -4,6 +4,7 @@
  * change goes through the command registry (architecture L1, L6).
  *
  *   GET /health            liveness + active kernel
+ *   /license /admin/*      `adminRoutes.ts` (license status; admin: users, audit, license)
  *   /live /command /undo /redo   `liveRoutes.ts`      /export/*   `exportRoutes.ts`
  *   POST /import/dwg       `importRoutes.ts` (DWG -> DXF converter, then import_dxf)
  *   ALL /mcp               `mcp.ts` (Streamable HTTP; bearer auth + rate limit)
@@ -15,6 +16,7 @@
 
 import './plugins'; // must stay first: installs domain plugins before liveDocument loads
 import './loadEnv';
+import path from 'path';
 import express from 'express';
 import cors from 'cors';
 import { buildMcpRouter } from './mcp';
@@ -23,6 +25,7 @@ import { buildImportRouter } from './importRoutes';
 import { getActiveKernelName } from './geometryKernel';
 import { buildLiveRouter } from './liveRoutes';
 import { buildExportRouter } from './exportRoutes';
+import { buildAdminRouter } from './adminRoutes';
 import { errorMessage } from '@lib/errorMessage';
 import { startServer } from './lifecycle';
 import {
@@ -58,9 +61,18 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', kernel: getActiveKernelName() });
 });
 app.use(buildLiveRouter(restLimiter));
+app.use(buildAdminRouter(restLimiter));
 app.use('/export', restLimiter, buildExportRouter(exchange));
 app.use('/import', buildImportRouter(restLimiter));
 app.use('/mcp', buildMcpRouter(exchange));
+// On-prem: serve the built web app (`LLULL_STATIC_DIR`, e.g. /app/dist) from the same origin.
+const staticDir = process.env['LLULL_STATIC_DIR'];
+if (staticDir !== undefined && staticDir !== '') {
+  app.use(express.static(staticDir));
+  app.get('*', (req, res, next) =>
+    req.accepts('html') === 'html' ? res.sendFile(path.resolve(staticDir, 'index.html')) : next(),
+  );
+}
 app.use((req, res) => {
   res.status(404).json({ error: `Not found: ${req.method} ${req.path}` });
 });

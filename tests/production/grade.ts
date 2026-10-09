@@ -41,6 +41,12 @@ function produce(doc: CadDocument, id: DeliverableId): string {
       return fromData('building_schedule', { kind: arg }, 'csv');
     case 'takeoff':
       return JSON.stringify(execute(doc, 'quantity_takeoff', {}).data ?? {});
+    case 'landxml':
+      return fromData('export_landxml', {}, 'text');
+    case 'plan-profile': {
+      const [, alignmentId = '', paper = 'A3'] = id.split(':');
+      return fromData('export_plan_profile_sheet', { alignmentId, paper }, 'text');
+    }
     case 'save':
       return serializeDocument(doc);
     default:

@@ -15,6 +15,7 @@ import type { CadDocument } from '@core/model/types';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence';
 import { errorMessage } from '@lib/errorMessage';
 import { documentHash } from '@mcp/liveSync';
+import { setAuditDefaultDirectory } from './audit';
 import type { LiveCommandEvent, LiveSnapshotEvent } from '@mcp/liveSync';
 
 /**
@@ -23,6 +24,8 @@ import type { LiveCommandEvent, LiveSnapshotEvent } from '@mcp/liveSync';
  */
 const AUTOSAVE_PATH =
   process.env['LLULL_AUTOSAVE_PATH'] ?? path.resolve(__dirname, '..', '.autosave.json');
+
+setAuditDefaultDirectory(path.dirname(AUTOSAVE_PATH));
 
 const AUTOSAVE_ENABLED =
   !process.env['VITEST'] &&
@@ -92,6 +95,11 @@ let _seq = 0;
 /** Random per process: `_seq` restarts at 0 on restart, so clients compare `(epoch, seq)`. */
 const _epoch: string = randomUUID();
 
+/** Current log position `(epoch, seq)` without hashing the document (audit lines). */
+export function getLiveLogPosition(): { epoch: string; seq: number } {
+  return { epoch: _epoch, seq: _seq };
+}
+
 export function getLiveDoc(): CadDocument {
   return _liveDoc;
 }
@@ -137,6 +145,8 @@ function broadcast(eventType: 'snapshot' | 'command', payload: unknown): void {
 interface LiveCommand {
   readonly name: string;
   readonly params: unknown;
+  /** Named user who ran it (named-user mode only); collaborators see who did what. */
+  readonly user?: { readonly id: string; readonly name: string };
 }
 
 /**
@@ -161,6 +171,7 @@ export function setLiveDoc(next: CadDocument, command?: LiveCommand): void {
     name: command.name,
     params: command.params,
     stateHash: documentHash(next),
+    ...(command.user !== undefined ? { userId: command.user.id, userName: command.user.name } : {}),
   };
   broadcast('command', event);
 }

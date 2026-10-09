@@ -18,7 +18,8 @@ import { withMonotonicStepCounter } from '@core/model/stepCounter';
 import { execute, getCommand } from '@core/commands/registry';
 import { errorMessage } from '@lib/errorMessage';
 import { hashText } from '@lib/hash';
-import { getLiveDoc, setLiveDoc } from './liveDocument';
+import { getLiveDoc, getLiveLogPosition, setLiveDoc } from './liveDocument';
+import { ANONYMOUS_ACTOR, appendAudit, hashParams, type Actor } from './audit';
 
 /** Maximum undo/redo depth — mirrors MAX_UNDO_DEPTH in the UI store. */
 const MAX_UNDO_DEPTH = 100;
@@ -78,12 +79,18 @@ function withHistoryFlags(result: Omit<CommandBusResult, 'canUndo' | 'canRedo'>)
  *
  * @param name   - snake_case command name (== MCP tool name).
  * @param params - raw params object forwarded to execute().
+ * @param actor - who is acting (audit line + live event attribution); omitted = anonymous/untracked.
  * @param commandId - optional client id; a repeated id returns the cached result without re-applying
  *   (network retries are safe). Only document-changing, non-readOnly results are cached; reuse with
  *   a different name/params is an error result. Bounded LRU of MAX_IDEMPOTENCY_ENTRIES.
  */
-export function applyCommand(name: string, params: unknown, commandId?: string): CommandBusResult {
-  if (commandId === undefined) return runCommand(name, params);
+export function applyCommand(
+  name: string,
+  params: unknown,
+  commandId?: string,
+  actor?: Actor,
+): CommandBusResult {
+  if (commandId === undefined) return runCommand(name, params, actor);
   const requestHash = requestHashOf(name, params);
   const cached = _resultsByCommandId.get(commandId);
   if (cached !== undefined) {
@@ -99,7 +106,7 @@ export function applyCommand(name: string, params: unknown, commandId?: string):
     _resultsByCommandId.set(commandId, cached); // refresh LRU position
     return withHistoryFlags(cached.result);
   }
-  const result = runCommand(name, params);
+  const result = runCommand(name, params, actor);
   if (!result.changed || getCommand(name)?.annotations?.readOnly === true) return result;
   _resultsByCommandId.set(commandId, { requestHash, result: boundedForReplay(result) });
   if (_resultsByCommandId.size > MAX_IDEMPOTENCY_ENTRIES) {
@@ -129,7 +136,7 @@ function boundedForReplay(result: CommandBusResult): CommandBusResult {
 }
 
 /** `changed` = the live document was replaced by this call. */
-function runCommand(name: string, params: unknown): CommandBusResult {
+function runCommand(name: string, params: unknown, actor?: Actor): CommandBusResult {
   const prior = getLiveDoc();
   let result: ReturnType<typeof execute>;
   try {
@@ -148,7 +155,12 @@ function runCommand(name: string, params: unknown): CommandBusResult {
   if (changed) {
     history.undo = pushCapped(history.undo, prior);
     history.redo = [];
-    setLiveDoc(result.document, { name, params });
+    setLiveDoc(result.document, {
+      name,
+      params,
+      ...(actor?.named === true ? { user: { id: actor.userId, name: actor.userName } } : {}),
+    });
+    recordAudit(actor, name, params, result.summary, result.affected.length);
   }
 
   return withHistoryFlags({
@@ -157,6 +169,27 @@ function runCommand(name: string, params: unknown): CommandBusResult {
     isError: result.rejected === true,
     changed,
     ...(result.data !== undefined ? { data: result.data } : {}),
+  });
+}
+
+function recordAudit(
+  actor: Actor | undefined,
+  command: string,
+  params: unknown,
+  summary: string,
+  affectedCount: number,
+): void {
+  const who = actor ?? ANONYMOUS_ACTOR('rest');
+  appendAudit({
+    ts: new Date().toISOString(),
+    userId: who.userId,
+    userName: who.userName,
+    source: who.source,
+    command,
+    paramsSha256: hashParams(params),
+    summary,
+    affectedCount,
+    ...getLiveLogPosition(),
   });
 }
 
@@ -169,6 +202,7 @@ function travelHistory(
   to: HistoryDirection,
   summary: string,
   emptySummary: string,
+  actor?: Actor,
 ): CommandBusResult {
   const target = history[from].at(-1);
   if (target === undefined) {
@@ -183,17 +217,18 @@ function travelHistory(
   history[from] = history[from].slice(0, -1);
   history[to] = pushCapped(history[to], current);
   setLiveDoc(withMonotonicStepCounter(target, current));
+  recordAudit(actor, from, {}, summary, 0);
   return withHistoryFlags({ summary, affected: [], isError: false, changed: true });
 }
 
 /** Undo the last mutating command. */
-export function undo(): CommandBusResult {
-  return travelHistory('undo', 'redo', 'Undid last change.', 'Nothing to undo.');
+export function undo(actor?: Actor): CommandBusResult {
+  return travelHistory('undo', 'redo', 'Undid last change.', 'Nothing to undo.', actor);
 }
 
 /** Redo the last undone command. */
-export function redo(): CommandBusResult {
-  return travelHistory('redo', 'undo', 'Redid last change.', 'Nothing to redo.');
+export function redo(actor?: Actor): CommandBusResult {
+  return travelHistory('redo', 'undo', 'Redid last change.', 'Nothing to redo.', actor);
 }
 
 export function canUndo(): boolean {

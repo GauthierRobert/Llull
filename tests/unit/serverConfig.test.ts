@@ -7,6 +7,8 @@ async function loadConfig(): Promise<typeof import('@ui/serverConfig')> {
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  window.localStorage.clear();
+  window.history.replaceState(null, '', '/');
 });
 
 describe('serverConfig', () => {
@@ -42,5 +44,21 @@ describe('serverConfig', () => {
     vi.stubEnv('VITE_LLULL_API_TOKEN', 'a b&c');
     const config = await loadConfig();
     expect(config.liveStreamUrl()).toBe('https://cad.example.com/live?access_token=a%20b%26c');
+  });
+
+  it('prefers a per-user token stored in localStorage over the build token', async () => {
+    vi.stubEnv('VITE_LLULL_API_TOKEN', 'shared');
+    window.localStorage.setItem('llull.apiToken', 'user-tok');
+    const config = await loadConfig();
+    expect(config.serverAuthHeaders()).toEqual({ Authorization: 'Bearer user-tok' });
+  });
+
+  it('captures #token=<token> into localStorage and strips the fragment', async () => {
+    vi.stubEnv('VITE_LLULL_API_TOKEN', '');
+    window.history.replaceState(null, '', '/#token=abc%20123');
+    const config = await loadConfig();
+    expect(config.serverAuthHeaders()).toEqual({ Authorization: 'Bearer abc 123' });
+    expect(window.location.hash).toBe('');
+    expect(window.localStorage.getItem('llull.apiToken')).toBe('abc 123');
   });
 });

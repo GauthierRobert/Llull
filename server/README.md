@@ -253,3 +253,29 @@ The `Origin` allowlist is CSRF protection only: `Origin` is forged trivially by 
 With `MCP_AUTH_TOKEN` set these follow the same policy as the mutation routes (anything that lets the local UI mutate lets it read), and additionally accept `?access_token=<token>` because `EventSource` and plain downloads cannot send headers (the token may appear in access logs; prefer the bearer header where possible). Without a token they stay open. `/live` is rate limited, capped at 64 subscribers (`503`), and a subscriber with more than 8 MB unsent is dropped (it resyncs via `/live/snapshot`).
 
 Behind a local reverse proxy every client looks like loopback: when a token is set, a request carrying `X-Forwarded-For` or `Forwarded` is treated as a non-loopback peer and needs the bearer. An unknown `?language=` on `/export/code` returns `400`.
+
+## Teams: named users, audit trail, license
+
+Opt-in; without these variables the server behaves exactly as above (shared `MCP_AUTH_TOKEN` or no-auth localhost). Full guide: [docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md).
+
+| Variable                   | Default                       | Purpose                                                                                                                             |
+| -------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `LLULL_USERS_FILE`         | unset (off)                   | JSON `[{ id, name, role: viewer\|editor\|admin, tokenSha256 }]`. Setting it enables named-user auth and supersedes `MCP_AUTH_TOKEN` |
+| `LLULL_AUDIT_FILE`         | `audit.jsonl` by the autosave | JSONL audit trail (off under tests unless set)                                                                                      |
+| `LLULL_AUDIT_MAX_BYTES`    | `10485760`                    | Rotate to `.1`, `.2` ... when the next line would exceed this                                                                       |
+| `LLULL_AUDIT_KEEP`         | `5`                           | Rotated audit files kept                                                                                                            |
+| `LLULL_LICENSE_FILE`       | unset (evaluation)            | Signed license (`<payload>.<signature>`)                                                                                            |
+| `LLULL_LICENSE_PUBLIC_KEY` | unset                         | Ed25519 public key PEM (or a path to it) used to verify the license offline                                                         |
+| `LLULL_STATIC_DIR`         | unset                         | Serve the built web app (`dist/`) from the same origin (on-prem image)                                                              |
+
+Roles: `viewer` = `GET /live`, `/live/snapshot`, `/export/*` and read-only MCP tools (registry `readOnly`); `editor` = also `/command`, `/undo`, `/redo`, `/import/*` and every MCP tool; `admin` = also `/admin/*`. Unknown token: 401; role too low: 403; user beyond the licensed seats: 402.
+
+| Method | Path           | Auth   | Description                                                                             |
+| ------ | -------------- | ------ | --------------------------------------------------------------------------------------- |
+| GET    | /license       | public | `{ mode: licensed\|evaluation, customer, seats, expires, label, evaluation, warning? }` |
+| GET    | /admin/license | admin  | License status plus `seatsUsed`, `namedUsers`, `usersWithoutSeat`                       |
+| GET    | /admin/users   | admin  | `{ users: [{ id, name, role, licensed }] }` (never token hashes)                        |
+| GET    | /admin/audit   | admin  | `?since=<ISO>&user=<id>&limit=<n ≤ 1000>` entries, oldest first                         |
+
+Scripts: `node server/scripts/add-user.mjs <id> <name> <role>` (prints the token once); `node server/scripts/license.mjs keygen | sign <payload.json>` (vendor side).
+Live `command` events carry `userId` / `userName` of the acting named user.
