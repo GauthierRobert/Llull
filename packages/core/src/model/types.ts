@@ -3,6 +3,7 @@
 import type { MeshData } from '../geometry/kernel';
 import type { ShapeRecipe } from '../geometry/shapeRecipe';
 import type { BuildingModel } from './building';
+import type { CivilModel } from './civil';
 export type { MeshData };
 
 export type EntityId = string;
@@ -518,6 +519,8 @@ export interface CadDocument {
   driveRelationOrder: string[];
   /** Absent until the first building command. */
   building?: BuildingModel;
+  /** Absent until the first civil (site / terrain / road / drainage) command. */
+  civil?: CivilModel;
 }
 
 /**

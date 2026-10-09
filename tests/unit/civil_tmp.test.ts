@@ -1,0 +1,25 @@
+import { it, expect } from 'vitest';
+import { execute } from '@core/commands/registry';
+import { createEmptyDocument } from '@core/model/types';
+import { serializeDocument, deserializeDocument } from '@core/commands/persistence';
+it('flow', () => {
+  let doc = createEmptyDocument();
+  doc = execute(doc, 'set_units', { unit: 'm' }).document;
+  const lines = ['P,E,N,Z,D'];
+  let n = 1;
+  for (let i = 0; i <= 20; i++) for (let j = 0; j <= 20; j++) lines.push(`${n++},${i * 5},${j * 5},${100 + i * 0.3 + Math.sin(j / 3) * 2},TOPO`);
+  let r = execute(doc, 'import_survey_points', { text: lines.join('\n') });
+  console.warn(r.summary);
+  r = execute(r.document, 'create_surface', {});
+  console.warn(r.summary, Object.keys(r.document.entities).length);
+  const q = execute(r.document, 'surface_report', { surfaceId: 'surface-1' });
+  console.warn(q.summary);
+  console.warn(execute(r.document, 'surface_elevation', { surfaceId: 'surface-1', points: [[50, 50], [500, 5]] }).summary);
+  const json = serializeDocument(r.document);
+  const back = deserializeDocument(json);
+  expect(Object.keys(back.entities).length).toBe(Object.keys(r.document.entities).length);
+  const m = execute(r.document, 'delete_entity', { id: 'surface-1:tin' });
+  console.warn(m.summary);
+  console.warn(execute(r.document, 'delete_civil_object', { id: 'pointGroup-1' }).summary);
+  console.warn(execute(r.document, 'describe_civil', {}).summary);
+});

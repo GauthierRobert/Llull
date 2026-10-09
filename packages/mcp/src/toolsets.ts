@@ -22,6 +22,7 @@ export const TOOLSET_NAMES = [
   'assembly',
   'exchange',
   'building',
+  'civil',
 ] as const;
 
 export type ToolsetName = (typeof TOOLSET_NAMES)[number];
@@ -173,6 +174,10 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   /** Contributed by the installed building + industrial plugins. */
   get building(): readonly string[] {
     return pluginToolNames('building');
+  },
+  /** Contributed by the installed civil (site / terrain / roads / drainage) plugin. */
+  get civil(): readonly string[] {
+    return pluginToolNames('civil');
   },
 };
 
