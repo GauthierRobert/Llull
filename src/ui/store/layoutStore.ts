@@ -13,6 +13,7 @@ import { readStored, writeStored } from './persistence';
 
 const SIDEBAR_TABS = [
   'building',
+  'civil',
   'layers',
   'assembly',
   'mechanisms',

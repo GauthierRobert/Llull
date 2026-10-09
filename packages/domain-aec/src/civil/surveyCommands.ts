@@ -256,7 +256,14 @@ export const updateSurface = defineCommand({
       ...(keepBoundary !== undefined ? { boundary: keepBoundary } : {}),
       ...(keepEdge !== undefined ? { maxEdgeLength: keepEdge } : {}),
     };
-    if (JSON.stringify(updated) === JSON.stringify(surface)) {
+    const unchanged =
+      updated.name === surface.name &&
+      updated.contourInterval === surface.contourInterval &&
+      updated.majorEvery === surface.majorEvery &&
+      updated.extraPoints.length === surface.extraPoints.length &&
+      JSON.stringify(updated.boundary) === JSON.stringify(surface.boundary) &&
+      updated.maxEdgeLength === surface.maxEdgeLength;
+    if (unchanged) {
       return noop(doc, `update_surface: nothing to change on ${surface.id}.`);
     }
     const next = withObject(civil, updated);

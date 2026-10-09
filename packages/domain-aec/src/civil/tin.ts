@@ -190,53 +190,61 @@ export function contourLevels(tin: Tin, interval: number, limit = 400): number[]
   return levels;
 }
 
-function keyOf(point: Vec2): string {
-  return `${point[0].toFixed(6)},${point[1].toFixed(6)}`;
-}
-
 /** Plan polylines where the TIN crosses `level` (closed loops have equal first/last points). */
 export function traceContour(tin: Tin, level: number): Vec2[][] {
-  const segments: Array<[Vec2, Vec2]> = [];
+  // A vertex exactly on the level is nudged up so every crossing lies strictly inside an edge.
+  const height = (index: number): number => {
+    const z = (tin.points[index] as Vec3)[2];
+    return z === level ? z + 1e-9 : z;
+  };
+  const crossing = new Map<string, Vec2>();
+  const segments: Array<[string, string]> = [];
   for (let t = 0; t < triangleCount(tin); t++) {
-    const triangle = corners(tin, t).map(
-      (point): Vec3 => [point[0], point[1], point[2] === level ? point[2] + 1e-9 : point[2]],
-    ) as [Vec3, Vec3, Vec3];
-    const crossings: Vec2[] = [];
+    const keys: string[] = [];
     for (let k = 0; k < 3; k++) {
-      const a = triangle[k] as Vec3;
-      const b = triangle[(k + 1) % 3] as Vec3;
-      if ((a[2] - level) * (b[2] - level) >= 0) continue;
-      const ratio = (level - a[2]) / (b[2] - a[2]);
-      crossings.push([a[0] + (b[0] - a[0]) * ratio, a[1] + (b[1] - a[1]) * ratio]);
+      const i = tin.triangles[t * 3 + k] as number;
+      const j = tin.triangles[t * 3 + ((k + 1) % 3)] as number;
+      const [low, high] = i < j ? [i, j] : [j, i];
+      const zLow = height(low);
+      const zHigh = height(high);
+      if ((zLow - level) * (zHigh - level) >= 0) continue;
+      const key = `${low}_${high}`;
+      if (!crossing.has(key)) {
+        const a = tin.points[low] as Vec3;
+        const b = tin.points[high] as Vec3;
+        const ratio = (level - zLow) / (zHigh - zLow);
+        crossing.set(key, [a[0] + (b[0] - a[0]) * ratio, a[1] + (b[1] - a[1]) * ratio]);
+      }
+      keys.push(key);
     }
-    if (crossings.length === 2) segments.push([crossings[0] as Vec2, crossings[1] as Vec2]);
+    if (keys.length === 2) segments.push([keys[0] as string, keys[1] as string]);
   }
   const byEnd = new Map<string, number[]>();
   segments.forEach(([a, b], index) => {
-    for (const key of [keyOf(a), keyOf(b)]) byEnd.set(key, [...(byEnd.get(key) ?? []), index]);
+    for (const key of [a, b]) byEnd.set(key, [...(byEnd.get(key) ?? []), index]);
   });
   const used = new Set<number>();
-  const lines: Vec2[][] = [];
-  const extend = (line: Vec2[]): void => {
+  const chains: string[][] = [];
+  const extend = (chain: string[]): void => {
     for (;;) {
-      const tail = line[line.length - 1] as Vec2;
-      const next = (byEnd.get(keyOf(tail)) ?? []).find((index) => !used.has(index));
+      const tail = chain[chain.length - 1] as string;
+      const next = (byEnd.get(tail) ?? []).find((index) => !used.has(index));
       if (next === undefined) return;
       used.add(next);
-      const [a, b] = segments[next] as [Vec2, Vec2];
-      line.push(keyOf(a) === keyOf(tail) ? b : a);
+      const [a, b] = segments[next] as [string, string];
+      chain.push(a === tail ? b : a);
     }
   };
   segments.forEach(([a, b], index) => {
     if (used.has(index)) return;
     used.add(index);
-    const line: Vec2[] = [a, b];
-    extend(line);
-    line.reverse();
-    extend(line);
-    lines.push(line);
+    const chain = [a, b];
+    extend(chain);
+    chain.reverse();
+    extend(chain);
+    chains.push(chain);
   });
-  return lines;
+  return chains.map((chain) => chain.map((key) => crossing.get(key) as Vec2));
 }
 
 /** Flat `positions` / `indices` mesh of the TIN. */

@@ -2,7 +2,7 @@
  * @layer domain-aec
  */
 
-import type { DocumentUnit, Vec2 } from '@core/model/types';
+import type { DocumentUnit, Vec2, Vec3 } from '@core/model/types';
 import { hatchSegments } from '@lib/hatch';
 import { triangulatePolygon } from '@lib/triangulate';
 import { round } from './numeric';
@@ -96,20 +96,21 @@ export class DxfWriter {
     this.entityCount += 1;
   }
 
-  private point(base: number, [x, y]: Vec2): void {
+  private point(base: number, [x, y]: Vec2, z = 0): void {
     this.minX = Math.min(this.minX, x);
     this.minY = Math.min(this.minY, y);
     this.maxX = Math.max(this.maxX, x);
     this.maxY = Math.max(this.maxY, y);
     this.pair(base, x);
     this.pair(base + 10, y);
-    this.pair(base + 20, 0);
+    this.pair(base + 20, z);
   }
 
-  line(layer: string, a: Vec2, b: Vec2): void {
+  /** Line in the horizontal plane at elevation `z` (default 0). */
+  line(layer: string, a: Vec2, b: Vec2, z = 0): void {
     this.start('LINE', layer);
-    this.point(10, a);
-    this.point(11, b);
+    this.point(10, a, z);
+    this.point(11, b, z);
   }
 
   circle(layer: string, center: Vec2, radius: number): void {
@@ -133,28 +134,30 @@ export class DxfWriter {
     content: string,
     align: 'left' | 'center' | 'right',
     rotation = 0,
+    z = 0,
   ): void {
     this.start('TEXT', layer);
-    this.point(10, at);
+    this.point(10, at, z);
     this.pair(40, height);
     this.pair(1, dxfText(content));
     if (rotation !== 0) this.pair(50, (rotation * 180) / Math.PI);
     if (align !== 'left') {
       this.pair(72, align === 'center' ? 1 : 2);
-      this.point(11, at);
+      this.point(11, at, z);
     }
   }
 
-  polyline(layer: string, points: ReadonlyArray<Vec2>, closed: boolean): void {
+  /** 2D polyline; `elevation` places its plane (contours keep their elevation). */
+  polyline(layer: string, points: ReadonlyArray<Vec2>, closed: boolean, elevation = 0): void {
     this.start('POLYLINE', layer);
     this.pair(66, 1);
     this.pair(70, closed ? 1 : 0);
-    this.point(10, [0, 0]);
+    this.point(10, [0, 0], elevation);
     const name = this.layerName(layer);
     for (const point of points) {
       this.pair(0, 'VERTEX');
       this.pair(8, name);
-      this.point(10, point);
+      this.point(10, point, elevation);
     }
     this.pair(0, 'SEQEND');
     this.pair(8, name);
@@ -169,9 +172,22 @@ export class DxfWriter {
     this.point(13, c);
   }
 
-  point2(layer: string, at: Vec2): void {
+  point2(layer: string, at: Vec2, z = 0): void {
     this.start('POINT', layer);
-    this.point(10, at);
+    this.point(10, at, z);
+  }
+
+  /** Triangular 3D face (the fourth corner repeats the third), e.g. one TIN triangle. */
+  face3d(layer: string, a: Vec3, b: Vec3, c: Vec3): void {
+    this.start('3DFACE', layer);
+    for (const [base, corner] of [
+      [10, a],
+      [11, b],
+      [12, c],
+      [13, c],
+    ] as const) {
+      this.point(base, [corner[0], corner[1]], corner[2]);
+    }
   }
 }
 

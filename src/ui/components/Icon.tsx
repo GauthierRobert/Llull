@@ -74,6 +74,7 @@ const ICON_PATHS = {
   modifyTrim:
     'M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12',
   modifyExtend: 'M3 12h13M12 8l4 4-4 4M21 4v16',
+  terrain: 'M2 19c3-4 5-6 8-6s4 3 7 3 3-1 5-2M2 14c3-3 5-6 8-6s4 2 7 2 3-1 5-2M2 9c3-2 5-5 8-5s4 2 7 2 3 0 5-1',
   building: 'M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6M9 10h.01M15 10h.01',
   wall: 'M3 5h18v14H3zM3 9.5h18M3 14.5h18M9 5v4.5M15 5v4.5M6 9.5v5M12 9.5v5M18 9.5v5M9 14.5V19M15 14.5V19',
   modifyExplode:

@@ -167,6 +167,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'export_code',
     'apply_code_trace',
     'import_mesh',
+    'import_dxf',
     'export_step',
     'import_step',
     'import_code',
@@ -229,6 +230,7 @@ export function isToolEnabled(toolName: string, enabled: ReadonlySet<ToolsetName
 const PROMPT_TOOLSETS: Readonly<Record<string, ToolsetName>> = {
   design_building: 'building',
   design_factory: 'building',
+  design_site: 'civil',
 };
 
 /** True when the MCP prompt `promptName` only references enabled tools. */

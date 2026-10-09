@@ -14,6 +14,7 @@ import { civilErrors } from './validate';
 import { regenerateCivil } from './evaluate';
 import { createSurface, importSurveyPoints, updateSurface } from './surveyCommands';
 import { surfaceElevation, surfaceReport } from './surfaceQueries';
+import { importSurveyDxf } from './surveyDxf';
 import { deleteCivilObject, describeCivil } from './civilCommands';
 import { earthworksCommands } from './earthworksCommands';
 import { roadCommands } from './roadCommands';
@@ -75,6 +76,7 @@ const civilDocument: DocumentExtension = {
 /** Civil / site-engineering commands. */
 export const civilCommands = [
   importSurveyPoints,
+  importSurveyDxf,
   createSurface,
   updateSurface,
   surfaceElevation,
