@@ -82,6 +82,28 @@ export function daylightReach(
 const cellsAlong = (length: number, spacing: number): number =>
   Math.max(1, Math.ceil(length / spacing - 1e-9));
 
+/**
+ * Columns × rows of a grid of `step` cells over width × height, capped to MAX_SAMPLES after
+ * rounding each axis (a thin strip cannot blow up one axis).
+ */
+export function gridSize(
+  width: number,
+  height: number,
+  step: number,
+): { columns: number; rows: number } {
+  const spacing =
+    (width / step) * (height / step) > MAX_SAMPLES
+      ? Math.sqrt((width * height) / MAX_SAMPLES)
+      : step;
+  let columns = Math.min(cellsAlong(width, spacing), MAX_SAMPLES);
+  let rows = Math.min(cellsAlong(height, spacing), MAX_SAMPLES);
+  if (columns * rows > MAX_SAMPLES) {
+    if (columns >= rows) columns = Math.max(1, Math.floor(MAX_SAMPLES / rows));
+    else rows = Math.max(1, Math.floor(MAX_SAMPLES / columns));
+  }
+  return { columns, rows };
+}
+
 function emptySamples(): GridSamples {
   return {
     ground: new Float64Array(0),
@@ -115,10 +137,7 @@ export function buildSamples(
   if (!(width > 0) || !(height > 0)) return emptySamples();
   let step = spacing ?? Math.sqrt(polygonArea(boundary) / TARGET_PAD_CELLS);
   if (!(step > 0)) step = Math.sqrt((width * height) / TARGET_PAD_CELLS);
-  if ((width / step) * (height / step) > MAX_SAMPLES)
-    step = Math.sqrt((width * height) / MAX_SAMPLES);
-  const columns = cellsAlong(width, step);
-  const rows = cellsAlong(height, step);
+  const { columns, rows } = gridSize(width, height, step);
   const dx = width / columns;
   const dy = height / rows;
   const ground = new Float64Array(columns * rows);
@@ -248,11 +267,8 @@ export function compareSurfaceVolumes(
   const width = maxX - minX;
   const height = maxY - minY;
   if (!(width > 0) || !(height > 0)) return none;
-  let step = spacing ?? Math.sqrt((width * height) / COMPARE_TARGET_CELLS);
-  if ((width / step) * (height / step) > MAX_SAMPLES)
-    step = Math.sqrt((width * height) / MAX_SAMPLES);
-  const columns = cellsAlong(width, step);
-  const rows = cellsAlong(height, step);
+  const step = spacing ?? Math.sqrt((width * height) / COMPARE_TARGET_CELLS);
+  const { columns, rows } = gridSize(width, height, step);
   const dx = width / columns;
   const dy = height / rows;
   let cut = 0;

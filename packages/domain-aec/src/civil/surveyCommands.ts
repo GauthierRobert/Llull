@@ -20,10 +20,11 @@ import {
   nextCivilId,
   toMetresText,
   withObject,
+  MAX_SURFACE_POINTS,
 } from './model';
 import { regenerateCivil } from './evaluate';
 import { parseSurvey, SURVEY_FORMATS } from './surveyParse';
-import { surfaceTin } from './surfaceTin';
+import { surfacePoints, surfaceTin } from './surfaceTin';
 import { triangleCount } from './tin';
 import { MAX_DRAWN_POINTS } from './surfaceEvaluate';
 
@@ -177,6 +178,13 @@ export const createSurface = defineCommand({
       majorEvery: params.majorEvery ?? 5,
     };
     const next = withObject(civil, surface);
+    const total = surfacePoints(next, surface).length;
+    if (total > MAX_SURFACE_POINTS) {
+      return noop(
+        doc,
+        `create_surface failed: ${total} points exceed the ${MAX_SURFACE_POINTS}-point surface limit; pick fewer point groups.`,
+      );
+    }
     if (surfaceTin(next, surface).triangles.length === 0) {
       return noop(
         doc,
@@ -272,6 +280,13 @@ export const updateSurface = defineCommand({
       return noop(doc, `update_surface: nothing to change on ${surface.id}.`);
     }
     const next = withObject(civil, updated);
+    const total = surfacePoints(next, updated).length;
+    if (total > MAX_SURFACE_POINTS) {
+      return noop(
+        doc,
+        `update_surface failed: ${total} points exceed the ${MAX_SURFACE_POINTS}-point surface limit.`,
+      );
+    }
     if (surfaceTin(next, updated).triangles.length === 0) {
       return noop(doc, 'update_surface failed: the surface would have no triangle.');
     }

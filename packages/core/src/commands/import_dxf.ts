@@ -16,6 +16,7 @@ import { nextId } from '../lib/id';
 import { newEntity } from './newEntity';
 import { flattenDxf, parseDxf, type DxfPrimitive } from '../lib/dxfRead';
 import { aciToHex, insUnitsMillimetres } from '../lib/dxfUnits';
+import { MAX_IMPORT_TRIANGLES } from './limits';
 
 const MM_PER_UNIT: Readonly<Record<DocumentUnit, number>> = {
   mm: 1,
@@ -223,6 +224,7 @@ export const importDxf = defineCommand({
     const faces = new Map<string, { positions: number[]; indices: number[]; color: string }>();
     let flattened = 0;
     let truncated = 0;
+    let faceTriangles = 0;
     for (const raw of selected) {
       const primitive = scalePrimitive(raw, factor);
       const layerAci = drawing.layers.get(primitive.layer) ?? 7;
@@ -231,6 +233,12 @@ export const importDxf = defineCommand({
         primitive.color === 256 || primitive.color === 0 ? layerAci : primitive.color,
       );
       if (primitive.kind === 'face') {
+        const triangles = primitive.corners.length === 4 ? 2 : 1;
+        if (faceTriangles + triangles > MAX_IMPORT_TRIANGLES) {
+          truncated += 1;
+          continue;
+        }
+        faceTriangles += triangles;
         const mesh = faces.get(layerId) ?? { positions: [], indices: [], color };
         const base = mesh.positions.length / 3;
         for (const corner of primitive.corners) mesh.positions.push(...corner);

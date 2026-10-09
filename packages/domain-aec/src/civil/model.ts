@@ -8,6 +8,7 @@ import type { CadDocument, DocumentUnit } from '@core/model/types';
 import type { CivilCategory, CivilModel, CivilObject } from '@core/model/civil';
 import { createEmptyCivil } from '@core/model/civil';
 import { fromMm, toMetres } from '../model';
+import { dependentsOf } from './integrity';
 
 export function getCivil(doc: Pick<CadDocument, 'civil'>): CivilModel {
   return doc.civil ?? createEmptyCivil();
@@ -68,9 +69,22 @@ export function civilObjectsOf<C extends CivilCategory>(
     });
 }
 
-/** Object ids first (replay / build_project aliases re-link references), then their entities. */
+/**
+ * Object ids first (replay / build_project aliases re-link references), then the entities of those
+ * objects and of every object regenerated because it depends on them.
+ */
 export function civilAffected(document: CadDocument, objectIds: ReadonlyArray<string>): string[] {
-  return [...objectIds, ...objectIds.flatMap((id) => document.civil?.objects[id]?.entityIds ?? [])];
+  const civil = document.civil;
+  const regenerated = new Set(objectIds);
+  const queue = [...objectIds];
+  while (civil && queue.length > 0) {
+    for (const dependent of dependentsOf(civil, queue.pop() as string)) {
+      if (regenerated.has(dependent)) continue;
+      regenerated.add(dependent);
+      queue.push(dependent);
+    }
+  }
+  return [...objectIds, ...[...regenerated].flatMap((id) => civil?.objects[id]?.entityIds ?? [])];
 }
 
 /** Station label "km+mmm.mm" from a station in metres, e.g. 1234.5 -> "1+234.50". */
@@ -108,3 +122,6 @@ export function fromMetres(doc: Pick<CadDocument, 'units'>, metres: number): num
 export function toMetresText(doc: Pick<CadDocument, 'units'>, value: number): string {
   return String(Number(toMetres(doc, value).toFixed(3)));
 }
+
+/** Points one surface may triangulate (groups + extra points); bounds load and edit time. */
+export const MAX_SURFACE_POINTS = 100000;

@@ -103,6 +103,7 @@ export const importSurveyDxf = defineCommand({
     for (const primitive of flattenDxf(drawing).primitives) {
       if (wanted !== undefined && !wanted.includes(primitive.layer.toLowerCase())) continue;
       for (const [x, y, z] of samples(primitive, sources)) {
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue;
         if (z === 0 && params.keepZeroElevation !== true) {
           zeros += 1;
           continue;

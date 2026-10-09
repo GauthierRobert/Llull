@@ -8,14 +8,14 @@
 import type { Entity, Vec2 } from '@core/model/types';
 import type { PointGroupObject, SurfaceObject } from '@core/model/civil';
 import { civilMesh, civilPoint, civilPolyline, civilText } from './entities';
-import { contourLevels, tinMesh, traceContour } from './tin';
+import { contourLevels, tinBounds, tinMesh, traceContour, type Tin } from './tin';
 import { surfaceTin } from './surfaceTin';
 import { labelHeight, type CivilContext } from './context';
 import { toMetres } from '../model';
 
 /** Above this many points a group is kept as data only (no per-point markers). */
 export const MAX_DRAWN_POINTS = 2000;
-/** Contour polylines drawn per surface at most (the coarsest levels are kept). */
+/** Contour polylines drawn per surface at most. */
 export const MAX_CONTOUR_LINES = 3000;
 
 export function evaluatePointGroup(_context: CivilContext, group: PointGroupObject): Entity[] {
@@ -39,6 +39,19 @@ function midpoint(line: ReadonlyArray<Vec2>): { at: Vec2; angle: number } {
   return { at: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], angle };
 }
 
+/** Contour levels drawn per surface at most; beyond it the interval is a multiple of the asked one. */
+export const MAX_CONTOUR_LEVELS = 400;
+
+/** The requested interval, or the smallest multiple of it giving <= MAX_CONTOUR_LEVELS levels. */
+export function drawnInterval(tin: Tin, interval: number): number {
+  const bounds = tinBounds(tin);
+  if (bounds === null) return interval;
+  const levels = (bounds.max[2] - bounds.min[2]) / interval;
+  return levels <= MAX_CONTOUR_LEVELS
+    ? interval
+    : interval * Math.ceil(levels / MAX_CONTOUR_LEVELS);
+}
+
 export function evaluateSurface(context: CivilContext, surface: SurfaceObject): Entity[] {
   const tin = surfaceTin(context.civil, surface);
   if (tin.triangles.length === 0) return [];
@@ -47,7 +60,8 @@ export function evaluateSurface(context: CivilContext, surface: SurfaceObject): 
   ];
   const height = labelHeight(context.doc);
   let lines = 0;
-  contourLevels(tin, surface.contourInterval).forEach((level) => {
+  const interval = drawnInterval(tin, surface.contourInterval);
+  contourLevels(tin, interval).forEach((level) => {
     const index = Math.round(level / surface.contourInterval);
     const major = surface.majorEvery > 0 && index % surface.majorEvery === 0;
     traceContour(tin, level).forEach((line, k) => {

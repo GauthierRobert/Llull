@@ -41,15 +41,21 @@ function restore(raw: Record<string, unknown>): Record<string, unknown> {
   const stale = new Set(
     Object.values((civil as CivilModel).objects).flatMap((object) => object.entityIds),
   );
-  const regenerated = regenerateCivil(
-    {
-      ...base,
-      order: savedOrder.filter((id) => id in base.entities && !stale.has(id)),
-      selection: [],
-      civil: { ...(civil as CivilModel), objects: {} },
-    },
-    civil as CivilModel,
-  );
+  let regenerated: CadDocument;
+  try {
+    regenerated = regenerateCivil(
+      {
+        ...base,
+        order: savedOrder.filter((id) => id in base.entities && !stale.has(id)),
+        selection: [],
+        civil: { ...(civil as CivilModel), objects: {} },
+      },
+      civil as CivilModel,
+    );
+  } catch {
+    // Validation reports the problem; never let a corrupt file throw out of load.
+    return raw;
+  }
   const present = savedOrder.filter((id) => id in regenerated.entities);
   const placed = new Set(present);
   const order = [...present, ...regenerated.order.filter((id) => !placed.has(id))];

@@ -207,9 +207,13 @@ function lwPolylinePoints(record: DxfRecord, closed: boolean): Vec3[] {
     if (last && code === 42) last.bulge = Number(value);
   }
   const result: Vec3[] = [];
-  vertices.forEach((vertex, index) => {
+  const finite = vertices.filter(
+    (vertex) => Number.isFinite(vertex.x) && Number.isFinite(vertex.y),
+  );
+  if (!Number.isFinite(elevation)) return [];
+  finite.forEach((vertex, index) => {
     result.push([vertex.x, vertex.y, elevation]);
-    const next = vertices[index + 1] ?? (closed ? vertices[0] : undefined);
+    const next = finite[index + 1] ?? (closed ? finite[0] : undefined);
     if (!next || vertex.bulge === 0 || !Number.isFinite(vertex.bulge)) return;
     const chord = Math.hypot(next.x - vertex.x, next.y - vertex.y);
     if (chord === 0) return;
@@ -287,8 +291,18 @@ export interface FlattenResult {
   readonly skipped: ReadonlyMap<string, number>;
 }
 
-/** World-space primitives of every entity (block inserts expanded up to `maxDepth`). */
-export function flattenDxf(drawing: DxfDrawing, maxDepth = 8): FlattenResult {
+/** Primitives produced by one flatten at most (nested block inserts can multiply exponentially). */
+export const MAX_DXF_PRIMITIVES = 200000;
+
+/**
+ * World-space primitives of every entity (block inserts expanded up to `maxDepth`); entities past
+ * `maxPrimitives` are counted in `skipped` as "over limit".
+ */
+export function flattenDxf(
+  drawing: DxfDrawing,
+  maxDepth = 8,
+  maxPrimitives = MAX_DXF_PRIMITIVES,
+): FlattenResult {
   const primitives: DxfPrimitive[] = [];
   const skipped = new Map<string, number>();
   const visit = (
@@ -298,6 +312,10 @@ export function flattenDxf(drawing: DxfDrawing, maxDepth = 8): FlattenResult {
     inherited: Common | null,
   ): void => {
     for (const record of list) {
+      if (primitives.length >= maxPrimitives) {
+        skipped.set('over limit', (skipped.get('over limit') ?? 0) + 1);
+        continue;
+      }
       const rawLayer = codeValue(record, 8) ?? '0';
       const layer = inherited && rawLayer === '0' ? inherited.layer : rawLayer;
       const rawColor = codeNumber(record, 62, 256);
@@ -351,8 +369,8 @@ export function flattenDxf(drawing: DxfDrawing, maxDepth = 8): FlattenResult {
             const points = arcPoints(
               ocs(record, local),
               radius,
-              record.type === 'ARC' ? (codeNumber(record, 50, 0) * Math.PI) / 180 : 0,
-              record.type === 'ARC' ? (codeNumber(record, 51, 360) * Math.PI) / 180 : Math.PI * 2,
+              start,
+              record.type === 'ARC' ? end : Math.PI * 2,
             ).map((p) => transform.apply(p));
             primitives.push({
               ...common,
