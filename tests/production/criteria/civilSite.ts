@@ -339,13 +339,13 @@ function landXmlCheck(intent: CivilIntent, { document, deliverable }: GradeConte
     const to = (objects(document, 'manhole') as ManholeObject[]).find((m) => m.id === model.toId);
     if (!from || !to) continue;
     const length = Math.hypot(to.position[0] - from.position[0], to.position[1] - from.position[1]);
-    const slope = (model.invertFrom - model.invertTo) / length;
-    if (Math.abs(pipe.slope - slope) > 1e-4)
+    const slope = ((model.invertFrom - model.invertTo) / length) * 100;
+    if (Math.abs(pipe.slope - slope) > 1e-2)
       problems.push(`${pipe.name} slope ${pipe.slope} vs ${round(slope, 5)}`);
   }
   return problems.length === 0
     ? pass(
-        `well-formed LandXML: ${xml.cgPoints} CgPoints, ${xml.surfaces.length} Surface (${xml.surfaces[0]?.faces} faces), Alignment with ${road?.spirals} Spiral + Profile, PipeNetwork ${xml.structs} structs / ${xml.pipes.length} pipes, slopes as ratios`,
+        `well-formed LandXML: ${xml.cgPoints} CgPoints, ${xml.surfaces.length} Surface (${xml.surfaces[0]?.faces} faces), Alignment with ${road?.spirals} Spiral + Profile, PipeNetwork ${xml.structs} structs / ${xml.pipes.length} pipes, slopes in percent`,
       )
     : fail(problems.join('; '));
 }

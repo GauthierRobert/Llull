@@ -113,8 +113,8 @@ conversion; every request uses a private temp dir that is always removed.
   editing; the plan-profile sheet's plan strip is straightened along the alignment.
 - Breaklines are not enforced in the TIN (they contribute vertices only); TIN meshes are not drawn
   on plan sheets (contours are).
-- No foul-water design; storm pipes only in LandXML. LandXML pipe `slope` is written as a ratio
-  (0.01 = 1 %) — check against your target software.
+- No foul-water design; storm pipes only in LandXML. LandXML pipe `slope` is written in percent
+  (1 = 1 %, per the LandXML 2.0 annotation and the buildingSMART InfraModel profile).
 - Site calibration is a 2D similarity transform (no projection library): use the calibration your
   surveyor provides for the national grid.
 - DWG needs the server with LibreDWG (`dwg2dxf`) or the ODA File Converter installed.

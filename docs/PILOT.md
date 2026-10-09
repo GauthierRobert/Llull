@@ -113,9 +113,9 @@ Check: pipe sizes and HGL against your tool with the same IDF, Tc and losses.
 - **LandXML**: CgPoints, the TIN surface, alignments (lines, curves, clothoids, profile) and the
   storm network. Import it into Civil 3D (Insert › LandXML), 12d (File › Import › LandXML) or
   Trimble Business Center.
-- **Verify the pipe slope convention**: llull writes the LandXML pipe `slope` as a ratio
-  (0.01 = 1 %). Some software reads it as a percentage. Open one pipe in your software and compare
-  its slope with llull's schedule before you trust any imported network.
+- **Check one pipe after import**: llull writes the LandXML pipe `slope` in percent (1 = 1 %), as
+  the LandXML 2.0 schema annotation and the buildingSMART InfraModel profile specify. Inverts are
+  also written on each structure, so compare one pipe's slope and inverts with llull's schedule.
 
 ## What to verify against your current tool
 

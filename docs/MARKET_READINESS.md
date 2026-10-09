@@ -64,6 +64,10 @@ geometry, save / load round trips, and the repository's coverage gate (≥ 90 / 
 - **Not verified here:** the LibreDWG 0.14 source build stage (ftp.gnu.org is unreachable from this
   sandbox) — build once with `LIBREDWG_SHA256` set before shipping the image.
 
+- **LandXML pipe slope convention resolved:** pipes are now written in percent (1 = 1 %), as the
+  LandXML 2.0 schema annotation and the buildingSMART InfraModel profile of LandXML 1.2 specify;
+  the previous ratio output would have read as 100× too flat in percent-reading software.
+
 ## Gaps that still limit sales (priority order)
 
 1. **Validation with real users** — no pilot customer has used it yet; the next step is a pilot with

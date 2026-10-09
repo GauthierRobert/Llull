@@ -146,12 +146,13 @@ function pipeXml(
     from && to
       ? Math.hypot(to.position[0] - from.position[0], to.position[1] - from.position[1])
       : 0;
-  const slope = planLength > 0 ? (pipe.invertFrom - pipe.invertTo) / planLength : 0;
+  // Percent, per the LandXML 2.0 schema annotation and the buildingSMART InfraModel profile.
+  const slopePercent = planLength > 0 ? ((pipe.invertFrom - pipe.invertTo) / planLength) * 100 : 0;
   return [
     `        <Pipe${attr('name', names.get(pipe.id) ?? pipe.id)}` +
       `${attr('refStart', names.get(pipe.fromId) ?? pipe.fromId)}` +
       `${attr('refEnd', names.get(pipe.toId) ?? pipe.toId)}` +
-      `${attr('length', metres(doc, planLength))}${attr('slope', String(Number(slope.toFixed(6))))}>`,
+      `${attr('length', metres(doc, planLength))}${attr('slope', String(Number(slopePercent.toFixed(4))))}>`,
     `          <CircPipe${attr('diameter', String(Number((toMetres(doc, pipe.diameter) * 1000).toFixed(1))))}` +
       `${attr('material', pipe.material)}${attr('mannings', String(pipe.manningN))}/>`,
     '        </Pipe>',
