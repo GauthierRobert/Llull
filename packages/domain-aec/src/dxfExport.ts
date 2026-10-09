@@ -91,7 +91,10 @@ type Group = readonly [code: number, value: string | number];
 const flatten = (groups: ReadonlyArray<Group>): string[] =>
   groups.flatMap(([code, value]) => [String(code), String(value)]);
 
-function header(doc: Pick<CadDocument, 'units'>, bounds: readonly [number, number, number, number]): string[] {
+function header(
+  doc: Pick<CadDocument, 'units'>,
+  bounds: readonly [number, number, number, number],
+): string[] {
   return flatten([
     [0, 'SECTION'],
     [2, 'HEADER'],

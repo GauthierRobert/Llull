@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent } from '@testing-library/react';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { CivilPanel } from '@ui/panels/civil/CivilPanel';
@@ -55,7 +55,9 @@ describe('CivilPanel', () => {
     const { rerender } = render(<CivilPanel />);
     expect(screen.getByTestId('civil-row-pointGroup-1')).toHaveTextContent('Topo');
     expect(screen.getByTestId('civil-row-pointGroup-1')).toHaveTextContent('4 points');
-    localDispatch('create_surface', {});
+    act(() => {
+      localDispatch('create_surface', {});
+    });
     rerender(<CivilPanel />);
     expect(screen.getByTestId('civil-row-surface-1')).toHaveTextContent(/4 points, 2 triangles/);
   });

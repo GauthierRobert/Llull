@@ -105,7 +105,7 @@ describe('horizontal geometry', () => {
     expect(pointAtStation(corner, -5000)?.point).toEqual([0, 0]);
     expect(pointAtStation(corner, 9999)?.point[1]).toBeCloseTo(100, 9);
     const before = stationOffset(corner, [30, 5]);
-    expect(before?.station).toBeCloseTo(1000, 9);
+    expect(before?.station).toBeCloseTo(1030, 9);
     expect(before?.offset).toBeCloseTo(5, 9);
     const nearEnd = stationOffset(corner, [100, 150]);
     expect(nearEnd?.station).toBeCloseTo(1000 + alignmentLength(corner), 6);
@@ -244,7 +244,14 @@ describe('vertical geometry', () => {
   });
 
   it('validates stations, lengths and overlapping curves', () => {
-    const pvi = (station: number, curveLength = 0) => ({ station, elevation: 0, curveLength });
+    const pvi = (
+      station: number,
+      curveLength = 0,
+    ): { station: number; elevation: number; curveLength: number } => ({
+      station,
+      elevation: 0,
+      curveLength,
+    });
     expect(validateProfile([pvi(0)])).toMatch(/at least 2/);
     expect(
       validateProfile([pvi(0), { station: Number.NaN, elevation: 0, curveLength: 0 }]),

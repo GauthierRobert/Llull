@@ -19,8 +19,6 @@ import { crossSectionSvg, MAX_CROSS_SECTIONS } from './crossSectionSvg';
 import { validateProfile } from './profileGeometry';
 import { toMetres } from '../model';
 
-const MAX_ROWS = 2000;
-
 function checkedAlignment(
   doc: CadDocument,
   alignmentId: string,
@@ -76,12 +74,6 @@ export const alignmentReport = defineCommand({
       return noop(doc, 'alignment_report failed: designSpeedKmh must be > 0.');
     }
     const stations = reportStations(alignment, interval);
-    if (stations.length > MAX_ROWS) {
-      return noop(
-        doc,
-        `alignment_report failed: ${stations.length} rows exceed ${MAX_ROWS}; raise interval.`,
-      );
-    }
     const rows = reportRows(
       doc,
       alignment,

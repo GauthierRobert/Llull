@@ -159,8 +159,8 @@ export const updateAlignment = defineCommand({
     const updated: AlignmentObject = {
       id: alignment.id,
       category: 'alignment',
-      entityIds: alignment.entityIds,
       name: params.name?.trim() || alignment.name,
+      entityIds: alignment.entityIds,
       points,
       radii,
       startStation,
