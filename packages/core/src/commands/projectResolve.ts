@@ -1,8 +1,12 @@
 import type { CadDocument } from '../model/types';
 import { report } from './noop';
 import type { CommandResult } from './types';
-import type { EvalResult } from './expression';
-import { evaluateExpression, extractReferences, parameterValues } from './expression';
+import {
+  type EvalResult,
+  evaluateExpression,
+  extractReferences,
+  parameterValues,
+} from './expression';
 import { MAX_PROJECT_STEPS } from './limits';
 import { mapStringLeaves } from './regenerate';
 import { isRecord } from '../lib/isRecord';

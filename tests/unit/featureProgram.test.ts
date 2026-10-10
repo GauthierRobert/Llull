@@ -1,9 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import type { CadDocument } from '@core/model/types';
-import { createEmptyDocument } from '@core/model/types';
+import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute, getCommand } from '@core/commands/registry';
-import { setGeometryKernel } from '@core/geometry/kernel';
-import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
+import { type GeometryKernel, type MeshData, setGeometryKernel } from '@core/geometry/kernel';
 import { buildFeatureProgram } from '@core/codegen/featureProgram';
 import { translateExpression } from '@core/codegen/identifiers';
 import type { Feature, FeatureProgram, ShapeSpec, Term } from '@core/codegen/program';

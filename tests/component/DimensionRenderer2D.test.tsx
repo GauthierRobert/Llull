@@ -23,8 +23,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
-import type { DimensionEntity } from '@core/model/types';
+import { type DimensionEntity, createEmptyDocument } from '@core/model/types';
 import { localDispatch } from '../helpers/storeTestHelpers';
 
 function resetStore(): void {

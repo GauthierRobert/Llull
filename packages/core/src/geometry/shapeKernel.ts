@@ -15,8 +15,7 @@
 
 import type { Entity, Vec3 } from '../model/types';
 import type { GeometryKernel, MeshData, ShapeHandle, ShapeTopology } from './kernel';
-import type { BooleanOp, ShapeRecipe } from './shapeRecipe';
-import { recipeKey } from './shapeRecipe';
+import { type BooleanOp, type ShapeRecipe, recipeKey } from './shapeRecipe';
 
 /**
  * Native operations of a concrete kernel. Each returns a NEW native shape (never one of its inputs:

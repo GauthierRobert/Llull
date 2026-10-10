@@ -6,10 +6,15 @@
  * @layer core/commands
  */
 
-import type { Component, Entity, InstanceEntity, Vec3 } from '../model/types';
+import {
+  type Component,
+  type Entity,
+  type InstanceEntity,
+  type Vec3,
+  DEFAULT_LAYER_ID,
+} from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, vec3, z } from './schema';
-import { DEFAULT_LAYER_ID } from '../model/types';
 import { UNIT_SCALE, expandInstance } from './instanceExpansion';
 import { nextId } from '../lib/id';
 import { commitEntity } from './commitEntity';

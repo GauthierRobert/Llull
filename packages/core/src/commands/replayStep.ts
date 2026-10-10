@@ -7,8 +7,7 @@
 
 import type { CadDocument, FeatureStep } from '../model/types';
 import { stepIdSource, stepKeyOf } from '../lib/id';
-import type { ExecutionContext } from './context';
-import { runInContext } from './context';
+import { type ExecutionContext, runInContext } from './context';
 import type { CommandDefinition, CommandResult } from './types';
 import { buildParamEnv, extendIdMap, remapIds, resolveStepParams } from './regenerate';
 

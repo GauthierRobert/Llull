@@ -4,11 +4,9 @@
  * apply_code_trace accepts the recorded modification commands.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import type { CadDocument, MeshSolidEntity } from '@core/model/types';
-import { createEmptyDocument } from '@core/model/types';
+import { type CadDocument, type MeshSolidEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { setGeometryKernel } from '@core/geometry/kernel';
-import type { ShapeTopology as Topology } from '@core/geometry/kernel';
+import { type ShapeTopology as Topology, setGeometryKernel } from '@core/geometry/kernel';
 import { fakeKernel, TETRA } from '../helpers/fakeKernel';
 
 const TOPOLOGY: Topology = {

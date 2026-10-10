@@ -11,12 +11,10 @@
  */
 
 import { useThree } from '@react-three/fiber';
-import type { Vec2 } from '@core/model/types';
-import { is2D } from '@core/model/types';
-import { useStore, useViewportStore } from '@ui/store';
+import { type Vec2, is2D } from '@core/model/types';
+import { type ModifyToolKind, useStore, useViewportStore } from '@ui/store';
 import { PICK_RADIUS_PX, nearestEntityId } from './modifyHelpers';
 import { isEntityVisible } from '../entityVisibility';
-import type { ModifyToolKind } from '@ui/store';
 import type { ModifyToolPhase } from './useModifyTool';
 import { GroundPlane, toDocumentPoint } from './GroundPlane';
 

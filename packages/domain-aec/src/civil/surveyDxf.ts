@@ -4,8 +4,7 @@
  * @layer domain-aec/civil
  */
 
-import type { Vec3 } from '@core/model/types';
-import { DOCUMENT_UNITS } from '@core/model/types';
+import { type Vec3, DOCUMENT_UNITS } from '@core/model/types';
 import type { PointGroupObject, SurveyPoint } from '@core/model/civil';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';

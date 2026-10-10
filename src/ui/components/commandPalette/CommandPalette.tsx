@@ -13,8 +13,7 @@ import type { CommandDefinition } from '@core/commands/types';
 import { usePaletteStore, useStore } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
 import { trapTab } from '@ui/focusTrap';
-import { allPaletteItems, searchPaletteItems } from './paletteItems';
-import type { PaletteItem } from './paletteItems';
+import { type PaletteItem, allPaletteItems, searchPaletteItems } from './paletteItems';
 import { CommandParamForm } from './CommandParamForm';
 
 function runCommand(command: CommandDefinition<unknown>, params: Record<string, unknown>): void {

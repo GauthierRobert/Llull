@@ -8,11 +8,15 @@
  */
 
 import React, { useId } from 'react';
-import { useViewportStore, useStore } from '@ui/store';
-import type { DisplayMode, ClipAxis, QualityOverride } from '@ui/store';
-import { Icon } from '@ui/components/Icon';
+import {
+  type DisplayMode,
+  type ClipAxis,
+  type QualityOverride,
+  useViewportStore,
+  useStore,
+} from '@ui/store';
+import { type IconName, Icon } from '@ui/components/Icon';
 import { NumberField } from '@ui/components/NumberField';
-import type { IconName } from '@ui/components/Icon';
 
 function Divider(): React.ReactElement {
   return <span className="vp-divider" aria-hidden="true" />;

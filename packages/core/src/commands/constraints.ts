@@ -13,8 +13,7 @@
  *          Solver non-convergence → best-effort positions returned, converged:false in data.
  */
 
-import type { CadDocument, Constraint } from '../model/types';
-import { CONSTRAINT_KINDS } from '../model/types';
+import { type CadDocument, type Constraint, CONSTRAINT_KINDS } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';

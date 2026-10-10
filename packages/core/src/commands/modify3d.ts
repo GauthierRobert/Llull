@@ -6,14 +6,12 @@
  * @layer core/commands
  */
 
-import type { CadDocument, Entity, Vec3 } from '../model/types';
+import { type CadDocument, type Entity, type Vec3, is3D } from '../model/types';
 import type { ShapeRecipe } from '../geometry/shapeRecipe';
-import { is3D } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, vec3, z } from './schema';
 import { selectEdges } from './edgeSelection';
-import type { ExecutionContext } from './context';
-import { currentContext } from './context';
+import { type ExecutionContext, currentContext } from './context';
 import { nextId } from '../lib/id';
 import { referenceLossSuffix, replaceEntities } from './entityOps';
 import { kernelUnavailable } from './kernelRefusal';

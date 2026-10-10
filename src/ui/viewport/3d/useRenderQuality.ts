@@ -13,8 +13,7 @@
  * dropping PCSS and contact shadows.
  */
 
-import { useStore, useViewportStore } from '@ui/store';
-import type { QualityTier, QualityOverride } from '@ui/store';
+import { type QualityTier, type QualityOverride, useStore, useViewportStore } from '@ui/store';
 
 /** Thresholds that map entity count to a quality tier (auto mode). */
 const HIGH_THRESHOLD = 50;

@@ -5,8 +5,7 @@
  * then call distribute_along_path and assert the resulting instances.
  */
 import { describe, it, expect } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
-import type { InstanceEntity, PolylineEntity } from '@core/model/types';
+import { type InstanceEntity, type PolylineEntity, createEmptyDocument } from '@core/model/types';
 import { execute, listCommands, toToolSchemas } from '@core/commands/registry';
 
 // ---------------------------------------------------------------------------

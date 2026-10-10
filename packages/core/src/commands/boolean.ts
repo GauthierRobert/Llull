@@ -7,13 +7,11 @@
  * @layer core/commands
  */
 
-import type { CadDocument, Entity } from '../model/types';
-import { is3D } from '../model/types';
+import { type CadDocument, type Entity, is3D } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import type { BooleanOp, ShapeRecipe } from '../geometry/shapeRecipe';
-import type { ExecutionContext } from './context';
-import { currentContext } from './context';
+import { type ExecutionContext, currentContext } from './context';
 import { nextId } from '../lib/id';
 import { referenceLossSuffix, replaceEntities } from './entityOps';
 import { kernelUnavailable } from './kernelRefusal';

@@ -1,7 +1,6 @@
 /** Incremental regeneration: parameter edits regenerate dependents; replay reuses prefixes. */
 import { describe, it, expect } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
-import type { BoxEntity, CadDocument } from '@core/model/types';
+import { type BoxEntity, type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import { createReplayCache } from '@core/commands/replayCache';

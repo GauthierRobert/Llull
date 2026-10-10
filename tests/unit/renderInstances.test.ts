@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
-import type { CadDocument } from '@core/model/types';
+import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 
 const svgOf = (doc: CadDocument, params: Record<string, unknown> = {}): string =>

@@ -7,8 +7,16 @@
  * @failure not an ASCII DXF / nothing importable -> no-op, affected:[]
  */
 
-import type { CadDocument, DocumentUnit, Entity, Layer, Vec2, Vec3 } from '../model/types';
-import { DEFAULT_LAYER_ID, DOCUMENT_UNITS } from '../model/types';
+import {
+  type CadDocument,
+  type DocumentUnit,
+  type Entity,
+  type Layer,
+  type Vec2,
+  type Vec3,
+  DEFAULT_LAYER_ID,
+  DOCUMENT_UNITS,
+} from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { noop } from './noop';

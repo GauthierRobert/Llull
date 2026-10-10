@@ -19,10 +19,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
+import { type FeatureStep, createEmptyDocument } from '@core/model/types';
 import { FeatureHistoryPanel } from '@ui/panels/FeatureHistoryPanel';
 import { localDispatch, liveSnapshot } from '../helpers/storeTestHelpers';
-import type { FeatureStep } from '@core/model/types';
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -2,8 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, act, fireEvent } from '@testing-library/react';
 import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
-import type { Vec2 } from '@core/model/types';
+import { type Vec2, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 
 const captured = vi.hoisted(() => ({ handlers: {} as Record<string, (event: unknown) => void> }));

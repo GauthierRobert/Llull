@@ -16,9 +16,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
+import { type RevolutionEntity, createEmptyDocument } from '@core/model/types';
 import { localDispatch } from '../helpers/storeTestHelpers';
-import type { RevolutionEntity } from '@core/model/types';
 
 function resetStore(): void {
   useStore.setState({ document: createEmptyDocument(), lastSummary: null });

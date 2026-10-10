@@ -5,9 +5,8 @@
  * @pure
  */
 
-import type { ProfilePvi } from '@core/model/civil';
+import { type ProfilePvi, CIVIL_CATEGORIES } from '@core/model/civil';
 import type { Vec2 } from '@core/model/types';
-import { CIVIL_CATEGORIES } from '@core/model/civil';
 import { isRecord } from '@lib/isRecord';
 import { isValidPolygon } from '@lib/polygon';
 import { validateHorizontal } from './alignmentGeometry';

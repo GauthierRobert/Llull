@@ -7,8 +7,7 @@
  * @failure invalid JSON / wrong format or version / structural or value validation error -> no-op, affected:[]
  */
 
-import type { CadDocument } from '../model/types';
-import { DOCUMENT_UNITS } from '../model/types';
+import { type CadDocument, DOCUMENT_UNITS } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { changed, noop } from './noop';

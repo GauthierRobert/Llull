@@ -1,5 +1,4 @@
-import type { CadDocument, Entity } from '../model/types';
-import { is3D } from '../model/types';
+import { type CadDocument, type Entity, is3D } from '../model/types';
 import { expandInstance } from './instanceExpansion';
 import { solidTriangles } from './solidTriangulation';
 import type { Triangle } from './exportMath';

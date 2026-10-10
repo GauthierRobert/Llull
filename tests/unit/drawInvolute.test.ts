@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
-import type { PolylineEntity } from '@core/model/types';
+import { type PolylineEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { sampleInvolute } from '@core/commands/gears';
 

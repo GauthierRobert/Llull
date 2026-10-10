@@ -1,4 +1,4 @@
-import type { Vec3 } from '../model/types';
+import { type Vec3, DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3, tolerant, untypedArray, colorField } from './schema';
 import { axisVector, isValidAxis } from '../lib/axis';
@@ -16,7 +16,6 @@ import {
   rejectBadProfile,
   rejectZeroAreaProfile,
 } from './geometryShared';
-import { DEFAULT_LAYER_ID } from '../model/types';
 import { circlePoints } from './tessellation';
 
 /** Number of polygon segments used to approximate a circle. */

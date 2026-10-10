@@ -4,8 +4,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
-import type { Animation, CadDocument, EntityGroup, LineEntity } from '@core/model/types';
+import {
+  type Animation,
+  type CadDocument,
+  type EntityGroup,
+  type LineEntity,
+  createEmptyDocument,
+} from '@core/model/types';
 import { isEntityVisible } from '../../src/ui/viewport/entityVisibility';
 import { animatedEntityIds } from '../../src/ui/viewport/3d/animationClickHelpers';
 import { collectSnapCandidates } from '../../src/ui/viewport/2d/snapping/candidates';

@@ -17,8 +17,7 @@
 
 import { vi } from 'vitest';
 import type { CadDocument } from '@core/model/types';
-import { documentHash } from '@mcp/liveSync';
-import type { LiveSnapshotEvent } from '@mcp/liveSync';
+import { type LiveSnapshotEvent, documentHash } from '@mcp/liveSync';
 import { execute } from '@core/commands/registry';
 import type { CommandResult } from '@core/commands/types';
 import { useStore } from '@ui/store';

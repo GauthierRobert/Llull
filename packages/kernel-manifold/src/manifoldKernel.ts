@@ -13,8 +13,7 @@
 import type { MeshData } from '@core/geometry/kernel';
 import type { BooleanOp } from '@core/geometry/shapeRecipe';
 import { kernelFromOps, type CachingKernel, type KernelOps } from '@core/geometry/shapeKernel';
-import type { Entity } from '@core/model/types';
-import { createEmptyDocument } from '@core/model/types';
+import { type Entity, createEmptyDocument } from '@core/model/types';
 import { entityToTriangles } from '@core/commands/exportTriangulate';
 import { toCounterClockwise } from '@lib/polygon';
 

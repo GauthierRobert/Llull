@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createEmptyDocument, is2D } from '@core/model/types';
-import type { Entity, TextEntity } from '@core/model/types';
+import { type Entity, type TextEntity, createEmptyDocument, is2D } from '@core/model/types';
 import { execute, toToolSchemas, listCommands, getCommand } from '@core/commands/registry';
 import { entityBounds } from '@core/commands/sceneBounds';
 

@@ -1,11 +1,9 @@
 /** Regression tests for the final migration review (S2, S3, S4, S7, N2, N5). */
 import { describe, it, expect, afterEach } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
-import type { BoxEntity, CadDocument } from '@core/model/types';
+import { type BoxEntity, type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { currentContext, defaultContext, runInContext } from '@core/commands/context';
-import { setGeometryKernel } from '@core/geometry/kernel';
-import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
+import { type GeometryKernel, type MeshData, setGeometryKernel } from '@core/geometry/kernel';
 import { installPlugin } from '@core/plugins/host';
 import { defineCommand, z } from '@core/commands/schema';
 import type { CommandDefinition } from '@core/commands/types';

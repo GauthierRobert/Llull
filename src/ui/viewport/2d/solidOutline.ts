@@ -11,8 +11,14 @@
 
 import { boundsCorners, localBounds } from '@core/commands/sceneBounds';
 import { applyEulerXYZ } from '@core/lib/eulerRotation';
-import type { CadDocument, Entity, InstanceEntity, Vec2, Vec3 } from '@core/model/types';
-import { is3D } from '@core/model/types';
+import {
+  type CadDocument,
+  type Entity,
+  type InstanceEntity,
+  type Vec2,
+  type Vec3,
+  is3D,
+} from '@core/model/types';
 import { projectOntoSegment } from '@lib/polygon';
 import type { SnapPoint } from './snapping/types';
 

@@ -1,6 +1,5 @@
-import type { Component, JointKind } from '../model/types';
+import { type Component, type JointKind, CONSTRAINT_KINDS } from '../model/types';
 import { findComponentCycle } from './assemblies';
-import { CONSTRAINT_KINDS } from '../model/types';
 import { isRecord } from '../lib/isRecord';
 import { isFiniteNumber } from '../lib/isFiniteNumber';
 import { documentExtensions } from '../plugins/host';

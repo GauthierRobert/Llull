@@ -6,8 +6,7 @@
  * @layer core/commands
  */
 
-import type { CadDocument, Layer } from '../model/types';
-import { DEFAULT_LAYER_ID } from '../model/types';
+import { type CadDocument, type Layer, DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';

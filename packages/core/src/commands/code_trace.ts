@@ -6,8 +6,7 @@
  * @see export_code (code_exchange.ts), packages/core/src/codegen/pythonRuntime.ts (the recorder)
  */
 
-import type { CadDocument } from '../model/types';
-import { createEmptyDocument } from '../model/types';
+import { type CadDocument, createEmptyDocument } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { execute } from './registry';

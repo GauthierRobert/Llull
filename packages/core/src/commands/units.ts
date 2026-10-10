@@ -7,8 +7,7 @@
  * @failure invalid unit or negative/non-integer/>20 precision -> no-op, affected:[]
  */
 
-import type { CadDocument } from '../model/types';
-import { DOCUMENT_UNITS } from '../model/types';
+import { type CadDocument, DOCUMENT_UNITS } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { noop, report } from './noop';

@@ -6,8 +6,7 @@
 
 import type { CadDocument, FeatureStep } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
-import type { ExecutionContext } from './context';
-import { currentContext, runInContext } from './context';
+import { type ExecutionContext, currentContext, runInContext } from './context';
 import { guardCommand } from './guard';
 import { kernelUnavailable } from './kernelRefusal';
 import { rejection } from './noop';

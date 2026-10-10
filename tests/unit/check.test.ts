@@ -10,11 +10,9 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
-import type { CadDocument, Entity } from '@core/model/types';
+import { type CadDocument, type Entity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { runModelChecks } from '@core/commands/check';
-import type { CheckResult } from '@core/commands/check';
+import { type CheckResult, runModelChecks } from '@core/commands/check';
 
 // ---------------------------------------------------------------------------
 // Helpers

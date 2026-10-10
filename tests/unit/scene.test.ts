@@ -5,8 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
-import type { Entity } from '@core/model/types';
+import { type Entity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { computeSceneSnapshot } from '@core/commands/scene';
 import { rotatedEntityBounds } from '@core/commands/sceneRotatedBounds';

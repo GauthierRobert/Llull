@@ -6,8 +6,7 @@
  */
 
 import type { MeshData } from '@core/geometry/kernel';
-import type { Entity, Vec3 } from '@core/model/types';
-import { createEmptyDocument } from '@core/model/types';
+import { type Entity, type Vec3, createEmptyDocument } from '@core/model/types';
 import { entityToTriangles } from '@core/commands/exportTriangulate';
 import { cross3, dot3, sub3 } from '@lib/vec3';
 import { isValidPolygon, toCounterClockwise } from '@lib/polygon';

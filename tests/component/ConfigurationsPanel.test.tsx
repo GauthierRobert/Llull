@@ -21,9 +21,8 @@ import { liveSnapshot } from '../helpers/storeTestHelpers';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
+import { type Configuration, createEmptyDocument } from '@core/model/types';
 import { ConfigurationsPanel } from '@ui/panels/ConfigurationsPanel';
-import type { Configuration } from '@core/model/types';
 
 // ---------------------------------------------------------------------------
 // Helpers

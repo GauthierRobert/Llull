@@ -22,8 +22,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import type { Vec2 } from '@core/model/types';
-import { useStore, useToolStore } from '@ui/store';
-import type { ModifyToolKind } from '@ui/store';
+import { type ModifyToolKind, useStore, useToolStore } from '@ui/store';
 import { isEditingKeyEvent } from '@ui/hooks/useKeyboardShortcuts';
 import { nearestVertex, signedOffsetDistance } from './modifyHelpers';
 

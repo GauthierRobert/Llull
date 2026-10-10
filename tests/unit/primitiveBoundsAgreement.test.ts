@@ -5,8 +5,7 @@
 
 import { describe, it, expect } from 'vitest';
 import type * as THREE from 'three';
-import { createEmptyDocument } from '@core/model/types';
-import type { Entity, Vec3 } from '@core/model/types';
+import { type Entity, type Vec3, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { rotatedEntityBounds } from '@core/commands/sceneRotatedBounds';
 import { entityBounds } from '@core/commands/sceneBounds';

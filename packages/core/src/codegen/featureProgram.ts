@@ -6,8 +6,7 @@
  * @pure
  */
 
-import type { CadDocument, Entity, FeatureStep, Vec3 } from '../model/types';
-import { is3D } from '../model/types';
+import { type CadDocument, type Entity, type FeatureStep, type Vec3, is3D } from '../model/types';
 import type { CommandDefinition } from '../commands/types';
 import { replayHistory, type ReplayStepEvent } from '../commands/replay';
 import { buildParamEnv } from '../commands/regenerate';

@@ -8,12 +8,9 @@
  *   runs the inner command in the caller's context unless it passes its own.
  */
 
-import type { GeometryKernel } from '../geometry/kernel';
-import { getGeometryKernel } from '../geometry/kernel';
-import type { ReplayCache } from './replayCache';
-import { createReplayCache } from './replayCache';
-import type { IdSource } from '../lib/id';
-import { counterIdSource, withIdSource } from '../lib/id';
+import { type GeometryKernel, getGeometryKernel } from '../geometry/kernel';
+import { type ReplayCache, createReplayCache } from './replayCache';
+import { type IdSource, counterIdSource, withIdSource } from '../lib/id';
 import type { CommandDefinition } from './types';
 import { getCommand } from './registry';
 

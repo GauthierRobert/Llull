@@ -25,9 +25,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
+import { type ExtrusionEntity, createEmptyDocument } from '@core/model/types';
 import { localDispatch } from '../helpers/storeTestHelpers';
-import type { ExtrusionEntity } from '@core/model/types';
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -7,8 +7,7 @@
  * @failure already-empty document -> no-op, affected:[]
  */
 
-import type { CadDocument } from '../model/types';
-import { createEmptyDocument } from '../model/types';
+import { type CadDocument, createEmptyDocument } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { noop, report } from './noop';

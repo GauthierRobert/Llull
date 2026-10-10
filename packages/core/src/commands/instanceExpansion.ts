@@ -5,8 +5,7 @@
  * @layer core/commands
  */
 
-import type { Component, Entity, InstanceEntity, Vec3 } from '../model/types';
-import { is3D } from '../model/types';
+import { type Component, type Entity, type InstanceEntity, type Vec3, is3D } from '../model/types';
 import { solidTriangles } from './solidTriangulation';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { ORIGIN, add3 } from '../lib/vec3';

@@ -5,8 +5,14 @@
  * @layer core/commands
  */
 
-import type { CadDocument, DimensionEntity, Entity, TextEntity, Vec3 } from '../model/types';
-import { DEFAULT_LAYER_ID } from '../model/types';
+import {
+  type CadDocument,
+  type DimensionEntity,
+  type Entity,
+  type TextEntity,
+  type Vec3,
+  DEFAULT_LAYER_ID,
+} from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';

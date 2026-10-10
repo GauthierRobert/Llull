@@ -9,8 +9,7 @@
  */
 
 import { useMemo } from 'react';
-import { is2D } from '@core/model/types';
-import type { Entity, EntityId, LineEntity } from '@core/model/types';
+import { type Entity, type EntityId, type LineEntity, is2D } from '@core/model/types';
 import { useStore, useViewportStore } from '@ui/store';
 import { isEntityVisible } from '../entityVisibility';
 import { BatchedLines2D } from './BatchedLines2D';

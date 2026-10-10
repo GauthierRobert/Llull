@@ -2,8 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { applyLiveCommand, documentHash } from '@mcp/liveSync';
-import type { LiveCommandEvent } from '@mcp/liveSync';
+import { type LiveCommandEvent, applyLiveCommand, documentHash } from '@mcp/liveSync';
 
 function serverStep(name: string, params: unknown): LiveCommandEvent {
   const after = execute(createEmptyDocument(), name, params).document;

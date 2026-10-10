@@ -3,13 +3,10 @@
  * (or inherited by nested executes), never from a module singleton.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
-import type { CadDocument, MeshSolidEntity } from '@core/model/types';
+import { type CadDocument, type MeshSolidEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import type { ExecutionContext } from '@core/commands/context';
-import { currentContext, defaultContext } from '@core/commands/context';
-import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
-import { setGeometryKernel } from '@core/geometry/kernel';
+import { type ExecutionContext, currentContext, defaultContext } from '@core/commands/context';
+import { type GeometryKernel, type MeshData, setGeometryKernel } from '@core/geometry/kernel';
 import type { IdSource } from '@lib/id';
 import { fakeKernel } from '../../helpers/fakeKernel';
 

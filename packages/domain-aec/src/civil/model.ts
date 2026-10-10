@@ -5,8 +5,12 @@
  */
 
 import type { CadDocument, DocumentUnit } from '@core/model/types';
-import type { CivilCategory, CivilModel, CivilObject } from '@core/model/civil';
-import { createEmptyCivil } from '@core/model/civil';
+import {
+  type CivilCategory,
+  type CivilModel,
+  type CivilObject,
+  createEmptyCivil,
+} from '@core/model/civil';
 import { fromMm, toMetres } from '../model';
 import { dependentsOf } from './integrity';
 

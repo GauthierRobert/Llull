@@ -9,8 +9,7 @@
  * than juggling generated ids.
  */
 
-import type { EntityKind } from '../model/types';
-import { SHAPE2D_KINDS, SOLID_KINDS } from '../model/types';
+import { type EntityKind, SHAPE2D_KINDS, SOLID_KINDS } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, vec3, z } from './schema';
 import { noop, report } from './noop';

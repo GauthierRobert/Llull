@@ -18,8 +18,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { Vec2 } from '@core/model/types';
-import { useStore, useToolStore } from '@ui/store';
-import type { DrawToolKind } from '@ui/store';
+import { type DrawToolKind, useStore, useToolStore } from '@ui/store';
 import { moveSelection } from '@ui/actions/selectionActions';
 import { isEditingKeyEvent } from '@ui/hooks/useKeyboardShortcuts';
 import {

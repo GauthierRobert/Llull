@@ -20,8 +20,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
-import type { TextEntity } from '@core/model/types';
+import { type TextEntity, createEmptyDocument } from '@core/model/types';
 import { localDispatch } from '../helpers/storeTestHelpers';
 
 function resetStore(): void {

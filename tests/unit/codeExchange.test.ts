@@ -1,11 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import type { BoxEntity, CadDocument } from '@core/model/types';
-import { createEmptyDocument } from '@core/model/types';
+import { type BoxEntity, type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { stripOuterParens } from '@core/commands/code_trace';
 import { MAX_TRACE_FEATURES } from '@core/commands/limits';
-import { setGeometryKernel } from '@core/geometry/kernel';
-import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
+import { type GeometryKernel, type MeshData, setGeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { fakeKernel } from '../helpers/fakeKernel';
 

@@ -31,11 +31,9 @@ import { TransformControls } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { TransformControls as TransformControlsImpl } from 'three-stdlib';
-import { useStore, useViewportStore } from '@ui/store';
-import type { GizmoMode } from '@ui/store';
+import { type GizmoMode, useStore, useViewportStore } from '@ui/store';
 import { toRenderPosition } from './floatingOrigin';
-import { collectSnapCandidates3D, snap3d } from './snap3d';
-import type { Snap3DType, SnapPoint3D } from './snap3d';
+import { type Snap3DType, type SnapPoint3D, collectSnapCandidates3D, snap3d } from './snap3d';
 import { SnapIndicator3D } from './SnapIndicator3D';
 import { gizmoDragCommit, snapBackHint } from './gizmoCommit';
 

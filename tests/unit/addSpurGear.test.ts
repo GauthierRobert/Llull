@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
-import type { ExtrusionEntity } from '@core/model/types';
+import { type ExtrusionEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { buildSpurGearProfile } from '@core/commands/gears';
 

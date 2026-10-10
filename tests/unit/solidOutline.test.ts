@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
-import type { CadDocument, Entity, Vec2 } from '@core/model/types';
+import { type CadDocument, type Entity, type Vec2, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import {
   convexHull,

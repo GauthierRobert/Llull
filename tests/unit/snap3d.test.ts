@@ -15,8 +15,7 @@ import type {
   SphereEntity,
   ExtrusionEntity,
 } from '@core/model/types';
-import { collectSnapCandidates3D, snap3d } from '../../src/ui/viewport/3d/snap3d';
-import type { SnapPoint3D } from '../../src/ui/viewport/3d/snap3d';
+import { type SnapPoint3D, collectSnapCandidates3D, snap3d } from '../../src/ui/viewport/3d/snap3d';
 
 // ---------------------------------------------------------------------------
 // Document builders

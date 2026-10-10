@@ -15,9 +15,8 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
+import { type CameraState, createEmptyDocument } from '@core/model/types';
 import { localDispatch } from '../helpers/storeTestHelpers';
-import type { CameraState } from '@core/model/types';
 import { sphericalToCartesian } from '@ui/viewport/3d/CameraRig';
 
 function resetStore(): void {

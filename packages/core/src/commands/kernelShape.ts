@@ -8,8 +8,7 @@
 
 import type { Entity } from '../model/types';
 import type { GeometryKernel, MeshData, ShapeHandle } from '../geometry/kernel';
-import type { ShapeRecipe } from '../geometry/shapeRecipe';
-import { meshRecipeOf, recipeOf } from '../geometry/shapeRecipe';
+import { type ShapeRecipe, meshRecipeOf, recipeOf } from '../geometry/shapeRecipe';
 import { newEntity } from './newEntity';
 
 /** The first op of `recipe` this kernel cannot perform at all, or null. */

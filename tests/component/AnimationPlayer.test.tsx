@@ -18,10 +18,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useViewportStore } from '@ui/store';
 import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
+import { type Animation, type EntityGroup, createEmptyDocument } from '@core/model/types';
 import { ViewportControls } from '@ui/viewport/3d/ViewportControls';
 import { findClickAnimationsForEntity } from '@ui/viewport/3d/animationClickHelpers';
-import type { Animation, EntityGroup } from '@core/model/types';
 
 // ---------------------------------------------------------------------------
 // Helpers

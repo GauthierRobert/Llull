@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
-import type { CadDocument } from '@core/model/types';
+import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { collectSnapCandidates } from '../../src/ui/viewport/2d/snapping/candidates';
 
 const base = {

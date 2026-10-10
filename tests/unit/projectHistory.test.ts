@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
-import type { CadDocument, BoxEntity } from '@core/model/types';
+import { type CadDocument, type BoxEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { executeRecorded } from '@core/commands/record';
 

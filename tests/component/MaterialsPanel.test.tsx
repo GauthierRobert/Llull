@@ -20,9 +20,8 @@ import { liveSnapshot } from '../helpers/storeTestHelpers';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
+import { type Material, createEmptyDocument } from '@core/model/types';
 import { MaterialsPanel } from '@ui/panels/MaterialsPanel';
-import type { Material } from '@core/model/types';
 
 // ---------------------------------------------------------------------------
 // Helpers

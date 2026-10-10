@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
-import type { CadDocument } from '@core/model/types';
+import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 
 /** A 2x2x2 component box instanced at x=100 (world bounds x 99..101) plus a 2x2x2 box at the origin. */

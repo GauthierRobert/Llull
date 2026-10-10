@@ -5,8 +5,7 @@
  * instead of a blank page.
  */
 
-import { Component } from 'react';
-import type { ErrorInfo, ReactNode } from 'react';
+import { type ErrorInfo, type ReactNode, Component } from 'react';
 import { errorMessage } from '@lib/errorMessage';
 
 interface AppErrorBoundaryProps {

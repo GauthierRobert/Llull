@@ -5,8 +5,7 @@
  * @layer core/commands
  */
 
-import type { CadDocument, FeatureStep } from '../model/types';
-import { createEmptyDocument } from '../model/types';
+import { type CadDocument, type FeatureStep, createEmptyDocument } from '../model/types';
 import { createEmptyBuilding } from '../model/building';
 import { currentContext } from './context';
 import type { CommandDefinition } from './types';
