@@ -9,7 +9,7 @@ import type { CadDocument, Parameter } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { topologicalSort } from '../lib/topologicalSort';
-import { noop } from './noop';
+import { changed, noop, report } from './noop';
 import { evaluateExpression, expressionSyntaxError, extractReferences } from './expression';
 import { regenerateParameterDependents } from './dependents';
 
@@ -136,11 +136,10 @@ export const setParameter = defineCommand({
     const newDoc: CadDocument = { ...doc, parameters: evaluated };
 
     if (param.error) {
-      return {
-        document: newDoc,
-        summary: `set_parameter '${name}': expression '${expression}' could not be evaluated — ${param.error}. Parameter stored with error.`,
-        affected: [],
-      };
+      return report(
+        newDoc,
+        `set_parameter '${name}': expression '${expression}' could not be evaluated — ${param.error}. Parameter stored with error.`,
+      );
     }
 
     const dependentCount = Object.values(evaluated).filter(
@@ -151,14 +150,13 @@ export const setParameter = defineCommand({
       return noop(doc, `set_parameter '${name}': ${refusal}`);
     }
 
-    return {
+    return changed(
       document,
-      summary:
-        `set_parameter '${name}' = ${param.value} (expression: '${expression}')` +
+      `set_parameter '${name}' = ${param.value} (expression: '${expression}')` +
         (dependentCount > 0 ? `; ${dependentCount} dependent(s) re-evaluated` : '') +
         (dependentSteps > 0 ? `; regenerated ${dependentSteps} dependent feature step(s).` : '.'),
-      affected: dependentSteps > 0 ? document.order : [],
-    };
+      dependentSteps > 0 ? document.order : [],
+    );
   },
 });
 
@@ -203,14 +201,12 @@ export const deleteParameter = defineCommand({
 
     const newDoc: CadDocument = { ...doc, parameters: evaluated };
 
-    return {
-      document: newDoc,
-      summary:
-        `delete_parameter '${name}': removed.` +
+    return report(
+      newDoc,
+      `delete_parameter '${name}': removed.` +
         (erroredDependents.length > 0
           ? ` ${erroredDependents.length} dependent(s) now have errors: ${erroredDependents.join(', ')}.`
           : ''),
-      affected: [],
-    };
+    );
   },
 });

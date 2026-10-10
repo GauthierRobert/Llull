@@ -11,7 +11,7 @@ import type { CadDocument } from '../model/types';
 import { DOCUMENT_UNITS } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 import { errorMessage } from '../lib/errorMessage';
 import { isRecord } from '../lib/isRecord';
 import { derivedEntityIds } from '../model/partition';
@@ -202,10 +202,10 @@ export const loadDocument = defineCommand({
     const entityCount = Object.keys(parsed.entities).length;
     const layerCount = Object.keys(parsed.layers).length;
 
-    return {
-      document: parsed,
-      summary: `Loaded document: ${entityCount} ${entityCount === 1 ? 'entity' : 'entities'}, ${layerCount} ${layerCount === 1 ? 'layer' : 'layers'}.`,
-      affected: parsed.order,
-    };
+    return changed(
+      parsed,
+      `Loaded document: ${entityCount} ${entityCount === 1 ? 'entity' : 'entities'}, ${layerCount} ${layerCount === 1 ? 'layer' : 'layers'}.`,
+      parsed.order,
+    );
   },
 });

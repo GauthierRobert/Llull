@@ -24,7 +24,7 @@ import {
   operandRecipe,
   topologySuffix,
 } from './kernelShape';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 
 function runBoolean(
   doc: CadDocument,
@@ -84,11 +84,11 @@ function runBoolean(
   const meshEntity = kernelResultEntity(newId, result, entA);
   const triangleCount = result.mesh.indices.length / 3;
   const document = replaceEntities(doc, [a, b], meshEntity);
-  return {
+  return changed(
     document,
-    summary: `${opName}: merged '${a}' and '${b}' into mesh '${newId}' (${triangleCount} triangles). Operands consumed.${fallbackSuffix(kernel, [entA, entB])}${topologySuffix(kernel, result.shape)}${referenceLossSuffix(doc, document)}`,
-    affected: [newId],
-  };
+    `${opName}: merged '${a}' and '${b}' into mesh '${newId}' (${triangleCount} triangles). Operands consumed.${fallbackSuffix(kernel, [entA, entB])}${topologySuffix(kernel, result.shape)}${referenceLossSuffix(doc, document)}`,
+    [newId],
+  );
 }
 
 /**

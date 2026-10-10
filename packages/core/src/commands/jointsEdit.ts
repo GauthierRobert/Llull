@@ -5,7 +5,7 @@ import { nextId } from '../lib/id';
 import { resolveNumeric } from './expression';
 import { instanceFrameRef, instanceRefsProblem } from './instanceFrameRef';
 import { isValidAxis } from '../lib/axis';
-import { noop } from './noop';
+import { changed, noop, report } from './noop';
 /**
  * @command add_joint
  * @pure
@@ -87,13 +87,12 @@ export const addJoint = defineCommand({
       jointOrder: [...doc.jointOrder, jointId],
     };
 
-    return {
-      document: newDoc,
-      summary:
-        `add_joint: added '${kind}' joint '${jointId}' between instance '${a.instanceId}' (a) ` +
+    return changed(
+      newDoc,
+      `add_joint: added '${kind}' joint '${jointId}' between instance '${a.instanceId}' (a) ` +
         `and instance '${b.instanceId}' (b), axis=${JSON.stringify(axis)}.`,
-      affected: [jointId],
-    };
+      [jointId],
+    );
   },
 });
 
@@ -145,11 +144,7 @@ export const deleteJoint = defineCommand({
         ? ` Also removed ${removedDrIds.length} drive relation(s): ${removedDrIds.join(', ')}.`
         : '';
 
-    return {
-      document: newDoc,
-      summary: `delete_joint: removed '${joint.kind}' joint '${id}'.${cascadeSummary}`,
-      affected: [],
-    };
+    return report(newDoc, `delete_joint: removed '${joint.kind}' joint '${id}'.${cascadeSummary}`);
   },
 });
 
@@ -195,12 +190,11 @@ export const setJointValue = defineCommand({
       joints: { ...doc.joints, [id]: { ...existing, [fieldName]: storedValue } as Joint },
     };
 
-    return {
-      document: newDoc,
-      summary:
-        `set_joint_value: joint '${id}' (${existing.kind}) ${fieldName} set to ${storedValue}` +
+    return changed(
+      newDoc,
+      `set_joint_value: joint '${id}' (${existing.kind}) ${fieldName} set to ${storedValue}` +
         (typeof value === 'string' ? ` (expression: "${value}").` : '.'),
-      affected: [id],
-    };
+      [id],
+    );
   },
 });

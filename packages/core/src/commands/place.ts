@@ -18,7 +18,7 @@
 import type { Entity, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 import { entityBoundsInDoc } from './sceneBounds';
 import { replaceEntitiesById, replaceEntity } from './entityOps';
 
@@ -110,11 +110,11 @@ export const align = defineCommand({
         `align: all ${targetIds.length} entit${plural(targetIds.length)} already aligned to ${edge} of "${referenceId}".`,
       );
     }
-    return {
-      document: replaceEntitiesById(doc, moved),
-      summary: `align: moved ${moved.length} entit${plural(moved.length)} to ${edge} of "${referenceId}".`,
-      affected: moved.map((e) => e.id),
-    };
+    return changed(
+      replaceEntitiesById(doc, moved),
+      `align: moved ${moved.length} entit${plural(moved.length)} to ${edge} of "${referenceId}".`,
+      moved.map((e) => e.id),
+    );
   },
 });
 
@@ -211,11 +211,11 @@ export const distribute = defineCommand({
         `distribute: ${n} entit${plural(n)} already evenly distributed along ${axis}.`,
       );
     }
-    return {
-      document: replaceEntitiesById(doc, moved),
-      summary: `distribute: repositioned ${moved.length} entit${plural(moved.length)} along ${axis} (mode: ${mode}).`,
-      affected: moved.map((e) => e.id),
-    };
+    return changed(
+      replaceEntitiesById(doc, moved),
+      `distribute: repositioned ${moved.length} entit${plural(moved.length)} along ${axis} (mode: ${mode}).`,
+      moved.map((e) => e.id),
+    );
   },
 });
 
@@ -263,10 +263,10 @@ export const stackOn = defineCommand({
     if (Math.abs(delta) < 1e-10) {
       return noop(doc, `stack_on: "${movingId}" is already stacked on "${baseId}" along ${axis}.`);
     }
-    return {
-      document: replaceEntity(doc, shiftAlong(movingEntity, axisIndex, delta)),
-      summary: `stack_on: moved "${movingId}" by ${delta.toFixed(4)} along ${axis} to sit on top of "${baseId}".`,
-      affected: [movingId],
-    };
+    return changed(
+      replaceEntity(doc, shiftAlong(movingEntity, axisIndex, delta)),
+      `stack_on: moved "${movingId}" by ${delta.toFixed(4)} along ${axis} to sit on top of "${baseId}".`,
+      [movingId],
+    );
   },
 });

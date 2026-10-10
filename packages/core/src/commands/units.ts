@@ -11,7 +11,7 @@ import type { CadDocument } from '../model/types';
 import { DOCUMENT_UNITS } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { noop } from './noop';
+import { noop, report } from './noop';
 import { MAX_DISPLAY_PRECISION } from './limits';
 
 export const setUnits = defineCommand({
@@ -56,11 +56,10 @@ export const setUnits = defineCommand({
     const nextUnits = units ?? doc.units;
     const nextPrecision = displayPrecision ?? doc.displayPrecision;
 
-    return {
-      document: { ...doc, units: nextUnits, displayPrecision: nextPrecision },
-      summary: `Units set to ${nextUnits}, precision ${nextPrecision}.`,
-      affected: [],
-    };
+    return report(
+      { ...doc, units: nextUnits, displayPrecision: nextPrecision },
+      `Units set to ${nextUnits}, precision ${nextPrecision}.`,
+    );
   },
 });
 

@@ -13,3 +13,20 @@ export const rejection = (doc: CadDocument, summary: string): CommandResult => (
   ...noop(doc, summary),
   rejected: true,
 });
+
+/** Result with no affected ids; `data` (when given) carries a query's structured answer. */
+export const report = (document: CadDocument, summary: string, data?: unknown): CommandResult => ({
+  ...noop(document, summary),
+  ...(data === undefined ? {} : { data }),
+});
+
+/** Mutating result: `document` is the next state, `affected` the created/changed entity ids. */
+export const changed = (
+  document: CadDocument,
+  summary: string,
+  affected: string[],
+): CommandResult => ({
+  document,
+  summary,
+  affected,
+});

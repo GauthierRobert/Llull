@@ -17,7 +17,7 @@ import {
   translated,
 } from './geometryShared';
 import { ORIGIN, finiteVec3OrZero } from '../lib/vec3';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 import { MAX_PROFILE_POINTS } from './limits';
 
 /**
@@ -157,11 +157,11 @@ export const move = defineCommand({
     if (!target) {
       return noop(doc, `No entity ${id} to move.`);
     }
-    return {
-      document: replaceEntity(doc, translated(target, delta)),
-      summary: `Moved ${id} by ${delta.join(', ')}.`,
-      affected: [id],
-    };
+    return changed(
+      replaceEntity(doc, translated(target, delta)),
+      `Moved ${id} by ${delta.join(', ')}.`,
+      [id],
+    );
   },
 });
 
@@ -195,10 +195,10 @@ export const deleteEntity = defineCommand({
         ? ` Dissolved group(s): [${dissolvedGroups.join(', ')}] (fell below 2 members).`
         : '';
 
-    return {
+    return changed(
       document,
-      summary: `Deleted ${id}.${dissolveSuffix}${referenceSuffix(prunedReferences)}`,
-      affected: [id],
-    };
+      `Deleted ${id}.${dissolveSuffix}${referenceSuffix(prunedReferences)}`,
+      [id],
+    );
   },
 });

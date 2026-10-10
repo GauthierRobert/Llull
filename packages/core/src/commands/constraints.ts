@@ -19,11 +19,20 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { runSolver } from './constraintSolver';
-import { noop } from './noop';
+import { changed, noop, report } from './noop';
 import { expressionSyntaxError } from './expression';
 
 /** Optional named point of a line / arc / circle (`EntityRef.kind`). */
 const SUB_POINT = z.enum(['start', 'end', 'center', 'mid']).optional();
+
+const entityRef = (
+  entityIdDescription: string,
+  kindDescription: string,
+): z.ZodObject<{ entityId: z.ZodString; kind: typeof SUB_POINT }> =>
+  z.object({
+    entityId: z.string().describe(entityIdDescription),
+    kind: SUB_POINT.describe(kindDescription),
+  });
 
 /** Semantic checks zod cannot express: non-empty entity ids; `value` on dimensional kinds. */
 function validateConstraintShape(c: {
@@ -71,25 +80,21 @@ export const addConstraint = defineCommand({
               'Dimensional: "distance" (distance between two points equals value), ' +
               '"angle" (angle between two line directions equals value in radians).',
           ),
-        a: z
-          .object({
-            entityId: z.string().describe('Id of the first entity.'),
-            kind: SUB_POINT.describe('Sub-point selector: start, end, center, or mid.'),
-          })
-          .describe(
-            'First entity reference. Minimum: { entityId: "<id>" }. ' +
-              'Optional sub-point: { entityId: "<id>", kind: "start"|"end"|"center"|"mid" } ' +
-              'to target a specific geometric point on a line, arc, or circle.',
-          ),
-        b: z
-          .object({
-            entityId: z.string().describe('Id of the second entity.'),
-            kind: SUB_POINT.describe('Sub-point selector: start, end, center, or mid.'),
-          })
-          .describe(
-            'Second entity reference. Same shape as "a". ' +
-              '{ entityId: "<id>" } or { entityId: "<id>", kind: "start"|"end"|"center"|"mid" }.',
-          ),
+        a: entityRef(
+          'Id of the first entity.',
+          'Sub-point selector: start, end, center, or mid.',
+        ).describe(
+          'First entity reference. Minimum: { entityId: "<id>" }. ' +
+            'Optional sub-point: { entityId: "<id>", kind: "start"|"end"|"center"|"mid" } ' +
+            'to target a specific geometric point on a line, arc, or circle.',
+        ),
+        b: entityRef(
+          'Id of the second entity.',
+          'Sub-point selector: start, end, center, or mid.',
+        ).describe(
+          'Second entity reference. Same shape as "a". ' +
+            '{ entityId: "<id>" } or { entityId: "<id>", kind: "start"|"end"|"center"|"mid" }.',
+        ),
         value: z
           .union([z.string(), z.number()])
           .optional()
@@ -155,11 +160,11 @@ export const addConstraint = defineCommand({
       constraintOrder: [...doc.constraintOrder, constraintId],
     };
 
-    return {
-      document: newDoc,
-      summary: `add_constraint: added '${constraint.kind}' constraint ${constraintId} between entities '${constraint.a.entityId}' and '${constraint.b.entityId}'.`,
-      affected: [constraintId],
-    };
+    return changed(
+      newDoc,
+      `add_constraint: added '${constraint.kind}' constraint ${constraintId} between entities '${constraint.a.entityId}' and '${constraint.b.entityId}'.`,
+      [constraintId],
+    );
   },
 });
 
@@ -201,11 +206,7 @@ export const deleteConstraint = defineCommand({
       constraintOrder: doc.constraintOrder.filter((cid) => cid !== id),
     };
 
-    return {
-      document: newDoc,
-      summary: `delete_constraint: removed '${constraint.kind}' constraint '${id}'.`,
-      affected: [],
-    };
+    return report(newDoc, `delete_constraint: removed '${constraint.kind}' constraint '${id}'.`);
   },
 });
 
@@ -233,18 +234,10 @@ export const updateConstraint = defineCommand({
           .union([z.string(), z.number()])
           .optional()
           .describe('New value for distance/angle constraints. Number or expression string.'),
-        a: z
-          .object({
-            entityId: z.string().describe('Entity id.'),
-            kind: SUB_POINT.describe('Sub-point selector.'),
-          })
+        a: entityRef('Entity id.', 'Sub-point selector.')
           .optional()
           .describe('New first entity reference { entityId, kind? }.'),
-        b: z
-          .object({
-            entityId: z.string().describe('Entity id.'),
-            kind: SUB_POINT.describe('Sub-point selector.'),
-          })
+        b: entityRef('Entity id.', 'Sub-point selector.')
           .optional()
           .describe('New second entity reference { entityId, kind? }.'),
       })
@@ -307,11 +300,11 @@ export const updateConstraint = defineCommand({
     };
 
     const changedFields = Object.keys(updates).join(', ');
-    return {
-      document: newDoc,
-      summary: `update_constraint: updated constraint '${id}' (kind: '${existing.kind}'), changed fields: ${changedFields || 'none'}.`,
-      affected: [id],
-    };
+    return changed(
+      newDoc,
+      `update_constraint: updated constraint '${id}' (kind: '${existing.kind}'), changed fields: ${changedFields || 'none'}.`,
+      [id],
+    );
   },
 });
 

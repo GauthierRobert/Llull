@@ -152,13 +152,7 @@ function roundEdges(
   return guarded('refusal', (own) => {
     const edges = uniqueSubShapes(api, shape, 'TopAbs_EDGE').map(own);
     if (edgeIndices.some((index) => edges[index] === undefined)) return null;
-    const selected =
-      edgeIndices.length > 0
-        ? edgeIndices.flatMap((index) => {
-            const edge = edges[index];
-            return edge === undefined ? [] : [edge];
-          })
-        : edges;
+    const selected = edgeIndices.length > 0 ? edgeIndices.map((i) => edges[i] as OccShape) : edges;
     if (selected.length === 0) return null;
     const maker = own(makeBuilder(shape));
     for (const current of selected) {
@@ -231,9 +225,13 @@ export function occtOps(api: OccApi): KernelOps<OccShape> {
         return builder.IsDone() ? builder.Shape() : null;
       }),
     fillet: (shape, edges, radius) =>
-      roundEdges(api, shape, edges, radius, (solid) => {
-        return new api.BRepFilletAPI_MakeFillet(solid, api.ChFi3d_FilletShape.ChFi3d_Rational);
-      }),
+      roundEdges(
+        api,
+        shape,
+        edges,
+        radius,
+        (solid) => new api.BRepFilletAPI_MakeFillet(solid, api.ChFi3d_FilletShape.ChFi3d_Rational),
+      ),
     chamfer: (shape, edges, distance) =>
       roundEdges(api, shape, edges, distance, (solid) => new api.BRepFilletAPI_MakeChamfer(solid)),
     shell: (shape, thickness) => hollow(api, shape, thickness),

@@ -12,7 +12,7 @@ import { defineCommand, z } from './schema';
 import { kernelRefusal } from './kernelRefusal';
 import { replayHistory } from './replay';
 import { unresolvedExpressionsNote } from './replayStep';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 
 /**
  * Refuse (kernel) or replay `newHistory`; `done` receives "<n> entity|entities".
@@ -59,11 +59,11 @@ function regenerateWith(
     brokenDependents.length > 0
       ? ` Warning: ${brokenDependents.length} step(s) no longer change the document (a referenced entity or input is gone): ${brokenDependents.map((step) => `${step.id} (${step.name})`).join(', ')}.`
       : '';
-  return {
-    document: regenerated,
-    summary: `${command}: ${done(`${count} ${count === 1 ? 'entity' : 'entities'}`)}${brokenNote}`,
-    affected: regenerated.order,
-  };
+  return changed(
+    regenerated,
+    `${command}: ${done(`${count} ${count === 1 ? 'entity' : 'entities'}`)}${brokenNote}`,
+    regenerated.order,
+  );
 }
 
 /** Locate `stepId`, let `edit` build the new history (or a no-op message), then regenerate. */
@@ -127,11 +127,11 @@ const replayHistoryCommand = defineCommand({
     }
     const regenerated = replayHistory(doc, doc.featureHistory, context.registry, warnings);
     const count = Object.keys(regenerated.entities).length;
-    return {
-      document: regenerated,
-      summary: `replay_history: replayed ${doc.featureHistory.length} step(s); ${count} ${count === 1 ? 'entity' : 'entities'} in document.${unresolvedExpressionsNote(warnings)}`,
-      affected: regenerated.order,
-    };
+    return changed(
+      regenerated,
+      `replay_history: replayed ${doc.featureHistory.length} step(s); ${count} ${count === 1 ? 'entity' : 'entities'} in document.${unresolvedExpressionsNote(warnings)}`,
+      regenerated.order,
+    );
   },
 });
 

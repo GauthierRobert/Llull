@@ -16,7 +16,7 @@ import { buildParamEnv } from './regenerate';
 import { evaluateExpression, extractReferences } from './expression';
 import { MAX_TRACE_FEATURES } from './limits';
 import { isRecord } from '../lib/isRecord';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 
 interface TraceParameter {
   name: string;
@@ -280,13 +280,12 @@ export const applyCodeTrace = defineCommand({
 
     const live = current.order.filter((id) => start.entities[id] === undefined);
     const parameterNames = trace.parameters.map((p) => p.name);
-    return {
-      document: current,
-      summary:
-        `apply_code_trace (${mode}): ${trace.parameters.length} parameter(s)` +
+    return changed(
+      current,
+      `apply_code_trace (${mode}): ${trace.parameters.length} parameter(s)` +
         (parameterNames.length > 0 ? ` [${parameterNames.join(', ')}]` : '') +
         `, ${trace.features.length} feature(s) → ${live.length} solid(s): ${live.join(', ') || 'none'}.`,
-      affected: live,
-    };
+      live,
+    );
   },
 });

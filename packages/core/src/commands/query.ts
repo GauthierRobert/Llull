@@ -13,7 +13,7 @@ import type { EntityKind } from '../model/types';
 import { SHAPE2D_KINDS, SOLID_KINDS } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, vec3, z } from './schema';
-import { noop } from './noop';
+import { noop, report } from './noop';
 import { boundsCenter, boundsOverlap, entityBoundsInDoc } from './sceneBounds';
 import type { Bounds } from './sceneTypes';
 import { distanceSq3 } from '../lib/vec3';
@@ -249,11 +249,10 @@ export const findEntities = defineCommand({
 
     const result: FindEntitiesResult = { matches, count: matches.length };
 
-    return {
-      document: doc,
-      summary: `find_entities${filterDesc}: ${matches.length} match${matches.length === 1 ? '' : 'es'} (of ${doc.order.length} total).`,
-      affected: [],
-      data: result,
-    };
+    return report(
+      doc,
+      `find_entities${filterDesc}: ${matches.length} match${matches.length === 1 ? '' : 'es'} (of ${doc.order.length} total).`,
+      result,
+    );
   },
 });

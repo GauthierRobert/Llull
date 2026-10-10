@@ -14,7 +14,7 @@ import { nextId } from '../lib/id';
 import { rotatePoint2 } from '../lib/polygon';
 import { add2, len2, normalize2, scale2, sub2 } from '../lib/vec2';
 import { MAX_COPIES_PER_COMMAND } from './limits';
-import { noop } from './noop';
+import { changed, noop, report } from './noop';
 import { withEntities } from './entityOps';
 import { instanceEntity } from './assemblies';
 
@@ -197,13 +197,11 @@ export const distributeAlongPath = defineCommand({
       // Open path: usable = totalLength - startOffset - endOffset
       const usable = totalLength - startOffset - endOffset;
       if (usable <= 1e-12) {
-        return {
-          document: doc,
-          summary:
-            `distribute_along_path: usable path length is <= 0 ` +
+        return report(
+          doc,
+          `distribute_along_path: usable path length is <= 0 ` +
             `(totalLength=${totalLength.toFixed(4)}, startOffset=${startOffset}, endOffset=${endOffset}).`,
-          affected: [],
-        };
+        );
       }
 
       if (count === 1) {
@@ -253,14 +251,13 @@ export const distributeAlongPath = defineCommand({
     const lastId = createdIds[createdIds.length - 1] ?? '';
     const rangeStr = createdIds.length > 1 ? `${firstId}..${lastId}` : firstId;
 
-    return {
-      document: withEntities(doc, created),
-      summary:
-        `Distributed ${createdIds.length} instance${createdIds.length === 1 ? '' : 's'} of "${component.name}" ` +
+    return changed(
+      withEntities(doc, created),
+      `Distributed ${createdIds.length} instance${createdIds.length === 1 ? '' : 's'} of "${component.name}" ` +
         `along ${pathEntity.kind} "${pathId}" ` +
         `(length=${totalLength.toFixed(2)}, spacing=${spacing.toFixed(4)}). ` +
         `Created: ${rangeStr}.`,
-      affected: createdIds,
-    };
+      createdIds,
+    );
   },
 });

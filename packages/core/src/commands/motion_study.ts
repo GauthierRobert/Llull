@@ -4,7 +4,7 @@ import { defineCommand, z } from './schema';
 import { boundsOverlap, instanceBoundsFromDoc } from './sceneBounds';
 import type { Bounds } from './sceneTypes';
 import { evaluateMotionInternal } from './jointsKinematics';
-import { noop } from './noop';
+import { noop, report } from './noop';
 import { elementAt } from '../lib/elementAt';
 
 /** One sweep sample: the applied value, resolved joint values and instance transforms by id. */
@@ -143,22 +143,20 @@ export const motionStudy = defineCommand({
     } satisfies MotionStudyData;
 
     if (start === end) {
-      return {
-        document: doc,
-        summary: `motion_study: start === end (${start}). Sweep has zero length — no steps to evaluate.`,
-        affected: [],
-        data: emptyStudy,
-      };
+      return report(
+        doc,
+        `motion_study: start === end (${start}). Sweep has zero length — no steps to evaluate.`,
+        emptyStudy,
+      );
     }
 
     const rawSteps = steps ?? 24;
     if (rawSteps < 2) {
-      return {
-        document: doc,
-        summary: `motion_study: steps must be at least 2 (got ${String(steps)}). No sweep performed.`,
-        affected: [],
-        data: emptyStudy,
-      };
+      return report(
+        doc,
+        `motion_study: steps must be at least 2 (got ${String(steps)}). No sweep performed.`,
+        emptyStudy,
+      );
     }
     const clampedSteps = Math.min(360, rawSteps);
 
@@ -235,15 +233,10 @@ export const motionStudy = defineCommand({
         ? `${allInterferences.length} interference pair(s) across ${framesWithInterference} frame(s).`
         : 'Interference check disabled.');
 
-    return {
-      document: doc,
-      summary: summaryText,
-      affected: [],
-      data: {
-        steps: motionSteps,
-        interferences: allInterferences,
-        summary: { totalSteps: clampedSteps, framesWithInterference },
-      } satisfies MotionStudyData,
-    };
+    return report(doc, summaryText, {
+      steps: motionSteps,
+      interferences: allInterferences,
+      summary: { totalSteps: clampedSteps, framesWithInterference },
+    } satisfies MotionStudyData);
   },
 });

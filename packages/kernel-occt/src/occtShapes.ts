@@ -187,6 +187,18 @@ function revolvedPrimitive(api: OccApi, entity: Entity): OccShape | null {
   return placed(api, shape, placementTransform(api, entity.rotation, entity.position, anchorShift));
 }
 
+/** Sweep `face` along `offset` into a prism, placed at the entity's rotation and position. */
+function prism(api: OccApi, face: OccShape, offset: Vec3, entity: Entity): OccShape {
+  const direction: OccHandle = new api.gp_Vec_4(...offset);
+  const maker = new api.BRepPrimAPI_MakePrism_1(face, direction, false, true) as {
+    Shape(): OccShape;
+    delete(): void;
+  };
+  const shape = maker.Shape();
+  [maker, direction, face].forEach(release);
+  return placed(api, shape, placementTransform(api, entity.rotation, entity.position));
+}
+
 /**
  * Prism of an XY polygon from z=0 to z=depth. The outline is made counter-clockwise first (a
  * clockwise face would extrude inside-out); degenerate or non-finite profiles -> null.
@@ -198,14 +210,7 @@ function extrudedProfile(api: OccApi, entity: Entity): OccShape | null {
   const outline = toCounterClockwise(entity.profile).map(([x, y]): Vec3 => [x, y, 0]);
   const face = polygonFace(api, outline);
   if (face === null) return null;
-  const direction: OccHandle = new api.gp_Vec_4(0, 0, entity.depth);
-  const maker = new api.BRepPrimAPI_MakePrism_1(face, direction, false, true) as {
-    Shape(): OccShape;
-    delete(): void;
-  };
-  const shape = maker.Shape();
-  [maker, direction, face].forEach(release);
-  return placed(api, shape, placementTransform(api, entity.rotation, entity.position));
+  return prism(api, face, [0, 0, entity.depth], entity);
 }
 
 /** Right-triangle prism: the YZ triangle (0,0), (h,0), (0,d) extruded along +X by the width. */
@@ -218,14 +223,7 @@ function wedgeSolid(api: OccApi, entity: Entity): OccShape | null {
     [0, 0, depth],
   ]);
   if (face === null) return null;
-  const direction: OccHandle = new api.gp_Vec_4(width, 0, 0);
-  const maker = new api.BRepPrimAPI_MakePrism_1(face, direction, false, true) as {
-    Shape(): OccShape;
-    delete(): void;
-  };
-  const shape = maker.Shape();
-  [maker, direction, face].forEach(release);
-  return placed(api, shape, placementTransform(api, entity.rotation, entity.position));
+  return prism(api, face, [width, 0, 0], entity);
 }
 
 /**

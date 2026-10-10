@@ -13,7 +13,7 @@ import { defineCommand, z } from './schema';
 import { reEvaluateAll, withParameterExpression } from './parameters';
 import { replayHistory } from './replay';
 import { unresolvedExpressionsNote } from './replayStep';
-import { noop } from './noop';
+import { changed, noop, report } from './noop';
 
 /**
  * @command create_configuration
@@ -75,11 +75,10 @@ export const createConfiguration = defineCommand({
     };
 
     const paramCount = Object.keys(parameterValues).length;
-    return {
-      document: newDoc,
-      summary: `create_configuration '${name}': stored with ${paramCount} parameter${paramCount === 1 ? '' : 's'} (${Object.keys(parameterValues).join(', ')}).`,
-      affected: [],
-    };
+    return report(
+      newDoc,
+      `create_configuration '${name}': stored with ${paramCount} parameter${paramCount === 1 ? '' : 's'} (${Object.keys(parameterValues).join(', ')}).`,
+    );
   },
 });
 
@@ -153,14 +152,13 @@ export const activateConfiguration = defineCommand({
         ? ` Warning: created ${unknownParams.length} new parameter(s) not previously in the document: ${unknownParams.join(', ')}.`
         : '';
 
-    return {
-      document: regenerated,
-      summary:
-        `activate_configuration '${name}': applied ${changedParams.length} parameter${changedParams.length === 1 ? '' : 's'} (${changedParams.join(', ')}) ` +
+    return changed(
+      regenerated,
+      `activate_configuration '${name}': applied ${changedParams.length} parameter${changedParams.length === 1 ? '' : 's'} (${changedParams.join(', ')}) ` +
         `regenerated ${entityCount} ${entityCount === 1 ? 'entity' : 'entities'}.` +
         createdNote +
         unresolvedExpressionsNote(warnings),
-      affected: regenerated.order,
-    };
+      regenerated.order,
+    );
   },
 });

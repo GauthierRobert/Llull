@@ -20,7 +20,7 @@ import { newEntity } from './newEntity';
 import { ORIGIN } from '../lib/vec3';
 import { MAX_TEMPLATE_ENTITIES } from './limits';
 import { circlePoints } from './tessellation';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 import { DEFAULT_DRAW_COLOR } from './draw2dShared';
 
 /** Build a circle entity at a given 2D center on the given work-plane position. */
@@ -264,10 +264,10 @@ export const instantiateTemplate = defineCommand({
     const affected = entities.map((e) => e.id);
     const newDoc = withEntities(doc, entities);
 
-    return {
-      document: newDoc,
-      summary: `Instantiated template "${template}": created ${entities.length} entities [${affected.join(', ')}].`,
+    return changed(
+      newDoc,
+      `Instantiated template "${template}": created ${entities.length} entities [${affected.join(', ')}].`,
       affected,
-    };
+    );
   },
 });

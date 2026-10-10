@@ -1,5 +1,5 @@
 import type { CadDocument, Constraint, EntityRef, Vec2, Vec3 } from '../model/types';
-import { len2 } from '../lib/vec2';
+import { cross2, dot2, len2 } from '../lib/vec2';
 import { resolveNumeric } from './expression';
 
 type Point = readonly [number, number];
@@ -157,10 +157,7 @@ function applyConstraintGradient(
       if (!da || !db) return 0;
       const target = resolveNumeric(c.value, doc.parameters);
       if (target === null) return 0;
-      // Angle from da to db (z-component of cross product + dot product).
-      const cross = da[0] * db[1] - da[1] * db[0]; // da × db
-      const dot = da[0] * db[0] + da[1] * db[1]; // da · db
-      const err = wrapAngle(Math.atan2(cross, dot) - target);
+      const err = wrapAngle(Math.atan2(cross2(da, db), dot2(da, db)) - target);
       // Line b turns about its midpoint (translating a line never changes its direction).
       addTurn(c.b.entityId, -TURN_RELAXATION * err);
       return err * err;
@@ -171,9 +168,7 @@ function applyConstraintGradient(
       const db = resolveDirection(doc, c.b);
       if (!da || !db) return 0;
       // Error: signed angle from b to the nearest parallel (or anti-parallel) direction of a.
-      const cross = da[0] * db[1] - da[1] * db[0];
-      const dot = da[0] * db[0] + da[1] * db[1];
-      const err = distanceToLattice(Math.atan2(cross, dot), 0, Math.PI);
+      const err = distanceToLattice(Math.atan2(cross2(da, db), dot2(da, db)), 0, Math.PI);
       addTurn(c.b.entityId, -TURN_RELAXATION * err);
       return err * err;
     }
@@ -183,9 +178,7 @@ function applyConstraintGradient(
       const db = resolveDirection(doc, c.b);
       if (!da || !db) return 0;
       // Error: signed angle from b to the nearest perpendicular direction of a.
-      const cross = da[0] * db[1] - da[1] * db[0];
-      const dot = da[0] * db[0] + da[1] * db[1];
-      const err = distanceToLattice(Math.atan2(cross, dot), Math.PI / 2, Math.PI);
+      const err = distanceToLattice(Math.atan2(cross2(da, db), dot2(da, db)), Math.PI / 2, Math.PI);
       addTurn(c.b.entityId, -TURN_RELAXATION * err);
       return err * err;
     }

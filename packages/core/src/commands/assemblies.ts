@@ -19,7 +19,7 @@ import {
   replaceEntities,
   withoutEntities,
 } from './entityOps';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 import { EXTRUSION_COLOR } from './geometryShared';
 import { ORIGIN } from '../lib/vec3';
 
@@ -151,11 +151,11 @@ export const createComponent = defineCommand({
     const instance = instanceEntity(instanceId, compId, ORIGIN, ORIGIN);
     const replaced = replaceEntities(doc, entityIds, instance);
 
-    return {
-      document: { ...replaced, components: { ...doc.components, [compId]: component } },
-      summary: `Created component "${name}" (id: ${compId}) from ${entityIds.length} entit${entityIds.length === 1 ? 'y' : 'ies'} [${entityIds.join(', ')}]; placed instance ${instanceId}.${referenceLossSuffix(doc, replaced)}`,
-      affected: [instanceId],
-    };
+    return changed(
+      { ...replaced, components: { ...doc.components, [compId]: component } },
+      `Created component "${name}" (id: ${compId}) from ${entityIds.length} entit${entityIds.length === 1 ? 'y' : 'ies'} [${entityIds.join(', ')}]; placed instance ${instanceId}.${referenceLossSuffix(doc, replaced)}`,
+      [instanceId],
+    );
   },
 });
 
@@ -260,10 +260,10 @@ export const explodeInstance = defineCommand({
       order: doc.order.flatMap((orderId) => (orderId === id ? bakedIds : [orderId])),
     };
 
-    return {
+    return changed(
       document,
-      summary: `Exploded instance "${id}" (component "${component.name}", ${entity.componentId}) into ${bakedEntities.length} concrete entit${bakedEntities.length === 1 ? 'y' : 'ies'}: [${bakedIds.join(', ')}].${referenceSuffix(prunedReferences)}`,
-      affected: bakedIds,
-    };
+      `Exploded instance "${id}" (component "${component.name}", ${entity.componentId}) into ${bakedEntities.length} concrete entit${bakedEntities.length === 1 ? 'y' : 'ies'}: [${bakedIds.join(', ')}].${referenceSuffix(prunedReferences)}`,
+      bakedIds,
+    );
   },
 });

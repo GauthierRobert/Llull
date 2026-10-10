@@ -6,7 +6,7 @@ import { offsetSegment, miterJoin, resolvePolyline } from './modify2dGeometry';
 import { commitEntity } from './commitEntity';
 import { referenceSuffix, withEntities, withoutEntities } from './entityOps';
 import { newEntity } from './newEntity';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 import { elementAt } from '../lib/elementAt';
 
 /**
@@ -56,11 +56,11 @@ export const explodePolyline = defineCommand({
     }
     const newDoc = withEntities(baseDoc, lines);
 
-    return {
-      document: newDoc,
-      summary: `Exploded polyline ${id} into ${createdIds.length} line(s): [${createdIds.join(', ')}].${referenceSuffix(prunedReferences)}`,
-      affected: createdIds,
-    };
+    return changed(
+      newDoc,
+      `Exploded polyline ${id} into ${createdIds.length} line(s): [${createdIds.join(', ')}].${referenceSuffix(prunedReferences)}`,
+      createdIds,
+    );
   },
 });
 

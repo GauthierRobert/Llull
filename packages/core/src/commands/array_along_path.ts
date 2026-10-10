@@ -11,7 +11,7 @@ import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { MAX_COPIES_PER_COMMAND, MAX_PROFILE_POINTS } from './limits';
 import { addCopies } from './transform';
 import { add3, cross3, dot3, len3, normalize3, scale3, sub3, distance3 } from '../lib/vec3';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 import { elementAt } from '../lib/elementAt';
 
 function polylineLength(path: Vec3[]): number {
@@ -120,11 +120,11 @@ export const arrayAlongPath = defineCommand({
       'e',
     );
 
-    return {
-      document: newDoc,
-      summary: `array_along_path: placed ${createdIds.length} cop${createdIds.length === 1 ? 'y' : 'ies'} of "${sourceId}" along path of ${validatedPath.length} points (total length ${totalLen.toFixed(3)}).`,
-      affected: createdIds,
-    };
+    return changed(
+      newDoc,
+      `array_along_path: placed ${createdIds.length} cop${createdIds.length === 1 ? 'y' : 'ies'} of "${sourceId}" along path of ${validatedPath.length} points (total length ${totalLen.toFixed(3)}).`,
+      createdIds,
+    );
   },
 });
 
@@ -214,11 +214,11 @@ export const distributeOnArc = defineCommand({
       'e',
     );
 
-    return {
-      document: newDoc,
-      summary: `distribute_on_arc: placed ${createdIds.length} cop${createdIds.length === 1 ? 'y' : 'ies'} of "${sourceId}" on arc r=${radius}, angles [${startAngle.toFixed(3)}, ${endAngle.toFixed(3)}].`,
-      affected: createdIds,
-    };
+    return changed(
+      newDoc,
+      `distribute_on_arc: placed ${createdIds.length} cop${createdIds.length === 1 ? 'y' : 'ies'} of "${sourceId}" on arc r=${radius}, angles [${startAngle.toFixed(3)}, ${endAngle.toFixed(3)}].`,
+      createdIds,
+    );
   },
 });
 

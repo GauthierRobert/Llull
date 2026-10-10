@@ -9,7 +9,7 @@ import type { Animation, CadDocument, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
-import { noop } from './noop';
+import { noop, report } from './noop';
 
 /**
  * Resolve `targetId` to its kind: 'group' if found in doc.groups, 'entity' if
@@ -26,6 +26,10 @@ function toAxis(raw: number[] | undefined): Vec3 {
   if (!raw || raw.length < 3) return [0, 1, 0];
   return [raw[0] ?? 0, raw[1] ?? 1, raw[2] ?? 0];
 }
+
+const targetIdField = z
+  .string()
+  .describe('Id of the entity or group to animate. Must exist in the document.');
 
 const pivotField = z
   .array(z.number())
@@ -105,9 +109,7 @@ export const animateSpin = defineCommand({
     'pivot is the world-space rotation pivot point; when omitted, the player defaults to the target entity/group position. ' +
     "trigger 'auto' runs the animation under the global Play button; 'click' toggles it when the user clicks the part in the viewport.",
   params: z.object({
-    targetId: z
-      .string()
-      .describe('Id of the entity or group to animate. Must exist in the document.'),
+    targetId: targetIdField,
     speed: z
       .number()
       .describe(
@@ -142,11 +144,10 @@ export const animateSpin = defineCommand({
     );
     const { id, axis: resolvedAxis, channel: resolvedChannel, trigger: resolvedTrigger } = anim;
 
-    return {
-      document: withAnimation(doc, anim),
-      summary: `Spin ${id}: ${targetKind} ${targetId} ${resolvedChannel === 'rotation' ? 'rotates' : 'translates'} about [${resolvedAxis.join(',')}] at ${speed.toFixed(3)} ${resolvedChannel === 'rotation' ? 'rad/s' : 'units/s'} (${resolvedTrigger}).`,
-      affected: [],
-    };
+    return report(
+      withAnimation(doc, anim),
+      `Spin ${id}: ${targetKind} ${targetId} ${resolvedChannel === 'rotation' ? 'rotates' : 'translates'} about [${resolvedAxis.join(',')}] at ${speed.toFixed(3)} ${resolvedChannel === 'rotation' ? 'rad/s' : 'units/s'} (${resolvedTrigger}).`,
+    );
   },
 });
 
@@ -169,9 +170,7 @@ export const animateOscillate = defineCommand({
     'pivot is the world-space rotation pivot; when omitted the player uses the target position. ' +
     "trigger 'auto' runs under the global Play button; 'click' toggles when the user clicks the part.",
   params: z.object({
-    targetId: z
-      .string()
-      .describe('Id of the entity or group to animate. Must exist in the document.'),
+    targetId: targetIdField,
     amplitude: z
       .number()
       .describe(
@@ -227,11 +226,10 @@ export const animateOscillate = defineCommand({
     );
     const { id, axis: resolvedAxis, channel: resolvedChannel, trigger: resolvedTrigger } = anim;
 
-    return {
-      document: withAnimation(doc, anim),
-      summary: `Oscillate ${id}: ${targetKind} ${targetId} ${resolvedChannel === 'rotation' ? 'rocks' : 'slides'} about [${resolvedAxis.join(',')}] ±${amplitude.toFixed(3)} ${resolvedChannel === 'rotation' ? 'rad' : 'units'} at ${frequency.toFixed(3)} Hz (${resolvedTrigger}).`,
-      affected: [],
-    };
+    return report(
+      withAnimation(doc, anim),
+      `Oscillate ${id}: ${targetKind} ${targetId} ${resolvedChannel === 'rotation' ? 'rocks' : 'slides'} about [${resolvedAxis.join(',')}] ±${amplitude.toFixed(3)} ${resolvedChannel === 'rotation' ? 'rad' : 'units'} at ${frequency.toFixed(3)} Hz (${resolvedTrigger}).`,
+    );
   },
 });
 
@@ -278,11 +276,10 @@ export const stopAnimation = defineCommand({
       }
       const next = { ...existing };
       delete next[animationId];
-      return {
-        document: { ...doc, animations: next },
-        summary: `stop_animation: removed animation ${animationId}.`,
-        affected: [],
-      };
+      return report(
+        { ...doc, animations: next },
+        `stop_animation: removed animation ${animationId}.`,
+      );
     }
 
     if (targetId !== undefined) {
@@ -297,21 +294,16 @@ export const stopAnimation = defineCommand({
       for (const a of toRemove) {
         delete next[a.id];
       }
-      return {
-        document: { ...doc, animations: next },
-        summary: `stop_animation: removed ${toRemove.length} animation(s) for target ${targetId}.`,
-        affected: [],
-      };
+      return report(
+        { ...doc, animations: next },
+        `stop_animation: removed ${toRemove.length} animation(s) for target ${targetId}.`,
+      );
     }
 
     const count = Object.keys(existing).length;
     if (count === 0) {
       return noop(doc, 'stop_animation: no animations to clear.');
     }
-    return {
-      document: { ...doc, animations: {} },
-      summary: `stop_animation: cleared all ${count} animation(s).`,
-      affected: [],
-    };
+    return report({ ...doc, animations: {} }, `stop_animation: cleared all ${count} animation(s).`);
   },
 });

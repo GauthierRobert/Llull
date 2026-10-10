@@ -8,6 +8,7 @@
 
 import type { CadDocument } from '../model/types';
 import type { CommandResult } from './types';
+import { report } from './noop';
 import { defineCommand, z } from './schema';
 import {
   type Bounds,
@@ -91,11 +92,10 @@ export const describeScene = defineCommand({
   params: z.object({}),
   run: (doc): CommandResult => {
     const snapshot = computeSceneSnapshot(doc);
-    return {
-      document: doc,
-      summary: `Scene: ${snapshot.entityCount} entit${snapshot.entityCount === 1 ? 'y' : 'ies'}, ${snapshot.layers.length} layer(s), ${snapshot.groups.length} group(s), ${snapshot.animations.length} animation(s).`,
-      affected: [],
-      data: snapshot,
-    };
+    return report(
+      doc,
+      `Scene: ${snapshot.entityCount} entit${snapshot.entityCount === 1 ? 'y' : 'ies'}, ${snapshot.layers.length} layer(s), ${snapshot.groups.length} group(s), ${snapshot.animations.length} animation(s).`,
+      snapshot,
+    );
   },
 });

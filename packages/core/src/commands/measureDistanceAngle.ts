@@ -4,11 +4,7 @@ import { defineCommand, vec3, z } from './schema';
 import { formatLength } from './units';
 import { boundsCenter, entityBoundsInDoc } from './sceneBounds';
 import { dot3, sub3, len3, distance3 } from '../lib/vec3';
-import { noop } from './noop';
-interface MeasureDistanceData {
-  distance: number;
-  unit: string;
-}
+import { noop, report } from './noop';
 
 /**
  * @command measure_distance
@@ -49,27 +45,18 @@ export const measureDistance = defineCommand({
       ),
   }),
   run: (doc, { point1, point2, entityId1, entityId2 }): CommandResult => {
-    let locA: Vec3 | undefined;
-    if (point1) {
-      locA = point1;
-    } else if (entityId1) {
-      const e = doc.entities[entityId1];
-      if (!e) {
-        return noop(doc, `measure_distance: entity '${entityId1}' not found.`);
-      }
-      locA = boundsCenter(entityBoundsInDoc(doc, e));
-    }
-
-    let locB: Vec3 | undefined;
-    if (point2) {
-      locB = point2;
-    } else if (entityId2) {
-      const e = doc.entities[entityId2];
-      if (!e) {
-        return noop(doc, `measure_distance: entity '${entityId2}' not found.`);
-      }
-      locB = boundsCenter(entityBoundsInDoc(doc, e));
-    }
+    const sides = [
+      { point: point1, entityId: entityId1 },
+      { point: point2, entityId: entityId2 },
+    ];
+    const unknown = sides.find(
+      ({ point, entityId }) => !point && entityId && !doc.entities[entityId],
+    );
+    if (unknown) return noop(doc, `measure_distance: entity '${unknown.entityId}' not found.`);
+    const [locA, locB] = sides.map(({ point, entityId }) => {
+      const entity = entityId ? doc.entities[entityId] : undefined;
+      return point ?? (entity && boundsCenter(entityBoundsInDoc(doc, entity)));
+    });
 
     if (!locA || !locB) {
       return noop(
@@ -80,22 +67,11 @@ export const measureDistance = defineCommand({
     }
 
     const distance = distance3(locA, locB);
-    const data: MeasureDistanceData = { distance, unit: doc.units };
-    return {
-      document: doc,
-      summary: `Distance = ${formatLength(doc, distance)}.`,
-      affected: [],
-      data,
-    };
+    return report(doc, `Distance = ${formatLength(doc, distance)}.`, { distance, unit: doc.units });
   },
 });
 
 const POINT_3D = z.tuple([z.number(), z.number(), z.number()]);
-
-interface MeasureAngleData {
-  degrees: number;
-  radians: number;
-}
 
 /**
  * @command measure_angle
@@ -174,12 +150,10 @@ export const measureAngle = defineCommand({
 
     const radians = Math.acos(Math.max(-1, Math.min(1, dot3(vA, vB) / (lenA * lenB))));
     const degrees = (radians * 180) / Math.PI;
-    const data: MeasureAngleData = { degrees, radians };
-    return {
-      document: doc,
-      summary: `Angle = ${degrees.toFixed(doc.displayPrecision)}° (${radians.toFixed(doc.displayPrecision)} rad).`,
-      affected: [],
-      data,
-    };
+    return report(
+      doc,
+      `Angle = ${degrees.toFixed(doc.displayPrecision)}° (${radians.toFixed(doc.displayPrecision)} rad).`,
+      { degrees, radians },
+    );
   },
 });

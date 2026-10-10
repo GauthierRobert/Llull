@@ -12,7 +12,7 @@ import { referenceSuffix, withEntities, withoutEntities } from './entityOps';
 import { nextId } from '../lib/id';
 import { ORIGIN } from '../lib/vec3';
 import { translated } from './geometryShared';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 
 type BatchIds =
   | { readonly ok: true; readonly existing: string[]; readonly missing: string[] }
@@ -91,11 +91,11 @@ export const deleteEntities = defineCommand({
         : '';
     const missingSuffix = missing.length > 0 ? ` Skipped missing: [${missing.join(', ')}].` : '';
 
-    return {
+    return changed(
       document,
-      summary: `Deleted ${existing.length} entit${existing.length === 1 ? 'y' : 'ies'} [${existing.join(', ')}].${dissolveSuffix}${referenceSuffix(prunedReferences)}${missingSuffix}`,
-      affected: existing,
-    };
+      `Deleted ${existing.length} entit${existing.length === 1 ? 'y' : 'ies'} [${existing.join(', ')}].${dissolveSuffix}${referenceSuffix(prunedReferences)}${missingSuffix}`,
+      existing,
+    );
   },
 });
 
@@ -131,11 +131,11 @@ export const moveEntities = defineCommand({
       if (target) entities[id] = translated(target, delta);
     }
     const missingSuffix = missing.length > 0 ? ` Skipped missing: [${missing.join(', ')}].` : '';
-    return {
-      document: { ...doc, entities },
-      summary: `Moved ${existing.length} entit${existing.length === 1 ? 'y' : 'ies'} [${existing.join(', ')}] by [${delta.join(', ')}].${missingSuffix}`,
-      affected: existing,
-    };
+    return changed(
+      { ...doc, entities },
+      `Moved ${existing.length} entit${existing.length === 1 ? 'y' : 'ies'} [${existing.join(', ')}] by [${delta.join(', ')}].${missingSuffix}`,
+      existing,
+    );
   },
 });
 
@@ -174,10 +174,10 @@ export const duplicateEntities = defineCommand({
     });
     const newIds = copies.map((copy) => copy.id);
     const missingSuffix = missing.length > 0 ? ` Skipped missing: [${missing.join(', ')}].` : '';
-    return {
-      document: withEntities(doc, copies),
-      summary: `Duplicated ${existing.length} entit${existing.length === 1 ? 'y' : 'ies'} [${existing.join(', ')}] → [${newIds.join(', ')}] at offset [${offset.join(', ')}].${missingSuffix}`,
-      affected: newIds,
-    };
+    return changed(
+      withEntities(doc, copies),
+      `Duplicated ${existing.length} entit${existing.length === 1 ? 'y' : 'ies'} [${existing.join(', ')}] → [${newIds.join(', ')}] at offset [${offset.join(', ')}].${missingSuffix}`,
+      newIds,
+    );
   },
 });

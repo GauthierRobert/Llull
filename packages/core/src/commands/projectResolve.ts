@@ -1,4 +1,5 @@
 import type { CadDocument } from '../model/types';
+import { report } from './noop';
 import type { CommandResult } from './types';
 import type { EvalResult } from './expression';
 import { evaluateExpression, extractReferences, parameterValues } from './expression';
@@ -89,7 +90,7 @@ export function rejectPlan(
   data: BuildProjectData,
   summary: string,
 ): CommandResult {
-  return { document: doc, summary, affected: [], data };
+  return report(doc, summary, data);
 }
 
 /** Expression env: every parameter value plus the loop variables (`$i`, `$<as>`). */

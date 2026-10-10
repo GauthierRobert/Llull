@@ -7,7 +7,7 @@ import { expandInstance } from './instanceExpansion';
 import type { Bounds } from './sceneTypes';
 import { formatLength } from './units';
 import { polygonArea, polygonCentroid } from '../lib/polygon';
-import { noop } from './noop';
+import { noop, report } from './noop';
 
 interface MeasureBoundingBoxData {
   min: Vec3;
@@ -78,15 +78,13 @@ export const measureBoundingBox = defineCommand({
       bounds.max[2] - bounds.min[2],
     ];
     const data: MeasureBoundingBoxData = { min: bounds.min, max: bounds.max, size };
-    return {
-      document: doc,
-      summary:
-        `Bounding box: min=${bounds.min.map((v) => formatLength(doc, v)).join(', ')}; ` +
+    return report(
+      doc,
+      `Bounding box: min=${bounds.min.map((v) => formatLength(doc, v)).join(', ')}; ` +
         `max=${bounds.max.map((v) => formatLength(doc, v)).join(', ')}; ` +
         `size=${size.map((v) => formatLength(doc, v)).join(' × ')}.`,
-      affected: [],
       data,
-    };
+    );
   },
 });
 
@@ -207,14 +205,12 @@ export const measureVolume = defineCommand({
         if (e.profile.some(([x]) => x < 0)) {
           const b = entityBounds(e);
           volume = (b.max[0] - b.min[0]) * (b.max[1] - b.min[1]) * (b.max[2] - b.min[2]);
-          return {
-            document: doc,
-            summary:
-              `Volume of ${entityId} ≈ ${volume.toFixed(doc.displayPrecision)} ${volumeUnit} ` +
+          return report(
+            doc,
+            `Volume of ${entityId} ≈ ${volume.toFixed(doc.displayPrecision)} ${volumeUnit} ` +
               `(bounding-box approximation — profile crosses revolution axis; Pappus requires profile x ≥ 0).`,
-            affected: [],
-            data: { volume, unit: volumeUnit } satisfies MeasureVolumeData,
-          };
+            { volume, unit: volumeUnit } satisfies MeasureVolumeData,
+          );
         }
         const profileArea = polygonArea(e.profile);
         volume =
@@ -232,12 +228,11 @@ export const measureVolume = defineCommand({
     }
 
     const data: MeasureVolumeData = { volume, unit: volumeUnit };
-    return {
-      document: doc,
-      summary: `Volume of ${entityId} = ${volume.toFixed(doc.displayPrecision)} ${volumeUnit}.`,
-      affected: [],
+    return report(
+      doc,
+      `Volume of ${entityId} = ${volume.toFixed(doc.displayPrecision)} ${volumeUnit}.`,
       data,
-    };
+    );
   },
 });
 
@@ -347,14 +342,12 @@ export const massProperties = defineCommand({
       const { volume, mass } = assembly;
       const averageDensity = volume > 0 ? mass / volume : density;
       const data: MassPropertiesData = { volume, density: averageDensity, mass, unit: 'g' };
-      return {
-        document: doc,
-        summary:
-          `Mass of assembly ${entityId}: volume=${volume.toFixed(doc.displayPrecision)} ${doc.units}³, ` +
+      return report(
+        doc,
+        `Mass of assembly ${entityId}: volume=${volume.toFixed(doc.displayPrecision)} ${doc.units}³, ` +
           `mean density=${averageDensity} g/${doc.units}³ (per-part materials, else param), mass=${mass.toFixed(doc.displayPrecision)} g.`,
-        affected: [],
         data,
-      };
+      );
     }
 
     let effectiveDensity = density;
@@ -375,13 +368,11 @@ export const massProperties = defineCommand({
     const { volume } = volumeResult.data as MeasureVolumeData;
     const mass = volume * effectiveDensity;
     const data: MassPropertiesData = { volume, density: effectiveDensity, mass, unit: 'g' };
-    return {
-      document: doc,
-      summary:
-        `Mass of ${entityId}: volume=${volume.toFixed(doc.displayPrecision)} ${doc.units}³, ` +
+    return report(
+      doc,
+      `Mass of ${entityId}: volume=${volume.toFixed(doc.displayPrecision)} ${doc.units}³, ` +
         `density=${effectiveDensity} g/${doc.units}³ (${densitySource}), mass=${mass.toFixed(doc.displayPrecision)} g.`,
-      affected: [],
       data,
-    };
+    );
   },
 });

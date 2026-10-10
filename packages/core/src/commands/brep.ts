@@ -13,7 +13,7 @@ import { defineCommand, z } from './schema';
 import { currentContext } from './context';
 import { kernelUnavailable } from './kernelRefusal';
 import { operandRecipe } from './kernelShape';
-import { noop } from './noop';
+import { noop, report } from './noop';
 
 const OCC_HINT = 'the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server)';
 
@@ -95,12 +95,10 @@ export const inspectTopology = defineCommand({
         `inspect_topology: this kernel has no exact B-rep topology; use ${OCC_HINT}.`,
       );
     }
-    return {
-      document: doc,
-      summary: topologySummary(id, topology, doc.displayPrecision),
-      affected: [],
-      data: { entityId: id, ...topology },
-    };
+    return report(doc, topologySummary(id, topology, doc.displayPrecision), {
+      entityId: id,
+      ...topology,
+    });
   },
 });
 
@@ -186,13 +184,11 @@ export const exportStepExact = defineCommand({
       entityIds: exported,
       skipped,
     };
-    return {
-      document: doc,
-      summary:
-        `export_step_exact: ${solids.length} exact solid(s) (${exported.join(', ')}) → STEP AP214, ${step.length} bytes` +
+    return report(
+      doc,
+      `export_step_exact: ${solids.length} exact solid(s) (${exported.join(', ')}) → STEP AP214, ${step.length} bytes` +
         (skipped.length > 0 ? `; skipped ${skipped.join(', ')}.` : '.'),
-      affected: [],
       data,
-    };
+    );
   },
 });

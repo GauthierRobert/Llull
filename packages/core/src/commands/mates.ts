@@ -10,7 +10,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { instanceFrameRef, instanceRefsProblem } from './instanceFrameRef';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 
 /**
  * @command add_mate
@@ -106,13 +106,12 @@ export const addMate = defineCommand({
     const frameA = a.frame ?? 'origin';
     const frameB = b.frame ?? 'origin';
 
-    return {
-      document: newDoc,
-      summary:
-        `add_mate: added '${kind}' mate ${constraintId} between instance '${a.instanceId}' (frame: ${frameA}) ` +
+    return changed(
+      newDoc,
+      `add_mate: added '${kind}' mate ${constraintId} between instance '${a.instanceId}' (frame: ${frameA}) ` +
         `and instance '${b.instanceId}' (frame: ${frameB})` +
         (kind === 'distance' ? ` with value=${String(value)}.` : '.'),
-      affected: [constraintId],
-    };
+      [constraintId],
+    );
   },
 });

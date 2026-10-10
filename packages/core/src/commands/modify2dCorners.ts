@@ -6,7 +6,7 @@ import { add2, cross2, dot2, len2, normalize2, scale2, sub2 } from '../lib/vec2'
 import { resolvePolyline } from './modify2dGeometry';
 import { replaceEntity, withEntity } from './entityOps';
 import { newEntity } from './newEntity';
-import { noop } from './noop';
+import { changed, noop, report } from './noop';
 import { elementAt } from '../lib/elementAt';
 
 interface Corner {
@@ -177,13 +177,12 @@ export const fillet2D = defineCommand({
       arcEntity,
     );
 
-    return {
+    return changed(
       document,
-      summary:
-        `Filleted polyline ${id} at vertex ${vertexIndex} with radius ${radius} → ` +
+      `Filleted polyline ${id} at vertex ${vertexIndex} with radius ${radius} → ` +
         `updated polyline (${pointCount} pts) + arc ${arcId}.`,
-      affected: [id, arcId],
-    };
+      [id, arcId],
+    );
   },
 });
 
@@ -230,13 +229,11 @@ export const chamfer2D = defineCommand({
     const { poly, vertex, toPrev, toNext, lenPrev, lenNext } = corner;
 
     if (distance > lenPrev - 1e-9 || distance > lenNext - 1e-9) {
-      return {
-        document: doc,
-        summary:
-          `chamfer_2d: distance ${distance} is too large for the adjacent segments at vertex ${vertexIndex} ` +
+      return report(
+        doc,
+        `chamfer_2d: distance ${distance} is too large for the adjacent segments at vertex ${vertexIndex} ` +
           `(prev segment length=${lenPrev.toFixed(4)}, next segment length=${lenNext.toFixed(4)}).`,
-        affected: [],
-      };
+      );
     }
 
     const dirPrev = normalize2(toPrev);
@@ -264,12 +261,11 @@ export const chamfer2D = defineCommand({
       bevelLine,
     );
 
-    return {
+    return changed(
       document,
-      summary:
-        `Chamfered polyline ${id} at vertex ${vertexIndex} with distance ${distance} → ` +
+      `Chamfered polyline ${id} at vertex ${vertexIndex} with distance ${distance} → ` +
         `updated polyline (${pointCount} pts) + bevel line ${bevelId}.`,
-      affected: [id, bevelId],
-    };
+      [id, bevelId],
+    );
   },
 });

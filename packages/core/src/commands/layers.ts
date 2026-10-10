@@ -11,7 +11,7 @@ import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 import { isHexColor } from '../lib/isHexColor';
 import { replaceEntitiesById, replaceEntity } from './entityOps';
 
@@ -30,11 +30,11 @@ function setLayerFlag(
 ): CommandResult {
   const layer = doc.layers[id];
   if (!layer) return noop(doc, `No layer ${id} — ${command} is a no-op.`);
-  return {
-    document: withLayer(doc, { ...layer, [flag]: value }),
-    summary: `Layer ${id} ("${layer.name}"): ${flag} = ${value}.`,
-    affected: [id],
-  };
+  return changed(
+    withLayer(doc, { ...layer, [flag]: value }),
+    `Layer ${id} ("${layer.name}"): ${flag} = ${value}.`,
+    [id],
+  );
 }
 
 /**
@@ -81,11 +81,11 @@ export const addLayer = defineCommand({
       ...(color !== undefined ? { color } : {}),
     };
 
-    return {
-      document: { ...withLayer(doc, layer), layerOrder: [...doc.layerOrder, id] },
-      summary: `Created layer ${id} ("${trimmed}").`,
-      affected: [id],
-    };
+    return changed(
+      { ...withLayer(doc, layer), layerOrder: [...doc.layerOrder, id] },
+      `Created layer ${id} ("${trimmed}").`,
+      [id],
+    );
   },
 });
 
@@ -119,11 +119,11 @@ export const renameLayer = defineCommand({
     }
 
     const prevName = layer.name;
-    return {
-      document: withLayer(doc, { ...layer, name: trimmed }),
-      summary: `Layer ${id}: renamed "${prevName}" → "${trimmed}".`,
-      affected: [id],
-    };
+    return changed(
+      withLayer(doc, { ...layer, name: trimmed }),
+      `Layer ${id}: renamed "${prevName}" → "${trimmed}".`,
+      [id],
+    );
   },
 });
 
@@ -213,11 +213,11 @@ export const setEntityLayer = defineCommand({
       );
     }
 
-    return {
-      document: replaceEntity(doc, { ...entity, layerId }),
-      summary: `Entity ${entityId}: moved from layer ${entity.layerId} to ${layerId} ("${targetLayer.name}").`,
-      affected: [entityId],
-    };
+    return changed(
+      replaceEntity(doc, { ...entity, layerId }),
+      `Entity ${entityId}: moved from layer ${entity.layerId} to ${layerId} ("${targetLayer.name}").`,
+      [entityId],
+    );
   },
 });
 

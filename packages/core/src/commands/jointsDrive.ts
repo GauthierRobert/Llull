@@ -3,7 +3,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { detectCycleOnAdd, evaluateMotionInternal } from './jointsKinematics';
-import { noop } from './noop';
+import { changed, noop, report } from './noop';
 /**
  * @command add_drive_relation
  * @pure
@@ -101,14 +101,13 @@ export const addDriveRelation = defineCommand({
       driveRelationOrder: [...doc.driveRelationOrder, drId],
     };
 
-    return {
-      document: newDoc,
-      summary:
-        `add_drive_relation: coupled '${driver}' → '${driven}' with ratio=${ratio}` +
+    return changed(
+      newDoc,
+      `add_drive_relation: coupled '${driver}' → '${driven}' with ratio=${ratio}` +
         (offset !== undefined ? ` offset=${offset}` : '') +
         ` (id: '${drId}').`,
-      affected: [drId],
-    };
+      [drId],
+    );
   },
 });
 
@@ -152,11 +151,10 @@ export const deleteDriveRelation = defineCommand({
       driveRelationOrder: doc.driveRelationOrder.filter((drid) => drid !== id),
     };
 
-    return {
-      document: newDoc,
-      summary: `delete_drive_relation: removed coupling '${dr.driver}' → '${dr.driven}' (id: '${id}').`,
-      affected: [],
-    };
+    return report(
+      newDoc,
+      `delete_drive_relation: removed coupling '${dr.driver}' → '${dr.driven}' (id: '${id}').`,
+    );
   },
 });
 
@@ -184,12 +182,11 @@ export const evaluateMotion = defineCommand({
   params: z.object({}),
   run: (doc, _params): CommandResult => {
     if (Object.keys(doc.joints).length === 0) {
-      return {
-        document: doc,
-        summary: 'evaluate_motion: no joints defined. Nothing to evaluate.',
-        affected: [],
-        data: { resolvedJoints: {}, instancePositions: {}, instanceRotations: {} },
-      };
+      return report(doc, 'evaluate_motion: no joints defined. Nothing to evaluate.', {
+        resolvedJoints: {},
+        instancePositions: {},
+        instanceRotations: {},
+      });
     }
 
     const { resolvedJoints, instancePositions, instanceRotations } = evaluateMotionInternal(doc);
@@ -197,12 +194,11 @@ export const evaluateMotion = defineCommand({
     const jointCount = Object.keys(resolvedJoints).length;
     const movedCount = Object.keys(instancePositions).length;
 
-    return {
-      document: doc,
-      summary: `evaluate_motion: evaluated ${jointCount} joint(s), ${movedCount} instance(s) would move.`,
-      affected: [],
-      data: { resolvedJoints, instancePositions, instanceRotations },
-    };
+    return report(
+      doc,
+      `evaluate_motion: evaluated ${jointCount} joint(s), ${movedCount} instance(s) would move.`,
+      { resolvedJoints, instancePositions, instanceRotations },
+    );
   },
 });
 
@@ -234,12 +230,10 @@ export const bakeMotion = defineCommand({
 
     const movedIds = Object.keys(instancePositions);
     if (movedIds.length === 0) {
-      return {
-        document: doc,
-        summary:
-          'bake_motion: joints exist but no instance positions changed (all instanceIds may be missing).',
-        affected: [],
-      };
+      return report(
+        doc,
+        'bake_motion: joints exist but no instance positions changed (all instanceIds may be missing).',
+      );
     }
 
     // Apply computed positions and rotations to entities
@@ -262,10 +256,10 @@ export const bakeMotion = defineCommand({
       entities: newEntities,
     };
 
-    return {
-      document: newDoc,
-      summary: `bake_motion: applied ${jointCount} joint(s); updated position/rotation of ${movedIds.length} instance(s): ${movedIds.join(', ')}.`,
-      affected: movedIds,
-    };
+    return changed(
+      newDoc,
+      `bake_motion: applied ${jointCount} joint(s); updated position/rotation of ${movedIds.length} instance(s): ${movedIds.join(', ')}.`,
+      movedIds,
+    );
   },
 });

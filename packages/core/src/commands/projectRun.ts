@@ -1,5 +1,6 @@
 import type { CadDocument } from '../model/types';
 import type { CommandResult } from './types';
+import { report } from './noop';
 import { getCommand } from './registry';
 import { executeRecorded } from './record';
 import { computeSceneSnapshot } from './scene';
@@ -179,14 +180,13 @@ function validatePlan(doc: CadDocument, actions: ActionItem[]): CommandResult {
     if (raw.as) defined.add(raw.as);
   });
   const ok = issues.length === 0;
-  return {
-    document: doc,
-    summary: ok
+  return report(
+    doc,
+    ok
       ? `Plan valid: ${actions.length} step(s) ready.`
       : `Plan invalid: ${issues.length} issue(s) — ${issues.join('; ')}.`,
-    affected: [],
-    data: { ok, validated: true, stepCount: actions.length, steps: [], failedAt: null, issues },
-  };
+    { ok, validated: true, stepCount: actions.length, steps: [], failedAt: null, issues },
+  );
 }
 
 /** Upper-bound count of executed commands a plan expands to (repeat/for_each multiply). */

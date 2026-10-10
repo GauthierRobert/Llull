@@ -11,7 +11,7 @@ import type { CadDocument } from '../model/types';
 import { createEmptyDocument } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { noop } from './noop';
+import { noop, report } from './noop';
 
 export const clearDocument = defineCommand({
   name: 'clear_document',
@@ -67,29 +67,11 @@ export const clearDocument = defineCommand({
 
     const nextDoc: CadDocument = {
       ...doc,
-      entities: {},
-      order: [],
-      selection: [],
-      groups: {},
-      parameters: {},
-      animations: {},
-      featureHistory: [],
-      configurations: {},
-      materials: {},
-      recipes: {},
-      components: {},
-      constraints: {},
-      constraintOrder: [],
-      joints: {},
-      jointOrder: [],
-      driveRelations: {},
-      driveRelationOrder: [],
-      ...(keepLayers
-        ? {}
-        : {
-            layers: fresh.layers,
-            layerOrder: fresh.layerOrder,
-          }),
+      ...fresh,
+      camera: doc.camera,
+      units: doc.units,
+      displayPrecision: doc.displayPrecision,
+      ...(keepLayers ? { layers: doc.layers, layerOrder: doc.layerOrder } : {}),
     };
     delete nextDoc.building;
     delete nextDoc.civil;
@@ -98,10 +80,9 @@ export const clearDocument = defineCommand({
       ? `kept ${layerCount} layer${layerCount === 1 ? '' : 's'}`
       : `reset to default layer`;
 
-    return {
-      document: nextDoc,
-      summary: `Cleared ${entityCount} entit${entityCount === 1 ? 'y' : 'ies'} and ${layerCount} layer${layerCount === 1 ? '' : 's'}; ${layerPart}; kept units (${doc.units}) and camera.`,
-      affected: [],
-    };
+    return report(
+      nextDoc,
+      `Cleared ${entityCount} entit${entityCount === 1 ? 'y' : 'ies'} and ${layerCount} layer${layerCount === 1 ? '' : 's'}; ${layerPart}; kept units (${doc.units}) and camera.`,
+    );
   },
 });

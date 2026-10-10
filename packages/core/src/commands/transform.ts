@@ -8,7 +8,7 @@
 import type { CadDocument, Entity, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 } from './schema';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 import { nextId } from '../lib/id';
 import { MAX_COPIES_PER_COMMAND } from './limits';
 import { add3, scale3 } from '../lib/vec3';
@@ -51,11 +51,11 @@ export const rotateEntity = defineCommand({
       );
     }
     const rotated: Entity = { ...target, rotation: add3(target.rotation, delta) };
-    return {
-      document: replaceEntity(doc, rotated),
-      summary: `Rotated ${id} by [${delta.join(', ')}] rad; new rotation [${rotated.rotation.join(', ')}].`,
-      affected: [id],
-    };
+    return changed(
+      replaceEntity(doc, rotated),
+      `Rotated ${id} by [${delta.join(', ')}] rad; new rotation [${rotated.rotation.join(', ')}].`,
+      [id],
+    );
   },
 });
 
@@ -199,11 +199,7 @@ export const scaleEntity = defineCommand({
     }
 
     const { scaled, dims } = scaleGeometry(target, factor);
-    return {
-      document: replaceEntity(doc, scaled),
-      summary: `Scaled ${id} by factor ${factor}; ${dims}.`,
-      affected: [id],
-    };
+    return changed(replaceEntity(doc, scaled), `Scaled ${id} by factor ${factor}; ${dims}.`, [id]);
   },
 });
 
@@ -247,11 +243,11 @@ export const mirrorEntity = defineCommand({
       axis === 'x' ? [-px, py, pz] : axis === 'y' ? [px, -py, pz] : [px, py, -pz];
 
     const mirrored: Entity = { ...target, position: newPosition };
-    return {
-      document: replaceEntity(doc, mirrored),
-      summary: `Mirrored ${id} across ${axis}-axis; new position [${newPosition.join(', ')}].`,
-      affected: [id],
-    };
+    return changed(
+      replaceEntity(doc, mirrored),
+      `Mirrored ${id} across ${axis}-axis; new position [${newPosition.join(', ')}].`,
+      [id],
+    );
   },
 });
 
@@ -323,13 +319,12 @@ export const arrayLinear = defineCommand({
         position: add3(target.position, scale3(offset, i + 1)),
       })),
     );
-    return {
+    return changed(
       document,
-      summary:
-        `Linear array of ${target.kind} ${id}: created ${newIds.length} copies ` +
+      `Linear array of ${target.kind} ${id}: created ${newIds.length} copies ` +
         `along [${offset.join(', ')}]. New ids: ${newIds.join(', ')}.`,
-      affected: newIds,
-    };
+      newIds,
+    );
   },
 });
 
@@ -400,12 +395,11 @@ export const arrayPolar = defineCommand({
       }),
     );
     const angleDeg = ((angle * 180) / Math.PI).toFixed(1);
-    return {
+    return changed(
       document,
-      summary:
-        `Polar array of ${target.kind} ${id}: created ${newIds.length} copies ` +
+      `Polar array of ${target.kind} ${id}: created ${newIds.length} copies ` +
         `over ${angleDeg}° around center [${center[0]}, ${center[1]}]. New ids: ${newIds.join(', ')}.`,
-      affected: newIds,
-    };
+      newIds,
+    );
   },
 });

@@ -3,7 +3,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { len2, sub2 } from '../lib/vec2';
 import { segIntersect, evalLine } from './modify2dGeometry';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 import { replaceEntity } from './entityOps';
 
 /** `line` with its endpoint nearer to `point` moved onto `point` (a tie moves the start). */
@@ -69,11 +69,11 @@ function moveEndpointToBoundary(
     command === 'trim'
       ? `Trimmed line ${id} to intersection with ${boundaryId}`
       : `Extended line ${id} to meet ${boundaryId}`;
-  return {
-    document: replaceEntity(doc, withNearerEndpointAt(line, point)),
-    summary: `${done} at [${point[0].toFixed(3)}, ${point[1].toFixed(3)}].`,
-    affected: [id],
-  };
+  return changed(
+    replaceEntity(doc, withNearerEndpointAt(line, point)),
+    `${done} at [${point[0].toFixed(3)}, ${point[1].toFixed(3)}].`,
+    [id],
+  );
 }
 
 /**

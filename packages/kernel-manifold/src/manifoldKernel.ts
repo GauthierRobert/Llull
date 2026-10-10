@@ -16,6 +16,7 @@ import { kernelFromOps, type CachingKernel, type KernelOps } from '@core/geometr
 import type { Entity } from '@core/model/types';
 import { createEmptyDocument } from '@core/model/types';
 import { entityToTriangles } from '@core/commands/exportTriangulate';
+import { toCounterClockwise } from '@lib/polygon';
 
 // Minimal local interface for the Manifold WASM module (avoids `any`).
 // We only model the subset we actually call; the cast is at one boundary point.
@@ -174,16 +175,6 @@ function signedVolume(vertices: readonly number[], triangles: readonly number[])
   return sum / 6;
 }
 
-/** Shoelace area of a polygon: positive for counter-clockwise, negative for clockwise. */
-function signedArea(outline: ReadonlyArray<readonly [number, number]>): number {
-  let twice = 0;
-  outline.forEach(([x, y], i) => {
-    const [nextX, nextY] = outline[(i + 1) % outline.length] ?? [x, y];
-    twice += x * nextY - nextX * y;
-  });
-  return twice / 2;
-}
-
 /** Corners closer than 1/WELD_SCALE document units are merged into one vertex. */
 const WELD_SCALE = 1e6;
 
@@ -205,9 +196,9 @@ function primitiveOf(m: ManifoldModule, entity: Entity): ManifoldShape | null {
       return entity.radius > 0 ? m.Manifold.sphere(entity.radius, 32) : null;
     case 'extrusion': {
       if (entity.profile.length < 3 || entity.depth <= 0) return null;
-      const outline = entity.profile.map(([x, y]) => [x, y] as [number, number]);
       // Manifold fills counter-clockwise outlines only; a clockwise profile would extrude to nothing.
-      const section = new m.CrossSection([signedArea(outline) < 0 ? outline.reverse() : outline]);
+      const outline = toCounterClockwise(entity.profile).map(([x, y]): [number, number] => [x, y]);
+      const section = new m.CrossSection([outline]);
       const prim = section.extrude(entity.depth);
       section.delete();
       return prim;

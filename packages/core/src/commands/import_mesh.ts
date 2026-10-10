@@ -10,7 +10,7 @@ import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { MAX_IMPORT_BODIES, MAX_IMPORT_TRIANGLES } from './limits';
 import { isHexColor } from '../lib/isHexColor';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 import { newEntity } from './newEntity';
 
 interface MeshBodyParams {
@@ -115,10 +115,10 @@ export const importMesh = defineCommand({
       order.push(id);
       affected.push(id);
     }
-    return {
-      document: { ...doc, entities, order },
-      summary: `Imported ${affected.length} mesh bod${affected.length === 1 ? 'y' : 'ies'} (${triangleCount} triangles): ${affected.join(', ')}.`,
+    return changed(
+      { ...doc, entities, order },
+      `Imported ${affected.length} mesh bod${affected.length === 1 ? 'y' : 'ies'} (${triangleCount} triangles): ${affected.join(', ')}.`,
       affected,
-    };
+    );
   },
 });

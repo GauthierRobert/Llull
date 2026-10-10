@@ -9,7 +9,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
 import { ORIGIN } from '../lib/vec3';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 import { commitEntity } from './commitEntity';
 import { replaceEntity } from './entityOps';
 import { translated } from './geometryShared';
@@ -124,11 +124,11 @@ export const ungroupEntities = defineCommand({
     const nextGroups = { ...doc.groups };
     delete nextGroups[groupId];
 
-    return {
-      document: { ...doc, groups: nextGroups },
-      summary: `Ungrouped ${groupId} ("${group.name}"), freeing ${group.memberIds.length} members: [${group.memberIds.join(', ')}].`,
-      affected: [...group.memberIds],
-    };
+    return changed(
+      { ...doc, groups: nextGroups },
+      `Ungrouped ${groupId} ("${group.name}"), freeing ${group.memberIds.length} members: [${group.memberIds.join(', ')}].`,
+      [...group.memberIds],
+    );
   },
 });
 
@@ -185,10 +185,6 @@ export const setEntityName = defineCommand({
     const tagsPart =
       patched.tags !== undefined ? `tags=[${patched.tags.join(', ')}]` : 'tags=<none>';
 
-    return {
-      document: replaceEntity(doc, patched),
-      summary: `Entity ${id}: ${namePart}, ${tagsPart}.`,
-      affected: [id],
-    };
+    return changed(replaceEntity(doc, patched), `Entity ${id}: ${namePart}, ${tagsPart}.`, [id]);
   },
 });

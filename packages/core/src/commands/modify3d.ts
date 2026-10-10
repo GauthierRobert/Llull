@@ -24,7 +24,7 @@ import {
   operandRecipe,
   topologySuffix,
 } from './kernelShape';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 
 /** Surface-neutral pointer to the B-rep kernel (browser URL flag or server env var). */
 const OCC_KERNEL_HINT =
@@ -106,11 +106,11 @@ function modifyEdges(
   const newId = nextId('mesh');
   const meshEntity = kernelResultEntity(newId, result, entity);
   const document = replaceEntities(doc, [id], meshEntity);
-  return {
+  return changed(
     document,
-    summary: `${command}: ${pastTense} '${id}' (kind '${entity.kind}', ${amountName} ${amount}) → mesh '${newId}' (${result.mesh.indices.length / 3} triangles). Source entity consumed.${near.length > 0 ? ` edgesNear selected edges ${selection.edges.join(', ')}.` : ''}${fallbackSuffix(kernel, [entity])}${topologySuffix(kernel, result.shape)}${referenceLossSuffix(doc, document)}`,
-    affected: [newId],
-  };
+    `${command}: ${pastTense} '${id}' (kind '${entity.kind}', ${amountName} ${amount}) → mesh '${newId}' (${result.mesh.indices.length / 3} triangles). Source entity consumed.${near.length > 0 ? ` edgesNear selected edges ${selection.edges.join(', ')}.` : ''}${fallbackSuffix(kernel, [entity])}${topologySuffix(kernel, result.shape)}${referenceLossSuffix(doc, document)}`,
+    [newId],
+  );
 }
 
 /**
