@@ -7,7 +7,8 @@
 
 import type { PipeSupportType } from '@core/model/building';
 import type { Vec3 } from '@core/model/types';
-import type { SteelBar } from './steelMemberBars';
+import { projectOntoSegment } from '@lib/polygon';
+import { HORIZONTAL_RATIO, VERTICAL_RATIO, type SteelBar } from './steelMemberBars';
 
 export interface BearingLimits {
   /** Largest vertical gap between the pipe and its steel, mm. */
@@ -28,8 +29,6 @@ interface BearingHit {
 const PENETRATION = 25;
 /** A hanger rod is at least this long, mm. */
 const MIN_ROD = 50;
-const HORIZONTAL_RATIO = 0.1;
-const VERTICAL_RATIO = 0.95;
 
 const isBelow = (type: PipeSupportType): boolean => type !== 'hanger';
 
@@ -37,20 +36,12 @@ function planProjection(
   bar: SteelBar,
   point: Vec3,
 ): { distance: number; t: number; axisZ: number } {
-  const [dx, dy] = [bar.end[0] - bar.start[0], bar.end[1] - bar.start[1]];
-  const squared = dx * dx + dy * dy;
-  const t =
-    squared === 0
-      ? 0
-      : Math.max(
-          0,
-          Math.min(1, ((point[0] - bar.start[0]) * dx + (point[1] - bar.start[1]) * dy) / squared),
-        );
-  return {
-    distance: Math.hypot(point[0] - (bar.start[0] + dx * t), point[1] - (bar.start[1] + dy * t)),
-    t,
-    axisZ: bar.start[2] + (bar.end[2] - bar.start[2]) * t,
-  };
+  const { distance, t } = projectOntoSegment(
+    [point[0], point[1]],
+    [bar.start[0], bar.start[1]],
+    [bar.end[0], bar.end[1]],
+  );
+  return { distance, t, axisZ: bar.start[2] + (bar.end[2] - bar.start[2]) * t };
 }
 
 /** Section width/depth (mm), axis slope (|dz| / length) and a reason formatter naming `bar`. */

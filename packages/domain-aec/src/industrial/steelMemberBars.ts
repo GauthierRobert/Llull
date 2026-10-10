@@ -68,8 +68,8 @@ const POINTER: Readonly<Partial<Record<MemberRole, string>>> = {
 };
 
 /** Slope limits of the classification: |dz| / length. */
-const VERTICAL_RATIO = 0.95;
-const HORIZONTAL_RATIO = 0.1;
+export const VERTICAL_RATIO = 0.95;
+export const HORIZONTAL_RATIO = 0.1;
 
 function classify(
   role: MemberRole,

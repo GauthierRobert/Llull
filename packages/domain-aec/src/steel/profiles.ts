@@ -275,13 +275,18 @@ interface ProfileOutline {
   readonly holes: Vec2[][];
 }
 
+/** Counter-clockwise polygon of `segments` vertices on a circle of `radius` centred on the origin. */
+export function circleOutline(radius: number, segments: number): Vec2[] {
+  return Array.from({ length: segments }, (_, index): Vec2 => {
+    const angle = (index / segments) * Math.PI * 2;
+    return [radius * Math.cos(angle), radius * Math.sin(angle)];
+  });
+}
+
 const CIRCLE_SEGMENTS = 20;
 
 function circle(radius: number, clockwise: boolean): Vec2[] {
-  const points = Array.from({ length: CIRCLE_SEGMENTS }, (_, index): Vec2 => {
-    const angle = (index / CIRCLE_SEGMENTS) * Math.PI * 2;
-    return [radius * Math.cos(angle), radius * Math.sin(angle)];
-  });
+  const points = circleOutline(radius, CIRCLE_SEGMENTS);
   return clockwise ? points.reverse() : points;
 }
 

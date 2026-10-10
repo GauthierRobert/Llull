@@ -106,6 +106,16 @@ export function upsizeProfileGroups(
   return { building: next, progressed, limited, changes, changedIds };
 }
 
+/** Accumulate one upsize step's change texts and ids into the running design report. */
+export function recordUpsizeStep(
+  step: { changes: string[]; changedIds: string[] },
+  changes: string[],
+  changed: Set<string>,
+): void {
+  changes.push(...step.changes);
+  for (const id of step.changedIds) changed.add(id);
+}
+
 /**
  * Next heavier profile of the same family; at the top of the family, the lightest I-section
  * (IPE / HEA / HEB) with a larger plastic modulus. Null when nothing larger exists.

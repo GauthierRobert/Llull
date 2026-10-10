@@ -16,6 +16,7 @@ import {
   isValidTargetUtilisation,
   MAX_ITERATIONS,
   nextProfile,
+  recordUpsizeStep,
   resizeProfileGroup,
   targetUtilisationParam,
   upsizeProfileGroups,
@@ -106,10 +107,9 @@ export const designPortalFrames = defineCommand({
         );
         return { building: reseated.building, changedIds: [...resizedIds, ...reseated.moved] };
       });
-      changes.push(...step.changes);
-      for (const id of step.changedIds) changed.add(id);
-      if (step.limited) limited = true;
+      recordUpsizeStep(step, changes, changed);
       current = { ...current, building: step.building };
+      if (step.limited) limited = true;
       if (!step.progressed) break;
       if (iteration === MAX_ITERATIONS - 1) limited = true;
     }

@@ -19,7 +19,7 @@ import {
 import { noop } from '@core/commands/noop';
 import { duplicateSummary, findTwin, samePath } from '../duplicates';
 import { regenerateBuilding } from '../evaluateElements';
-import { MAX_ROUTE_POINTS, hasRepeatedPoint, parseRoute, routeLength } from './routeSupport';
+import { hasRepeatedPoint, routeLength, routeOrFailure } from './routeSupport';
 import { levelIdParam } from '../levelParams';
 
 export const trayLength = (tray: CableTrayElement): number => routeLength(tray.points);
@@ -47,14 +47,8 @@ export const addCableTray = defineCommand({
     levelId: levelIdParam,
   }),
   run: (doc, { points, width, height, system, levelId }): CommandResult => {
-    const path = parseRoute(points);
-    if (!path) return noop(doc, 'add_cable_tray failed: points must be ≥ 2 [x, y, z] points.');
-    if (path.length > MAX_ROUTE_POINTS) {
-      return noop(
-        doc,
-        `add_cable_tray failed: at most ${MAX_ROUTE_POINTS} points per run (got ${path.length}); split the run.`,
-      );
-    }
+    const path = routeOrFailure('add_cable_tray', points, 'run');
+    if (typeof path === 'string') return noop(doc, path);
     const resolvedWidth = width ?? fromMm(doc, 300);
     const resolvedHeight = height ?? fromMm(doc, 60);
     if (hasRepeatedPoint(path) || !(resolvedWidth > 0) || !(resolvedHeight > 0)) {

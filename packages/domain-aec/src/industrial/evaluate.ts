@@ -19,7 +19,7 @@ import type {
 import { fromMm, toMm } from '../model';
 import { base, colorForMaterial, MEMBER_LAYER, meshEntity, orientedBox } from '../entities';
 import { prismMesh, sweepMesh } from '../mesh';
-import { findProfile, profileOutline } from '../steel/profiles';
+import { circleOutline, findProfile, profileOutline } from '../steel/profiles';
 import { cross3, dot3, sub3 } from '@lib/vec3';
 import { normalize } from '../vec3';
 import { shapeOf } from './equipmentShape';
@@ -164,10 +164,7 @@ export function evaluateEquipment(equipment: EquipmentElement, level: BuildingLe
   }
   const [cx, cy] = equipment.location;
   const radius = (shape === 'vertical_vessel' ? length : width) / 2;
-  const circle = Array.from({ length: VESSEL_SEGMENTS }, (_, index): Vec2 => {
-    const theta = (index / VESSEL_SEGMENTS) * Math.PI * 2;
-    return [radius * Math.cos(theta), radius * Math.sin(theta)];
-  });
+  const circle = circleOutline(radius, VESSEL_SEGMENTS);
   const [cos, sin] = [Math.cos(equipment.angle), Math.sin(equipment.angle)];
   const mesh =
     shape === 'vertical_vessel'
@@ -208,10 +205,7 @@ const PIPE_SEGMENTS = 16;
 
 export function evaluatePipe(pipe: PipeElement, level: BuildingLevel): Entity[] {
   const radius = pipe.diameter / 2;
-  const circle = Array.from({ length: PIPE_SEGMENTS }, (_, index): Vec2 => {
-    const angle = (index / PIPE_SEGMENTS) * Math.PI * 2;
-    return [radius * Math.cos(angle), radius * Math.sin(angle)];
-  });
+  const circle = circleOutline(radius, PIPE_SEGMENTS);
   const color = colorForMaterial(pipe.material, '#2f9c8f');
   const points = pipe.points.map((point) => atLevel(level, point));
   const entities = sweepRun(pipe, circle, points, `Pipe ${pipe.mark} ${pipe.service}`, color);

@@ -94,34 +94,22 @@ function floorLevels(beams: ReadonlyArray<BeamResult>): {
 }
 
 function geometryOf(bar: SteelBar, storey: number): BraceGeometry | undefined {
-  const dx = bar.end[0] - bar.start[0];
-  const dy = bar.end[1] - bar.start[1];
-  if (Math.abs(dy) <= PLANE_TOLERANCE) {
-    const plane = (bar.start[1] + bar.end[1]) / 2;
-    const [low, high] = [Math.min(bar.start[0], bar.end[0]), Math.max(bar.start[0], bar.end[0])];
+  // An X-plane holds y constant (the brace runs along x); a Y-plane holds x constant.
+  for (const [direction, across, along] of [
+    ['X', 1, 0],
+    ['Y', 0, 1],
+  ] as const) {
+    if (Math.abs(bar.end[across] - bar.start[across]) > PLANE_TOLERANCE) continue;
+    const plane = (bar.start[across] + bar.end[across]) / 2;
     return {
       bar,
       storey,
-      direction: 'X',
+      direction,
       plane,
       planeKey: snap(plane),
-      low,
-      high,
-      horizontal: Math.abs(dx),
-    };
-  }
-  if (Math.abs(dx) <= PLANE_TOLERANCE) {
-    const plane = (bar.start[0] + bar.end[0]) / 2;
-    const [low, high] = [Math.min(bar.start[1], bar.end[1]), Math.max(bar.start[1], bar.end[1])];
-    return {
-      bar,
-      storey,
-      direction: 'Y',
-      plane,
-      planeKey: snap(plane),
-      low,
-      high,
-      horizontal: Math.abs(dy),
+      low: Math.min(bar.start[along], bar.end[along]),
+      high: Math.max(bar.start[along], bar.end[along]),
+      horizontal: Math.abs(bar.end[along] - bar.start[along]),
     };
   }
   return undefined;

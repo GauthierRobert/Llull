@@ -5,7 +5,15 @@
 import type { EquipmentElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, looseVec2, vec3, z } from '@core/commands/schema';
-import { elementAffected, getBuilding, isVec2, resolveLevel, toVec2, withElement } from '../model';
+import {
+  elementAffected,
+  elementsOf,
+  getBuilding,
+  isVec2,
+  resolveLevel,
+  toVec2,
+  withElement,
+} from '../model';
 import { noop } from '@core/commands/noop';
 import { regenerateBuilding } from '../evaluateElements';
 import {
@@ -68,9 +76,7 @@ export const updateEquipment = defineCommand({
     },
   ): CommandResult => {
     const building = getBuilding(doc);
-    const equipments = Object.values(building.elements).filter(
-      (element): element is EquipmentElement => element.category === 'equipment',
-    );
+    const equipments = elementsOf(building, 'equipment');
     let target: EquipmentElement | undefined;
     if (elementId !== undefined) {
       const element = building.elements[elementId];

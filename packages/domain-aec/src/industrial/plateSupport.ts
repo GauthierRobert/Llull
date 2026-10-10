@@ -69,10 +69,7 @@ export function refitPlates(
   member: SteelMemberElement,
   previousProfile: string,
 ): { building: BuildingModel; resized: string[]; removed: string[] } {
-  const plates = Object.values(building.elements).filter(
-    (element): element is BasePlateElement =>
-      element.category === 'plate' && element.memberId === member.id,
-  );
+  const plates = elementsOf(building, 'plate').filter((plate) => plate.memberId === member.id);
   if (member.role !== 'column') {
     const removed = new Set(plates.map((plate) => plate.id));
     return { building: withoutElements(building, removed), resized: [], removed: [...removed] };

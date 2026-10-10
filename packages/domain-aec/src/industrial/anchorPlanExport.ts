@@ -2,7 +2,6 @@
  * @layer domain-aec
  */
 
-import type { GridElement } from '@core/model/building';
 import type { Vec2 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
@@ -125,10 +124,7 @@ export const exportAnchorPlan = defineCommand({
         `export_anchor_plan failed: no base plates on level ${level.id} (add_base_plates first).`,
       );
     }
-    const grids = Object.values(building.elements).filter(
-      (element): element is GridElement => element.category === 'grid',
-    );
-    const { vertical, horizontal } = gridAxes(grids, mm);
+    const { vertical, horizontal } = gridAxes(elementsOf(building, 'grid'), mm);
     const embedmentMm = embedment !== undefined ? mm(embedment) : DEFAULT_EMBEDMENT_MM;
 
     const sheetPaper: PaperSize = paper ?? 'A3';

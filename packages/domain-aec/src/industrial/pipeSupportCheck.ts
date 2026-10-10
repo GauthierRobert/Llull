@@ -10,6 +10,7 @@ import { noop } from '@core/commands/noop';
 import { isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
 import { getBuilding } from '../model';
 import { round } from '../numeric';
+import { metres as shown } from './steelMemberRows';
 import { toCsv } from '../csv';
 import { briefList } from './utilisation';
 import { collectSteelBars, modelUnits, type ModelUnits } from './steelMemberBars';
@@ -104,7 +105,6 @@ function rowOf(
   };
   const issues: string[] = [];
   const notes: string[] = [];
-  const shown = (value: number): string => (value / 1000).toFixed(2);
   if (arcs.length === 0 && carriers[0] === null && carriers[1] === null) {
     issues.push(`no support: ${shown(length)} m of pipe rest on nothing`);
   }

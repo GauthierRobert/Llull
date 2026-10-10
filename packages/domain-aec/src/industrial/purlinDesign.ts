@@ -4,12 +4,12 @@
  * @layer domain-aec
  */
 
-import type { BuildingModel, SteelMemberElement } from '@core/model/building';
+import type { BuildingModel } from '@core/model/building';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { PURLIN_LOAD_SHAPE } from './purlinLoadParams';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { elementAffected, fromMm, getBuilding, withElement } from '../model';
+import { elementAffected, elementsOf, fromMm, getBuilding, withElement } from '../model';
 import { noop } from '@core/commands/noop';
 import { add3, scale3 } from '@lib/vec3';
 import { regenerateBuilding } from '../evaluateElements';
@@ -22,6 +22,7 @@ import {
   isValidTargetUtilisation,
   MAX_ITERATIONS,
   nextProfile,
+  recordUpsizeStep,
   resizeProfileGroup,
   targetUtilisationParam,
   upsizeProfileGroups,
@@ -121,10 +122,9 @@ export const designPurlins = defineCommand({
           };
         },
       );
-      changes.push(...step.changes);
-      for (const id of step.changedIds) changed.add(id);
-      if (step.limited) limited = true;
+      recordUpsizeStep(step, changes, changed);
       current = { ...current, building: step.building };
+      if (step.limited) limited = true;
       if (!step.progressed) break;
       if (iteration === MAX_ITERATIONS - 1) limited = true;
     }
@@ -167,9 +167,7 @@ function reseatResized(
   if (!old || !larger) return building;
   const half = fromMm(doc, larger.h - old.h) / 2;
   const tolerance = fromMm(doc, 10);
-  const members = Object.values(building.elements).filter(
-    (element): element is SteelMemberElement => element.category === 'member',
-  );
+  const members = elementsOf(building, 'member');
   const rafters = members.filter((member) => member.role === 'rafter');
   const xs = members.flatMap((member) => [member.start[0], member.end[0]]);
   const centre = (Math.min(...xs) + Math.max(...xs)) / 2;
