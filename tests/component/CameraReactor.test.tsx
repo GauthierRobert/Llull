@@ -18,25 +18,10 @@ import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { localDispatch } from '../helpers/storeTestHelpers';
 import type { CameraState } from '@core/model/types';
+import { sphericalToCartesian } from '@ui/viewport/3d/CameraRig';
 
 function resetStore(): void {
   useStore.setState({ document: createEmptyDocument(), lastSummary: null });
-}
-
-// Pure helper that mirrors the logic in Viewport3D.tsx sphericalToCartesian.
-// Keeping it here so we can unit-test the math without importing from the UI layer.
-function sphericalToCartesian(
-  target: [number, number, number],
-  azimuth: number,
-  polar: number,
-  distance: number,
-): [number, number, number] {
-  const sinPolar = Math.sin(polar);
-  return [
-    target[0] + distance * sinPolar * Math.sin(azimuth),
-    target[1] + distance * sinPolar * Math.cos(azimuth),
-    target[2] + distance * Math.cos(polar),
-  ];
 }
 
 // ---------------------------------------------------------------------------

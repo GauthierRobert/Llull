@@ -8,13 +8,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { useStore, useViewportStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { BuildingPanel } from '@ui/panels/building/BuildingPanel';
-import { localDispatch } from '../helpers/storeTestHelpers';
-
-function spyDispatch(): ReturnType<typeof vi.fn> {
-  const spy = vi.fn();
-  useStore.setState({ dispatch: spy } as unknown as Parameters<typeof useStore.setState>[0]);
-  return spy;
-}
+import { localDispatch, spyDispatch } from '../helpers/storeTestHelpers';
 
 beforeEach(() => {
   useStore.setState({ document: createEmptyDocument(), lastSummary: null });

@@ -59,41 +59,23 @@ describe('McpConnect — structure', () => {
     expect(titleEl?.textContent).toMatch(/connect an mcp agent/i);
   });
 
-  it('shows the title "Connect an MCP agent"', () => {
+  it.each<[string, () => string | RegExp]>([
+    ['the title "Connect an MCP agent"', () => /connect an mcp agent/i],
+    [
+      'the server install and start command in a code block',
+      () => 'npm --prefix server install && npm --prefix server run dev',
+    ],
+    ['the endpoint URL in a code block', () => 'http://localhost:3001/mcp'],
+    [
+      'the live registry command count as a capability badge',
+      () => `${listCommands().length} commands`,
+    ],
+    ['the "structuredContent" capability badge', () => 'structuredContent'],
+    ['the "prompts (EN2)" capability badge', () => 'prompts (EN2)'],
+    ['the "session isolation" capability badge', () => 'session isolation'],
+  ])('shows %s', (_label, text) => {
     render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText(/connect an mcp agent/i)).toBeDefined();
-  });
-
-  it('shows the server install and start command in a code block', () => {
-    render(<McpConnect onClose={() => undefined} />);
-    expect(
-      screen.getByText('npm --prefix server install && npm --prefix server run dev'),
-    ).toBeDefined();
-  });
-
-  it('shows the endpoint URL in a code block', () => {
-    render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText('http://localhost:3001/mcp')).toBeDefined();
-  });
-
-  it('shows the live registry command count as a capability badge', () => {
-    render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText(`${listCommands().length} commands`)).toBeDefined();
-  });
-
-  it('shows the "structuredContent" capability badge', () => {
-    render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText('structuredContent')).toBeDefined();
-  });
-
-  it('shows the "prompts (EN2)" capability badge', () => {
-    render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText('prompts (EN2)')).toBeDefined();
-  });
-
-  it('shows the "session isolation" capability badge', () => {
-    render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText('session isolation')).toBeDefined();
+    expect(screen.getByText(text())).toBeDefined();
   });
 
   it('has a close button', () => {
@@ -212,46 +194,20 @@ describe('McpConnect — quickstart content', () => {
     expect(screen.getByText(/install.*start the mcp server/i)).toBeDefined();
   });
 
-  it('shows the install+start command text', () => {
-    render(<McpConnect onClose={() => undefined} />);
-    expect(
-      screen.getByText('npm --prefix server install && npm --prefix server run dev'),
-    ).toBeDefined();
-  });
-
-  it('shows the correct endpoint URL with port 3001', () => {
-    render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText('http://localhost:3001/mcp')).toBeDefined();
-  });
-
   it('shows the recommended agent loop section', () => {
     render(<McpConnect onClose={() => undefined} />);
     expect(screen.getByRole('region', { name: /recommended agent loop/i })).toBeDefined();
   });
 
-  it('shows the cad://conventions step', () => {
+  it.each<[string, string | RegExp]>([
+    ['the cad://conventions step', 'read cad://conventions'],
+    ['the describe_scene step', /describe_scene/],
+    ['the render_view step', /render_view/],
+    ['the check_model step', /check_model/],
+    ['MCP_AUTH_TOKEN in the endpoint section', /MCP_AUTH_TOKEN/],
+  ])('shows %s', (_label, text) => {
     render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText('read cad://conventions')).toBeDefined();
-  });
-
-  it('shows the describe_scene step', () => {
-    render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText(/describe_scene/)).toBeDefined();
-  });
-
-  it('shows the render_view step', () => {
-    render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText(/render_view/)).toBeDefined();
-  });
-
-  it('shows the check_model step', () => {
-    render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText(/check_model/)).toBeDefined();
-  });
-
-  it('mentions MCP_AUTH_TOKEN in the endpoint section', () => {
-    render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText(/MCP_AUTH_TOKEN/)).toBeDefined();
+    expect(screen.getByText(text)).toBeDefined();
   });
 });
 

@@ -7,9 +7,23 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { MAX_AUTO_SELECT } from '@ui/store/localMode';
+import { flushPromises } from '../helpers/storeTestHelpers';
 
-async function flushPromises(): Promise<void> {
-  for (let i = 0; i < 10; i++) await new Promise<void>((resolve) => resolve());
+function stubServerAffecting(id: string): void {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          summary: 'ok',
+          affected: [id],
+          isError: false,
+          canUndo: true,
+          canRedo: false,
+        }),
+    }),
+  );
 }
 
 describe('dispatch selectAffected', () => {
@@ -71,20 +85,7 @@ describe('dispatch selectAffected', () => {
 
   it('selects the affected ids from a server response', async () => {
     useStore.setState({ liveStatus: 'connected' });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            summary: 'ok',
-            affected: ['box-9'],
-            isError: false,
-            canUndo: true,
-            canRedo: false,
-          }),
-      }),
-    );
+    stubServerAffecting('box-9');
     useStore.getState().dispatch('add_box', { size: [1, 1, 1] }, { selectAffected: true });
     await flushPromises();
     expect(useStore.getState().document.selection).toEqual(['box-9']);
@@ -92,20 +93,7 @@ describe('dispatch selectAffected', () => {
 
   it('leaves the server-mode selection untouched without the option', async () => {
     useStore.setState({ liveStatus: 'connected' });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            summary: 'ok',
-            affected: ['box-9'],
-            isError: false,
-            canUndo: true,
-            canRedo: false,
-          }),
-      }),
-    );
+    stubServerAffecting('box-9');
     const before = useStore.getState().document;
     useStore.getState().dispatch('add_box', { size: [1, 1, 1] });
     await flushPromises();
@@ -114,20 +102,7 @@ describe('dispatch selectAffected', () => {
 
   it('keeps a selection the user changed while the request was in flight', async () => {
     useStore.setState({ liveStatus: 'connected' });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            summary: 'ok',
-            affected: ['box-9'],
-            isError: false,
-            canUndo: true,
-            canRedo: false,
-          }),
-      }),
-    );
+    stubServerAffecting('box-9');
     useStore.getState().dispatch('add_box', { size: [1, 1, 1] }, { selectAffected: true });
     useStore.setState({ document: { ...useStore.getState().document, selection: ['other'] } });
     await flushPromises();

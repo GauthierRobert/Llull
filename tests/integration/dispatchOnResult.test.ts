@@ -6,10 +6,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
-
-async function flushPromises(): Promise<void> {
-  for (let i = 0; i < 10; i++) await new Promise<void>((resolve) => resolve());
-}
+import { flushPromises } from '../helpers/storeTestHelpers';
 
 function serverResponse(body: Record<string, unknown>, ok = true): ReturnType<typeof vi.fn> {
   return vi.fn().mockResolvedValue({

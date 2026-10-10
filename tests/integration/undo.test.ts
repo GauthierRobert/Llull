@@ -14,23 +14,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
-import { liveSnapshot, localDispatch } from '../helpers/storeTestHelpers';
+import { liveSnapshot, localDispatch, flushPromises, getState } from '../helpers/storeTestHelpers';
 import type { ServerCommandResponse } from '@ui/store/serverCommands';
-
-/** Flush all pending microtasks (multiple promise chain hops). */
-async function flushPromises(): Promise<void> {
-  for (let i = 0; i < 10; i++) {
-    await new Promise<void>((resolve) => resolve());
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function getState(): ReturnType<typeof useStore.getState> {
-  return useStore.getState();
-}
 
 function resetStore(): void {
   useStore.setState({

@@ -15,6 +15,7 @@
  * `core/commands/execute`, never inline.
  */
 
+import { vi } from 'vitest';
 import type { CadDocument } from '@core/model/types';
 import { documentHash } from '@mcp/liveSync';
 import type { LiveSnapshotEvent } from '@mcp/liveSync';
@@ -46,4 +47,20 @@ export function liveSnapshot(
   epoch = TEST_EPOCH,
 ): LiveSnapshotEvent {
   return { epoch, seq, stateHash: documentHash(document), document };
+}
+
+/** Flush all pending microtasks (multiple promise chain hops). */
+export async function flushPromises(): Promise<void> {
+  for (let i = 0; i < 10; i++) await new Promise<void>((resolve) => resolve());
+}
+
+export function getState(): ReturnType<typeof useStore.getState> {
+  return useStore.getState();
+}
+
+/** Replace the store's `dispatch` with a spy so param-gathering UI can be asserted. */
+export function spyDispatch(): ReturnType<typeof vi.fn> {
+  const spy = vi.fn();
+  useStore.setState({ dispatch: spy } as unknown as Parameters<typeof useStore.setState>[0]);
+  return spy;
 }

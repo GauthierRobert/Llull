@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import type { CadDocument } from '@core/model/types';
+import type { CommandResult } from '@core/commands/types';
+
+function twoBoxes(): { doc: CadDocument; r1: CommandResult; r2: CommandResult } {
+  const r1 = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });
+  const r2 = execute(r1.document, 'add_box', { size: [2, 2, 2] });
+  return { doc: r2.document, r1, r2 };
+}
 
 describe('edit commands', () => {
   // -------------------------------------------------------------------------
@@ -109,11 +117,7 @@ describe('edit commands', () => {
 
   describe('group_entities', () => {
     it('creates a new group containing the provided entity ids', () => {
-      let doc = createEmptyDocument();
-      const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-      doc = r1.document;
-      const r2 = execute(doc, 'add_box', { size: [2, 2, 2] });
-      doc = r2.document;
+      const { doc, r1, r2 } = twoBoxes();
       const id1 = r1.affected[0]!;
       const id2 = r2.affected[0]!;
 
@@ -129,11 +133,7 @@ describe('edit commands', () => {
     });
 
     it('defaults group name to "Group" when not provided', () => {
-      let doc = createEmptyDocument();
-      const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-      doc = r1.document;
-      const r2 = execute(doc, 'add_box', { size: [2, 2, 2] });
-      doc = r2.document;
+      const { doc, r1, r2 } = twoBoxes();
 
       const result = execute(doc, 'group_entities', {
         ids: [r1.affected[0]!, r2.affected[0]!],
@@ -143,11 +143,7 @@ describe('edit commands', () => {
     });
 
     it('filters out ids that do not exist in the document', () => {
-      let doc = createEmptyDocument();
-      const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-      doc = r1.document;
-      const r2 = execute(doc, 'add_box', { size: [2, 2, 2] });
-      doc = r2.document;
+      const { doc, r1, r2 } = twoBoxes();
       const id1 = r1.affected[0]!;
       const id2 = r2.affected[0]!;
 
@@ -178,11 +174,7 @@ describe('edit commands', () => {
     });
 
     it('is pure — input document is not mutated', () => {
-      let doc = createEmptyDocument();
-      const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-      doc = r1.document;
-      const r2 = execute(doc, 'add_box', { size: [2, 2, 2] });
-      doc = r2.document;
+      const { doc, r1, r2 } = twoBoxes();
       const snapshot = JSON.stringify(doc);
 
       execute(doc, 'group_entities', { ids: [r1.affected[0]!, r2.affected[0]!] });
@@ -197,11 +189,8 @@ describe('edit commands', () => {
 
   describe('ungroup_entities', () => {
     it('removes the group from doc.groups', () => {
-      let doc = createEmptyDocument();
-      const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-      doc = r1.document;
-      const r2 = execute(doc, 'add_box', { size: [2, 2, 2] });
-      doc = r2.document;
+      const { doc: boxes, r1, r2 } = twoBoxes();
+      let doc = boxes;
       const grouped = execute(doc, 'group_entities', {
         ids: [r1.affected[0]!, r2.affected[0]!],
         name: 'ToDissolve',
@@ -215,11 +204,8 @@ describe('edit commands', () => {
     });
 
     it('keeps member entities in the document after ungroup', () => {
-      let doc = createEmptyDocument();
-      const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-      doc = r1.document;
-      const r2 = execute(doc, 'add_box', { size: [2, 2, 2] });
-      doc = r2.document;
+      const { doc: boxes, r1, r2 } = twoBoxes();
+      let doc = boxes;
       const id1 = r1.affected[0]!;
       const id2 = r2.affected[0]!;
       const grouped = execute(doc, 'group_entities', { ids: [id1, id2] });
@@ -233,11 +219,8 @@ describe('edit commands', () => {
     });
 
     it('returns freed member ids in affected', () => {
-      let doc = createEmptyDocument();
-      const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-      doc = r1.document;
-      const r2 = execute(doc, 'add_box', { size: [2, 2, 2] });
-      doc = r2.document;
+      const { doc: boxes, r1, r2 } = twoBoxes();
+      let doc = boxes;
       const id1 = r1.affected[0]!;
       const id2 = r2.affected[0]!;
       const grouped = execute(doc, 'group_entities', { ids: [id1, id2] });
@@ -260,11 +243,8 @@ describe('edit commands', () => {
     });
 
     it('is pure — input document is not mutated', () => {
-      let doc = createEmptyDocument();
-      const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-      doc = r1.document;
-      const r2 = execute(doc, 'add_box', { size: [2, 2, 2] });
-      doc = r2.document;
+      const { doc: boxes, r1, r2 } = twoBoxes();
+      let doc = boxes;
       const grouped = execute(doc, 'group_entities', { ids: [r1.affected[0]!, r2.affected[0]!] });
       doc = grouped.document;
       const groupId = grouped.affected[0]!;

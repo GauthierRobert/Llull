@@ -3,29 +3,14 @@
  * the pipe-support check (param-gathering → dispatch; the command math is unit-tested elsewhere).
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { BuildingPanel } from '@ui/panels/building/BuildingPanel';
-import { localDispatch } from '../helpers/storeTestHelpers';
+import { localDispatch, spyDispatch } from '../helpers/storeTestHelpers';
 import { shoeDoc } from '../unit/building/pipeSupportFixtures';
-
-function spyDispatch(): ReturnType<typeof vi.fn> {
-  const spy = vi.fn();
-  useStore.setState({ dispatch: spy } as unknown as Parameters<typeof useStore.setState>[0]);
-  return spy;
-}
-
-const pickTool = (id: string): void => {
-  fireEvent.change(screen.getByTestId('building-tool-select'), { target: { value: id } });
-};
-const setField = (key: string, value: string): void => {
-  fireEvent.change(screen.getByTestId(`tool-field-${key}`), { target: { value } });
-};
-const submit = (): void => {
-  fireEvent.click(screen.getByTestId('tool-submit'));
-};
+import { pickTool, setField, submit } from '../helpers/buildingForm';
 
 const supportCount = (): number =>
   Object.values(useStore.getState().document.building?.elements ?? {}).filter(

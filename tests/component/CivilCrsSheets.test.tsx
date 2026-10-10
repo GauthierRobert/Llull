@@ -6,7 +6,7 @@ import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { CivilPanel } from '@ui/panels/civil/CivilPanel';
 import { downloadText } from '@ui/download';
-import { localDispatch } from '../helpers/storeTestHelpers';
+import { localDispatch, spyDispatch } from '../helpers/storeTestHelpers';
 
 vi.mock('@ui/download', () => ({ downloadText: vi.fn(), downloadBlob: vi.fn() }));
 
@@ -16,12 +16,6 @@ beforeEach(() => {
   useStore.setState({ document: createEmptyDocument(), lastSummary: null });
   vi.mocked(downloadText).mockClear();
 });
-
-function spyDispatch(): ReturnType<typeof vi.fn> {
-  const spy = vi.fn();
-  useStore.setState({ dispatch: spy } as unknown as Parameters<typeof useStore.setState>[0]);
-  return spy;
-}
 
 describe('CivilCrsSection', () => {
   it('dispatches set_coordinate_system and set_site_calibration', () => {

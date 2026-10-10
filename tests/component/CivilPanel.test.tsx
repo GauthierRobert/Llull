@@ -9,15 +9,9 @@ import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { CivilPanel } from '@ui/panels/civil/CivilPanel';
 import { downloadText } from '@ui/download';
-import { localDispatch } from '../helpers/storeTestHelpers';
+import { localDispatch, spyDispatch } from '../helpers/storeTestHelpers';
 
 vi.mock('@ui/download', () => ({ downloadText: vi.fn(), downloadBlob: vi.fn() }));
-
-function spyDispatch(): ReturnType<typeof vi.fn> {
-  const spy = vi.fn();
-  useStore.setState({ dispatch: spy } as unknown as Parameters<typeof useStore.setState>[0]);
-  return spy;
-}
 
 const SURVEY = ['1,0,0,10,TOPO', '2,20,0,11,TOPO', '3,0,20,12,TOPO', '4,20,20,13,TOPO'].join('\n');
 

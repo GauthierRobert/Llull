@@ -10,7 +10,8 @@ import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { PropertiesPanel } from '@ui/panels/PropertiesPanel';
 import { BuildingPanel } from '@ui/panels/building/BuildingPanel';
-import { localDispatch } from '../helpers/storeTestHelpers';
+import { localDispatch, spyDispatch } from '../helpers/storeTestHelpers';
+import { pickTool, setField, submit } from '../helpers/buildingForm';
 
 vi.mock('@core/commands/registry', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@core/commands/registry')>();
@@ -24,22 +25,6 @@ vi.mock('@core/commands/registry', async (importOriginal) => {
     },
   };
 });
-
-function spyDispatch(): ReturnType<typeof vi.fn> {
-  const spy = vi.fn();
-  useStore.setState({ dispatch: spy } as unknown as Parameters<typeof useStore.setState>[0]);
-  return spy;
-}
-
-const pickTool = (id: string): void => {
-  fireEvent.change(screen.getByTestId('building-tool-select'), { target: { value: id } });
-};
-const setField = (key: string, value: string): void => {
-  fireEvent.change(screen.getByTestId(`tool-field-${key}`), { target: { value } });
-};
-const submit = (): void => {
-  fireEvent.click(screen.getByTestId('tool-submit'));
-};
 
 beforeEach(() => {
   useStore.setState({ document: createEmptyDocument(), lastSummary: null });

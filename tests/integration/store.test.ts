@@ -20,23 +20,18 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { serializeDocument } from '@core/commands/persistence';
-import { localDispatch, liveSnapshot, TEST_EPOCH } from '../helpers/storeTestHelpers';
+import {
+  localDispatch,
+  liveSnapshot,
+  TEST_EPOCH,
+  flushPromises,
+  getState,
+} from '../helpers/storeTestHelpers';
 import type { ServerCommandResponse } from '@ui/store/serverCommands';
-
-/** Flush all pending microtasks (multiple promise chain hops). */
-async function flushPromises(): Promise<void> {
-  for (let i = 0; i < 10; i++) {
-    await new Promise<void>((resolve) => resolve());
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function getState(): ReturnType<typeof useStore.getState> {
-  return useStore.getState();
-}
 
 function resetStore(): void {
   useStore.getState().setDocument(createEmptyDocument());
@@ -57,6 +52,14 @@ function resetStore(): void {
     liveEpoch: null,
     liveSeq: -1,
   });
+}
+
+/** Go online against a simulated server: hydrate an empty snapshot and wait for the outbox replay. */
+async function reconnectTo(server: ReturnType<typeof simulatedServer>): Promise<void> {
+  vi.stubGlobal('fetch', server.fetch);
+  useStore.setState({ liveStatus: 'connected' });
+  getState().hydrateLiveDocument(liveSnapshot(createEmptyDocument()));
+  await vi.waitFor(() => expect(getState().syncState).toBe('idle'));
 }
 
 /**
@@ -460,11 +463,7 @@ describe('CadStore — offline fallback', () => {
     getState().dispatch('add_sphere', { radius: 2 });
     expect(getState().localOutbox.map((c) => c.name)).toEqual(['add_box', 'add_sphere']);
     const server = simulatedServer();
-    vi.stubGlobal('fetch', server.fetch);
-    useStore.setState({ liveStatus: 'connected' });
-
-    getState().hydrateLiveDocument(liveSnapshot(createEmptyDocument()));
-    await vi.waitFor(() => expect(getState().syncState).toBe('idle'));
+    await reconnectTo(server);
 
     expect(server.commands()).toEqual(['add_box', 'add_sphere']);
     expect(getState().document.order).toEqual(server.doc().order);
@@ -487,11 +486,7 @@ describe('CadStore — offline fallback', () => {
       ['add_sphere', false],
     ]);
     const server = simulatedServer();
-    vi.stubGlobal('fetch', server.fetch);
-    useStore.setState({ liveStatus: 'connected' });
-
-    getState().hydrateLiveDocument(liveSnapshot(createEmptyDocument()));
-    await vi.waitFor(() => expect(getState().syncState).toBe('idle'));
+    await reconnectTo(server);
 
     expect(server.commands()).toEqual(['add_sphere']);
     expect(getState().localOutbox).toEqual([]);
@@ -773,10 +768,7 @@ describe('CadStore — outbox flush correctness', () => {
     expect(new Set(ids).size).toBe(2);
 
     const server = simulatedServer();
-    vi.stubGlobal('fetch', server.fetch);
-    useStore.setState({ liveStatus: 'connected' });
-    getState().hydrateLiveDocument(liveSnapshot(createEmptyDocument()));
-    await vi.waitFor(() => expect(getState().syncState).toBe('idle'));
+    await reconnectTo(server);
 
     expect(server.bodies().map((body) => body.commandId)).toEqual(ids);
   });
