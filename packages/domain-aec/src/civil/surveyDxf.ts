@@ -12,15 +12,8 @@ import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
 import { flattenDxf, parseDxf, type DxfPrimitive } from '@lib/dxfRead';
 import { insUnitsMillimetres } from '@lib/dxfUnits';
-import {
-  civilAffected,
-  civilObjectsOf,
-  fromUnit,
-  getCivil,
-  nextCivilId,
-  withObject,
-} from './model';
-import { regenerateCivil } from './evaluate';
+import { civilObjectsOf, fromUnit, getCivil, nextCivilId, withObject } from './model';
+import { commitCivil } from './evaluate';
 
 const SOURCES = ['points', 'vertices', 'faces', 'text'] as const;
 type Source = (typeof SOURCES)[number];
@@ -139,14 +132,13 @@ export const importSurveyDxf = defineCommand({
       entityIds: [],
       points,
     };
-    const document = regenerateCivil(doc, withObject(civil, group));
-    return {
-      document,
-      summary:
-        `Imported ${points.length} survey points from DXF (${unit}) as ${group.name} (${id})` +
+    return commitCivil(
+      doc,
+      withObject(civil, group),
+      [id],
+      `Imported ${points.length} survey points from DXF (${unit}) as ${group.name} (${id})` +
         (zeros > 0 ? `; ${zeros} at elevation 0 ignored.` : '.'),
-      affected: civilAffected(document, [id]),
-      data: { pointGroupId: id, count: points.length },
-    };
+      { pointGroupId: id, count: points.length },
+    );
   },
 });

@@ -13,16 +13,9 @@ import type {
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
 import { projectOntoSegment } from '@lib/polygon';
-import {
-  fromMm,
-  getBuilding,
-  nextElementId,
-  nextMark,
-  withElement,
-  elementAffected,
-} from './model';
+import { fromMm, getBuilding, nextElementId, nextMark, withElement } from './model';
+import { commitBuilding } from './evaluateElements';
 import { noop } from '@core/commands/noop';
-import { regenerateBuilding } from './evaluateElements';
 import { builtExtent, openingsOf, wallFrame } from './wallGeometry';
 import { arcOffsetOf, curvedWallLength } from './curvedWallGeometry';
 import { openingFitError } from './walls';
@@ -108,15 +101,14 @@ function addOpening(doc: CadDocument, kind: OpeningKind, params: AddOpeningParam
     builtExtent(building, wall),
   );
   if (fitError) return noop(doc, `${name} failed: ${fitError}.`);
-  const document = regenerateBuilding(doc, withElement(building, opening));
-  return {
-    document,
-    summary:
-      `Added ${kind} ${opening.mark} (${opening.id}) ${width}×${height} in wall ${wall.mark} at ` +
+  return commitBuilding(
+    doc,
+    withElement(building, opening),
+    [opening.id, wall.id],
+    `Added ${kind} ${opening.mark} (${opening.id}) ${width}×${height} in wall ${wall.mark} at ` +
       `${offset.toFixed(3)} from its start, sill ${sillHeight}.`,
-    affected: elementAffected(document, [opening.id, wall.id]),
-    data: { elementId: opening.id },
-  };
+    { elementId: opening.id },
+  );
 }
 
 interface OpeningShape {
@@ -290,11 +282,11 @@ export const updateOpening = defineCommand({
       builtExtent(building, wall),
     );
     if (fitError) return noop(doc, `update_opening refused: ${fitError}.`);
-    const document = regenerateBuilding(doc, withElement(building, updated));
-    return {
-      document,
-      summary: `Updated ${updated.category} ${updated.mark} (${openingId}): ${updated.width}×${updated.height} at ${updated.offset.toFixed(3)}, sill ${updated.sillHeight}.`,
-      affected: elementAffected(document, [openingId, wall.id]),
-    };
+    return commitBuilding(
+      doc,
+      withElement(building, updated),
+      [openingId, wall.id],
+      `Updated ${updated.category} ${updated.mark} (${openingId}): ${updated.width}×${updated.height} at ${updated.offset.toFixed(3)}, sill ${updated.sillHeight}.`,
+    );
   },
 });

@@ -22,7 +22,7 @@ import {
   withObject,
   MAX_SURFACE_POINTS,
 } from './model';
-import { regenerateCivil } from './evaluate';
+import { commitCivil, regenerateCivil } from './evaluate';
 import { gridToLocal } from './crs';
 import { parseSurvey, SURVEY_FORMATS } from './surveyParse';
 import { surfacePoints, surfaceTin } from './surfaceTin';
@@ -131,7 +131,6 @@ export const importSurveyPoints = defineCommand({
       entityIds: [],
       points: surveyPoints,
     };
-    const document = regenerateCivil(doc, withObject(civil, group));
     const skipped =
       parsed.rejectedLines.length > 0
         ? ` Skipped ${parsed.rejectedLines.length} unreadable line(s): ${parsed.rejectedLines.slice(0, 10).join(', ')}.`
@@ -140,12 +139,13 @@ export const importSurveyPoints = defineCommand({
       surveyPoints.length > MAX_DRAWN_POINTS
         ? ` Markers not drawn above ${MAX_DRAWN_POINTS} points (the data is kept).`
         : '';
-    return {
-      document,
-      summary: `Imported ${surveyPoints.length} survey points as ${group.name} (${id}).${skipped}${drawn}`,
-      affected: civilAffected(document, [id]),
-      data: { pointGroupId: id, count: surveyPoints.length, rejectedLines: parsed.rejectedLines },
-    };
+    return commitCivil(
+      doc,
+      withObject(civil, group),
+      [id],
+      `Imported ${surveyPoints.length} survey points as ${group.name} (${id}).${skipped}${drawn}`,
+      { pointGroupId: id, count: surveyPoints.length, rejectedLines: parsed.rejectedLines },
+    );
   },
 });
 

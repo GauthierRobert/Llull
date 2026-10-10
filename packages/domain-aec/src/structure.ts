@@ -26,11 +26,10 @@ import {
   toMm,
   toVec2,
   withElement,
-  elementAffected,
 } from './model';
 import { noop } from '@core/commands/noop';
 import { duplicateSummary, findTwin, samePoint, sameRing, sameSegment } from './duplicates';
-import { regenerateBuilding } from './evaluateElements';
+import { commitBuilding } from './evaluateElements';
 
 const levelIdParam = (): z.ZodOptional<z.ZodString> =>
   z
@@ -218,13 +217,13 @@ export const addSlab = defineCommand({
       role,
       material: material?.trim() || 'concrete',
     };
-    const document = regenerateBuilding(doc, withElement(resolution.building, slab));
-    return {
-      document,
-      summary: `Added ${slab.role} slab ${slab.mark} (${slab.id}) on ${resolution.level.name}: area ${(polygonArea(outline) * toMetres(doc, 1) ** 2).toFixed(2)} m², thickness ${resolvedThickness} ${doc.units}.`,
-      affected: elementAffected(document, [slab.id]),
-      data: { elementId: slab.id },
-    };
+    return commitBuilding(
+      doc,
+      withElement(resolution.building, slab),
+      [slab.id],
+      `Added ${slab.role} slab ${slab.mark} (${slab.id}) on ${resolution.level.name}: area ${(polygonArea(outline) * toMetres(doc, 1) ** 2).toFixed(2)} m², thickness ${resolvedThickness} ${doc.units}.`,
+      { elementId: slab.id },
+    );
   },
 });
 
@@ -350,17 +349,16 @@ export const addColumn = defineCommand({
       next = withElement(next, column);
       ids.push(column.id);
     }
-    const document = regenerateBuilding(doc, next);
-    return {
-      document,
-      summary:
-        `Added ${ids.length} ${shape} column(s) ${ids.join(', ')} on ${resolution.level.name}.` +
+    return commitBuilding(
+      doc,
+      next,
+      ids,
+      `Added ${ids.length} ${shape} column(s) ${ids.join(', ')} on ${resolution.level.name}.` +
         (skipped.length > 0
           ? ` Skipped ${skipped.length} occupied location(s): ${skipped.join(', ')}.`
           : ''),
-      affected: elementAffected(document, ids),
-      data: { elementIds: ids },
-    };
+      { elementIds: ids },
+    );
   },
 });
 
@@ -420,13 +418,13 @@ export const addBeam = defineCommand({
       topOffset,
       material: material?.trim() || 'concrete',
     };
-    const document = regenerateBuilding(doc, withElement(resolution.building, beam));
-    return {
-      document,
-      summary: `Added beam ${beam.mark} (${beam.id}) ${resolvedWidth}×${resolvedDepth}, span ${distance(start, end).toFixed(3)} ${doc.units}.`,
-      affected: elementAffected(document, [beam.id]),
-      data: { elementId: beam.id },
-    };
+    return commitBuilding(
+      doc,
+      withElement(resolution.building, beam),
+      [beam.id],
+      `Added beam ${beam.mark} (${beam.id}) ${resolvedWidth}×${resolvedDepth}, span ${distance(start, end).toFixed(3)} ${doc.units}.`,
+      { elementId: beam.id },
+    );
   },
 });
 
@@ -516,16 +514,15 @@ export const addStair = defineCommand({
       treadDepth: resolvedTread,
       material: material?.trim() || 'concrete',
     };
-    const document = regenerateBuilding(doc, withElement(resolution.building, stair));
     const blondelMm = toMm(doc, 2 * riserHeight + resolvedTread);
-    return {
-      document,
-      summary:
-        `Added stair ${stair.mark} (${stair.id}): ${count} risers of ${Number(riserHeight.toPrecision(4))}, tread ${resolvedTread}, ` +
+    return commitBuilding(
+      doc,
+      withElement(resolution.building, stair),
+      [stair.id],
+      `Added stair ${stair.mark} (${stair.id}): ${count} risers of ${Number(riserHeight.toPrecision(4))}, tread ${resolvedTread}, ` +
         `run ${(count * resolvedTread).toFixed(1)} ${doc.units}; 2R+G = ${blondelMm.toFixed(0)} mm` +
         `${blondelMm < 600 || blondelMm > 650 ? ' (outside the 600–650 mm comfort range)' : ''}.`,
-      affected: elementAffected(document, [stair.id]),
-      data: { elementId: stair.id },
-    };
+      { elementId: stair.id },
+    );
   },
 });

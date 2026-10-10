@@ -10,6 +10,7 @@ import type { CivilModel } from '@core/model/civil';
 import type { CadPlugin, DocumentExtension } from '@core/plugins/plugin';
 import type { CommandDefinition } from '@core/commands/types';
 import { civilDerivationGuard } from './integrity';
+import { mergeRestored } from '../derived';
 import { civilErrors } from './validate';
 import { regenerateCivil } from './evaluate';
 import { createSurface, importSurveyPoints, updateSurface } from './surveyCommands';
@@ -58,17 +59,9 @@ function restore(raw: Record<string, unknown>): Record<string, unknown> {
     // Validation reports the problem; never let a corrupt file throw out of load.
     return raw;
   }
-  const present = savedOrder.filter((id) => id in regenerated.entities);
-  const placed = new Set(present);
-  const order = [...present, ...regenerated.order.filter((id) => !placed.has(id))];
-  const selection = Array.isArray(raw['selection'])
-    ? (raw['selection'] as string[]).filter((id) => id in regenerated.entities)
-    : [];
   return {
     ...raw,
-    entities: regenerated.entities,
-    order,
-    selection,
+    ...mergeRestored(raw, savedOrder, regenerated),
     civil: regenerated.civil,
     layers: regenerated.layers,
     layerOrder: regenerated.layerOrder,

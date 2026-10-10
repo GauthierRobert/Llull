@@ -11,7 +11,6 @@ import { defineCommand, z, vec2 } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
 import { isValidPolygon, segmentsIntersect, signedArea } from '@lib/polygon';
 import {
-  civilAffected,
   civilObject,
   civilObjectsOf,
   getCivil,
@@ -19,7 +18,7 @@ import {
   toMetresText,
   withObject,
 } from './model';
-import { regenerateCivil } from './evaluate';
+import { commitCivil } from './evaluate';
 import { surfaceTinById } from './surfaceTin';
 import { elevationAt, type Tin } from './tin';
 import {
@@ -166,16 +165,15 @@ export const addPlatform = defineCommand({
     };
     const problem = platformProblem(platform, tin);
     if (problem) return noop(doc, `add_platform failed: ${problem}`);
-    const document = regenerateCivil(doc, withObject(civil, platform));
     const data = report(doc, worksOf(platform, tin));
-    return {
-      document,
-      summary:
-        `Created platform ${platform.name} (${id}) at ${toMetresText(doc, platform.elevation)} m on ` +
+    return commitCivil(
+      doc,
+      withObject(civil, platform),
+      [id],
+      `Created platform ${platform.name} (${id}) at ${toMetresText(doc, platform.elevation)} m on ` +
         `${surface.name}: ${volumeText(data)}.`,
-      affected: civilAffected(document, [id]),
-      data: { platformId: id, ...data },
-    };
+      { platformId: id, ...data },
+    );
   },
 });
 
@@ -224,14 +222,14 @@ export const updatePlatform = defineCommand({
     }
     const problem = platformProblem(updated, tin);
     if (problem) return noop(doc, `update_platform failed: ${problem}`);
-    const document = regenerateCivil(doc, withObject(civil, updated));
     const data = report(doc, worksOf(updated, tin));
-    return {
-      document,
-      summary: `Updated platform ${updated.name} (${updated.id}) at ${toMetresText(doc, updated.elevation)} m: ${volumeText(data)}.`,
-      affected: civilAffected(document, [updated.id]),
-      data: { platformId: updated.id, ...data },
-    };
+    return commitCivil(
+      doc,
+      withObject(civil, updated),
+      [updated.id],
+      `Updated platform ${updated.name} (${updated.id}) at ${toMetresText(doc, updated.elevation)} m: ${volumeText(data)}.`,
+      { platformId: updated.id, ...data },
+    );
   },
 });
 
@@ -400,22 +398,21 @@ export const balancePlatform = defineCommand({
     const residual = round(
       (works.cutVolume * swellFactor - works.fillVolume) * toMetres(doc, 1) ** 3,
     );
-    const document = regenerateCivil(doc, withObject(civil, updated));
-    return {
-      document,
-      summary:
-        `Balanced ${platform.name} (${platform.id}): elevation ${toMetresText(doc, platform.elevation)} m -> ` +
+    return commitCivil(
+      doc,
+      withObject(civil, updated),
+      [platform.id],
+      `Balanced ${platform.name} (${platform.id}): elevation ${toMetresText(doc, platform.elevation)} m -> ` +
         `${round(toMetres(doc, elevation), 3)} m; ${volumeText(data)}; residual ${residual} m³ ` +
         `(cut x ${swellFactor} - fill).`,
-      affected: civilAffected(document, [platform.id]),
-      data: {
+      {
         platformId: platform.id,
         elevationM: round(toMetres(doc, elevation), 4),
         cutM3: data['cutM3'],
         fillM3: data['fillM3'],
         residualM3: residual,
       },
-    };
+    );
   },
 });
 

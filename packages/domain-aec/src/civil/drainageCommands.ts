@@ -11,7 +11,6 @@ import { defineCommand, z, vec2 } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
 import { fromMm } from '../model';
 import {
-  civilAffected,
   civilObject,
   civilObjectsOf,
   getCivil,
@@ -19,7 +18,7 @@ import {
   toMetresText,
   withObject,
 } from './model';
-import { regenerateCivil } from './evaluate';
+import { commitCivil } from './evaluate';
 import { surfaceTinById } from './surfaceTin';
 import { elevationAt } from './tin';
 import { pipePlanLength } from './drainageTopology';
@@ -153,16 +152,15 @@ export const addManhole = defineCommand({
       ...(params.inflowLps ? { inflow: params.inflowLps } : {}),
       ...(params.entryTimeMin ? { entryTimeMin: params.entryTimeMin } : {}),
     };
-    const document = regenerateCivil(doc, withObject(civil, manhole));
-    return {
-      document,
-      summary:
-        `Added manhole ${manhole.name} (${id}) at [${manhole.position.join(', ')}]: ` +
+    return commitCivil(
+      doc,
+      withObject(civil, manhole),
+      [id],
+      `Added manhole ${manhole.name} (${id}) at [${manhole.position.join(', ')}]: ` +
         `invert ${toMetresText(doc, manhole.invertElevation)} m, rim ${toMetresText(doc, rim)} m, ` +
         `depth ${toMetresText(doc, rim - manhole.invertElevation)} m.`,
-      affected: civilAffected(document, [id]),
-      data: { manholeId: id },
-    };
+      { manholeId: id },
+    );
   },
 });
 
@@ -239,18 +237,17 @@ export const updateManhole = defineCommand({
       (pipe) =>
         (pipe.fromId === manhole.id ? pipe.invertFrom : pipe.invertTo) < updated.invertElevation,
     );
-    const document = regenerateCivil(doc, next);
     const warning =
       below.length > 0
         ? ` Warning: pipe(s) ${below.map((p) => p.id).join(', ')} have an invert below the manhole invert.`
         : '';
-    return {
-      document,
-      summary:
-        `Updated manhole ${updated.name} (${updated.id}): invert ${toMetresText(doc, invert)} m, ` +
+    return commitCivil(
+      doc,
+      next,
+      [updated.id, ...attached.map((pipe) => pipe.id)],
+      `Updated manhole ${updated.name} (${updated.id}): invert ${toMetresText(doc, invert)} m, ` +
         `rim ${toMetresText(doc, rim)} m; ${attached.length} connected pipe(s) kept.${warning}`,
-      affected: civilAffected(document, [updated.id, ...attached.map((pipe) => pipe.id)]),
-    };
+    );
   },
 });
 

@@ -10,6 +10,7 @@ import type { CadDocument } from '@core/model/types';
 import type { CadPlugin, DocumentExtension } from '@core/plugins/plugin';
 import { buildingCommands, industrialCommands } from './index';
 import { buildingDerivationGuard } from './integrity';
+import { mergeRestored } from './derived';
 import { buildingErrors } from './validate';
 import { regenerateBuilding } from './evaluateElements';
 
@@ -35,17 +36,9 @@ function restore(raw: Record<string, unknown>): Record<string, unknown> {
     { ...base, order: savedOrder.filter((id) => id in base.entities), selection: [] },
     base.building as NonNullable<CadDocument['building']>,
   );
-  const present = savedOrder.filter((id) => id in regenerated.entities);
-  const placed = new Set(present);
-  const order = [...present, ...regenerated.order.filter((id) => !placed.has(id))];
-  const selection = Array.isArray(raw['selection'])
-    ? (raw['selection'] as string[]).filter((id) => id in regenerated.entities)
-    : [];
   return {
     ...raw,
-    entities: regenerated.entities,
-    order,
-    selection,
+    ...mergeRestored(raw, savedOrder, regenerated),
     building: regenerated.building,
     layers: regenerated.layers,
     layerOrder: regenerated.layerOrder,

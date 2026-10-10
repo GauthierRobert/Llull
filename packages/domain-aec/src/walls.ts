@@ -21,7 +21,7 @@ import {
 import { distance } from '@lib/polygon';
 import { findTwin, sameSegment } from './duplicates';
 import { noop } from '@core/commands/noop';
-import { regenerateBuilding } from './evaluateElements';
+import { commitBuilding, regenerateBuilding } from './evaluateElements';
 import { builtExtent, openingsOf, wallFrame, type WallExtent } from './wallGeometry';
 
 /**
@@ -336,15 +336,14 @@ export const updateWall = defineCommand({
     const next = withElement(building, updated);
     const issues = openingFitIssues(next, new Set([wall.levelId, updated.levelId]));
     if (issues.length > 0) return noop(doc, `update_wall refused: ${issues[0]}.`);
-    const document = regenerateBuilding(doc, next);
-    return {
-      document,
-      summary:
-        `Updated wall ${updated.mark} (${wallId}): [${updated.start.join(', ')}]→[${updated.end.join(', ')}], ` +
+    return commitBuilding(
+      doc,
+      next,
+      [wallId],
+      `Updated wall ${updated.mark} (${wallId}): [${updated.start.join(', ')}]→[${updated.end.join(', ')}], ` +
         `thickness ${updated.thickness}, height ${updated.height}, ${updated.material}` +
         `${!keepLayers && layers ? ' (build-up removed)' : ''}.`,
-      affected: elementAffected(document, [wallId]),
-    };
+    );
   },
 });
 

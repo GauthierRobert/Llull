@@ -7,7 +7,6 @@ import type { CurvedWallElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
 import {
-  elementAffected,
   fromMm,
   getBuilding,
   nextElementId,
@@ -18,7 +17,7 @@ import {
 } from './model';
 import { noop } from '@core/commands/noop';
 import { duplicateSummary, findTwin, samePoint, sameSegment } from './duplicates';
-import { regenerateBuilding } from './evaluateElements';
+import { commitBuilding } from './evaluateElements';
 import { curvedWallArc, curvedWallBand, curvedWallLength } from './curvedWallGeometry';
 import { levelIdParam } from './levelParams';
 
@@ -87,12 +86,12 @@ export const addCurvedWall = defineCommand({
     if (twin) {
       return noop(doc, duplicateSummary('add_curved_wall', twin, 'a curved wall on this arc'));
     }
-    const document = regenerateBuilding(doc, withElement(resolution.building, wall));
-    return {
-      document,
-      summary: `Added curved wall ${wall.mark} (${wall.id}): radius ${arc.radius.toFixed(1)}, ${((Math.abs(arc.sweep) * 180) / Math.PI).toFixed(1)}°, length ${toMetres(doc, curvedWallLength(wall)).toFixed(2)} m, ${thickness} thick, ${height} high.`,
-      affected: elementAffected(document, [wall.id]),
-      data: { elementId: wall.id, radius: arc.radius },
-    };
+    return commitBuilding(
+      doc,
+      withElement(resolution.building, wall),
+      [wall.id],
+      `Added curved wall ${wall.mark} (${wall.id}): radius ${arc.radius.toFixed(1)}, ${((Math.abs(arc.sweep) * 180) / Math.PI).toFixed(1)}°, length ${toMetres(doc, curvedWallLength(wall)).toFixed(2)} m, ${thickness} thick, ${height} high.`,
+      { elementId: wall.id, radius: arc.radius },
+    );
   },
 });

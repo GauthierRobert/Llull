@@ -5,7 +5,7 @@
  * @pure
  */
 
-import type { BoxEntity, Layer, MeshData, MeshSolidEntity, Vec3 } from '@core/model/types';
+import type { BoxEntity, MeshData, MeshSolidEntity, Vec3 } from '@core/model/types';
 import type { BimCategory, BuildingElement, MemberRole } from '@core/model/building';
 
 /** AIA / US National CAD Standard layer per category. */
@@ -42,9 +42,9 @@ export const MEMBER_LAYER: Readonly<Record<MemberRole, { name: string; color: st
   crane: { name: 'S-CRAN', color: '#d39b2a' },
 };
 
-const LAYER_COLOR: ReadonlyMap<string, string> = new Map(
+export const BUILDING_LAYER_COLOR: ReadonlyMap<string, string> = new Map(
   [...Object.values(CATEGORY_LAYER), ...Object.values(MEMBER_LAYER)].map(({ name, color }) => [
-    name,
+    `layer-${name}`,
     color,
   ]),
 );
@@ -129,22 +129,4 @@ export function meshEntity(
   color: string,
 ): MeshSolidEntity {
   return { ...base(element, stub, [0, 0, 0], [0, 0, 0], color), kind: 'mesh', mesh };
-}
-
-/** Adds any layer referenced by `layerIds` that the document lacks (standard name + colour). */
-export function ensureLayers(
-  layers: Record<string, Layer>,
-  layerOrder: string[],
-  layerIds: Iterable<string>,
-): { layers: Record<string, Layer>; layerOrder: string[] } {
-  let nextLayers = layers;
-  let nextOrder = layerOrder;
-  for (const id of layerIds) {
-    if (nextLayers[id]) continue;
-    const name = id.replace(/^layer-/, '');
-    const color = LAYER_COLOR.get(name) ?? '#8a8a8a';
-    nextLayers = { ...nextLayers, [id]: { id, name, visible: true, locked: false, color } };
-    nextOrder = [...nextOrder, id];
-  }
-  return { layers: nextLayers, layerOrder: nextOrder };
 }

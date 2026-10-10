@@ -12,7 +12,6 @@ import { noop } from '@core/commands/noop';
 import { alignmentLength, endStation, validateHorizontal } from './alignmentGeometry';
 import { grades, validateProfile, verticalCurves } from './profileGeometry';
 import {
-  civilAffected,
   civilObject,
   civilObjectsOf,
   formatStation,
@@ -22,7 +21,7 @@ import {
   toMetresText,
   withObject,
 } from './model';
-import { regenerateCivil } from './evaluate';
+import { commitCivil } from './evaluate';
 import { roadReportCommands } from './roadReportCommands';
 import { setSuperelevation } from './roadSuperelevationCommand';
 import { toMetres } from '../model';
@@ -33,10 +32,6 @@ function pointsInput(): z.ZodArray<z.ZodTuple<[z.ZodNumber, z.ZodNumber], null>>
 
 function findAlignment(doc: CadDocument, alignmentId: string): AlignmentObject | undefined {
   return civilObject(getCivil(doc), alignmentId, 'alignment');
-}
-
-function commit(doc: CadDocument, alignment: AlignmentObject): CadDocument {
-  return regenerateCivil(doc, withObject(getCivil(doc), alignment));
 }
 
 function spiralsOrNone(spirals: ReadonlyArray<number>): { spirals?: readonly number[] } {
@@ -115,18 +110,17 @@ export const addAlignment = defineCommand({
       ...(params.surfaceId ? { surfaceId: params.surfaceId } : {}),
       profile: [],
     };
-    const document = commit(doc, alignment);
     const lengthM = toMetres(doc, alignmentLength(alignment));
-    return {
-      document,
-      summary:
-        `Created alignment ${alignment.name} (${id}): ${params.points.length} PIs, ` +
+    return commitCivil(
+      doc,
+      withObject(getCivil(doc), alignment),
+      [id],
+      `Created alignment ${alignment.name} (${id}): ${params.points.length} PIs, ` +
         `${radii.filter((radius) => radius > 0).length} curve(s)` +
         `${spirals.some((length) => length > 0) ? ` (${spirals.filter((length) => length > 0).length} with spirals)` : ''}, length ${lengthM.toFixed(2)} m, ` +
         `stations ${formatStation(toMetres(doc, startStation))} to ${formatStation(toMetres(doc, endStation(alignment)))}.`,
-      affected: civilAffected(document, [id]),
-      data: { alignmentId: id, lengthM: Number(lengthM.toFixed(3)) },
-    };
+      { alignmentId: id, lengthM: Number(lengthM.toFixed(3)) },
+    );
   },
 });
 
@@ -199,7 +193,6 @@ export const updateAlignment = defineCommand({
     if (JSON.stringify(updated) === JSON.stringify(alignment)) {
       return noop(doc, `update_alignment: nothing to change on ${alignment.id}.`);
     }
-    const document = commit(doc, updated);
     const last = alignment.profile[alignment.profile.length - 1];
     const outside =
       last &&
@@ -207,13 +200,13 @@ export const updateAlignment = defineCommand({
         (alignment.profile[0]?.station ?? 0) < startStation - 1e-6)
         ? ' Warning: the profile now extends beyond the alignment stations.'
         : '';
-    return {
-      document,
-      summary:
-        `Updated alignment ${updated.name} (${updated.id}): length ` +
+    return commitCivil(
+      doc,
+      withObject(getCivil(doc), updated),
+      [updated.id],
+      `Updated alignment ${updated.name} (${updated.id}): length ` +
         `${toMetres(doc, alignmentLength(updated)).toFixed(2)} m.${outside}`,
-      affected: civilAffected(document, [updated.id]),
-    };
+    );
   },
 });
 
@@ -283,12 +276,12 @@ export const setAlignmentProfile = defineCommand({
         `set_alignment_profile failed: PVIs span ${first.station} to ${last.station} but the alignment runs ${start} to ${Number(end.toFixed(4))}.`,
       );
     }
-    const document = commit(doc, { ...alignment, profile });
-    return {
-      document,
-      summary: `Set profile of ${alignment.name} (${alignment.id}): ${profile.length} PVIs. ${gradeSummary(doc, profile)}`,
-      affected: civilAffected(document, [alignment.id]),
-    };
+    return commitCivil(
+      doc,
+      withObject(getCivil(doc), { ...alignment, profile }),
+      [alignment.id],
+      `Set profile of ${alignment.name} (${alignment.id}): ${profile.length} PVIs. ${gradeSummary(doc, profile)}`,
+    );
   },
 });
 
@@ -343,15 +336,14 @@ export const setRoadSection = defineCommand({
         'set_road_section failed: laneWidth and slopes must be > 0, shoulderWidth >= 0, crossfall between 0 and 0.3.',
       );
     }
-    const document = commit(doc, { ...alignment, section });
-    return {
-      document,
-      summary:
-        `Set road section of ${alignment.name} (${alignment.id}): lane ${toMetresText(doc, section.laneWidth)} m, ` +
+    return commitCivil(
+      doc,
+      withObject(getCivil(doc), { ...alignment, section }),
+      [alignment.id],
+      `Set road section of ${alignment.name} (${alignment.id}): lane ${toMetresText(doc, section.laneWidth)} m, ` +
         `shoulder ${toMetresText(doc, section.shoulderWidth)} m, crossfall ${(section.crossfall * 100).toFixed(1)}%, ` +
         `cut ${section.cutSlope}H:1V, fill ${section.fillSlope}H:1V.`,
-      affected: civilAffected(document, [alignment.id]),
-    };
+    );
   },
 });
 

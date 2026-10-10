@@ -25,7 +25,7 @@ import {
 } from './model';
 import { noop } from '@core/commands/noop';
 import { duplicateSummary, findTwin, sameRing } from './duplicates';
-import { regenerateBuilding } from './evaluateElements';
+import { commitBuilding, regenerateBuilding } from './evaluateElements';
 import { resolveOutline } from './structure';
 import { openingFitIssues } from './walls';
 import { nextMemberMark } from './industrial/memberSupport';
@@ -95,14 +95,14 @@ export const addRoom = defineCommand({
       name: name.trim(),
       boundary: outline,
     };
-    const document = regenerateBuilding(doc, withElement(resolution.building, room));
     const squareMetres = polygonArea(outline) * toMetres(doc, 1) ** 2;
-    return {
-      document,
-      summary: `Added room ${room.mark} "${room.name}" (${room.id}) on ${resolution.level.name}: ${squareMetres.toFixed(2)} m².`,
-      affected: elementAffected(document, [room.id]),
-      data: { elementId: room.id, areaSquareMetres: squareMetres },
-    };
+    return commitBuilding(
+      doc,
+      withElement(resolution.building, room),
+      [room.id],
+      `Added room ${room.mark} "${room.name}" (${room.id}) on ${resolution.level.name}: ${squareMetres.toFixed(2)} m².`,
+      { elementId: room.id, areaSquareMetres: squareMetres },
+    );
   },
 });
 
@@ -447,12 +447,12 @@ export const copyLevelElements = defineCommand({
       next,
       created.filter((id) => next.elements[id]?.category === 'pipeSupport'),
     );
-    const document = regenerateBuilding(doc, supports.building);
-    return {
-      document,
-      summary: `Copied ${sourceElements.length} element(s) from ${sourceLevelId} to ${targetLevelIds.join(', ')}: ${created.length} new element(s).${reconciliationNote(supports)}`,
-      affected: elementAffected(document, created),
-      data: { elementIds: created },
-    };
+    return commitBuilding(
+      doc,
+      supports.building,
+      created,
+      `Copied ${sourceElements.length} element(s) from ${sourceLevelId} to ${targetLevelIds.join(', ')}: ${created.length} new element(s).${reconciliationNote(supports)}`,
+      { elementIds: created },
+    );
   },
 });
