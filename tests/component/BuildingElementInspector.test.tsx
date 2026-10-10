@@ -37,6 +37,14 @@ function selectBody(command: string, params: unknown): void {
   useStore.getState().select([affected.find((id) => id.endsWith(':body')) ?? affected[0]!]);
 }
 
+const selectIpeBeam = (): void =>
+  selectBody('add_steel_member', {
+    role: 'beam',
+    profile: 'IPE300',
+    start: [0, 0, 4000],
+    end: [6000, 0, 4000],
+  });
+
 describe('building element inspector', () => {
   it('shows steel member facts and dispatches only the changed fields', () => {
     selectBody('add_steel_member', {
@@ -61,12 +69,7 @@ describe('building element inspector', () => {
   });
 
   it('keeps the top of steel of a beam on a section change unless unticked', () => {
-    selectBody('add_steel_member', {
-      role: 'beam',
-      profile: 'IPE300',
-      start: [0, 0, 4000],
-      end: [6000, 0, 4000],
-    });
+    selectIpeBeam();
     const dispatch = spyDispatch();
     render(<PropertiesPanel />);
     expect(screen.queryByTestId('member-keep-top')).toBeNull();
@@ -83,12 +86,7 @@ describe('building element inspector', () => {
   });
 
   it('does not dispatch when nothing changed', () => {
-    selectBody('add_steel_member', {
-      role: 'beam',
-      profile: 'IPE300',
-      start: [0, 0, 4000],
-      end: [6000, 0, 4000],
-    });
+    selectIpeBeam();
     const dispatch = spyDispatch();
     render(<PropertiesPanel />);
     expect(screen.getByLabelText('Start joint')).toBeInTheDocument();

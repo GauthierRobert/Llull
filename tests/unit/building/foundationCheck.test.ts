@@ -7,6 +7,7 @@ import { foundationCheck } from '@aec/industrial/foundationCheckRun';
 import { consolidationSettlement } from '@aec/industrial/foundationSettlement';
 import { baseReactions } from '@aec/industrial/frameModelSolve';
 import { anchorBoltResistance, boltResistance } from '@aec/industrial/steelDesign';
+import { mapElements } from './elementEdits';
 
 const HALL = { span: 24000, length: 30000 };
 
@@ -77,16 +78,9 @@ describe('check_foundations', () => {
   });
 
   it('fails a small footing on soil bearing and lists it', () => {
-    const base = hall();
-    const building = base.building;
-    if (!building) throw new Error('no building');
-    const elements = Object.fromEntries(
-      Object.entries(building.elements).map(([id, element]) => [
-        id,
-        element.category === 'footing' ? { ...element, width: 300, length: 300 } : element,
-      ]),
+    const doc = mapElements(hall(), (element) =>
+      element.category === 'footing' ? { ...element, width: 300, length: 300 } : element,
     );
-    const doc = { ...base, building: { ...building, elements } };
     const result = foundationCheck.run(doc, {});
     const data = result.data as { failures: string[]; maxUtilisation: number };
     expect(data.maxUtilisation).toBeGreaterThan(1);

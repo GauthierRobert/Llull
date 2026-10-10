@@ -10,6 +10,13 @@ import type {
 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 
+function expectPure(name: string, params: unknown): void {
+  const doc = createEmptyDocument();
+  const snapshot = JSON.stringify(doc);
+  execute(doc, name, params);
+  expect(JSON.stringify(doc)).toBe(snapshot);
+}
+
 describe('2D draw commands', () => {
   // -------------------------------------------------------------------------
   // draw_line
@@ -61,10 +68,7 @@ describe('2D draw commands', () => {
     });
 
     it('is pure — input document is not mutated', () => {
-      const doc = createEmptyDocument();
-      const snapshot = JSON.stringify(doc);
-      execute(doc, 'draw_line', { start: [0, 0], end: [1, 1] });
-      expect(JSON.stringify(doc)).toBe(snapshot);
+      expectPure('draw_line', { start: [0, 0], end: [1, 1] });
     });
   });
 
@@ -122,15 +126,12 @@ describe('2D draw commands', () => {
     });
 
     it('is pure — input document is not mutated', () => {
-      const doc = createEmptyDocument();
-      const snapshot = JSON.stringify(doc);
-      execute(doc, 'draw_polyline', {
+      expectPure('draw_polyline', {
         points: [
           [0, 0],
           [1, 1],
         ],
       });
-      expect(JSON.stringify(doc)).toBe(snapshot);
     });
   });
 
@@ -184,10 +185,7 @@ describe('2D draw commands', () => {
     });
 
     it('is pure — input document is not mutated', () => {
-      const doc = createEmptyDocument();
-      const snapshot = JSON.stringify(doc);
-      execute(doc, 'draw_arc', { center: [0, 0], radius: 3, startAngle: 0, endAngle: 1 });
-      expect(JSON.stringify(doc)).toBe(snapshot);
+      expectPure('draw_arc', { center: [0, 0], radius: 3, startAngle: 0, endAngle: 1 });
     });
   });
 
@@ -224,10 +222,7 @@ describe('2D draw commands', () => {
     });
 
     it('is pure — input document is not mutated', () => {
-      const doc = createEmptyDocument();
-      const snapshot = JSON.stringify(doc);
-      execute(doc, 'draw_circle', { center: [0, 0], radius: 5 });
-      expect(JSON.stringify(doc)).toBe(snapshot);
+      expectPure('draw_circle', { center: [0, 0], radius: 5 });
     });
   });
 
@@ -265,10 +260,7 @@ describe('2D draw commands', () => {
     });
 
     it('is pure — input document is not mutated', () => {
-      const doc = createEmptyDocument();
-      const snapshot = JSON.stringify(doc);
-      execute(doc, 'draw_rectangle', { width: 4, height: 3 });
-      expect(JSON.stringify(doc)).toBe(snapshot);
+      expectPure('draw_rectangle', { width: 4, height: 3 });
     });
   });
 
@@ -298,10 +290,7 @@ describe('2D draw commands', () => {
     });
 
     it('is pure — input document is not mutated', () => {
-      const doc = createEmptyDocument();
-      const snapshot = JSON.stringify(doc);
-      execute(doc, 'draw_point', { position: [0, 0, 0] });
-      expect(JSON.stringify(doc)).toBe(snapshot);
+      expectPure('draw_point', { position: [0, 0, 0] });
     });
   });
 

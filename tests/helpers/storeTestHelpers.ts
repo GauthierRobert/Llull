@@ -16,7 +16,7 @@
  */
 
 import { vi } from 'vitest';
-import type { CadDocument } from '@core/model/types';
+import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { type LiveSnapshotEvent, documentHash } from '@mcp/liveSync';
 import { execute } from '@core/commands/registry';
 import type { CommandResult } from '@core/commands/types';
@@ -62,4 +62,19 @@ export function spyDispatch(): ReturnType<typeof vi.fn> {
   const spy = vi.fn();
   useStore.setState({ dispatch: spy } as unknown as Parameters<typeof useStore.setState>[0]);
   return spy;
+}
+
+/** Offline store with an empty document and no local undo history. */
+export function resetOfflineStore(): void {
+  useStore.getState().setDocument(createEmptyDocument());
+  useStore.setState({ liveStatus: 'disconnected', localUndoStack: [], localRedoStack: [] });
+}
+
+/** Replaces `dispatch` with a spy that answers every call's `onResult` with `result`. */
+export function answerDispatch(result: { summary: string; changed: boolean }): void {
+  const answer = (_n: string, _p: unknown, options?: { onResult?: (r: unknown) => void }): void =>
+    options?.onResult?.(result);
+  useStore.setState({ dispatch: vi.fn(answer) } as unknown as Parameters<
+    typeof useStore.setState
+  >[0]);
 }

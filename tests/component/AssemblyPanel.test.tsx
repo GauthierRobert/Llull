@@ -31,6 +31,14 @@ function resetStore(): void {
 // Tests
 // ---------------------------------------------------------------------------
 
+/** A unit box wrapped in component `name` and instanced once; returns the instance id. */
+function insertedInstance(name: string): string {
+  const boxResult = localDispatch('add_box', { size: [1, 1, 1] });
+  localDispatch('create_component', { name, entityIds: [boxResult.affected[0]!] });
+  const compId = Object.keys(useStore.getState().document.components)[0]!;
+  return localDispatch('insert_instance', { componentId: compId }).affected[0]!;
+}
+
 describe('AssemblyPanel — empty state', () => {
   beforeEach(() => {
     resetStore();
@@ -131,12 +139,7 @@ describe('AssemblyPanel — instances section', () => {
   });
 
   it('clicking an instance row calls select() with the instance id', () => {
-    const boxResult = localDispatch('add_box', { size: [1, 1, 1] });
-    localDispatch('create_component', { name: 'Pin', entityIds: [boxResult.affected[0]!] });
-    const doc = useStore.getState().document;
-    const compId = Object.keys(doc.components)[0]!;
-    const insertResult = localDispatch('insert_instance', { componentId: compId });
-    const instanceId = insertResult.affected[0]!;
+    const instanceId = insertedInstance('Pin');
 
     const selectSpy = vi.spyOn(useStore.getState(), 'select');
 
@@ -151,12 +154,7 @@ describe('AssemblyPanel — instances section', () => {
   });
 
   it('Explode button dispatches explode_instance with the correct id', () => {
-    const boxResult = localDispatch('add_box', { size: [1, 1, 1] });
-    localDispatch('create_component', { name: 'Widget', entityIds: [boxResult.affected[0]!] });
-    const doc = useStore.getState().document;
-    const compId = Object.keys(doc.components)[0]!;
-    const insertResult = localDispatch('insert_instance', { componentId: compId });
-    const instanceId = insertResult.affected[0]!;
+    const instanceId = insertedInstance('Widget');
 
     const dispatchSpy = vi.spyOn(useStore.getState(), 'dispatch').mockResolvedValue();
 
@@ -170,12 +168,7 @@ describe('AssemblyPanel — instances section', () => {
   });
 
   it('selected instance row has the selected CSS class', () => {
-    const boxResult = localDispatch('add_box', { size: [1, 1, 1] });
-    localDispatch('create_component', { name: 'Cap', entityIds: [boxResult.affected[0]!] });
-    const doc = useStore.getState().document;
-    const compId = Object.keys(doc.components)[0]!;
-    const insertResult = localDispatch('insert_instance', { componentId: compId });
-    const instanceId = insertResult.affected[0]!;
+    const instanceId = insertedInstance('Cap');
 
     // Pre-select the instance in the store so the component renders it selected.
     useStore.setState({
@@ -192,10 +185,7 @@ describe('AssemblyPanel — instances section', () => {
   });
 
   it('exposes each instance as a keyboard-operable button reflecting selection', () => {
-    const boxResult = localDispatch('add_box', { size: [1, 1, 1] });
-    localDispatch('create_component', { name: 'Bolt', entityIds: [boxResult.affected[0]!] });
-    const compId = Object.keys(useStore.getState().document.components)[0]!;
-    const instanceId = localDispatch('insert_instance', { componentId: compId }).affected[0]!;
+    const instanceId = insertedInstance('Bolt');
 
     render(<AssemblyPanel />);
 

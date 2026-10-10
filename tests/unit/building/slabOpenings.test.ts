@@ -6,10 +6,7 @@ import { buildPlanDrawing } from '@aec/planDrawing';
 import type { TakeoffLine } from '@aec/takeoffBasics';
 import type { IfcExport } from '@aec/ifcBuild';
 import { segmentsIntersect, pointInPolygon } from '@lib/polygon';
-
-function run(doc: CadDocument, name: string, params: unknown): CadDocument {
-  return execute(doc, name, params).document;
-}
+import { run } from './runFixtures';
 
 const rect = (x0: number, y0: number, x1: number, y1: number): number[][] => [
   [x0, y0],

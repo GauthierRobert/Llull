@@ -582,16 +582,20 @@ function makeOfflineEdit(): void {
   useStore.setState({ liveStatus: 'connected' });
 }
 
-describe('CadStore — sync race fixes', () => {
+/** Reset the store before each test; restore timers, globals and the document after. */
+function useCleanStoreHooks(): void {
   beforeEach(() => {
     resetStore();
   });
-
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
     getState().setDocument(createEmptyDocument());
   });
+}
+
+describe('CadStore — sync race fixes', () => {
+  useCleanStoreHooks();
 
   it('select during push does not leave the unsynced flag set', async () => {
     makeOfflineEdit();
@@ -733,15 +737,7 @@ describe('CadStore — live command log', () => {
 });
 
 describe('CadStore — outbox flush correctness', () => {
-  beforeEach(() => {
-    resetStore();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-    vi.unstubAllGlobals();
-    getState().setDocument(createEmptyDocument());
-  });
+  useCleanStoreHooks();
 
   it('outbox entries get unique client commandIds that are sent to the server', async () => {
     useStore.setState({ liveStatus: 'disconnected' });

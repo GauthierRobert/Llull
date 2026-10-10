@@ -33,6 +33,14 @@ describe('transform commands', () => {
     expect(JSON.stringify(doc)).toBe(snapshot);
   }
 
+  function expectInOrder(id: string, result: ReturnType<typeof execute>): void {
+    const order = result.document.order;
+    expect(order).toContain(id);
+    for (const copyId of result.affected) {
+      expect(order).toContain(copyId);
+    }
+  }
+
   /** Box at `position`, then `cmd` on it; for rotation/placement assertions. */
   function runOnBox(
     cmd: string,
@@ -313,12 +321,7 @@ describe('transform commands', () => {
 
     it('appends all copy ids to document.order', () => {
       const { id, result } = runOnBox('array_linear', { count: 3, offset: [1, 0, 0] }, [0, 0, 0]);
-
-      const order = result.document.order;
-      expect(order).toContain(id);
-      for (const copyId of result.affected) {
-        expect(order).toContain(copyId);
-      }
+      expectInOrder(id, result);
     });
 
     it('copies preserve geometry, rotation, color, and layer from the original', () => {
@@ -431,12 +434,7 @@ describe('transform commands', () => {
 
     it('appends copy ids to document.order', () => {
       const { id, result } = runOnBox('array_polar', { count: 3, center: [0, 0, 0] }, [2, 0, 0]);
-
-      const order = result.document.order;
-      expect(order).toContain(id);
-      for (const copyId of result.affected) {
-        expect(order).toContain(copyId);
-      }
+      expectInOrder(id, result);
     });
 
     it('is a no-op for a missing id', () => {

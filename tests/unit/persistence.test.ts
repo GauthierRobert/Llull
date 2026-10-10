@@ -226,24 +226,16 @@ describe('load_document command', () => {
     expect(result.summary).toMatch(/invalid JSON/i);
   });
 
-  it('failure path: wrong format is a graceful no-op', () => {
+  it.each([
+    ['wrong format', { format: 'unknown', version: 1, document: {} }, /format/i],
+    ['wrong version', { format: 'llull-document', version: 99, document: {} }, /version/i],
+  ])('failure path: %s is a graceful no-op', (_label, envelope, summary) => {
     const doc = createEmptyDocument();
-    const bad = JSON.stringify({ format: 'unknown', version: 1, document: {} });
-    const result = execute(doc, 'load_document', { json: bad });
+    const result = execute(doc, 'load_document', { json: JSON.stringify(envelope) });
 
     expect(result.document).toBe(doc);
     expect(result.affected).toHaveLength(0);
-    expect(result.summary).toMatch(/format/i);
-  });
-
-  it('failure path: wrong version is a graceful no-op', () => {
-    const doc = createEmptyDocument();
-    const bad = JSON.stringify({ format: 'llull-document', version: 99, document: {} });
-    const result = execute(doc, 'load_document', { json: bad });
-
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-    expect(result.summary).toMatch(/version/i);
+    expect(result.summary).toMatch(summary);
   });
 
   it('is pure — the input document is never mutated', () => {
@@ -292,14 +284,11 @@ describe('deserializeDocument — entity kind-specific validation', () => {
     expect((restored.entities['t1'] as unknown as Record<string, unknown>)['kind']).toBe('text');
   });
 
-  it('throws on text entity with height <= 0', () => {
-    const entity = validEntityBase('t1', 'text', { content: 'hi', height: 0, points: [[0, 0]] });
-    const json = makeEnvelope({ entities: { t1: entity }, order: ['t1'] });
-    expect(() => deserializeDocument(json)).toThrow(/height/i);
-  });
-
-  it('throws on text entity with non-finite height (NaN)', () => {
-    const entity = validEntityBase('t1', 'text', { content: 'hi', height: NaN, points: [[0, 0]] });
+  it.each([
+    ['height <= 0', 0],
+    ['non-finite height (NaN)', NaN],
+  ])('throws on text entity with %s', (_label, height) => {
+    const entity = validEntityBase('t1', 'text', { content: 'hi', height, points: [[0, 0]] });
     const json = makeEnvelope({ entities: { t1: entity }, order: ['t1'] });
     expect(() => deserializeDocument(json)).toThrow(/height/i);
   });

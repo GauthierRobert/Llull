@@ -20,6 +20,7 @@ import { useViewportStore } from '@ui/store';
 import { useStore } from '@ui/store';
 import { type Animation, type EntityGroup, createEmptyDocument } from '@core/model/types';
 import { ViewportControls } from '@ui/viewport/3d/ViewportControls';
+import { resetViewportStores } from '../helpers/componentEntities';
 import { findClickAnimationsForEntity } from '@ui/viewport/3d/animationClickHelpers';
 
 // ---------------------------------------------------------------------------
@@ -45,17 +46,12 @@ function makeAnimation(overrides: Partial<Animation> & { id: string }): Animatio
   return base;
 }
 
-function resetStores(): void {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
-  useViewportStore.setState({
-    displayMode: 'shaded',
-    clipPlane: { enabled: false, axis: 'y', offset: 0, flipped: false },
-    hiddenEntityIds: new Set(),
+const resetStores = (): void =>
+  resetViewportStores({
     animationPlaying: false,
     activeClickAnimationIds: new Set(),
     animationResetNonce: 0,
   });
-}
 
 // ---------------------------------------------------------------------------
 // Part A — viewportStore animation actions

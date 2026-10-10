@@ -16,7 +16,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
 
-import { liveSnapshot } from '../helpers/storeTestHelpers';
+import { answerDispatch, liveSnapshot } from '../helpers/storeTestHelpers';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { useStore } from '@ui/store';
@@ -33,6 +33,11 @@ function resetStore(): void {
     lastSummary: null,
   });
 }
+
+const STEEL_AND_PLA: Record<string, Material> = {
+  steel: { name: 'steel', density: 0.00785, color: '#b0b0b0', metalness: 0.9, roughness: 0.2 },
+  pla: { name: 'pla', density: 0.00124, color: '#ff8800', metalness: 0, roughness: 0.7 },
+};
 
 /** Inject materials directly into the store document for fixture setup. */
 function setMaterials(mats: Record<string, Material>): void {
@@ -66,10 +71,7 @@ describe('MaterialsPanel — rendering', () => {
   });
 
   it('renders a row for each material', () => {
-    setMaterials({
-      steel: { name: 'steel', density: 0.00785, color: '#b0b0b0', metalness: 0.9, roughness: 0.2 },
-      pla: { name: 'pla', density: 0.00124, color: '#ff8800', metalness: 0, roughness: 0.7 },
-    });
+    setMaterials(STEEL_AND_PLA);
 
     render(<MaterialsPanel />);
 
@@ -187,10 +189,7 @@ describe('MaterialsPanel — assign', () => {
   });
 
   it('dispatches with the correct materialName when multiple materials exist', () => {
-    setMaterials({
-      steel: { name: 'steel', density: 0.00785, color: '#b0b0b0', metalness: 0.9, roughness: 0.2 },
-      pla: { name: 'pla', density: 0.00124, color: '#ff8800', metalness: 0, roughness: 0.7 },
-    });
+    setMaterials(STEEL_AND_PLA);
     setSelection(['e-001']);
     const dispatchSpy = vi.fn();
     patchDispatch(dispatchSpy);
@@ -282,11 +281,7 @@ describe('MaterialsPanel — create form', () => {
     ['keeps the typed values when the create is rejected', 'duplicate', false, 'steel', '0.00785'],
     ['clears name and density after successful submit', 'ok', true, '', ''],
   ])('%s', (_title, summary, changed, expectedName, expectedDensity) => {
-    patchDispatch(
-      vi.fn((_name: string, _params: unknown, options?: { onResult?: (r: any) => void }) =>
-        options?.onResult?.({ summary, changed }),
-      ),
-    );
+    answerDispatch({ summary, changed });
 
     render(<MaterialsPanel />);
     const form = screen.getByTestId('material-create-form');

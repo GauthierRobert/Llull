@@ -7,13 +7,7 @@ import { boltResistance, yieldStrength } from '@aec/industrial/steelDesign';
 import { connectionWelds } from '@aec/industrial/connections';
 import type { MomentConnectionElement, SteelMemberElement } from '@core/model/building';
 import type { TakeoffLine } from '@aec/takeoffBasics';
-
-const HALL = { span: 24000, length: 30000 };
-
-function hall(params: Record<string, unknown> = {}): CadDocument {
-  return execute(createEmptyDocument(), 'add_portal_frame_building', { ...HALL, ...params })
-    .document;
-}
+import { hall } from './hallFixtures';
 
 describe('design helpers', () => {
   it('reads yield strengths, bolt resistances and the next section size', () => {

@@ -464,17 +464,21 @@ describe('applyOrthoPolar', () => {
     expect(result[1]).toBeCloseTo(3);
   });
 
-  it('snaps to the nearest polar angle increment (polar=true, increment=15°)', () => {
+  it.each([
+    [
+      'snaps to the nearest polar angle increment (polar=true, increment=15°)',
+      (15 * Math.PI) / 180,
+    ],
+    ['treats a 0 polarIncrement as the 15° default (never returns NaN)', 0],
+  ])('%s', (_name, polarIncrement) => {
     const origin: [number, number] = [0, 0];
     // angle ≈ 22.5°, nearest 15° increment → 30°
     const length = 5;
     const angle = (22.5 * Math.PI) / 180;
     const cursor: [number, number] = [length * Math.cos(angle), length * Math.sin(angle)];
-    const result = applyOrthoPolar(origin, cursor, {
-      ortho: false,
-      polar: true,
-      polarIncrement: (15 * Math.PI) / 180,
-    });
+    const result = applyOrthoPolar(origin, cursor, { ortho: false, polar: true, polarIncrement });
+    expect(Number.isNaN(result[0])).toBe(false);
+    expect(Number.isNaN(result[1])).toBe(false);
     const expectedAngle = (30 * Math.PI) / 180;
     expect(result[0]).toBeCloseTo(length * Math.cos(expectedAngle));
     expect(result[1]).toBeCloseTo(length * Math.sin(expectedAngle));
@@ -506,24 +510,6 @@ describe('applyOrthoPolar', () => {
     const origin: [number, number] = [3, 4];
     const result = applyOrthoPolar(origin, [3, 4], { ortho: true, polar: false });
     expect(result).toEqual([3, 4]);
-  });
-
-  it('treats a 0 polarIncrement as the 15° default (never returns NaN)', () => {
-    const origin: [number, number] = [0, 0];
-    const length = 5;
-    const angle = (22.5 * Math.PI) / 180;
-    const cursor: [number, number] = [length * Math.cos(angle), length * Math.sin(angle)];
-    const result = applyOrthoPolar(origin, cursor, {
-      ortho: false,
-      polar: true,
-      polarIncrement: 0,
-    });
-    expect(Number.isNaN(result[0])).toBe(false);
-    expect(Number.isNaN(result[1])).toBe(false);
-    // Falls back to 15° increment → nearest is 30°.
-    const expected = (30 * Math.PI) / 180;
-    expect(result[0]).toBeCloseTo(length * Math.cos(expected));
-    expect(result[1]).toBeCloseTo(length * Math.sin(expected));
   });
 });
 

@@ -4,7 +4,7 @@ import { execute } from '@core/commands/registry';
 import { pipeWeightPerMetre } from '@aec/industrial/pipeWeight';
 import { tributaryLengths } from '@aec/industrial/steelSupportLoads';
 import { findProfile } from '@aec/steel/profiles';
-import { G, beam, check, column, rowOf, step, twoLevels } from './steelFixtures';
+import { G, beamOnColumns, check, column, rowOf, step, twoLevels } from './steelFixtures';
 import { hangerDoc, shoeDoc } from './pipeSupportFixtures';
 
 const W = pipeWeightPerMetre(114.3, 1000); // kN/m, DN100 water-filled
@@ -16,6 +16,12 @@ const support = (doc: CadDocument, params: Record<string, unknown>): CadDocument
 
 const pipeRun = (doc: CadDocument, points: Array<[number, number, number]>): CadDocument =>
   step(doc, 'add_pipe_run', { levelId: 'level-1', dn: 100, points });
+
+const columnWithRun = (top = 3000): CadDocument =>
+  pipeRun(column(twoLevels(), 1000, 1000, 'HEB200', top), [
+    [0, 1000, 2000],
+    [3000, 1000, 2000],
+  ]);
 
 interface LineRow {
   supports: number;
@@ -58,12 +64,7 @@ describe('pipe weight through supports', () => {
   });
 
   it('shares a run between supports like the resting rule: 2 m and 4 m tributaries', () => {
-    let doc = twoLevels();
-    for (const x of [1000, 3000]) {
-      doc = column(doc, x, 0);
-      doc = column(doc, x, 4000);
-      doc = beam(doc, [x, 0], [x, 4000]);
-    }
+    let doc = beamOnColumns([1000, 3000]);
     doc = pipeRun(doc, [
       [0, 2000, 3027.15],
       [6000, 2000, 3027.15],
@@ -176,12 +177,7 @@ describe('pipe weight through supports', () => {
   });
 
   it('takes a column-borne support as axial load and notes the bracket eccentricity', () => {
-    let doc = twoLevels();
-    doc = column(doc, 1000, 1000);
-    doc = pipeRun(doc, [
-      [0, 1000, 2000],
-      [3000, 1000, 2000],
-    ]);
+    let doc = columnWithRun();
     doc = support(doc, { pipeId: 'pipe-1', at: [[1000, 1000, 2000]], type: 'anchor' });
     const data = check(doc);
     // support at 1 m of a 3 m run: 1 m + 2 m overhangs = 3 m of pipe
@@ -196,12 +192,7 @@ describe('pipe weight through supports', () => {
   });
 
   it('carries a pipe standing on a column top concentrically, without a note', () => {
-    let doc = twoLevels();
-    doc = column(doc, 1000, 1000, 'HEB200', 1942.85);
-    doc = pipeRun(doc, [
-      [0, 1000, 2000],
-      [3000, 1000, 2000],
-    ]);
+    let doc = columnWithRun(1942.85);
     doc = support(doc, { pipeId: 'pipe-1', at: [[1000, 1000, 2000]] });
     const data = check(doc);
     expect(lineOf(doc).carriedKn).toBeCloseTo(3 * W, 9);

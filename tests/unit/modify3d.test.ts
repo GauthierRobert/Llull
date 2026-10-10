@@ -3,6 +3,7 @@ import { type MeshSolidEntity, type CadDocument, createEmptyDocument } from '@co
 import { execute } from '@core/commands/registry';
 import { type MeshData, setGeometryKernel } from '@core/geometry/kernel';
 import {
+  TETRA,
   fakeKernel,
   type FakeCall,
   type FakeKernel,
@@ -12,11 +13,6 @@ import {
 // ---------------------------------------------------------------------------
 // Canned meshes
 // ---------------------------------------------------------------------------
-
-const CANNED_MESH: MeshData = {
-  positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
-  indices: [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3],
-};
 
 const FILLET_MESH: MeshData = {
   positions: [0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 1, 1, 0, 1, 0, 1],
@@ -37,7 +33,7 @@ function lastCall(fake: FakeKernel, op: string): FakeCall | undefined {
 }
 
 function freshKernel(spec: FakeKernelSpec = {}): FakeKernel {
-  return fakeKernel({ solid: CANNED_MESH, fillet: FILLET_MESH, chamfer: CHAMFER_MESH, ...spec });
+  return fakeKernel({ solid: TETRA, fillet: FILLET_MESH, chamfer: CHAMFER_MESH, ...spec });
 }
 
 // ---------------------------------------------------------------------------

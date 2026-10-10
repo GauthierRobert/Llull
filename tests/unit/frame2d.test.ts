@@ -6,9 +6,22 @@ const pinned: FrameNode['restraint'] = [true, true, false];
 const fixed: FrameNode['restraint'] = [true, true, true];
 const free: FrameNode['restraint'] = [false, false, false];
 
+const [L, q, I] = [6000, -10, 8.356e7];
+/** The 6 m beam under uniform load q on a roller at its far end; `releases` hinge the member ends. */
+const udlBeam = (
+  start: FrameNode['restraint'],
+  releases: object,
+): NonNullable<ReturnType<typeof solveFrame>> =>
+  solveFrame(
+    [
+      { x: 0, y: 0, restraint: start },
+      { x: L, y: 0, restraint: [false, true, false] },
+    ],
+    [{ a: 0, b: 1, E, A: 5380, I, load: { qx: 0, qy: q }, ...releases }],
+  )!;
+
 describe('solveFrame', () => {
   it('reproduces a simply supported beam under uniform load (qL²/8, qL⁴ deflection)', () => {
-    const [L, q, I] = [6000, -10, 8.356e7];
     const result = solveFrame(
       [
         { x: 0, y: 0, restraint: pinned },
@@ -66,14 +79,7 @@ describe('solveFrame', () => {
   });
 
   it('reports the in-span deflection of a single member (5qL⁴/384EI)', () => {
-    const [L, q, I] = [6000, -10, 8.356e7];
-    const result = solveFrame(
-      [
-        { x: 0, y: 0, restraint: pinned },
-        { x: L, y: 0, restraint: [false, true, false] },
-      ],
-      [{ a: 0, b: 1, E, A: 5380, I, load: { qx: 0, qy: q } }],
-    )!;
+    const result = udlBeam(pinned, {});
     expect(result.members[0]!.maxDisplacement.y).toBeCloseTo(
       Math.abs((5 * q * L ** 4) / (384 * E * I)),
       3,
@@ -126,14 +132,7 @@ describe('solveFrame', () => {
 
   describe('moment releases', () => {
     it('makes a propped cantilever: M = qL²/8 at the fixed end, 0 at the hinge, δ per closed form', () => {
-      const [L, q, I] = [6000, -10, 8.356e7];
-      const result = solveFrame(
-        [
-          { x: 0, y: 0, restraint: fixed },
-          { x: L, y: 0, restraint: [false, true, false] },
-        ],
-        [{ a: 0, b: 1, E, A: 5380, I, load: { qx: 0, qy: q }, releaseB: true }],
-      )!;
+      const result = udlBeam(fixed, { releaseB: true });
       const member = result.members[0]!;
       expect(member.moment[0]).toBeCloseTo((q * L * L) / 8, 3);
       expect(member.moment[1]).toBeCloseTo(0, 6);
@@ -143,14 +142,7 @@ describe('solveFrame', () => {
     });
 
     it('simply supports a beam released at both ends without a singular rotation', () => {
-      const [L, q, I] = [6000, -10, 8.356e7];
-      const result = solveFrame(
-        [
-          { x: 0, y: 0, restraint: pinned },
-          { x: L, y: 0, restraint: [false, true, false] },
-        ],
-        [{ a: 0, b: 1, E, A: 5380, I, load: { qx: 0, qy: q }, releaseA: true, releaseB: true }],
-      )!;
+      const result = udlBeam(pinned, { releaseA: true, releaseB: true });
       const member = result.members[0]!;
       expect(member.moment[0]).toBeCloseTo(0, 6);
       expect(member.moment[1]).toBeCloseTo(0, 6);

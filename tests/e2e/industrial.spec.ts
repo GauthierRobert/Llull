@@ -12,6 +12,18 @@ async function hall(page: Page): Promise<void> {
   await expect(status(page)).toContainText('Added portal-frame hall 24.0 × 36.0 m');
 }
 
+/** A 24 × 30 m hall without cladding, with a crane rail, under a 0.7 kN/m² wind pressure. */
+async function windyCraneHall(page: Page): Promise<void> {
+  await openBuilding(page);
+  await applyTool(page, 'hall', {
+    span: '24000',
+    length: '30000',
+    cladding: 'false',
+    craneRailHeight: '6000',
+  });
+  await page.getByLabel('Wind pressure qp (kN/m²)').fill('0.7');
+}
+
 test.describe('industrial workflow', () => {
   test('I1–I5 — portal-frame hall with crane runway, footings and cladding', async ({ page }) => {
     await openBuilding(page);
@@ -211,14 +223,7 @@ test.describe('industrial workflow', () => {
   test('I20–I23 — wind and crane combinations, buckling, sway stability, deflections', async ({
     page,
   }) => {
-    await openBuilding(page);
-    await applyTool(page, 'hall', {
-      span: '24000',
-      length: '30000',
-      cladding: 'false',
-      craneRailHeight: '6000',
-    });
-    await page.getByLabel('Wind pressure qp (kN/m²)').fill('0.7');
+    await windyCraneHall(page);
     await page.getByTestId('frame-check').click();
     const summary = page.getByTestId('frame-check-summary');
     await expect(summary).toContainText('66 ULS combination(s)');
@@ -234,14 +239,7 @@ test.describe('industrial workflow', () => {
   });
 
   test('I24–I27 — bracing, foundations and crane runway checks', async ({ page }) => {
-    await openBuilding(page);
-    await applyTool(page, 'hall', {
-      span: '24000',
-      length: '30000',
-      cladding: 'false',
-      craneRailHeight: '6000',
-    });
-    await page.getByLabel('Wind pressure qp (kN/m²)').fill('0.7');
+    await windyCraneHall(page);
     const summary = page.getByTestId('frame-check-summary');
     await page.getByTestId('bracing-check').click();
     await expect(summary).toContainText('Bracing check (qp 0.7 kN/m²');

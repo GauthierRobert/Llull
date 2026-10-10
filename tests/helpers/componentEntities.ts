@@ -6,11 +6,24 @@
 
 import * as THREE from 'three';
 import { createEmptyDocument, type Entity } from '@core/model/types';
-import { useStore } from '@ui/store';
+import { useStore, useViewportStore } from '@ui/store';
 import { localDispatch } from './storeTestHelpers';
 
 export function resetStore(): void {
   useStore.setState({ document: createEmptyDocument(), lastSummary: null });
+}
+
+/** Empty document plus a viewport store back at shaded / no section plane / nothing hidden. */
+export function resetViewportStores(
+  extra: Partial<ReturnType<typeof useViewportStore.getState>> = {},
+): void {
+  resetStore();
+  useViewportStore.setState({
+    displayMode: 'shaded',
+    clipPlane: { enabled: false, axis: 'y', offset: 0, flipped: false },
+    hiddenEntityIds: new Set(),
+    ...extra,
+  });
 }
 
 export interface DispatchedEntity {

@@ -2,26 +2,16 @@
  * @layer server/tests
  * Per-user audit trail: JSONL lines (REST + MCP + undo), params hashed, rotation, admin query.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import fs from 'fs';
 import path from 'path';
 import { app } from '../src/index';
-import { _resetLiveDoc } from '../src/liveDocument';
-import { _resetHistory, applyCommand } from '../src/commandBus';
+import { applyCommand } from '../src/commandBus';
 import { appendAudit, type AuditEntry } from '../src/audit';
-import {
-  ADMIN,
-  EDITOR,
-  VIEWER,
-  clearEnv,
-  installUsersFile,
-  sha256,
-  tempDir,
-} from './userTestSupport';
+import { ADMIN, EDITOR, VIEWER, bearer, sha256, withUserFixture } from './userTestSupport';
+import { mcpRequest } from './mcpTestSupport';
 
-const bearer = (token: string): [string, string] => ['Authorization', `Bearer ${token}`];
-let dir: string;
 let auditFile: string;
 
 const lines = (file = auditFile): AuditEntry[] =>
@@ -31,17 +21,9 @@ const lines = (file = auditFile): AuditEntry[] =>
     .filter((l) => l !== '')
     .map((l) => JSON.parse(l) as AuditEntry);
 
-beforeEach(() => {
-  dir = tempDir();
+withUserFixture((dir) => {
   auditFile = path.join(dir, 'audit.jsonl');
   process.env['LLULL_AUDIT_FILE'] = auditFile;
-  installUsersFile(dir, [ADMIN, EDITOR, VIEWER]);
-  _resetLiveDoc();
-  _resetHistory();
-});
-afterEach(() => {
-  clearEnv();
-  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 describe('audit trail', () => {
@@ -88,10 +70,7 @@ describe('audit trail', () => {
   });
 
   it('attributes MCP tool calls with source mcp', async () => {
-    const init = await request(app)
-      .post('/mcp')
-      .set('Content-Type', 'application/json')
-      .set('Accept', 'application/json, text/event-stream')
+    const init = await mcpRequest(app)
       .set(...bearer(EDITOR.token))
       .send({
         jsonrpc: '2.0',
@@ -104,11 +83,7 @@ describe('audit trail', () => {
         },
       });
     const session = init.headers['mcp-session-id'] as string;
-    await request(app)
-      .post('/mcp')
-      .set('Content-Type', 'application/json')
-      .set('Accept', 'application/json, text/event-stream')
-      .set('mcp-session-id', session)
+    await mcpRequest(app, session)
       .set(...bearer(EDITOR.token))
       .send({
         jsonrpc: '2.0',

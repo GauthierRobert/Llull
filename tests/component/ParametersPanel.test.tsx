@@ -21,7 +21,7 @@ import { act, render, screen, fireEvent, within } from '@testing-library/react';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { ParametersPanel } from '@ui/panels/ParametersPanel';
-import { localDispatch } from '../helpers/storeTestHelpers';
+import { answerDispatch, localDispatch } from '../helpers/storeTestHelpers';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -253,11 +253,7 @@ describe('ParametersPanel — add parameter form', () => {
   });
 
   it('keeps the form fields when the command was rejected', () => {
-    patchDispatch(
-      vi.fn((_name: string, _params: unknown, options?: { onResult?: (r: unknown) => void }) =>
-        options?.onResult?.({ summary: 'rejected', changed: false }),
-      ),
-    );
+    answerDispatch({ summary: 'rejected', changed: false });
     render(<ParametersPanel />);
     const form = screen.getByTestId('param-add-form');
     const nameInput = within(form).getByRole('textbox', {
@@ -278,11 +274,7 @@ describe('ParametersPanel — add parameter form', () => {
   });
 
   it('clears the form fields after successful submit', () => {
-    const dispatchSpy = vi.fn(
-      (_name: string, _params: unknown, options?: { onResult?: (r: unknown) => void }) =>
-        options?.onResult?.({ summary: 'ok', changed: true }),
-    );
-    patchDispatch(dispatchSpy);
+    answerDispatch({ summary: 'ok', changed: true });
 
     render(<ParametersPanel />);
 

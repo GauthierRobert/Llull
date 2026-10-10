@@ -21,14 +21,9 @@ import { frameRoofAverage } from '@aec/industrial/windCoefficients';
 import { findProfile, sectionProperties } from '@aec/steel/profiles';
 import type { SteelMemberElement } from '@core/model/building';
 import { GRAVITY } from '@aec/numeric';
+import { hall } from './hallFixtures';
 
 const HOIST_10T = 10 * GRAVITY * 1000;
-const HALL = { span: 24000, length: 30000 };
-
-function hall(params: Record<string, unknown> = {}): CadDocument {
-  return execute(createEmptyDocument(), 'add_portal_frame_building', { ...HALL, ...params })
-    .document;
-}
 
 interface CheckData {
   rows: CheckRow[];

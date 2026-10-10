@@ -14,7 +14,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import request from 'supertest';
 import type { Express } from 'express';
-import { BUILD123D_PYTHON, CADQUERY_PYTHON, probePython } from './exchangeTestSupport';
+import { BUILD123D_PYTHON, CADQUERY_PYTHON, parseBuffer, probePython } from './exchangeTestSupport';
+import { mcpRequest } from './mcpTestSupport';
 
 const hasCadQuery = probePython(CADQUERY_PYTHON).cadquery !== null;
 const hasBuild123d =
@@ -180,11 +181,7 @@ describe.skipIf(!hasCadQuery)('GET /export/step with CadQuery', () => {
       .get('/export/step')
       .query({ name: 'plate' })
       .buffer(true)
-      .parse((res, callback) => {
-        const chunks: Buffer[] = [];
-        res.on('data', (chunk: Buffer) => chunks.push(chunk));
-        res.on('end', () => callback(null, Buffer.concat(chunks)));
-      });
+      .parse(parseBuffer);
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toBe('model/step');
     expect(res.headers['content-disposition']).toBe('attachment; filename="plate.step"');
@@ -213,11 +210,7 @@ describe.skipIf(!hasBuild123d)('GET /export/step with build123d', () => {
       .get('/export/step')
       .query({ language: 'build123d' })
       .buffer(true)
-      .parse((res, callback) => {
-        const chunks: Buffer[] = [];
-        res.on('data', (chunk: Buffer) => chunks.push(chunk));
-        res.on('end', () => callback(null, Buffer.concat(chunks)));
-      });
+      .parse(parseBuffer);
     expect(res.status).toBe(200);
     expect((res.body as Buffer).subarray(0, 13).toString('utf8')).toBe('ISO-10303-21;');
   }, 120_000);
@@ -251,12 +244,7 @@ async function rpc(
   params: Record<string, unknown>,
 ): Promise<{ result: unknown; sessionId: string | null }> {
   const id = rpcId++;
-  let req = request(app)
-    .post('/mcp')
-    .set('Content-Type', 'application/json')
-    .set('Accept', 'application/json, text/event-stream');
-  if (sessionId !== null) req = req.set('mcp-session-id', sessionId);
-  const res = await req.send({ jsonrpc: '2.0', id, method, params });
+  const res = await mcpRequest(app, sessionId).send({ jsonrpc: '2.0', id, method, params });
   expect(res.status).toBe(200);
   const header = res.headers['mcp-session-id'];
   return { result: parseSse(res.text, id), sessionId: typeof header === 'string' ? header : null };
@@ -269,12 +257,10 @@ async function mcpSession(app: Express): Promise<string> {
     clientInfo: { name: 'exchange-test', version: '0.0.1' },
   });
   expect(init.sessionId).not.toBeNull();
-  await request(app)
-    .post('/mcp')
-    .set('Content-Type', 'application/json')
-    .set('Accept', 'application/json, text/event-stream')
-    .set('mcp-session-id', init.sessionId as string)
-    .send({ jsonrpc: '2.0', method: 'notifications/initialized' });
+  await mcpRequest(app, init.sessionId).send({
+    jsonrpc: '2.0',
+    method: 'notifications/initialized',
+  });
   return init.sessionId as string;
 }
 

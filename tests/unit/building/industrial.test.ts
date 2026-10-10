@@ -11,6 +11,7 @@ import type { IfcExport } from '@aec/ifcBuild';
 import { serializeDocument } from '@core/commands/persistence';
 import { buildingErrors } from '@aec/validate';
 import { polygonArea } from '@lib/polygon';
+import { rawBuilding } from './elementEdits';
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {
   const result = execute(doc, name, params);
@@ -752,9 +753,7 @@ describe('review regressions', () => {
       start: [0, 0, 0],
       end: [1000, 0, 0],
     });
-    const broken = JSON.parse(JSON.stringify(doc.building)) as {
-      elements: Record<string, Record<string, unknown>>;
-    };
+    const broken = rawBuilding(doc);
     broken.elements['member-1']!['role'] = 'girder';
     broken.elements['member-1']!['material'] = 5;
     expect(buildingErrors(broken)).toEqual([
@@ -1160,9 +1159,7 @@ describe('phase 2 review regressions', () => {
     const drawing = execute(doc, 'export_elevation_sheet', { direction: 'south', cutAt: 0 })
       .data as { svg: string };
     expect(drawing.svg).toContain('class="poche-steel"');
-    const broken = JSON.parse(JSON.stringify(doc.building)) as {
-      elements: Record<string, Record<string, unknown>>;
-    };
+    const broken = rawBuilding(doc);
     broken.elements['member-1']!['role'] = 'beam';
     expect(buildingErrors(broken)).toEqual([expect.stringMatching(/is not a steel column/)]);
   });

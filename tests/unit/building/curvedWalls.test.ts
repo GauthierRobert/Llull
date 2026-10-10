@@ -10,6 +10,7 @@ import type { TakeoffLine } from '@aec/takeoffBasics';
 import type { IfcExport } from '@aec/ifcBuild';
 import type { DxfExport } from '@aec/dxfExport';
 import type { Clash } from '@aec/industrial/clash';
+import { rawBuilding } from './elementEdits';
 
 /** Half circle of radius 5000 from (−5000, 0) over (0, 5000) to (5000, 0). */
 const HALF = { start: [-5000, 0], through: [0, 5000], end: [5000, 0], thickness: 300 };
@@ -130,9 +131,7 @@ describe('add_curved_wall', () => {
     }).document;
     expect(loaded.entities['curvedWall-2:body']).toBeDefined();
     expect(buildingErrors(doc.building)).toEqual([]);
-    const broken = JSON.parse(JSON.stringify(doc.building)) as {
-      elements: Record<string, Record<string, unknown>>;
-    };
+    const broken = rawBuilding(doc);
     broken.elements['curvedWall-1']!['through'] = 'x';
     expect(buildingErrors(broken)).toEqual([expect.stringMatching(/through/)]);
   });
@@ -149,9 +148,7 @@ describe('curved wall review regressions', () => {
   it('rejects collinear curved walls on load and gives no clash boxes without a band', async () => {
     const { elementBoxes } = await import('@aec/industrial/clashBoxes');
     const doc = execute(createEmptyDocument(), 'add_curved_wall', HALF).document;
-    const broken = JSON.parse(JSON.stringify(doc.building)) as {
-      elements: Record<string, Record<string, unknown>>;
-    };
+    const broken = rawBuilding(doc);
     broken.elements['curvedWall-1']!['through'] = [0, 0];
     expect(buildingErrors(broken)).toEqual([expect.stringMatching(/collinear/)]);
     const thick = { ...wallOf(doc), thickness: 20000 };

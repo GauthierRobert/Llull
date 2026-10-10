@@ -1,7 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute, getCommand } from '@core/commands/registry';
-import { type GeometryKernel, type MeshData, setGeometryKernel } from '@core/geometry/kernel';
 import { buildFeatureProgram } from '@core/codegen/featureProgram';
 import { translateExpression } from '@core/codegen/identifiers';
 import type { Feature, FeatureProgram, ShapeSpec, Term } from '@core/codegen/program';
@@ -15,20 +14,9 @@ import {
   numberRows,
   stepHeading,
 } from '@core/codegen/format';
-import { fakeKernel } from '../helpers/fakeKernel';
+import { TETRA, fakeKernel, installKernelPerTest } from '../helpers/fakeKernel';
 
-const cannedMesh: MeshData = {
-  positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
-  indices: [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3],
-};
-const cannedKernel: GeometryKernel = fakeKernel({ boolean: cannedMesh });
-
-beforeEach(() => {
-  setGeometryKernel(cannedKernel);
-});
-afterEach(() => {
-  setGeometryKernel(null);
-});
+installKernelPerTest(fakeKernel({ boolean: TETRA }));
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {
   return execute(doc, name, params).document;

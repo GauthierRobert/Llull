@@ -17,7 +17,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
 
-import { liveSnapshot } from '../helpers/storeTestHelpers';
+import { answerDispatch, liveSnapshot } from '../helpers/storeTestHelpers';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { useStore } from '@ui/store';
@@ -263,11 +263,7 @@ describe('ConfigurationsPanel — create form', () => {
   });
 
   it('clears form fields after successful submit', () => {
-    const dispatchSpy = vi.fn(
-      (_name: string, _params: unknown, options?: { onResult?: (r: unknown) => void }) =>
-        options?.onResult?.({ summary: 'ok', changed: true }),
-    );
-    patchDispatch(dispatchSpy);
+    answerDispatch({ summary: 'ok', changed: true });
 
     render(<ConfigurationsPanel />);
 
@@ -289,11 +285,7 @@ describe('ConfigurationsPanel — rejected create', () => {
   });
 
   it('keeps the typed values when the command was rejected', () => {
-    patchDispatch(
-      vi.fn((_name: string, _params: unknown, options?: { onResult?: (r: unknown) => void }) =>
-        options?.onResult?.({ summary: 'rejected', changed: false }),
-      ),
-    );
+    answerDispatch({ summary: 'rejected', changed: false });
     render(<ConfigurationsPanel />);
     const form = screen.getByTestId('config-create-form');
     const nameInput = fillName(form, 'keep');

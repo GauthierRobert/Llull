@@ -339,16 +339,16 @@ describe('svg stripping in MCP content shaping', () => {
 // (g) MCP shaping hook — busResult with data.svg includes image block + text block
 // ---------------------------------------------------------------------------
 
+const RENDERED = {
+  summary: 'Rendered view.',
+  affected: [] as string[],
+  isError: false,
+  data: { svg: VALID_SVG, width: 100, height: 100 },
+};
+
 describe('MCP shaping hook — content augmentation with SVG data', () => {
   it('shaped content keeps the text summary block', () => {
-    const busResult = {
-      summary: 'Rendered view.',
-      affected: [] as string[],
-      isError: false,
-      data: { svg: VALID_SVG, width: 100, height: 100 },
-    };
-
-    const shaped = shapeToolCallContent(busResult);
+    const shaped = shapeToolCallContent(RENDERED);
 
     // Text summary must still be present as first block.
     expect(shaped.content[0]?.type).toBe('text');
@@ -356,23 +356,15 @@ describe('MCP shaping hook — content augmentation with SVG data', () => {
   });
 
   it('buildImageBlock produces an image block for a result with data.svg', () => {
-    const data = { svg: VALID_SVG, width: 100, height: 100 };
-    const imageBlock = buildImageBlock(data);
+    const imageBlock = buildImageBlock(RENDERED.data);
     expect(imageBlock).not.toBeNull();
     expect(imageBlock!.type).toBe('image');
     expect(imageBlock!.mimeType).toBe('image/png');
   });
 
   it('combined content array has text block then image block', () => {
-    const busResult = {
-      summary: 'Rendered view.',
-      affected: [] as string[],
-      isError: false,
-      data: { svg: VALID_SVG, width: 100, height: 100 },
-    };
-
-    const shaped = shapeToolCallContent(busResult);
-    const imageBlock = buildImageBlock(busResult.data);
+    const shaped = shapeToolCallContent(RENDERED);
+    const imageBlock = buildImageBlock(RENDERED.data);
 
     const content = [...shaped.content, ...(imageBlock ? [imageBlock] : [])];
 

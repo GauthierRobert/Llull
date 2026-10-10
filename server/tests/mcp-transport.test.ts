@@ -33,6 +33,7 @@ import { _resetHistory } from '../src/commandBus';
 import { listCommands } from '@core/commands/registry';
 import * as registry from '@core/commands/registry';
 import { buildDiscoveryToolDefinitions, buildExchangeToolDefinitions } from '@mcp/index';
+import { mcpRequest } from './mcpTestSupport';
 
 // ---------------------------------------------------------------------------
 // SSE parsing helpers
@@ -100,14 +101,7 @@ const INITIALIZE_PARAMS = {
 
 /** POST one JSON-RPC message to /mcp (with the session header once a session exists). */
 function mcpPost(message: Record<string, unknown>, sessionId?: string): request.Test {
-  const req = request(app)
-    .post('/mcp')
-    .set('Content-Type', 'application/json')
-    .set('Accept', 'application/json, text/event-stream');
-  return (sessionId === undefined ? req : req.set('mcp-session-id', sessionId)).send({
-    jsonrpc: '2.0',
-    ...message,
-  });
+  return mcpRequest(app, sessionId).send({ jsonrpc: '2.0', ...message });
 }
 
 async function mcpInitialize(): Promise<string> {

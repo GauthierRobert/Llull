@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createEmptyDocument, type CadDocument } from '@core/model/types';
+import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { windCasesOf, WIND_CASES, type FrameModel } from '@aec/industrial/frameModelTypes';
 import { framesOf } from '@aec/industrial/frameModelFrames';
@@ -12,6 +12,7 @@ import {
   type WindDirection,
 } from '@aec/industrial/windCoefficients';
 import type { PurlinRow, ZoneSummary } from '@aec/industrial/purlinModel';
+import { hall } from './hallFixtures';
 
 const cpe = (
   roofType: RoofType,
@@ -145,13 +146,7 @@ describe('duopitch frame average', () => {
   });
 });
 
-const HALL = { span: 24000, length: 30000 };
 const LOADS = { deadLoad: 0.5, snowLoad: 0.8, windPressure: 1 };
-
-function hall(params: Record<string, unknown> = {}): CadDocument {
-  return execute(createEmptyDocument(), 'add_portal_frame_building', { ...HALL, ...params })
-    .document;
-}
 
 function framesOfHall(doc: CadDocument): FrameModel[] {
   const building = doc.building!;

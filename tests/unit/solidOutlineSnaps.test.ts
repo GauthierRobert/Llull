@@ -1,13 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { type CadDocument, type Entity, type Vec2, createEmptyDocument } from '@core/model/types';
-import { execute } from '@core/commands/registry';
+import { add } from '../helpers/addEntity';
 import { solidOutline, solidSnapPoints } from '../../src/ui/viewport/2d/solidOutline';
 import { collectSnapCandidates } from '../../src/ui/viewport/2d/snapping/candidates';
-
-function add(doc: CadDocument, name: string, params: unknown): { doc: CadDocument; id: string } {
-  const result = execute(doc, name, params);
-  return { doc: result.document, id: result.affected[0] as string };
-}
 
 const entityOf = (doc: CadDocument, id: string): Entity => doc.entities[id] as Entity;
 const width = (ring: ReadonlyArray<Vec2>): number =>

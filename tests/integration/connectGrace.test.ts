@@ -24,6 +24,16 @@ function resetStore(liveStatus: 'connecting' | 'connected'): void {
   });
 }
 
+/** Stubs fetch with POSTs that stay pending until their entry in the returned list is called. */
+function stubPendingFetch(): Array<(reason: Error) => void> {
+  const settle: Array<(reason: Error) => void> = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => new Promise((_resolve, reject) => settle.push(reject))),
+  );
+  return settle;
+}
+
 describe('dispatch while connecting', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -49,14 +59,10 @@ describe('dispatch while connecting', () => {
   });
 
   it('does not apply the command twice when the POST fails after the local run', async () => {
-    let rejectFetch: (reason: Error) => void = () => undefined;
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => new Promise((_resolve, reject) => (rejectFetch = reject))),
-    );
+    const settle = stubPendingFetch();
     useStore.getState().dispatch('add_box', { size: [1, 1, 1] });
     await vi.advanceTimersByTimeAsync(CONNECT_GRACE_MS);
-    rejectFetch(new Error('refused'));
+    settle[0]?.(new Error('refused'));
     await vi.advanceTimersByTimeAsync(10);
 
     expect(useStore.getState().document.order).toHaveLength(1);
@@ -105,17 +111,13 @@ describe('dispatch while connecting', () => {
   });
 
   it('setDocument cancels pending grace runs: the old command never lands in the new document', async () => {
-    let rejectFetch: (reason: Error) => void = () => undefined;
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => new Promise((_resolve, reject) => (rejectFetch = reject))),
-    );
+    const settle = stubPendingFetch();
     useStore.getState().dispatch('add_box', { size: [1, 1, 1] });
     useStore.getState().setDocument(createEmptyDocument());
     useStore.setState({ liveStatus: 'connecting', sseEverConnected: false });
 
     await vi.advanceTimersByTimeAsync(CONNECT_GRACE_MS * 2);
-    rejectFetch(new Error('refused'));
+    settle[0]?.(new Error('refused'));
     await vi.advanceTimersByTimeAsync(10);
 
     expect(useStore.getState().document.order).toHaveLength(0);
@@ -123,11 +125,7 @@ describe('dispatch while connecting', () => {
   });
 
   it('a cancelled dispatch settling late does not disturb a newer grace run', async () => {
-    const settle: Array<(reason: Error) => void> = [];
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => new Promise((_resolve, reject) => settle.push(reject))),
-    );
+    const settle = stubPendingFetch();
     useStore.getState().dispatch('add_box', { size: [1, 1, 1] });
     useStore.getState().setDocument(createEmptyDocument());
     useStore.setState({ liveStatus: 'connecting', sseEverConnected: false });

@@ -2,10 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { gridLetter } from '@aec/grid';
-
-function run(doc: CadDocument, name: string, params: unknown): CadDocument {
-  return execute(doc, name, params).document;
-}
+import { run } from './runFixtures';
 
 describe('add_level / update_level / delete_level / set_active_level', () => {
   it('adds stacked levels with default 3 m height and makes the newest active', () => {

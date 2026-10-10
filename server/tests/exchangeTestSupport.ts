@@ -7,6 +7,7 @@
 
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
+import type request from 'supertest';
 
 export const BRIDGE_SCRIPT = path.resolve(__dirname, '../python/llull_bridge.py');
 const configuredPython =
@@ -39,3 +40,10 @@ export function probePython(python: string): ProbeResult {
     return none;
   }
 }
+
+/** supertest `.parse` handler that collects a binary response body into a Buffer. */
+export const parseBuffer: Parameters<request.Test['parse']>[0] = (res, callback) => {
+  const chunks: Buffer[] = [];
+  res.on('data', (chunk: Buffer) => chunks.push(chunk));
+  res.on('end', () => callback(null, Buffer.concat(chunks)));
+};

@@ -1,7 +1,10 @@
 /** Shared civil test fixtures: a metric document with a surveyed analytic terrain. */
 
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
+import type { AlignmentObject } from '@core/model/civil';
 import { execute } from '@core/commands/registry';
+import { deserializeDocument, serializeDocument } from '@core/commands/persistence';
+import { expect } from 'vitest';
 
 export function metricDocument(): CadDocument {
   return execute(createEmptyDocument(), 'set_units', { units: 'm' }).document;
@@ -31,4 +34,17 @@ export function surveyedDocument(
     text: gridSurvey(f, n, step),
   });
   return execute(imported.document, 'create_surface', {}).document;
+}
+
+export const alignmentOf = (doc: CadDocument, id: string): AlignmentObject =>
+  doc.civil?.objects[id] as AlignmentObject;
+
+/** Save / load keeps the alignment, every entity id and the alignment report. */
+export function expectSaveLoadRoundTrip(doc: CadDocument, id: string): void {
+  const loaded = deserializeDocument(serializeDocument(doc));
+  expect(alignmentOf(loaded, id)).toEqual(alignmentOf(doc, id));
+  expect(Object.keys(loaded.entities).sort()).toEqual(Object.keys(doc.entities).sort());
+  const report = (d: CadDocument): unknown =>
+    execute(d, 'alignment_report', { alignmentId: id }).data;
+  expect(report(loaded)).toEqual(report(doc));
 }

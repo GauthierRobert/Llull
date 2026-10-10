@@ -3,39 +3,27 @@
  * Named users and roles: 401 unknown token, 403 insufficient role, viewer read-only (REST + MCP),
  * editor commands, admin endpoints, token hashing, license seat refusal, live event attribution.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import fs from 'fs';
 import { app } from '../src/index';
-import { _resetLiveDoc } from '../src/liveDocument';
-import { _resetHistory } from '../src/commandBus';
 import { authenticateToken, loadUsers } from '../src/users';
 import {
   ADMIN,
   EDITOR,
   VIEWER,
-  clearEnv,
+  bearer,
   installUsersFile,
   sha256,
-  tempDir,
+  withUserFixture,
 } from './userTestSupport';
 import { subscribeLive } from '../src/liveDocument';
 import type { Response } from 'express';
+import { mcpRequest } from './mcpTestSupport';
 
-const bearer = (token: string): [string, string] => ['Authorization', `Bearer ${token}`];
 const addBox = { name: 'add_box', params: { size: [1, 1, 1] } };
 
-let dir: string;
-beforeEach(() => {
-  dir = tempDir();
-  installUsersFile(dir, [ADMIN, EDITOR, VIEWER]);
-  _resetLiveDoc();
-  _resetHistory();
-});
-afterEach(() => {
-  clearEnv();
-  fs.rmSync(dir, { recursive: true, force: true });
-});
+const dirOf = withUserFixture();
 
 describe('named-user authentication', () => {
   it('rejects a missing or unknown token with 401', async () => {
@@ -134,7 +122,7 @@ describe('roles over REST', () => {
   });
 
   it('refuses users beyond the seat count with 402', async () => {
-    installUsersFile(dir, [ADMIN, EDITOR, VIEWER, { ...VIEWER, id: 'v2', token: 'tok-v2' }]);
+    installUsersFile(dirOf(), [ADMIN, EDITOR, VIEWER, { ...VIEWER, id: 'v2', token: 'tok-v2' }]);
     const refused = await request(app)
       .get('/live/snapshot')
       .set(...bearer('tok-v2'));
@@ -169,13 +157,9 @@ describe('live attribution', () => {
 
 /** Minimal MCP client over supertest (responses are SSE-wrapped JSON-RPC). */
 async function mcp(token: string, body: object, session?: string): Promise<request.Response> {
-  const req = request(app)
-    .post('/mcp')
-    .set('Content-Type', 'application/json')
-    .set('Accept', 'application/json, text/event-stream')
-    .set(...bearer(token));
-  if (session !== undefined) req.set('mcp-session-id', session);
-  return req.send(body);
+  return mcpRequest(app, session)
+    .set(...bearer(token))
+    .send(body);
 }
 
 function rpcResult(text: string): {

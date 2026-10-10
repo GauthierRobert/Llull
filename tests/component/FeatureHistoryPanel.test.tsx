@@ -157,30 +157,19 @@ describe('FeatureHistoryPanel — reorder', () => {
     resetStore();
   });
 
-  it('dispatches reorder_step with newIndex=0 when move-up clicked on index 1', () => {
+  it.each([
+    ['newIndex=0 when move-up clicked on index 1', 's1', /move step add_sphere up/i, 0],
+    ['newIndex=1 when move-down clicked on index 0', 's0', /move step add_box down/i, 1],
+  ])('dispatches reorder_step with %s', (_title, stepId, buttonName, newIndex) => {
     setHistory([makeStep('s0', 'add_box'), makeStep('s1', 'add_sphere')]);
     const dispatchSpy = vi.fn();
     patchDispatch(dispatchSpy);
 
     render(<FeatureHistoryPanel />);
-    const row = screen.getByTestId('history-step-s1');
-    const upBtn = within(row).getByRole('button', { name: /move step add_sphere up/i });
-    fireEvent.click(upBtn);
+    const row = screen.getByTestId(`history-step-${stepId}`);
+    fireEvent.click(within(row).getByRole('button', { name: buttonName }));
 
-    expect(dispatchSpy).toHaveBeenCalledWith('reorder_step', { stepId: 's1', newIndex: 0 });
-  });
-
-  it('dispatches reorder_step with newIndex=1 when move-down clicked on index 0', () => {
-    setHistory([makeStep('s0', 'add_box'), makeStep('s1', 'add_sphere')]);
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
-
-    render(<FeatureHistoryPanel />);
-    const row = screen.getByTestId('history-step-s0');
-    const downBtn = within(row).getByRole('button', { name: /move step add_box down/i });
-    fireEvent.click(downBtn);
-
-    expect(dispatchSpy).toHaveBeenCalledWith('reorder_step', { stepId: 's0', newIndex: 1 });
+    expect(dispatchSpy).toHaveBeenCalledWith('reorder_step', { stepId, newIndex });
   });
 
   it('disables move-up for the first step', () => {

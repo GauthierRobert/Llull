@@ -5,6 +5,7 @@ import { findProfile } from '@aec/steel/profiles';
 import { type PurlinRow, type ZoneSummary } from '@aec/industrial/purlinModel';
 import { effectiveModulusRatio } from '@aec/industrial/purlinSection';
 import { checkPurlins } from '@aec/industrial/purlinCheckRun';
+import { mapElements, withoutElements } from './elementEdits';
 
 interface PurlinData {
   rows: PurlinRow[];
@@ -23,35 +24,13 @@ function check(doc: CadDocument, params: Record<string, unknown> = {}): PurlinDa
   return checkPurlins.run(doc, params).data as PurlinData;
 }
 
-function withoutRoles(doc: CadDocument, roles: readonly string[]): CadDocument {
-  const building = doc.building;
-  if (!building) throw new Error('no building');
-  const elements = Object.fromEntries(
-    Object.entries(building.elements).filter(
-      ([, element]) => !(element.category === 'member' && roles.includes(element.role)),
-    ),
-  );
-  return {
-    ...doc,
-    building: {
-      ...building,
-      elements,
-      elementOrder: building.elementOrder.filter((id) => id in elements),
-    },
-  };
-}
+const withoutRoles = (doc: CadDocument, roles: readonly string[]): CadDocument =>
+  withoutElements(doc, (element) => element.category === 'member' && roles.includes(element.role));
 
-function withProfile(doc: CadDocument, role: string, profile: string): CadDocument {
-  const building = doc.building;
-  if (!building) throw new Error('no building');
-  const elements = Object.fromEntries(
-    Object.entries(building.elements).map(([id, element]) => [
-      id,
-      element.category === 'member' && element.role === role ? { ...element, profile } : element,
-    ]),
+const withProfile = (doc: CadDocument, role: string, profile: string): CadDocument =>
+  mapElements(doc, (element) =>
+    element.category === 'member' && element.role === role ? { ...element, profile } : element,
   );
-  return { ...doc, building: { ...building, elements } };
-}
 
 const purlinsOf = (data: PurlinData): PurlinRow[] =>
   data.rows.filter((row) => row.kind === 'purlin');

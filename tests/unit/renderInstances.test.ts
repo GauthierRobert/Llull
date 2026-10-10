@@ -1,28 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import { boxInstance } from '../helpers/boxInstance';
 
 const svgOf = (doc: CadDocument, params: Record<string, unknown> = {}): string =>
   (execute(doc, 'render_view', params).data as { svg: string }).svg;
 
 const shapeCount = (svg: string): number => (svg.match(/<polygon|<path|<polyline/g) ?? []).length;
 
-function assembly(): { doc: CadDocument; instanceId: string } {
-  const part = execute(createEmptyDocument(), 'add_box', { size: [2, 2, 2] });
-  const component = execute(part.document, 'create_component', {
-    name: 'Part',
-    entityIds: [part.affected[0]!],
-    componentId: 'comp-part',
-  });
-  const inserted = execute(component.document, 'insert_instance', {
-    componentId: 'comp-part',
-    position: [5, 0, 0],
-  });
-  return { doc: inserted.document, instanceId: inserted.affected[0]! };
-}
-
 describe('render_view draws component instances', () => {
-  const { doc, instanceId } = assembly();
+  const { doc, instanceId } = boxInstance([5, 0, 0]);
 
   it('an assembly-only document renders its component geometry', () => {
     const empty = svgOf(createEmptyDocument());

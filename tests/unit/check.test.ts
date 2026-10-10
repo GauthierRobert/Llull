@@ -12,6 +12,7 @@
 import { describe, it, expect } from 'vitest';
 import { type CadDocument, type Entity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import { groupedBoxes } from '../helpers/groupedBoxes';
 import { type CheckResult, runModelChecks } from '@core/commands/check';
 
 // ---------------------------------------------------------------------------
@@ -363,15 +364,7 @@ describe('check_model — orphaned_group_member', () => {
   });
 
   it('does NOT flag a group whose members all exist', () => {
-    let doc = createEmptyDocument();
-    const a = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = a.document;
-    const b = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = b.document;
-    doc = execute(doc, 'group_entities', {
-      ids: [a.affected[0]!, b.affected[0]!],
-      name: 'Good',
-    }).document;
+    const { doc } = groupedBoxes('Good');
     const { issues } = runModelChecks(doc, 1e6);
     expect(issues.filter((i) => i.code === 'orphaned_group_member')).toHaveLength(0);
   });

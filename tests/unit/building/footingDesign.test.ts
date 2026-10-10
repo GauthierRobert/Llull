@@ -8,31 +8,18 @@ import { designFootings } from '@aec/industrial/footingDesignCommand';
 import { type FoundationRow } from '@aec/industrial/foundationModel';
 import { foundationCheck } from '@aec/industrial/foundationCheckRun';
 import type { TakeoffLine } from '@aec/takeoffBasics';
-
-function hall(params: Record<string, unknown> = {}): CadDocument {
-  return execute(createEmptyDocument(), 'add_portal_frame_building', {
-    span: 24000,
-    length: 30000,
-    ...params,
-  }).document;
-}
+import { hall } from './hallFixtures';
+import { mapElements } from './elementEdits';
 
 const footingsOf = (doc: CadDocument): FootingElement[] =>
   Object.values(doc.building?.elements ?? {}).filter(
     (element: BuildingElement): element is FootingElement => element.category === 'footing',
   );
 
-function withFootings(doc: CadDocument, patch: Partial<FootingElement>): CadDocument {
-  const building = doc.building;
-  if (!building) throw new Error('no building');
-  const elements = Object.fromEntries(
-    Object.entries(building.elements).map(([id, element]) => [
-      id,
-      element.category === 'footing' ? { ...element, ...patch } : element,
-    ]),
+const withFootings = (doc: CadDocument, patch: Partial<FootingElement>): CadDocument =>
+  mapElements(doc, (element) =>
+    element.category === 'footing' ? { ...element, ...patch } : element,
   );
-  return { ...doc, building: { ...building, elements } };
-}
 
 function design(doc: CadDocument, params: Record<string, unknown> = {}): FootingDesignRow[] {
   return (designFootings.run(doc, params).data as { footings: FootingDesignRow[] }).footings;

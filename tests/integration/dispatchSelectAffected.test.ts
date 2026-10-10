@@ -5,9 +5,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
 import { MAX_AUTO_SELECT } from '@ui/store/localMode';
-import { flushPromises } from '../helpers/storeTestHelpers';
+import { flushPromises, resetOfflineStore } from '../helpers/storeTestHelpers';
 
 function stubServerAffecting(id: string): void {
   vi.stubGlobal(
@@ -26,15 +25,19 @@ function stubServerAffecting(id: string): void {
   );
 }
 
-describe('dispatch selectAffected', () => {
-  beforeEach(() => {
-    useStore.getState().setDocument(createEmptyDocument());
-    useStore.setState({ liveStatus: 'disconnected', localUndoStack: [], localRedoStack: [] });
-  });
+/** Auto-selects a fresh box, then linear-arrays it `count` times; returns the first box id. */
+function boxThenArray(count: number): string {
+  useStore.getState().dispatch('add_box', { size: [1, 1, 1] }, { selectAffected: true });
+  const first = useStore.getState().document.order[0]!;
+  useStore
+    .getState()
+    .dispatch('array_linear', { id: first, count, offset: [2, 0, 0] }, { selectAffected: true });
+  return first;
+}
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
+describe('dispatch selectAffected', () => {
+  beforeEach(resetOfflineStore);
+  afterEach(() => vi.unstubAllGlobals());
 
   it('selects the created entity when running locally', () => {
     useStore.getState().dispatch('add_box', { size: [1, 1, 1] }, { selectAffected: true });
@@ -44,30 +47,14 @@ describe('dispatch selectAffected', () => {
   });
 
   it('does not auto-select a very large result (policy threshold), keeping the selection', () => {
-    useStore.getState().dispatch('add_box', { size: [1, 1, 1] }, { selectAffected: true });
-    const first = useStore.getState().document.order[0]!;
-    useStore
-      .getState()
-      .dispatch(
-        'array_linear',
-        { id: first, count: MAX_AUTO_SELECT + 20, offset: [2, 0, 0] },
-        { selectAffected: true },
-      );
+    const first = boxThenArray(MAX_AUTO_SELECT + 20);
     const { document } = useStore.getState();
     expect(document.order.length).toBeGreaterThan(MAX_AUTO_SELECT);
     expect(document.selection).toEqual([first]);
   });
 
   it('still auto-selects a result right at the threshold', () => {
-    useStore.getState().dispatch('add_box', { size: [1, 1, 1] }, { selectAffected: true });
-    const first = useStore.getState().document.order[0]!;
-    useStore
-      .getState()
-      .dispatch(
-        'array_linear',
-        { id: first, count: MAX_AUTO_SELECT + 1, offset: [2, 0, 0] },
-        { selectAffected: true },
-      );
+    boxThenArray(MAX_AUTO_SELECT + 1);
     expect(useStore.getState().document.selection).toHaveLength(MAX_AUTO_SELECT);
   });
 

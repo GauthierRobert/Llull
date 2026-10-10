@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { type BoxEntity, type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { stripOuterParens } from '@core/commands/code_trace';
 import { MAX_TRACE_FEATURES } from '@core/commands/limits';
-import { type GeometryKernel, type MeshData, setGeometryKernel } from '@core/geometry/kernel';
+import { setGeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
-import { fakeKernel } from '../helpers/fakeKernel';
+import { TETRA, fakeKernel, installKernelPerTest } from '../helpers/fakeKernel';
 
 interface CodeData {
   format: string;
@@ -78,20 +78,7 @@ function buildRichDoc(): CadDocument {
   return result.document;
 }
 
-const cannedMesh: MeshData = {
-  positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
-  indices: [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3],
-};
-
-const cannedKernel: GeometryKernel = fakeKernel({ boolean: cannedMesh });
-
-beforeEach(() => {
-  setGeometryKernel(cannedKernel);
-});
-
-afterEach(() => {
-  setGeometryKernel(null);
-});
+installKernelPerTest(fakeKernel({ boolean: TETRA }));
 
 describe('export_code', () => {
   it('exports a CadQuery script with parameters, expressions and ordered features', () => {

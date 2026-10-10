@@ -17,6 +17,7 @@ import request from 'supertest';
 import { app } from '../src/index';
 import { _resetLiveDoc } from '../src/liveDocument';
 import { _resetHistory, applyCommand } from '../src/commandBus';
+import { parseBuffer } from './exchangeTestSupport';
 
 // ---------------------------------------------------------------------------
 // Reset shared state before each test.
@@ -66,11 +67,7 @@ function getBinaryStl(): Promise<request.Response> {
     .get('/export/stl')
     .query({ format: 'binary' })
     .buffer(true)
-    .parse((res, callback) => {
-      const chunks: Buffer[] = [];
-      res.on('data', (chunk: Buffer) => chunks.push(chunk));
-      res.on('end', () => callback(null, Buffer.concat(chunks)));
-    });
+    .parse(parseBuffer);
 }
 
 // ---------------------------------------------------------------------------

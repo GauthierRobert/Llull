@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useStore, useToolStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
+import { resetOfflineStore } from '../helpers/storeTestHelpers';
 import { Toolbar } from '@ui/components/toolbar/Toolbar';
 import { ShortcutsDialog } from '@ui/components/ShortcutsDialog';
 
@@ -14,8 +14,7 @@ const button = (name: string): HTMLElement => screen.getByRole('button', { name 
 
 describe('Toolbar', () => {
   beforeEach(() => {
-    useStore.getState().setDocument(createEmptyDocument());
-    useStore.setState({ liveStatus: 'disconnected', localUndoStack: [], localRedoStack: [] });
+    resetOfflineStore();
     useToolStore.setState({
       viewMode: '3d',
       drawTool: 'none',

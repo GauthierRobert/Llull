@@ -16,23 +16,14 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useViewportStore } from '@ui/store';
 import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
 import { ViewportControls } from '@ui/viewport/3d/ViewportControls';
 import { PropertiesPanel } from '@ui/panels/PropertiesPanel';
 import { localDispatch } from '../helpers/storeTestHelpers';
+import { resetViewportStores } from '../helpers/componentEntities';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function resetStores(): void {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
-  useViewportStore.setState({
-    displayMode: 'shaded',
-    clipPlane: { enabled: false, axis: 'y', offset: 0, flipped: false },
-    hiddenEntityIds: new Set(),
-  });
-}
 
 // ---------------------------------------------------------------------------
 // Store unit tests — viewportStore actions
@@ -40,7 +31,7 @@ function resetStores(): void {
 
 describe('viewportStore — displayMode', () => {
   beforeEach(() => {
-    resetStores();
+    resetViewportStores();
   });
 
   it('starts as "shaded"', () => {
@@ -66,7 +57,7 @@ describe('viewportStore — displayMode', () => {
 
 describe('viewportStore — clipPlane', () => {
   beforeEach(() => {
-    resetStores();
+    resetViewportStores();
   });
 
   it('starts with clip plane disabled', () => {
@@ -106,7 +97,7 @@ describe('viewportStore — clipPlane', () => {
 
 describe('viewportStore — hiddenEntityIds', () => {
   beforeEach(() => {
-    resetStores();
+    resetViewportStores();
   });
 
   it('starts with no hidden entities', () => {
@@ -147,7 +138,7 @@ describe('viewportStore — hiddenEntityIds', () => {
 
 describe('ViewportControls — display mode buttons', () => {
   beforeEach(() => {
-    resetStores();
+    resetViewportStores();
   });
 
   it('renders Shaded, Wire, and X-Ray buttons', () => {
@@ -193,7 +184,7 @@ describe('ViewportControls — display mode buttons', () => {
 
 describe('ViewportControls — section plane toggle', () => {
   beforeEach(() => {
-    resetStores();
+    resetViewportStores();
   });
 
   it('renders a Section toggle button', () => {
@@ -268,7 +259,7 @@ function selectNewBox(): string {
 
 describe('PropertiesPanel — entity visibility toggle', () => {
   beforeEach(() => {
-    resetStores();
+    resetViewportStores();
   });
 
   it('shows a Hide button when a 3D entity is selected', () => {

@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CadDocument } from '@core/model/types';
-import type { AlignmentObject } from '@core/model/civil';
 import { execute } from '@core/commands/registry';
-import { deserializeDocument, serializeDocument } from '@core/commands/persistence';
-import { surveyedDocument } from './fixtures';
+import { alignmentOf, expectSaveLoadRoundTrip, surveyedDocument } from './fixtures';
 
 const flat = (z: number) => () => z;
 const line: [number, number][] = [
@@ -33,9 +31,6 @@ function designed(designZ: number, groundZ = 100): { doc: CadDocument; id: strin
   expect(section.affected.length, section.summary).toBeGreaterThan(0);
   return { doc: section.document, id };
 }
-
-const alignmentOf = (doc: CadDocument, id: string): AlignmentObject =>
-  doc.civil?.objects[id] as AlignmentObject;
 
 describe('add_alignment / update_alignment', () => {
   it('creates centreline, ticks and curve labels with metric defaults', () => {
@@ -507,12 +502,7 @@ describe('long section and cross sections', () => {
 describe('persistence and derivation', () => {
   it('round-trips through save / load with identical derived geometry', () => {
     const { doc, id } = designed(101);
-    const loaded = deserializeDocument(serializeDocument(doc));
-    expect(alignmentOf(loaded, id)).toEqual(alignmentOf(doc, id));
-    expect(Object.keys(loaded.entities).sort()).toEqual(Object.keys(doc.entities).sort());
-    const report = (d: CadDocument): unknown =>
-      execute(d, 'alignment_report', { alignmentId: id }).data;
-    expect(report(loaded)).toEqual(report(doc));
+    expectSaveLoadRoundTrip(doc, id);
   });
 
   it('refuses deleting a generated entity', () => {

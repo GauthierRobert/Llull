@@ -19,21 +19,13 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { useViewportStore } from '@ui/store';
 import { ViewportControls } from '@ui/viewport/3d/ViewportControls';
 import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
+import { resetViewportStores } from '../helpers/componentEntities';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function resetStores(): void {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
-  useViewportStore.setState({
-    displayMode: 'shaded',
-    clipPlane: { enabled: false, axis: 'y', offset: 0, flipped: false },
-    hiddenEntityIds: new Set(),
-    qualityOverride: 'auto',
-  });
-}
+const resetStores = (): void => resetViewportStores({ qualityOverride: 'auto' });
 
 // ---------------------------------------------------------------------------
 // QualityControl rendering

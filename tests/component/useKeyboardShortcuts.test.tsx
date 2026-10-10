@@ -15,6 +15,13 @@ function Harness(): React.ReactElement {
   return <input aria-label="field" />;
 }
 
+/** Renders the harness with a wall's generated body and the loose entity `a` selected. */
+function renderWithSelectedWall(): void {
+  const walled = execute(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [1000, 0] });
+  useStore.setState({ document: { ...walled.document, selection: ['wall-1:body-0', 'a'] } });
+  render(<Harness />);
+}
+
 describe('useKeyboardShortcuts', () => {
   const undo = vi.fn();
   const redo = vi.fn();
@@ -55,12 +62,7 @@ describe('useKeyboardShortcuts', () => {
   });
 
   it('Delete routes generated building geometry to delete_building_element', () => {
-    const walled = execute(createEmptyDocument(), 'add_wall', {
-      start: [0, 0],
-      end: [1000, 0],
-    }).document;
-    useStore.setState({ document: { ...walled, selection: ['wall-1:body-0', 'a'] } });
-    render(<Harness />);
+    renderWithSelectedWall();
     fireEvent.keyDown(window, { key: 'Delete' });
     expect(dispatch.mock.calls).toEqual([
       ['delete_building_element', { elementIds: ['wall-1'] }],
@@ -169,12 +171,7 @@ describe('useKeyboardShortcuts', () => {
   });
 
   it('arrow nudge routes generated building geometry through its element', () => {
-    const walled = execute(createEmptyDocument(), 'add_wall', {
-      start: [0, 0],
-      end: [1000, 0],
-    }).document;
-    useStore.setState({ document: { ...walled, selection: ['wall-1:body-0', 'a'] } });
-    render(<Harness />);
+    renderWithSelectedWall();
     fireEvent.keyDown(window, { key: 'ArrowRight' });
     expect(dispatch.mock.calls).toEqual([
       ['move_building_element', { elementIds: ['wall-1'], delta: [1, 0] }],

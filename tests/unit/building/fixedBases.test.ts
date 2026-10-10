@@ -11,15 +11,10 @@ import { footingMoment } from '@aec/industrial/foundationCombinations';
 import type { FootingDesignRow } from '@aec/industrial/footingModel';
 import { findProfile } from '@aec/steel/profiles';
 import { buildingErrors } from '@aec/validate';
+import { HALL, hall } from './hallFixtures';
 
-const HALL = { span: 24000, length: 30000 };
 const LOADS: FrameLoads = { deadLoad: 0.5, snowLoad: 0.8, windPressure: 0.7 };
 const CRANE_HALL = { ...HALL, crane: { capacity: 10, railHeight: 6000 } };
-
-function hall(params: Record<string, unknown> = {}): CadDocument {
-  return execute(createEmptyDocument(), 'add_portal_frame_building', { ...HALL, ...params })
-    .document;
-}
 
 const plates = (doc: CadDocument): BasePlateElement[] =>
   Object.values(doc.building!.elements).filter(

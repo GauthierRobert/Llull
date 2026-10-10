@@ -15,6 +15,7 @@ import {
   squareBay,
   step,
   twoLevels,
+  beamOnColumns,
 } from './steelFixtures';
 
 const IPE300 = (findProfile('IPE300')?.massPerMetre ?? 0) * G * 1e-3; // kN/m
@@ -259,12 +260,8 @@ describe('column buckling', () => {
 
 describe('pipes and trays', () => {
   const pipeBeamDoc = (underside: number): ReturnType<typeof twoLevels> => {
-    let doc = twoLevels();
-    doc = column(doc, 3000, 0);
-    doc = column(doc, 3000, 4000);
-    doc = beam(doc, [3000, 0], [3000, 4000]);
     // pipe along X crossing the beam at y = 2000; level-1 elevation is 0, beam top of steel 2970
-    return step(doc, 'add_pipe_run', {
+    return step(beamOnColumns(), 'add_pipe_run', {
       levelId: 'level-1',
       diameter: 114.3,
       service: 'water',
@@ -299,13 +296,7 @@ describe('pipes and trays', () => {
   });
 
   it('shares a run between supports by half the span to the neighbours', () => {
-    let doc = twoLevels();
-    for (const x of [1000, 3000]) {
-      doc = column(doc, x, 0);
-      doc = column(doc, x, 4000);
-      doc = beam(doc, [x, 0], [x, 4000]);
-    }
-    doc = step(doc, 'add_pipe_run', {
+    const doc = step(beamOnColumns([1000, 3000]), 'add_pipe_run', {
       levelId: 'level-1',
       diameter: 114.3,
       points: [
@@ -324,11 +315,7 @@ describe('pipes and trays', () => {
   });
 
   it('supports a cable tray by its underside and weighs it per metre', () => {
-    let doc = twoLevels();
-    doc = column(doc, 3000, 0);
-    doc = column(doc, 3000, 4000);
-    doc = beam(doc, [3000, 0], [3000, 4000]);
-    doc = step(doc, 'add_cable_tray', {
+    const doc = step(beamOnColumns(), 'add_cable_tray', {
       levelId: 'level-1',
       width: 600,
       height: 100,

@@ -24,6 +24,33 @@ const GAP = {
 const asNumbers = (value: unknown): number[] => (Array.isArray(value) ? value.map(Number) : []);
 const text = (value: unknown): string => String(value);
 const degrees = (radians: number): string => String((radians * 180) / Math.PI);
+/** The form fields of a boundary given by its first and third points (opposite corners). */
+const rectangleFields = (boundary: unknown): Record<string, string> => {
+  const [first, , third] = (Array.isArray(boundary) ? boundary : []).map(asNumbers);
+  return {
+    x1: text(first?.[0]),
+    y1: text(first?.[1]),
+    x2: text(third?.[0]),
+    y2: text(third?.[1]),
+  };
+};
+/** The equipment form fields (all but `mark`) of a step's params. */
+const equipmentFields = (
+  params: Record<string, unknown>,
+  weight: string,
+): Record<string, string> => {
+  const [location, size] = [asNumbers(params['location']), asNumbers(params['size'])];
+  return {
+    name: text(params['name']),
+    x: text(location[0]),
+    y: text(location[1]),
+    length: text(size[0]),
+    width: text(size[1]),
+    height: text(size[2]),
+    weight,
+    clearance: text(params['clearance']),
+  };
+};
 const levelOf = (args: Record<string, unknown>): Record<string, string> =>
   typeof args['levelId'] === 'string' ? { levelId: args['levelId'] } : {};
 const route = (points: unknown): string =>
@@ -116,20 +143,9 @@ export class UiDriver {
       case 'add_slab':
         return this.addSlab(args);
       case 'add_equipment': {
-        const [location, size] = [asNumbers(args['location']), asNumbers(args['size'])];
         return this.panel.applyTool(
           'equipment',
-          {
-            mark: text(args['mark'] ?? ''),
-            name: text(args['name']),
-            x: text(location[0]),
-            y: text(location[1]),
-            length: text(size[0]),
-            width: text(size[1]),
-            height: text(size[2]),
-            weight: text(args['weight'] ?? ''),
-            clearance: text(args['clearance']),
-          },
+          { mark: text(args['mark'] ?? ''), ...equipmentFields(args, text(args['weight'] ?? '')) },
           levelOf(args),
         );
       }
@@ -194,17 +210,10 @@ export class UiDriver {
       this.gaps.add(GAP.historyEdit);
       return this.palette('edit_step_params', args);
     }
-    const [location, size] = [asNumbers(record['location']), asNumbers(record['size'])];
-    return this.panel.editEquipment(record['mark'], {
-      name: text(record['name']),
-      x: text(location[0]),
-      y: text(location[1]),
-      length: text(size[0]),
-      width: text(size[1]),
-      height: text(size[2]),
-      weight: text(record['weight']),
-      clearance: text(record['clearance']),
-    });
+    return this.panel.editEquipment(
+      record['mark'],
+      equipmentFields(record, text(record['weight'])),
+    );
   }
 
   /** One submission of the Pipe support form: the line, the type and the points (or a spacing). */
@@ -235,15 +244,10 @@ export class UiDriver {
 
   /** Gratings and floors are drawn as the rectangle given by two opposite corners. */
   private async addSlab(args: Record<string, unknown>): Promise<string> {
-    const corners = (Array.isArray(args['boundary']) ? args['boundary'] : []).map(asNumbers);
-    const [first, , third] = corners;
     return this.panel.applyTool(
       'slab',
       {
-        x1: text(first?.[0]),
-        y1: text(first?.[1]),
-        x2: text(third?.[0]),
-        y2: text(third?.[1]),
+        ...rectangleFields(args['boundary']),
         thickness: text(args['thickness']),
         material: text(args['material'] ?? ''),
       },
@@ -255,17 +259,9 @@ export class UiDriver {
     if (typeof args['stairId'] === 'string') {
       return this.panel.applyTool('slabOpening', {}, { source: 'stair', stairId: args['stairId'] });
     }
-    const corners = (Array.isArray(args['boundary']) ? args['boundary'] : []).map(asNumbers);
-    const [first, , third] = corners;
-    return this.panel.applyTool(
-      'slabOpening',
-      {
-        x1: text(first?.[0]),
-        y1: text(first?.[1]),
-        x2: text(third?.[0]),
-        y2: text(third?.[1]),
-      },
-      { source: 'rectangle', slabId: text(args['slabId']) },
-    );
+    return this.panel.applyTool('slabOpening', rectangleFields(args['boundary']), {
+      source: 'rectangle',
+      slabId: text(args['slabId']),
+    });
   }
 }

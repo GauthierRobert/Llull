@@ -2,7 +2,13 @@
  * Fake shape kernel for command tests: the real recipe evaluator (`kernelFromOps`) over canned
  * native ops, so commands exercise recipes, caching and handles without WASM.
  */
-import type { MeshData, ShapeTopology } from '@core/geometry/kernel';
+import { afterEach, beforeEach } from 'vitest';
+import {
+  setGeometryKernel,
+  type GeometryKernel,
+  type MeshData,
+  type ShapeTopology,
+} from '@core/geometry/kernel';
 import type { BooleanOp, ShapeRecipe } from '@core/geometry/shapeRecipe';
 import { kernelFromOps, type CachingKernel } from '@core/geometry/shapeKernel';
 import type { Entity } from '@core/model/types';
@@ -78,4 +84,10 @@ export function fakeKernel(spec: FakeKernelSpec = {}): FakeKernel {
     release: () => undefined,
   });
   return Object.assign(kernel, { calls });
+}
+
+/** Installs `kernel` as the geometry kernel before each test of the file and clears it after. */
+export function installKernelPerTest(kernel: GeometryKernel): void {
+  beforeEach(() => setGeometryKernel(kernel));
+  afterEach(() => setGeometryKernel(null));
 }

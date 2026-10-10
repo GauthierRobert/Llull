@@ -3,6 +3,7 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { type BracingRow } from '@aec/industrial/bracingModel';
 import { checkBracing } from '@aec/industrial/bracingCheckRun';
+import { withoutElements } from './elementEdits';
 
 function hall(params: Record<string, unknown> = {}, base = createEmptyDocument()): CadDocument {
   return execute(base, 'add_portal_frame_building', { span: 24000, length: 48000, ...params })
@@ -14,23 +15,8 @@ function rowsOf(doc: CadDocument, params: Record<string, unknown> = {}): Bracing
   return data.rows;
 }
 
-function without(doc: CadDocument, role: string): CadDocument {
-  const building = doc.building;
-  if (!building) throw new Error('no building');
-  const elements = Object.fromEntries(
-    Object.entries(building.elements).filter(
-      ([, element]) => !(element.category === 'member' && element.role === role),
-    ),
-  );
-  return {
-    ...doc,
-    building: {
-      ...building,
-      elements,
-      elementOrder: building.elementOrder.filter((id) => id in elements),
-    },
-  };
-}
+const without = (doc: CadDocument, role: string): CadDocument =>
+  withoutElements(doc, (element) => element.category === 'member' && element.role === role);
 
 describe('check_bracing', () => {
   it('passes the default hall and is read-only', () => {

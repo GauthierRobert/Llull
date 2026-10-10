@@ -1,13 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { type MeshSolidEntity, type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { type MeshData, setGeometryKernel, getGeometryKernel } from '@core/geometry/kernel';
-import { fakeKernel, type FakeCall, type FakeKernel } from '../helpers/fakeKernel';
-
-const CANNED_MESH: MeshData = {
-  positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
-  indices: [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3],
-};
+import { setGeometryKernel, getGeometryKernel } from '@core/geometry/kernel';
+import { TETRA, fakeKernel, type FakeCall, type FakeKernel } from '../helpers/fakeKernel';
 
 function lastBoolean(fake: FakeKernel): FakeCall | undefined {
   return [...fake.calls].reverse().find((call) => call.op === 'boolean');
@@ -46,7 +41,7 @@ describe('boolean commands', () => {
   let fake: FakeKernel;
 
   beforeEach(() => {
-    fake = fakeKernel({ boolean: CANNED_MESH });
+    fake = fakeKernel({ boolean: TETRA });
     setGeometryKernel(fake);
   });
 
@@ -75,8 +70,8 @@ describe('boolean commands', () => {
       const result = execute(doc, 'boolean_union', { a: idA, b: idB });
       const newId = result.affected[0]!;
       const entity = result.document.entities[newId] as MeshSolidEntity;
-      expect(entity.mesh.positions).toEqual(CANNED_MESH.positions);
-      expect(entity.mesh.indices).toEqual(CANNED_MESH.indices);
+      expect(entity.mesh.positions).toEqual(TETRA.positions);
+      expect(entity.mesh.indices).toEqual(TETRA.indices);
     });
 
     it('stores the boolean recipe of both operands as brep', () => {
@@ -111,7 +106,7 @@ describe('boolean commands', () => {
       const { doc, idA, idB } = docWithTwoBoxes();
       const result = execute(doc, 'boolean_union', { a: idA, b: idB });
       const newId = result.affected[0]!;
-      const triangleCount = CANNED_MESH.indices.length / 3; // 4
+      const triangleCount = TETRA.indices.length / 3; // 4
       expect(result.summary).toContain(idA);
       expect(result.summary).toContain(idB);
       expect(result.summary).toContain(newId);
@@ -235,22 +230,16 @@ describe('boolean commands', () => {
       expect(result.summary).toContain('2D');
     });
 
-    it('no-op when kernel is not injected', () => {
-      setGeometryKernel(null);
+    it.each([
+      ['kernel is not injected', null, 'kernel not available'],
+      ['kernel returns null (degenerate geometry)', fakeKernel({ boolean: null }), 'null'],
+    ])('no-op when %s', (_label, kernel, summary) => {
+      setGeometryKernel(kernel);
       const { doc, idA, idB } = docWithTwoBoxes();
       const result = execute(doc, 'boolean_union', { a: idA, b: idB });
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
-      expect(result.summary).toContain('kernel not available');
-    });
-
-    it('no-op when kernel returns null (degenerate geometry)', () => {
-      setGeometryKernel(fakeKernel({ boolean: null }));
-      const { doc, idA, idB } = docWithTwoBoxes();
-      const result = execute(doc, 'boolean_union', { a: idA, b: idB });
-      expect(result.affected).toHaveLength(0);
-      expect(result.document).toBe(doc);
-      expect(result.summary).toContain('null');
+      expect(result.summary).toContain(summary);
     });
   });
 
@@ -345,7 +334,7 @@ describe('boolean commands', () => {
     if (entity.kind === 'mesh') {
       // Each xyz triple of the canned tetra is doubled; indices are unchanged.
       expect([...entity.mesh.positions]).toEqual([0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2]);
-      expect([...entity.mesh.indices]).toEqual([...CANNED_MESH.indices]);
+      expect([...entity.mesh.indices]).toEqual([...TETRA.indices]);
     }
   });
 });

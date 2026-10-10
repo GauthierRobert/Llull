@@ -10,6 +10,7 @@ import { fitScale, type PlanSheet } from '@aec/sheet';
 import { type IfcExport } from '@aec/ifcBuild';
 import { ifcGuid, ifcReal, ifcString } from '@aec/ifcStep';
 import { fileSlug } from '@aec/model';
+import { drawHouseWalls, run } from './runFixtures';
 
 /** True for code points XML 1.0 forbids (C0 controls other than tab, LF, CR; U+FFFE; U+FFFF). */
 function isIllegalXmlCharacter(character: string): boolean {
@@ -21,10 +22,6 @@ function isIllegalXmlCharacter(character: string): boolean {
   );
 }
 
-function run(doc: CadDocument, name: string, params: unknown): CadDocument {
-  return execute(doc, name, params).document;
-}
-
 function house(): CadDocument {
   let doc = run(createEmptyDocument(), 'set_project_info', {
     name: 'Maison Dupont',
@@ -33,16 +30,7 @@ function house(): CadDocument {
   });
   doc = run(doc, 'add_level', { name: 'Rez-de-chaussée' });
   doc = run(doc, 'add_grid_system', { xSpacings: [5000, 5000], ySpacings: [8000] });
-  doc = run(doc, 'draw_walls', {
-    points: [
-      [0, 0],
-      [10000, 0],
-      [10000, 8000],
-      [0, 8000],
-    ],
-    closed: true,
-    thickness: 300,
-  });
+  doc = drawHouseWalls(doc);
   doc = run(doc, 'add_door', { wallId: 'wall-1', offset: 2000 });
   doc = run(doc, 'add_door', { wallId: 'wall-3', offset: 2000, swing: 'right' });
   doc = run(doc, 'add_window', { wallId: 'wall-1', offset: 7000 });
