@@ -82,17 +82,14 @@ export const exportDrainageLongSection = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const criteria = criteriaFrom(params);
-    if (typeof criteria === 'string') {
+    if (typeof criteria === 'string')
       return noop(doc, `export_drainage_long_section failed: ${criteria}`);
-    }
     const civil = getCivil(doc);
     const start = civilObject(civil, params.fromManholeId, 'manhole');
-    if (!start) {
+    if (!start)
       return noop(doc, `export_drainage_long_section failed: no manhole ${params.fromManholeId}.`);
-    }
-    if (params.toManholeId !== undefined && !civilObject(civil, params.toManholeId, 'manhole')) {
+    if (params.toManholeId !== undefined && !civilObject(civil, params.toManholeId, 'manhole'))
       return noop(doc, `export_drainage_long_section failed: no manhole ${params.toManholeId}.`);
-    }
     const run = runPipes(civil, start.id, params.toManholeId);
     if (run.length === 0) {
       return noop(

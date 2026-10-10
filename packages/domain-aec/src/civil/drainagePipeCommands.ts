@@ -116,9 +116,8 @@ export const addPipe = defineCommand({
       invertTo: params.invertTo ?? to.invertElevation,
     };
     const length = pipePlanLength(civil, pipe) ?? 0;
-    if (!(length > 0)) {
+    if (!(length > 0))
       return noop(doc, `add_pipe failed: ${from.id} and ${to.id} share the same plan position.`);
-    }
     const adverse = pipe.invertFrom <= pipe.invertTo ? ' Warning: adverse or zero slope.' : '';
     return commitCivil(
       doc,
@@ -161,9 +160,8 @@ export const updatePipe = defineCommand({
       invertFrom: params.invertFrom ?? pipe.invertFrom,
       invertTo: params.invertTo ?? pipe.invertTo,
     };
-    if (JSON.stringify(updated) === JSON.stringify(pipe)) {
+    if (JSON.stringify(updated) === JSON.stringify(pipe))
       return noop(doc, `update_pipe: nothing to change on ${pipe.id}.`);
-    }
     const length = pipePlanLength(civil, updated) ?? 0;
     const adverse =
       updated.invertFrom <= updated.invertTo ? ' Warning: adverse or zero slope.' : '';

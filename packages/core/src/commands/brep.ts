@@ -173,9 +173,8 @@ export const exportStepExact = defineCommand({
       shapes.push(shape);
     }
     const step = kernel.exportStep(shapes);
-    if (step === null) {
+    if (step === null)
       return noop(doc, `export_step_exact: this kernel cannot write exact STEP; use ${OCC_HINT}.`);
-    }
     const exported = solids.map((entity) => entity.id);
     const data: ExportStepExactData = {
       format: 'step',

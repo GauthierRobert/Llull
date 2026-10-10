@@ -21,9 +21,8 @@ const WALL_LAYER_FUNCTIONS = [
 
 /** @failure malformed layer list -> reason string */
 export function parseWallLayers(value: unknown): WallLayer[] | string {
-  if (!Array.isArray(value) || value.length < 1 || value.length > 10) {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 10)
     return 'layers must be a list of 1–10 { material, thickness, function }';
-  }
   const layers: WallLayer[] = [];
   for (const raw of value as unknown[]) {
     const layer = raw as Partial<Record<keyof WallLayer, unknown>>;
@@ -101,9 +100,8 @@ export const setWallLayers = defineCommand({
     const walls = [...new Set(wallIds)]
       .map((id) => building.elements[id])
       .filter((element): element is WallElement => element?.category === 'wall');
-    if (walls.length === 0 || walls.length !== new Set(wallIds).size) {
+    if (walls.length === 0 || walls.length !== new Set(wallIds).size)
       return noop(doc, 'set_wall_layers failed: wallIds must list existing walls.');
-    }
     const ids = walls.map((wall) => wall.id);
     const marks = walls.map((wall) => wall.mark).join(', ');
     if (layers === null) {

@@ -182,9 +182,8 @@ function elementErrors(
 ): string[] {
   if (!isRecord(element)) return [`building element ${key} is not an object`];
   const category = element['category'];
-  if (typeof category !== 'string' || !CATEGORIES.has(category)) {
+  if (typeof category !== 'string' || !CATEGORIES.has(category))
     return [`building element ${key}: unknown category '${String(category)}'`];
-  }
   const errors: string[] = [];
   if (element['id'] !== key) errors.push(`building element ${key}: id does not match its key`);
   if (typeof element['mark'] !== 'string')

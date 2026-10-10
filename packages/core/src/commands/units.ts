@@ -49,9 +49,8 @@ export const setUnits = defineCommand({
       );
     }
 
-    if (units === undefined && displayPrecision === undefined) {
+    if (units === undefined && displayPrecision === undefined)
       return noop(doc, 'No changes: provide at least one of units or displayPrecision.');
-    }
 
     const nextUnits = units ?? doc.units;
     const nextPrecision = displayPrecision ?? doc.displayPrecision;

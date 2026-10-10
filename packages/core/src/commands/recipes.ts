@@ -79,9 +79,8 @@ export const saveRecipe = defineCommand({
   }),
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, { name, label }): CommandResult => {
-    if (name.trim() === '') {
+    if (name.trim() === '')
       return noop(doc, 'save_recipe failed: name must be a non-empty, non-whitespace-only string.');
-    }
 
     const steps: FeatureStep[] = doc.featureHistory.map((s) => ({ ...s }));
 
@@ -145,9 +144,8 @@ function instantiateRecipeOnce(
   name: string,
   ctx: ExecutionContext,
 ): CommandResult {
-  if (name.trim() === '') {
+  if (name.trim() === '')
     return noop(doc, 'instantiate_recipe failed: name must be a non-empty string.');
-  }
 
   const recipe = doc.recipes[name];
   if (!recipe) {
@@ -160,9 +158,7 @@ function instantiateRecipeOnce(
   }
 
   const refused = kernelRefusal(doc, recipe.steps, ctx);
-  if (refused !== null) {
-    return noop(doc, `instantiate_recipe: ${refused}`);
-  }
+  if (refused !== null) return noop(doc, `instantiate_recipe: ${refused}`);
 
   if (recipe.steps.length > MAX_PROJECT_STEPS) {
     return noop(

@@ -42,9 +42,8 @@ export function drawPointSeries(
   position: Vec3,
   color: string,
 ): CommandResult {
-  if (points.length < 2) {
+  if (points.length < 2)
     return noop(doc, `draw_${kind}: requires at least 2 points (got ${points.length}).`);
-  }
   if (points.length > MAX_PROFILE_POINTS) {
     return noop(
       doc,

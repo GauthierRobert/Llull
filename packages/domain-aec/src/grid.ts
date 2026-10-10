@@ -83,15 +83,13 @@ export const addGridLine = defineCommand({
     label: z.string().optional().describe('Bubble label, e.g. "A" or "3". Must be unique.'),
   }),
   run: (doc, { start, end, label }): CommandResult => {
-    if (distance(start, end) <= 0) {
+    if (distance(start, end) <= 0)
       return noop(doc, 'add_grid_line failed: start and end must be distinct [x, y] points.');
-    }
     const building = getBuilding(doc);
     const used = gridLabels(building);
     const resolvedLabel = label?.trim() || nextFreeLabel(used, true);
-    if (used.has(resolvedLabel)) {
+    if (used.has(resolvedLabel))
       return noop(doc, `add_grid_line failed: grid label "${resolvedLabel}" already exists.`);
-    }
     const twin = gridTwin(building, start, end);
     if (twin) {
       return noop(
@@ -155,9 +153,7 @@ export const addGridSystem = defineCommand({
       );
     }
     const overrun = extension ?? fromMm(doc, 1500);
-    if (overrun < 0) {
-      return noop(doc, 'add_grid_system failed: extension must be >= 0.');
-    }
+    if (overrun < 0) return noop(doc, 'add_grid_system failed: extension must be >= 0.');
     const origin: Vec2 = originInput ?? [0, 0];
     const xs = [origin[0]];
     for (const spacing of xSpacings) xs.push((xs[xs.length - 1] as number) + spacing);

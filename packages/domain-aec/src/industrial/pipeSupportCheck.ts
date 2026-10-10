@@ -208,16 +208,13 @@ export const checkPipeSupports = defineCommand({
   }),
   run: (doc: CadDocument, params): CommandResult => {
     const { spanFactor = 1, overhangRatio = 0.5 } = params;
-    if (!isPositiveNumber(spanFactor)) {
+    if (!isPositiveNumber(spanFactor))
       return noop(doc, 'check_pipe_supports failed: spanFactor must be a number > 0.');
-    }
-    if (!isNonNegativeNumber(overhangRatio)) {
+    if (!isNonNegativeNumber(overhangRatio))
       return noop(doc, 'check_pipe_supports failed: overhangRatio must be a number >= 0.');
-    }
     const building = getBuilding(doc);
-    if (params.levelId !== undefined && !building.levels[params.levelId]) {
+    if (params.levelId !== undefined && !building.levels[params.levelId])
       return noop(doc, `check_pipe_supports failed: no level '${params.levelId}'.`);
-    }
     const units = modelUnits(doc);
     const runs = pipeRunsOf(units);
     const selected = runs.filter(

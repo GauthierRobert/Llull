@@ -184,26 +184,21 @@ export function validateHorizontal(
   spirals: ReadonlyArray<number> = [],
 ): string | null {
   if (points.length < 2) return 'an alignment needs at least 2 points.';
-  if (!points.every((point) => Number.isFinite(point[0]) && Number.isFinite(point[1]))) {
+  if (!points.every((point) => Number.isFinite(point[0]) && Number.isFinite(point[1])))
     return 'points must be finite [x, y] pairs.';
-  }
   for (let i = 0; i + 1 < points.length; i++) {
     const a = points[i] as Vec2;
     const b = points[i + 1] as Vec2;
     if (Math.hypot(b[0] - a[0], b[1] - a[1]) < EPS) return `points ${i} and ${i + 1} coincide.`;
   }
-  if (radii.length !== points.length - 2) {
+  if (radii.length !== points.length - 2)
     return `radii needs ${points.length - 2} value(s) (one per interior PI), got ${radii.length}.`;
-  }
-  if (!radii.every((radius) => Number.isFinite(radius) && radius >= 0)) {
+  if (!radii.every((radius) => Number.isFinite(radius) && radius >= 0))
     return 'radii must be finite numbers >= 0 (0 = no curve).';
-  }
-  if (spirals.length > 0 && spirals.length !== radii.length) {
+  if (spirals.length > 0 && spirals.length !== radii.length)
     return `spirals needs ${radii.length} value(s) (one per interior PI), got ${spirals.length}.`;
-  }
-  if (!spirals.every((length) => Number.isFinite(length) && length >= 0)) {
+  if (!spirals.every((length) => Number.isFinite(length) && length >= 0))
     return 'spirals must be finite numbers >= 0 (0 = no spiral).';
-  }
   for (let i = 1; i < points.length - 1; i++) {
     const a = points[i - 1] as Vec2;
     const b = points[i] as Vec2;

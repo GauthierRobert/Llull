@@ -79,9 +79,8 @@ export const setCamera = defineCommand({
       ),
   }),
   run: (doc, p): CommandResult => {
-    if (p.distance !== undefined && p.distance <= 0) {
+    if (p.distance !== undefined && p.distance <= 0)
       return noop(doc, `set_camera: distance must be > 0 (got ${p.distance}). Camera unchanged.`);
-    }
 
     const prev: CameraState = doc.camera;
     const next: CameraState = {
@@ -94,9 +93,8 @@ export const setCamera = defineCommand({
       (field) => p[field] !== undefined,
     );
 
-    if (changed.length === 0) {
+    if (changed.length === 0)
       return noop(doc, 'set_camera: no fields specified; camera unchanged.');
-    }
 
     return report(
       { ...doc, camera: next },
@@ -197,9 +195,8 @@ export const fitView = defineCommand({
     const direction: FitDirection = p.direction ?? 'iso';
     const padding: number = p.padding ?? 1.2;
 
-    if (padding <= 0) {
+    if (padding <= 0)
       return noop(doc, `fit_view: padding must be > 0 (got ${padding}). Camera unchanged.`);
-    }
 
     const { bounds } = computeSceneSnapshot(doc);
 

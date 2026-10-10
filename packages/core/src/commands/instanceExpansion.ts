@@ -69,9 +69,8 @@ function bakedMeshChild(child: Entity, instance: InstanceEntity, scale: Vec3, id
 function scaledChild(entity: Entity, scale: Vec3): Entity {
   const [ax, ay, az] = [Math.abs(scale[0]), Math.abs(scale[1]), Math.abs(scale[2])];
   if (ax === 1 && ay === 1 && az === 1) return entity;
-  if ((entity.kind === 'box' || entity.kind === 'wedge') && ax > 0 && ay > 0 && az > 0) {
+  if ((entity.kind === 'box' || entity.kind === 'wedge') && ax > 0 && ay > 0 && az > 0)
     return { ...entity, size: [entity.size[0] * ax, entity.size[1] * ay, entity.size[2] * az] };
-  }
   const factor = ax === ay && ay === az ? ax : Math.cbrt(ax * ay * az);
   return factor > 0 ? scaleGeometry(entity, factor).scaled : entity;
 }

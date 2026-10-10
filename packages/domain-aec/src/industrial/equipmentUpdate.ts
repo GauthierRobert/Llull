@@ -80,9 +80,8 @@ export const updateEquipment = defineCommand({
     let target: EquipmentElement | undefined;
     if (elementId !== undefined) {
       const element = building.elements[elementId];
-      if (element === undefined) {
+      if (element === undefined)
         return noop(doc, `update_equipment failed: no element '${elementId}'.`);
-      }
       if (element.category !== 'equipment') {
         return noop(
           doc,
@@ -113,26 +112,22 @@ export const updateEquipment = defineCommand({
         `update_equipment failed: size must be 3 numbers valid for shape ${newShape} (box: all > 0; vertical_vessel: diameter and height > 0; horizontal_vessel: length and diameter > 0).`,
       );
     }
-    if (location !== undefined && !isVec2(location)) {
+    if (location !== undefined && !isVec2(location))
       return noop(doc, 'update_equipment failed: location must be [x, y] with finite numbers.');
-    }
     const next = {
       angle: angle ?? equipment.angle,
       clearance: clearance ?? equipment.clearance,
       weight: weight ?? equipment.weight,
     };
-    if (next.clearance < 0 || next.weight < 0) {
+    if (next.clearance < 0 || next.weight < 0)
       return noop(doc, 'update_equipment failed: clearance >= 0 and weight >= 0.');
-    }
     const newName = name !== undefined ? name.trim() : equipment.name;
     const newMark = mark !== undefined ? mark.trim() : equipment.mark;
-    if (newName === '' || newMark === '') {
+    if (newName === '' || newMark === '')
       return noop(doc, 'update_equipment failed: name and mark cannot be empty.');
-    }
     const clash = equipments.find((other) => other.id !== equipment.id && other.mark === newMark);
-    if (clash) {
+    if (clash)
       return noop(doc, `update_equipment failed: tag '${newMark}' is already used by ${clash.id}.`);
-    }
     const resolution = resolveLevel(doc, building, levelId ?? equipment.levelId);
     if (!resolution.ok) return noop(doc, `update_equipment failed: ${resolution.reason}.`);
     const withoutShape: EquipmentElement = { ...equipment };

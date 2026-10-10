@@ -134,9 +134,7 @@ export const animateSpin = defineCommand({
   }),
   run: (doc, { targetId, speed, axis, channel, pivot, trigger }): CommandResult => {
     const targetKind = resolveTargetKind(doc, targetId);
-    if (targetKind === null) {
-      return noop(doc, `animate_spin: no entity or group ${targetId}.`);
-    }
+    if (targetKind === null) return noop(doc, `animate_spin: no entity or group ${targetId}.`);
 
     const anim = buildAnimation(
       { targetId, targetKind, axis, channel, trigger, pivot },
@@ -202,9 +200,7 @@ export const animateOscillate = defineCommand({
   }),
   run: (doc, { targetId, amplitude, frequency, axis, channel, pivot, trigger }): CommandResult => {
     const targetKind = resolveTargetKind(doc, targetId);
-    if (targetKind === null) {
-      return noop(doc, `animate_oscillate: no entity or group ${targetId}.`);
-    }
+    if (targetKind === null) return noop(doc, `animate_oscillate: no entity or group ${targetId}.`);
 
     if (amplitude <= 0) {
       return noop(
@@ -271,9 +267,8 @@ export const stopAnimation = defineCommand({
     const existing = doc.animations;
 
     if (animationId !== undefined) {
-      if (existing[animationId] === undefined) {
+      if (existing[animationId] === undefined)
         return noop(doc, `stop_animation: animation ${animationId} not found; nothing removed.`);
-      }
       const next = { ...existing };
       delete next[animationId];
       return report(
@@ -301,9 +296,7 @@ export const stopAnimation = defineCommand({
     }
 
     const count = Object.keys(existing).length;
-    if (count === 0) {
-      return noop(doc, 'stop_animation: no animations to clear.');
-    }
+    if (count === 0) return noop(doc, 'stop_animation: no animations to clear.');
     return report({ ...doc, animations: {} }, `stop_animation: cleared all ${count} animation(s).`);
   },
 });

@@ -159,9 +159,8 @@ export function elevationAt(tin: Tin, at: Vec2): number | null {
     const l1 = ((b[1] - c[1]) * (at[0] - c[0]) + (c[0] - b[0]) * (at[1] - c[1])) / det;
     const l2 = ((c[1] - a[1]) * (at[0] - c[0]) + (a[0] - c[0]) * (at[1] - c[1])) / det;
     const l3 = 1 - l1 - l2;
-    if (l1 < -BARYCENTRIC_TOLERANCE || l2 < -BARYCENTRIC_TOLERANCE || l3 < -BARYCENTRIC_TOLERANCE) {
+    if (l1 < -BARYCENTRIC_TOLERANCE || l2 < -BARYCENTRIC_TOLERANCE || l3 < -BARYCENTRIC_TOLERANCE)
       continue;
-    }
     return l1 * a[2] + l2 * b[2] + l3 * c[2];
   }
   return null;

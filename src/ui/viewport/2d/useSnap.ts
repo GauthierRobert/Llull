@@ -63,9 +63,7 @@ function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult | null
   // We need the adjusted cursor before computing advanced snap candidates.
   const adjustedCursor: Vec2 | null = useMemo(() => {
     if (cursor === null) return null;
-    if (orthoPolar && drawOrigin != null) {
-      return applyOrthoPolar(drawOrigin, cursor, orthoPolar);
-    }
+    if (orthoPolar && drawOrigin != null) return applyOrthoPolar(drawOrigin, cursor, orthoPolar);
     return cursor;
     // orthoPolar is compared by identity: callers must memoise it or accept a cheap recompute.
   }, [cursor, orthoPolar, drawOrigin]);

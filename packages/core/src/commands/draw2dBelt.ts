@@ -105,9 +105,7 @@ export const drawBeltAround = defineCommand({
   ): CommandResult => {
     const pulleys = pulleyInput as unknown as PulleySpec[];
     const n = pulleys.length;
-    if (n < 2) {
-      return noop(doc, `draw_belt_around: requires at least 2 pulleys (got ${n}).`);
-    }
+    if (n < 2) return noop(doc, `draw_belt_around: requires at least 2 pulleys (got ${n}).`);
 
     if (arcSamples < 2 || arcSamples > MAX_CURVE_SAMPLES) {
       return noop(
@@ -119,9 +117,8 @@ export const drawBeltAround = defineCommand({
 
     for (let i = 0; i < n; i++) {
       const p = elementAt(pulleys, i);
-      if (p.center.length < 2) {
+      if (p.center.length < 2)
         return noop(doc, `draw_belt_around: pulley[${i}] center must be a [x, y] array.`);
-      }
       const [cx, cy] = p.center;
       if (!Number.isFinite(cx) || !Number.isFinite(cy)) {
         return noop(

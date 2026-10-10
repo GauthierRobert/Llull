@@ -40,9 +40,8 @@ export const exportLandxml = defineCommand({
     ),
   }),
   run: (doc, { date, coordinates }): CommandResult => {
-    if (getCivil(doc).order.length === 0) {
+    if (getCivil(doc).order.length === 0)
       return noop(doc, 'export_landxml: nothing to export (no civil objects).');
-    }
     const project = getBuilding(doc).project;
     const projectDate = ISO_DATE.test(project.date) ? project.date : '1970-01-01';
     const projectName = project.name.trim() === '' ? 'Site' : project.name;
@@ -84,9 +83,8 @@ export const exportCivilDxf = defineCommand({
   }),
   run: (doc, { coordinates }): CommandResult => {
     const result = buildCivilDxf(doc, coordinates);
-    if (result.entityCount === 0) {
+    if (result.entityCount === 0)
       return noop(doc, 'export_civil_dxf: nothing to export (no civil entities).');
-    }
     const fileName = `${fileSlug(getBuilding(doc).project.name, 'site')}_civil.dxf`;
     return {
       document: doc,

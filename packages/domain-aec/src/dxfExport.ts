@@ -240,9 +240,8 @@ export const exportDxf = defineCommand({
   run: (doc, { levelId, includeDrafting = true }): CommandResult => {
     const result = buildDxf(doc, levelId, includeDrafting);
     if (!result) return noop(doc, `export_dxf failed: no level '${levelId ?? ''}'.`);
-    if (result.entityCount === 0) {
+    if (result.entityCount === 0)
       return noop(doc, 'export_dxf: nothing to export (no building elements or 2D drafting).');
-    }
     return {
       document: doc,
       summary: `DXF ${result.filename}: ${result.entityCount} entities on layers ${result.layers.join(', ')}.`,

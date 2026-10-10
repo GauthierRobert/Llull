@@ -133,9 +133,8 @@ export const fillet2D = defineCommand({
     }
 
     const tanHalf = Math.tan(halfAngle);
-    if (!isFinite(tanHalf) || tanHalf < 1e-12) {
+    if (!isFinite(tanHalf) || tanHalf < 1e-12)
       return noop(doc, `fillet_2d: degenerate angle at vertex ${vertexIndex}.`);
-    }
     const tangentDist = radius / tanHalf;
 
     if (tangentDist > lenPrev - 1e-9 || tangentDist > lenNext - 1e-9) {

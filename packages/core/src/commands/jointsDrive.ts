@@ -222,9 +222,8 @@ export const bakeMotion = defineCommand({
     'Returns the updated document with affected[] listing all modified instance ids.',
   params: z.object({}),
   run: (doc, _params): CommandResult => {
-    if (Object.keys(doc.joints).length === 0) {
+    if (Object.keys(doc.joints).length === 0)
       return noop(doc, 'bake_motion: no joints defined. Nothing to bake.');
-    }
 
     const { resolvedJoints, instancePositions, instanceRotations } = evaluateMotionInternal(doc);
 

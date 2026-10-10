@@ -123,9 +123,8 @@ export function analyseBracing(
   const rafters = members.filter(({ member }) => member.role === 'rafter');
   if (braces.length === 0)
     return { reason: `check_bracing: no bracing (role brace) on level '${levelId}'.` };
-  if (rafters.length === 0) {
+  if (rafters.length === 0)
     return { reason: `check_bracing failed: no rafters on level '${levelId}' (no gable).` };
-  }
   const rafterEnds = rafters.flatMap(({ start, end }) => [start, end]);
   const ys = rafterEnds.map((point) => point[1]);
   const y0 = Math.min(...ys);

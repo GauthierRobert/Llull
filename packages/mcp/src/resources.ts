@@ -92,9 +92,8 @@ export const MAX_RESOURCE_ITEMS = 500;
 function boundedScene(doc: CadDocument): Record<string, unknown> {
   const snapshot = computeSceneSnapshot(doc);
   const cut = (items: readonly unknown[]): boolean => items.length > MAX_RESOURCE_ITEMS;
-  if (!cut(snapshot.entities) && !cut(snapshot.selection) && !cut(snapshot.animations)) {
+  if (!cut(snapshot.entities) && !cut(snapshot.selection) && !cut(snapshot.animations))
     return { ...snapshot };
-  }
   return {
     ...snapshot,
     entities: snapshot.entities.slice(0, MAX_RESOURCE_ITEMS),

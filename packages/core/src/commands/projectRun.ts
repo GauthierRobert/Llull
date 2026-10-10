@@ -54,13 +54,11 @@ function execStep(
     run.steps.push({ index, command, ok, summary, affected });
     return { ok, affected };
   };
-  if (!getCommand(command)) {
+  if (!getCommand(command))
     return report(false, `Unknown command: ${command}${label ? ` (${label})` : ''}`);
-  }
   const resolved = resolveExprInParam(params, bindings, env);
-  if (resolved.error) {
+  if (resolved.error)
     return report(false, `Param error${label ? ` in ${label}` : ''}: ${resolved.error}`);
-  }
   const recorded = recordableParams(params, resolved.value, run.current.parameters);
   const result = executeRecorded(
     run.current,
@@ -120,9 +118,8 @@ function runAction(run: PlanRun, raw: ActionItem, index: number): boolean {
     const countResult = resolveCount(raw.repeat.count, run.current);
     if (countResult.error !== null) return failStep(run, index, 'repeat', countResult.error);
     const count = Math.round(countResult.count);
-    if (count < 0) {
+    if (count < 0)
       return failStep(run, index, 'repeat', `repeat: count must be >= 0 (got ${count}).`);
-    }
     return runLoop(run, index, raw.step, count, 'repeat', raw.repeat.as, () => ({
       extras: {},
       bindings: run.bindings,

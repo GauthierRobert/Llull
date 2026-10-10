@@ -34,9 +34,7 @@ function runBoolean(
   b: string,
   ctx: ExecutionContext | undefined,
 ): CommandResult {
-  if (a === b) {
-    return noop(doc, `${opName}: operands a and b must be different ids (got '${a}').`);
-  }
+  if (a === b) return noop(doc, `${opName}: operands a and b must be different ids (got '${a}').`);
   const ids = [a, b];
   const operands = ids.map((id) => doc.entities[id]);
   const missing = ids.find((_, i) => !operands[i]);

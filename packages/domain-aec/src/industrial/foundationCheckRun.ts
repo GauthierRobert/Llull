@@ -69,9 +69,8 @@ export const foundationCheck = defineCommand({
     if ('reason' in resolved) return noop(doc, `check_foundations failed: ${resolved.reason}.`);
     const { loads, levelId } = resolved;
     const tieCapacity = params.tieCapacity ?? DEFAULT_TIE_CAPACITY;
-    if (tieCapacity <= 0) {
+    if (tieCapacity <= 0)
       return noop(doc, 'check_foundations failed: tieCapacity must be a number > 0 (kN).');
-    }
     const thrustTie = params.thrustTie ?? defaultThrustTie(doc, levelId);
     const { rows, footings, plates, unchecked } = checkFoundations(
       doc,

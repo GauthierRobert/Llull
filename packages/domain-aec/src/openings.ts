@@ -35,9 +35,8 @@ function resolveOffset(
   at: Vec2 | undefined,
 ): number {
   if (offset !== undefined) return offset;
-  if (wall.category === 'curvedWall') {
+  if (wall.category === 'curvedWall')
     return at ? arcOffsetOf(wall, at) : curvedWallLength(wall) / 2;
-  }
   const { length } = wallFrame(wall);
   return at ? projectOntoSegment(at, wall.start, wall.end).t * length : length / 2;
 }
@@ -70,9 +69,8 @@ function addOpening(doc: CadDocument, kind: OpeningKind, params: AddOpeningParam
   const height = params.height ?? Math.min(fromMm(doc, defaults.height), wall.height);
   const sillHeight = params.sillHeight ?? fromMm(doc, defaults.sill);
   const offset = resolveOffset(wall, params.offset, params.at);
-  if (width <= 0 || height <= 0 || sillHeight < 0) {
+  if (width <= 0 || height <= 0 || sillHeight < 0)
     return noop(doc, `${name} failed: width/height must be > 0, sillHeight >= 0.`);
-  }
   const requestedMark = params.mark?.trim();
   const markOwner = requestedMark ? markHolder(building, kind, requestedMark) : undefined;
   if (markOwner) {
@@ -245,13 +243,11 @@ export const updateOpening = defineCommand({
   ): CommandResult => {
     const building = getBuilding(doc);
     const opening = building.elements[openingId];
-    if (!opening || (opening.category !== 'door' && opening.category !== 'window')) {
+    if (!opening || (opening.category !== 'door' && opening.category !== 'window'))
       return noop(doc, `update_opening failed: no door or window '${openingId}'.`);
-    }
     const wall = building.elements[opening.hostId];
-    if (!wall || (wall.category !== 'wall' && wall.category !== 'curvedWall')) {
+    if (!wall || (wall.category !== 'wall' && wall.category !== 'curvedWall'))
       return noop(doc, `update_opening failed: host wall '${opening.hostId}' is missing.`);
-    }
     const updated: OpeningElement = {
       ...opening,
       offset: offset ?? opening.offset,
@@ -262,9 +258,8 @@ export const updateOpening = defineCommand({
       material: material?.trim() || opening.material,
       mark: mark?.trim() || opening.mark,
     };
-    if (updated.width <= 0 || updated.height <= 0 || updated.sillHeight < 0) {
+    if (updated.width <= 0 || updated.height <= 0 || updated.sillHeight < 0)
       return noop(doc, 'update_opening failed: width/height must be > 0, sillHeight >= 0.');
-    }
     const markOwner = markHolder(building, opening.category, updated.mark, opening.id);
     if (markOwner) {
       return noop(
@@ -272,9 +267,8 @@ export const updateOpening = defineCommand({
         `update_opening failed: mark '${updated.mark}' is already used by ${markOwner.id}; schedule marks must be unique per category.`,
       );
     }
-    if (JSON.stringify(updated) === JSON.stringify(opening)) {
+    if (JSON.stringify(updated) === JSON.stringify(opening))
       return noop(doc, `update_opening: ${openingId} already has these values; nothing changed.`);
-    }
     const fitError = openingFitError(
       wall,
       updated,

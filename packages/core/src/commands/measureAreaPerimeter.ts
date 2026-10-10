@@ -45,20 +45,15 @@ export const measureArea = defineCommand({
       });
 
     if (points) {
-      if (points.length < 3) {
+      if (points.length < 3)
         return noop(doc, `measure_area: points must have >= 3 vertices, got ${points.length}.`);
-      }
       return measured(polygonArea(points), '');
     }
 
-    if (!entityId) {
-      return noop(doc, 'measure_area: provide either entityId or points.');
-    }
+    if (!entityId) return noop(doc, 'measure_area: provide either entityId or points.');
 
     const e = doc.entities[entityId];
-    if (!e) {
-      return noop(doc, `measure_area: entity '${entityId}' not found.`);
-    }
+    if (!e) return noop(doc, `measure_area: entity '${entityId}' not found.`);
 
     switch (e.kind) {
       case 'circle':
@@ -72,9 +67,8 @@ export const measureArea = defineCommand({
             `measure_area: polyline '${entityId}' is not closed — cannot compute area.`,
           );
         }
-        if (e.points.length < 3) {
+        if (e.points.length < 3)
           return noop(doc, `measure_area: polyline '${entityId}' has fewer than 3 points.`);
-        }
         return measured(polygonArea(e.points), ` of ${entityId}`);
       default:
         return noop(
@@ -110,9 +104,7 @@ export const measurePerimeter = defineCommand({
   }),
   run: (doc, { entityId }): CommandResult => {
     const e = doc.entities[entityId];
-    if (!e) {
-      return noop(doc, `measure_perimeter: entity '${entityId}' not found.`);
-    }
+    if (!e) return noop(doc, `measure_perimeter: entity '${entityId}' not found.`);
 
     let perimeter: number;
     switch (e.kind) {

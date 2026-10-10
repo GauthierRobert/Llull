@@ -184,9 +184,8 @@ export const createSurface = defineCommand({
     const groupIds =
       params.pointGroupIds ?? civilObjectsOf(civil, 'pointGroup').map((group) => group.id);
     const missing = groupIds.filter((id) => civilObject(civil, id, 'pointGroup') === undefined);
-    if (missing.length > 0) {
+    if (missing.length > 0)
       return noop(doc, `create_surface failed: unknown point group(s) ${missing.join(', ')}.`);
-    }
     const checked = checkSurfaceOptions(params);
     if (checked !== null) return noop(doc, `create_surface failed: ${checked}`);
     const id = nextCivilId(civil, 'surface');
@@ -234,18 +233,13 @@ function checkSurfaceOptions(options: {
   contourInterval?: number | undefined;
   majorEvery?: number | undefined;
 }): string | null {
-  if (options.boundary !== undefined && !isValidPolygon(options.boundary)) {
+  if (options.boundary !== undefined && !isValidPolygon(options.boundary))
     return 'boundary must be a simple polygon of >= 3 [x, y] points.';
-  }
-  if (options.maxEdgeLength !== undefined && !(options.maxEdgeLength > 0)) {
+  if (options.maxEdgeLength !== undefined && !(options.maxEdgeLength > 0))
     return 'maxEdgeLength must be > 0.';
-  }
-  if (options.contourInterval !== undefined && !(options.contourInterval > 0)) {
+  if (options.contourInterval !== undefined && !(options.contourInterval > 0))
     return 'contourInterval must be > 0.';
-  }
-  if (options.majorEvery !== undefined && options.majorEvery < 0) {
-    return 'majorEvery must be >= 0.';
-  }
+  if (options.majorEvery !== undefined && options.majorEvery < 0) return 'majorEvery must be >= 0.';
   return null;
 }
 
@@ -301,9 +295,7 @@ export const updateSurface = defineCommand({
       updated.extraPoints.length === surface.extraPoints.length &&
       JSON.stringify(updated.boundary) === JSON.stringify(surface.boundary) &&
       updated.maxEdgeLength === surface.maxEdgeLength;
-    if (unchanged) {
-      return noop(doc, `update_surface: nothing to change on ${surface.id}.`);
-    }
+    if (unchanged) return noop(doc, `update_surface: nothing to change on ${surface.id}.`);
     const next = withObject(civil, updated);
     const total = surfacePoints(next, updated).length;
     if (total > MAX_SURFACE_POINTS) {
@@ -312,9 +304,8 @@ export const updateSurface = defineCommand({
         `update_surface failed: ${total} points exceed the ${MAX_SURFACE_POINTS}-point surface limit.`,
       );
     }
-    if (surfaceTin(next, updated).triangles.length === 0) {
+    if (surfaceTin(next, updated).triangles.length === 0)
       return noop(doc, 'update_surface failed: the surface would have no triangle.');
-    }
     const document = regenerateCivil(doc, next);
     return {
       document,

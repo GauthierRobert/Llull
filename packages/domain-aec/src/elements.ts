@@ -59,9 +59,7 @@ export const addRoom = defineCommand({
     levelId: levelIdParam,
   }),
   run: (doc, { name, number, boundary, wallIds, levelId }): CommandResult => {
-    if (name.trim() === '') {
-      return noop(doc, 'add_room failed: name is required.');
-    }
+    if (name.trim() === '') return noop(doc, 'add_room failed: name is required.');
     const building = getBuilding(doc);
     const { outline, wallLevelId, failure } = resolveOutline(
       building,
@@ -129,9 +127,8 @@ export const deleteBuildingElement = defineCommand({
   run: (doc, { elementIds }): CommandResult => {
     const building = getBuilding(doc);
     const known = elementIds.filter((id) => building.elements[id] !== undefined);
-    if (known.length === 0) {
+    if (known.length === 0)
       return noop(doc, 'delete_building_element: none of the given ids is a building element.');
-    }
     const ignored = elementIds.filter((id) => building.elements[id] === undefined);
     const doomed = withDependents(building, known);
     const removedEntityIds = [...doomed].flatMap((id) => building.elements[id]?.entityIds ?? []);
@@ -217,12 +214,10 @@ export const moveBuildingElement = defineCommand({
   run: (doc, { elementIds, delta }): CommandResult => {
     const building = getBuilding(doc);
     const known = [...new Set(elementIds)].filter((id) => building.elements[id] !== undefined);
-    if (known.length === 0) {
+    if (known.length === 0)
       return noop(doc, 'move_building_element: none of the given ids is a building element.');
-    }
-    if (delta[0] === 0 && delta[1] === 0) {
+    if (delta[0] === 0 && delta[1] === 0)
       return noop(doc, 'move_building_element: delta is [0, 0]; nothing to move.');
-    }
     const ignored = elementIds.filter((id) => building.elements[id] === undefined);
     const strayOpenings = known.filter((id) => {
       const element = building.elements[id];
@@ -370,9 +365,8 @@ export const copyLevelElements = defineCommand({
       (element): element is Exclude<BuildingElement, { category: 'grid' | 'door' | 'window' }> =>
         'levelId' in element && element.levelId === sourceLevelId && allowed.has(element.category),
     );
-    if (sourceElements.length === 0) {
+    if (sourceElements.length === 0)
       return noop(doc, `copy_level_elements: level ${sourceLevelId} has nothing to copy.`);
-    }
     const sourceHeight = building.levels[sourceLevelId]?.height ?? 0;
     let next = building;
     const created: string[] = [];

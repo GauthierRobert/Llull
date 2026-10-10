@@ -286,9 +286,8 @@ function runSearchTools(
   const requestedLimit = isFiniteNumber(args.limit) ? args.limit : SEARCH_TOOLS_DEFAULT_LIMIT;
   const limit = Math.min(SEARCH_TOOLS_MAX_LIMIT, Math.max(1, Math.floor(requestedLimit)));
   const results = searchTools(query, limit, enabledToolsets);
-  if (results.length === 0) {
+  if (results.length === 0)
     return outcome(`search_tools: no tools match "${query}".`, false, { results });
-  }
   const names = results.map((r) => `${r.name} [${r.toolset}${r.enabled ? '' : ', disabled'}]`);
   const disabled = [...new Set(results.filter((r) => !r.enabled).map((r) => r.toolset))];
   const hint =

@@ -37,19 +37,16 @@ export function openingFitError(
   const left = opening.offset - opening.width / 2;
   const right = opening.offset + opening.width / 2;
   const tolerance = 1e-9;
-  if (left < extent.start - tolerance || right > extent.end + tolerance) {
+  if (left < extent.start - tolerance || right > extent.end + tolerance)
     return `${opening.mark} spans ${left.toFixed(3)}…${right.toFixed(3)} but wall ${wall.mark} is built from ${extent.start.toFixed(3)} to ${extent.end.toFixed(3)} along its axis`;
-  }
-  if (opening.sillHeight + opening.height > wall.height + tolerance) {
+  if (opening.sillHeight + opening.height > wall.height + tolerance)
     return `${opening.mark} top (${opening.sillHeight + opening.height}) exceeds wall ${wall.mark} height ${wall.height}`;
-  }
   for (const other of others) {
     if (other.id === opening.id) continue;
     const otherLeft = other.offset - other.width / 2;
     const otherRight = other.offset + other.width / 2;
-    if (left < otherRight - tolerance && otherLeft < right - tolerance) {
+    if (left < otherRight - tolerance && otherLeft < right - tolerance)
       return `${opening.mark} overlaps ${other.mark} in wall ${wall.mark}`;
-    }
   }
   return null;
 }
@@ -107,22 +104,19 @@ function buildWalls(
 ): WallBuild {
   const thickness = options.thickness ?? fromMm(doc, 200);
   const baseOffset = options.baseOffset ?? 0;
-  if (thickness <= 0) {
+  if (thickness <= 0)
     return { ok: false, reason: `thickness must be > 0 (got ${String(options.thickness)})` };
-  }
   const resolution = resolveLevel(doc, getBuilding(doc), options.levelId);
   if (!resolution.ok) return { ok: false, reason: resolution.reason };
   const height = options.height ?? resolution.level.height;
-  if (height <= 0) {
+  if (height <= 0)
     return { ok: false, reason: `height must be > 0 (got ${String(options.height)})` };
-  }
   let building = resolution.building;
   const wallIds: string[] = [];
   const skippedAs: string[] = [];
   for (const [start, end] of segments) {
-    if (distance(start, end) <= 0) {
+    if (distance(start, end) <= 0)
       return { ok: false, reason: `segment ${segmentLabel([start, end])} has zero length` };
-    }
     const twin = findTwin(
       building,
       'wall',
@@ -292,15 +286,12 @@ export const updateWall = defineCommand({
   ): CommandResult => {
     const building = getBuilding(doc);
     const wall = building.elements[wallId];
-    if (!wall || wall.category !== 'wall') {
+    if (!wall || wall.category !== 'wall')
       return noop(doc, `update_wall failed: no wall '${wallId}'.`);
-    }
-    if ((thickness !== undefined && thickness <= 0) || (height !== undefined && height <= 0)) {
+    if ((thickness !== undefined && thickness <= 0) || (height !== undefined && height <= 0))
       return noop(doc, 'update_wall failed: thickness/height must be > 0.');
-    }
-    if (levelId !== undefined && !building.levels[levelId]) {
+    if (levelId !== undefined && !building.levels[levelId])
       return noop(doc, `update_wall failed: no level '${levelId}'.`);
-    }
     // A new overall thickness or material no longer matches a build-up: the wall becomes
     // single-layer.
     const { layers, ...single } = wall;
@@ -319,9 +310,8 @@ export const updateWall = defineCommand({
       material: material?.trim() || wall.material,
       levelId: levelId ?? wall.levelId,
     };
-    if (distance(updated.start, updated.end) <= 0) {
+    if (distance(updated.start, updated.end) <= 0)
       return noop(doc, 'update_wall failed: start and end would coincide.');
-    }
     if (
       updated.start.every((value, index) => value === wall.start[index]) &&
       updated.end.every((value, index) => value === wall.end[index]) &&

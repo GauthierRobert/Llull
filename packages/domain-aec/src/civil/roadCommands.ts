@@ -190,9 +190,8 @@ export const updateAlignment = defineCommand({
       ...(alignment.section ? { section: alignment.section } : {}),
       ...(alignment.superelevation ? { superelevation: alignment.superelevation } : {}),
     };
-    if (JSON.stringify(updated) === JSON.stringify(alignment)) {
+    if (JSON.stringify(updated) === JSON.stringify(alignment))
       return noop(doc, `update_alignment: nothing to change on ${alignment.id}.`);
-    }
     const last = alignment.profile[alignment.profile.length - 1];
     const outside =
       last &&

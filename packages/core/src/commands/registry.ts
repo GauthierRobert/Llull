@@ -247,13 +247,10 @@ export function execute(
   ctx: ExecutionContext = currentContext(),
 ): CommandResult {
   const def = byName.get(commandName);
-  if (!def) {
-    return rejection(doc, `Unknown command: ${commandName}`);
-  }
+  if (!def) return rejection(doc, `Unknown command: ${commandName}`);
   const annotations = def.annotations;
-  if (annotations?.requiresKernel === true && ctx.kernel === null) {
+  if (annotations?.requiresKernel === true && ctx.kernel === null)
     return rejection(doc, kernelUnavailable(commandName));
-  }
   const recordsStep = annotations?.readOnly !== true && annotations?.metaHistory !== true;
   if (!recordsStep || ctx.stepKey !== undefined) {
     // Queries, history meta-commands, and executes nested inside a running step append nothing.
@@ -265,9 +262,7 @@ export function execute(
   const stepContext: ExecutionContext = { ...ctx, ids: stepIdSource(stepKey), stepKey };
   const result = runInContext(stepContext, () => def.run(doc, params, stepContext));
 
-  if (result.document === doc) {
-    return result;
-  }
+  if (result.document === doc) return result;
 
   const step: FeatureStep = {
     id: `step-${stepKey}`,

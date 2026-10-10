@@ -135,33 +135,27 @@ export const runwayCheck = defineCommand({
       railSize = 'A55',
       girder = 'rolled',
     } = params;
-    if (craneCapacity !== undefined && !isPositiveNumber(craneCapacity)) {
+    if (craneCapacity !== undefined && !isPositiveNumber(craneCapacity))
       return noop(doc, 'check_crane_runways failed: craneCapacity must be a number > 0 (t).');
-    }
-    if (!isPositiveNumber(wheelBase)) {
+    if (!isPositiveNumber(wheelBase))
       return noop(doc, 'check_crane_runways failed: wheelBase must be a number > 0 (mm).');
-    }
-    if (!isNonNegativeNumber(hoistingSpeed)) {
+    if (!isNonNegativeNumber(hoistingSpeed))
       return noop(doc, 'check_crane_runways failed: hoistingSpeed must be a number >= 0 (m/s).');
-    }
-    if (!isNonNegativeNumber(minHookApproach)) {
+    if (!isNonNegativeNumber(minHookApproach))
       return noop(doc, 'check_crane_runways failed: minHookApproach must be a number >= 0 (m).');
-    }
     for (const [name, value] of [
       ['craneSpan', craneSpan],
       ['craneSelfWeight', craneSelfWeight],
       ['travelSpeed', travelSpeed],
       ['bufferStiffness', bufferStiffness],
     ] as const) {
-      if (value !== undefined && !isPositiveNumber(value)) {
+      if (value !== undefined && !isPositiveNumber(value))
         return noop(doc, `check_crane_runways failed: ${name} must be a number > 0.`);
-      }
     }
     const building = getBuilding(doc);
     const levelId = existingLevelId(building, params.levelId);
-    if (levelId === undefined) {
+    if (levelId === undefined)
       return noop(doc, `check_crane_runways failed: no level '${params.levelId ?? ''}'.`);
-    }
     const mm = (value: number): number => toMm(doc, value);
     const rows: RunwayCheckRow[] = [];
     const runways = Object.values(building.elements).filter(

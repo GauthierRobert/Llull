@@ -17,14 +17,12 @@ function resolvePoint(doc: CadDocument, ref: EntityRef): Point | null {
     const { start, end } = entity;
     if (subKind === 'start') return [start[0] + px, start[1] + py];
     if (subKind === 'end') return [end[0] + px, end[1] + py];
-    if (subKind === 'center' || subKind === 'mid') {
+    if (subKind === 'center' || subKind === 'mid')
       return [(start[0] + end[0]) / 2 + px, (start[1] + end[1]) / 2 + py];
-    }
   }
 
-  if ((entity.kind === 'arc' || entity.kind === 'circle') && subKind === 'center') {
+  if ((entity.kind === 'arc' || entity.kind === 'circle') && subKind === 'center')
     return [entity.center[0] + px, entity.center[1] + py];
-  }
 
   return [px, py];
 }
@@ -245,9 +243,8 @@ export function runSolver(doc: CadDocument): {
   const BASE_STEP = 0.1;
 
   const constraints = Object.values(doc.constraints);
-  if (constraints.length === 0) {
+  if (constraints.length === 0)
     return { document: doc, residual: 0, iterations: 0, converged: true };
-  }
 
   // Working copy of positions keyed by entity id.
   const positions = new Map<string, Vec3>();

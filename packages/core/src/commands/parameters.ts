@@ -113,9 +113,8 @@ export const setParameter = defineCommand({
         `set_parameter failed: name '${name}' is invalid. Use letters, digits, and underscores; must not start with a digit.`,
       );
     }
-    if (expression.trim() === '') {
+    if (expression.trim() === '')
       return noop(doc, `set_parameter failed: expression must be a non-empty string.`);
-    }
 
     const syntaxError = expressionSyntaxError(expression);
     if (syntaxError !== null) {
@@ -146,9 +145,7 @@ export const setParameter = defineCommand({
       (p) => p.name !== name && extractReferences(p.expression).has(name),
     ).length;
     const { document, dependentSteps, refusal } = regenerateParameterDependents(doc, newDoc, ctx);
-    if (refusal !== undefined) {
-      return noop(doc, `set_parameter '${name}': ${refusal}`);
-    }
+    if (refusal !== undefined) return noop(doc, `set_parameter '${name}': ${refusal}`);
 
     return changed(
       document,
@@ -187,9 +184,8 @@ export const deleteParameter = defineCommand({
       ),
   }),
   run: (doc, { name }): CommandResult => {
-    if (!Object.hasOwn(doc.parameters, name)) {
+    if (!Object.hasOwn(doc.parameters, name))
       return noop(doc, `delete_parameter: parameter '${name}' does not exist — no change made.`);
-    }
 
     const evaluated = reEvaluateAll(
       Object.fromEntries(Object.entries(doc.parameters).filter(([key]) => key !== name)),

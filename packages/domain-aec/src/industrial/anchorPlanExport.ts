@@ -101,12 +101,10 @@ export const exportAnchorPlan = defineCommand({
       ),
   }),
   run: (doc, { levelId, scale, paper, embedment }): CommandResult => {
-    if (scale !== undefined && !(scale > 0)) {
+    if (scale !== undefined && !(scale > 0))
       return noop(doc, 'export_anchor_plan failed: scale must be a number > 0.');
-    }
-    if (embedment !== undefined && !(embedment > 0)) {
+    if (embedment !== undefined && !(embedment > 0))
       return noop(doc, 'export_anchor_plan failed: embedment must be a number > 0.');
-    }
     const building = getBuilding(doc);
     const resolvedId = existingLevelId(building, levelId);
     const level = resolvedId !== undefined ? building.levels[resolvedId] : undefined;

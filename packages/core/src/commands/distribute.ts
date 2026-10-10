@@ -128,9 +128,7 @@ export const distributeAlongPath = defineCommand({
     { pathId, componentId, count, tangentAlign = true, startOffset = 0, endOffset = 0, name },
   ): CommandResult => {
     const pathEntity = doc.entities[pathId];
-    if (!pathEntity) {
-      return noop(doc, `distribute_along_path: path entity "${pathId}" not found.`);
-    }
+    if (!pathEntity) return noop(doc, `distribute_along_path: path entity "${pathId}" not found.`);
     if (pathEntity.kind !== 'polyline' && pathEntity.kind !== 'spline') {
       return noop(
         doc,
@@ -179,9 +177,8 @@ export const distributeAlongPath = defineCommand({
     const cumulative = cumulativeLengths(pathPoints, pathClosed);
     const totalLength = cumulative[cumulative.length - 1] ?? 0;
 
-    if (!Number.isFinite(totalLength) || totalLength < 1e-12) {
+    if (!Number.isFinite(totalLength) || totalLength < 1e-12)
       return noop(doc, `distribute_along_path: path "${pathId}" has zero or degenerate length.`);
-    }
 
     const placements: number[] = [];
 

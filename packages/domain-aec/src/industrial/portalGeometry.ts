@@ -88,9 +88,7 @@ export function buildHallGeometry(input: HallGeometryInput): HallGeometry {
   /** Roof slopes of a span, each from its low end (at a column line) up to its high end. */
   const slopesOf = (bounds: readonly [number, number]): Slope[] => {
     const [a, b] = bounds;
-    if (monopitch) {
-      return [{ side: -1, lowX: a, lowZ: roofLine(a), highX: b, highZ: roofLine(b) }];
-    }
+    if (monopitch) return [{ side: -1, lowX: a, lowZ: roofLine(a), highX: b, highZ: roofLine(b) }];
     const middle = (a + b) / 2;
     const peak = eave + ((b - a) / 2) * rise;
     return [

@@ -52,9 +52,8 @@ export const setSuperelevation = defineCommand({
         `set_superelevation failed: maxRate must be between 0 and ${MAX_SUPERELEVATION_RATE}.`,
       );
     }
-    if (runoffLength !== undefined && !(runoffLength > 0 && Number.isFinite(runoffLength))) {
+    if (runoffLength !== undefined && !(runoffLength > 0 && Number.isFinite(runoffLength)))
       return noop(doc, 'set_superelevation failed: runoffLength must be > 0.');
-    }
     const { superelevation: previous, ...rest } = alignment;
     const updated: AlignmentObject =
       maxRate === 0
@@ -63,9 +62,8 @@ export const setSuperelevation = defineCommand({
             ...rest,
             superelevation: { maxRate, ...(runoffLength !== undefined ? { runoffLength } : {}) },
           };
-    if (JSON.stringify(updated) === JSON.stringify(alignment)) {
+    if (JSON.stringify(updated) === JSON.stringify(alignment))
       return noop(doc, `set_superelevation: nothing to change on ${alignment.id}.`);
-    }
     const text =
       maxRate === 0
         ? `Removed superelevation (was ${((previous?.maxRate ?? 0) * 100).toFixed(2)} %)`

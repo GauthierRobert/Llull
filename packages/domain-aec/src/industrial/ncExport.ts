@@ -181,9 +181,8 @@ export const exportNcFiles = defineCommand({
   run: (doc, params): CommandResult => {
     const { memberIds, includePlates = true, levelId } = params;
     const building = getBuilding(doc);
-    if (levelId !== undefined && !building.levels[levelId]) {
+    if (levelId !== undefined && !building.levels[levelId])
       return noop(doc, `export_nc_files failed: no level '${String(levelId)}'.`);
-    }
     const elements = orderedElements(building);
     const allMembers: Record<string, SteelMemberElement | undefined> = {};
     const allConnections: MomentConnectionElement[] = [];

@@ -77,18 +77,15 @@ export const designPurlins = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const { targetUtilisation = 0.95, ...loadParams } = params;
-    if (!isValidTargetUtilisation(targetUtilisation)) {
+    if (!isValidTargetUtilisation(targetUtilisation))
       return noop(doc, 'design_purlins failed: targetUtilisation must be in [0.5, 1].');
-    }
     const analyse = (document: CadDocument): { rows: PurlinRow[]; summary: string } => {
       const result = checkPurlins.run(document, loadParams);
       const data = result.data as { rows: PurlinRow[] } | undefined;
       return { rows: data?.rows ?? [], summary: result.summary };
     };
     const first = analyse(doc);
-    if (first.rows.length === 0) {
-      return noop(doc, `design_purlins failed: ${first.summary}`);
-    }
+    if (first.rows.length === 0) return noop(doc, `design_purlins failed: ${first.summary}`);
     let current = doc;
     let limited = false;
     const changes: string[] = [];
@@ -128,9 +125,8 @@ export const designPurlins = defineCommand({
       if (!step.progressed) break;
       if (iteration === MAX_ITERATIONS - 1) limited = true;
     }
-    if (changed.size === 0) {
+    if (changed.size === 0)
       return noChangeResult(doc, `${first.rows.length} purlin / rail row(s)`, first.rows, limited);
-    }
     const document = regenerateBuilding(doc, getBuilding(current));
     const final = analyse(document).rows;
     const stats = utilisationStats(final);

@@ -276,9 +276,8 @@ export function crossingColumnPrimitives(
   const home = getBuilding(doc).levels[element.levelId];
   if (!home) return [];
   const relativeCut = level.elevation + cutHeight - home.elevation;
-  if (element.category === 'column') {
+  if (element.category === 'column')
     return relativeCut >= 0 && relativeCut < element.height ? [columnPrimitive(element)] : [];
-  }
   if (element.role !== 'column') return [];
   const [dx, dy, dz] = [
     element.end[0] - element.start[0],

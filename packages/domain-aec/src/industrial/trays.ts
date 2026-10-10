@@ -68,9 +68,8 @@ export const addCableTray = defineCommand({
         element.height === resolvedHeight &&
         samePath(element.points, path),
     );
-    if (trayTwin) {
+    if (trayTwin)
       return noop(doc, duplicateSummary('add_cable_tray', trayTwin, 'a cable tray on this route'));
-    }
     const tray: CableTrayElement = {
       id: nextElementId(resolution.building, 'tray'),
       category: 'tray',

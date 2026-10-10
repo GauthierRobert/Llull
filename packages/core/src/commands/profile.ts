@@ -67,14 +67,11 @@ export const extrudeSketch = defineCommand({
       .optional(),
   }),
   run: (doc, { id, depth, rotation }): CommandResult => {
-    if (depth <= 0) {
+    if (depth <= 0)
       return noop(doc, `extrude_sketch: depth must be > 0 (got ${depth}); entity ${id} unchanged.`);
-    }
 
     const source = doc.entities[id];
-    if (!source) {
-      return noop(doc, `extrude_sketch: no entity with id "${id}".`);
-    }
+    if (!source) return noop(doc, `extrude_sketch: no entity with id "${id}".`);
 
     let profile: ReadonlyArray<readonly [number, number]> | null = null;
 

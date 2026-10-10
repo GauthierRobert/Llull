@@ -71,9 +71,8 @@ export function slabOpeningError(slab: SlabElement, opening: ReadonlyArray<Vec2>
         ),
     ),
   );
-  if (tooClose) {
+  if (tooClose)
     return `the opening comes within ${gap.toFixed(1)} of the slab edge or another opening (keep a gap)`;
-  }
   const clash = (slab.openings ?? []).findIndex((existing) => polygonsTouch(existing, opening));
   if (clash >= 0) return `the opening overlaps opening #${clash} of slab ${slab.mark}`;
   return triangulatePolygon(slab.boundary, [...(slab.openings ?? []), opening]).complete
@@ -137,9 +136,7 @@ export const addSlabOpening = defineCommand({
       if (stair?.category !== 'stair')
         return noop(doc, `add_slab_opening failed: no stair '${stairId}'.`);
       const clearance = margin ?? fromMm(doc, 100);
-      if (clearance < 0) {
-        return noop(doc, 'add_slab_opening failed: margin must be >= 0.');
-      }
+      if (clearance < 0) return noop(doc, 'add_slab_opening failed: margin must be >= 0.');
       outline = stairFootprint(stair, clearance);
       slab = slabId === undefined ? slabAboveStair(building, stair, outline) : undefined;
     } else if (isVec2List(boundary, 3)) {

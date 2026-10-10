@@ -142,9 +142,8 @@ export function frameRoofWind(
       return share * flat('windward') + (1 - share) * flat('leeward');
     }
     const faces = fromLeft === z1 > z0;
-    if (!apex) {
+    if (!apex)
       return frameRoofAverage('monopitch', pitchDegrees, faces ? 0 : 180, windCase.roofSet);
-    }
     const spanIndex = valleys.filter((valley) => valley < (x0 + x1) / 2).length;
     const cpe = frameRoofAverage(
       'duopitch',

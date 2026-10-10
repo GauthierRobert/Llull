@@ -55,9 +55,7 @@ export function adaptiveGridStep(zoom: number): number {
   for (const nice of NICE_STEPS) {
     const candidate = nice * decade;
     const candidatePx = candidate * zoom;
-    if (candidatePx >= MIN_CELL_PX && candidatePx <= MAX_CELL_PX) {
-      return candidate;
-    }
+    if (candidatePx >= MIN_CELL_PX && candidatePx <= MAX_CELL_PX) return candidate;
     // If candidatePx > MAX_CELL_PX after the first that was >= MIN_CELL_PX,
     // take the previous step (one decade up).
     if (candidatePx > MAX_CELL_PX) {
@@ -194,9 +192,7 @@ export function scaleBarLength(
   for (const nice of candidates) {
     const candidate = nice * decade;
     const candidatePx = candidate * zoom;
-    if (candidatePx >= targetPx * 0.5) {
-      return { worldLength: candidate, pixelLength: candidatePx };
-    }
+    if (candidatePx >= targetPx * 0.5) return { worldLength: candidate, pixelLength: candidatePx };
   }
 
   // Fallback: 10× decade

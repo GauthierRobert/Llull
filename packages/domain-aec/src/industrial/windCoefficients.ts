@@ -155,9 +155,8 @@ export function roofCoefficients(
   direction: WindDirection,
 ): RoofCoefficients {
   if (roofType === 'flat' || (pitchDeg >= 0 && pitchDeg < FLAT_ROOF_LIMIT)) return asZones(FLAT);
-  if (roofType === 'duopitch') {
+  if (roofType === 'duopitch')
     return interpolate(direction === 90 ? DUOPITCH_ALONG : DUOPITCH_ACROSS, pitchDeg);
-  }
   if (direction === 90) return interpolate(MONOPITCH_ALONG, pitchDeg);
   return interpolate(direction === 180 ? MONOPITCH_HIGH_EAVES : MONOPITCH_LOW_EAVES, pitchDeg);
 }

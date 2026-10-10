@@ -198,9 +198,7 @@ export function snap3d(
     SNAP3D_PRIORITY,
   );
 
-  if (best !== null) {
-    return { x: best.x, y: best.y, z: best.z, type: best.type, snapped: true };
-  }
+  if (best !== null) return { x: best.x, y: best.y, z: best.z, type: best.type, snapped: true };
 
   // Grid fallback.
   if (gridStep > 0) {

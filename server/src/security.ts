@@ -65,9 +65,8 @@ export function isLoopbackAddress(address: string | undefined): boolean {
  * reverse proxy every client looks like loopback, so `X-Forwarded-For` / `Forwarded` demote it.
  */
 function isLocalPeer(req: Request): boolean {
-  if (req.headers['x-forwarded-for'] !== undefined || req.headers['forwarded'] !== undefined) {
+  if (req.headers['x-forwarded-for'] !== undefined || req.headers['forwarded'] !== undefined)
     return false;
-  }
   return isLoopbackAddress(req.socket?.remoteAddress);
 }
 

@@ -50,9 +50,8 @@ function fieldKind(spec: ParamSpec): FieldKind {
   if (spec.type === 'string') return 'text';
   if (spec.type === 'boolean') return 'boolean';
   if (spec.type === 'array' && isNumeric(spec.items?.type)) return 'numberList';
-  if (spec.type === 'array' && spec.items?.type === 'string' && spec.items.enum === undefined) {
+  if (spec.type === 'array' && spec.items?.type === 'string' && spec.items.enum === undefined)
     return 'textList';
-  }
   return 'json';
 }
 

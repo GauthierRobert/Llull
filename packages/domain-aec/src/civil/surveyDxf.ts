@@ -79,9 +79,8 @@ export const importSurveyDxf = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const drawing = parseDxf(params.text);
-    if (drawing === null) {
+    if (drawing === null)
       return noop(doc, 'import_survey_dxf failed: not an ASCII DXF with an ENTITIES section.');
-    }
     const headerMm = insUnitsMillimetres(drawing.insUnits);
     const unit =
       params.sourceUnit ??

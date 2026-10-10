@@ -36,9 +36,7 @@ function validateSolidTarget(
   id: string,
 ): { entity: Entity } | CommandResult {
   const entity = doc.entities[id];
-  if (!entity) {
-    return noop(doc, `${opName}: entity '${id}' not found.`);
-  }
+  if (!entity) return noop(doc, `${opName}: entity '${id}' not found.`);
   if (!is3D(entity)) {
     return noop(
       doc,

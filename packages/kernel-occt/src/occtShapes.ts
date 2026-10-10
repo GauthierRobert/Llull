@@ -204,9 +204,8 @@ function prism(api: OccApi, face: OccShape, offset: Vec3, entity: Entity): OccSh
  * clockwise face would extrude inside-out); degenerate or non-finite profiles -> null.
  */
 function extrudedProfile(api: OccApi, entity: Entity): OccShape | null {
-  if (entity.kind !== 'extrusion' || !isValidPolygon(entity.profile) || !(entity.depth > 0)) {
+  if (entity.kind !== 'extrusion' || !isValidPolygon(entity.profile) || !(entity.depth > 0))
     return null;
-  }
   const outline = toCounterClockwise(entity.profile).map(([x, y]): Vec3 => [x, y, 0]);
   const face = polygonFace(api, outline);
   if (face === null) return null;

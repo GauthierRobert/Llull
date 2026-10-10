@@ -110,9 +110,8 @@ export function resolveOutline(
   ) {
     return { outline: null };
   }
-  if (new Set(walls.map((wall) => wall.levelId)).size > 1) {
+  if (new Set(walls.map((wall) => wall.levelId)).size > 1)
     return { outline: null, failure: 'wallIds belong to different levels' };
-  }
   const loop = wallLoop(walls);
   const shift = wallShift(Math.max(...walls.map((wall) => wall.thickness)) / 2);
   const outline = loop ? (shift === 0 ? loop : offsetPolygon(loop, shift)) : null;
@@ -191,9 +190,7 @@ export const addSlab = defineCommand({
       );
     }
     const resolvedThickness = thickness ?? fromMm(doc, 200);
-    if (resolvedThickness <= 0) {
-      return noop(doc, 'add_slab failed: thickness must be > 0.');
-    }
+    if (resolvedThickness <= 0) return noop(doc, 'add_slab failed: thickness must be > 0.');
     const resolution = resolveLevel(doc, building, levelId ?? wallLevelId);
     if (!resolution.ok) return noop(doc, `add_slab failed: ${resolution.reason}.`);
     const slabTwin = findTwin(
@@ -306,9 +303,8 @@ export const addColumn = defineCommand({
     const shape = params.shape ?? 'rectangular';
     const width = params.width ?? fromMm(doc, 300);
     const depth = params.depth ?? width;
-    if (width <= 0 || depth <= 0 || (params.height !== undefined && params.height <= 0)) {
+    if (width <= 0 || depth <= 0 || (params.height !== undefined && params.height <= 0))
       return noop(doc, 'add_column failed: width, depth and height must be > 0.');
-    }
     const resolution = resolveLevel(doc, building, params.levelId);
     if (!resolution.ok) return noop(doc, `add_column failed: ${resolution.reason}.`);
     let next = resolution.building;
@@ -387,14 +383,12 @@ export const addBeam = defineCommand({
     material: z.string().optional().describe('Material. Default concrete.'),
   }),
   run: (doc, { start, end, width, depth, topOffset = 0, levelId, material }): CommandResult => {
-    if (distance(start, end) <= 0) {
+    if (distance(start, end) <= 0)
       return noop(doc, 'add_beam failed: start and end must be distinct [x, y] points.');
-    }
     const resolvedWidth = width ?? fromMm(doc, 300);
     const resolvedDepth = depth ?? fromMm(doc, 500);
-    if (resolvedWidth <= 0 || resolvedDepth <= 0) {
+    if (resolvedWidth <= 0 || resolvedDepth <= 0)
       return noop(doc, 'add_beam failed: width and depth must be > 0.');
-    }
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_beam failed: ${resolution.reason}.`);
     const twin = findTwin(

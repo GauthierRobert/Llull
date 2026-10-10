@@ -70,9 +70,8 @@ export const addJoint = defineCommand({
     if (refProblem !== null) return noop(doc, refProblem);
 
     const jointId = id !== undefined && id.length > 0 ? id : nextId('joint');
-    if (jointId in doc.joints) {
+    if (jointId in doc.joints)
       return noop(doc, `add_joint: joint id '${jointId}' already exists — no change made.`);
-    }
 
     const mateRef = ({ instanceId, frame }: typeof a): JointMateRef =>
       frame !== undefined ? { instanceId, frame } : { instanceId };
@@ -121,9 +120,8 @@ export const deleteJoint = defineCommand({
   }),
   run: (doc, { id }): CommandResult => {
     const joint = Object.hasOwn(doc.joints, id) ? doc.joints[id] : undefined;
-    if (!joint) {
+    if (!joint)
       return noop(doc, `delete_joint: joint '${String(id)}' does not exist — no change made.`);
-    }
 
     const removedDrIds = Object.entries(doc.driveRelations)
       .filter(([, dr]) => dr.driver === id || dr.driven === id)
@@ -177,9 +175,8 @@ export const setJointValue = defineCommand({
   }),
   run: (doc, { id, value }): CommandResult => {
     const existing = Object.hasOwn(doc.joints, id) ? doc.joints[id] : undefined;
-    if (!existing) {
+    if (!existing)
       return noop(doc, `set_joint_value: joint '${String(id)}' does not exist — no change made.`);
-    }
 
     const resolved = resolveNumeric(value, doc.parameters);
     const fieldName = existing.kind === 'revolute' ? 'angle' : 'displacement';

@@ -96,9 +96,7 @@ export function resolveFrameLoads(
   }
   const building = getBuilding(doc);
   const levelId = existingLevelId(building, params.levelId);
-  if (levelId === undefined) {
-    return { reason: `no level '${params.levelId ?? ''}'` };
-  }
+  if (levelId === undefined) return { reason: `no level '${params.levelId ?? ''}'` };
   const craneModel: CraneModel = {
     ...(hoistingClass !== undefined ? { hoistingClass } : {}),
     ...(hoistingSpeed !== undefined ? { hoistingSpeed } : {}),

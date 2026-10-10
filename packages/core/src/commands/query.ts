@@ -173,22 +173,17 @@ export const findEntities = defineCommand({
     } = params;
 
     const fail = (summary: string): CommandResult => noop(doc, summary);
-    if ((bboxMin === undefined) !== (bboxMax === undefined)) {
+    if ((bboxMin === undefined) !== (bboxMax === undefined))
       return fail('find_entities: bboxMin and bboxMax must both be provided or both omitted.');
-    }
-    if (nearPoint !== undefined && nearPoint.radius <= 0) {
+    if (nearPoint !== undefined && nearPoint.radius <= 0)
       return fail('find_entities: nearPoint.radius must be a finite number > 0.');
-    }
-    if (insideBBox !== undefined && isInverted(insideBBox[0], insideBBox[1])) {
+    if (insideBBox !== undefined && isInverted(insideBBox[0], insideBBox[1]))
       return fail('find_entities: insideBBox min must be <= max on every axis.');
-    }
-    if (overlapsBBox !== undefined && isInverted(overlapsBBox[0], overlapsBBox[1])) {
+    if (overlapsBBox !== undefined && isInverted(overlapsBBox[0], overlapsBBox[1]))
       return fail('find_entities: overlapsBBox min must be <= max on every axis.');
-    }
     const touchingRef = touchingId !== undefined ? doc.entities[touchingId] : undefined;
-    if (touchingId !== undefined && !touchingRef) {
+    if (touchingId !== undefined && !touchingRef)
       return fail(`find_entities: touchingId "${touchingId}" does not exist in the document.`);
-    }
     const touchingBounds = touchingRef ? entityBoundsInDoc(doc, touchingRef) : null;
     const nearRadiusSq = nearPoint ? nearPoint.radius * nearPoint.radius : 0;
     const nameLc = name?.toLowerCase();
@@ -207,9 +202,8 @@ export const findEntities = defineCommand({
       }
       if (tag !== undefined && !e.tags?.includes(tag)) continue;
       if (nameFuzzyLc !== undefined && !e.name?.toLowerCase().includes(nameFuzzyLc)) continue;
-      if (tagFuzzyLc !== undefined && !e.tags?.some((t) => t.toLowerCase().includes(tagFuzzyLc))) {
+      if (tagFuzzyLc !== undefined && !e.tags?.some((t) => t.toLowerCase().includes(tagFuzzyLc)))
         continue;
-      }
       if (touchingId !== undefined && e.id === touchingId) continue;
 
       const needsBounds = bboxMin || nearPoint || insideBBox || overlapsBBox || touchingBounds;

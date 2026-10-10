@@ -56,17 +56,12 @@ export function portalInputs(
   }
   const spanCount = params.spans?.length ?? 1;
   const sizes = [span, hallLength, targetBay, eave, purlinSpacing, railSpacing];
-  if (sizes.some((value) => value <= 0)) {
-    return fail('all sizes > 0 required.');
-  }
-  if (pitchDegrees < 0 || pitchDegrees >= 45) {
-    return fail('roofPitch must be in [0, 45) degrees.');
-  }
+  if (sizes.some((value) => value <= 0)) return fail('all sizes > 0 required.');
+  if (pitchDegrees < 0 || pitchDegrees >= 45) return fail('roofPitch must be in [0, 45) degrees.');
   const roofType = params.roofType ?? 'duopitch';
   const columnBase = params.columnBase ?? 'pinned';
-  if (columnBase === 'fixed' && params.basePlates === false) {
+  if (columnBase === 'fixed' && params.basePlates === false)
     return fail("columnBase 'fixed' needs base plates (basePlates must not be false).");
-  }
   const names = {
     column: params.columnProfile ?? 'HEA400',
     rafter: params.rafterProfile ?? 'IPE450',
@@ -85,9 +80,8 @@ export function portalInputs(
     );
   }
   const p = profiles as PortalProfiles;
-  if (params.crane && !(params.crane.railHeight > 0 && params.crane.railHeight < eave)) {
+  if (params.crane && !(params.crane.railHeight > 0 && params.crane.railHeight < eave))
     return fail('crane.railHeight must be > 0 and below the eaves.');
-  }
   return {
     mm,
     origin,

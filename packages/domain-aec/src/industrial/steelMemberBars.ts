@@ -79,9 +79,8 @@ function classify(
   dz: number,
 ): { kind: BarKind; reason: string | undefined } {
   const skip = (reason: string): { kind: BarKind; reason: string } => ({ kind: 'skipped', reason });
-  if (profile === null) {
+  if (profile === null)
     return skip(`profile '${profileName}' is not in the steel catalogue (list_steel_profiles)`);
-  }
   if (!(length > 1)) return skip('member length is zero');
   const pointer = POINTER[role];
   if (pointer !== undefined) {

@@ -150,14 +150,12 @@ export const distribute = defineCommand({
   }),
   run: (doc, { targetIds: requestedIds, axis, mode = 'equal-spacing' }): CommandResult => {
     const targetIds = [...new Set(requestedIds)];
-    if (targetIds.length < 2) {
+    if (targetIds.length < 2)
       return noop(doc, 'distribute: targetIds must contain at least 2 distinct entity ids.');
-    }
     const missingId = targetIds.find((id) => !doc.entities[id]);
     if (missingId) return noop(doc, `distribute: entity "${missingId}" not found.`);
-    if (axis !== 'x' && axis !== 'y' && axis !== 'z') {
+    if (axis !== 'x' && axis !== 'y' && axis !== 'z')
       return noop(doc, `distribute: invalid axis "${axis}". Must be "x", "y", or "z".`);
-    }
     if (mode !== 'equal-spacing' && mode !== 'equal-gap') {
       return noop(
         doc,
@@ -252,17 +250,15 @@ export const stackOn = defineCommand({
     if (!movingEntity) return noop(doc, `stack_on: moving entity "${movingId}" not found.`);
     const baseEntity = doc.entities[baseId];
     if (!baseEntity) return noop(doc, `stack_on: base entity "${baseId}" not found.`);
-    if (axis !== 'x' && axis !== 'y' && axis !== 'z') {
+    if (axis !== 'x' && axis !== 'y' && axis !== 'z')
       return noop(doc, `stack_on: invalid axis "${axis}". Must be "x", "y", or "z".`);
-    }
     const axisIndex = axisIndexOf(axis);
     const delta =
       entityBoundsInDoc(doc, baseEntity).max[axisIndex] -
       entityBoundsInDoc(doc, movingEntity).min[axisIndex];
 
-    if (Math.abs(delta) < 1e-10) {
+    if (Math.abs(delta) < 1e-10)
       return noop(doc, `stack_on: "${movingId}" is already stacked on "${baseId}" along ${axis}.`);
-    }
     return changed(
       replaceEntity(doc, shiftAlong(movingEntity, axisIndex, delta)),
       `stack_on: moved "${movingId}" by ${delta.toFixed(4)} along ${axis} to sit on top of "${baseId}".`,

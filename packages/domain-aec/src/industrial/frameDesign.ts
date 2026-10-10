@@ -53,9 +53,8 @@ export const designPortalFrames = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const { targetUtilisation = 0.95 } = params;
-    if (!isValidTargetUtilisation(targetUtilisation)) {
+    if (!isValidTargetUtilisation(targetUtilisation))
       return noop(doc, 'design_portal_frames failed: targetUtilisation must be in [0.5, 1].');
-    }
     const resolved = resolveFrameLoads(doc, params);
     if ('reason' in resolved) return noop(doc, `design_portal_frames failed: ${resolved.reason}.`);
     const { loads, levelId } = resolved;
@@ -66,9 +65,8 @@ export const designPortalFrames = defineCommand({
     let limited = false;
     for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
       const { rows, frames } = checkFrames(current, levelId, loads);
-      if (frames === 0) {
+      if (frames === 0)
         return noop(doc, 'design_portal_frames failed: no analysable portal frame on the level.');
-      }
       const building = getBuilding(current);
       for (const row of rows) if (row.kind !== 'connection') analysed.add(row.elementId);
       const groups: ProfileGroups = new Map();

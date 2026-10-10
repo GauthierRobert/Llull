@@ -39,12 +39,10 @@ export function instanceRefsProblem(
 ): string | null {
   for (const side of ['a', 'b'] as const) {
     const { instanceId } = refs[side];
-    if (instanceId.length === 0) {
+    if (instanceId.length === 0)
       return `${command}: ${side} must be an object with a non-empty instanceId string.`;
-    }
-    if (doc.entities[instanceId]?.kind !== 'instance') {
+    if (doc.entities[instanceId]?.kind !== 'instance')
       return `${command}: ${side}.instanceId '${instanceId}' does not exist or is not an InstanceEntity.`;
-    }
   }
   return null;
 }

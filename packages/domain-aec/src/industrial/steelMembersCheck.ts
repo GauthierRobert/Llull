@@ -127,19 +127,15 @@ export const checkSteelMembers = defineCommand({
         'check_steel_members failed: floorDeadLoad, imposedLoad, pipeContentDensity and cableTrayWeight must be numbers >= 0.',
       );
     }
-    if (!(isFiniteNumber(notionalFactor) && notionalFactor >= 0 && notionalFactor <= 0.1)) {
+    if (!(isFiniteNumber(notionalFactor) && notionalFactor >= 0 && notionalFactor <= 0.1))
       return noop(doc, 'check_steel_members failed: notionalFactor must be a number in [0, 0.1].');
-    }
-    if (!isPositiveNumber(deflectionRatio)) {
+    if (!isPositiveNumber(deflectionRatio))
       return noop(doc, 'check_steel_members failed: deflectionRatio must be a number > 0.');
-    }
     const building = getBuilding(doc);
-    if (params.levelId !== undefined && !building.levels[params.levelId]) {
+    if (params.levelId !== undefined && !building.levels[params.levelId])
       return noop(doc, `check_steel_members failed: no level '${params.levelId}'.`);
-    }
-    if (!isPositiveNumber(swayRatio)) {
+    if (!isPositiveNumber(swayRatio))
       return noop(doc, 'check_steel_members failed: swayRatio must be a number > 0.');
-    }
     const analysis = analyseSteelStructure(doc, {
       floorDeadLoad,
       imposedLoad,

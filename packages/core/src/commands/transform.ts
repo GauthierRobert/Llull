@@ -41,9 +41,7 @@ export const rotateEntity = defineCommand({
   }),
   run: (doc, { id, delta }): CommandResult => {
     const target = doc.entities[id];
-    if (!target) {
-      return noop(doc, `No entity ${id} to rotate.`);
-    }
+    if (!target) return noop(doc, `No entity ${id} to rotate.`);
     if (!isFiniteVec3(delta)) {
       return noop(
         doc,
@@ -191,12 +189,9 @@ export const scaleEntity = defineCommand({
   }),
   run: (doc, { id, factor }): CommandResult => {
     const target = doc.entities[id];
-    if (!target) {
-      return noop(doc, `No entity ${id} to scale.`);
-    }
-    if (factor <= 0) {
+    if (!target) return noop(doc, `No entity ${id} to scale.`);
+    if (factor <= 0)
       return noop(doc, `scale_entity: factor must be > 0 (got ${factor}); entity ${id} unchanged.`);
-    }
 
     const { scaled, dims } = scaleGeometry(target, factor);
     return changed(replaceEntity(doc, scaled), `Scaled ${id} by factor ${factor}; ${dims}.`, [id]);
@@ -228,9 +223,7 @@ export const mirrorEntity = defineCommand({
   }),
   run: (doc, { id, axis }): CommandResult => {
     const target = doc.entities[id];
-    if (!target) {
-      return noop(doc, `No entity ${id} to mirror.`);
-    }
+    if (!target) return noop(doc, `No entity ${id} to mirror.`);
     if (!VALID_AXES.has(axis)) {
       return noop(
         doc,
@@ -297,9 +290,7 @@ export const arrayLinear = defineCommand({
   }),
   run: (doc, { id, count, offset }): CommandResult => {
     const target = doc.entities[id];
-    if (!target) {
-      return noop(doc, `array_linear: No entity ${id}.`);
-    }
+    if (!target) return noop(doc, `array_linear: No entity ${id}.`);
     if (count < 2 || count > MAX_COPIES_PER_COMMAND) {
       return noop(
         doc,
@@ -364,9 +355,7 @@ export const arrayPolar = defineCommand({
   }),
   run: (doc, { id, count, center, angle = 2 * Math.PI }): CommandResult => {
     const target = doc.entities[id];
-    if (!target) {
-      return noop(doc, `array_polar: No entity ${id}.`);
-    }
+    if (!target) return noop(doc, `array_polar: No entity ${id}.`);
     if (count < 2 || count > MAX_COPIES_PER_COMMAND) {
       return noop(
         doc,

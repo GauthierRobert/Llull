@@ -75,9 +75,8 @@ export function refitPlates(
     return { building: withoutElements(building, removed), resized: [], removed: [...removed] };
   }
   const [before, after] = [findProfile(previousProfile), findProfile(member.profile)];
-  if (!before || !after || before.name === after.name) {
+  if (!before || !after || before.name === after.name)
     return { building, resized: [], removed: [] };
-  }
   let next = building;
   for (const plate of plates) {
     next = withElement(next, {

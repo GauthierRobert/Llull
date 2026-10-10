@@ -134,12 +134,10 @@ export const addPipeSupport = defineCommand({
   run: (doc, params): CommandResult => {
     const { pipeId, line, at, spacing, memberId, type = 'shoe' } = params;
     const fail = (reason: string): CommandResult => noop(doc, `add_pipe_support failed: ${reason}`);
-    if ((pipeId === undefined) === (line === undefined)) {
+    if ((pipeId === undefined) === (line === undefined))
       return fail('give exactly one of pipeId or line.');
-    }
-    if ((at === undefined) === (spacing === undefined)) {
+    if ((at === undefined) === (spacing === undefined))
       return fail('give exactly one of at (list of points) or spacing.');
-    }
     const below = type !== 'hanger';
     const unit = fromMm(doc, 1);
     const limits = {
@@ -148,9 +146,8 @@ export const addPipeSupport = defineCommand({
     };
     const snapDistance = (params.snapDistance ?? fromMm(doc, SNAP_DISTANCE)) / unit;
     const positive = [spacing ?? 1, limits.maxReach, snapDistance];
-    if (!positive.every(isPositiveNumber) || !isNonNegativeNumber(limits.planTolerance)) {
+    if (!positive.every(isPositiveNumber) || !isNonNegativeNumber(limits.planTolerance))
       return fail('spacing, maxReach and snapDistance must be > 0 and planTolerance >= 0.');
-    }
     const units = modelUnits(doc);
     const { building } = units;
     const runs = pipeRunsOf(units);
@@ -176,14 +173,12 @@ export const addPipeSupport = defineCommand({
         );
       }
     }
-    if (at !== undefined && at.length > MAX_SUPPORTS_PER_RUN) {
+    if (at !== undefined && at.length > MAX_SUPPORTS_PER_RUN)
       return fail(`give at most ${MAX_SUPPORTS_PER_RUN} points per call (got ${at.length}).`);
-    }
     const bars = collectSteelBars(doc);
     const explicit = memberId === undefined ? undefined : bars.find((bar) => bar.id === memberId);
-    if (memberId !== undefined && !explicit) {
+    if (memberId !== undefined && !explicit)
       return fail(`memberId '${memberId}' is not a steel member.`);
-    }
     const wanted: Array<{ run: PipeRun; arc: number }> = [];
     const skipped: string[] = [];
     if (at !== undefined) {
@@ -239,9 +234,7 @@ export const addPipeSupport = defineCommand({
       if (!at3) continue;
       const riser = isRiserPoint(run.points, at3.point);
       const hit = resolveBearing(bars, type, at3.point, run.diameterMm, limits, riser, explicit);
-      if (typeof hit === 'string') {
-        return fail(`${hit}; no support was added.`);
-      }
+      if (typeof hit === 'string') return fail(`${hit}; no support was added.`);
       const support: PipeSupportElement = {
         id: nextElementId(next, 'pipeSupport'),
         category: 'pipeSupport',

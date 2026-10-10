@@ -50,9 +50,7 @@ export function snap(
     SNAP_TYPE_PRIORITY,
   );
 
-  if (best !== null) {
-    return { x: best.x, y: best.y, type: best.type, snapped: true };
-  }
+  if (best !== null) return { x: best.x, y: best.y, type: best.type, snapped: true };
 
   // No geometric snap — fall back to nearest grid point.
   if (gridSize > 0) {

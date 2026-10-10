@@ -53,9 +53,7 @@ export const measureBoundingBox = defineCommand({
 
     if (entityId) {
       const e = doc.entities[entityId];
-      if (!e) {
-        return noop(doc, `measure_bounding_box: entity '${entityId}' not found.`);
-      }
+      if (!e) return noop(doc, `measure_bounding_box: entity '${entityId}' not found.`);
       bounds = entityBoundsInDoc(doc, e);
     } else {
       const ids = useSelection && doc.selection.length > 0 ? doc.selection : doc.order;
@@ -67,9 +65,8 @@ export const measureBoundingBox = defineCommand({
         bounds = bounds ? mergeBounds(bounds, b) : b;
       }
 
-      if (!bounds) {
+      if (!bounds)
         return noop(doc, 'measure_bounding_box: document is empty — no bounds to compute.');
-      }
     }
 
     const size: Vec3 = [
@@ -143,9 +140,7 @@ export const measureVolume = defineCommand({
   }),
   run: (doc, { entityId }): CommandResult => {
     const e = doc.entities[entityId];
-    if (!e) {
-      return noop(doc, `measure_volume: entity '${entityId}' not found.`);
-    }
+    if (!e) return noop(doc, `measure_volume: entity '${entityId}' not found.`);
 
     const volumeUnit = `${doc.units}³`;
     let volume: number;
@@ -253,9 +248,8 @@ function instanceMass(
   fallbackDensity: number,
 ): { volume: number; mass: number } | string {
   const component = doc.components[instance.componentId];
-  if (!component) {
+  if (!component)
     return `instance '${instance.id}' references missing component '${instance.componentId}'.`;
-  }
   let volume = 0;
   let mass = 0;
   for (const baked of expandInstance(instance, component)) {
@@ -327,14 +321,11 @@ export const massProperties = defineCommand({
       ),
   }),
   run: (doc, { entityId, density }): CommandResult => {
-    if (density <= 0) {
+    if (density <= 0)
       return noop(doc, `mass_properties: density must be > 0, got ${String(density)}.`);
-    }
 
     const e = doc.entities[entityId];
-    if (!e) {
-      return noop(doc, `mass_properties: entity '${entityId}' not found.`);
-    }
+    if (!e) return noop(doc, `mass_properties: entity '${entityId}' not found.`);
 
     if (e.kind === 'instance') {
       const assembly = instanceMass(doc, e, density);
@@ -361,9 +352,7 @@ export const massProperties = defineCommand({
     }
 
     const volumeResult = measureVolume.run(doc, { entityId });
-    if (!volumeResult.data) {
-      return noop(doc, volumeResult.summary);
-    }
+    if (!volumeResult.data) return noop(doc, volumeResult.summary);
 
     const { volume } = volumeResult.data as MeasureVolumeData;
     const mass = volume * effectiveDensity;

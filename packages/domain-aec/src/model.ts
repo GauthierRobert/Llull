@@ -281,9 +281,8 @@ export function followLevelHeight(
   ) {
     return { ...element, height: newHeight };
   }
-  if (element.category === 'stair' && same(element.riserCount * element.riserHeight)) {
+  if (element.category === 'stair' && same(element.riserCount * element.riserHeight))
     return { ...element, riserHeight: newHeight / element.riserCount };
-  }
   return element;
 }
 

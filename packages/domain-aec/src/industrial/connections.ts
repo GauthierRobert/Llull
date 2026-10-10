@@ -78,9 +78,8 @@ export const addMomentConnections = defineCommand({
       );
     }
     const building = getBuilding(doc);
-    if (params.levelId !== undefined && !building.levels[params.levelId]) {
+    if (params.levelId !== undefined && !building.levels[params.levelId])
       return noop(doc, `add_moment_connections failed: no level '${params.levelId}'.`);
-    }
     const levelId = existingLevelId(building, params.levelId) ?? '';
     const joints = findMomentJoints(
       building,

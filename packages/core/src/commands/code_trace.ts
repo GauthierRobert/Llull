@@ -152,40 +152,32 @@ function lowerParams(
     }
     return { run, record };
   }
-  if (typeof value === 'number' && !Number.isFinite(value)) {
+  if (typeof value === 'number' && !Number.isFinite(value))
     return { error: `non-finite number ${String(value)}` };
-  }
   return { run: value, record: value };
 }
 
 function validateTrace(trace: unknown): string | null {
   if (!isRecord(trace)) return 'trace must be an object';
   const { parameters, features } = trace;
-  if (!Array.isArray(parameters) || !Array.isArray(features)) {
+  if (!Array.isArray(parameters) || !Array.isArray(features))
     return 'trace needs "parameters" and "features" arrays';
-  }
-  if (features.length > MAX_TRACE_FEATURES) {
+  if (features.length > MAX_TRACE_FEATURES)
     return `${features.length} features exceeds MAX_TRACE_FEATURES (${MAX_TRACE_FEATURES})`;
-  }
   for (const [i, p] of parameters.entries()) {
-    if (!isRecord(p) || typeof p.name !== 'string' || !PARAMETER_NAME.test(p.name)) {
+    if (!isRecord(p) || typeof p.name !== 'string' || !PARAMETER_NAME.test(p.name))
       return `parameter ${i}: name must be an identifier`;
-    }
-    if (typeof p.expression !== 'string' || p.expression.trim() === '') {
+    if (typeof p.expression !== 'string' || p.expression.trim() === '')
       return `parameter ${p.name}: expression must be a non-empty string`;
-    }
   }
   const refs = new Set<string>();
   for (const [i, f] of features.entries()) {
-    if (!isRecord(f) || typeof f.command !== 'string' || !isRecord(f.params)) {
+    if (!isRecord(f) || typeof f.command !== 'string' || !isRecord(f.params))
       return `feature ${i}: needs { command, params }`;
-    }
-    if (!TRACE_COMMANDS.has(f.command)) {
+    if (!TRACE_COMMANDS.has(f.command))
       return `feature ${i}: command "${f.command}" is not allowed in a code trace`;
-    }
-    if (f.ref !== undefined && (typeof f.ref !== 'string' || refs.has(f.ref))) {
+    if (f.ref !== undefined && (typeof f.ref !== 'string' || refs.has(f.ref)))
       return `feature ${i}: ref must be a unique string`;
-    }
     if (f.name !== undefined && typeof f.name !== 'string')
       return `feature ${i}: name must be a string`;
     if (typeof f.ref === 'string') refs.add(f.ref);
@@ -265,9 +257,8 @@ export const applyCodeTrace = defineCommand({
       if ('error' in lowered)
         return abort(doc, `feature ${i} (${feature.command}): ${lowered.error}`);
       const result = executeRecorded(current, feature.command, lowered.run, lowered.record);
-      if (result.document === current && result.affected.length === 0) {
+      if (result.document === current && result.affected.length === 0)
         return abort(doc, `feature ${i} (${feature.command}) failed: ${result.summary}`);
-      }
       current = result.document;
       if (feature.ref !== undefined && result.affected[0] !== undefined) {
         refs.set(feature.ref, result.affected[0]);

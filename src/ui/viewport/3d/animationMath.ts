@@ -27,9 +27,7 @@ export function evaluateAnimationScalar(
   anim: Pick<Animation, 'mode' | 'speed' | 'amplitude' | 'frequency'>,
   phase: number,
 ): number {
-  if (anim.mode === 'spin') {
-    return anim.speed * phase;
-  }
+  if (anim.mode === 'spin') return anim.speed * phase;
   // oscillate
   return anim.amplitude * Math.sin(2 * Math.PI * anim.frequency * phase);
 }

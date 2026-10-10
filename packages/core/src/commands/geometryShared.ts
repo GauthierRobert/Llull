@@ -152,9 +152,8 @@ export function rejectNonPositive(
   dimensions: ReadonlyArray<readonly [name: string, value: number]>,
 ): CommandResult | null {
   for (const [name, value] of dimensions) {
-    if (!Number.isFinite(value) || value <= 0) {
+    if (!Number.isFinite(value) || value <= 0)
       return noop(doc, `${command} failed: ${name} must be finite and > 0, got ${value}.`);
-    }
   }
   return null;
 }

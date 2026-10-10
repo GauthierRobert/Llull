@@ -75,9 +75,8 @@ export function analysePurlins(
 ): PurlinAnalysis | { reason: string } {
   const purlins = members.filter(({ member }) => member.role === 'purlin');
   const rails = members.filter(({ member }) => member.role === 'rail');
-  if (purlins.length === 0) {
+  if (purlins.length === 0)
     return { reason: `check_purlins: no purlins (role purlin) on level '${levelId}'.` };
-  }
 
   // Hall envelope: plan extents of every member, ridge height, eaves level.
   const everyPoint = members.flatMap(({ start, end }) => [start, end]);

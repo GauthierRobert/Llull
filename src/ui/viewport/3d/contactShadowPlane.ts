@@ -31,9 +31,7 @@ export function computeContactShadowPlane(
   bounds: Bounds | null,
   renderOrigin: Vec3,
 ): ContactShadowPlane {
-  if (!bounds) {
-    return { position: [0, 0, -0.001], scale: DEFAULT_SCALE, far: DEFAULT_FAR };
-  }
+  if (!bounds) return { position: [0, 0, -0.001], scale: DEFAULT_SCALE, far: DEFAULT_FAR };
   const extentX = bounds.max[0] - bounds.min[0];
   const extentY = bounds.max[1] - bounds.min[1];
   const scale = Math.max(Math.max(extentX, extentY) * FOOTPRINT_MARGIN, MIN_SCALE);

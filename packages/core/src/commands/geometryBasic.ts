@@ -154,9 +154,7 @@ export const move = defineCommand({
   }),
   run: (doc, { id, delta }): CommandResult => {
     const target = doc.entities[id];
-    if (!target) {
-      return noop(doc, `No entity ${id} to move.`);
-    }
+    if (!target) return noop(doc, `No entity ${id} to move.`);
     return changed(
       replaceEntity(doc, translated(target, delta)),
       `Moved ${id} by ${delta.join(', ')}.`,
@@ -184,9 +182,7 @@ export const deleteEntity = defineCommand({
     id: z.string().describe('Target entity id to delete.'),
   }),
   run: (doc, { id }): CommandResult => {
-    if (!doc.entities[id]) {
-      return noop(doc, `No entity ${id} to delete.`);
-    }
+    if (!doc.entities[id]) return noop(doc, `No entity ${id} to delete.`);
 
     const { document, dissolvedGroups, prunedReferences } = withoutEntities(doc, new Set([id]));
 

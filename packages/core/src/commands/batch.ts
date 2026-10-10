@@ -37,15 +37,13 @@ function resolveBatchIds(
     result: noop(doc, `${command}: ${summary}`),
   });
   if (ids.length === 0) return fail(emptyDetail);
-  if (ids.length > MAX_BATCH_IDS) {
+  if (ids.length > MAX_BATCH_IDS)
     return fail(`${ids.length} ids exceeds MAX_BATCH_IDS (${MAX_BATCH_IDS}).`);
-  }
   const unique = [...new Set(ids)];
   const existing = unique.filter((id) => Object.hasOwn(doc.entities, id));
   const missing = unique.filter((id) => !Object.hasOwn(doc.entities, id));
-  if (existing.length === 0) {
+  if (existing.length === 0)
     return fail(`no listed entity exists (missing: [${missing.join(', ')}]).`);
-  }
   return { ok: true, existing, missing };
 }
 

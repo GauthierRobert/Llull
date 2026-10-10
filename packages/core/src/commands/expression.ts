@@ -149,9 +149,7 @@ function parsePrimary(s: ParseState): EvalResult {
     return inner;
   }
 
-  if (t.kind === 'eof') {
-    return { ok: false, error: 'unexpected end of expression' };
-  }
+  if (t.kind === 'eof') return { ok: false, error: 'unexpected end of expression' };
 
   return { ok: false, error: `unexpected token '${t.text}'` };
 }
@@ -172,27 +170,21 @@ export function evaluateExpression(
   expression: string,
   env: Readonly<Record<string, number>>,
 ): EvalResult {
-  if (expression.trim() === '') {
-    return { ok: false, error: 'expression is empty' };
-  }
+  if (expression.trim() === '') return { ok: false, error: 'expression is empty' };
 
   const tokensOrError = tokenize(expression);
-  if (typeof tokensOrError === 'string') {
-    return { ok: false, error: tokensOrError };
-  }
+  if (typeof tokensOrError === 'string') return { ok: false, error: tokensOrError };
 
   const state: ParseState = { tokens: tokensOrError, pos: 0, env };
   const result = parseExpr(state);
   if (!result.ok) return result;
 
   // Ensure the entire input was consumed.
-  if (peek(state).kind !== 'eof') {
+  if (peek(state).kind !== 'eof')
     return { ok: false, error: `unexpected token '${peek(state).text}' after expression` };
-  }
 
-  if (!Number.isFinite(result.value)) {
+  if (!Number.isFinite(result.value))
     return { ok: false, error: 'expression result is not a finite number (divide by zero?)' };
-  }
   return result;
 }
 
@@ -208,9 +200,8 @@ export function expressionSyntaxError(expression: string): string | null {
   const probeEnv = Object.fromEntries([...refs].map((name) => [name, 1]));
   const result = evaluateExpression(expression, probeEnv);
   if (result.ok) return null;
-  if (result.error.startsWith('expression result is not a finite')) {
+  if (result.error.startsWith('expression result is not a finite'))
     return refs.size === 0 ? result.error : null;
-  }
   return result.error;
 }
 

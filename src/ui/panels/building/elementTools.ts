@@ -214,9 +214,8 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
           material: material ?? '',
           function: fn ?? 'structure',
         }));
-      if (layers.length === 0 || layers.some((layer) => !(layer.thickness > 0))) {
+      if (layers.length === 0 || layers.some((layer) => !(layer.thickness > 0)))
         return { ok: false, reason: 'Check: layers ("thickness material function; …")' };
-      }
       return result(reader, 'set_wall_layers', { wallIds, layers });
     },
   },

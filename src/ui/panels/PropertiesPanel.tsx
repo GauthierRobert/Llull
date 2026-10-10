@@ -166,9 +166,8 @@ function PropertiesBody(): React.ReactElement {
       />
     );
   }
-  if (elementIds.size === 1 && everyEntityBelongs && soleElementId !== undefined) {
+  if (elementIds.size === 1 && everyEntityBelongs && soleElementId !== undefined)
     return <ElementInspector elementId={soleElementId} />;
-  }
   if (selection.length > 1) {
     return (
       <>

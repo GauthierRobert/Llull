@@ -66,15 +66,13 @@ function checkOptions(options: {
   entryTimeMin?: number | undefined;
 }): string | null {
   if (options.diameter !== undefined && !(options.diameter > 0)) return 'diameter must be > 0.';
-  if (options.catchmentAreaHa !== undefined && options.catchmentAreaHa < 0) {
+  if (options.catchmentAreaHa !== undefined && options.catchmentAreaHa < 0)
     return 'catchmentAreaHa must be >= 0.';
-  }
   const c = options.runoffCoefficient;
   if (c !== undefined && !(c >= 0 && c <= 1)) return 'runoffCoefficient must be between 0 and 1.';
   if (options.inflowLps !== undefined && options.inflowLps < 0) return 'inflowLps must be >= 0.';
-  if (options.entryTimeMin !== undefined && !(options.entryTimeMin > 0)) {
+  if (options.entryTimeMin !== undefined && !(options.entryTimeMin > 0))
     return 'entryTimeMin must be > 0.';
-  }
   return null;
 }
 
@@ -196,9 +194,8 @@ export const updateManhole = defineCommand({
       rim = ground;
     }
     const invert = params.invertElevation ?? manhole.invertElevation;
-    if (!(rim > invert)) {
+    if (!(rim > invert))
       return noop(doc, `update_manhole failed: rim ${rim} must be above invert ${invert}.`);
-    }
     const catchment = catchmentOf(
       params.catchmentAreaHa,
       params.runoffCoefficient,
@@ -219,9 +216,8 @@ export const updateManhole = defineCommand({
       ...(inflow ? { inflow } : {}),
       ...(entryTimeMin ? { entryTimeMin } : {}),
     };
-    if (JSON.stringify(updated) === JSON.stringify(manhole)) {
+    if (JSON.stringify(updated) === JSON.stringify(manhole))
       return noop(doc, `update_manhole: nothing to change on ${manhole.id}.`);
-    }
     const next = withObject(civil, updated);
     const attached = civilObjectsOf(next, 'pipe').filter(
       (pipe) => pipe.fromId === manhole.id || pipe.toId === manhole.id,

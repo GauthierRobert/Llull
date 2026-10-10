@@ -35,9 +35,7 @@ export const duplicateEntity = defineCommand({
   }),
   run: (doc, { id, offset = ORIGIN }): CommandResult => {
     const source = doc.entities[id];
-    if (!source) {
-      return noop(doc, `No entity ${id} to duplicate.`);
-    }
+    if (!source) return noop(doc, `No entity ${id} to duplicate.`);
 
     const newId = nextId(source.kind);
     return commitEntity(
@@ -117,9 +115,7 @@ export const ungroupEntities = defineCommand({
   run: (doc, { groupId }): CommandResult => {
     const group = doc.groups[groupId];
 
-    if (!group) {
-      return noop(doc, `No group ${groupId} to ungroup.`);
-    }
+    if (!group) return noop(doc, `No group ${groupId} to ungroup.`);
 
     const nextGroups = { ...doc.groups };
     delete nextGroups[groupId];
@@ -168,9 +164,7 @@ export const setEntityName = defineCommand({
   }),
   run: (doc, { id, name, tags }): CommandResult => {
     const entity = doc.entities[id];
-    if (!entity) {
-      return noop(doc, `No entity ${id} — set_entity_name is a no-op.`);
-    }
+    if (!entity) return noop(doc, `No entity ${id} — set_entity_name is a no-op.`);
 
     const { name: currentName, tags: currentTags, ...rest } = entity;
     const nextName = name === undefined ? currentName : name === '' ? undefined : name;

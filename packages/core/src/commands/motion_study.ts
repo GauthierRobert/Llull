@@ -132,9 +132,7 @@ export const motionStudy = defineCommand({
       ),
   }),
   run: (doc, { mode, target, start, end, steps, interferenceCheck }): CommandResult => {
-    if (target.length === 0) {
-      return noop(doc, 'motion_study: "target" must be a non-empty string.');
-    }
+    if (target.length === 0) return noop(doc, 'motion_study: "target" must be a non-empty string.');
 
     const emptyStudy = {
       steps: [],
@@ -161,15 +159,13 @@ export const motionStudy = defineCommand({
     const clampedSteps = Math.min(360, rawSteps);
 
     if (mode === 'joint') {
-      if (!(target in doc.joints)) {
+      if (!(target in doc.joints))
         return noop(doc, `motion_study: joint '${target}' does not exist in doc.joints.`);
-      }
     } else {
       // mode === 'parameter'
       const param = Object.hasOwn(doc.parameters, target) ? doc.parameters[target] : undefined;
-      if (!param) {
+      if (!param)
         return noop(doc, `motion_study: parameter '${target}' does not exist in doc.parameters.`);
-      }
       if (typeof param.value !== 'number' || !Number.isFinite(param.value)) {
         return noop(
           doc,

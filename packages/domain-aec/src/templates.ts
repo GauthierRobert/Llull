@@ -213,9 +213,8 @@ export const addBuildingTemplate = defineCommand({
     for (const [index, step] of steps(doc, template, origin, created).entries()) {
       const before = getBuilding(current);
       const result = step(current);
-      if (result.document === current) {
+      if (result.document === current)
         return noop(doc, `add_building_template failed at step ${index + 1}: ${result.summary}`);
-      }
       current = result.document;
       const after = getBuilding(current);
       const fresh = [

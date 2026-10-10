@@ -72,9 +72,8 @@ export const createMaterial = defineCommand({
   }),
   annotations: { idempotent: true },
   run: (doc, { name, density, color, metalness, roughness }): CommandResult => {
-    if (name.trim() === '') {
+    if (name.trim() === '')
       return noop(doc, 'create_material failed: name must be a non-empty string.');
-    }
 
     if (density <= 0) {
       return noop(
@@ -150,9 +149,8 @@ export const assignMaterial = defineCommand({
   }),
   annotations: { idempotent: true },
   run: (doc, { materialName, entityIds }): CommandResult => {
-    if (materialName.trim() === '') {
+    if (materialName.trim() === '')
       return noop(doc, 'assign_material failed: materialName must be a non-empty string.');
-    }
 
     if (!doc.materials[materialName]) {
       const available = Object.keys(doc.materials);

@@ -115,12 +115,8 @@ export const measureAngle = defineCommand({
     } else if (lineId1 && lineId2) {
       const e1 = doc.entities[lineId1];
       const e2 = doc.entities[lineId2];
-      if (!e1) {
-        return noop(doc, `measure_angle: entity '${lineId1}' not found.`);
-      }
-      if (!e2) {
-        return noop(doc, `measure_angle: entity '${lineId2}' not found.`);
-      }
+      if (!e1) return noop(doc, `measure_angle: entity '${lineId1}' not found.`);
+      if (!e2) return noop(doc, `measure_angle: entity '${lineId2}' not found.`);
       if (e1.kind !== 'line') {
         return noop(
           doc,
@@ -144,9 +140,8 @@ export const measureAngle = defineCommand({
 
     const lenA = len3(vA);
     const lenB = len3(vB);
-    if (lenA < 1e-12 || lenB < 1e-12) {
+    if (lenA < 1e-12 || lenB < 1e-12)
       return noop(doc, 'measure_angle: degenerate vector (zero length) — cannot compute angle.');
-    }
 
     const radians = Math.acos(Math.max(-1, Math.min(1, dot3(vA, vB) / (lenA * lenB))));
     const degrees = (radians * 180) / Math.PI;

@@ -28,9 +28,8 @@ function pointAtArcLength(path: Vec3[], t: number): Vec3 {
   for (let i = 1; i < path.length; i++) {
     const seg = sub3(elementAt(path, i), elementAt(path, i - 1));
     const segLen = distance3(elementAt(path, i), elementAt(path, i - 1));
-    if (remaining <= segLen + 1e-10) {
+    if (remaining <= segLen + 1e-10)
       return add3(elementAt(path, i - 1), scale3(normalize3(seg), remaining));
-    }
     remaining -= segLen;
   }
   return elementAt(path, path.length - 1);
@@ -70,9 +69,7 @@ export const arrayAlongPath = defineCommand({
   }),
   run: (doc, { sourceId, path, count }): CommandResult => {
     const source = doc.entities[sourceId];
-    if (!source) {
-      return noop(doc, `array_along_path: source entity "${sourceId}" not found.`);
-    }
+    if (!source) return noop(doc, `array_along_path: source entity "${sourceId}" not found.`);
     if (path.length < 2) {
       return noop(
         doc,
@@ -161,28 +158,19 @@ export const distributeOnArc = defineCommand({
   }),
   run: (doc, { sourceId, center, normal, radius, startAngle, endAngle, count }): CommandResult => {
     const source = doc.entities[sourceId];
-    if (!source) {
-      return noop(doc, `distribute_on_arc: source entity "${sourceId}" not found.`);
-    }
-    if (radius <= 0) {
-      return noop(doc, `distribute_on_arc: radius must be > 0 (got ${radius}).`);
-    }
+    if (!source) return noop(doc, `distribute_on_arc: source entity "${sourceId}" not found.`);
+    if (radius <= 0) return noop(doc, `distribute_on_arc: radius must be > 0 (got ${radius}).`);
     if (count < 1 || count > MAX_COPIES_PER_COMMAND) {
       return noop(
         doc,
         `distribute_on_arc: count must be in [1, ${MAX_COPIES_PER_COMMAND}] (got ${count}).`,
       );
     }
-    if (center.length < 3) {
-      return noop(doc, 'distribute_on_arc: center must be a [x,y,z] triple.');
-    }
-    if (normal.length < 3) {
-      return noop(doc, 'distribute_on_arc: normal must be a [x,y,z] triple.');
-    }
+    if (center.length < 3) return noop(doc, 'distribute_on_arc: center must be a [x,y,z] triple.');
+    if (normal.length < 3) return noop(doc, 'distribute_on_arc: normal must be a [x,y,z] triple.');
 
-    if (len3([normal[0] as number, normal[1] as number, normal[2] as number]) < 1e-10) {
+    if (len3([normal[0] as number, normal[1] as number, normal[2] as number]) < 1e-10)
       return noop(doc, 'distribute_on_arc: normal must be a non-zero vector.');
-    }
 
     const c: Vec3 = [center[0] as number, center[1] as number, center[2] as number];
     const n: Vec3 = normalize3([normal[0] as number, normal[1] as number, normal[2] as number]);

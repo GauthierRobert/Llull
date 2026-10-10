@@ -71,9 +71,8 @@ export const addEquipment = defineCommand({
     { name, location, size, shape = 'box', angle = 0, clearance, weight = 0, levelId, mark },
   ): CommandResult => {
     if (name.trim() === '') return noop(doc, 'add_equipment failed: name is required.');
-    if (!isVec2(location)) {
+    if (!isVec2(location))
       return noop(doc, 'add_equipment failed: location must be [x, y] with finite numbers.');
-    }
     const dimensions = normaliseEquipmentSize(shape, size);
     if (!dimensions) {
       return noop(
@@ -82,9 +81,8 @@ export const addEquipment = defineCommand({
       );
     }
     const resolvedClearance = clearance ?? fromMm(doc, 800);
-    if (resolvedClearance < 0 || weight < 0) {
+    if (resolvedClearance < 0 || weight < 0)
       return noop(doc, 'add_equipment failed: clearance >= 0 and weight >= 0.');
-    }
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_equipment failed: ${resolution.reason}.`);
     const requestedMark = mark?.trim();
@@ -179,9 +177,8 @@ export const addPipeRun = defineCommand({
   ): CommandResult => {
     const path = routeOrFailure('add_pipe_run', points, 'line');
     if (typeof path === 'string') return noop(doc, path);
-    if (dn !== undefined && !(Number.isInteger(dn) && dn > 0)) {
+    if (dn !== undefined && !(Number.isInteger(dn) && dn > 0))
       return noop(doc, `add_pipe_run failed: dn must be a positive integer (got ${dn}).`);
-    }
     const tabulated = dn !== undefined ? outsideDiameterMm(dn) : null;
     if (diameter === undefined && dn !== undefined && tabulated === null) {
       const known = Object.keys(PIPE_OUTSIDE_DIAMETER_MM).join(', ');
@@ -191,9 +188,8 @@ export const addPipeRun = defineCommand({
       );
     }
     const resolvedDiameter = diameter ?? fromMm(doc, tabulated ?? 114.3);
-    if (hasRepeatedPoint(path) || resolvedDiameter <= 0) {
+    if (hasRepeatedPoint(path) || resolvedDiameter <= 0)
       return noop(doc, 'add_pipe_run failed: consecutive points must differ and diameter be > 0.');
-    }
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_pipe_run failed: ${resolution.reason}.`);
     const pipeTwin = findTwin(

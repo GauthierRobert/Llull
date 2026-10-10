@@ -257,9 +257,8 @@ export const updateSteelMember = defineCommand({
         'update_steel_member failed: start/end must be [x, y, z] (or [x, y] with z = 0).',
       );
     }
-    if (distance3(to, from) === 0) {
+    if (distance3(to, from) === 0)
       return noop(doc, 'update_steel_member failed: start and end would coincide.');
-    }
     const nextRole = role ?? member.role;
     const problem = fixityProblem(nextRole, { startJoint, endJoint, baseFixity });
     if (problem) return noop(doc, `update_steel_member failed: ${problem}.`);

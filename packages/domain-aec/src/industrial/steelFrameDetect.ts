@@ -49,12 +49,10 @@ interface Candidate {
 function planeOf(bar: SteelBar): { direction: FrameDirection; coordinate: number } | null {
   const dx = Math.abs(bar.end[0] - bar.start[0]);
   const dy = Math.abs(bar.end[1] - bar.start[1]);
-  if (dy <= PLANE_TOLERANCE && dx > PLANE_TOLERANCE) {
+  if (dy <= PLANE_TOLERANCE && dx > PLANE_TOLERANCE)
     return { direction: 'X', coordinate: (bar.start[1] + bar.end[1]) / 2 };
-  }
-  if (dx <= PLANE_TOLERANCE && dy > PLANE_TOLERANCE) {
+  if (dx <= PLANE_TOLERANCE && dy > PLANE_TOLERANCE)
     return { direction: 'Y', coordinate: (bar.start[0] + bar.end[0]) / 2 };
-  }
   return null;
 }
 
@@ -78,9 +76,8 @@ function candidateOf(beam: BeamResult, markOf: (id: string) => string): Candidat
         support.type === 'beam' ? `frames into beam ${markOf(support.id)}` : 'bears on nothing';
       return `${name} joint is rigid but the beam ${where}: a moment joint needs a column`;
     }
-    if (support.type === 'beam') {
+    if (support.type === 'beam')
       return `${name} end frames into beam ${markOf(support.id)}: the pinned end of a moment-frame beam must bear on a column or be free`;
-    }
   }
   return { beam, ...plane, columnIds };
 }

@@ -67,9 +67,8 @@ export const checkPurlins = defineCommand({
       );
     }
     const levelId = existingLevelId(getBuilding(doc), params.levelId);
-    if (levelId === undefined) {
+    if (levelId === undefined)
       return noop(doc, `check_purlins failed: no level '${params.levelId ?? ''}'.`);
-    }
     const { members, skipped } = locatePurlinMembers(doc, levelId);
     const analysis = analysePurlins(members, levelId, { windPressure, snowLoad, roofDeadLoad });
     if ('reason' in analysis) return noop(doc, analysis.reason);

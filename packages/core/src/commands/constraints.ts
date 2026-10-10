@@ -45,9 +45,8 @@ function validateConstraintShape(c: {
     if (c[key].entityId.length === 0)
       return `constraint.${key} must be a valid EntityRef (has entityId)`;
   }
-  if ((c.kind === 'distance' || c.kind === 'angle') && c.value === undefined) {
+  if ((c.kind === 'distance' || c.kind === 'angle') && c.value === undefined)
     return `constraint kind '${c.kind}' requires a numeric or string 'value' field`;
-  }
   return null;
 }
 
@@ -120,9 +119,7 @@ export const addConstraint = defineCommand({
   }),
   run: (doc, { constraint, id }): CommandResult => {
     const err = validateConstraintShape(constraint);
-    if (err !== null) {
-      return noop(doc, `add_constraint failed: ${err}.`);
-    }
+    if (err !== null) return noop(doc, `add_constraint failed: ${err}.`);
 
     const unknownEntity = [constraint.a.entityId, constraint.b.entityId].find(
       (entityId) => !Object.hasOwn(doc.entities, entityId),
@@ -193,9 +190,8 @@ export const deleteConstraint = defineCommand({
   }),
   run: (doc, { id }): CommandResult => {
     const constraint = Object.hasOwn(doc.constraints, id) ? doc.constraints[id] : undefined;
-    if (!constraint) {
+    if (!constraint)
       return noop(doc, `delete_constraint: constraint '${id}' does not exist — no change made.`);
-    }
 
     const newConstraints = { ...doc.constraints };
     delete newConstraints[id];
@@ -249,9 +245,8 @@ export const updateConstraint = defineCommand({
   }),
   run: (doc, { id, patch }): CommandResult => {
     const existing = Object.hasOwn(doc.constraints, id) ? doc.constraints[id] : undefined;
-    if (!existing) {
+    if (!existing)
       return noop(doc, `update_constraint: constraint '${id}' does not exist — no change made.`);
-    }
 
     const updates: Record<string, unknown> = {};
 

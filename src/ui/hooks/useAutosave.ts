@@ -30,9 +30,8 @@ export function useAutosave(storage: KeyValueStorage | null = browserStorage()):
       if (timer !== null) clearTimeout(timer);
       timer = null;
       const state = useStore.getState();
-      if (storage === null || !restoreDecided || !pending || state.liveStatus === 'connected') {
+      if (storage === null || !restoreDecided || !pending || state.liveStatus === 'connected')
         return;
-      }
       pending = false;
       if (state.document.order.length === 0) clearAutosave(storage);
       else {

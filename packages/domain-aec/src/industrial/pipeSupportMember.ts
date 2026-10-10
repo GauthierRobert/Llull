@@ -76,13 +76,11 @@ export function bearingOf(
   if (slope >= VERTICAL_RATIO) {
     if (!isBelow(type)) return failure('is a column: a hanger needs steel above the pipe');
     const planDistance = Math.hypot(point[0] - bar.start[0], point[1] - bar.start[1]);
-    if (planDistance > Math.max(width, depth) / 2 + limits.planTolerance) {
+    if (planDistance > Math.max(width, depth) / 2 + limits.planTolerance)
       return failure(`is ${Math.round(planDistance)} mm from the pipe in plan`);
-    }
     const [low, high] = [Math.min(bar.start[2], bar.end[2]), Math.max(bar.start[2], bar.end[2])];
-    if (underside >= low - PENETRATION && underside <= high + PENETRATION) {
+    if (underside >= low - PENETRATION && underside <= high + PENETRATION)
       return { memberId: bar.id, gap: 0, planDistance };
-    }
     const gap = underside - high;
     return gap >= 0 && gap <= limits.maxReach
       ? { memberId: bar.id, gap, planDistance }
@@ -136,9 +134,8 @@ export function riserBearingOf(
 ): RiserHit | string {
   const { width, depth, slope, failure } = barTraits(bar);
   const column = slope >= VERTICAL_RATIO;
-  if (!column && slope > HORIZONTAL_RATIO) {
+  if (!column && slope > HORIZONTAL_RATIO)
     return failure('is inclined: only columns and horizontal members take riser brackets');
-  }
   const projection = column ? null : planProjection(bar, point);
   const nearest: [number, number] =
     projection === null

@@ -61,9 +61,7 @@ export const clearDocument = defineCommand({
       doc.civil === undefined &&
       (keepLayers || isLayersDefault);
 
-    if (isAlreadyEmpty) {
-      return noop(doc, 'Document is already empty.');
-    }
+    if (isAlreadyEmpty) return noop(doc, 'Document is already empty.');
 
     const nextDoc: CadDocument = {
       ...doc,

@@ -117,14 +117,11 @@ const replayHistoryCommand = defineCommand({
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, _params, ctx): CommandResult => {
     const context = ctx ?? currentContext();
-    if (doc.featureHistory.length === 0) {
+    if (doc.featureHistory.length === 0)
       return noop(doc, 'replay_history: featureHistory is empty — nothing to replay.');
-    }
     const warnings: string[] = [];
     const refused = kernelRefusal(doc, doc.featureHistory, context);
-    if (refused !== null) {
-      return noop(doc, `replay_history: ${refused}`);
-    }
+    if (refused !== null) return noop(doc, `replay_history: ${refused}`);
     const regenerated = replayHistory(doc, doc.featureHistory, context.registry, warnings);
     const count = Object.keys(regenerated.entities).length;
     return changed(
@@ -331,9 +328,8 @@ const insertStep = defineCommand({
       afterStepId === undefined
         ? doc.featureHistory.length - 1
         : doc.featureHistory.findIndex((s) => s.id === afterStepId);
-    if (afterStepId !== undefined && insertIdx === -1) {
+    if (afterStepId !== undefined && insertIdx === -1)
       return noop(doc, `insert_step: afterStepId '${afterStepId}' not found in featureHistory.`);
-    }
 
     const stepNumber = doc.nextStepNumber ?? 1;
     const newStep: FeatureStep = {

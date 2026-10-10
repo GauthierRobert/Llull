@@ -20,23 +20,20 @@ const VALID_JOINT_KINDS: ReadonlySet<string> = new Set<JointKind>(['revolute', '
 
 function validateJointMateRef(id: string, field: string, v: unknown): string | null {
   if (!isRecord(v)) return `joint '${id}': ${field} must be an object`;
-  if (typeof v['instanceId'] !== 'string' || (v['instanceId'] as string).length === 0) {
+  if (typeof v['instanceId'] !== 'string' || (v['instanceId'] as string).length === 0)
     return `joint '${id}': ${field}.instanceId must be a non-empty string`;
-  }
   if ('frame' in v) {
     const f = v['frame'];
-    if (f !== 'origin' && f !== 'axis-x' && f !== 'axis-y' && f !== 'axis-z') {
+    if (f !== 'origin' && f !== 'axis-x' && f !== 'axis-y' && f !== 'axis-z')
       return `joint '${id}': ${field}.frame must be origin|axis-x|axis-y|axis-z, got '${String(f)}'`;
-    }
   }
   return null;
 }
 
 function validateJointAxis(id: string, axis: unknown): string | null {
   if (axis === 'x' || axis === 'y' || axis === 'z') return null;
-  if (Array.isArray(axis) && axis.length === 3 && (axis as unknown[]).every(isFiniteNumber)) {
+  if (Array.isArray(axis) && axis.length === 3 && (axis as unknown[]).every(isFiniteNumber))
     return null;
-  }
   return `joint '${id}': axis must be 'x', 'y', 'z', or a [x,y,z] finite-number array, got ${JSON.stringify(axis)}`;
 }
 
@@ -44,9 +41,8 @@ function validateJointValue(id: string, v: unknown): string | null {
   if (!isRecord(v)) return `joint '${id}' is not an object`;
   if (typeof v['id'] !== 'string') return `joint '${id}': id field must be a string`;
   const kind = v['kind'];
-  if (typeof kind !== 'string' || !VALID_JOINT_KINDS.has(kind)) {
+  if (typeof kind !== 'string' || !VALID_JOINT_KINDS.has(kind))
     return `joint '${id}': unknown kind '${String(kind)}'. Allowed: revolute, prismatic.`;
-  }
   const refErrA = validateJointMateRef(id, 'a', v['a']);
   if (refErrA !== null) return refErrA;
   const refErrB = validateJointMateRef(id, 'b', v['b']);
@@ -54,13 +50,11 @@ function validateJointValue(id: string, v: unknown): string | null {
   const axisErr = validateJointAxis(id, v['axis']);
   if (axisErr !== null) return axisErr;
   if (kind === 'revolute') {
-    if (!isFiniteNumber(v['angle'])) {
+    if (!isFiniteNumber(v['angle']))
       return `joint '${id}' (revolute): angle must be a finite number`;
-    }
   } else {
-    if (!isFiniteNumber(v['displacement'])) {
+    if (!isFiniteNumber(v['displacement']))
       return `joint '${id}' (prismatic): displacement must be a finite number`;
-    }
   }
   return null;
 }
@@ -84,27 +78,23 @@ function validateConstraintValue(id: string, v: unknown): string | null {
   if (!isRecord(v)) return `constraint '${id}' is not an object`;
   if (typeof v['id'] !== 'string') return `constraint '${id}': id field must be a string`;
   const kind = v['kind'];
-  if (typeof kind !== 'string' || !VALID_CONSTRAINT_KINDS.has(kind)) {
+  if (typeof kind !== 'string' || !VALID_CONSTRAINT_KINDS.has(kind))
     return `constraint '${id}': unknown kind '${String(kind)}'`;
-  }
   for (const field of ['a', 'b'] as const) {
     const ref = v[field];
     if (!isRecord(ref)) return `constraint '${id}': ${field} must be an object`;
-    if (typeof ref['entityId'] !== 'string' || ref['entityId'].length === 0) {
+    if (typeof ref['entityId'] !== 'string' || ref['entityId'].length === 0)
       return `constraint '${id}': ${field}.entityId must be a non-empty string`;
-    }
     if ('kind' in ref) {
       const rk = ref['kind'];
-      if (rk !== 'start' && rk !== 'end' && rk !== 'center' && rk !== 'mid') {
+      if (rk !== 'start' && rk !== 'end' && rk !== 'center' && rk !== 'mid')
         return `constraint '${id}': ${field}.kind must be start|end|center|mid, got '${String(rk)}'`;
-      }
     }
   }
   if (kind === 'distance' || kind === 'angle') {
     const val = v['value'];
-    if (typeof val !== 'number' && typeof val !== 'string') {
+    if (typeof val !== 'number' && typeof val !== 'string')
       return `constraint '${id}' (${kind}): value must be a number or string`;
-    }
   }
   return null;
 }

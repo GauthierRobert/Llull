@@ -26,9 +26,8 @@ function resolveLinePair(
   const boundary = doc.entities[boundaryId];
   if (!line) return noop(doc, `${command}: entity ${id} not found.`);
   if (!boundary) return noop(doc, `${command}: boundary entity ${boundaryId} not found.`);
-  if (line.kind !== 'line') {
+  if (line.kind !== 'line')
     return noop(doc, `${command}: entity ${id} is kind '${line.kind}', expected 'line'.`);
-  }
   if (boundary.kind !== 'line') {
     return noop(
       doc,
@@ -52,9 +51,8 @@ function moveEndpointToBoundary(
   if ('summary' in pair) return pair;
   const { line, boundary } = pair;
   const hit = segIntersect(line.start, line.end, boundary.start, boundary.end);
-  if (hit === null) {
+  if (hit === null)
     return noop(doc, `${command}: lines ${id} and ${boundaryId} are parallel — no intersection.`);
-  }
   if (
     command === 'trim' &&
     (hit.t < -1e-9 || hit.t > 1 + 1e-9 || hit.u < -1e-9 || hit.u > 1 + 1e-9)

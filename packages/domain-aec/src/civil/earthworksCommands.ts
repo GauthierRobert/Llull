@@ -64,18 +64,15 @@ function isSimple(polygon: ReadonlyArray<Vec2>): boolean {
 
 /** Why `platform` cannot be graded into `tin`, or null when it can. */
 function platformProblem(platform: PlatformObject, tin: Tin): string | null {
-  if (platform.boundary.length > MAX_BOUNDARY_VERTICES) {
+  if (platform.boundary.length > MAX_BOUNDARY_VERTICES)
     return `boundary has more than ${MAX_BOUNDARY_VERTICES} vertices.`;
-  }
-  if (!isValidPolygon(platform.boundary) || !isSimple(platform.boundary)) {
+  if (!isValidPolygon(platform.boundary) || !isSimple(platform.boundary))
     return 'boundary must be a simple (non self-intersecting) polygon of >= 3 [x, y] points.';
-  }
   const problem =
     slopeOf('cutSlope', platform.cutSlope) ?? slopeOf('fillSlope', platform.fillSlope);
   if (problem) return problem;
-  if (platform.boundary.some((vertex) => elevationAt(tin, vertex) === null)) {
+  if (platform.boundary.some((vertex) => elevationAt(tin, vertex) === null))
     return 'the boundary lies outside the surface (every vertex must be inside the TIN).';
-  }
   return null;
 }
 
@@ -206,9 +203,8 @@ export const updatePlatform = defineCommand({
     const platform = civilObject(civil, params.platformId, 'platform');
     if (!platform) return noop(doc, `update_platform failed: no platform ${params.platformId}.`);
     const tin = surfaceTinById(civil, platform.surfaceId);
-    if (!tin) {
+    if (!tin)
       return noop(doc, `update_platform failed: surface ${platform.surfaceId} no longer exists.`);
-    }
     const updated: PlatformObject = {
       ...platform,
       name: params.name?.trim() || platform.name,
@@ -217,9 +213,8 @@ export const updatePlatform = defineCommand({
       cutSlope: params.cutSlope ?? platform.cutSlope,
       fillSlope: params.fillSlope ?? platform.fillSlope,
     };
-    if (JSON.stringify(updated) === JSON.stringify(platform)) {
+    if (JSON.stringify(updated) === JSON.stringify(platform))
       return noop(doc, `update_platform: nothing to change on ${platform.id}.`);
-    }
     const problem = platformProblem(updated, tin);
     if (problem) return noop(doc, `update_platform failed: ${problem}`);
     const data = report(doc, worksOf(updated, tin));
@@ -266,9 +261,8 @@ export const platformEarthworks = defineCommand({
         `platform_earthworks failed: surface ${platform.surfaceId} no longer exists.`,
       );
     }
-    if (gridSpacing !== undefined && !(gridSpacing > 0)) {
+    if (gridSpacing !== undefined && !(gridSpacing > 0))
       return noop(doc, 'platform_earthworks failed: gridSpacing must be > 0.');
-    }
     const data = report(doc, worksOf(platform, tin, gridSpacing));
     const daylight = daylightPoints(
       tin,
@@ -344,12 +338,10 @@ export const balancePlatform = defineCommand({
     const platform = civilObject(civil, platformId, 'platform');
     if (!platform) return noop(doc, `balance_platform failed: no platform ${platformId}.`);
     const tin = surfaceTinById(civil, platform.surfaceId);
-    if (!tin) {
+    if (!tin)
       return noop(doc, `balance_platform failed: surface ${platform.surfaceId} no longer exists.`);
-    }
-    if (!(swellFactor > 0) || !Number.isFinite(swellFactor)) {
+    if (!(swellFactor > 0) || !Number.isFinite(swellFactor))
       return noop(doc, 'balance_platform failed: swellFactor must be > 0.');
-    }
     const [low, high] = surfaceRange(tin, platform.boundary);
     const reach = Math.max(
       daylightReach(tin, low, platform.cutSlope, platform.fillSlope),
@@ -445,13 +437,11 @@ export const compareSurfaces = defineCommand({
     if (!base) return noop(doc, `compare_surfaces failed: no surface ${baseSurfaceId}.`);
     if (!comparison)
       return noop(doc, `compare_surfaces failed: no surface ${comparisonSurfaceId}.`);
-    if (gridSpacing !== undefined && !(gridSpacing > 0)) {
+    if (gridSpacing !== undefined && !(gridSpacing > 0))
       return noop(doc, 'compare_surfaces failed: gridSpacing must be > 0.');
-    }
     const result = compareSurfaceVolumes(base, comparison, gridSpacing);
-    if (result.samples === 0) {
+    if (result.samples === 0)
       return noop(doc, 'compare_surfaces failed: the surfaces share no plan extent.');
-    }
     const k = toMetres(doc, 1);
     const data = {
       baseSurfaceId,

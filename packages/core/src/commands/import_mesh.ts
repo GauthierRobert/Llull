@@ -26,27 +26,22 @@ export const DEFAULT_MESH_COLOR = '#9aa5b1';
 /** Expand to a triangle soup (positions per corner, indices 0..n-1) so every consumer agrees. */
 function toTriangleSoup(body: MeshBodyParams): number[] | string {
   const { positions, indices } = body;
-  if (!Array.isArray(positions) || positions.length % 3 !== 0) {
+  if (!Array.isArray(positions) || positions.length % 3 !== 0)
     return 'positions must be a flat [x,y,z, ...] number array';
-  }
-  if (!positions.every((v) => typeof v === 'number' && Number.isFinite(v))) {
+  if (!positions.every((v) => typeof v === 'number' && Number.isFinite(v)))
     return 'positions must be finite numbers';
-  }
   if (indices === undefined) {
-    if (positions.length % 9 !== 0 || positions.length === 0) {
+    if (positions.length % 9 !== 0 || positions.length === 0)
       return 'without indices, positions must hold whole triangles (9 numbers each)';
-    }
     return positions;
   }
   const vertexCount = positions.length / 3;
-  if (!Array.isArray(indices) || indices.length === 0 || indices.length % 3 !== 0) {
+  if (!Array.isArray(indices) || indices.length === 0 || indices.length % 3 !== 0)
     return 'indices must be a non-empty multiple of 3';
-  }
   const soup: number[] = [];
   for (const index of indices) {
-    if (!Number.isInteger(index) || index < 0 || index >= vertexCount) {
+    if (!Number.isInteger(index) || index < 0 || index >= vertexCount)
       return `index ${String(index)} is outside 0..${vertexCount - 1}`;
-    }
     soup.push(
       positions[index * 3] ?? 0,
       positions[index * 3 + 1] ?? 0,
@@ -85,9 +80,8 @@ export const importMesh = defineCommand({
   run: (doc, params): CommandResult => {
     const bodies = params.bodies as unknown as MeshBodyParams[];
     if (bodies.length === 0) return fail(doc, 'bodies must be a non-empty array');
-    if (bodies.length > MAX_IMPORT_BODIES) {
+    if (bodies.length > MAX_IMPORT_BODIES)
       return fail(doc, `${bodies.length} bodies exceeds MAX_IMPORT_BODIES (${MAX_IMPORT_BODIES})`);
-    }
     const entities: Record<string, Entity> = { ...doc.entities };
     const order = [...doc.order];
     const affected: string[] = [];
@@ -96,9 +90,8 @@ export const importMesh = defineCommand({
       const soup = toTriangleSoup(body);
       if (typeof soup === 'string') return fail(doc, `body ${i}: ${soup}`);
       triangleCount += soup.length / 9;
-      if (triangleCount > MAX_IMPORT_TRIANGLES) {
+      if (triangleCount > MAX_IMPORT_TRIANGLES)
         return fail(doc, `more than MAX_IMPORT_TRIANGLES (${MAX_IMPORT_TRIANGLES}) triangles`);
-      }
       const id = nextId('mesh');
       const name = typeof body.name === 'string' && body.name.trim() !== '' ? body.name : undefined;
       const entity = newEntity(

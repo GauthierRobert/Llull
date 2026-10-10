@@ -205,12 +205,10 @@ const METADATA_FIELDS = new Set(['name', 'tags', 'layerId', 'materialId', 'color
 
 /** Deep equality with a numeric tolerance (replayed floats may differ in the last bits). */
 function nearlyEqual(left: unknown, right: unknown): boolean {
-  if (typeof left === 'number' && typeof right === 'number') {
+  if (typeof left === 'number' && typeof right === 'number')
     return Math.abs(left - right) <= EPSILON * Math.max(1, Math.abs(left), Math.abs(right));
-  }
-  if (Array.isArray(left) && Array.isArray(right)) {
+  if (Array.isArray(left) && Array.isArray(right))
     return left.length === right.length && left.every((item, i) => nearlyEqual(item, right[i]));
-  }
   if (left !== null && right !== null && typeof left === 'object' && typeof right === 'object') {
     const a = left as Record<string, unknown>;
     const b = right as Record<string, unknown>;
@@ -280,9 +278,8 @@ function lowerParameters(
     const identifier = identifiers.get(name);
     if (parameter === undefined || identifier === undefined) return [];
     const literal = Number(parameter.expression);
-    if (parameter.error !== undefined || Number.isFinite(literal)) {
+    if (parameter.error !== undefined || Number.isFinite(literal))
       return [{ name, identifier, value: parameter.value }];
-    }
     const expression = translateExpression(parameter.expression, identifiers);
     return [
       expression === null
@@ -478,9 +475,8 @@ function lowerStep(
 function historyMismatch(doc: CadDocument, replayed: CadDocument): string | null {
   const expected = solids(doc);
   const actual = solids(replayed);
-  if (expected.length !== actual.length) {
+  if (expected.length !== actual.length)
     return `featureHistory replays to ${actual.length} solid(s) but the document has ${expected.length}`;
-  }
   const differing = expected.find((original, i) => {
     const regenerated = actual[i];
     return regenerated === undefined || !geometryEqual(original, regenerated);
