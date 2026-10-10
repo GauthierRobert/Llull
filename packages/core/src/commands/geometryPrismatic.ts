@@ -1,14 +1,12 @@
 import type { CommandResult } from './types';
-import { defineCommand, z, looseVec3, colorField } from './schema';
+import { defineCommand, z, looseVec3 } from './schema';
 import { ORIGIN } from '../lib/vec3';
 import {
   DEFAULT_SOLID_COLOR,
-  anchorField,
   placeSolid,
-  positionField,
+  placedSolidFields,
   rejectBadSize,
   rejectNonPositive,
-  rotationField,
 } from './geometryShared';
 
 /**
@@ -42,13 +40,10 @@ export const addWedge = defineCommand({
       '[width, height, depth] in document units. width=X extent; height=full height at front face; ' +
         'depth=Z extent (ramp direction). All must be > 0.',
     ),
-    position: positionField(),
-    anchor: anchorField('wedge', 'min', {
+    ...placedSolidFields('wedge', 'min', {
       min: 'lower-front-left corner of the bounding box (min-XYZ)',
       center: 'geometric center of the AABB',
     }),
-    rotation: rotationField(),
-    color: colorField(DEFAULT_SOLID_COLOR),
   }),
   run: (
     doc,
@@ -109,13 +104,10 @@ export const addPyramid = defineCommand({
       .describe(
         'Height from the base center to the apex along the local +Z axis in document units. Must be > 0.',
       ),
-    position: positionField(),
-    anchor: anchorField('pyramid', 'base-center', {
+    ...placedSolidFields('pyramid', 'base-center', {
       'base-center': 'center of the rectangular base; apex at position+[0,0,height]',
       center: 'geometric center of the AABB (mid X/Y/Z)',
     }),
-    rotation: rotationField(),
-    color: colorField(DEFAULT_SOLID_COLOR),
   }),
   run: (
     doc,

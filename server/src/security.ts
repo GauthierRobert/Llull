@@ -159,12 +159,7 @@ export function guardRead(): RequestHandler {
  * all-powerful). No token configured: loopback peers only.
  */
 export function guardAdmin(): RequestHandler {
-  const userGuard = requireRole('admin', false);
-  return (req: Request, res: Response, next: NextFunction): void => {
-    if (isUserMode()) {
-      userGuard(req, res, next);
-      return;
-    }
+  return userRoleOr('admin', false, (req, res, next) => {
     const token = process.env['MCP_AUTH_TOKEN'];
     if (token ? hasValidBearer(req, token) : isLocalPeer(req)) {
       next();
@@ -177,16 +172,17 @@ export function guardAdmin(): RequestHandler {
           ? UNAUTHORIZED_BODY
           : { error: 'Admin endpoints need MCP_AUTH_TOKEN or a loopback peer.' },
       );
-  };
+  });
+}
+
+/** Named-user mode defers to the role check; otherwise `tokenGuard` decides. */
+function userRoleOr(role: Role, acceptQuery: boolean, tokenGuard: RequestHandler): RequestHandler {
+  const userGuard = requireRole(role, acceptQuery);
+  return (req, res, next) => (isUserMode() ? userGuard : tokenGuard)(req, res, next);
 }
 
 function buildGuard(acceptQueryToken: boolean, role: Role): RequestHandler {
-  const userGuard = requireRole(role, acceptQueryToken);
-  return (req: Request, res: Response, next: NextFunction): void => {
-    if (isUserMode()) {
-      userGuard(req, res, next);
-      return;
-    }
+  return userRoleOr(role, acceptQueryToken, (req, res, next) => {
     const token = process.env['MCP_AUTH_TOKEN'];
     if (!token && acceptQueryToken) {
       next();
@@ -213,7 +209,7 @@ function buildGuard(acceptQueryToken: boolean, role: Role): RequestHandler {
       return;
     }
     next();
-  };
+  });
 }
 
 /**

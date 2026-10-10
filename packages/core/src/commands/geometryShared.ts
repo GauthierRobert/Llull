@@ -1,6 +1,6 @@
 import type { BaseEntity, CadDocument, Entity, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
-import { z, looseVec3, tolerant } from './schema';
+import { z, colorField, looseVec3, tolerant } from './schema';
 import { rotatedEntityBounds } from './sceneRotatedBounds';
 import { add3, finiteVec3OrZero } from '../lib/vec3';
 import { nextId } from '../lib/id';
@@ -140,6 +140,22 @@ export function rotationField(
         'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
     ),
   ).optional();
+}
+
+/** position / anchor / rotation / color params of a placed solid (`anchorField` arguments). */
+export function placedSolidFields(
+  shape: string,
+  defaultAnchor: AnchorName,
+  details: Partial<Record<AnchorName, string>> = {},
+  rotation = rotationField(),
+): {
+  position: ReturnType<typeof positionField>;
+  anchor: ReturnType<typeof anchorField>;
+  rotation: ReturnType<typeof rotationField>;
+  color: ReturnType<typeof colorField>;
+} {
+  const anchor = anchorField(shape, defaultAnchor, details);
+  return { position: positionField(), anchor, rotation, color: colorField(DEFAULT_SOLID_COLOR) };
 }
 
 /**

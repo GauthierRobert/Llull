@@ -1,10 +1,10 @@
 import type { CommandResult } from './types';
-import { defineCommand, z, colorField } from './schema';
+import { defineCommand, z } from './schema';
 import { ORIGIN } from '../lib/vec3';
 import {
   DEFAULT_SOLID_COLOR,
-  anchorField,
   placeSolid,
+  placedSolidFields,
   positionField,
   rejectNonPositive,
   rotationField,
@@ -36,10 +36,7 @@ export const addCylinder = defineCommand({
       .number()
       .describe('Radius of the cylinder cross-section in document units. Must be > 0.'),
     height: z.number().describe('Total height of the cylinder in document units. Must be > 0.'),
-    position: positionField(),
-    anchor: anchorField('cylinder', 'center'),
-    rotation: rotationField(),
-    color: colorField(DEFAULT_SOLID_COLOR),
+    ...placedSolidFields('cylinder', 'center'),
   }),
   run: (
     doc,
@@ -87,10 +84,12 @@ export const addSphere = defineCommand({
     'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.',
   params: z.object({
     radius: z.number().describe('Radius of the sphere in document units. Must be > 0.'),
-    position: positionField(),
-    anchor: anchorField('sphere', 'center'),
-    rotation: rotationField('Stored for uniformity; geometrically moot for a sphere.'),
-    color: colorField(DEFAULT_SOLID_COLOR),
+    ...placedSolidFields(
+      'sphere',
+      'center',
+      {},
+      rotationField('Stored for uniformity; geometrically moot for a sphere.'),
+    ),
   }),
   run: (
     doc,
@@ -144,13 +143,10 @@ export const addCone = defineCommand({
       .describe(
         'Height from the base center to the apex along the local +Z axis in document units. Must be > 0.',
       ),
-    position: positionField(),
-    anchor: anchorField('cone', 'base-center', {
+    ...placedSolidFields('cone', 'base-center', {
       'base-center': 'center of the circular base; apex at position+[0,0,height]',
       center: 'geometric center of the AABB (mid X/Y/Z)',
     }),
-    rotation: rotationField(),
-    color: colorField(DEFAULT_SOLID_COLOR),
   }),
   run: (
     doc,
@@ -213,10 +209,8 @@ export const addTorus = defineCommand({
         'Radius of the circular tube cross-section (minor radius) in document units. Must be > 0. ' +
           'Should be less than ringRadius for a non-self-intersecting torus.',
       ),
+    ...placedSolidFields('torus', 'center'),
     position: positionField('The ring lies in the XY plane. '),
-    anchor: anchorField('torus', 'center'),
-    rotation: rotationField(),
-    color: colorField(DEFAULT_SOLID_COLOR),
   }),
   run: (
     doc,

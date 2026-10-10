@@ -6,10 +6,9 @@ import { referenceSuffix, replaceEntity, withoutEntities } from './entityOps';
 import {
   DEFAULT_SOLID_COLOR,
   EXTRUSION_COLOR,
-  anchorField,
   commitSolid,
   placeSolid,
-  positionField,
+  placedSolidFields,
   rejectBadProfile,
   rejectZeroAreaProfile,
   rejectBadSize,
@@ -40,10 +39,7 @@ export const addBox = defineCommand({
     'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.',
   params: z.object({
     size: looseVec3('[width, height, depth] in document units. All three components must be > 0.'),
-    position: positionField(),
-    anchor: anchorField('box', 'center'),
-    rotation: rotationField(),
-    color: colorField(DEFAULT_SOLID_COLOR),
+    ...placedSolidFields('box', 'center'),
   }),
   run: (
     doc,
