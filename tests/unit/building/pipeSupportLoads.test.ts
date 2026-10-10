@@ -14,6 +14,9 @@ const HEB200 = (findProfile('HEB200')?.massPerMetre ?? 0) * G * 1e-3;
 const support = (doc: CadDocument, params: Record<string, unknown>): CadDocument =>
   step(doc, 'add_pipe_support', params);
 
+const pipeRun = (doc: CadDocument, points: Array<[number, number, number]>): CadDocument =>
+  step(doc, 'add_pipe_run', { levelId: 'level-1', dn: 100, points });
+
 interface LineRow {
   supports: number;
   basis: string;
@@ -61,14 +64,10 @@ describe('pipe weight through supports', () => {
       doc = column(doc, x, 4000);
       doc = beam(doc, [x, 0], [x, 4000]);
     }
-    doc = step(doc, 'add_pipe_run', {
-      levelId: 'level-1',
-      dn: 100,
-      points: [
-        [0, 2000, 3027.15],
-        [6000, 2000, 3027.15],
-      ],
-    });
+    doc = pipeRun(doc, [
+      [0, 2000, 3027.15],
+      [6000, 2000, 3027.15],
+    ]);
     doc = support(doc, {
       pipeId: 'pipe-1',
       at: [
@@ -122,14 +121,10 @@ describe('pipe weight through supports', () => {
         end: [1000, 5000, 100],
         levelId: 'level-1',
       });
-      doc = step(doc, 'add_pipe_run', {
-        levelId: 'level-1',
-        dn: 100,
-        points: [
-          [0, 0, 500],
-          [length, 0, 500],
-        ],
-      });
+      doc = pipeRun(doc, [
+        [0, 0, 500],
+        [length, 0, 500],
+      ]);
       for (const x of [0, length]) {
         doc = step(doc, 'add_equipment', {
           name: `Vessel ${x}`,
@@ -172,14 +167,10 @@ describe('pipe weight through supports', () => {
       end: [0, 4000, -180],
       levelId: 'level-2',
     });
-    const lone = step(floating, 'add_pipe_run', {
-      levelId: 'level-1',
-      dn: 100,
-      points: [
-        [0, 0, 1000],
-        [6000, 0, 1000],
-      ],
-    });
+    const lone = pipeRun(floating, [
+      [0, 0, 1000],
+      [6000, 0, 1000],
+    ]);
     const warning = check(lone).warnings.find((text) => text.includes('rests on no steel beam'));
     expect(warning).toContain('add_pipe_support');
   });
@@ -187,14 +178,10 @@ describe('pipe weight through supports', () => {
   it('takes a column-borne support as axial load and notes the bracket eccentricity', () => {
     let doc = twoLevels();
     doc = column(doc, 1000, 1000);
-    doc = step(doc, 'add_pipe_run', {
-      levelId: 'level-1',
-      dn: 100,
-      points: [
-        [0, 1000, 2000],
-        [3000, 1000, 2000],
-      ],
-    });
+    doc = pipeRun(doc, [
+      [0, 1000, 2000],
+      [3000, 1000, 2000],
+    ]);
     doc = support(doc, { pipeId: 'pipe-1', at: [[1000, 1000, 2000]], type: 'anchor' });
     const data = check(doc);
     // support at 1 m of a 3 m run: 1 m + 2 m overhangs = 3 m of pipe
@@ -211,14 +198,10 @@ describe('pipe weight through supports', () => {
   it('carries a pipe standing on a column top concentrically, without a note', () => {
     let doc = twoLevels();
     doc = column(doc, 1000, 1000, 'HEB200', 1942.85);
-    doc = step(doc, 'add_pipe_run', {
-      levelId: 'level-1',
-      dn: 100,
-      points: [
-        [0, 1000, 2000],
-        [3000, 1000, 2000],
-      ],
-    });
+    doc = pipeRun(doc, [
+      [0, 1000, 2000],
+      [3000, 1000, 2000],
+    ]);
     doc = support(doc, { pipeId: 'pipe-1', at: [[1000, 1000, 2000]] });
     const data = check(doc);
     expect(lineOf(doc).carriedKn).toBeCloseTo(3 * W, 9);
@@ -242,14 +225,10 @@ describe('pipe weight through supports', () => {
       end: [0, 4000, 100],
       levelId: 'level-1',
     });
-    doc = step(doc, 'add_pipe_run', {
-      levelId: 'level-1',
-      dn: 100,
-      points: [
-        [2000, 2000, 2957.15],
-        [4000, 2000, 2957.15],
-      ],
-    });
+    doc = pipeRun(doc, [
+      [2000, 2000, 2957.15],
+      [4000, 2000, 2957.15],
+    ]);
     doc = support(doc, { pipeId: 'pipe-1', at: [[3000, 2000, 2957.15]] });
     const warning = check(doc).warnings.find((text) => text.includes('does not analyse'));
     expect(warning).toContain('bears on purlin');

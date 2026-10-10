@@ -79,6 +79,36 @@ function renderSvg(doc: ReturnType<typeof createEmptyDocument>, view: string): s
   return (result.data as { svg: string }).svg;
 }
 
+type Bbox = { minX: number; minY: number; maxX: number; maxY: number };
+
+/** Add one solid (optionally rotate it by `delta`) and return the SVG bbox / SVG of `view`. */
+function renderSolid(
+  addCommand: string,
+  params: Record<string, unknown>,
+  delta?: [number, number, number],
+  view = 'front',
+): { svg: string; bbox: Bbox | null } {
+  let doc = execute(createEmptyDocument(), addCommand, { ...params, position: [0, 0, 0] }).document;
+  if (delta) doc = execute(doc, 'rotate_entity', { id: doc.order[0]!, delta }).document;
+  const svg = renderSvg(doc, view);
+  return { svg, bbox: svgPolygonBbox(svg) };
+}
+
+const QUARTER_X: [number, number, number] = [Math.PI / 2, 0, 0];
+
+/** Unrotated vs rotated front-view bboxes of one solid. */
+function frontPair(
+  addCommand: string,
+  params: Record<string, unknown>,
+  delta: [number, number, number] = QUARTER_X,
+): { a: Bbox; b: Bbox } {
+  const a = renderSolid(addCommand, params).bbox;
+  const b = renderSolid(addCommand, params, delta).bbox;
+  expect(a).not.toBeNull();
+  expect(b).not.toBeNull();
+  return { a: a!, b: b! };
+}
+
 // ---------------------------------------------------------------------------
 // Cylinder rotation test
 //
@@ -96,50 +126,27 @@ function renderSvg(doc: ReturnType<typeof createEmptyDocument>, view: string): s
 // ---------------------------------------------------------------------------
 
 describe('render_view rotation — cylinder', () => {
+  const cyl = { radius: 1, height: 4 };
+
   it('unrotated cylinder front view is taller than wide', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_cylinder', { radius: 1, height: 4, position: [0, 0, 0] }).document;
-    const svg = renderSvg(doc, 'front');
-    const bbox = svgPolygonBbox(svg);
+    const { bbox } = renderSolid('add_cylinder', cyl);
     expect(bbox).not.toBeNull();
     // Z-axis cylinder seen from front: taller (Y screen) than wide (X screen)
     expect(bboxHeight(bbox!)).toBeGreaterThan(bboxWidth(bbox!));
   });
 
   it('cylinder rotated [π/2,0,0] front view becomes nearly square (axis into camera)', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_cylinder', { radius: 1, height: 4, position: [0, 0, 0] }).document;
-    const id = doc.order[0]!;
-    doc = execute(doc, 'rotate_entity', { id, delta: [Math.PI / 2, 0, 0] }).document;
-    const svg = renderSvg(doc, 'front');
-    const bbox = svgPolygonBbox(svg);
+    const { bbox } = renderSolid('add_cylinder', cyl, QUARTER_X);
     expect(bbox).not.toBeNull();
-    // After Rx 90°: cylinder axis is now along Y (into camera from front view).
-    // Silhouette is roughly a circle: width ≈ height ≈ 2*radius.
-    // The key assertion: it is now WIDER relative to its height than before.
-    const w = bboxWidth(bbox!);
-    const h = bboxHeight(bbox!);
-    // aspect ratio should be close to 1 (within 50% either way) for the rotated case
-    expect(w / h).toBeGreaterThan(0.5);
-    expect(w / h).toBeLessThan(2.0);
+    // Axis now along Y (into camera): silhouette roughly a circle, width ≈ height ≈ 2*radius.
+    const ratio = bboxWidth(bbox!) / bboxHeight(bbox!);
+    expect(ratio).toBeGreaterThan(0.5);
+    expect(ratio).toBeLessThan(2.0);
   });
 
   it('rotated bbox differs from unrotated bbox', () => {
-    let docA = createEmptyDocument();
-    docA = execute(docA, 'add_cylinder', { radius: 1, height: 4, position: [0, 0, 0] }).document;
-    const svgA = renderSvg(docA, 'front');
-
-    let docB = createEmptyDocument();
-    docB = execute(docB, 'add_cylinder', { radius: 1, height: 4, position: [0, 0, 0] }).document;
-    const idB = docB.order[0]!;
-    docB = execute(docB, 'rotate_entity', { id: idB, delta: [Math.PI / 2, 0, 0] }).document;
-    const svgB = renderSvg(docB, 'front');
-
-    const bboxA = svgPolygonBbox(svgA)!;
-    const bboxB = svgPolygonBbox(svgB)!;
-
-    // The height of the projected shape must change substantially with a 90° rotation.
-    expect(Math.abs(bboxHeight(bboxA) - bboxHeight(bboxB))).toBeGreaterThan(10);
+    const { a, b } = frontPair('add_cylinder', cyl);
+    expect(Math.abs(bboxHeight(a) - bboxHeight(b))).toBeGreaterThan(10);
   });
 });
 
@@ -151,44 +158,25 @@ describe('render_view rotation — cylinder', () => {
 // ---------------------------------------------------------------------------
 
 describe('render_view rotation — box', () => {
+  const slim = { size: [1, 1, 4] };
+
   it('unrotated box [1,1,4] front view is taller than wide', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 4], position: [0, 0, 0] }).document;
-    const svg = renderSvg(doc, 'front');
-    const bbox = svgPolygonBbox(svg);
+    const { bbox } = renderSolid('add_box', slim);
     expect(bbox).not.toBeNull();
     expect(bboxHeight(bbox!)).toBeGreaterThan(bboxWidth(bbox!));
   });
 
   it('box [1,1,4] rotated [π/2,0,0] front view is no longer taller than wide', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 4], position: [0, 0, 0] }).document;
-    const id = doc.order[0]!;
-    doc = execute(doc, 'rotate_entity', { id, delta: [Math.PI / 2, 0, 0] }).document;
-    const svg = renderSvg(doc, 'front');
-    const bbox = svgPolygonBbox(svg);
+    const { bbox } = renderSolid('add_box', slim, QUARTER_X);
     expect(bbox).not.toBeNull();
-    // After rotation the long axis is now into the camera; screen shape is ~square
-    // width (1 unit) ≈ height (1 unit), both much less than original 4-unit height.
+    // Long axis is now into the camera; screen shape is ~square.
     expect(bboxWidth(bbox!)).toBeGreaterThan(0);
-    // No longer taller than wide (or equal within 20%)
     expect(bboxHeight(bbox!) / bboxWidth(bbox!)).toBeLessThan(1.5);
   });
 
   it('rotated bbox differs from unrotated bbox', () => {
-    let docA = createEmptyDocument();
-    docA = execute(docA, 'add_box', { size: [1, 1, 4], position: [0, 0, 0] }).document;
-    const svgA = renderSvg(docA, 'front');
-
-    let docB = createEmptyDocument();
-    docB = execute(docB, 'add_box', { size: [1, 1, 4], position: [0, 0, 0] }).document;
-    const idB = docB.order[0]!;
-    docB = execute(docB, 'rotate_entity', { id: idB, delta: [Math.PI / 2, 0, 0] }).document;
-    const svgB = renderSvg(docB, 'front');
-
-    const bboxA = svgPolygonBbox(svgA)!;
-    const bboxB = svgPolygonBbox(svgB)!;
-    expect(Math.abs(bboxHeight(bboxA) - bboxHeight(bboxB))).toBeGreaterThan(10);
+    const { a, b } = frontPair('add_box', slim);
+    expect(Math.abs(bboxHeight(a) - bboxHeight(b))).toBeGreaterThan(10);
   });
 });
 
@@ -202,32 +190,8 @@ describe('render_view rotation — box', () => {
 
 describe('render_view rotation — torus', () => {
   it('torus rotated [π/2,0,0] produces different bbox from unrotated torus', () => {
-    let docA = createEmptyDocument();
-    docA = execute(docA, 'add_torus', {
-      ringRadius: 2,
-      tubeRadius: 0.5,
-      position: [0, 0, 0],
-    }).document;
-    const svgA = renderSvg(docA, 'front');
-
-    let docB = createEmptyDocument();
-    docB = execute(docB, 'add_torus', {
-      ringRadius: 2,
-      tubeRadius: 0.5,
-      position: [0, 0, 0],
-    }).document;
-    const idB = docB.order[0]!;
-    docB = execute(docB, 'rotate_entity', { id: idB, delta: [Math.PI / 2, 0, 0] }).document;
-    const svgB = renderSvg(docB, 'front');
-
-    const bboxA = svgPolygonBbox(svgA);
-    const bboxB = svgPolygonBbox(svgB);
-    expect(bboxA).not.toBeNull();
-    expect(bboxB).not.toBeNull();
-    // The screen extents must change when the torus is rotated 90° around X.
-    const heightA = bboxHeight(bboxA!);
-    const heightB = bboxHeight(bboxB!);
-    expect(Math.abs(heightA - heightB)).toBeGreaterThan(5);
+    const { a, b } = frontPair('add_torus', { ringRadius: 2, tubeRadius: 0.5 });
+    expect(Math.abs(bboxHeight(a) - bboxHeight(b))).toBeGreaterThan(5);
   });
 });
 
@@ -241,19 +205,8 @@ describe('render_view rotation — torus', () => {
 
 describe('render_view rotation — cone', () => {
   it('cone rotated [π/2,0,0] has different front-view height than unrotated', () => {
-    let docA = createEmptyDocument();
-    docA = execute(docA, 'add_cone', { radius: 1, height: 4, position: [0, 0, 0] }).document;
-    const svgA = renderSvg(docA, 'front');
-
-    let docB = createEmptyDocument();
-    docB = execute(docB, 'add_cone', { radius: 1, height: 4, position: [0, 0, 0] }).document;
-    const idB = docB.order[0]!;
-    docB = execute(docB, 'rotate_entity', { id: idB, delta: [Math.PI / 2, 0, 0] }).document;
-    const svgB = renderSvg(docB, 'front');
-
-    const bboxA = svgPolygonBbox(svgA)!;
-    const bboxB = svgPolygonBbox(svgB)!;
-    expect(Math.abs(bboxHeight(bboxA) - bboxHeight(bboxB))).toBeGreaterThan(10);
+    const { a, b } = frontPair('add_cone', { radius: 1, height: 4 });
+    expect(Math.abs(bboxHeight(a) - bboxHeight(b))).toBeGreaterThan(10);
   });
 });
 
@@ -262,35 +215,13 @@ describe('render_view rotation — cone', () => {
 // ---------------------------------------------------------------------------
 
 describe('render_view rotation — zero rotation is a no-op', () => {
-  it('cylinder with rotation [0,0,0] produces identical SVG to default (no rotation)', () => {
-    // Both docs are created fresh with the same id counter state — they produce
-    // the same entity id, same geometry, same SVG.
-    let docA = createEmptyDocument();
-    docA = execute(docA, 'add_cylinder', { radius: 1, height: 2, position: [0, 0, 0] }).document;
-    const svgA = renderSvg(docA, 'iso');
-
-    let docB = createEmptyDocument();
-    docB = execute(docB, 'add_cylinder', { radius: 1, height: 2, position: [0, 0, 0] }).document;
-    const idB = docB.order[0]!;
-    // Explicitly set rotation to [0,0,0] — should be same as default
-    docB = execute(docB, 'rotate_entity', { id: idB, delta: [0, 0, 0] }).document;
-    const svgB = renderSvg(docB, 'iso');
-
-    expect(svgA).toBe(svgB);
-  });
-
-  it('box with rotation [0,0,0] produces identical SVG to default', () => {
-    let docA = createEmptyDocument();
-    docA = execute(docA, 'add_box', { size: [2, 3, 4], position: [0, 0, 0] }).document;
-    const svgA = renderSvg(docA, 'iso');
-
-    let docB = createEmptyDocument();
-    docB = execute(docB, 'add_box', { size: [2, 3, 4], position: [0, 0, 0] }).document;
-    const idB = docB.order[0]!;
-    docB = execute(docB, 'rotate_entity', { id: idB, delta: [0, 0, 0] }).document;
-    const svgB = renderSvg(docB, 'iso');
-
-    expect(svgA).toBe(svgB);
+  it.each([
+    ['cylinder', 'add_cylinder', { radius: 1, height: 2 }],
+    ['box', 'add_box', { size: [2, 3, 4] }],
+  ])('%s with rotation [0,0,0] produces identical SVG to default', (_kind, command, params) => {
+    const plain = renderSolid(command, params, undefined, 'iso').svg;
+    const zeroRotated = renderSolid(command, params, [0, 0, 0], 'iso').svg;
+    expect(plain).toBe(zeroRotated);
   });
 });
 
@@ -300,50 +231,16 @@ describe('render_view rotation — zero rotation is a no-op', () => {
 
 describe('render_view rotation — pyramid', () => {
   it('pyramid rotated [π/2,0,0] has different front-view bbox than unrotated', () => {
-    let docA = createEmptyDocument();
-    docA = execute(docA, 'add_pyramid', {
-      baseWidth: 2,
-      baseDepth: 2,
-      height: 4,
-      position: [0, 0, 0],
-    }).document;
-    const svgA = renderSvg(docA, 'front');
-
-    let docB = createEmptyDocument();
-    docB = execute(docB, 'add_pyramid', {
-      baseWidth: 2,
-      baseDepth: 2,
-      height: 4,
-      position: [0, 0, 0],
-    }).document;
-    const idB = docB.order[0]!;
-    docB = execute(docB, 'rotate_entity', { id: idB, delta: [Math.PI / 2, 0, 0] }).document;
-    const svgB = renderSvg(docB, 'front');
-
-    const bboxA = svgPolygonBbox(svgA)!;
-    const bboxB = svgPolygonBbox(svgB)!;
-    expect(Math.abs(bboxHeight(bboxA) - bboxHeight(bboxB))).toBeGreaterThan(5);
+    const { a, b } = frontPair('add_pyramid', { baseWidth: 2, baseDepth: 2, height: 4 });
+    expect(Math.abs(bboxHeight(a) - bboxHeight(b))).toBeGreaterThan(5);
   });
 });
 
 describe('render_view rotation — wedge', () => {
   it('wedge rotated [0,0,π/2] has different front-view bbox than unrotated', () => {
-    let docA = createEmptyDocument();
-    docA = execute(docA, 'add_wedge', { size: [1, 4, 1], position: [0, 0, 0] }).document;
-    const svgA = renderSvg(docA, 'front');
-
-    let docB = createEmptyDocument();
-    docB = execute(docB, 'add_wedge', { size: [1, 4, 1], position: [0, 0, 0] }).document;
-    const idB = docB.order[0]!;
-    docB = execute(docB, 'rotate_entity', { id: idB, delta: [0, 0, Math.PI / 2] }).document;
-    const svgB = renderSvg(docB, 'front');
-
-    const bboxA = svgPolygonBbox(svgA);
-    const bboxB = svgPolygonBbox(svgB);
-    expect(bboxA).not.toBeNull();
-    expect(bboxB).not.toBeNull();
+    const { a, b } = frontPair('add_wedge', { size: [1, 4, 1] }, [0, 0, Math.PI / 2]);
     // After rotating about Z, what was along Y now points along X — bboxes differ
-    expect(Math.abs(bboxWidth(bboxA!) - bboxWidth(bboxB!))).toBeGreaterThan(5);
+    expect(Math.abs(bboxWidth(a) - bboxWidth(b))).toBeGreaterThan(5);
   });
 });
 
@@ -424,12 +321,7 @@ describe('applyEulerXYZ — compound rotation math (convention discriminator)', 
 
 describe('render_view rotation — compound-rotation end-to-end (convention discriminator)', () => {
   it('thin box [100,4,4] rotated [π/2, π/2, 0]: front-view appears nearly square (long axis into depth)', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [100, 4, 4], position: [0, 0, 0] }).document;
-    const id = doc.order[0]!;
-    doc = execute(doc, 'rotate_entity', { id, delta: [Math.PI / 2, Math.PI / 2, 0] }).document;
-    const svg = renderSvg(doc, 'front');
-    const bbox = svgPolygonBbox(svg);
+    const { bbox } = renderSolid('add_box', { size: [100, 4, 4] }, [Math.PI / 2, Math.PI / 2, 0]);
     expect(bbox).not.toBeNull();
     const w = bboxWidth(bbox!);
     const h = bboxHeight(bbox!);

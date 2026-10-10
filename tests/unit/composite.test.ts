@@ -85,153 +85,46 @@ function expectClose(actual: Vec3, expected: Vec3, eps = 1e-6, label = ''): void
 // ---------------------------------------------------------------------------
 
 describe('make_tube_between', () => {
-  // --- Happy paths: axis-aligned directions ---
-
-  it('axis +X: tube from [0,0,0] to [10,0,0] has correct endpoints', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'make_tube_between', {
-      p1: [0, 0, 0],
-      p2: [10, 0, 0],
-      radius: 1,
-    });
+  /** Create the tube and return its endpoints as recovered from the stored transform. */
+  function tubeEndpoints(
+    p1: Vec3,
+    p2: Vec3,
+    radius: number,
+  ): { e: { position: Vec3; rotation: Vec3; height: number }; p1End: Vec3; p2End: Vec3 } {
+    const result = execute(createEmptyDocument(), 'make_tube_between', { p1, p2, radius });
     expect(result.affected).toHaveLength(1);
-    const id = result.affected[0]!;
-    const e = result.document.entities[id] as { position: Vec3; rotation: Vec3; height: number };
-    const { p1End, p2End } = cylinderEndpoint(e.position, e.rotation, e.height);
-    expectClose(p1End, [0, 0, 0], 1e-6, '+X p1');
-    expectClose(p2End, [10, 0, 0], 1e-6, '+X p2');
-  });
+    const e = result.document.entities[result.affected[0]!] as {
+      position: Vec3;
+      rotation: Vec3;
+      height: number;
+    };
+    return { e, ...cylinderEndpoint(e.position, e.rotation, e.height) };
+  }
 
-  it('axis -X: tube from [5,0,0] to [-5,0,0] has correct endpoints', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'make_tube_between', {
-      p1: [5, 0, 0],
-      p2: [-5, 0, 0],
-      radius: 2,
-    });
-    const id = result.affected[0]!;
-    const e = result.document.entities[id] as { position: Vec3; rotation: Vec3; height: number };
-    const { p1End, p2End } = cylinderEndpoint(e.position, e.rotation, e.height);
-    expectClose(p1End, [5, 0, 0], 1e-6, '-X p1');
-    expectClose(p2End, [-5, 0, 0], 1e-6, '-X p2');
-  });
+  // --- Happy paths: axis-aligned, diagonal and offset directions ---
 
-  it('axis +Y: tube from [0,0,0] to [0,7,0] has correct endpoints', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'make_tube_between', {
-      p1: [0, 0, 0],
-      p2: [0, 7, 0],
-      radius: 1,
-    });
-    const id = result.affected[0]!;
-    const e = result.document.entities[id] as { position: Vec3; rotation: Vec3; height: number };
-    const { p1End, p2End } = cylinderEndpoint(e.position, e.rotation, e.height);
-    expectClose(p1End, [0, 0, 0], 1e-6, '+Y p1');
-    expectClose(p2End, [0, 7, 0], 1e-6, '+Y p2');
-  });
-
-  it('axis -Y: tube from [0,3,0] to [0,-3,0] has correct endpoints', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'make_tube_between', {
-      p1: [0, 3, 0],
-      p2: [0, -3, 0],
-      radius: 1,
-    });
-    const id = result.affected[0]!;
-    const e = result.document.entities[id] as { position: Vec3; rotation: Vec3; height: number };
-    const { p1End, p2End } = cylinderEndpoint(e.position, e.rotation, e.height);
-    expectClose(p1End, [0, 3, 0], 1e-6, '-Y p1');
-    expectClose(p2End, [0, -3, 0], 1e-6, '-Y p2');
+  it.each<[string, Vec3, Vec3, number]>([
+    ['axis +X', [0, 0, 0], [10, 0, 0], 1],
+    ['axis -X', [5, 0, 0], [-5, 0, 0], 2],
+    ['axis +Y', [0, 0, 0], [0, 7, 0], 1],
+    ['axis -Y', [0, 3, 0], [0, -3, 0], 1],
+    ['axis -Z (antiparallel edge case)', [0, 0, 4], [0, 0, -4], 1],
+    ['diagonal XY plane', [0, 0, 0], [1, 1, 0], 0.5],
+    ['diagonal XZ plane', [0, 0, 0], [1, 0, 1], 0.5],
+    ['fully 3D', [0, 0, 0], [1, 1, 1], 0.25],
+    ['non-origin start', [10, 20, 30], [13, 24, 30], 1],
+  ])('%s: tube has correct endpoints', (label, p1, p2, radius) => {
+    const { p1End, p2End } = tubeEndpoints(p1, p2, radius);
+    expectClose(p1End, p1, 1e-6, `${label} p1`);
+    expectClose(p2End, p2, 1e-6, `${label} p2`);
   });
 
   it('axis +Z: tube from [0,0,0] to [0,0,5] has correct endpoints (identity rotation)', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'make_tube_between', {
-      p1: [0, 0, 0],
-      p2: [0, 0, 5],
-      radius: 1,
-    });
-    const id = result.affected[0]!;
-    const e = result.document.entities[id] as { position: Vec3; rotation: Vec3; height: number };
+    const { e, p1End, p2End } = tubeEndpoints([0, 0, 0], [0, 0, 5], 1);
     // rotation must be identity for +Z alignment
-    expect(e.rotation[0]).toBeCloseTo(0, 9);
-    expect(e.rotation[1]).toBeCloseTo(0, 9);
-    expect(e.rotation[2]).toBeCloseTo(0, 9);
-    const { p1End, p2End } = cylinderEndpoint(e.position, e.rotation, e.height);
+    for (const angle of e.rotation) expect(angle).toBeCloseTo(0, 9);
     expectClose(p1End, [0, 0, 0], 1e-6, '+Z p1');
     expectClose(p2End, [0, 0, 5], 1e-6, '+Z p2');
-  });
-
-  it('axis -Z: tube from [0,0,4] to [0,0,-4] has correct endpoints (antiparallel edge case)', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'make_tube_between', {
-      p1: [0, 0, 4],
-      p2: [0, 0, -4],
-      radius: 1,
-    });
-    const id = result.affected[0]!;
-    const e = result.document.entities[id] as { position: Vec3; rotation: Vec3; height: number };
-    const { p1End, p2End } = cylinderEndpoint(e.position, e.rotation, e.height);
-    expectClose(p1End, [0, 0, 4], 1e-6, '-Z p1');
-    expectClose(p2End, [0, 0, -4], 1e-6, '-Z p2');
-  });
-
-  // --- Happy paths: diagonal directions ---
-
-  it('diagonal XY plane: tube from [0,0,0] to [1,1,0] has correct endpoints', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'make_tube_between', {
-      p1: [0, 0, 0],
-      p2: [1, 1, 0],
-      radius: 0.5,
-    });
-    const id = result.affected[0]!;
-    const e = result.document.entities[id] as { position: Vec3; rotation: Vec3; height: number };
-    const { p1End, p2End } = cylinderEndpoint(e.position, e.rotation, e.height);
-    expectClose(p1End, [0, 0, 0], 1e-6, 'XY p1');
-    expectClose(p2End, [1, 1, 0], 1e-6, 'XY p2');
-  });
-
-  it('diagonal XZ plane: tube from [0,0,0] to [1,0,1] has correct endpoints', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'make_tube_between', {
-      p1: [0, 0, 0],
-      p2: [1, 0, 1],
-      radius: 0.5,
-    });
-    const id = result.affected[0]!;
-    const e = result.document.entities[id] as { position: Vec3; rotation: Vec3; height: number };
-    const { p1End, p2End } = cylinderEndpoint(e.position, e.rotation, e.height);
-    expectClose(p1End, [0, 0, 0], 1e-6, 'XZ p1');
-    expectClose(p2End, [1, 0, 1], 1e-6, 'XZ p2');
-  });
-
-  it('fully 3D: tube from [0,0,0] to [1,1,1] has correct endpoints', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'make_tube_between', {
-      p1: [0, 0, 0],
-      p2: [1, 1, 1],
-      radius: 0.25,
-    });
-    const id = result.affected[0]!;
-    const e = result.document.entities[id] as { position: Vec3; rotation: Vec3; height: number };
-    const { p1End, p2End } = cylinderEndpoint(e.position, e.rotation, e.height);
-    expectClose(p1End, [0, 0, 0], 1e-6, '3D p1');
-    expectClose(p2End, [1, 1, 1], 1e-6, '3D p2');
-  });
-
-  it('non-origin start: tube from [10,20,30] to [13,24,30] has correct endpoints', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'make_tube_between', {
-      p1: [10, 20, 30],
-      p2: [13, 24, 30],
-      radius: 1,
-    });
-    const id = result.affected[0]!;
-    const e = result.document.entities[id] as { position: Vec3; rotation: Vec3; height: number };
-    const { p1End, p2End } = cylinderEndpoint(e.position, e.rotation, e.height);
-    expectClose(p1End, [10, 20, 30], 1e-6, 'offset p1');
-    expectClose(p2End, [13, 24, 30], 1e-6, 'offset p2');
   });
 
   // --- Entity properties ---
@@ -284,63 +177,17 @@ describe('make_tube_between', () => {
 
   // --- Failure paths ---
 
-  it('radius <= 0: no-op, affected:[], descriptive summary', () => {
+  it.each<[string, Record<string, unknown>, string[]]>([
+    ['radius <= 0', { p1: [0, 0, 0], p2: [1, 0, 0], radius: 0 }, ['radius', '0']],
+    ['negative radius', { p1: [0, 0, 0], p2: [1, 0, 0], radius: -5 }, []],
+    ['p1 === p2 (degenerate)', { p1: [3, 4, 5], p2: [3, 4, 5], radius: 1 }, ['same point']],
+    ['non-array p1', { p1: 'not-an-array', p2: [1, 0, 0], radius: 1 }, ['p1']],
+    ['non-array p2', { p1: [0, 0, 0], p2: null, radius: 1 }, []],
+  ])('%s: no-op, affected:[], descriptive summary', (_label, params, summaryParts) => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'make_tube_between', {
-      p1: [0, 0, 0],
-      p2: [1, 0, 0],
-      radius: 0,
-    });
+    const result = execute(doc, 'make_tube_between', params);
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
-    expect(result.summary).toContain('radius');
-    expect(result.summary).toContain('0');
-  });
-
-  it('negative radius: no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'make_tube_between', {
-      p1: [0, 0, 0],
-      p2: [1, 0, 0],
-      radius: -5,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('p1 === p2 (degenerate): no-op, affected:[], descriptive summary', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'make_tube_between', {
-      p1: [3, 4, 5],
-      p2: [3, 4, 5],
-      radius: 1,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('same point');
-  });
-
-  it('non-array p1: no-op, affected:[], descriptive summary', () => {
-    const doc = createEmptyDocument();
-    // Cast to any to simulate a bad agent call
-    const result = execute(doc, 'make_tube_between', {
-      p1: 'not-an-array' as unknown as [number, number, number],
-      p2: [1, 0, 0],
-      radius: 1,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('p1');
-  });
-
-  it('non-array p2: no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'make_tube_between', {
-      p1: [0, 0, 0],
-      p2: null as unknown as [number, number, number],
-      radius: 1,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
+    for (const part of summaryParts) expect(result.summary).toContain(part);
   });
 });

@@ -1,122 +1,43 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
-import type {
-  CircleEntity,
-  RectangleEntity,
-  PolylineEntity,
-  LineEntity,
-  ExtrusionEntity,
-  RevolutionEntity,
-} from '@core/model/types';
+import type { Entity, ExtrusionEntity, RevolutionEntity } from '@core/model/types';
 import { DEFAULT_LAYER_ID } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 
-// ---------------------------------------------------------------------------
-// helpers — build minimal 2D entities directly in doc for test setup
-// (entities are constructed here only for test fixture setup, not production)
-// ---------------------------------------------------------------------------
+type Doc = ReturnType<typeof createEmptyDocument>;
 
-function docWithCircle(): { doc: ReturnType<typeof createEmptyDocument>; id: string } {
+/** Doc holding one 2D fixture entity (built here only as test setup, not production). */
+function docWith(id: string, shape: Record<string, unknown>): { doc: Doc; id: string } {
   const base = createEmptyDocument();
-  const id = 'circle-1';
-  const entity: CircleEntity = {
+  const entity = {
     id,
-    kind: 'circle',
-    center: [0, 0],
-    radius: 5,
-    position: [1, 2, 0],
-    rotation: [0, 0, 0],
-    layerId: DEFAULT_LAYER_ID,
-    color: '#ffffff',
-  };
-  return {
-    doc: { ...base, entities: { ...base.entities, [id]: entity }, order: [id] },
-    id,
-  };
-}
-
-function docWithRectangle(): { doc: ReturnType<typeof createEmptyDocument>; id: string } {
-  const base = createEmptyDocument();
-  const id = 'rect-1';
-  const entity: RectangleEntity = {
-    id,
-    kind: 'rectangle',
-    width: 4,
-    height: 3,
     position: [0, 0, 0],
     rotation: [0, 0, 0],
     layerId: DEFAULT_LAYER_ID,
     color: '#ffffff',
-  };
-  return {
-    doc: { ...base, entities: { ...base.entities, [id]: entity }, order: [id] },
-    id,
-  };
+    ...shape,
+  } as unknown as Entity;
+  return { doc: { ...base, entities: { ...base.entities, [id]: entity }, order: [id] }, id };
 }
 
-function docWithClosedPolyline(): { doc: ReturnType<typeof createEmptyDocument>; id: string } {
-  const base = createEmptyDocument();
-  const id = 'poly-1';
-  const entity: PolylineEntity = {
-    id,
-    kind: 'polyline',
-    points: [
-      [0, 0],
-      [10, 0],
-      [5, 8],
-    ],
-    closed: true,
-    position: [0, 0, 0],
-    rotation: [0, 0, 0],
-    layerId: DEFAULT_LAYER_ID,
-    color: '#ffffff',
-  };
-  return {
-    doc: { ...base, entities: { ...base.entities, [id]: entity }, order: [id] },
-    id,
-  };
-}
+const TRI_POINTS = [
+  [0, 0],
+  [10, 0],
+  [5, 8],
+];
+const docWithCircle = (): { doc: Doc; id: string } =>
+  docWith('circle-1', { kind: 'circle', center: [0, 0], radius: 5, position: [1, 2, 0] });
+const docWithRectangle = (): { doc: Doc; id: string } =>
+  docWith('rect-1', { kind: 'rectangle', width: 4, height: 3 });
+const docWithPolyline = (closed: boolean, id: string): { doc: Doc; id: string } =>
+  docWith(id, { kind: 'polyline', points: TRI_POINTS, closed });
+const docWithLine = (): { doc: Doc; id: string } =>
+  docWith('line-1', { kind: 'line', start: [0, 0], end: [5, 5] });
 
-function docWithOpenPolyline(): { doc: ReturnType<typeof createEmptyDocument>; id: string } {
-  const base = createEmptyDocument();
-  const id = 'poly-open-1';
-  const entity: PolylineEntity = {
-    id,
-    kind: 'polyline',
-    points: [
-      [0, 0],
-      [10, 0],
-      [5, 8],
-    ],
-    closed: false,
-    position: [0, 0, 0],
-    rotation: [0, 0, 0],
-    layerId: DEFAULT_LAYER_ID,
-    color: '#ffffff',
-  };
-  return {
-    doc: { ...base, entities: { ...base.entities, [id]: entity }, order: [id] },
-    id,
-  };
-}
-
-function docWithLine(): { doc: ReturnType<typeof createEmptyDocument>; id: string } {
-  const base = createEmptyDocument();
-  const id = 'line-1';
-  const entity: LineEntity = {
-    id,
-    kind: 'line',
-    start: [0, 0],
-    end: [5, 5],
-    position: [0, 0, 0],
-    rotation: [0, 0, 0],
-    layerId: DEFAULT_LAYER_ID,
-    color: '#ffffff',
-  };
-  return {
-    doc: { ...base, entities: { ...base.entities, [id]: entity }, order: [id] },
-    id,
-  };
+function expectNoOp(result: ReturnType<typeof execute>, doc: Doc, summary?: string): void {
+  expect(result.affected).toHaveLength(0);
+  expect(result.document).toBe(doc);
+  if (summary) expect(result.summary).toContain(summary);
 }
 
 // ---------------------------------------------------------------------------
@@ -142,20 +63,16 @@ describe('extrude_sketch', () => {
   it('circle extrude: source circle remains in document', () => {
     const { doc, id } = docWithCircle();
     const result = execute(doc, 'extrude_sketch', { id, depth: 5 });
-    // original circle still present
     expect(result.document.entities[id]).toBeDefined();
     expect(result.document.entities[id]!.kind).toBe('circle');
   });
 
   it('circle extrude: profile points lie on the correct radius', () => {
     const { doc, id } = docWithCircle();
-    // circle center=[0,0] radius=5
     const result = execute(doc, 'extrude_sketch', { id, depth: 2 });
-    const extId = result.affected[0]!;
-    const ext = result.document.entities[extId] as ExtrusionEntity;
+    const ext = result.document.entities[result.affected[0]!] as ExtrusionEntity;
     for (const [x, y] of ext.profile) {
-      const r = Math.sqrt(x * x + y * y);
-      expect(r).toBeCloseTo(5, 5);
+      expect(Math.sqrt(x * x + y * y)).toBeCloseTo(5, 5);
     }
   });
 
@@ -164,44 +81,36 @@ describe('extrude_sketch', () => {
     const result = execute(doc, 'extrude_sketch', { id, depth: 3 });
 
     expect(result.affected).toHaveLength(1);
-    const extId = result.affected[0]!;
-    const ext = result.document.entities[extId] as ExtrusionEntity;
+    const ext = result.document.entities[result.affected[0]!] as ExtrusionEntity;
     expect(ext.kind).toBe('extrusion');
-    expect(ext.profile).toHaveLength(4);
     expect(ext.depth).toBe(3);
     // lower-left origin: corners should be (0,0),(4,0),(4,3),(0,3)
-    expect(ext.profile[0]).toEqual([0, 0]);
-    expect(ext.profile[1]).toEqual([4, 0]);
-    expect(ext.profile[2]).toEqual([4, 3]);
-    expect(ext.profile[3]).toEqual([0, 3]);
+    expect(ext.profile).toEqual([
+      [0, 0],
+      [4, 0],
+      [4, 3],
+      [0, 3],
+    ]);
   });
 
   it('closed polyline → creates an extrusion with the polyline points', () => {
-    const { doc, id } = docWithClosedPolyline();
+    const { doc, id } = docWithPolyline(true, 'poly-1');
     const result = execute(doc, 'extrude_sketch', { id, depth: 7 });
 
     expect(result.affected).toHaveLength(1);
-    const extId = result.affected[0]!;
-    const ext = result.document.entities[extId] as ExtrusionEntity;
+    const ext = result.document.entities[result.affected[0]!] as ExtrusionEntity;
     expect(ext.kind).toBe('extrusion');
-    expect(ext.profile).toHaveLength(3);
-    expect(ext.profile[0]).toEqual([0, 0]);
-    expect(ext.profile[1]).toEqual([10, 0]);
-    expect(ext.profile[2]).toEqual([5, 8]);
+    expect(ext.profile).toEqual(TRI_POINTS);
     expect(ext.depth).toBe(7);
   });
 
-  it('is pure — input document is never mutated (circle)', () => {
-    const { doc } = docWithCircle();
+  it.each([
+    ['circle', docWithCircle],
+    ['rectangle', docWithRectangle],
+  ])('is pure — input document is never mutated (%s)', (_label, make) => {
+    const { doc, id } = make();
     const snapshot = JSON.stringify(doc);
-    execute(doc, 'extrude_sketch', { id: 'circle-1', depth: 5 });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('is pure — input document is never mutated (rectangle)', () => {
-    const { doc } = docWithRectangle();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'extrude_sketch', { id: 'rect-1', depth: 5 });
+    execute(doc, 'extrude_sketch', { id, depth: 5 });
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 
@@ -209,65 +118,38 @@ describe('extrude_sketch', () => {
 
   it('missing id → graceful no-op', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'extrude_sketch', { id: 'nonexistent', depth: 5 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('nonexistent');
+    expectNoOp(execute(doc, 'extrude_sketch', { id: 'nonexistent', depth: 5 }), doc, 'nonexistent');
   });
 
-  it('depth <= 0 → graceful no-op', () => {
+  it.each([
+    ['depth <= 0', 0, 'depth'],
+    ['negative depth', -1, undefined],
+  ])('%s → graceful no-op', (_label, depth, summary) => {
     const { doc, id } = docWithCircle();
-    const result = execute(doc, 'extrude_sketch', { id, depth: 0 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('depth');
-  });
-
-  it('negative depth → graceful no-op', () => {
-    const { doc, id } = docWithCircle();
-    const result = execute(doc, 'extrude_sketch', { id, depth: -1 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
+    expectNoOp(execute(doc, 'extrude_sketch', { id, depth }), doc, summary);
   });
 
   it('line entity → graceful no-op (not a closed profile)', () => {
     const { doc, id } = docWithLine();
-    const result = execute(doc, 'extrude_sketch', { id, depth: 5 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('not a closed 2D profile');
+    expectNoOp(execute(doc, 'extrude_sketch', { id, depth: 5 }), doc, 'not a closed 2D profile');
   });
 
   it('open polyline → graceful no-op', () => {
-    const { doc, id } = docWithOpenPolyline();
-    const result = execute(doc, 'extrude_sketch', { id, depth: 5 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('not closed');
+    const { doc, id } = docWithPolyline(false, 'poly-open-1');
+    expectNoOp(execute(doc, 'extrude_sketch', { id, depth: 5 }), doc, 'not closed');
   });
 
   it('closed polyline with < 3 points → graceful no-op', () => {
-    // Build a 2-point closed polyline directly (degenerate profile)
-    const base = createEmptyDocument();
-    const id = 'poly-short';
-    const entity: PolylineEntity = {
-      id,
+    const { doc, id } = docWith('poly-short', {
       kind: 'polyline',
       points: [
         [0, 0],
         [5, 0],
       ],
       closed: true,
-      position: [0, 0, 0],
-      rotation: [0, 0, 0],
-      layerId: DEFAULT_LAYER_ID,
-      color: '#ffffff',
-    };
-    const doc = { ...base, entities: { ...base.entities, [id]: entity }, order: [id] };
+    });
     const result = execute(doc, 'extrude_sketch', { id, depth: 5 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('fewer than 3 points');
+    expectNoOp(result, doc, 'fewer than 3 points');
   });
 });
 
@@ -416,82 +298,27 @@ describe('revolve_profile', () => {
 
   // ── failure paths ──────────────────────────────────────────────────────────
 
-  it('profile with < 3 points → graceful no-op', () => {
+  it.each<[string, Record<string, unknown>, string?]>([
+    [
+      'profile with < 3 points',
+      {
+        profile: [
+          [1, 0],
+          [2, 1],
+        ],
+      },
+      'at least 3',
+    ],
+    ['empty profile array', { profile: [] }],
+    ['non-array profile', { profile: 'bad' }],
+    ['angle = 0', { profile: TRI_PROFILE, angle: 0 }, 'angle'],
+    ['negative angle', { profile: TRI_PROFILE, angle: -1 }],
+    ['non-finite angle', { profile: TRI_PROFILE, angle: Infinity }],
+    ['invalid axis string', { profile: TRI_PROFILE, axis: 'diagonal' }, 'axis'],
+    ['zero-length Vec3 axis', { profile: TRI_PROFILE, axis: [0, 0, 0] }],
+    ['non-array axis', { profile: TRI_PROFILE, axis: 42 }],
+  ])('%s → graceful no-op', (_label, params, summary) => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'revolve_profile', {
-      profile: [
-        [1, 0],
-        [2, 1],
-      ],
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('at least 3');
-  });
-
-  it('empty profile array → graceful no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'revolve_profile', { profile: [] });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('non-array profile → graceful no-op', () => {
-    const doc = createEmptyDocument();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result = execute(doc, 'revolve_profile', { profile: 'bad' as any });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('angle = 0 → graceful no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'revolve_profile', { profile: TRI_PROFILE, angle: 0 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('angle');
-  });
-
-  it('negative angle → graceful no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'revolve_profile', { profile: TRI_PROFILE, angle: -1 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('non-finite angle → graceful no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'revolve_profile', { profile: TRI_PROFILE, angle: Infinity });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('invalid axis string → graceful no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'revolve_profile', {
-      profile: TRI_PROFILE,
-      axis: 'diagonal',
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('axis');
-  });
-
-  it('zero-length Vec3 axis → graceful no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'revolve_profile', {
-      profile: TRI_PROFILE,
-      axis: [0, 0, 0],
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('non-array axis → graceful no-op', () => {
-    const doc = createEmptyDocument();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result = execute(doc, 'revolve_profile', { profile: TRI_PROFILE, axis: 42 as any });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
+    expectNoOp(execute(doc, 'revolve_profile', params), doc, summary);
   });
 });

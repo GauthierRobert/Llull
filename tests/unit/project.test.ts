@@ -25,16 +25,25 @@ interface BuildData {
   scene?: { entityCount: number };
 }
 
+const build = (
+  actions: unknown[],
+  extra: Record<string, unknown> = {},
+  doc = createEmptyDocument(),
+): {
+  result: ReturnType<typeof execute>;
+  data: BuildData;
+  doc: ReturnType<typeof createEmptyDocument>;
+} => {
+  const result = execute(doc, 'build_project', { ...extra, actions });
+  return { result, data: result.data as BuildData, doc };
+};
+
 describe('build_project — happy path', () => {
   it('runs a multi-step plan and reports each step', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'build_project', {
-      actions: [
-        { command: 'add_box', params: { size: [2, 2, 2] } },
-        { command: 'add_sphere', params: { radius: 1 } },
-      ],
-    });
-    const data = result.data as BuildData;
+    const { result, data } = build([
+      { command: 'add_box', params: { size: [2, 2, 2] } },
+      { command: 'add_sphere', params: { radius: 1 } },
+    ]);
 
     expect(data.ok).toBe(true);
     expect(data.stepCount).toBe(2);
@@ -46,14 +55,10 @@ describe('build_project — happy path', () => {
   });
 
   it("resolves a $alias reference to an earlier step's created id", () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'build_project', {
-      actions: [
-        { command: 'add_box', params: { size: [1, 1, 1], position: [0, 0, 0] }, as: 'base' },
-        { command: 'move_entity', params: { id: '$base', delta: [5, 0, 0] } },
-      ],
-    });
-    const data = result.data as BuildData;
+    const { result, data } = build([
+      { command: 'add_box', params: { size: [1, 1, 1], position: [0, 0, 0] }, as: 'base' },
+      { command: 'move_entity', params: { id: '$base', delta: [5, 0, 0] } },
+    ]);
 
     expect(data.ok).toBe(true);
     const boxId = data.steps[0]!.affected[0]!;
@@ -61,29 +66,21 @@ describe('build_project — happy path', () => {
   });
 
   it('resolves $alias inside an array param (boolean ids)', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'build_project', {
-      actions: [
-        { command: 'add_box', params: { size: [2, 2, 2] }, as: 'a' },
-        { command: 'add_box', params: { size: [2, 2, 2], position: [1, 0, 0] }, as: 'b' },
-        { command: 'group_entities', params: { ids: ['$a', '$b'], name: 'Pair' } },
-      ],
-    });
-    const data = result.data as BuildData;
+    const { result, data } = build([
+      { command: 'add_box', params: { size: [2, 2, 2] }, as: 'a' },
+      { command: 'add_box', params: { size: [2, 2, 2], position: [1, 0, 0] }, as: 'b' },
+      { command: 'group_entities', params: { ids: ['$a', '$b'], name: 'Pair' } },
+    ]);
     expect(data.ok).toBe(true);
     expect(data.steps[2]!.ok).toBe(true);
     expect(Object.keys(result.document.groups)).toHaveLength(1);
   });
 
   it('supports $alias[N] indexing into affected ids', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'build_project', {
-      actions: [
-        { command: 'add_box', params: { size: [1, 1, 1] }, as: 'b' },
-        { command: 'move_entity', params: { id: '$b[0]', delta: [0, 2, 0] } },
-      ],
-    });
-    const data = result.data as BuildData;
+    const { result, data } = build([
+      { command: 'add_box', params: { size: [1, 1, 1] }, as: 'b' },
+      { command: 'move_entity', params: { id: '$b[0]', delta: [0, 2, 0] } },
+    ]);
     expect(data.ok).toBe(true);
     const boxId = data.steps[0]!.affected[0]!;
     expect(result.document.entities[boxId]!.position).toEqual([0, 2, 0]);
@@ -101,15 +98,11 @@ describe('build_project — happy path', () => {
 
 describe('build_project — abort (default) rolls back', () => {
   it('aborts on the first failing step and returns the input document unchanged', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'build_project', {
-      actions: [
-        { command: 'add_box', params: { size: [1, 1, 1] } },
-        { command: 'move_entity', params: { id: 'ghost', delta: [1, 0, 0] } }, // no-op → soft fail
-        { command: 'add_sphere', params: { radius: 1 } },
-      ],
-    });
-    const data = result.data as BuildData;
+    const { doc, result, data } = build([
+      { command: 'add_box', params: { size: [1, 1, 1] } },
+      { command: 'move_entity', params: { id: 'ghost', delta: [1, 0, 0] } }, // no-op → soft fail
+      { command: 'add_sphere', params: { radius: 1 } },
+    ]);
 
     expect(data.ok).toBe(false);
     expect(data.failedAt).toBe(1);
@@ -142,14 +135,10 @@ describe('build_project — abort (default) rolls back', () => {
   });
 
   it('aborts on an out-of-range alias index', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'build_project', {
-      actions: [
-        { command: 'add_box', params: { size: [1, 1, 1] }, as: 'b' },
-        { command: 'move_entity', params: { id: '$b[3]', delta: [1, 0, 0] } },
-      ],
-    });
-    const data = result.data as BuildData;
+    const { doc, result, data } = build([
+      { command: 'add_box', params: { size: [1, 1, 1] }, as: 'b' },
+      { command: 'move_entity', params: { id: '$b[3]', delta: [1, 0, 0] } },
+    ]);
     expect(data.failedAt).toBe(1);
     expect(data.steps[1]!.summary).toMatch(/no id at index 3/);
     expect(result.document).toBe(doc);
@@ -166,16 +155,14 @@ describe('build_project — abort (default) rolls back', () => {
 
 describe('build_project — continue mode', () => {
   it('applies the good steps and records the failures without rolling back', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'build_project', {
-      onError: 'continue',
-      actions: [
+    const { result, data } = build(
+      [
         { command: 'add_box', params: { size: [1, 1, 1] } },
         { command: 'move_entity', params: { id: 'ghost', delta: [1, 0, 0] } }, // soft fail
         { command: 'add_sphere', params: { radius: 2 } },
       ],
-    });
-    const data = result.data as BuildData;
+      { onError: 'continue' },
+    );
 
     expect(data.ok).toBe(false);
     expect(data.failedAt).toBeNull();
@@ -185,30 +172,22 @@ describe('build_project — continue mode', () => {
   });
 
   it('continues past an unknown command and a malformed action', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'build_project', {
-      onError: 'continue',
-      actions: [
-        { command: 'nope', params: {} },
-        42,
-        { command: 'add_box', params: { size: [1, 1, 1] } },
-      ],
-    });
-    const data = result.data as BuildData;
+    const { result, data } = build(
+      [{ command: 'nope', params: {} }, 42, { command: 'add_box', params: { size: [1, 1, 1] } }],
+      { onError: 'continue' },
+    );
     expect(data.steps.map((s) => s.ok)).toEqual([false, false, true]);
     expect(result.document.order).toHaveLength(1);
   });
 
   it('continues past an unresolvable alias', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'build_project', {
-      onError: 'continue',
-      actions: [
+    const { result, data } = build(
+      [
         { command: 'move_entity', params: { id: '$ghost', delta: [1, 0, 0] } },
         { command: 'add_box', params: { size: [1, 1, 1] } },
       ],
-    });
-    const data = result.data as BuildData;
+      { onError: 'continue' },
+    );
     expect(data.steps.map((s) => s.ok)).toEqual([false, true]);
     expect(result.document.order).toHaveLength(1);
   });

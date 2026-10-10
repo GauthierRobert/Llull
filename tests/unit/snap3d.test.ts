@@ -8,13 +8,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
-import type {
-  CadDocument,
-  BoxEntity,
-  CylinderEntity,
-  SphereEntity,
-  ExtrusionEntity,
-} from '@core/model/types';
+import type { CadDocument, CylinderEntity, Entity } from '@core/model/types';
 import { type SnapPoint3D, collectSnapCandidates3D, snap3d } from '../../src/ui/viewport/3d/snap3d';
 
 // ---------------------------------------------------------------------------
@@ -23,6 +17,18 @@ import { type SnapPoint3D, collectSnapCandidates3D, snap3d } from '../../src/ui/
 
 function emptyDoc(): CadDocument {
   return createEmptyDocument();
+}
+
+function docWith(id: string, shape: Record<string, unknown>): CadDocument {
+  const entity = {
+    id,
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+    layerId: 'layer-default',
+    color: '#ffffff',
+    ...shape,
+  } as unknown as Entity;
+  return { ...emptyDoc(), entities: { [id]: entity }, order: [id] };
 }
 
 function docWithBox(
@@ -34,17 +40,7 @@ function docWithBox(
   h: number,
   d: number,
 ): CadDocument {
-  const doc = emptyDoc();
-  const entity: BoxEntity = {
-    id,
-    kind: 'box',
-    size: [w, h, d],
-    position: [px, py, pz],
-    rotation: [0, 0, 0],
-    layerId: 'layer-default',
-    color: '#ffffff',
-  };
-  return { ...doc, entities: { [id]: entity }, order: [id] };
+  return docWith(id, { kind: 'box', size: [w, h, d], position: [px, py, pz] });
 }
 
 function docWithCylinder(
@@ -55,18 +51,7 @@ function docWithCylinder(
   radius: number,
   height: number,
 ): CadDocument {
-  const doc = emptyDoc();
-  const entity: CylinderEntity = {
-    id,
-    kind: 'cylinder',
-    radius,
-    height,
-    position: [px, py, pz],
-    rotation: [0, 0, 0],
-    layerId: 'layer-default',
-    color: '#ffffff',
-  };
-  return { ...doc, entities: { [id]: entity }, order: [id] };
+  return docWith(id, { kind: 'cylinder', radius, height, position: [px, py, pz] });
 }
 
 function docWithSphere(
@@ -76,23 +61,11 @@ function docWithSphere(
   pz: number,
   radius: number,
 ): CadDocument {
-  const doc = emptyDoc();
-  const entity: SphereEntity = {
-    id,
-    kind: 'sphere',
-    radius,
-    position: [px, py, pz],
-    rotation: [0, 0, 0],
-    layerId: 'layer-default',
-    color: '#ffffff',
-  };
-  return { ...doc, entities: { [id]: entity }, order: [id] };
+  return docWith(id, { kind: 'sphere', radius, position: [px, py, pz] });
 }
 
 function docWithExtrusion(id: string, px: number, py: number, pz: number): CadDocument {
-  const doc = emptyDoc();
-  const entity: ExtrusionEntity = {
-    id,
+  return docWith(id, {
     kind: 'extrusion',
     profile: [
       [0, 0],
@@ -102,11 +75,7 @@ function docWithExtrusion(id: string, px: number, py: number, pz: number): CadDo
     ],
     depth: 3,
     position: [px, py, pz],
-    rotation: [0, 0, 0],
-    layerId: 'layer-default',
-    color: '#ffffff',
-  };
-  return { ...doc, entities: { [id]: entity }, order: [id] };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -131,25 +100,13 @@ describe('collectSnapCandidates3D', () => {
     expect(candidates).toHaveLength(26);
   });
 
-  it('box candidates include all 8 corners as "vertex" type', () => {
-    const doc = docWithBox('b1', 0, 0, 0, 2, 2, 2);
-    const candidates = collectSnapCandidates3D(doc, undefined);
-    const vertices = candidates.filter((c) => c.type === 'vertex');
-    expect(vertices).toHaveLength(8);
-  });
-
-  it('box candidates include 6 face-centers', () => {
-    const doc = docWithBox('b1', 0, 0, 0, 2, 2, 2);
-    const candidates = collectSnapCandidates3D(doc, undefined);
-    const faceCenters = candidates.filter((c) => c.type === 'face-center');
-    expect(faceCenters).toHaveLength(6);
-  });
-
-  it('box candidates include 12 edge midpoints', () => {
-    const doc = docWithBox('b1', 0, 0, 0, 2, 2, 2);
-    const candidates = collectSnapCandidates3D(doc, undefined);
-    const edges = candidates.filter((c) => c.type === 'edge');
-    expect(edges).toHaveLength(12);
+  it.each([
+    ['vertex', 8, 'all 8 corners'],
+    ['face-center', 6, '6 face-centers'],
+    ['edge', 12, '12 edge midpoints'],
+  ])('box candidates of type "%s" number %i (%s)', (type, count) => {
+    const candidates = collectSnapCandidates3D(docWithBox('b1', 0, 0, 0, 2, 2, 2), undefined);
+    expect(candidates.filter((c) => c.type === type)).toHaveLength(count);
   });
 
   it('box at non-origin position has corners offset correctly', () => {
@@ -316,10 +273,13 @@ describe('snap3d', () => {
     expect(result).toMatchObject({ type: 'grid', snapped: true, x: 1, y: 3, z: 0 });
   });
 
-  it('snaps to vertex within tolerance', () => {
-    const candidates: SnapPoint3D[] = [makeVertex(5, 5, 5)];
-    const result = snap3d(5.3, 5.1, 4.9, candidates, TOLERANCE, GRID_STEP);
-    expect(result).toMatchObject({ type: 'vertex', snapped: true, x: 5, y: 5, z: 5 });
+  it.each<[SnapPoint3D['type'], [number, number, number], [number, number, number]]>([
+    ['vertex', [5, 5, 5], [5.3, 5.1, 4.9]],
+    ['edge', [3, 3, 3], [3.2, 3.1, 2.9]],
+    ['face-center', [2, 0, 2], [2.1, 0.1, 2.1]],
+  ])('snaps to %s within tolerance', (type, [x, y, z], cursor) => {
+    const result = snap3d(...cursor, [{ x, y, z, type }], TOLERANCE, GRID_STEP);
+    expect(result).toMatchObject({ type, snapped: true, x, y, z });
   });
 
   it('does not snap to vertex beyond tolerance', () => {
@@ -328,18 +288,6 @@ describe('snap3d', () => {
     const result = snap3d(5.4, 5.4, 5.4, candidates, TOLERANCE, GRID_STEP);
     // Distance = sqrt(3) * 0.4 ≈ 0.693 > 0.5 → grid snap instead.
     expect(result.type).toBe('grid');
-  });
-
-  it('snaps to edge within tolerance', () => {
-    const candidates: SnapPoint3D[] = [makeEdge(3, 3, 3)];
-    const result = snap3d(3.2, 3.1, 2.9, candidates, TOLERANCE, GRID_STEP);
-    expect(result).toMatchObject({ type: 'edge', snapped: true, x: 3, y: 3, z: 3 });
-  });
-
-  it('snaps to face-center within tolerance', () => {
-    const candidates: SnapPoint3D[] = [makeFaceCenter(2, 0, 2)];
-    const result = snap3d(2.1, 0.1, 2.1, candidates, TOLERANCE, GRID_STEP);
-    expect(result).toMatchObject({ type: 'face-center', snapped: true, x: 2, y: 0, z: 2 });
   });
 
   it('tolerance boundary: exactly at tolerance distance snaps', () => {

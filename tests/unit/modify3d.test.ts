@@ -60,6 +60,27 @@ function docWithLine(): { doc: CadDocument; lineId: string } {
 // Tests
 // ---------------------------------------------------------------------------
 
+const CASES = [
+  {
+    cmd: 'fillet_edge',
+    op: 'fillet',
+    key: 'radius',
+    size: 0.2,
+    other: 0.5,
+    mesh: FILLET_MESH,
+    edges: [0, 3, 7],
+  },
+  {
+    cmd: 'chamfer_edge',
+    op: 'chamfer',
+    key: 'distance',
+    size: 0.1,
+    other: 0.3,
+    mesh: CHAMFER_MESH,
+    edges: [1, 5],
+  },
+] as const;
+
 describe('modify3d commands', () => {
   let fake: FakeKernel;
 
@@ -72,158 +93,149 @@ describe('modify3d commands', () => {
     setGeometryKernel(null);
   });
 
-  // -------------------------------------------------------------------------
-  // fillet_edge — happy path
-  // -------------------------------------------------------------------------
+  describe.each(CASES)('$cmd', ({ cmd, op, key, size, other, mesh, edges }) => {
+    const run = (
+      doc: CadDocument,
+      id: string,
+      extra: Record<string, unknown> = {},
+    ): ReturnType<typeof execute> => execute(doc, cmd, { id, [key]: size, ...extra });
 
-  describe('fillet_edge', () => {
     it('creates a new mesh entity and marks it as affected', () => {
       const { doc, boxId } = docWithBox();
-      const result = execute(doc, 'fillet_edge', { id: boxId, radius: 0.2 });
+      const result = run(doc, boxId);
 
       expect(result.affected).toHaveLength(1);
-      const newId = result.affected[0]!;
-      const entity = result.document.entities[newId];
+      const entity = result.document.entities[result.affected[0]!];
       expect(entity).toBeDefined();
       expect(entity!.kind).toBe('mesh');
     });
 
-    it('new mesh entity carries the filleted mesh data', () => {
+    it('new mesh entity carries the resulting mesh data', () => {
       const { doc, boxId } = docWithBox();
-      const result = execute(doc, 'fillet_edge', { id: boxId, radius: 0.2 });
-      const newId = result.affected[0]!;
-      const entity = result.document.entities[newId] as MeshSolidEntity;
-      expect(entity.mesh.positions).toEqual(FILLET_MESH.positions);
-      expect(entity.mesh.indices).toEqual(FILLET_MESH.indices);
+      const result = run(doc, boxId);
+      const entity = result.document.entities[result.affected[0]!] as MeshSolidEntity;
+      expect(entity.mesh.positions).toEqual(mesh.positions);
+      expect(entity.mesh.indices).toEqual(mesh.indices);
     });
 
-    it('stores the fillet recipe of the source as brep', () => {
+    it('stores the recipe of the source as brep', () => {
       const { doc, boxId } = docWithBox();
-      const result = execute(doc, 'fillet_edge', { id: boxId, radius: 0.2, edgeIndices: [1, 2] });
+      const result = run(doc, boxId, { edgeIndices: [1, 2] });
       const entity = result.document.entities[result.affected[0]!] as MeshSolidEntity;
       expect(entity.brep).toMatchObject({
-        op: 'fillet',
+        op,
         source: { op: 'solid', entity: doc.entities[boxId] },
         edges: [1, 2],
-        size: 0.2,
+        size,
       });
     });
 
     it('prunes the source entity from entities and order', () => {
       const { doc, boxId } = docWithBox();
-      const result = execute(doc, 'fillet_edge', { id: boxId, radius: 0.2 });
+      const result = run(doc, boxId);
       expect(result.document.entities[boxId]).toBeUndefined();
       expect(result.document.order).not.toContain(boxId);
     });
 
     it('appends new mesh id to order', () => {
       const { doc, boxId } = docWithBox();
-      const result = execute(doc, 'fillet_edge', { id: boxId, radius: 0.2 });
-      const newId = result.affected[0]!;
-      expect(result.document.order).toContain(newId);
+      const result = run(doc, boxId);
+      expect(result.document.order).toContain(result.affected[0]!);
     });
 
     it('new mesh entity inherits layerId and color from source', () => {
       const { doc, boxId } = docWithBox();
       const source = doc.entities[boxId]!;
-      const result = execute(doc, 'fillet_edge', { id: boxId, radius: 0.2 });
-      const newId = result.affected[0]!;
-      const entity = result.document.entities[newId]!;
+      const result = run(doc, boxId);
+      const entity = result.document.entities[result.affected[0]!]!;
       expect(entity.layerId).toBe(source.layerId);
       expect(entity.color).toBe(source.color);
     });
 
     it('new mesh entity has position [0,0,0] and rotation [0,0,0]', () => {
       const { doc, boxId } = docWithBox();
-      const result = execute(doc, 'fillet_edge', { id: boxId, radius: 0.2 });
-      const newId = result.affected[0]!;
-      const entity = result.document.entities[newId]!;
+      const result = run(doc, boxId);
+      const entity = result.document.entities[result.affected[0]!]!;
       expect(entity.position).toEqual([0, 0, 0]);
       expect(entity.rotation).toEqual([0, 0, 0]);
     });
 
-    it('passes radius to the kernel', () => {
+    it('passes the size to the kernel', () => {
       const { doc, boxId } = docWithBox();
-      execute(doc, 'fillet_edge', { id: boxId, radius: 0.5 });
-      expect(lastCall(fake, 'fillet')?.size).toBe(0.5);
+      run(doc, boxId, { [key]: other });
+      expect(lastCall(fake, op)?.size).toBe(other);
     });
 
     it('passes edgeIndices to the kernel when provided', () => {
       const { doc, boxId } = docWithBox();
-      execute(doc, 'fillet_edge', { id: boxId, radius: 0.2, edgeIndices: [0, 3, 7] });
-      expect(lastCall(fake, 'fillet')?.edges).toEqual([0, 3, 7]);
+      run(doc, boxId, { edgeIndices: [...edges] });
+      expect(lastCall(fake, op)?.edges).toEqual(edges);
     });
 
     it('defaults edgeIndices to [] (all edges) when omitted', () => {
       const { doc, boxId } = docWithBox();
-      execute(doc, 'fillet_edge', { id: boxId, radius: 0.2 });
-      expect(lastCall(fake, 'fillet')?.edges).toEqual([]);
+      run(doc, boxId);
+      expect(lastCall(fake, op)?.edges).toEqual([]);
     });
 
-    it('summary includes source id, new id, radius, triangle count', () => {
+    it('summary includes source id, new id, size, triangle count', () => {
       const { doc, boxId } = docWithBox();
-      const result = execute(doc, 'fillet_edge', { id: boxId, radius: 0.2 });
-      const newId = result.affected[0]!;
-      const triCount = FILLET_MESH.indices.length / 3;
+      const result = run(doc, boxId);
       expect(result.summary).toContain(boxId);
-      expect(result.summary).toContain(newId);
-      expect(result.summary).toContain('0.2');
-      expect(result.summary).toContain(String(triCount));
+      expect(result.summary).toContain(result.affected[0]!);
+      expect(result.summary).toContain(String(size));
+      expect(result.summary).toContain(String(mesh.indices.length / 3));
     });
 
-    it('builds the source leaf then fillets it once', () => {
+    it('builds the source leaf then runs the op once', () => {
       const { doc, boxId } = docWithBox();
-      execute(doc, 'fillet_edge', { id: boxId, radius: 0.2 });
+      run(doc, boxId);
       expect(countOf(fake, 'solid')).toBe(1);
-      expect(countOf(fake, 'fillet')).toBe(1);
+      expect(countOf(fake, op)).toBe(1);
     });
-
-    // -----------------------------------------------------------------------
-    // fillet_edge — failure paths
-    // -----------------------------------------------------------------------
 
     it('no-op when target id does not exist', () => {
       const { doc } = docWithBox();
-      const result = execute(doc, 'fillet_edge', { id: 'ghost', radius: 0.2 });
+      const result = run(doc, 'ghost');
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
       expect(result.summary).toContain('ghost');
       expect(countOf(fake, 'solid')).toBe(0);
-      expect(countOf(fake, 'fillet')).toBe(0);
+      expect(countOf(fake, op)).toBe(0);
     });
 
     it('no-op when target is a 2D entity', () => {
       const { doc, lineId } = docWithLine();
-      const result = execute(doc, 'fillet_edge', { id: lineId, radius: 0.2 });
+      const result = run(doc, lineId);
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
       expect(result.summary).toContain('2D');
       expect(countOf(fake, 'solid')).toBe(0);
-      expect(countOf(fake, 'fillet')).toBe(0);
+      expect(countOf(fake, op)).toBe(0);
     });
 
-    it('no-op when radius is zero', () => {
+    it('no-op when size is zero', () => {
       const { doc, boxId } = docWithBox();
-      const result = execute(doc, 'fillet_edge', { id: boxId, radius: 0 });
+      const result = run(doc, boxId, { [key]: 0 });
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
-      expect(result.summary).toContain('radius');
+      expect(result.summary).toContain(key);
       expect(countOf(fake, 'solid')).toBe(0);
-      expect(countOf(fake, 'fillet')).toBe(0);
+      expect(countOf(fake, op)).toBe(0);
     });
 
-    it('no-op when radius is negative', () => {
+    it('no-op when size is negative', () => {
       const { doc, boxId } = docWithBox();
-      const result = execute(doc, 'fillet_edge', { id: boxId, radius: -1 });
+      const result = run(doc, boxId, { [key]: -1 });
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
-      expect(countOf(fake, 'fillet')).toBe(0);
+      expect(countOf(fake, op)).toBe(0);
     });
 
     it('no-op when kernel is not injected', () => {
       setGeometryKernel(null);
       const { doc, boxId } = docWithBox();
-      const result = execute(doc, 'fillet_edge', { id: boxId, radius: 0.2 });
+      const result = run(doc, boxId);
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
       expect(result.summary).toContain('kernel not available');
@@ -232,201 +244,17 @@ describe('modify3d commands', () => {
     it('no-op when the kernel cannot build the source; source not pruned', () => {
       setGeometryKernel((fake = freshKernel({ solid: null })));
       const { doc, boxId } = docWithBox();
-      const result = execute(doc, 'fillet_edge', { id: boxId, radius: 0.2 });
+      const result = run(doc, boxId);
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
       expect(result.document.entities[boxId]).toBeDefined();
-      expect(countOf(fake, 'fillet')).toBe(0);
+      expect(countOf(fake, op)).toBe(0);
     });
 
-    it('no-op when kernel fillet returns null; source not pruned', () => {
-      setGeometryKernel((fake = freshKernel({ fillet: null })));
+    it('no-op when the kernel op returns null; source not pruned', () => {
+      setGeometryKernel((fake = freshKernel({ [op]: null })));
       const { doc, boxId } = docWithBox();
-      const result = execute(doc, 'fillet_edge', { id: boxId, radius: 0.2 });
-      expect(result.affected).toHaveLength(0);
-      expect(result.document).toBe(doc);
-      expect(result.document.entities[boxId]).toBeDefined();
-      expect(result.summary).toContain('returned null');
-      expect(result.summary).toContain('LLULL_KERNEL=occt on the server');
-      expect(result.summary).not.toContain('Try ?kernel=occt');
-    });
-
-    // -----------------------------------------------------------------------
-    // fillet_edge — purity
-    // -----------------------------------------------------------------------
-
-    it('is pure — input doc not mutated on success', () => {
-      const { doc, boxId } = docWithBox();
-      const snapshot = JSON.stringify(doc);
-      execute(doc, 'fillet_edge', { id: boxId, radius: 0.2 });
-      expect(JSON.stringify(doc)).toBe(snapshot);
-    });
-
-    it('is pure — input doc not mutated on failure (missing id)', () => {
-      const { doc } = docWithBox();
-      const snapshot = JSON.stringify(doc);
-      execute(doc, 'fillet_edge', { id: 'ghost', radius: 0.2 });
-      expect(JSON.stringify(doc)).toBe(snapshot);
-    });
-
-    it('is pure — input doc not mutated when kernel returns null', () => {
-      setGeometryKernel((fake = freshKernel({ fillet: null })));
-      const { doc, boxId } = docWithBox();
-      const snapshot = JSON.stringify(doc);
-      execute(doc, 'fillet_edge', { id: boxId, radius: 0.2 });
-      expect(JSON.stringify(doc)).toBe(snapshot);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // chamfer_edge — happy path
-  // -------------------------------------------------------------------------
-
-  describe('chamfer_edge', () => {
-    it('creates a new mesh entity and marks it as affected', () => {
-      const { doc, boxId } = docWithBox();
-      const result = execute(doc, 'chamfer_edge', { id: boxId, distance: 0.1 });
-
-      expect(result.affected).toHaveLength(1);
-      const newId = result.affected[0]!;
-      const entity = result.document.entities[newId];
-      expect(entity).toBeDefined();
-      expect(entity!.kind).toBe('mesh');
-    });
-
-    it('new mesh entity carries the chamfered mesh data', () => {
-      const { doc, boxId } = docWithBox();
-      const result = execute(doc, 'chamfer_edge', { id: boxId, distance: 0.1 });
-      const newId = result.affected[0]!;
-      const entity = result.document.entities[newId] as MeshSolidEntity;
-      expect(entity.mesh.positions).toEqual(CHAMFER_MESH.positions);
-      expect(entity.mesh.indices).toEqual(CHAMFER_MESH.indices);
-    });
-
-    it('stores the chamfer recipe of the source as brep', () => {
-      const { doc, boxId } = docWithBox();
-      const result = execute(doc, 'chamfer_edge', {
-        id: boxId,
-        distance: 0.1,
-        edgeIndices: [1, 2],
-      });
-      const entity = result.document.entities[result.affected[0]!] as MeshSolidEntity;
-      expect(entity.brep).toMatchObject({
-        op: 'chamfer',
-        source: { op: 'solid', entity: doc.entities[boxId] },
-        edges: [1, 2],
-        size: 0.1,
-      });
-    });
-
-    it('prunes the source entity from entities and order', () => {
-      const { doc, boxId } = docWithBox();
-      const result = execute(doc, 'chamfer_edge', { id: boxId, distance: 0.1 });
-      expect(result.document.entities[boxId]).toBeUndefined();
-      expect(result.document.order).not.toContain(boxId);
-    });
-
-    it('passes distance to the kernel', () => {
-      const { doc, boxId } = docWithBox();
-      execute(doc, 'chamfer_edge', { id: boxId, distance: 0.3 });
-      expect(lastCall(fake, 'chamfer')?.size).toBe(0.3);
-    });
-
-    it('passes edgeIndices to the kernel when provided', () => {
-      const { doc, boxId } = docWithBox();
-      execute(doc, 'chamfer_edge', { id: boxId, distance: 0.1, edgeIndices: [1, 5] });
-      expect(lastCall(fake, 'chamfer')?.edges).toEqual([1, 5]);
-    });
-
-    it('defaults edgeIndices to [] (all edges) when omitted', () => {
-      const { doc, boxId } = docWithBox();
-      execute(doc, 'chamfer_edge', { id: boxId, distance: 0.1 });
-      expect(lastCall(fake, 'chamfer')?.edges).toEqual([]);
-    });
-
-    it('summary includes source id, new id, distance, triangle count', () => {
-      const { doc, boxId } = docWithBox();
-      const result = execute(doc, 'chamfer_edge', { id: boxId, distance: 0.1 });
-      const newId = result.affected[0]!;
-      const triCount = CHAMFER_MESH.indices.length / 3;
-      expect(result.summary).toContain(boxId);
-      expect(result.summary).toContain(newId);
-      expect(result.summary).toContain('0.1');
-      expect(result.summary).toContain(String(triCount));
-    });
-
-    it('builds the source leaf then chamfers it once', () => {
-      const { doc, boxId } = docWithBox();
-      execute(doc, 'chamfer_edge', { id: boxId, distance: 0.1 });
-      expect(countOf(fake, 'solid')).toBe(1);
-      expect(countOf(fake, 'chamfer')).toBe(1);
-    });
-
-    // -----------------------------------------------------------------------
-    // chamfer_edge — failure paths
-    // -----------------------------------------------------------------------
-
-    it('no-op when target id does not exist', () => {
-      const { doc } = docWithBox();
-      const result = execute(doc, 'chamfer_edge', { id: 'ghost', distance: 0.1 });
-      expect(result.affected).toHaveLength(0);
-      expect(result.document).toBe(doc);
-      expect(result.summary).toContain('ghost');
-      expect(countOf(fake, 'solid')).toBe(0);
-      expect(countOf(fake, 'chamfer')).toBe(0);
-    });
-
-    it('no-op when target is a 2D entity', () => {
-      const { doc, lineId } = docWithLine();
-      const result = execute(doc, 'chamfer_edge', { id: lineId, distance: 0.1 });
-      expect(result.affected).toHaveLength(0);
-      expect(result.document).toBe(doc);
-      expect(result.summary).toContain('2D');
-      expect(countOf(fake, 'solid')).toBe(0);
-      expect(countOf(fake, 'chamfer')).toBe(0);
-    });
-
-    it('no-op when distance is zero', () => {
-      const { doc, boxId } = docWithBox();
-      const result = execute(doc, 'chamfer_edge', { id: boxId, distance: 0 });
-      expect(result.affected).toHaveLength(0);
-      expect(result.document).toBe(doc);
-      expect(result.summary).toContain('distance');
-      expect(countOf(fake, 'solid')).toBe(0);
-      expect(countOf(fake, 'chamfer')).toBe(0);
-    });
-
-    it('no-op when distance is negative', () => {
-      const { doc, boxId } = docWithBox();
-      const result = execute(doc, 'chamfer_edge', { id: boxId, distance: -0.5 });
-      expect(result.affected).toHaveLength(0);
-      expect(result.document).toBe(doc);
-      expect(countOf(fake, 'chamfer')).toBe(0);
-    });
-
-    it('no-op when kernel is not injected', () => {
-      setGeometryKernel(null);
-      const { doc, boxId } = docWithBox();
-      const result = execute(doc, 'chamfer_edge', { id: boxId, distance: 0.1 });
-      expect(result.affected).toHaveLength(0);
-      expect(result.document).toBe(doc);
-      expect(result.summary).toContain('kernel not available');
-    });
-
-    it('no-op when the kernel cannot build the source; source not pruned', () => {
-      setGeometryKernel((fake = freshKernel({ solid: null })));
-      const { doc, boxId } = docWithBox();
-      const result = execute(doc, 'chamfer_edge', { id: boxId, distance: 0.1 });
-      expect(result.affected).toHaveLength(0);
-      expect(result.document).toBe(doc);
-      expect(result.document.entities[boxId]).toBeDefined();
-      expect(countOf(fake, 'chamfer')).toBe(0);
-    });
-
-    it('no-op when kernel chamfer returns null; source not pruned', () => {
-      setGeometryKernel((fake = freshKernel({ chamfer: null })));
-      const { doc, boxId } = docWithBox();
-      const result = execute(doc, 'chamfer_edge', { id: boxId, distance: 0.1 });
+      const result = run(doc, boxId);
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
       expect(result.document.entities[boxId]).toBeDefined();
@@ -435,29 +263,25 @@ describe('modify3d commands', () => {
       expect(result.summary).not.toContain('Try ?kernel=occt');
     });
 
-    // -----------------------------------------------------------------------
-    // chamfer_edge — purity
-    // -----------------------------------------------------------------------
-
     it('is pure — input doc not mutated on success', () => {
       const { doc, boxId } = docWithBox();
       const snapshot = JSON.stringify(doc);
-      execute(doc, 'chamfer_edge', { id: boxId, distance: 0.1 });
+      run(doc, boxId);
       expect(JSON.stringify(doc)).toBe(snapshot);
     });
 
     it('is pure — input doc not mutated on failure (missing id)', () => {
       const { doc } = docWithBox();
       const snapshot = JSON.stringify(doc);
-      execute(doc, 'chamfer_edge', { id: 'ghost', distance: 0.1 });
+      run(doc, 'ghost');
       expect(JSON.stringify(doc)).toBe(snapshot);
     });
 
     it('is pure — input doc not mutated when kernel returns null', () => {
-      setGeometryKernel((fake = freshKernel({ chamfer: null })));
+      setGeometryKernel((fake = freshKernel({ [op]: null })));
       const { doc, boxId } = docWithBox();
       const snapshot = JSON.stringify(doc);
-      execute(doc, 'chamfer_edge', { id: boxId, distance: 0.1 });
+      run(doc, boxId);
       expect(JSON.stringify(doc)).toBe(snapshot);
     });
   });

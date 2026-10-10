@@ -12,6 +12,20 @@ export interface GoldenAction {
   step?: { command: string; params?: Record<string, unknown> };
 }
 
+const CUBE_COMPONENT: GoldenAction[] = [
+  { command: 'add_box', params: { size: [1, 1, 1] }, as: 'b' },
+  {
+    command: 'create_component',
+    params: { name: 'Cube', entityIds: ['$b'], componentId: 'comp-cube' },
+  },
+];
+
+const cubeInstance = (x: number, as: string): GoldenAction => ({
+  command: 'insert_instance',
+  params: { componentId: 'comp-cube', position: [x, 0, 0] },
+  as,
+});
+
 export const plans: Record<string, GoldenAction[]> = {
   '2d_lines_polylines': [
     { command: 'draw_line', params: { start: [0, 0], end: [10, 5] } },
@@ -292,11 +306,7 @@ export const plans: Record<string, GoldenAction[]> = {
     { command: 'solve_constraints', params: {} },
   ],
   assembly_components_instances: [
-    { command: 'add_box', params: { size: [1, 1, 1] }, as: 'b' },
-    {
-      command: 'create_component',
-      params: { name: 'Cube', entityIds: ['$b'], componentId: 'comp-cube' },
-    },
+    ...CUBE_COMPONENT,
     { command: 'insert_instance', params: { componentId: 'comp-cube', position: [5, 0, 0] } },
     {
       command: 'insert_instance',
@@ -304,42 +314,18 @@ export const plans: Record<string, GoldenAction[]> = {
     },
   ],
   assembly_mates: [
-    { command: 'add_box', params: { size: [1, 1, 1] }, as: 'b' },
-    {
-      command: 'create_component',
-      params: { name: 'Cube', entityIds: ['$b'], componentId: 'comp-cube' },
-    },
-    {
-      command: 'insert_instance',
-      params: { componentId: 'comp-cube', position: [5, 0, 0] },
-      as: 'ia',
-    },
-    {
-      command: 'insert_instance',
-      params: { componentId: 'comp-cube', position: [20, 0, 0] },
-      as: 'ib',
-    },
+    ...CUBE_COMPONENT,
+    cubeInstance(5, 'ia'),
+    cubeInstance(20, 'ib'),
     {
       command: 'add_mate',
       params: { kind: 'distance', a: { instanceId: '$ia' }, b: { instanceId: '$ib' }, value: 5 },
     },
   ],
   assembly_joints: [
-    { command: 'add_box', params: { size: [1, 1, 1] }, as: 'b' },
-    {
-      command: 'create_component',
-      params: { name: 'Cube', entityIds: ['$b'], componentId: 'comp-cube' },
-    },
-    {
-      command: 'insert_instance',
-      params: { componentId: 'comp-cube', position: [0, 0, 0] },
-      as: 'ia',
-    },
-    {
-      command: 'insert_instance',
-      params: { componentId: 'comp-cube', position: [3, 0, 0] },
-      as: 'ib',
-    },
+    ...CUBE_COMPONENT,
+    cubeInstance(0, 'ia'),
+    cubeInstance(3, 'ib'),
     {
       command: 'add_joint',
       params: { kind: 'revolute', a: { instanceId: '$ia' }, b: { instanceId: '$ib' }, axis: 'z' },

@@ -26,6 +26,18 @@ function docWithTwoBoxes(): { doc: CadDocument; idA: string; idB: string } {
   return { doc, idA: r1.affected[0]!, idB: r2.affected[0]! };
 }
 
+/** Empty doc plus `count` unit boxes; returns the doc and their ids in creation order. */
+function docWithBoxes(count: number): { doc: CadDocument; ids: string[] } {
+  let doc = createEmptyDocument();
+  const ids: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const r = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = r.document;
+    ids.push(r.affected[0]!);
+  }
+  return { doc, ids };
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -207,34 +219,17 @@ describe('boolean commands', () => {
       expect(result.summary).toContain(idA);
     });
 
-    it('no-op when operand a is a 2D entity', () => {
-      let doc = createEmptyDocument();
-      const lineResult = execute(doc, 'draw_line', {
-        start: [0, 0],
-        end: [1, 0],
-      });
-      doc = lineResult.document;
+    it.each([
+      ['a', true],
+      ['b', false],
+    ])('no-op when operand %s is a 2D entity', (_operand, lineFirst) => {
+      const { doc: boxDoc, ids } = docWithBoxes(1);
+      const lineResult = execute(boxDoc, 'draw_line', { start: [0, 0], end: [1, 0] });
+      const doc = lineResult.document;
       const lineId = lineResult.affected[0]!;
-      const boxResult = execute(doc, 'add_box', { size: [1, 1, 1] });
-      doc = boxResult.document;
-      const boxId = boxResult.affected[0]!;
+      const operands = lineFirst ? { a: lineId, b: ids[0]! } : { a: ids[0]!, b: lineId };
 
-      const result = execute(doc, 'boolean_union', { a: lineId, b: boxId });
-      expect(result.affected).toHaveLength(0);
-      expect(result.document).toBe(doc);
-      expect(result.summary).toContain('2D');
-    });
-
-    it('no-op when operand b is a 2D entity', () => {
-      let doc = createEmptyDocument();
-      const boxResult = execute(doc, 'add_box', { size: [1, 1, 1] });
-      doc = boxResult.document;
-      const boxId = boxResult.affected[0]!;
-      const lineResult = execute(doc, 'draw_line', { start: [0, 0], end: [1, 0] });
-      doc = lineResult.document;
-      const lineId = lineResult.affected[0]!;
-
-      const result = execute(doc, 'boolean_union', { a: boxId, b: lineId });
+      const result = execute(doc, 'boolean_union', operands);
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
       expect(result.summary).toContain('2D');
@@ -280,50 +275,26 @@ describe('boolean commands', () => {
     });
 
     it('keeps groups that retain >= 2 members after operands are removed', () => {
-      let doc = createEmptyDocument();
-      const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-      doc = r1.document;
-      const r2 = execute(doc, 'add_box', { size: [1, 1, 1] });
-      doc = r2.document;
-      const r3 = execute(doc, 'add_box', { size: [1, 1, 1] });
-      doc = r3.document;
-      const idA = r1.affected[0]!;
-      const idB = r2.affected[0]!;
-      const idC = r3.affected[0]!;
+      const { doc, ids } = docWithBoxes(3);
+      const [idA, idB, idC] = ids as [string, string, string];
 
-      // Group all three; after union(A, B), C remains alone — group has 1 member → dissolves.
-      // Use A+C and B+C to keep a group alive after removing A+B.
+      // Group all three; after union(A, B) only C remains — a 1-member group dissolves.
       const grouped = execute(doc, 'group_entities', { ids: [idA, idB, idC], name: 'Trio' });
-      doc = grouped.document;
       const groupId = grouped.affected[0]!;
 
-      const result = execute(doc, 'boolean_union', { a: idA, b: idB });
-
-      // Group had 3 members; after removing A and B, 1 remains → dissolves.
+      const result = execute(grouped.document, 'boolean_union', { a: idA, b: idB });
       expect(result.document.groups[groupId]).toBeUndefined();
     });
 
     it('keeps a group with >= 2 non-operand members intact', () => {
-      let doc = createEmptyDocument();
-      const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-      doc = r1.document;
-      const r2 = execute(doc, 'add_box', { size: [1, 1, 1] });
-      doc = r2.document;
-      const r3 = execute(doc, 'add_box', { size: [1, 1, 1] });
-      doc = r3.document;
-      const r4 = execute(doc, 'add_box', { size: [1, 1, 1] });
-      doc = r4.document;
-      const idA = r1.affected[0]!;
-      const idB = r2.affected[0]!;
-      const idC = r3.affected[0]!;
-      const idD = r4.affected[0]!;
+      const { doc, ids } = docWithBoxes(4);
+      const [idA, idB, idC, idD] = ids as [string, string, string, string];
 
       // Group C and D (not the operands).
       const grouped = execute(doc, 'group_entities', { ids: [idC, idD], name: 'Survivors' });
-      doc = grouped.document;
       const groupId = grouped.affected[0]!;
 
-      const result = execute(doc, 'boolean_union', { a: idA, b: idB });
+      const result = execute(grouped.document, 'boolean_union', { a: idA, b: idB });
 
       // Group of C+D must be untouched.
       expect(result.document.groups[groupId]).toBeDefined();
@@ -336,26 +307,15 @@ describe('boolean commands', () => {
   // -------------------------------------------------------------------------
 
   describe('purity', () => {
-    it('is pure — input document is not mutated by boolean_union', () => {
-      const { doc, idA, idB } = docWithTwoBoxes();
-      const snapshot = JSON.stringify(doc);
-      execute(doc, 'boolean_union', { a: idA, b: idB });
-      expect(JSON.stringify(doc)).toBe(snapshot);
-    });
-
-    it('is pure — input document is not mutated by boolean_subtract', () => {
-      const { doc, idA, idB } = docWithTwoBoxes();
-      const snapshot = JSON.stringify(doc);
-      execute(doc, 'boolean_subtract', { a: idA, b: idB });
-      expect(JSON.stringify(doc)).toBe(snapshot);
-    });
-
-    it('is pure — input document is not mutated by boolean_intersect', () => {
-      const { doc, idA, idB } = docWithTwoBoxes();
-      const snapshot = JSON.stringify(doc);
-      execute(doc, 'boolean_intersect', { a: idA, b: idB });
-      expect(JSON.stringify(doc)).toBe(snapshot);
-    });
+    it.each(['boolean_union', 'boolean_subtract', 'boolean_intersect'])(
+      'is pure — input document is not mutated by %s',
+      (command) => {
+        const { doc, idA, idB } = docWithTwoBoxes();
+        const snapshot = JSON.stringify(doc);
+        execute(doc, command, { a: idA, b: idB });
+        expect(JSON.stringify(doc)).toBe(snapshot);
+      },
+    );
   });
 
   // -------------------------------------------------------------------------
