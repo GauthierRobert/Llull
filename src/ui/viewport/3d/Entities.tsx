@@ -13,7 +13,7 @@
  */
 
 import { memo, useCallback, useMemo } from 'react';
-import type { CadDocument, Entity, EntityId, InstanceEntity } from '@core/model/types';
+import type { CadDocument, Entity, EntityId, InstanceEntity, SolidKind } from '@core/model/types';
 import { useStore, useViewportStore } from '@ui/store';
 import { animatedEntityIds, findClickAnimationsForEntity } from './animationClickHelpers';
 import { isEntityVisible } from '../entityVisibility';
@@ -35,6 +35,24 @@ import { GridAnnotations3D } from './GridAnnotations3D';
 import { GRID_LAYER_NAME } from './gridAnnotations';
 import { expandInstance } from '@core/commands/instanceExpansion';
 import type { PbrMaterial } from './useMaterialProps';
+import type { SolidMeshKindProps } from './entities/SolidMeshShell';
+
+type SolidMeshBranch<E extends Entity> = (
+  props: SolidMeshKindProps<E>,
+) => React.ReactElement | null;
+
+const SOLID_MESHES: { [K in SolidKind]: SolidMeshBranch<Extract<Entity, { kind: K }>> } = {
+  box: BoxMesh,
+  cylinder: CylinderMesh,
+  sphere: SphereMesh,
+  extrusion: ExtrusionMesh,
+  mesh: MeshSolidMesh,
+  cone: ConeMesh,
+  torus: TorusMesh,
+  wedge: WedgeMesh,
+  pyramid: PyramidMesh,
+  revolution: RevolutionMesh,
+};
 
 /**
  * Renders a single InstanceEntity by expanding it into world-space entities via
@@ -114,28 +132,14 @@ const EntityRenderer = memo(function EntityRenderer({
   pbrMaterial?: PbrMaterial | undefined;
   document?: CadDocument | undefined;
 }): React.ReactElement | null {
-  const shared = { selected, onSelect, pbrMaterial };
+  if (entity.kind in SOLID_MESHES) {
+    // Keyed by kind, so the branch picked always matches the entity's narrowed type.
+    const Mesh = SOLID_MESHES[entity.kind as SolidKind] as SolidMeshBranch<Entity>;
+    return (
+      <Mesh entity={entity} selected={selected} onSelect={onSelect} pbrMaterial={pbrMaterial} />
+    );
+  }
   switch (entity.kind) {
-    case 'box':
-      return <BoxMesh entity={entity} {...shared} />;
-    case 'cylinder':
-      return <CylinderMesh entity={entity} {...shared} />;
-    case 'sphere':
-      return <SphereMesh entity={entity} {...shared} />;
-    case 'extrusion':
-      return <ExtrusionMesh entity={entity} {...shared} />;
-    case 'mesh':
-      return <MeshSolidMesh entity={entity} {...shared} />;
-    case 'cone':
-      return <ConeMesh entity={entity} {...shared} />;
-    case 'torus':
-      return <TorusMesh entity={entity} {...shared} />;
-    case 'wedge':
-      return <WedgeMesh entity={entity} {...shared} />;
-    case 'pyramid':
-      return <PyramidMesh entity={entity} {...shared} />;
-    case 'revolution':
-      return <RevolutionMesh entity={entity} {...shared} />;
     case 'text':
       return <TextMesh entity={entity} selected={selected} onSelect={onSelect} />;
     case 'instance':
