@@ -104,6 +104,26 @@ export function gridSize(
   return { columns, rows };
 }
 
+/** Row-major cell centres of the sampling grid over a [minX, minY] + width × height window. */
+function cellCentres(
+  minX: number,
+  minY: number,
+  width: number,
+  height: number,
+  step: number,
+): { centres: Vec2[]; cellArea: number } {
+  const { columns, rows } = gridSize(width, height, step);
+  const dx = width / columns;
+  const dy = height / rows;
+  const centres: Vec2[] = [];
+  for (let row = 0; row < rows; row++) {
+    for (let column = 0; column < columns; column++) {
+      centres.push([minX + (column + 0.5) * dx, minY + (row + 0.5) * dy]);
+    }
+  }
+  return { centres, cellArea: dx * dy };
+}
+
 function emptySamples(): GridSamples {
   return {
     ground: new Float64Array(0),
@@ -137,27 +157,17 @@ export function buildSamples(
   if (!(width > 0) || !(height > 0)) return emptySamples();
   let step = spacing ?? Math.sqrt(polygonArea(boundary) / TARGET_PAD_CELLS);
   if (!(step > 0)) step = Math.sqrt((width * height) / TARGET_PAD_CELLS);
-  const { columns, rows } = gridSize(width, height, step);
-  const dx = width / columns;
-  const dy = height / rows;
-  const ground = new Float64Array(columns * rows);
-  const distance = new Float64Array(columns * rows);
+  const { centres, cellArea } = cellCentres(minX, minY, width, height, step);
+  const ground = new Float64Array(centres.length);
+  const distance = new Float64Array(centres.length);
   let outsideTin = 0;
-  for (let row = 0; row < rows; row++) {
-    for (let column = 0; column < columns; column++) {
-      const at: Vec2 = [minX + (column + 0.5) * dx, minY + (row + 0.5) * dy];
-      const index = row * columns + column;
-      const z = elevationAt(tin, at);
-      if (z === null) {
-        outsideTin += 1;
-        ground[index] = NaN;
-        continue;
-      }
-      ground[index] = z;
-      distance[index] = pointInPolygon(at, boundary) ? 0 : distanceToOutline(at, boundary);
-    }
-  }
-  return { ground, distance, cellArea: dx * dy, spacing: Math.sqrt(dx * dy), outsideTin };
+  centres.forEach((at, index) => {
+    const z = elevationAt(tin, at);
+    ground[index] = z ?? NaN;
+    if (z === null) outsideTin += 1;
+    else distance[index] = pointInPolygon(at, boundary) ? 0 : distanceToOutline(at, boundary);
+  });
+  return { ground, distance, cellArea, spacing: Math.sqrt(cellArea), outsideTin };
 }
 
 /** Cut (+) / fill (-) depth of a cell: pad level inside the pad, batters outside. */
@@ -268,41 +278,33 @@ export function compareSurfaceVolumes(
   const height = maxY - minY;
   if (!(width > 0) || !(height > 0)) return none;
   const step = spacing ?? Math.sqrt((width * height) / COMPARE_TARGET_CELLS);
-  const { columns, rows } = gridSize(width, height, step);
-  const dx = width / columns;
-  const dy = height / rows;
+  const { centres, cellArea } = cellCentres(minX, minY, width, height, step);
   let cut = 0;
   let fill = 0;
   let cutCells = 0;
   let fillCells = 0;
   let outsideTin = 0;
-  for (let row = 0; row < rows; row++) {
-    for (let column = 0; column < columns; column++) {
-      const at: Vec2 = [minX + (column + 0.5) * dx, minY + (row + 0.5) * dy];
-      const z0 = elevationAt(base, at);
-      const z1 = elevationAt(comparison, at);
-      if (z0 === null || z1 === null) {
-        outsideTin += 1;
-        continue;
-      }
-      if (z1 < z0) {
-        cut += z0 - z1;
-        cutCells += 1;
-      } else if (z1 > z0) {
-        fill += z1 - z0;
-        fillCells += 1;
-      }
+  for (const at of centres) {
+    const z0 = elevationAt(base, at);
+    const z1 = elevationAt(comparison, at);
+    if (z0 === null || z1 === null) {
+      outsideTin += 1;
+    } else if (z1 < z0) {
+      cut += z0 - z1;
+      cutCells += 1;
+    } else if (z1 > z0) {
+      fill += z1 - z0;
+      fillCells += 1;
     }
   }
-  const cellArea = dx * dy;
   return {
     cutVolume: cut * cellArea,
     fillVolume: fill * cellArea,
     cutArea: cutCells * cellArea,
     fillArea: fillCells * cellArea,
-    area: (columns * rows - outsideTin) * cellArea,
+    area: (centres.length - outsideTin) * cellArea,
     spacing: Math.sqrt(cellArea),
-    samples: columns * rows,
+    samples: centres.length,
     outsideTin,
   };
 }

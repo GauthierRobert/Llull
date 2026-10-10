@@ -20,9 +20,8 @@ import { findProfile, lightestProfile, sectionProperties } from '../steel/profil
 import {
   addProfileGroup,
   isValidTargetUtilisation,
-  MAX_ITERATIONS,
   nextProfile,
-  recordUpsizeStep,
+  iterateUpsizing,
   resizeProfileGroup,
   targetUtilisationParam,
   upsizeProfileGroups,
@@ -86,11 +85,7 @@ export const designPurlins = defineCommand({
     };
     const first = analyse(doc);
     if (first.rows.length === 0) return noop(doc, `design_purlins failed: ${first.summary}`);
-    let current = doc;
-    let limited = false;
-    const changes: string[] = [];
-    const changed = new Set<string>();
-    for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+    const { current, limited, changes, changed } = iterateUpsizing(doc, (current) => {
       const { rows } = analyse(current);
       const building = getBuilding(current);
       const levelId = levelOf(building, rows);
@@ -101,30 +96,20 @@ export const designPurlins = defineCommand({
         if (member?.category !== 'member') continue;
         addProfileGroup(groups, member);
       }
-      if (groups.size === 0) break;
-      const step = upsizeProfileGroups(
-        building,
-        groups,
-        nextSecondaryProfile,
-        (next, group, larger) => {
-          const { building: resizedBuilding, resizedIds } = resizeProfileGroup(
-            next,
-            group,
-            larger,
-            (element) => element.levelId === levelId,
-          );
-          return {
-            building: reseatResized(current, resizedBuilding, resizedIds, group.profile, larger),
-            changedIds: resizedIds,
-          };
-        },
-      );
-      recordUpsizeStep(step, changes, changed);
-      current = { ...current, building: step.building };
-      if (step.limited) limited = true;
-      if (!step.progressed) break;
-      if (iteration === MAX_ITERATIONS - 1) limited = true;
-    }
+      if (groups.size === 0) return null;
+      return upsizeProfileGroups(building, groups, nextSecondaryProfile, (next, group, larger) => {
+        const { building: resizedBuilding, resizedIds } = resizeProfileGroup(
+          next,
+          group,
+          larger,
+          (element) => element.levelId === levelId,
+        );
+        return {
+          building: reseatResized(current, resizedBuilding, resizedIds, group.profile, larger),
+          changedIds: resizedIds,
+        };
+      });
+    });
     if (changed.size === 0)
       return noChangeResult(doc, `${first.rows.length} purlin / rail row(s)`, first.rows, limited);
     const document = regenerateBuilding(doc, getBuilding(current));

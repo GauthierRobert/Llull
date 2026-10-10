@@ -14,9 +14,8 @@ import { findProfile } from '../steel/profiles';
 import {
   addProfileGroup,
   isValidTargetUtilisation,
-  MAX_ITERATIONS,
   nextProfile,
-  recordUpsizeStep,
+  iterateUpsizing,
   resizeProfileGroup,
   targetUtilisationParam,
   upsizeProfileGroups,
@@ -58,15 +57,12 @@ export const designPortalFrames = defineCommand({
     const resolved = resolveFrameLoads(doc, params);
     if ('reason' in resolved) return noop(doc, `design_portal_frames failed: ${resolved.reason}.`);
     const { loads, levelId } = resolved;
-    let current = doc;
     const analysed = new Set<string>();
-    const changes: string[] = [];
-    const changed = new Set<string>();
-    let limited = false;
-    for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+    let noFrames = false;
+    const upsized = iterateUpsizing(doc, (current) => {
       const { rows, frames } = checkFrames(current, levelId, loads);
-      if (frames === 0)
-        return noop(doc, 'design_portal_frames failed: no analysable portal frame on the level.');
+      noFrames = frames === 0;
+      if (noFrames) return null;
       const building = getBuilding(current);
       for (const row of rows) if (row.kind !== 'connection') analysed.add(row.elementId);
       const groups: ProfileGroups = new Map();
@@ -84,8 +80,8 @@ export const designPortalFrames = defineCommand({
           }
         }
       }
-      if (groups.size === 0) break;
-      const step = upsizeProfileGroups(building, groups, nextProfile, (next, group, larger) => {
+      if (groups.size === 0) return null;
+      return upsizeProfileGroups(building, groups, nextProfile, (next, group, larger) => {
         const resizedGroup = resizeProfileGroup(
           next,
           group,
@@ -105,12 +101,11 @@ export const designPortalFrames = defineCommand({
         );
         return { building: reseated.building, changedIds: [...resizedIds, ...reseated.moved] };
       });
-      recordUpsizeStep(step, changes, changed);
-      current = { ...current, building: step.building };
-      if (step.limited) limited = true;
-      if (!step.progressed) break;
-      if (iteration === MAX_ITERATIONS - 1) limited = true;
-    }
+    });
+    if (noFrames)
+      return noop(doc, 'design_portal_frames failed: no analysable portal frame on the level.');
+    const { current, changes, changed } = upsized;
+    let { limited } = upsized;
     const { rows } = checkFrames(current, levelId, loads);
     const bolts = sizeBoltGroups(current, getBuilding(current), rows, targetUtilisation);
     let building = bolts.building;
