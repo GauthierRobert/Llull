@@ -26,6 +26,7 @@ import {
   CHAIN_DRAW_TOOLS,
   rectParamsFromCorners,
   circleRadiusFromPoints,
+  chainTolerance,
   dropRepeatedPoints,
   ellipseParamsFromCenterCorner,
 } from './drawHelpers';
@@ -54,18 +55,14 @@ export function wallChainParams(
   points: ReadonlyArray<Vec2>,
   closed: boolean,
 ): { points: Vec2[]; closed: boolean } {
-  const xs = points.map((point) => point[0]);
-  const ys = points.map((point) => point[1]);
-  const diagonal = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
-  const tolerance = Math.max(diagonal * 1e-3, 1e-9);
-  const near = (a: Vec2, b: Vec2): boolean => Math.hypot(a[0] - b[0], a[1] - b[1]) <= tolerance;
-  const distinct = points.filter(
-    (point, index) => index === 0 || !near(point, points[index - 1] as Vec2),
-  );
+  const distinct = dropRepeatedPoints(points);
   const first = distinct[0];
   const last = distinct[distinct.length - 1];
   const returnsToStart =
-    distinct.length >= 4 && first !== undefined && last !== undefined && near(first, last);
+    distinct.length >= 4 &&
+    first !== undefined &&
+    last !== undefined &&
+    Math.hypot(first[0] - last[0], first[1] - last[1]) <= chainTolerance(points);
   return returnsToStart
     ? { points: distinct.slice(0, -1), closed: true }
     : { points: distinct, closed };

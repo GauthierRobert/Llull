@@ -65,10 +65,7 @@ export function circleRadiusFromPoints(center: Vec2, rim: Vec2): number | null {
  * @pure
  */
 export function dropRepeatedPoints(points: ReadonlyArray<Vec2>): Vec2[] {
-  const xs = points.map((point) => point[0]);
-  const ys = points.map((point) => point[1]);
-  const diagonal = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
-  const tolerance = Math.max(diagonal * 1e-3, 1e-9);
+  const tolerance = chainTolerance(points);
   return points.filter((point, index) => {
     const previous = points[index - 1];
     return (
@@ -76,6 +73,14 @@ export function dropRepeatedPoints(points: ReadonlyArray<Vec2>): Vec2[] {
       Math.hypot(point[0] - previous[0], point[1] - previous[1]) > tolerance
     );
   });
+}
+
+/** 0.1% of the chain's bounding diagonal (never below 1e-9). */
+export function chainTolerance(points: ReadonlyArray<Vec2>): number {
+  const xs = points.map((point) => point[0]);
+  const ys = points.map((point) => point[1]);
+  const diagonal = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  return Math.max(diagonal * 1e-3, 1e-9);
 }
 
 interface EllipseParams {
