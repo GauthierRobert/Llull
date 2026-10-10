@@ -72,15 +72,17 @@ function hostedOpening(reader: FieldReader): {
 
 const NO_HOST_WALL = { ok: false, reason: 'Pick a host wall first.' } as const;
 
-function rectangle(reader: FieldReader): Array<[number, number]> {
-  const [x1, y1] = reader.point('x1', 'y1');
-  const [x2, y2] = reader.point('x2', 'y2');
+function corners([x1, y1, x2, y2]: PlanExtent): Array<[number, number]> {
   return [
     [x1, y1],
     [x2, y1],
     [x2, y2],
     [x1, y2],
   ];
+}
+
+function rectangle(reader: FieldReader): Array<[number, number]> {
+  return corners([...reader.point('x1', 'y1'), ...reader.point('x2', 'y2')]);
 }
 
 const RECTANGLE_FIELDS = [
@@ -99,16 +101,7 @@ function outline(
   const source = reader.text('source');
   if (source === 'walls') return { wallIds: [...wallIds] };
   if (source !== 'grid') return { boundary: rectangle(reader) };
-  if (gridExtent === null) return null;
-  const [x1, y1, x2, y2] = gridExtent;
-  return {
-    boundary: [
-      [x1, y1],
-      [x2, y1],
-      [x2, y2],
-      [x1, y2],
-    ],
-  };
+  return gridExtent === null ? null : { boundary: corners(gridExtent) };
 }
 
 export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [

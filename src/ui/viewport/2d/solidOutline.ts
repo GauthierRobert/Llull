@@ -9,7 +9,7 @@
  * hull of its projected bounding box / vertices (mesh, revolution, wedge, pyramid, box, instance).
  */
 
-import { localBounds } from '@core/commands/sceneBounds';
+import { boundsCorners, localBounds } from '@core/commands/sceneBounds';
 import { applyEulerXYZ } from '@core/lib/eulerRotation';
 import type { CadDocument, Entity, InstanceEntity, Vec2, Vec3 } from '@core/model/types';
 import { is3D } from '@core/model/types';
@@ -61,16 +61,6 @@ function circlePoints(radius: number, z: number): Vec3[] {
     const angle = (2 * Math.PI * i) / CIRCLE_SAMPLES;
     return [radius * Math.cos(angle), radius * Math.sin(angle), z];
   });
-}
-
-function boundsCorners(e: Entity): Vec3[] {
-  const { min, max } = localBounds(e);
-  return [min[2], max[2]].flatMap((z) => [
-    [min[0], min[1], z] as Vec3,
-    [max[0], min[1], z] as Vec3,
-    [max[0], max[1], z] as Vec3,
-    [min[0], max[1], z] as Vec3,
-  ]);
 }
 
 function torusSurface(ringRadius: number, tubeRadius: number): Vec3[] {
@@ -169,7 +159,7 @@ function outlineRings(document: ComponentsDoc, e: Entity, depth: number): Outlin
       return instanceRings(document, e, depth);
     case 'revolution': {
       const upright = isUpright(e) && Math.abs(e.axis[2]) > 0.999 && e.angle >= 2 * Math.PI - 1e-9;
-      if (!upright) return hullRing(e, boundsCorners(e));
+      if (!upright) return hullRing(e, boundsCorners(localBounds(e)));
       const radii = e.profile.map(([radial]) => Math.abs(radial));
       const outer = Math.max(...radii);
       const inner = Math.min(...radii);
@@ -181,7 +171,7 @@ function outlineRings(document: ComponentsDoc, e: Entity, depth: number): Outlin
     }
     default:
       // box, wedge, pyramid: hull of the projected local bounding box.
-      return hullRing(e, boundsCorners(e));
+      return hullRing(e, boundsCorners(localBounds(e)));
   }
 }
 
