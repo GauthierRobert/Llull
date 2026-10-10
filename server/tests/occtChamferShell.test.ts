@@ -10,7 +10,7 @@ import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
 import type { ShapeRecipe } from '@core/geometry/shapeRecipe';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createNodeOcctKernel } from '../src/occtNode';
-import { leaf, meshOf } from './kernelTestSupport';
+import { leaf, meshOf, volume } from './kernelTestSupport';
 
 const cubeEntity = (size: number): Entity =>
   ({
@@ -22,24 +22,6 @@ const cubeEntity = (size: number): Entity =>
     layerId: 'layer-default',
     color: '#888888',
   }) as Entity;
-
-function volume(mesh: MeshData): number {
-  const p = mesh.positions;
-  let sum = 0;
-  for (let i = 0; i < mesh.indices.length; i += 3) {
-    const [a, b, c] = [0, 1, 2].map((k) => (mesh.indices[i + k] ?? 0) * 3) as [
-      number,
-      number,
-      number,
-    ];
-    sum +=
-      ((p[a] ?? 0) * ((p[b + 1] ?? 0) * (p[c + 2] ?? 0) - (p[b + 2] ?? 0) * (p[c + 1] ?? 0)) -
-        (p[a + 1] ?? 0) * ((p[b] ?? 0) * (p[c + 2] ?? 0) - (p[b + 2] ?? 0) * (p[c] ?? 0)) +
-        (p[a + 2] ?? 0) * ((p[b] ?? 0) * (p[c + 1] ?? 0) - (p[b + 1] ?? 0) * (p[c] ?? 0))) /
-      6;
-  }
-  return sum;
-}
 
 const cube = leaf(cubeEntity(4));
 const shell = (source: ShapeRecipe, thickness: number): ShapeRecipe => ({

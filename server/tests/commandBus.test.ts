@@ -13,34 +13,9 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { frameEntityIds, parseSseFrame } from './sseTestHelpers';
+import { frameEntityIds, makeFakeRes, parseSseFrame } from './sseTestHelpers';
 import { applyCommand, undo, redo, canUndo, canRedo, _resetHistory } from '../src/commandBus';
 import { getLiveDoc, _resetLiveDoc, subscribeLive } from '../src/liveDocument';
-
-// ---------------------------------------------------------------------------
-// Minimal fake Express Response for broadcast-capture tests.
-// ---------------------------------------------------------------------------
-
-interface FakeResponse {
-  written: string[];
-  ended: boolean;
-  write(chunk: string): boolean;
-  end(): void;
-}
-
-function makeFakeRes(): FakeResponse {
-  return {
-    written: [],
-    ended: false,
-    write(chunk: string): boolean {
-      this.written.push(chunk);
-      return true;
-    },
-    end(): void {
-      this.ended = true;
-    },
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Reset shared state before each test.
@@ -80,8 +55,7 @@ describe('applyCommand — mutating command', () => {
 
   it('broadcasts to SSE subscribers after a mutation', () => {
     const fakeRes = makeFakeRes();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const unsub = subscribeLive(fakeRes as any);
+    const unsub = subscribeLive(fakeRes);
 
     // Initial snapshot write (1 total).
     expect(fakeRes.written).toHaveLength(1);
@@ -129,8 +103,7 @@ describe('applyCommand — query command (measure_volume)', () => {
     const entityId = Object.keys(getLiveDoc().entities)[0] ?? '';
 
     const fakeRes = makeFakeRes();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const unsub = subscribeLive(fakeRes as any);
+    const unsub = subscribeLive(fakeRes);
     const writeCountBefore = fakeRes.written.length;
 
     applyCommand('measure_volume', { entityId });
@@ -259,8 +232,7 @@ describe('undo / redo', () => {
     applyCommand('add_box', { size: [1, 1, 1], position: [0, 0, 0] });
 
     const fakeRes = makeFakeRes();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const unsub = subscribeLive(fakeRes as any);
+    const unsub = subscribeLive(fakeRes);
     const writesBefore = fakeRes.written.length;
 
     undo();

@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { frameEntityIds, parseSseFrame } from './sseTestHelpers';
+import { frameEntityIds, makeFakeRes, parseSseFrame } from './sseTestHelpers';
 import {
   getLiveDoc,
   getLiveSnapshot,
@@ -22,32 +22,6 @@ import {
 } from '../src/liveDocument';
 import { applyToolCall } from '../../tests/helpers/applyToolCall';
 import { createEmptyDocument } from '@core/model/types';
-
-// ---------------------------------------------------------------------------
-// Minimal fake Express Response for SSE tests.
-// We only need res.write() and res.end() — both are no-ops that record calls.
-// ---------------------------------------------------------------------------
-
-interface FakeResponse {
-  written: string[];
-  ended: boolean;
-  write(chunk: string): boolean;
-  end(): void;
-}
-
-function makeFakeRes(): FakeResponse {
-  return {
-    written: [],
-    ended: false,
-    write(chunk: string): boolean {
-      this.written.push(chunk);
-      return true;
-    },
-    end(): void {
-      this.ended = true;
-    },
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Reset shared state before each test so tests are independent.
@@ -127,9 +101,7 @@ describe('subscribeLive', () => {
     setLiveDoc(r.document);
 
     const res = makeFakeRes();
-    // Cast: subscribeLive accepts express Response; our fake matches structurally.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const unsubscribe = subscribeLive(res as any);
+    const unsubscribe = subscribeLive(res);
 
     // Exactly one SSE message written at subscription time.
     expect(res.written).toHaveLength(1);
@@ -144,10 +116,8 @@ describe('subscribeLive', () => {
   it('broadcasts a fresh snapshot to subscribers after setLiveDoc', () => {
     const resA = makeFakeRes();
     const resB = makeFakeRes();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const unsubA = subscribeLive(resA as any);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const unsubB = subscribeLive(resB as any);
+    const unsubA = subscribeLive(resA);
+    const unsubB = subscribeLive(resB);
 
     // Both got the initial empty snapshot.
     expect(resA.written).toHaveLength(1);
@@ -175,8 +145,7 @@ describe('subscribeLive', () => {
 
   it('unsubscribed response no longer receives broadcasts', () => {
     const res = makeFakeRes();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const unsubscribe = subscribeLive(res as any);
+    const unsubscribe = subscribeLive(res);
 
     // Unsubscribe before the mutation.
     unsubscribe();
@@ -195,8 +164,7 @@ describe('subscribeLive', () => {
     expect(_subscriberCount()).toBe(0);
 
     const res = makeFakeRes();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const unsub = subscribeLive(res as any);
+    const unsub = subscribeLive(res);
     expect(_subscriberCount()).toBe(1);
 
     unsub();
@@ -229,7 +197,7 @@ describe('epoch', () => {
 
     const res = makeFakeRes();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    subscribeLive(res as any);
+    subscribeLive(res);
     setLiveDoc(createEmptyDocument(), { name: 'noop', params: {} });
     const commandFrame = parseSseFrame(res.written[res.written.length - 1] ?? '');
     expect(commandFrame.event).toBe('command');

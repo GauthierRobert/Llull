@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { frameEntityIds } from './sseTestHelpers';
+import { frameEntityIds, makeFakeRes } from './sseTestHelpers';
 import request from 'supertest';
 import { app } from '../src/index';
 import { getLiveDoc, _resetLiveDoc, subscribeLive } from '../src/liveDocument';
@@ -55,21 +55,8 @@ describe('POST /command — mutation', () => {
   });
 
   it('/live SSE subscriber receives the broadcast', async () => {
-    interface FakeResponse {
-      written: string[];
-      write(chunk: string): boolean;
-      end(): void;
-    }
-    const fakeRes: FakeResponse = {
-      written: [],
-      write(chunk: string): boolean {
-        this.written.push(chunk);
-        return true;
-      },
-      end(): void {},
-    };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const unsub = subscribeLive(fakeRes as any);
+    const fakeRes = makeFakeRes();
+    const unsub = subscribeLive(fakeRes);
     const writesBefore = fakeRes.written.length;
 
     await request(app)

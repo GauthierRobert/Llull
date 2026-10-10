@@ -7,51 +7,17 @@
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import type { Entity, Vec3 } from '@core/model/types';
-import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
+import type { GeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createNodeOcctKernel } from '../src/occtNode';
-import { booleanMesh, meshOf } from './kernelTestSupport';
+import { booleanMesh, bounds, box, common, meshOf, volume } from './kernelTestSupport';
 
-const common = { layerId: 'layer-default', color: '#888888' };
 const cylinder = (position: Vec3, rotation: Vec3): Entity =>
   ({ id: 'c', kind: 'cylinder', position, rotation, radius: 2, height: 6, ...common }) as Entity;
 const sphere = (position: Vec3, rotation: Vec3): Entity =>
   ({ id: 's', kind: 'sphere', position, rotation, radius: 3, ...common }) as Entity;
 const cone = (position: Vec3, rotation: Vec3): Entity =>
   ({ id: 'k', kind: 'cone', position, rotation, radius: 2.5, height: 5, ...common }) as Entity;
-const box = (position: Vec3, size: Vec3): Entity =>
-  ({ id: 'b', kind: 'box', position, rotation: [0, 0, 0], size, ...common }) as Entity;
-
-function bounds(mesh: MeshData): { min: number[]; max: number[] } {
-  const min = [Infinity, Infinity, Infinity];
-  const max = [-Infinity, -Infinity, -Infinity];
-  for (let i = 0; i < mesh.positions.length; i += 3) {
-    for (let k = 0; k < 3; k++) {
-      min[k] = Math.min(min[k] ?? 0, mesh.positions[i + k] ?? 0);
-      max[k] = Math.max(max[k] ?? 0, mesh.positions[i + k] ?? 0);
-    }
-  }
-  return { min, max };
-}
-
-/** Signed volume by the divergence theorem: positive when the mesh is wound outward. */
-function volume(mesh: MeshData): number {
-  let sum = 0;
-  const p = mesh.positions;
-  for (let i = 0; i < mesh.indices.length; i += 3) {
-    const [a, b, c] = [0, 1, 2].map((k) => (mesh.indices[i + k] ?? 0) * 3) as [
-      number,
-      number,
-      number,
-    ];
-    sum +=
-      ((p[a] ?? 0) * ((p[b + 1] ?? 0) * (p[c + 2] ?? 0) - (p[b + 2] ?? 0) * (p[c + 1] ?? 0)) -
-        (p[a + 1] ?? 0) * ((p[b] ?? 0) * (p[c + 2] ?? 0) - (p[b + 2] ?? 0) * (p[c] ?? 0)) +
-        (p[a + 2] ?? 0) * ((p[b] ?? 0) * (p[c + 1] ?? 0) - (p[b + 1] ?? 0) * (p[c] ?? 0))) /
-      6;
-  }
-  return sum;
-}
 
 let occt: GeometryKernel;
 let manifold: GeometryKernel;

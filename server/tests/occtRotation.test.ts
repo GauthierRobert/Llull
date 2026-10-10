@@ -9,7 +9,7 @@ import type { Entity, Vec3 } from '@core/model/types';
 import type { MeshData } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createNodeOcctKernel } from '../src/occtNode';
-import { booleanMesh, meshOf } from './kernelTestSupport';
+import { booleanMesh, bounds, meshOf } from './kernelTestSupport';
 
 function box(position: Vec3, rotation: Vec3, size: Vec3 = [4, 2, 2]): Entity {
   return {
@@ -21,18 +21,6 @@ function box(position: Vec3, rotation: Vec3, size: Vec3 = [4, 2, 2]): Entity {
     layerId: 'layer-default',
     color: '#888888',
   } as unknown as Entity;
-}
-
-function bounds(mesh: MeshData): { min: number[]; max: number[] } {
-  const min = [Infinity, Infinity, Infinity];
-  const max = [-Infinity, -Infinity, -Infinity];
-  for (let i = 0; i < mesh.positions.length; i += 3) {
-    for (let k = 0; k < 3; k++) {
-      min[k] = Math.min(min[k] ?? 0, mesh.positions[i + k] ?? 0);
-      max[k] = Math.max(max[k] ?? 0, mesh.positions[i + k] ?? 0);
-    }
-  }
-  return { min, max };
 }
 
 function expectSameBounds(a: MeshData | null, b: MeshData | null): void {

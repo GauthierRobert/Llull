@@ -9,9 +9,8 @@ import type { Entity, Vec3 } from '@core/model/types';
 import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createNodeOcctKernel } from '../src/occtNode';
-import { booleanMesh, meshOf } from './kernelTestSupport';
+import { booleanMesh, bounds, box, common, meshOf, volume } from './kernelTestSupport';
 
-const common = { layerId: 'layer-default', color: '#888888' };
 type Profile = Array<[number, number]>;
 // L-shaped, concave, area 5 (3x3 square minus a 2x1 notch... see volume below).
 const L_SHAPE: Profile = [
@@ -25,40 +24,8 @@ const L_SHAPE: Profile = [
 const L_AREA = 5;
 const extrusion = (profile: Profile, position: Vec3, rotation: Vec3, depth = 4): Entity =>
   ({ id: 'e', kind: 'extrusion', position, rotation, profile, depth, ...common }) as Entity;
-const box = (position: Vec3, size: Vec3): Entity =>
-  ({ id: 'b', kind: 'box', position, rotation: [0, 0, 0], size, ...common }) as Entity;
 const meshEntity = (mesh: MeshData): Entity =>
   ({ id: 'm', kind: 'mesh', position: [0, 0, 0], rotation: [0, 0, 0], mesh, ...common }) as Entity;
-
-function volume(mesh: MeshData): number {
-  const p = mesh.positions;
-  let sum = 0;
-  for (let i = 0; i < mesh.indices.length; i += 3) {
-    const [a, b, c] = [0, 1, 2].map((k) => (mesh.indices[i + k] ?? 0) * 3) as [
-      number,
-      number,
-      number,
-    ];
-    sum +=
-      ((p[a] ?? 0) * ((p[b + 1] ?? 0) * (p[c + 2] ?? 0) - (p[b + 2] ?? 0) * (p[c + 1] ?? 0)) -
-        (p[a + 1] ?? 0) * ((p[b] ?? 0) * (p[c + 2] ?? 0) - (p[b + 2] ?? 0) * (p[c] ?? 0)) +
-        (p[a + 2] ?? 0) * ((p[b] ?? 0) * (p[c + 1] ?? 0) - (p[b + 1] ?? 0) * (p[c] ?? 0))) /
-      6;
-  }
-  return sum;
-}
-
-function bounds(mesh: MeshData): { min: number[]; max: number[] } {
-  const min = [Infinity, Infinity, Infinity];
-  const max = [-Infinity, -Infinity, -Infinity];
-  for (let i = 0; i < mesh.positions.length; i += 3) {
-    for (let k = 0; k < 3; k++) {
-      min[k] = Math.min(min[k] ?? 0, mesh.positions[i + k] ?? 0);
-      max[k] = Math.max(max[k] ?? 0, mesh.positions[i + k] ?? 0);
-    }
-  }
-  return { min, max };
-}
 
 let occt: GeometryKernel;
 let manifold: GeometryKernel;

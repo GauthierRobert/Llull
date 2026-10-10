@@ -84,20 +84,7 @@ function nextId(): number {
  */
 describe('MCP initialize instructions', () => {
   it('returns the server instructions so agents learn the workflow up front', async () => {
-    const res = await request(app)
-      .post('/mcp')
-      .set('Content-Type', 'application/json')
-      .set('Accept', 'application/json, text/event-stream')
-      .send({
-        jsonrpc: '2.0',
-        id: 9001,
-        method: 'initialize',
-        params: {
-          protocolVersion: '2024-11-05',
-          capabilities: {},
-          clientInfo: { name: 'test-client', version: '0.0.1' },
-        },
-      });
+    const res = await mcpPost({ id: 9001, method: 'initialize', params: INITIALIZE_PARAMS });
     expect(res.status).toBe(200);
     expect(res.text).toContain('instructions');
     expect(res.text).toContain('cad://conventions');
@@ -105,22 +92,27 @@ describe('MCP initialize instructions', () => {
   });
 });
 
-async function mcpInitialize(): Promise<string> {
-  const id = nextId();
-  const res = await request(app)
+const INITIALIZE_PARAMS = {
+  protocolVersion: '2024-11-05',
+  capabilities: {},
+  clientInfo: { name: 'test-client', version: '0.0.1' },
+};
+
+/** POST one JSON-RPC message to /mcp (with the session header once a session exists). */
+function mcpPost(message: Record<string, unknown>, sessionId?: string): request.Test {
+  const req = request(app)
     .post('/mcp')
     .set('Content-Type', 'application/json')
-    .set('Accept', 'application/json, text/event-stream')
-    .send({
-      jsonrpc: '2.0',
-      id,
-      method: 'initialize',
-      params: {
-        protocolVersion: '2024-11-05',
-        capabilities: {},
-        clientInfo: { name: 'test-client', version: '0.0.1' },
-      },
-    });
+    .set('Accept', 'application/json, text/event-stream');
+  return (sessionId === undefined ? req : req.set('mcp-session-id', sessionId)).send({
+    jsonrpc: '2.0',
+    ...message,
+  });
+}
+
+async function mcpInitialize(): Promise<string> {
+  const id = nextId();
+  const res = await mcpPost({ id, method: 'initialize', params: INITIALIZE_PARAMS });
 
   expect(res.status).toBe(200);
   const sessionId = res.headers['mcp-session-id'] as string | undefined;
@@ -128,17 +120,11 @@ async function mcpInitialize(): Promise<string> {
   return sessionId as string;
 }
 
-/**
- * Send an initialized notification (required by the MCP spec after initialize).
- * Notifications have no `id` field and no expected response.
- */
-async function mcpNotifyInitialized(sessionId: string): Promise<void> {
-  await request(app)
-    .post('/mcp')
-    .set('Content-Type', 'application/json')
-    .set('Accept', 'application/json, text/event-stream')
-    .set('mcp-session-id', sessionId)
-    .send({ jsonrpc: '2.0', method: 'notifications/initialized' });
+/** Initialize + send the `initialized` notification (required by the MCP spec): a ready session id. */
+async function mcpSession(): Promise<string> {
+  const sessionId = await mcpInitialize();
+  await mcpPost({ method: 'notifications/initialized' }, sessionId);
+  return sessionId;
 }
 
 interface McpToolResult {
@@ -158,12 +144,10 @@ async function mcpCallTool(
   args: Record<string, unknown>,
 ): Promise<McpToolResult> {
   const id = nextId();
-  const res = await request(app)
-    .post('/mcp')
-    .set('Content-Type', 'application/json')
-    .set('Accept', 'application/json, text/event-stream')
-    .set('mcp-session-id', sessionId)
-    .send({ jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: args } });
+  const res = await mcpPost(
+    { id, method: 'tools/call', params: { name, arguments: args } },
+    sessionId,
+  );
 
   expect(res.status).toBe(200);
   const result = parseSseResult(res.text, id) as McpToolResult | undefined;
@@ -176,12 +160,7 @@ async function mcpCallTool(
  */
 async function mcpListTools(sessionId: string): Promise<Array<{ name: string }>> {
   const id = nextId();
-  const res = await request(app)
-    .post('/mcp')
-    .set('Content-Type', 'application/json')
-    .set('Accept', 'application/json, text/event-stream')
-    .set('mcp-session-id', sessionId)
-    .send({ jsonrpc: '2.0', id, method: 'tools/list', params: {} });
+  const res = await mcpPost({ id, method: 'tools/list', params: {} }, sessionId);
 
   expect(res.status).toBe(200);
   const result = parseSseResult(res.text, id) as { tools?: Array<{ name: string }> } | undefined;
@@ -222,8 +201,7 @@ describe('MCP initialize handshake', () => {
 
 describe('MCP tools/list', () => {
   it('returns one tool per registered command plus the exchange tools', async () => {
-    const sessionId = await mcpInitialize();
-    await mcpNotifyInitialized(sessionId);
+    const sessionId = await mcpSession();
 
     const tools = await mcpListTools(sessionId);
     // The transport appends the exchange tools (export_step, import_step, import_code) on top
@@ -236,8 +214,7 @@ describe('MCP tools/list', () => {
   });
 
   it('tool names include all registered command names plus exchange tool names', async () => {
-    const sessionId = await mcpInitialize();
-    await mcpNotifyInitialized(sessionId);
+    const sessionId = await mcpSession();
 
     const tools = await mcpListTools(sessionId);
     const registeredNames = listCommands().map((c) => c.name);
@@ -257,8 +234,7 @@ describe('MCP tools/list', () => {
 
 describe('MCP tools/call — mutation (add_box)', () => {
   it('returns isError:false with summary and affected-ids content blocks', async () => {
-    const sessionId = await mcpInitialize();
-    await mcpNotifyInitialized(sessionId);
+    const sessionId = await mcpSession();
 
     const result = await mcpCallTool(sessionId, 'add_box', {
       size: [2, 2, 2],
@@ -283,8 +259,7 @@ describe('MCP tools/call — mutation (add_box)', () => {
   });
 
   it('live document is updated after the MCP mutation', async () => {
-    const sessionId = await mcpInitialize();
-    await mcpNotifyInitialized(sessionId);
+    const sessionId = await mcpSession();
 
     await mcpCallTool(sessionId, 'add_box', { size: [3, 3, 3], position: [0, 0, 0] });
 
@@ -292,8 +267,7 @@ describe('MCP tools/call — mutation (add_box)', () => {
   });
 
   it('does NOT set structuredContent for a mutation result', async () => {
-    const sessionId = await mcpInitialize();
-    await mcpNotifyInitialized(sessionId);
+    const sessionId = await mcpSession();
 
     const result = await mcpCallTool(sessionId, 'add_box', {
       size: [1, 1, 1],
@@ -311,8 +285,7 @@ describe('MCP tools/call — mutation (add_box)', () => {
 
 describe('MCP tools/call — query (measure_volume)', () => {
   it('returns json data block and structuredContent with volume record', async () => {
-    const sessionId = await mcpInitialize();
-    await mcpNotifyInitialized(sessionId);
+    const sessionId = await mcpSession();
 
     // First create a box to measure.
     const addResult = await mcpCallTool(sessionId, 'add_box', {
@@ -345,8 +318,7 @@ describe('MCP tools/call — query (measure_volume)', () => {
   });
 
   it('query does NOT mutate the live document', async () => {
-    const sessionId = await mcpInitialize();
-    await mcpNotifyInitialized(sessionId);
+    const sessionId = await mcpSession();
 
     await mcpCallTool(sessionId, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
     const entityId = Object.keys(getLiveDoc().entities)[0]!;
@@ -365,8 +337,7 @@ describe('MCP tools/call — query (measure_volume)', () => {
 
 describe('MCP tools/call + REST /undo interop', () => {
   it('POST /undo after MCP add_box reverts the entity (shared history)', async () => {
-    const sessionId = await mcpInitialize();
-    await mcpNotifyInitialized(sessionId);
+    const sessionId = await mcpSession();
 
     // MCP call mutates the live document via the command bus.
     await mcpCallTool(sessionId, 'add_box', { size: [4, 4, 4], position: [0, 0, 0] });
@@ -383,8 +354,7 @@ describe('MCP tools/call + REST /undo interop', () => {
   });
 
   it('two MCP mutations then two REST undos restore empty document', async () => {
-    const sessionId = await mcpInitialize();
-    await mcpNotifyInitialized(sessionId);
+    const sessionId = await mcpSession();
 
     await mcpCallTool(sessionId, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
     await mcpCallTool(sessionId, 'add_box', { size: [2, 2, 2], position: [5, 0, 0] });
@@ -403,26 +373,22 @@ describe('MCP tools/call + REST /undo interop', () => {
 // ---------------------------------------------------------------------------
 
 describe('MCP tools/call — render_view (SVG stripping)', () => {
-  it('response contains an image block', { timeout: 15000 }, async () => {
-    const sessionId = await mcpInitialize();
-    await mcpNotifyInitialized(sessionId);
-
-    // Add a box so the render has something to draw.
+  /** A fresh session with one box, then render_view. */
+  async function renderBox(): Promise<McpToolResult> {
+    const sessionId = await mcpSession();
     await mcpCallTool(sessionId, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
+    return mcpCallTool(sessionId, 'render_view', {});
+  }
 
-    const result = await mcpCallTool(sessionId, 'render_view', {});
+  it('response contains an image block', { timeout: 15000 }, async () => {
+    const result = await renderBox();
 
     const imageBlocks = result.content.filter((b) => b.type === 'image');
     expect(imageBlocks.length).toBeGreaterThanOrEqual(1);
   });
 
   it('no text block contains raw SVG markup (<svg or <polygon)', { timeout: 15000 }, async () => {
-    const sessionId = await mcpInitialize();
-    await mcpNotifyInitialized(sessionId);
-
-    await mcpCallTool(sessionId, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
-
-    const result = await mcpCallTool(sessionId, 'render_view', {});
+    const result = await renderBox();
 
     const textBlocks = result.content.filter((b) => b.type === 'text');
     for (const block of textBlocks) {
@@ -432,12 +398,7 @@ describe('MCP tools/call — render_view (SVG stripping)', () => {
   });
 
   it('json metadata block still contains useful fields (not svg)', { timeout: 15000 }, async () => {
-    const sessionId = await mcpInitialize();
-    await mcpNotifyInitialized(sessionId);
-
-    await mcpCallTool(sessionId, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
-
-    const result = await mcpCallTool(sessionId, 'render_view', {});
+    const result = await renderBox();
 
     const jsonBlock = result.content.find((b) => b.text?.startsWith('```json'));
     expect(jsonBlock).toBeDefined();
@@ -449,12 +410,7 @@ describe('MCP tools/call — render_view (SVG stripping)', () => {
   });
 
   it('structuredContent does not contain svg key', { timeout: 15000 }, async () => {
-    const sessionId = await mcpInitialize();
-    await mcpNotifyInitialized(sessionId);
-
-    await mcpCallTool(sessionId, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
-
-    const result = await mcpCallTool(sessionId, 'render_view', {});
+    const result = await renderBox();
 
     if (result.structuredContent !== undefined) {
       expect('svg' in result.structuredContent).toBe(false);
@@ -462,8 +418,7 @@ describe('MCP tools/call — render_view (SVG stripping)', () => {
   });
 
   it('normal mutation (add_box) still works unchanged — regression', async () => {
-    const sessionId = await mcpInitialize();
-    await mcpNotifyInitialized(sessionId);
+    const sessionId = await mcpSession();
 
     const result = await mcpCallTool(sessionId, 'add_box', {
       size: [1, 1, 1],
@@ -485,8 +440,7 @@ describe('MCP tools/call — render_view (SVG stripping)', () => {
 
 describe('MCP tools/call — unknown tool name', () => {
   it('returns isError:true with an explanatory summary content block', async () => {
-    const sessionId = await mcpInitialize();
-    await mcpNotifyInitialized(sessionId);
+    const sessionId = await mcpSession();
 
     const result = await mcpCallTool(sessionId, 'totally_nonexistent_tool', {});
 
@@ -497,8 +451,7 @@ describe('MCP tools/call — unknown tool name', () => {
   });
 
   it('puts a one-letter typo of a real tool first', async () => {
-    const sessionId = await mcpInitialize();
-    await mcpNotifyInitialized(sessionId);
+    const sessionId = await mcpSession();
 
     const result = await mcpCallTool(sessionId, 'add_boxx', {});
 
@@ -506,8 +459,7 @@ describe('MCP tools/call — unknown tool name', () => {
   });
 
   it('suggests the closest real tools and points at search_tools', async () => {
-    const sessionId = await mcpInitialize();
-    await mcpNotifyInitialized(sessionId);
+    const sessionId = await mcpSession();
 
     const result = await mcpCallTool(sessionId, 'make_box', {});
 
@@ -521,8 +473,7 @@ describe('MCP tools/call — unknown tool name', () => {
 
 describe('MCP tools/call — throwing command', () => {
   it('is returned as an isError result, not a JSON-RPC error', async () => {
-    const sessionId = await mcpInitialize();
-    await mcpNotifyInitialized(sessionId);
+    const sessionId = await mcpSession();
     vi.spyOn(registry, 'execute').mockImplementation(() => {
       throw new Error('kernel exploded');
     });
