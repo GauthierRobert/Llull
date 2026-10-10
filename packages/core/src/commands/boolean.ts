@@ -12,17 +12,9 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import type { BooleanOp, ShapeRecipe } from '../geometry/shapeRecipe';
 import { type ExecutionContext, currentContext } from './context';
-import { nextId } from '../lib/id';
-import { referenceLossSuffix, replaceEntities } from './entityOps';
 import { kernelUnavailable } from './kernelRefusal';
-import {
-  evaluateRecipe,
-  fallbackSuffix,
-  kernelResultEntity,
-  operandRecipe,
-  topologySuffix,
-} from './kernelShape';
-import { changed, noop } from './noop';
+import { commitKernelResult, evaluateRecipe, operandRecipe } from './kernelShape';
+import { noop } from './noop';
 
 function runBoolean(
   doc: CadDocument,
@@ -76,14 +68,13 @@ function runBoolean(
     );
   }
 
-  const newId = nextId('mesh');
-  const meshEntity = kernelResultEntity(newId, result, entA);
-  const triangleCount = result.mesh.indices.length / 3;
-  const document = replaceEntities(doc, [a, b], meshEntity);
-  return changed(
-    document,
-    `${opName}: merged '${a}' and '${b}' into mesh '${newId}' (${triangleCount} triangles). Operands consumed.${fallbackSuffix(kernel, [entA, entB])}${topologySuffix(kernel, result.shape)}${referenceLossSuffix(doc, document)}`,
-    [newId],
+  return commitKernelResult(
+    doc,
+    kernel,
+    result,
+    [entA, entB],
+    (newId, triangles) =>
+      `${opName}: merged '${a}' and '${b}' into mesh '${newId}' (${triangles} triangles). Operands consumed.`,
   );
 }
 

@@ -6,10 +6,14 @@
  * @pure
  */
 
-import type { Entity } from '../model/types';
+import type { CadDocument, Entity } from '../model/types';
 import type { GeometryKernel, MeshData, ShapeHandle } from '../geometry/kernel';
 import { type ShapeRecipe, meshRecipeOf, recipeOf } from '../geometry/shapeRecipe';
 import { newEntity } from './newEntity';
+import { nextId } from '../lib/id';
+import { referenceLossSuffix, replaceEntities } from './entityOps';
+import { changed } from './noop';
+import type { CommandResult } from './types';
 
 /** The first op of `recipe` this kernel cannot perform at all, or null. */
 function unsupportedOp(kernel: GeometryKernel, recipe: ShapeRecipe): ShapeRecipe['op'] | null {
@@ -36,7 +40,7 @@ export function operandRecipe(kernel: GeometryKernel, entity: Entity): ShapeReci
 }
 
 /** Summary suffix naming operands used as triangles because this kernel lacks an op of their tree. */
-export function fallbackSuffix(kernel: GeometryKernel, operands: readonly Entity[]): string {
+function fallbackSuffix(kernel: GeometryKernel, operands: readonly Entity[]): string {
   const notes = operands.flatMap((entity) => {
     if (meshRecipeOf(entity) === null) return [];
     const op = unsupportedOp(kernel, recipeOf(entity));
@@ -69,7 +73,7 @@ export function evaluateRecipe(
 }
 
 /** The `mesh` entity of a kernel result (world space), styled after `source`. */
-export function kernelResultEntity(id: string, result: KernelResult, source: Entity): Entity {
+function kernelResultEntity(id: string, result: KernelResult, source: Entity): Entity {
   return newEntity(
     'mesh',
     id,
@@ -83,8 +87,27 @@ export function kernelResultEntity(id: string, result: KernelResult, source: Ent
 }
 
 /** Summary suffix describing the exact topology kept by the kernel ('' for mesh-only kernels). */
-export function topologySuffix(kernel: GeometryKernel, shape: ShapeHandle): string {
+function topologySuffix(kernel: GeometryKernel, shape: ShapeHandle): string {
   const topology = kernel.topology(shape);
   if (topology === null) return '';
   return ` Exact B-rep kept: ${topology.faces.length} faces, ${topology.edges.length} edges (inspect_topology lists them).`;
+}
+
+/**
+ * Replace `operands` (the first one styles the result) by the kernel result's `mesh` entity. The
+ * summary is `describe(newId, triangles)` plus the fallback / topology / lost-reference notes.
+ */
+export function commitKernelResult(
+  doc: CadDocument,
+  kernel: GeometryKernel,
+  result: KernelResult,
+  operands: readonly [Entity, ...Entity[]],
+  describe: (newId: string, triangles: number) => string,
+): CommandResult {
+  const newId = nextId('mesh');
+  const ids = operands.map((operand) => operand.id);
+  const document = replaceEntities(doc, ids, kernelResultEntity(newId, result, operands[0]));
+  const notes = `${fallbackSuffix(kernel, operands)}${topologySuffix(kernel, result.shape)}`;
+  const summary = `${describe(newId, result.mesh.indices.length / 3)}${notes}`;
+  return changed(document, `${summary}${referenceLossSuffix(doc, document)}`, [newId]);
 }

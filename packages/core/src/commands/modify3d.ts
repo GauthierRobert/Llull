@@ -12,17 +12,9 @@ import type { CommandResult } from './types';
 import { defineCommand, vec3, z } from './schema';
 import { selectEdges } from './edgeSelection';
 import { type ExecutionContext, currentContext } from './context';
-import { nextId } from '../lib/id';
-import { referenceLossSuffix, replaceEntities } from './entityOps';
 import { kernelUnavailable } from './kernelRefusal';
-import {
-  evaluateRecipe,
-  fallbackSuffix,
-  kernelResultEntity,
-  operandRecipe,
-  topologySuffix,
-} from './kernelShape';
-import { changed, noop } from './noop';
+import { commitKernelResult, evaluateRecipe, operandRecipe } from './kernelShape';
+import { noop } from './noop';
 
 /** Surface-neutral pointer to the B-rep kernel (browser URL flag or server env var). */
 const OCC_KERNEL_HINT =
@@ -99,13 +91,14 @@ function modifyEdges(
     );
   }
 
-  const newId = nextId('mesh');
-  const meshEntity = kernelResultEntity(newId, result, entity);
-  const document = replaceEntities(doc, [id], meshEntity);
-  return changed(
-    document,
-    `${command}: ${pastTense} '${id}' (kind '${entity.kind}', ${amountName} ${amount}) → mesh '${newId}' (${result.mesh.indices.length / 3} triangles). Source entity consumed.${near.length > 0 ? ` edgesNear selected edges ${selection.edges.join(', ')}.` : ''}${fallbackSuffix(kernel, [entity])}${topologySuffix(kernel, result.shape)}${referenceLossSuffix(doc, document)}`,
-    [newId],
+  const picked = near.length > 0 ? ` edgesNear selected edges ${selection.edges.join(', ')}.` : '';
+  return commitKernelResult(
+    doc,
+    kernel,
+    result,
+    [entity],
+    (newId, triangles) =>
+      `${command}: ${pastTense} '${id}' (kind '${entity.kind}', ${amountName} ${amount}) → mesh '${newId}' (${triangles} triangles). Source entity consumed.${picked}`,
   );
 }
 
