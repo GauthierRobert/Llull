@@ -14,109 +14,63 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '@ui/store';
-import { type InstanceEntity, createEmptyDocument } from '@core/model/types';
+import { type Component, type InstanceEntity } from '@core/model/types';
 import { expandInstance } from '@core/commands/instanceExpansion';
 import { localDispatch } from '../helpers/storeTestHelpers';
+import { resetStore } from '../helpers/componentEntities';
 
-function resetStore(): void {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
+/** Create the given entities, group them into a component, and insert one instance of it. */
+function insertInstanceOf(
+  name: string,
+  entities: ReadonlyArray<readonly [string, unknown]>,
+  instanceParams: Record<string, unknown> = {},
+): { instanceId: string; instance: InstanceEntity; comp: Component } {
+  const entityIds = entities.map(
+    ([command, params]) => localDispatch(command, params).affected[0]!,
+  );
+  localDispatch('create_component', { name, entityIds });
+  const compId = Object.keys(useStore.getState().document.components)[0]!;
+  const instanceId = localDispatch('insert_instance', { componentId: compId, ...instanceParams })
+    .affected[0]!;
+  const { entities: all, components } = useStore.getState().document;
+  return { instanceId, instance: all[instanceId] as InstanceEntity, comp: components[compId]! };
 }
 
-// ---------------------------------------------------------------------------
-// expandInstance — geometry count > 0 after create_component + insert_instance
-// ---------------------------------------------------------------------------
-
 describe('InstanceRender — expandInstance produces geometry', () => {
-  beforeEach(() => {
-    resetStore();
-  });
+  beforeEach(resetStore);
 
   it('expandInstance returns > 0 entities for a component with 1 box', () => {
-    const boxResult = localDispatch('add_box', { size: [2, 2, 2] });
-    localDispatch('create_component', { name: 'Block', entityIds: [boxResult.affected[0]!] });
-
-    const doc = useStore.getState().document;
-    const compId = Object.keys(doc.components)[0]!;
-    const comp = doc.components[compId]!;
-
-    // Insert a second instance to get a fresh InstanceEntity to test.
-    const instResult = localDispatch('insert_instance', { componentId: compId });
-    const instId = instResult.affected[0]!;
-
-    const updatedDoc = useStore.getState().document;
-    const instance = updatedDoc.entities[instId] as InstanceEntity;
-
-    const expanded = expandInstance(instance, comp);
-    expect(expanded.length).toBeGreaterThan(0);
+    const { instance, comp } = insertInstanceOf('Block', [['add_box', { size: [2, 2, 2] }]]);
+    expect(expandInstance(instance, comp).length).toBeGreaterThan(0);
   });
 
   it('expandInstance returns 2 entities for a component with 2 children', () => {
-    const r1 = localDispatch('add_box', { size: [1, 1, 1] });
-    const r2 = localDispatch('add_sphere', { radius: 2 });
-    localDispatch('create_component', {
-      name: 'Multi',
-      entityIds: [r1.affected[0]!, r2.affected[0]!],
-    });
-
-    const doc = useStore.getState().document;
-    const compId = Object.keys(doc.components)[0]!;
-    const comp = doc.components[compId]!;
-
-    const instResult = localDispatch('insert_instance', { componentId: compId });
-    const instId = instResult.affected[0]!;
-
-    const updatedDoc = useStore.getState().document;
-    const instance = updatedDoc.entities[instId] as InstanceEntity;
-
-    const expanded = expandInstance(instance, comp);
-    expect(expanded).toHaveLength(2);
+    const { instance, comp } = insertInstanceOf('Multi', [
+      ['add_box', { size: [1, 1, 1] }],
+      ['add_sphere', { radius: 2 }],
+    ]);
+    expect(expandInstance(instance, comp)).toHaveLength(2);
   });
 
   it('expandInstance applies instance position to child world positions', () => {
-    const boxResult = localDispatch('add_box', { size: [1, 1, 1] });
     // The box starts at origin [0,0,0] inside the component.
-    localDispatch('create_component', { name: 'Shifted', entityIds: [boxResult.affected[0]!] });
-
-    const doc = useStore.getState().document;
-    const compId = Object.keys(doc.components)[0]!;
-    const comp = doc.components[compId]!;
-
-    const instResult = localDispatch('insert_instance', {
-      componentId: compId,
+    const { instance, comp } = insertInstanceOf('Shifted', [['add_box', { size: [1, 1, 1] }]], {
       position: [10, 20, 30],
     });
-    const instId = instResult.affected[0]!;
-
-    const updatedDoc = useStore.getState().document;
-    const instance = updatedDoc.entities[instId] as InstanceEntity;
-
     const expanded = expandInstance(instance, comp);
     expect(expanded).toHaveLength(1);
     const child = expanded[0]!;
-    // Child world position should include the instance translation.
     expect(child.position[0]).toBeCloseTo(10);
     expect(child.position[1]).toBeCloseTo(20);
     expect(child.position[2]).toBeCloseTo(30);
   });
 });
 
-// ---------------------------------------------------------------------------
-// Instance selection routing — select routes to the instance id
-// ---------------------------------------------------------------------------
-
 describe('InstanceRender — selection routing to instance id', () => {
-  beforeEach(() => {
-    resetStore();
-  });
+  beforeEach(resetStore);
 
   it('instance id is selectable from the document selection', () => {
-    const boxResult = localDispatch('add_box', { size: [3, 3, 3] });
-    localDispatch('create_component', { name: 'SelectTest', entityIds: [boxResult.affected[0]!] });
-
-    const doc = useStore.getState().document;
-    const compId = Object.keys(doc.components)[0]!;
-    const instResult = localDispatch('insert_instance', { componentId: compId });
-    const instanceId = instResult.affected[0]!;
+    const { instanceId } = insertInstanceOf('SelectTest', [['add_box', { size: [3, 3, 3] }]]);
 
     // Simulate selecting the instance id (as the viewport would do on sub-mesh click).
     useStore.getState().select([instanceId]);
@@ -132,17 +86,8 @@ describe('InstanceRender — selection routing to instance id', () => {
   });
 
   it('instance entity has kind === instance after insert_instance', () => {
-    const boxResult = localDispatch('add_box', { size: [1, 2, 3] });
-    localDispatch('create_component', { name: 'KindCheck', entityIds: [boxResult.affected[0]!] });
-
-    const doc = useStore.getState().document;
-    const compId = Object.keys(doc.components)[0]!;
-    const instResult = localDispatch('insert_instance', { componentId: compId });
-    const instanceId = instResult.affected[0]!;
-
-    const updatedDoc = useStore.getState().document;
-    const entity = updatedDoc.entities[instanceId];
-    expect(entity).toBeDefined();
-    expect(entity!.kind).toBe('instance');
+    const { instance } = insertInstanceOf('KindCheck', [['add_box', { size: [1, 2, 3] }]]);
+    expect(instance).toBeDefined();
+    expect(instance.kind).toBe('instance');
   });
 });

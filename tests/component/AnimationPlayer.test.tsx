@@ -262,113 +262,84 @@ describe('ViewportControls — animation transport controls (with animations)', 
 // Part C — findClickAnimationsForEntity pure helper
 // ---------------------------------------------------------------------------
 
-describe('findClickAnimationsForEntity — direct entity target', () => {
-  it('returns animation id when entity is the direct target with trigger:click', () => {
-    const animations: Record<string, Animation> = {
-      a1: makeAnimation({ id: 'a1', targetId: 'ent-1', targetKind: 'entity', trigger: 'click' }),
-    };
-    const groups: Record<string, EntityGroup> = {};
-    expect(findClickAnimationsForEntity('ent-1', animations, groups)).toEqual(['a1']);
+const clickAnim = (
+  id: string,
+  targetId: string,
+  targetKind: 'entity' | 'group',
+  trigger: 'click' | 'auto' = 'click',
+): Animation => makeAnimation({ id, targetId, targetKind, trigger });
+
+const groupOf = (...memberIds: string[]): EntityGroup => ({
+  id: 'grp-1',
+  name: 'Group',
+  memberIds,
+});
+
+/** Run the helper for 'ent-1' over a list of animations and an optional 'grp-1' group. */
+function findFor(animationList: Animation[], group?: EntityGroup): string[] {
+  const animations = Object.fromEntries(animationList.map((a) => [a.id, a]));
+  return findClickAnimationsForEntity('ent-1', animations, group ? { 'grp-1': group } : {});
+}
+
+describe('findClickAnimationsForEntity', () => {
+  it.each<[string, Animation[], EntityGroup | undefined, string[]]>([
+    [
+      'the entity is the direct target with trigger:click',
+      [clickAnim('a1', 'ent-1', 'entity')],
+      undefined,
+      ['a1'],
+    ],
+    [
+      'the entity is a member of the targeted group',
+      [clickAnim('a1', 'grp-1', 'group')],
+      groupOf('ent-1', 'ent-2'),
+      ['a1'],
+    ],
+    [
+      'auto-trigger animations are ignored',
+      [clickAnim('a1', 'ent-1', 'entity', 'auto')],
+      undefined,
+      [],
+    ],
+    [
+      'animations targeting a different entity are ignored',
+      [clickAnim('a1', 'ent-2', 'entity')],
+      undefined,
+      [],
+    ],
+    [
+      'the entity is NOT in the targeted group',
+      [clickAnim('a1', 'grp-1', 'group')],
+      groupOf('ent-3'),
+      [],
+    ],
+    ['the targeted group does not exist', [clickAnim('a1', 'grp-missing', 'group')], undefined, []],
+    [
+      'group animation with trigger:auto is ignored',
+      [clickAnim('a1', 'grp-1', 'group', 'auto')],
+      groupOf('ent-1'),
+      [],
+    ],
+    ['there are no animations', [], undefined, []],
+  ])('%s', (_label, animations, group, expected) => {
+    expect(findFor(animations, group)).toEqual(expected);
   });
 
-  it('ignores auto-trigger animations', () => {
-    const animations: Record<string, Animation> = {
-      a1: makeAnimation({ id: 'a1', targetId: 'ent-1', targetKind: 'entity', trigger: 'auto' }),
-    };
-    const groups: Record<string, EntityGroup> = {};
-    expect(findClickAnimationsForEntity('ent-1', animations, groups)).toEqual([]);
-  });
-
-  it('ignores animations targeting a different entity', () => {
-    const animations: Record<string, Animation> = {
-      a1: makeAnimation({ id: 'a1', targetId: 'ent-2', targetKind: 'entity', trigger: 'click' }),
-    };
-    const groups: Record<string, EntityGroup> = {};
-    expect(findClickAnimationsForEntity('ent-1', animations, groups)).toEqual([]);
-  });
-
-  it('returns multiple ids when several click animations target the same entity', () => {
-    const animations: Record<string, Animation> = {
-      a1: makeAnimation({ id: 'a1', targetId: 'ent-1', targetKind: 'entity', trigger: 'click' }),
-      a2: makeAnimation({ id: 'a2', targetId: 'ent-1', targetKind: 'entity', trigger: 'click' }),
-    };
-    const groups: Record<string, EntityGroup> = {};
-    const result = findClickAnimationsForEntity('ent-1', animations, groups);
+  it.each<[string, Animation[], EntityGroup | undefined]>([
+    [
+      'several click animations target the same entity',
+      [clickAnim('a1', 'ent-1', 'entity'), clickAnim('a2', 'ent-1', 'entity')],
+      undefined,
+    ],
+    [
+      'both direct and group targets apply in one call',
+      [clickAnim('a1', 'ent-1', 'entity'), clickAnim('a2', 'grp-1', 'group')],
+      groupOf('ent-1', 'ent-2'),
+    ],
+  ])('returns both ids when %s', (_label, animations, group) => {
+    const result = findFor(animations, group);
     expect(result).toContain('a1');
     expect(result).toContain('a2');
     expect(result.length).toBe(2);
-  });
-});
-
-describe('findClickAnimationsForEntity — group target', () => {
-  it('returns animation id when entity is a member of the targeted group', () => {
-    const animations: Record<string, Animation> = {
-      a1: makeAnimation({ id: 'a1', targetId: 'grp-1', targetKind: 'group', trigger: 'click' }),
-    };
-    const groups: Record<string, EntityGroup> = {
-      'grp-1': { id: 'grp-1', name: 'Group', memberIds: ['ent-1', 'ent-2'] },
-    };
-    expect(findClickAnimationsForEntity('ent-1', animations, groups)).toEqual(['a1']);
-  });
-
-  it('returns nothing when entity is NOT in the targeted group', () => {
-    const animations: Record<string, Animation> = {
-      a1: makeAnimation({ id: 'a1', targetId: 'grp-1', targetKind: 'group', trigger: 'click' }),
-    };
-    const groups: Record<string, EntityGroup> = {
-      'grp-1': { id: 'grp-1', name: 'Group', memberIds: ['ent-3'] },
-    };
-    expect(findClickAnimationsForEntity('ent-1', animations, groups)).toEqual([]);
-  });
-
-  it('returns nothing when the group does not exist', () => {
-    const animations: Record<string, Animation> = {
-      a1: makeAnimation({
-        id: 'a1',
-        targetId: 'grp-missing',
-        targetKind: 'group',
-        trigger: 'click',
-      }),
-    };
-    const groups: Record<string, EntityGroup> = {};
-    expect(findClickAnimationsForEntity('ent-1', animations, groups)).toEqual([]);
-  });
-
-  it('ignores group animation with trigger:auto', () => {
-    const animations: Record<string, Animation> = {
-      a1: makeAnimation({ id: 'a1', targetId: 'grp-1', targetKind: 'group', trigger: 'auto' }),
-    };
-    const groups: Record<string, EntityGroup> = {
-      'grp-1': { id: 'grp-1', name: 'Group', memberIds: ['ent-1'] },
-    };
-    expect(findClickAnimationsForEntity('ent-1', animations, groups)).toEqual([]);
-  });
-});
-
-describe('findClickAnimationsForEntity — mixed direct + group', () => {
-  it('collects from both direct and group targets in one call', () => {
-    const animations: Record<string, Animation> = {
-      a1: makeAnimation({ id: 'a1', targetId: 'ent-1', targetKind: 'entity', trigger: 'click' }),
-      a2: makeAnimation({ id: 'a2', targetId: 'grp-1', targetKind: 'group', trigger: 'click' }),
-    };
-    const groups: Record<string, EntityGroup> = {
-      'grp-1': { id: 'grp-1', name: 'Group', memberIds: ['ent-1', 'ent-2'] },
-    };
-    const result = findClickAnimationsForEntity('ent-1', animations, groups);
-    expect(result).toContain('a1');
-    expect(result).toContain('a2');
-    expect(result.length).toBe(2);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Smoke test: AnimationPlayer mounts without crashing
-// (per-frame three.js math is not testable in jsdom)
-// ---------------------------------------------------------------------------
-
-describe('AnimationPlayer — smoke test', () => {
-  it('findClickAnimationsForEntity returns [] for empty animations', () => {
-    // Pure function exercised without any DOM/WebGL dependency.
-    expect(findClickAnimationsForEntity('ent-1', {}, {})).toEqual([]);
   });
 });

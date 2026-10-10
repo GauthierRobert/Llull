@@ -31,16 +31,20 @@ beforeEach(() => {
   localDispatch('add_level', {});
 });
 
+/** Run a building command and select the `:body` entity it created (else the first affected). */
+function selectBody(command: string, params: unknown): void {
+  const { affected } = localDispatch(command, params);
+  useStore.getState().select([affected.find((id) => id.endsWith(':body')) ?? affected[0]!]);
+}
+
 describe('building element inspector', () => {
   it('shows steel member facts and dispatches only the changed fields', () => {
-    const { affected } = localDispatch('add_steel_member', {
+    selectBody('add_steel_member', {
       role: 'column',
       profile: 'HEB300',
       start: [0, 0, 0],
       end: [0, 0, 6000],
     });
-    const memberEntity = affected.find((id) => id.endsWith(':body')) ?? affected[0]!;
-    useStore.getState().select([memberEntity]);
     const dispatch = spyDispatch();
     render(<PropertiesPanel />);
     expect(screen.getByText(/HEB300/, { selector: '.props-number' })).toBeInTheDocument();
@@ -57,13 +61,12 @@ describe('building element inspector', () => {
   });
 
   it('keeps the top of steel of a beam on a section change unless unticked', () => {
-    const { affected } = localDispatch('add_steel_member', {
+    selectBody('add_steel_member', {
       role: 'beam',
       profile: 'IPE300',
       start: [0, 0, 4000],
       end: [6000, 0, 4000],
     });
-    useStore.getState().select([affected.find((id) => id.endsWith(':body')) ?? affected[0]!]);
     const dispatch = spyDispatch();
     render(<PropertiesPanel />);
     expect(screen.queryByTestId('member-keep-top')).toBeNull();
@@ -80,13 +83,12 @@ describe('building element inspector', () => {
   });
 
   it('does not dispatch when nothing changed', () => {
-    const { affected } = localDispatch('add_steel_member', {
+    selectBody('add_steel_member', {
       role: 'beam',
       profile: 'IPE300',
       start: [0, 0, 4000],
       end: [6000, 0, 4000],
     });
-    useStore.getState().select([affected.find((id) => id.endsWith(':body')) ?? affected[0]!]);
     const dispatch = spyDispatch();
     render(<PropertiesPanel />);
     expect(screen.getByLabelText('Start joint')).toBeInTheDocument();
@@ -95,12 +97,11 @@ describe('building element inspector', () => {
   });
 
   it('edits equipment through update_equipment', () => {
-    const { affected } = localDispatch('add_equipment', {
+    selectBody('add_equipment', {
       name: 'Press',
       location: [0, 0],
       size: [2000, 2000, 2000],
     });
-    useStore.getState().select([affected.find((id) => id.endsWith(':body')) ?? affected[0]!]);
     const dispatch = spyDispatch();
     render(<PropertiesPanel />);
     fireEvent.change(screen.getByTestId('equipment-edit-weight'), { target: { value: '1234' } });

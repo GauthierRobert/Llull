@@ -16,12 +16,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { useStore } from '@ui/store';
-import { type RevolutionEntity, createEmptyDocument } from '@core/model/types';
-import { localDispatch } from '../helpers/storeTestHelpers';
-
-function resetStore(): void {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
-}
+import { type RevolutionEntity } from '@core/model/types';
+import { type DispatchedEntity, dispatchEntity, resetStore } from '../helpers/componentEntities';
 
 // A simple closed square profile in the radial half-plane:
 // [radialOffset, axialOffset] — must have r >= 0 to avoid inside-out geometry.
@@ -37,36 +33,24 @@ const SQUARE_PROFILE: ReadonlyArray<readonly [number, number]> = [
 // ---------------------------------------------------------------------------
 
 describe('RevolutionMesh — revolve_profile command → kind "revolution"', () => {
-  beforeEach(() => {
-    resetStore();
-  });
+  beforeEach(resetStore);
+
+  const revolve = (
+    axis: [number, number, number],
+    angle: number,
+    segments: number,
+  ): DispatchedEntity =>
+    dispatchEntity('revolve_profile', { profile: SQUARE_PROFILE, axis, angle, segments });
 
   it('revolve_profile produces an entity with kind "revolution"', () => {
-    const result = localDispatch('revolve_profile', {
-      profile: SQUARE_PROFILE,
-      axis: [0, 0, 1],
-      angle: Math.PI * 2,
-      segments: 32,
-    });
-    expect(result.affected).toHaveLength(1);
-
-    const entityId = result.affected[0]!;
-    const entity = useStore.getState().document.entities[entityId];
-    expect(entity).toBeDefined();
-    expect(entity?.kind).toBe('revolution');
+    const { entity, affected } = revolve([0, 0, 1], Math.PI * 2, 32);
+    expect(affected).toHaveLength(1);
+    expect(entity.kind).toBe('revolution');
   });
 
   it('revolution entity carries the correct profile, axis, angle, and segments', () => {
-    const result = localDispatch('revolve_profile', {
-      profile: SQUARE_PROFILE,
-      axis: [0, 0, 1],
-      angle: Math.PI,
-      segments: 16,
-    });
-    const entityId = result.affected[0]!;
-    const entity = useStore.getState().document.entities[entityId] as RevolutionEntity | undefined;
-    if (!entity || entity.kind !== 'revolution') throw new Error('Expected revolution entity');
-
+    const entity = revolve([0, 0, 1], Math.PI, 16).entity as RevolutionEntity;
+    expect(entity.kind).toBe('revolution');
     expect(entity.profile).toEqual(SQUARE_PROFILE);
     expect(entity.axis).toEqual([0, 0, 1]);
     expect(entity.angle).toBeCloseTo(Math.PI, 5);
@@ -74,39 +58,18 @@ describe('RevolutionMesh — revolve_profile command → kind "revolution"', () 
   });
 
   it('revolution entity appears in document.order', () => {
-    const result = localDispatch('revolve_profile', {
-      profile: SQUARE_PROFILE,
-      axis: [0, 0, 1],
-      angle: Math.PI * 2,
-      segments: 32,
-    });
-    const entityId = result.affected[0]!;
-    expect(useStore.getState().document.order).toContain(entityId);
+    const { id } = revolve([0, 0, 1], Math.PI * 2, 32);
+    expect(useStore.getState().document.order).toContain(id);
   });
 
   it('revolution entity has a valid position (length 3)', () => {
-    const result = localDispatch('revolve_profile', {
-      profile: SQUARE_PROFILE,
-      axis: [0, 1, 0],
-      angle: Math.PI * 2,
-      segments: 24,
-    });
-    const entityId = result.affected[0]!;
-    const entity = useStore.getState().document.entities[entityId];
-    expect(entity?.position).toHaveLength(3);
+    expect(revolve([0, 1, 0], Math.PI * 2, 24).entity.position).toHaveLength(3);
   });
 
   it('partial revolution (angle=PI) creates a revolution entity', () => {
-    const result = localDispatch('revolve_profile', {
-      profile: SQUARE_PROFILE,
-      axis: [1, 0, 0],
-      angle: Math.PI,
-      segments: 12,
-    });
-    expect(result.affected).toHaveLength(1);
-    const entityId = result.affected[0]!;
-    const entity = useStore.getState().document.entities[entityId];
-    expect(entity?.kind).toBe('revolution');
+    const { entity, affected } = revolve([1, 0, 0], Math.PI, 12);
+    expect(affected).toHaveLength(1);
+    expect(entity.kind).toBe('revolution');
   });
 });
 

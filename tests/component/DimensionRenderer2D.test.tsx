@@ -23,389 +23,167 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '@ui/store';
-import { type DimensionEntity, createEmptyDocument } from '@core/model/types';
+import { type DimensionEntity, is2D } from '@core/model/types';
+import { isBatchable } from '@ui/viewport/3d/grouping';
 import { localDispatch } from '../helpers/storeTestHelpers';
+import { resetStore } from '../helpers/componentEntities';
 
-function resetStore(): void {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
-}
-
-// ---------------------------------------------------------------------------
-// Helpers — create referenced entities in the store
-// ---------------------------------------------------------------------------
-
-function addPoint(x: number, y: number): string {
-  const result = localDispatch('draw_point', { position: [x, y, 0] });
-  const id = result.affected[0];
-  if (!id) throw new Error('draw_point returned no affected id');
+function created(command: string, params: unknown): string {
+  const id = localDispatch(command, params).affected[0];
+  if (!id) throw new Error(`${command} returned no affected id`);
   return id;
 }
+const addPoint = (x: number, y: number): string => created('draw_point', { position: [x, y, 0] });
+const addLine = (x1: number, y1: number, x2: number, y2: number): string =>
+  created('draw_line', { start: [x1, y1, 0], end: [x2, y2, 0] });
+const addCircle = (cx: number, cy: number, r: number): string =>
+  created('draw_circle', { center: [cx, cy, 0], radius: r });
 
-function addLine(x1: number, y1: number, x2: number, y2: number): string {
-  const result = localDispatch('draw_line', {
-    start: [x1, y1, 0],
-    end: [x2, y2, 0],
-  });
-  const id = result.affected[0];
-  if (!id) throw new Error('draw_line returned no affected id');
-  return id;
+interface Dimensioned {
+  affected: readonly string[];
+  dimId: string | undefined;
+  dim: DimensionEntity;
 }
 
-function addCircle(cx: number, cy: number, r: number): string {
-  const result = localDispatch('draw_circle', {
-    center: [cx, cy, 0],
-    radius: r,
-  });
-  const id = result.affected[0];
-  if (!id) throw new Error('draw_circle returned no affected id');
-  return id;
+/** Dispatch add_dimension; `dim` is the created entity (undefined when the command no-ops). */
+function dimension(
+  dimensionKind: string,
+  entityIds: readonly string[],
+  extra: Record<string, unknown> = {},
+): Dimensioned {
+  const { affected } = localDispatch('add_dimension', { dimensionKind, entityIds, ...extra });
+  const dimId = affected[0];
+  const dim = (dimId ? useStore.getState().document.entities[dimId] : undefined) as DimensionEntity;
+  return { affected, dimId, dim };
 }
 
-// ---------------------------------------------------------------------------
-// 1. Linear dimension between two point entities
-// ---------------------------------------------------------------------------
+/** Linear dimension between two fresh points at (0,0) and (x,y). */
+const linearTo = (x: number, y: number, extra: Record<string, unknown> = {}): Dimensioned =>
+  dimension('linear', [addPoint(0, 0), addPoint(x, y)], extra);
 
-describe('DimensionRenderer2D — linear dimension between two points', () => {
-  beforeEach(() => {
-    resetStore();
-  });
+describe('DimensionRenderer2D', () => {
+  beforeEach(resetStore);
 
-  it('produces a dimension entity with kind "dimension" and dimensionKind "linear"', () => {
-    const idA = addPoint(0, 0);
-    const idB = addPoint(5, 0);
-
-    const result = localDispatch('add_dimension', {
-      dimensionKind: 'linear',
-      entityIds: [idA, idB],
+  describe('linear dimension between two points', () => {
+    it('produces a dimension entity with kind "dimension" and dimensionKind "linear"', () => {
+      const idA = addPoint(0, 0);
+      const idB = addPoint(5, 0);
+      const { affected, dim } = dimension('linear', [idA, idB]);
+      expect(affected).toHaveLength(1);
+      expect(dim.kind).toBe('dimension');
+      expect(dim.dimensionKind).toBe('linear');
+      expect(dim.entityIds).toEqual([idA, idB]);
     });
 
-    expect(result.affected).toHaveLength(1);
-    const dimId = result.affected[0]!;
-    const entity = useStore.getState().document.entities[dimId];
-    expect(entity).toBeDefined();
-    expect(entity?.kind).toBe('dimension');
-    const dim = entity as DimensionEntity;
-    expect(dim.dimensionKind).toBe('linear');
-    expect(dim.entityIds).toEqual([idA, idB]);
-  });
-
-  it('dimension entity appears in document.order', () => {
-    const idA = addPoint(0, 0);
-    const idB = addPoint(3, 4);
-    const result = localDispatch('add_dimension', {
-      dimensionKind: 'linear',
-      entityIds: [idA, idB],
-    });
-    const dimId = result.affected[0]!;
-    expect(useStore.getState().document.order).toContain(dimId);
-  });
-
-  it('linear dimension has offset 5 by default', () => {
-    const idA = addPoint(0, 0);
-    const idB = addPoint(10, 0);
-    const result = localDispatch('add_dimension', {
-      dimensionKind: 'linear',
-      entityIds: [idA, idB],
-    });
-    const dimId = result.affected[0]!;
-    const dim = useStore.getState().document.entities[dimId] as DimensionEntity;
-    // offset defaults to undefined in entity (stored only when explicitly passed)
-    expect(dim.offset).toBeUndefined();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 2. Radial dimension on a circle
-// ---------------------------------------------------------------------------
-
-describe('DimensionRenderer2D — radial dimension on a circle', () => {
-  beforeEach(() => {
-    resetStore();
-  });
-
-  it('produces a radial dimension entity referencing the circle', () => {
-    const circleId = addCircle(0, 0, 4);
-    const result = localDispatch('add_dimension', {
-      dimensionKind: 'radial',
-      entityIds: [circleId],
+    it('dimension entity appears in document.order', () => {
+      const { dimId } = linearTo(3, 4);
+      expect(useStore.getState().document.order).toContain(dimId);
     });
 
-    expect(result.affected).toHaveLength(1);
-    const dimId = result.affected[0]!;
-    const dim = useStore.getState().document.entities[dimId] as DimensionEntity;
-    expect(dim.kind).toBe('dimension');
-    expect(dim.dimensionKind).toBe('radial');
-    expect(dim.entityIds[0]).toBe(circleId);
-  });
-
-  it('referenced circle is still in the document (no crash from dimension creation)', () => {
-    const circleId = addCircle(2, 3, 7);
-    localDispatch('add_dimension', {
-      dimensionKind: 'radial',
-      entityIds: [circleId],
+    it('offset is stored only when explicitly passed (undefined by default)', () => {
+      expect(linearTo(10, 0).dim.offset).toBeUndefined();
     });
-    // Both circle and dimension should be in the store.
-    const doc = useStore.getState().document;
-    expect(doc.entities[circleId]).toBeDefined();
-    expect(doc.entities[circleId]?.kind).toBe('circle');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 3. Angular dimension on 3 point entities
-// ---------------------------------------------------------------------------
-
-describe('DimensionRenderer2D — angular dimension on 3 points', () => {
-  beforeEach(() => {
-    resetStore();
   });
 
-  it('produces an angular dimension entity with 3 entityIds', () => {
-    const vertex = addPoint(0, 0);
-    const armA = addPoint(5, 0);
-    const armB = addPoint(0, 5);
-
-    const result = localDispatch('add_dimension', {
-      dimensionKind: 'angular',
-      entityIds: [vertex, armA, armB],
+  describe('radial dimension on a circle', () => {
+    it('produces a radial dimension entity referencing the circle', () => {
+      const circleId = addCircle(0, 0, 4);
+      const { affected, dim } = dimension('radial', [circleId]);
+      expect(affected).toHaveLength(1);
+      expect(dim.kind).toBe('dimension');
+      expect(dim.dimensionKind).toBe('radial');
+      expect(dim.entityIds[0]).toBe(circleId);
     });
 
-    expect(result.affected).toHaveLength(1);
-    const dimId = result.affected[0]!;
-    const dim = useStore.getState().document.entities[dimId] as DimensionEntity;
-    expect(dim.dimensionKind).toBe('angular');
-    expect(dim.entityIds).toHaveLength(3);
-    expect(dim.entityIds[0]).toBe(vertex);
-    expect(dim.entityIds[1]).toBe(armA);
-    expect(dim.entityIds[2]).toBe(armB);
-  });
-
-  it('angular dimension between 90° arms is stored correctly', () => {
-    const vertex = addPoint(0, 0);
-    const armA = addPoint(1, 0); // along +X → 0°
-    const armB = addPoint(0, 1); // along +Y → 90°
-
-    const result = localDispatch('add_dimension', {
-      dimensionKind: 'angular',
-      entityIds: [vertex, armA, armB],
+    it('referenced circle is still in the document (no crash from dimension creation)', () => {
+      const circleId = addCircle(2, 3, 7);
+      dimension('radial', [circleId]);
+      expect(useStore.getState().document.entities[circleId]?.kind).toBe('circle');
     });
-    // The dimension entity exists — angle computation happens at render time.
-    expect(result.affected).toHaveLength(1);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 4. Missing reference entity → add_dimension no-ops gracefully
-// ---------------------------------------------------------------------------
-
-describe('DimensionRenderer2D — missing reference entity', () => {
-  beforeEach(() => {
-    resetStore();
   });
 
-  it('add_dimension with a non-existent entity id returns no-op', () => {
-    const idA = addPoint(0, 0);
-    const result = localDispatch('add_dimension', {
-      dimensionKind: 'linear',
-      entityIds: [idA, 'does-not-exist'],
-    });
-    // Command should guard against missing refs → no entity created.
-    expect(result.affected).toHaveLength(0);
-    expect(useStore.getState().document.order).toHaveLength(1); // only the point
-  });
-
-  it('no crash when both references are missing', () => {
-    const result = localDispatch('add_dimension', {
-      dimensionKind: 'linear',
-      entityIds: ['ghost-a', 'ghost-b'],
-    });
-    expect(result.affected).toHaveLength(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 5. Wrong-kind reference (radial on a line → command no-op)
-// ---------------------------------------------------------------------------
-
-describe('DimensionRenderer2D — wrong-kind reference for radial', () => {
-  beforeEach(() => {
-    resetStore();
-  });
-
-  it('radial dimension pointing at a line entity is rejected by the command', () => {
-    const lineId = addLine(0, 0, 5, 5);
-    const result = localDispatch('add_dimension', {
-      dimensionKind: 'radial',
-      entityIds: [lineId],
-    });
-    // add_dimension guards radial kind → must be circle/arc/ellipse.
-    expect(result.affected).toHaveLength(0);
-  });
-
-  it('linear dimension pointing at a circle entity is rejected by the command', () => {
-    const circleId = addCircle(0, 0, 3);
-    const idB = addPoint(5, 5);
-    const result = localDispatch('add_dimension', {
-      dimensionKind: 'linear',
-      entityIds: [circleId, idB],
-    });
-    expect(result.affected).toHaveLength(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 6. Precision override
-// ---------------------------------------------------------------------------
-
-describe('DimensionRenderer2D — precision override', () => {
-  beforeEach(() => {
-    resetStore();
-  });
-
-  it('entity.precision is stored when precision param is provided', () => {
-    const idA = addPoint(0, 0);
-    const idB = addPoint(10, 0);
-    const result = localDispatch('add_dimension', {
-      dimensionKind: 'linear',
-      entityIds: [idA, idB],
-      precision: 1,
-    });
-    const dimId = result.affected[0]!;
-    const dim = useStore.getState().document.entities[dimId] as DimensionEntity;
-    expect(dim.precision).toBe(1);
-  });
-
-  it('entity.precision is undefined when not provided (uses document displayPrecision)', () => {
-    const idA = addPoint(0, 0);
-    const idB = addPoint(10, 0);
-    const result = localDispatch('add_dimension', {
-      dimensionKind: 'linear',
-      entityIds: [idA, idB],
-    });
-    const dimId = result.affected[0]!;
-    const dim = useStore.getState().document.entities[dimId] as DimensionEntity;
-    // Not set → undefined; renderer falls back to doc.displayPrecision.
-    expect(dim.precision).toBeUndefined();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 7. Label override
-// ---------------------------------------------------------------------------
-
-describe('DimensionRenderer2D — label override', () => {
-  beforeEach(() => {
-    resetStore();
-  });
-
-  it('entity.label is stored when label param is provided', () => {
-    const idA = addPoint(0, 0);
-    const idB = addPoint(10, 0);
-    const result = localDispatch('add_dimension', {
-      dimensionKind: 'linear',
-      entityIds: [idA, idB],
-      label: 'REF',
-    });
-    const dimId = result.affected[0]!;
-    const dim = useStore.getState().document.entities[dimId] as DimensionEntity;
-    expect(dim.label).toBe('REF');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 8. dimension is NOT batchable (not routed through instanced renderer)
-// ---------------------------------------------------------------------------
-
-describe('DimensionRenderer2D — not routed through instanced renderer', () => {
-  beforeEach(() => {
-    resetStore();
-  });
-
-  it('isBatchable returns false for a dimension entity', async () => {
-    const { isBatchable } = await import('../../src/ui/viewport/3d/grouping');
-    const idA = addPoint(0, 0);
-    const idB = addPoint(5, 0);
-    const result = localDispatch('add_dimension', {
-      dimensionKind: 'linear',
-      entityIds: [idA, idB],
-    });
-    const dimId = result.affected[0]!;
-    const entity = useStore.getState().document.entities[dimId]!;
-    expect(isBatchable(entity)).toBe(false);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 9. Aligned dimension
-// ---------------------------------------------------------------------------
-
-describe('DimensionRenderer2D — aligned dimension', () => {
-  beforeEach(() => {
-    resetStore();
-  });
-
-  it('produces an aligned dimension entity with dimensionKind "aligned"', () => {
-    const idA = addPoint(0, 0);
-    const idB = addPoint(3, 4);
-    const result = localDispatch('add_dimension', {
-      dimensionKind: 'aligned',
-      entityIds: [idA, idB],
-      offset: 2,
-    });
-    expect(result.affected).toHaveLength(1);
-    const dimId = result.affected[0]!;
-    const dim = useStore.getState().document.entities[dimId] as DimensionEntity;
-    expect(dim.dimensionKind).toBe('aligned');
-    expect(dim.offset).toBe(2);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 10. Angular dimension using line entities
-// ---------------------------------------------------------------------------
-
-describe('DimensionRenderer2D — angular dimension using lines', () => {
-  beforeEach(() => {
-    resetStore();
-  });
-
-  it('angular dimension accepts vertex point + 2 line entities', () => {
-    const vertex = addPoint(0, 0);
-    const lineA = addLine(0, 0, 5, 0);
-    const lineB = addLine(0, 0, 0, 5);
-
-    const result = localDispatch('add_dimension', {
-      dimensionKind: 'angular',
-      entityIds: [vertex, lineA, lineB],
+  describe('angular dimension on 3 points', () => {
+    it('produces an angular dimension entity with 3 entityIds', () => {
+      const ids = [addPoint(0, 0), addPoint(5, 0), addPoint(0, 5)];
+      const { affected, dim } = dimension('angular', ids);
+      expect(affected).toHaveLength(1);
+      expect(dim.dimensionKind).toBe('angular');
+      expect(dim.entityIds).toEqual(ids);
     });
 
-    expect(result.affected).toHaveLength(1);
-    const dimId = result.affected[0]!;
-    const dim = useStore.getState().document.entities[dimId] as DimensionEntity;
-    expect(dim.dimensionKind).toBe('angular');
-    expect(dim.entityIds[0]).toBe(vertex);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 11. is2D returns true for dimension entity
-// ---------------------------------------------------------------------------
-
-describe('DimensionRenderer2D — is2D classification', () => {
-  beforeEach(() => {
-    resetStore();
-  });
-
-  it('is2D returns true for a dimension entity', async () => {
-    const { is2D } = await import('@core/model/types');
-    const idA = addPoint(0, 0);
-    const idB = addPoint(5, 0);
-    const result = localDispatch('add_dimension', {
-      dimensionKind: 'linear',
-      entityIds: [idA, idB],
+    it('angular dimension between 90° arms is stored correctly', () => {
+      // Angle computation happens at render time; the entity must exist.
+      const { affected } = dimension('angular', [addPoint(0, 0), addPoint(1, 0), addPoint(0, 1)]);
+      expect(affected).toHaveLength(1);
     });
-    const dimId = result.affected[0]!;
-    const entity = useStore.getState().document.entities[dimId]!;
-    expect(is2D(entity)).toBe(true);
+  });
+
+  describe('missing reference entity', () => {
+    it('add_dimension with a non-existent entity id returns no-op', () => {
+      const idA = addPoint(0, 0);
+      expect(dimension('linear', [idA, 'does-not-exist']).affected).toHaveLength(0);
+      expect(useStore.getState().document.order).toHaveLength(1); // only the point
+    });
+
+    it('no crash when both references are missing', () => {
+      expect(dimension('linear', ['ghost-a', 'ghost-b']).affected).toHaveLength(0);
+    });
+  });
+
+  describe('wrong-kind reference', () => {
+    it('radial dimension pointing at a line entity is rejected by the command', () => {
+      expect(dimension('radial', [addLine(0, 0, 5, 5)]).affected).toHaveLength(0);
+    });
+
+    it('linear dimension pointing at a circle entity is rejected by the command', () => {
+      expect(dimension('linear', [addCircle(0, 0, 3), addPoint(5, 5)]).affected).toHaveLength(0);
+    });
+  });
+
+  describe('precision and label overrides', () => {
+    it('entity.precision is stored when precision param is provided', () => {
+      expect(linearTo(10, 0, { precision: 1 }).dim.precision).toBe(1);
+    });
+
+    it('entity.precision is undefined when not provided (uses document displayPrecision)', () => {
+      expect(linearTo(10, 0).dim.precision).toBeUndefined();
+    });
+
+    it('entity.label is stored when label param is provided', () => {
+      expect(linearTo(10, 0, { label: 'REF' }).dim.label).toBe('REF');
+    });
+  });
+
+  describe('classification', () => {
+    it('isBatchable returns false for a dimension entity (not routed through instancing)', () => {
+      expect(isBatchable(linearTo(5, 0).dim)).toBe(false);
+    });
+
+    it('is2D returns true for a dimension entity', () => {
+      expect(is2D(linearTo(5, 0).dim)).toBe(true);
+    });
+  });
+
+  describe('aligned and line-based angular dimensions', () => {
+    it('produces an aligned dimension entity with dimensionKind "aligned"', () => {
+      const { affected, dim } = dimension('aligned', [addPoint(0, 0), addPoint(3, 4)], {
+        offset: 2,
+      });
+      expect(affected).toHaveLength(1);
+      expect(dim.dimensionKind).toBe('aligned');
+      expect(dim.offset).toBe(2);
+    });
+
+    it('angular dimension accepts vertex point + 2 line entities', () => {
+      const vertex = addPoint(0, 0);
+      const { affected, dim } = dimension('angular', [
+        vertex,
+        addLine(0, 0, 5, 0),
+        addLine(0, 0, 0, 5),
+      ]);
+      expect(affected).toHaveLength(1);
+      expect(dim.dimensionKind).toBe('angular');
+      expect(dim.entityIds[0]).toBe(vertex);
+    });
   });
 });

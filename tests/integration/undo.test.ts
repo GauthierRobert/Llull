@@ -15,7 +15,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { liveSnapshot, localDispatch, flushPromises, getState } from '../helpers/storeTestHelpers';
-import type { ServerCommandResponse } from '@ui/store/serverCommands';
+import { mockFetch } from '../helpers/integrationFetch';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -34,63 +34,86 @@ function resetStore(): void {
   });
 }
 
-function mockFetch(response: ServerCommandResponse): ReturnType<typeof vi.fn> {
-  const spy = vi.fn().mockResolvedValue({
-    ok: true,
-    json: () => Promise.resolve(response),
-  });
-  vi.stubGlobal('fetch', spy);
-  return spy;
-}
+describe.each([
+  {
+    op: 'undo',
+    path: 'undo',
+    summary: 'Undone.',
+    canUndo: false,
+    canRedo: true,
+    networkError: 'Network down',
+  },
+  {
+    op: 'redo',
+    path: 'redo',
+    summary: 'Redone.',
+    canUndo: true,
+    canRedo: false,
+    networkError: 'Timeout',
+  },
+] as const)(
+  '$op — server-authoritative',
+  ({ op, path, summary, canUndo, canRedo, networkError }) => {
+    const response = { summary, affected: [], isError: false, canUndo, canRedo };
 
-// ---------------------------------------------------------------------------
-// undo()
-// ---------------------------------------------------------------------------
+    beforeEach(() => {
+      resetStore();
+    });
 
-describe('undo — server-authoritative', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it(`${op}() POSTs to /${path}`, async () => {
+      const spy = mockFetch(response);
+
+      getState()[op]();
+      await flushPromises();
+
+      expect(spy).toHaveBeenCalledOnce();
+      const [url, init] = spy.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe(`http://localhost:3001/${path}`);
+      expect(init.method).toBe('POST');
+    });
+
+    it(`${op}() updates lastSummary from the server response`, async () => {
+      mockFetch(response);
+
+      getState()[op]();
+      await flushPromises();
+
+      expect(getState().lastSummary).toBe(summary);
+    });
+
+    it(`${op}() updates canUndo and canRedo from the server response`, async () => {
+      mockFetch(response);
+
+      getState()[op]();
+      await flushPromises();
+
+      expect(getState().canUndo).toBe(canUndo);
+      expect(getState().canRedo).toBe(canRedo);
+    });
+
+    it(`${op}() sets liveStatus to disconnected on network failure`, async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error(networkError)));
+
+      getState()[op]();
+      await flushPromises();
+
+      expect(getState().liveStatus).toBe('disconnected');
+      expect(getState().lastSummary).toContain('ran locally');
+    });
+  },
+);
+
+describe('undo — document arrives via live sync', () => {
   beforeEach(() => {
     resetStore();
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
-  });
-
-  it('undo() POSTs to /undo', async () => {
-    const spy = mockFetch({
-      summary: 'Undone.',
-      affected: [],
-      isError: false,
-      canUndo: false,
-      canRedo: true,
-    });
-
-    getState().undo();
-    await flushPromises();
-
-    expect(spy).toHaveBeenCalledOnce();
-    const [url, init] = spy.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('http://localhost:3001/undo');
-    expect(init.method).toBe('POST');
-  });
-
-  it('undo() updates lastSummary from the server response', async () => {
-    mockFetch({ summary: 'Undone.', affected: [], isError: false, canUndo: false, canRedo: true });
-
-    getState().undo();
-    await flushPromises();
-
-    expect(getState().lastSummary).toBe('Undone.');
-  });
-
-  it('undo() updates canUndo and canRedo from the server response', async () => {
-    mockFetch({ summary: 'Undone.', affected: [], isError: false, canUndo: false, canRedo: true });
-
-    getState().undo();
-    await flushPromises();
-
-    expect(getState().canUndo).toBe(false);
-    expect(getState().canRedo).toBe(true);
   });
 
   it('undo() document update arrives via hydrateLiveDocument (not from response)', async () => {
@@ -111,77 +134,6 @@ describe('undo — server-authoritative', () => {
     const emptyDoc = createEmptyDocument();
     getState().hydrateLiveDocument(liveSnapshot(emptyDoc));
     expect(getState().document.order).toHaveLength(0);
-  });
-
-  it('undo() sets liveStatus to disconnected on network failure', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network down')));
-
-    getState().undo();
-    await flushPromises();
-
-    expect(getState().liveStatus).toBe('disconnected');
-    expect(getState().lastSummary).toContain('ran locally');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// redo()
-// ---------------------------------------------------------------------------
-
-describe('redo — server-authoritative', () => {
-  beforeEach(() => {
-    resetStore();
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it('redo() POSTs to /redo', async () => {
-    const spy = mockFetch({
-      summary: 'Redone.',
-      affected: [],
-      isError: false,
-      canUndo: true,
-      canRedo: false,
-    });
-
-    getState().redo();
-    await flushPromises();
-
-    expect(spy).toHaveBeenCalledOnce();
-    const [url, init] = spy.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('http://localhost:3001/redo');
-    expect(init.method).toBe('POST');
-  });
-
-  it('redo() updates lastSummary from the server response', async () => {
-    mockFetch({ summary: 'Redone.', affected: [], isError: false, canUndo: true, canRedo: false });
-
-    getState().redo();
-    await flushPromises();
-
-    expect(getState().lastSummary).toBe('Redone.');
-  });
-
-  it('redo() updates canUndo and canRedo from the server response', async () => {
-    mockFetch({ summary: 'Redone.', affected: [], isError: false, canUndo: true, canRedo: false });
-
-    getState().redo();
-    await flushPromises();
-
-    expect(getState().canUndo).toBe(true);
-    expect(getState().canRedo).toBe(false);
-  });
-
-  it('redo() sets liveStatus to disconnected on network failure', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Timeout')));
-
-    getState().redo();
-    await flushPromises();
-
-    expect(getState().liveStatus).toBe('disconnected');
-    expect(getState().lastSummary).toContain('ran locally');
   });
 });
 

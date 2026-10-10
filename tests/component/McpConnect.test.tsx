@@ -134,12 +134,16 @@ describe('McpConnect — close behavior', () => {
 // McpConnect modal — focus management
 // ---------------------------------------------------------------------------
 
+const openDialog = async (): Promise<HTMLElement> => {
+  await act(async () => {
+    render(<McpConnect onClose={() => undefined} />);
+  });
+  return screen.getByRole('dialog');
+};
+
 describe('McpConnect — focus management', () => {
   it('focuses the first focusable element on open', async () => {
-    await act(async () => {
-      render(<McpConnect onClose={() => undefined} />);
-    });
-    const dialog = screen.getByRole('dialog');
+    const dialog = await openDialog();
     const firstBtn = dialog.querySelector('button');
     await waitFor(() => {
       expect(document.activeElement).toBe(firstBtn);
@@ -147,10 +151,7 @@ describe('McpConnect — focus management', () => {
   });
 
   it('wraps Tab from the last focusable element back to the first', async () => {
-    await act(async () => {
-      render(<McpConnect onClose={() => undefined} />);
-    });
-    const dialog = screen.getByRole('dialog');
+    const dialog = await openDialog();
     const buttons = Array.from(dialog.querySelectorAll<HTMLElement>('button'));
     const last = buttons[buttons.length - 1];
     expect(last).toBeTruthy();
@@ -164,10 +165,7 @@ describe('McpConnect — focus management', () => {
   });
 
   it('wraps Shift+Tab from the first focusable element back to the last', async () => {
-    await act(async () => {
-      render(<McpConnect onClose={() => undefined} />);
-    });
-    const dialog = screen.getByRole('dialog');
+    const dialog = await openDialog();
     const buttons = Array.from(dialog.querySelectorAll<HTMLElement>('button'));
     const first = buttons[0];
     const last = buttons[buttons.length - 1];
@@ -261,28 +259,24 @@ describe('McpConnectButton', () => {
 // ---------------------------------------------------------------------------
 
 describe('McpConnect — copy buttons', () => {
-  it('Copy button for install+start command calls clipboard.writeText with the full command', async () => {
+  it.each<[string, RegExp, string]>([
+    [
+      'install+start command (the full command)',
+      /copy install and start command/i,
+      'npm --prefix server install && npm --prefix server run dev',
+    ],
+    ['endpoint URL (the correct port-3001 URL)', /copy endpoint url/i, 'http://localhost:3001/mcp'],
+    [
+      'read cad://conventions (the tool name)',
+      /copy read cad:\/\/conventions tool name/i,
+      'read cad://conventions',
+    ],
+  ])('Copy button for %s calls clipboard.writeText', async (_label, name, expected) => {
     render(<McpConnect onClose={() => undefined} />);
-    const copyBtns = screen.getAllByRole('button', { name: /copy install and start command/i });
+    const copyBtns = screen.getAllByRole('button', { name });
     expect(copyBtns.length).toBeGreaterThanOrEqual(1);
     fireEvent.click(copyBtns[0]!);
-
-    await waitFor(() => {
-      expect(writeTextMock).toHaveBeenCalledWith(
-        'npm --prefix server install && npm --prefix server run dev',
-      );
-    });
-  });
-
-  it('Copy button for endpoint URL calls clipboard.writeText with the correct port-3001 URL', async () => {
-    render(<McpConnect onClose={() => undefined} />);
-    const copyBtns = screen.getAllByRole('button', { name: /copy endpoint url/i });
-    expect(copyBtns.length).toBeGreaterThanOrEqual(1);
-    fireEvent.click(copyBtns[0]!);
-
-    await waitFor(() => {
-      expect(writeTextMock).toHaveBeenCalledWith('http://localhost:3001/mcp');
-    });
+    await waitFor(() => expect(writeTextMock).toHaveBeenCalledWith(expected));
   });
 
   it('Copy button shows "Copied!" label after click', async () => {
@@ -294,19 +288,6 @@ describe('McpConnect — copy buttons', () => {
       expect(
         screen.getByRole('button', { name: /install and start command copied/i }),
       ).toBeDefined();
-    });
-  });
-
-  it('Copy button for read cad://conventions calls clipboard.writeText with the tool name', async () => {
-    render(<McpConnect onClose={() => undefined} />);
-    const copyBtns = screen.getAllByRole('button', {
-      name: /copy read cad:\/\/conventions tool name/i,
-    });
-    expect(copyBtns.length).toBeGreaterThanOrEqual(1);
-    fireEvent.click(copyBtns[0]!);
-
-    await waitFor(() => {
-      expect(writeTextMock).toHaveBeenCalledWith('read cad://conventions');
     });
   });
 });

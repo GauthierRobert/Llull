@@ -46,6 +46,27 @@ function patchDispatch(spy: ReturnType<typeof vi.fn>): void {
   useStore.setState({ dispatch: spy } as any);
 }
 
+function textbox(root: HTMLElement, name: RegExp): HTMLInputElement {
+  return within(root).getByRole('textbox', { name }) as HTMLInputElement;
+}
+
+/** Type a configuration name into the create form. */
+function fillName(form: HTMLElement, value: string): HTMLInputElement {
+  const input = textbox(form, /^configuration name$/i);
+  fireEvent.change(input, { target: { value } });
+  return input;
+}
+
+/** Type a parameter name + expression into 1-based `row` of the create form. */
+function fillRow(form: HTMLElement, row: number, name: string, expression: string): void {
+  fireEvent.change(textbox(form, new RegExp(`parameter name for row ${row}`, 'i')), {
+    target: { value: name },
+  });
+  fireEvent.change(textbox(form, new RegExp(`expression for row ${row}`, 'i')), {
+    target: { value: expression },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Rendering tests
 // ---------------------------------------------------------------------------
@@ -187,13 +208,9 @@ describe('ConfigurationsPanel — create form', () => {
   it('Create button is enabled when name and one param row are filled', () => {
     render(<ConfigurationsPanel />);
 
-    const nameInput = screen.getByRole('textbox', { name: /^configuration name$/i });
-    fireEvent.change(nameInput, { target: { value: 'myconfig' } });
-
-    const paramNameInput = screen.getByRole('textbox', { name: /parameter name for row 1/i });
-    const exprInput = screen.getByRole('textbox', { name: /expression for row 1/i });
-    fireEvent.change(paramNameInput, { target: { value: 'w' } });
-    fireEvent.change(exprInput, { target: { value: '20' } });
+    const form = screen.getByTestId('config-create-form');
+    fillName(form, 'myconfig');
+    fillRow(form, 1, 'w', '20');
 
     const createBtn = screen.getByRole('button', {
       name: /create configuration/i,
@@ -208,13 +225,8 @@ describe('ConfigurationsPanel — create form', () => {
     render(<ConfigurationsPanel />);
 
     const form = screen.getByTestId('config-create-form');
-    const nameInput = within(form).getByRole('textbox', { name: /^configuration name$/i });
-    const paramNameInput = within(form).getByRole('textbox', { name: /parameter name for row 1/i });
-    const exprInput = within(form).getByRole('textbox', { name: /expression for row 1/i });
-
-    fireEvent.change(nameInput, { target: { value: 'compact' } });
-    fireEvent.change(paramNameInput, { target: { value: 'width' } });
-    fireEvent.change(exprInput, { target: { value: '30' } });
+    fillName(form, 'compact');
+    fillRow(form, 1, 'width', '30');
     fireEvent.submit(form);
 
     expect(dispatchSpy).toHaveBeenCalledWith(
@@ -231,24 +243,12 @@ describe('ConfigurationsPanel — create form', () => {
     render(<ConfigurationsPanel />);
 
     const form = screen.getByTestId('config-create-form');
-    const nameInput = within(form).getByRole('textbox', { name: /^configuration name$/i });
-    fireEvent.change(nameInput, { target: { value: 'full' } });
-
-    // Fill first row
-    const row0Name = within(form).getByRole('textbox', { name: /parameter name for row 1/i });
-    const row0Expr = within(form).getByRole('textbox', { name: /expression for row 1/i });
-    fireEvent.change(row0Name, { target: { value: 'w' } });
-    fireEvent.change(row0Expr, { target: { value: '40' } });
+    fillName(form, 'full');
+    fillRow(form, 1, 'w', '40');
 
     // Add second row
-    const addRowBtn = screen.getByRole('button', { name: /add parameter row/i });
-    fireEvent.click(addRowBtn);
-
-    // Fill second row
-    const row1Name = within(form).getByRole('textbox', { name: /parameter name for row 2/i });
-    const row1Expr = within(form).getByRole('textbox', { name: /expression for row 2/i });
-    fireEvent.change(row1Name, { target: { value: 'h' } });
-    fireEvent.change(row1Expr, { target: { value: '20' } });
+    fireEvent.click(screen.getByRole('button', { name: /add parameter row/i }));
+    fillRow(form, 2, 'h', '20');
 
     fireEvent.submit(form);
 
@@ -272,31 +272,14 @@ describe('ConfigurationsPanel — create form', () => {
     render(<ConfigurationsPanel />);
 
     const form = screen.getByTestId('config-create-form');
-    const nameInput = within(form).getByRole('textbox', {
-      name: /^configuration name$/i,
-    }) as HTMLInputElement;
-    const paramNameInput = within(form).getByRole('textbox', {
-      name: /parameter name for row 1/i,
-    }) as HTMLInputElement;
-    const exprInput = within(form).getByRole('textbox', {
-      name: /expression for row 1/i,
-    }) as HTMLInputElement;
-
-    fireEvent.change(nameInput, { target: { value: 'temp' } });
-    fireEvent.change(paramNameInput, { target: { value: 'r' } });
-    fireEvent.change(exprInput, { target: { value: '5' } });
+    const nameInput = fillName(form, 'temp');
+    fillRow(form, 1, 'r', '5');
     fireEvent.submit(form);
 
     // The reset row is a fresh React key, so re-query rather than reuse the old elements.
     expect(nameInput.value).toBe('');
-    const freshName = within(form).getByRole('textbox', {
-      name: /parameter name for row 1/i,
-    }) as HTMLInputElement;
-    const freshExpr = within(form).getByRole('textbox', {
-      name: /expression for row 1/i,
-    }) as HTMLInputElement;
-    expect(freshName.value).toBe('');
-    expect(freshExpr.value).toBe('');
+    expect(textbox(form, /parameter name for row 1/i).value).toBe('');
+    expect(textbox(form, /expression for row 1/i).value).toBe('');
   });
 });
 
@@ -313,16 +296,8 @@ describe('ConfigurationsPanel — rejected create', () => {
     );
     render(<ConfigurationsPanel />);
     const form = screen.getByTestId('config-create-form');
-    const nameInput = within(form).getByRole('textbox', {
-      name: /^configuration name$/i,
-    }) as HTMLInputElement;
-    fireEvent.change(nameInput, { target: { value: 'keep' } });
-    fireEvent.change(within(form).getByRole('textbox', { name: /parameter name for row 1/i }), {
-      target: { value: 'r' },
-    });
-    fireEvent.change(within(form).getByRole('textbox', { name: /expression for row 1/i }), {
-      target: { value: '5' },
-    });
+    const nameInput = fillName(form, 'keep');
+    fillRow(form, 1, 'r', '5');
     fireEvent.submit(form);
     expect(nameInput.value).toBe('keep');
   });

@@ -24,6 +24,7 @@ import {
   groupEntitiesForInstancing,
   entityIdFromInstanceId,
   isBatchable,
+  type InstanceBatch,
 } from '../../src/ui/viewport/3d/grouping';
 import { makeMaterialArgs } from '@ui/viewport/3d/InstancedRenderer';
 
@@ -191,29 +192,18 @@ describe('InstancedRenderer integration — cylinder and sphere batching', () =>
     resetStore();
   });
 
-  it('3 identical cylinders → 1 batch', () => {
+  it.each([
+    ['cylinder', 'add_cylinder', { radius: 5, height: 12 }],
+    ['sphere', 'add_sphere', { radius: 7 }],
+  ])('3 identical %ss → 1 batch', (kind, command, params) => {
     for (let i = 0; i < 3; i++) {
-      localDispatch('add_cylinder', { radius: 5, height: 12 });
+      localDispatch(command, params);
     }
 
-    const entities = getVisibleEntities();
-    const batches = groupEntitiesForInstancing(entities);
+    const batches = groupEntitiesForInstancing(getVisibleEntities());
     expect(batches.size).toBe(1);
     const [batch] = batches.values();
-    expect(batch!.kind).toBe('cylinder');
-    expect(batch!.entities).toHaveLength(3);
-  });
-
-  it('3 identical spheres → 1 batch', () => {
-    for (let i = 0; i < 3; i++) {
-      localDispatch('add_sphere', { radius: 7 });
-    }
-
-    const entities = getVisibleEntities();
-    const batches = groupEntitiesForInstancing(entities);
-    expect(batches.size).toBe(1);
-    const [batch] = batches.values();
-    expect(batch!.kind).toBe('sphere');
+    expect(batch!.kind).toBe(kind);
     expect(batch!.entities).toHaveLength(3);
   });
 
@@ -233,35 +223,29 @@ describe('InstancedRenderer integration — entityIdFromInstanceId', () => {
     resetStore();
   });
 
-  it('instanceId maps to a valid entity id in the document', () => {
+  function fiveBoxBatch(): InstanceBatch {
     for (let i = 0; i < 5; i++) {
       localDispatch('add_box', { size: [3, 3, 3] });
     }
+    const [batch] = groupEntitiesForInstancing(getVisibleEntities()).values();
+    return batch!;
+  }
 
-    const entities = getVisibleEntities();
-    const batches = groupEntitiesForInstancing(entities);
-    const [batch] = batches.values();
-
+  it('instanceId maps to a valid entity id in the document', () => {
+    const batch = fiveBoxBatch();
     const entityIds = new Set(useStore.getState().document.order);
     for (let i = 0; i < 5; i++) {
-      const id = entityIdFromInstanceId(batch!, i);
+      const id = entityIdFromInstanceId(batch, i);
       expect(id).toBeDefined();
       expect(entityIds.has(id!)).toBe(true);
     }
   });
 
   it('each instanceId maps to a distinct entity id (no duplicates)', () => {
-    for (let i = 0; i < 5; i++) {
-      localDispatch('add_box', { size: [3, 3, 3] });
-    }
-
-    const entities = getVisibleEntities();
-    const batches = groupEntitiesForInstancing(entities);
-    const [batch] = batches.values();
-
+    const batch = fiveBoxBatch();
     const seen = new Set<string>();
     for (let i = 0; i < 5; i++) {
-      const id = entityIdFromInstanceId(batch!, i);
+      const id = entityIdFromInstanceId(batch, i);
       expect(id).toBeDefined();
       expect(seen.has(id!)).toBe(false);
       seen.add(id!);

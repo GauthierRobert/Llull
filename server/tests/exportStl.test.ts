@@ -61,6 +61,18 @@ describe('GET /export/stl — ascii (default)', () => {
   });
 });
 
+function getBinaryStl(): Promise<request.Response> {
+  return request(app)
+    .get('/export/stl')
+    .query({ format: 'binary' })
+    .buffer(true)
+    .parse((res, callback) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk: Buffer) => chunks.push(chunk));
+      res.on('end', () => callback(null, Buffer.concat(chunks)));
+    });
+}
+
 // ---------------------------------------------------------------------------
 // (b) Binary download
 // ---------------------------------------------------------------------------
@@ -69,15 +81,7 @@ describe('GET /export/stl — binary', () => {
   it('returns 200 with raw binary body of correct length', async () => {
     applyCommand('add_box', { size: [1, 1, 1], position: [0, 0, 0] });
 
-    const res = await request(app)
-      .get('/export/stl')
-      .query({ format: 'binary' })
-      .buffer(true)
-      .parse((res, callback) => {
-        const chunks: Buffer[] = [];
-        res.on('data', (chunk: Buffer) => chunks.push(chunk));
-        res.on('end', () => callback(null, Buffer.concat(chunks)));
-      });
+    const res = await getBinaryStl();
 
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toMatch(/model\/stl/);
@@ -113,15 +117,7 @@ describe('GET /export/stl — empty document', () => {
   });
 
   it('returns 200 with a valid empty binary STL (84 bytes) for an empty document', async () => {
-    const res = await request(app)
-      .get('/export/stl')
-      .query({ format: 'binary' })
-      .buffer(true)
-      .parse((res, callback) => {
-        const chunks: Buffer[] = [];
-        res.on('data', (chunk: Buffer) => chunks.push(chunk));
-        res.on('end', () => callback(null, Buffer.concat(chunks)));
-      });
+    const res = await getBinaryStl();
 
     expect(res.status).toBe(200);
     const buf = res.body as Buffer;

@@ -204,6 +204,20 @@ async function openSession(token: string): Promise<string> {
   return session;
 }
 
+async function callAddBox(token: string, session: string): Promise<ReturnType<typeof rpcResult>> {
+  const response = await mcp(
+    token,
+    {
+      jsonrpc: '2.0',
+      id: 3,
+      method: 'tools/call',
+      params: { name: 'add_box', arguments: { size: [1, 1, 1] } },
+    },
+    session,
+  );
+  return rpcResult(response.text);
+}
+
 describe('roles over MCP', () => {
   it('rejects an unknown token on /mcp', async () => {
     expect((await mcp('nope', { jsonrpc: '2.0', id: 1, method: 'ping' })).status).toBe(401);
@@ -223,40 +237,14 @@ describe('roles over MCP', () => {
     const names = (list.tools ?? []).map((t) => t.name);
     expect(names).not.toContain('add_box');
     expect(names).toContain('search_tools');
-    const call = rpcResult(
-      (
-        await mcp(
-          VIEWER.token,
-          {
-            jsonrpc: '2.0',
-            id: 3,
-            method: 'tools/call',
-            params: { name: 'add_box', arguments: { size: [1, 1, 1] } },
-          },
-          session,
-        )
-      ).text,
-    );
+    const call = await callAddBox(VIEWER.token, session);
     expect(call.isError).toBe(true);
     expect(call.content?.[0]?.text).toMatch(/Forbidden.*viewer/);
   });
 
   it('editor mutates, and another user cannot reuse the session', async () => {
     const session = await openSession(EDITOR.token);
-    const call = rpcResult(
-      (
-        await mcp(
-          EDITOR.token,
-          {
-            jsonrpc: '2.0',
-            id: 3,
-            method: 'tools/call',
-            params: { name: 'add_box', arguments: { size: [1, 1, 1] } },
-          },
-          session,
-        )
-      ).text,
-    );
+    const call = await callAddBox(EDITOR.token, session);
     expect(call.isError).toBe(false);
     const stolen = await mcp(
       VIEWER.token,

@@ -94,6 +94,25 @@ function resetStore(liveStatus: 'connecting' | 'disconnected'): void {
 
 const state = (): ReturnType<typeof useStore.getState> => useStore.getState();
 
+const refuseAddBox = (name: string): number | undefined => (name === 'add_box' ? 413 : undefined);
+
+async function connectAndFlush(): Promise<void> {
+  state().setLiveStatus('connected');
+  await vi.advanceTimersByTimeAsync(0);
+}
+
+/** Dispatch add_box during the connect grace; the scripted server holds its reply. */
+async function graceRunAddBox(server: ReturnType<typeof scriptedServer>): Promise<void> {
+  server.holdNext();
+  state().dispatch('add_box', { size: [1, 1, 1] });
+  await vi.advanceTimersByTimeAsync(CONNECT_GRACE_MS);
+}
+
+function seedServerBox(): { seeded: ReturnType<typeof execute>; serverBoxId: string } {
+  const seeded = execute(createEmptyDocument(), 'add_box', { size: [2, 2, 2] });
+  return { seeded, serverBoxId: seeded.affected[0] ?? '' };
+}
+
 describe('outbox — permanent HTTP errors', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => {
@@ -104,12 +123,10 @@ describe('outbox — permanent HTTP errors', () => {
 
   it('a grace-run command later refused with 413 leaves the outbox, and later commands sync', async () => {
     resetStore('connecting');
-    const server = scriptedServer((name) => (name === 'add_box' ? 413 : undefined));
+    const server = scriptedServer(refuseAddBox);
     vi.stubGlobal('fetch', server.fetch);
 
-    server.holdNext();
-    state().dispatch('add_box', { size: [1, 1, 1] });
-    await vi.advanceTimersByTimeAsync(CONNECT_GRACE_MS);
+    await graceRunAddBox(server);
     expect(state().localOutbox.map((entry) => entry.name)).toEqual(['add_box']);
 
     server.release();
@@ -120,8 +137,7 @@ describe('outbox — permanent HTTP errors', () => {
     state().dispatch('add_sphere', { radius: 1 });
     expect(state().localOutbox.map((entry) => entry.name)).toEqual(['add_sphere']);
 
-    state().setLiveStatus('connected');
-    await vi.advanceTimersByTimeAsync(0);
+    await connectAndFlush();
     expect(server.applied()).toEqual(['add_sphere']);
     expect(state().syncState).toBe('idle');
     expect(state().hasUnsyncedLocalEdits).toBe(false);
@@ -133,11 +149,10 @@ describe('outbox — permanent HTTP errors', () => {
     state().dispatch('add_box', { size: [1, 1, 1] });
     state().dispatch('add_sphere', { radius: 1 });
     expect(state().localOutbox).toHaveLength(2);
-    const server = scriptedServer((name) => (name === 'add_box' ? 413 : undefined));
+    const server = scriptedServer(refuseAddBox);
     vi.stubGlobal('fetch', server.fetch);
 
-    state().setLiveStatus('connected');
-    await vi.advanceTimersByTimeAsync(0);
+    await connectAndFlush();
 
     expect(server.applied()).toEqual(['add_sphere']);
     expect(state().localOutbox).toHaveLength(0);
@@ -154,8 +169,7 @@ describe('outbox — permanent HTTP errors', () => {
     const server = scriptedServer((_name, attempt) => (attempt === 1 ? status : undefined));
     vi.stubGlobal('fetch', server.fetch);
 
-    state().setLiveStatus('connected');
-    await vi.advanceTimersByTimeAsync(0);
+    await connectAndFlush();
     expect(state().syncState).toBe('failed');
     expect(state().localOutbox).toHaveLength(1);
 
@@ -166,22 +180,17 @@ describe('outbox — permanent HTTP errors', () => {
   });
 
   it('drops later entries that reference an id created by a refused entry (no server edit)', async () => {
-    const seeded = execute(createEmptyDocument(), 'add_box', { size: [2, 2, 2] });
-    const serverBoxId = seeded.affected[0] ?? '';
+    const { seeded, serverBoxId } = seedServerBox();
     resetStore('disconnected');
     state().dispatch('add_box', { size: [1, 1, 1] });
     const localBoxId = state().localOutbox[0]?.affected[0];
     expect(localBoxId).toBe(serverBoxId); // the raw local id would hit an unrelated server box
     state().dispatch('move_entity', { id: localBoxId, delta: [5, 0, 0] });
     state().dispatch('add_sphere', { radius: 1 });
-    const server = scriptedServer(
-      (name) => (name === 'add_box' ? 413 : undefined),
-      seeded.document,
-    );
+    const server = scriptedServer(refuseAddBox, seeded.document);
     vi.stubGlobal('fetch', server.fetch);
 
-    state().setLiveStatus('connected');
-    await vi.advanceTimersByTimeAsync(0);
+    await connectAndFlush();
 
     expect(server.applied()).toEqual(['add_sphere']);
     expect(server.doc().entities[serverBoxId]?.position).toEqual(
@@ -194,18 +203,12 @@ describe('outbox — permanent HTTP errors', () => {
   });
 
   it('a refused grace-run add_box poisons its id for the queued move_entity', async () => {
-    const seeded = execute(createEmptyDocument(), 'add_box', { size: [2, 2, 2] });
-    const serverBoxId = seeded.affected[0] ?? '';
+    const { seeded, serverBoxId } = seedServerBox();
     resetStore('connecting');
-    const server = scriptedServer(
-      (name) => (name === 'add_box' ? 413 : undefined),
-      seeded.document,
-    );
+    const server = scriptedServer(refuseAddBox, seeded.document);
     vi.stubGlobal('fetch', server.fetch);
 
-    server.holdNext();
-    state().dispatch('add_box', { size: [1, 1, 1] });
-    await vi.advanceTimersByTimeAsync(CONNECT_GRACE_MS);
+    await graceRunAddBox(server);
     const localBoxId = state().localOutbox[0]?.affected[0];
     expect(localBoxId).toBe(serverBoxId);
     server.release();
@@ -214,8 +217,7 @@ describe('outbox — permanent HTTP errors', () => {
 
     state().dispatch('move_entity', { id: localBoxId, delta: [5, 0, 0] });
     expect(state().localOutbox.map((entry) => entry.name)).toEqual(['move_entity']);
-    state().setLiveStatus('connected');
-    await vi.advanceTimersByTimeAsync(0);
+    await connectAndFlush();
 
     expect(server.applied()).toEqual([]);
     expect(server.doc().entities[serverBoxId]?.position).toEqual(
@@ -225,8 +227,7 @@ describe('outbox — permanent HTTP errors', () => {
   });
 
   it('a refused edit of a server-held entity does not poison it for later entries', async () => {
-    const seeded = execute(createEmptyDocument(), 'add_box', { size: [2, 2, 2] });
-    const serverBoxId = seeded.affected[0] ?? '';
+    const { seeded, serverBoxId } = seedServerBox();
     resetStore('disconnected');
     useStore.setState({ liveBase: seeded.document, document: seeded.document });
     state().dispatch('move_entity', { id: serverBoxId, delta: [1, 0, 0] });
@@ -237,8 +238,7 @@ describe('outbox — permanent HTTP errors', () => {
     );
     vi.stubGlobal('fetch', server.fetch);
 
-    state().setLiveStatus('connected');
-    await vi.advanceTimersByTimeAsync(0);
+    await connectAndFlush();
 
     expect(server.applied()).toEqual(['move_entity']);
     expect(state().lastSummary).toContain('refused 1');
@@ -255,8 +255,7 @@ describe('outbox — permanent HTTP errors', () => {
     );
     vi.stubGlobal('fetch', server.fetch);
 
-    state().setLiveStatus('connected');
-    await vi.advanceTimersByTimeAsync(0);
+    await connectAndFlush();
 
     expect(server.applied()).toEqual(['add_box', 'move_entity']);
     expect(state().lastSummary).toContain('refused 1');
@@ -296,8 +295,7 @@ describe('outbox — permanent HTTP errors', () => {
     state().dispatch('move_entity', { id: boxId, delta: [0, 1, 0] });
     const server = scriptedServer(() => undefined);
     vi.stubGlobal('fetch', server.fetch);
-    state().setLiveStatus('connected');
-    await vi.advanceTimersByTimeAsync(0);
+    await connectAndFlush();
 
     expect(server.applied()).toEqual(['add_box', 'move_entity']);
     expect(state().lastSummary).not.toContain('depends on refused');
@@ -314,8 +312,7 @@ describe('outbox — permanent HTTP errors', () => {
       const server = scriptedServer(() => status);
       vi.stubGlobal('fetch', server.fetch);
 
-      state().setLiveStatus('connected');
-      await vi.advanceTimersByTimeAsync(0);
+      await connectAndFlush();
       expect(state().localOutbox.map((entry) => entry.name)).toEqual(['add_box', 'add_sphere']);
       expect(state().document.order).toEqual(localOrder);
       expect(state().hasUnsyncedLocalEdits).toBe(true);
@@ -337,9 +334,7 @@ describe('outbox — permanent HTTP errors', () => {
     const server = scriptedServer(() => 403);
     vi.stubGlobal('fetch', server.fetch);
 
-    server.holdNext();
-    state().dispatch('add_box', { size: [1, 1, 1] });
-    await vi.advanceTimersByTimeAsync(CONNECT_GRACE_MS);
+    await graceRunAddBox(server);
     server.release();
     await vi.advanceTimersByTimeAsync(0);
     expect(state().localOutbox.map((entry) => entry.name)).toEqual(['add_box']);
@@ -352,15 +347,12 @@ describe('outbox — permanent HTTP errors', () => {
     const server = scriptedServer((_name, attempt) => (attempt === 1 ? 500 : undefined));
     vi.stubGlobal('fetch', server.fetch);
 
-    server.holdNext();
-    state().dispatch('add_box', { size: [1, 1, 1] });
-    await vi.advanceTimersByTimeAsync(CONNECT_GRACE_MS);
+    await graceRunAddBox(server);
     server.release();
     await vi.advanceTimersByTimeAsync(0);
     expect(state().localOutbox).toHaveLength(1);
 
-    state().setLiveStatus('connected');
-    await vi.advanceTimersByTimeAsync(0);
+    await connectAndFlush();
     expect(server.applied()).toEqual(['add_box']);
     expect(state().syncState).toBe('idle');
   });

@@ -27,10 +27,16 @@ import {
   getState,
 } from '../helpers/storeTestHelpers';
 import type { ServerCommandResponse } from '@ui/store/serverCommands';
+import { mockFetch } from '../helpers/integrationFetch';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/** Run a command locally and return the first affected id. */
+function dispatchId(name: string, params: unknown): string {
+  return localDispatch(name, params).affected[0]!;
+}
 
 function resetStore(): void {
   useStore.getState().setDocument(createEmptyDocument());
@@ -59,19 +65,6 @@ async function reconnectTo(server: ReturnType<typeof simulatedServer>): Promise<
   useStore.setState({ liveStatus: 'connected' });
   getState().hydrateLiveDocument(liveSnapshot(createEmptyDocument()));
   await vi.waitFor(() => expect(getState().syncState).toBe('idle'));
-}
-
-/**
- * Build a mock fetch that resolves with the given ServerCommandResponse.
- * Also returns a spy so callers can assert it was called.
- */
-function mockFetch(response: ServerCommandResponse): ReturnType<typeof vi.fn> {
-  const spy = vi.fn().mockResolvedValue({
-    ok: true,
-    json: () => Promise.resolve(response),
-  });
-  vi.stubGlobal('fetch', spy);
-  return spy;
 }
 
 const DEFAULT_RESPONSE: ServerCommandResponse = {
@@ -254,18 +247,15 @@ describe('CadStore — networked dispatch', () => {
   // ── select ────────────────────────────────────────────────────────────────
 
   it('select sets document.selection to the provided ids', () => {
-    const r = localDispatch('add_box', { size: [1, 1, 1] });
-    const id = r.affected[0]!;
+    const id = dispatchId('add_box', { size: [1, 1, 1] });
 
     getState().select([id]);
     expect(getState().document.selection).toEqual([id]);
   });
 
   it('select replaces the entire selection (not additive)', () => {
-    const r1 = localDispatch('add_box', { size: [1, 1, 1] });
-    const r2 = localDispatch('add_box', { size: [2, 2, 2] });
-    const id1 = r1.affected[0]!;
-    const id2 = r2.affected[0]!;
+    const id1 = dispatchId('add_box', { size: [1, 1, 1] });
+    const id2 = dispatchId('add_box', { size: [2, 2, 2] });
 
     getState().select([id1]);
     getState().select([id2]);
@@ -274,8 +264,7 @@ describe('CadStore — networked dispatch', () => {
   });
 
   it('select is immutable — previous document is not mutated', () => {
-    const r = localDispatch('add_box', { size: [1, 1, 1] });
-    const id = r.affected[0]!;
+    const id = dispatchId('add_box', { size: [1, 1, 1] });
     const docBefore = getState().document;
 
     getState().select([id]);
@@ -287,16 +276,14 @@ describe('CadStore — networked dispatch', () => {
   // ── toggleSelection ───────────────────────────────────────────────────────
 
   it('toggleSelection adds an id that is not currently selected', () => {
-    const r = localDispatch('add_box', { size: [1, 1, 1] });
-    const id = r.affected[0]!;
+    const id = dispatchId('add_box', { size: [1, 1, 1] });
 
     getState().toggleSelection(id);
     expect(getState().document.selection).toContain(id);
   });
 
   it('toggleSelection removes an id that is already selected', () => {
-    const r = localDispatch('add_box', { size: [1, 1, 1] });
-    const id = r.affected[0]!;
+    const id = dispatchId('add_box', { size: [1, 1, 1] });
 
     getState().select([id]);
     getState().toggleSelection(id);
@@ -304,10 +291,8 @@ describe('CadStore — networked dispatch', () => {
   });
 
   it('toggleSelection preserves other selected ids', () => {
-    const r1 = localDispatch('add_box', { size: [1, 1, 1] });
-    const r2 = localDispatch('add_box', { size: [2, 2, 2] });
-    const id1 = r1.affected[0]!;
-    const id2 = r2.affected[0]!;
+    const id1 = dispatchId('add_box', { size: [1, 1, 1] });
+    const id2 = dispatchId('add_box', { size: [2, 2, 2] });
 
     getState().select([id1, id2]);
     getState().toggleSelection(id1);
@@ -318,8 +303,7 @@ describe('CadStore — networked dispatch', () => {
   // ── clearSelection ────────────────────────────────────────────────────────
 
   it('clearSelection empties document.selection', () => {
-    const r = localDispatch('add_box', { size: [1, 1, 1] });
-    const id = r.affected[0]!;
+    const id = dispatchId('add_box', { size: [1, 1, 1] });
 
     getState().select([id]);
     expect(getState().document.selection).toHaveLength(1);

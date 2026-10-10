@@ -24,6 +24,17 @@ const cubeEntity = (size: number): Entity =>
   }) as Entity;
 
 const cube = leaf(cubeEntity(4));
+const drill = (): Entity =>
+  ({
+    id: 'd',
+    kind: 'cylinder',
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+    radius: 1,
+    height: 10,
+    layerId: 'layer-default',
+    color: '#888888',
+  }) as unknown as Entity;
 const shell = (source: ShapeRecipe, thickness: number): ShapeRecipe => ({
   op: 'shell',
   source,
@@ -91,17 +102,7 @@ describe('occt chamfer / fillet on true B-rep edges', () => {
   });
 
   it('fillets a boolean result on its exact circular edge (a filleted hole lip)', () => {
-    const drill = {
-      id: 'd',
-      kind: 'cylinder',
-      position: [0, 0, 0],
-      rotation: [0, 0, 0],
-      radius: 1,
-      height: 10,
-      layerId: 'layer-default',
-      color: '#888888',
-    } as unknown as Entity;
-    const drilled: ShapeRecipe = { op: 'boolean', boolean: 'subtract', a: cube, b: leaf(drill) };
+    const drilled: ShapeRecipe = { op: 'boolean', boolean: 'subtract', a: cube, b: leaf(drill()) };
     const topology = occt.topology(occt.evaluate(drilled)!)!;
     const lip = topology.edges.find((edge) => edge.curve === 'circle');
     expect(lip).toBeDefined();
@@ -123,17 +124,12 @@ describe('occt chamfer / fillet on true B-rep edges', () => {
   });
 
   it('writes exact STEP: analytic planes and a cylinder, no triangulated faces', () => {
-    const drill = {
-      id: 'd',
-      kind: 'cylinder',
-      position: [0, 0, 0],
-      rotation: [0, 0, 0],
-      radius: 1,
-      height: 10,
-      layerId: 'layer-default',
-      color: '#888888',
-    } as unknown as Entity;
-    const drilled = occt.evaluate({ op: 'boolean', boolean: 'subtract', a: cube, b: leaf(drill) })!;
+    const drilled = occt.evaluate({
+      op: 'boolean',
+      boolean: 'subtract',
+      a: cube,
+      b: leaf(drill()),
+    })!;
     const step = occt.exportStep([drilled]);
     expect(step).toMatch(/^ISO-10303-21;/);
     expect(step).toMatch(/CYLINDRICAL_SURFACE/);
