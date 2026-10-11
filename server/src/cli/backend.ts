@@ -8,10 +8,12 @@
 import fs from 'fs';
 import path from 'path';
 import { execute } from '@core/commands/registry';
+import { defaultContext } from '@core/commands/context';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence/serialization';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
+import type { StepObserver } from './progress';
 
 /** One command outcome, the same shape whichever backend ran it. */
 export interface CliRunResult {
@@ -60,6 +62,8 @@ export function writeDocumentFile(docPath: string, doc: CadDocument): void {
 interface LocalOptions {
   /** Run and report, but never write the document file. */
   readonly dryRun: boolean;
+  /** Watches `build_project` steps: progress lines, per-step timing, the `--timeout` deadline. */
+  readonly observer?: StepObserver;
 }
 
 /** Offline backend over a document file: load, `execute`, save when the document changed. */
@@ -95,7 +99,14 @@ export function createLocalBackend(docPath: string, options: LocalOptions): CliB
     run(name, params) {
       try {
         const prior = doc ?? readDocumentFile(docPath);
-        const result = execute(prior, name, params);
+        const result = execute(
+          prior,
+          name,
+          params,
+          options.observer !== undefined
+            ? { ...defaultContext(), onStep: options.observer.onStep }
+            : undefined,
+        );
         const changed = result.document !== prior;
         doc = result.document;
         if (changed && !options.dryRun) writeDocumentFile(docPath, result.document);
@@ -104,7 +115,9 @@ export function createLocalBackend(docPath: string, options: LocalOptions): CliB
           affected: result.affected,
           isError: result.rejected === true,
           changed,
-          ...(result.data !== undefined ? { data: result.data } : {}),
+          ...(result.data !== undefined
+            ? { data: options.observer?.withDurations(result.data) ?? result.data }
+            : {}),
         });
       } catch (error) {
         return Promise.resolve({
@@ -150,6 +163,8 @@ const REMOTE_TIMEOUT_MS = 120_000;
 
 interface RemoteOptions {
   readonly token: string | undefined;
+  /** `--timeout` in seconds: how long one call may take (default 120 s). */
+  readonly timeoutSeconds?: number;
   /** Injected for tests; the global `fetch` otherwise. */
   readonly fetchImpl?: FetchLike;
 }
@@ -157,6 +172,8 @@ interface RemoteOptions {
 /** Backend over a running llull server: every call goes through its command bus (shared history). */
 export function createRemoteBackend(serverUrl: string, options: RemoteOptions): CliBackend {
   const base = serverUrl.replace(/\/+$/, '');
+  const timeoutMs =
+    options.timeoutSeconds !== undefined ? options.timeoutSeconds * 1000 : REMOTE_TIMEOUT_MS;
   const fetchImpl: FetchLike = options.fetchImpl ?? ((url, init) => fetch(url, init));
   const post = async (route: string, body: unknown): Promise<CliRunResult> => {
     try {
@@ -167,7 +184,7 @@ export function createRemoteBackend(serverUrl: string, options: RemoteOptions): 
           ...(options.token !== undefined ? { Authorization: `Bearer ${options.token}` } : {}),
         },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(REMOTE_TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMs),
       });
       const text = await response.text();
       let parsed: unknown = null;
@@ -178,6 +195,14 @@ export function createRemoteBackend(serverUrl: string, options: RemoteOptions): 
       }
       return resultOfBody(parsed, response.status);
     } catch (error) {
+      if (error instanceof Error && error.name === 'TimeoutError') {
+        return {
+          summary: `Timed out after ${timeoutMs / 1000}s waiting for the llull server at ${base}${options.timeoutSeconds !== undefined ? ' (--timeout)' : ''}; the server may still be running the command.`,
+          affected: [],
+          isError: true,
+          changed: false,
+        };
+      }
       return {
         summary: `Cannot reach the llull server at ${base}: ${errorMessage(error)} (start it with npm --prefix server run dev, or drop --server to work on a local file).`,
         affected: [],

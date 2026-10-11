@@ -106,6 +106,22 @@ export interface ParamSpec extends ParamItemSpec {
  */
 export type CommandLookup = (name: string) => CommandDefinition<unknown> | undefined;
 
+/** Progress of a running `build_project`: a `start` and an `end` event per executed command. */
+export interface PlanStepEvent {
+  readonly phase: 'start' | 'end';
+  /** 1-based ordinal of this executed command (loop iterations count one each). */
+  readonly ordinal: number;
+  /** Executed commands the plan expands to (an upper bound when a step fails or is skipped). */
+  readonly total: number;
+  readonly command: string;
+  /** Index of the plan action this command belongs to. */
+  readonly index: number;
+  /** `end` only: whether the step succeeded. */
+  readonly ok?: boolean;
+  /** `end` only: position of the step's report in `data.steps`. */
+  readonly stepPosition?: number;
+}
+
 export interface ExecutionContext {
   /** Geometry kernel for booleans/fillets; null while none is installed or loaded. */
   readonly kernel: GeometryKernel | null;
@@ -127,4 +143,9 @@ export interface ExecutionContext {
    * context keeps one cache per installed kernel.
    */
   readonly replayCache: ReplayCache | null;
+  /**
+   * Observer of `build_project` execution (CLI progress, timeouts); a throw aborts the plan.
+   * Optional and side-effect only: it never changes a result.
+   */
+  readonly onStep?: (event: PlanStepEvent) => void;
 }

@@ -13,6 +13,7 @@ const BOOLEAN_FLAGS: ReadonlySet<string> = new Set([
   'force',
   'help',
   'quiet',
+  'progress',
 ]);
 
 export interface ParsedArgv {
@@ -61,7 +62,16 @@ export function parseArgv(argv: readonly string[]): ParsedArgv {
 }
 
 /** Flags that need a value; `--save` alone is a mistake, never "on". */
-const VALUE_FLAGS = ['doc', 'server', 'token', 'save', 'kernel', 'toolset', 'limit'] as const;
+const VALUE_FLAGS = [
+  'doc',
+  'server',
+  'token',
+  'save',
+  'kernel',
+  'toolset',
+  'limit',
+  'timeout',
+] as const;
 
 /** The first value flag given without a value, or undefined. */
 export function missingValueFlag(parsed: ParsedArgv): string | undefined {

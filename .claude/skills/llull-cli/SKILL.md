@@ -58,6 +58,23 @@ available with no CLI change. Code: `server/src/cli/` · help: `llull help`.
 `summary`, `affected`, `changed`, `data`, `saved`) · `--quiet` · `--kernel occt` (exact B-rep:
 `export_step_exact`, real fillets).
 
+## Long plans: progress, timing, timeout
+- `llull run plan.json --progress` (automatic on a terminal) streams `[12/189] boolean_subtract … 3.2s`
+  per step to stderr, announcing kernel commands (booleans, fillets) before they start so a slow OCC
+  boolean does not look like a hang. Steps over 10 s always print a `warning: slow step` line.
+- Every step of the `--json` report carries `durationMs` (text mode shows steps over 1 s as `[3.2s]`).
+  Local runs only: with `--server` the server runs the plan (progress/durations are not streamed).
+- `--timeout SEC` bounds a whole run: exit `1`, "timed out after SEC s (--timeout) before step n/N",
+  nothing saved. Local: checked before each plan step, plus a hard kill 5 s after the deadline for a
+  single step that never ends (the CLI supervises itself in a child process); `--server`: per-request
+  limit (default 120 s; the server may still finish the command).
+
+## Exports carry names and colors
+`export_gltf` writes one node per entity (name from `set_entity_name`, else id), a PBR material per
+distinct color and group nodes for `group_entities` groups; `export_obj` one `o` object per entity;
+`export_stl perEntity=true` one named solid per entity; `export_step_exact` (OCC) names each STEP
+product after the entity (group name in the description) and colors its solid. Name entities before exporting.
+
 ## Exit codes (script on them)
 `0` ok · `1` the command failed, a plan step failed, a change command changed nothing (read the
 summary; setters and history commands are exempt), or `--save` could not write · `2` usage
