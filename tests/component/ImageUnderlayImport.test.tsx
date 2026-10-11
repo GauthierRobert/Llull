@@ -1,0 +1,36 @@
+/**
+ * The underlay import button reads the chosen PNG/JPEG as a data URL and dispatches
+ * `add_image_underlay` (locked, named after the file); the command does the rest.
+ *
+ * @layer tests/component
+ */
+
+import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { ImageUnderlayImport } from '@ui/components/ImageUnderlayImport';
+import { spyDispatch } from '../helpers/storeTestHelpers';
+import { pngBytes } from '../helpers/imageFixtures';
+
+describe('ImageUnderlayImport', () => {
+  it('dispatches add_image_underlay with the file as a data URL', async () => {
+    const dispatch = spyDispatch();
+    render(<ImageUnderlayImport />);
+    const file = new File([Uint8Array.from(pngBytes(32, 16)).buffer], 'section.png', {
+      type: 'image/png',
+    });
+    fireEvent.change(screen.getByLabelText('Image underlay file'), { target: { files: [file] } });
+    await waitFor(() => expect(dispatch).toHaveBeenCalledTimes(1));
+    const [name, params] = dispatch.mock.calls[0] as [string, Record<string, unknown>];
+    expect(name).toBe('add_image_underlay');
+    expect(params['dataUrl']).toMatch(/^data:image\/png;base64,/);
+    expect(params).toMatchObject({ name: 'section.png', locked: true });
+  });
+
+  it('opens the file chooser from the button and ignores an empty choice', () => {
+    const dispatch = spyDispatch();
+    render(<ImageUnderlayImport />);
+    fireEvent.click(screen.getByRole('button', { name: /image underlay/i }));
+    fireEvent.change(screen.getByLabelText('Image underlay file'), { target: { files: [] } });
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+});

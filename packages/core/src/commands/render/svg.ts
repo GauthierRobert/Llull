@@ -1,7 +1,8 @@
-import type { Vec3 } from '../../model/types';
+import type { ImageEntity, Vec3 } from '../../model/types';
 import { type Polygon3D } from './types';
 import { add3, scale3 } from '../../lib/vec3';
 import { type Camera, type Projector, makeProjector, shade } from './camera';
+import { underlaySvg } from './underlays';
 
 export const MAX_POLYGONS = 4000;
 
@@ -38,6 +39,7 @@ export function svgDot(center: readonly [number, number], attributes: string): s
 /** Build the complete SVG string. */
 export function buildSvg(
   polygons: Polygon3D[],
+  underlays: readonly ImageEntity[],
   cam: Camera,
   orthoHalf: number,
   width: number,
@@ -47,12 +49,13 @@ export function buildSvg(
 ): string {
   const project = makeProjector(cam, orthoHalf, width, height);
   // Painter's algorithm: `depth` grows away from the camera, so draw farthest first so nearer
-  // faces paint on top. Strokes (2D) always draw on top.
+  // faces paint on top. Strokes (2D) always draw on top; image underlays sit below everything.
   const filled = polygons.filter((p) => !p.stroke).sort((a, b) => b.depth - a.depth);
   const stroked = polygons.filter((p) => p.stroke);
 
   return svgDocument(width, height, [
     buildGroundGrid(project, cam.target, orthoHalf),
+    ...underlays.map((image) => underlaySvg(image, project)),
     ...[...filled, ...stroked].map((poly) => polygonSvg(poly, project)),
     buildAxisTriad(project, cam.target, width, height, orthoHalf),
     `  <text x="8" y="20" font-family="monospace" font-size="13" fill="#aaaacc">${viewName.toUpperCase()} | ${entityCount} entit${entityCount === 1 ? 'y' : 'ies'}</text>`,

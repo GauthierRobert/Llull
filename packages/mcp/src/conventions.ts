@@ -159,6 +159,12 @@ wildly unexpected orientation. Always use radians.
 | \`export_step\`     | Exact B-rep STEP file (server Python bridge)       |
 | \`import_step\`     | STEP solids → named, coloured mesh entities        |
 
+To trace a scanned drawing instead of estimating scale by eye: \`add_image_underlay\` (PNG/JPEG
+data URL), \`calibrate_underlay\` (two pixel points + their real distance; optional \`origin\` pins a
+pixel to a world point, \`align\` de-skews), then \`image_to_world\` turns pixel coordinates read
+off the picture (origin top-left, +y down) into model [x, y] points for \`draw_polyline\`,
+\`extrude_profile\` or \`revolve_profile\`.
+
 To read or rework a whole model at once, call \`export_code\` (language "cadquery"):
 the code lists every parameter, dimension and feature in build order. Edit it and
 send it back with \`import_code\` to regenerate an editable feature history.

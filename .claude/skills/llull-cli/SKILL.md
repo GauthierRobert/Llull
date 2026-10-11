@@ -49,6 +49,8 @@ available with no CLI change. Code: `server/src/cli/` · help: `llull help`.
   (string-typed params stay strings: `name=123` is `"123"`).
   Quote for the shell: `'position=[0,0,5]'`, `"name=top plate"`.
 - One JSON object: `'{"size":[1,2,3]}'` · a file: `@params.json` · stdin: `-`.
+- A value `@img:scan.png` is read as a PNG/JPEG data URL: trace a drawing with
+  `llull add_image_underlay dataUrl=@img:scan.png`, then `calibrate_underlay` and `image_to_world`.
 - `llull <command> …` is shorthand for `llull exec <command> …`.
 
 ## Flags

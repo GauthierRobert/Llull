@@ -13,6 +13,7 @@ import { validateShapeRecipe } from '../../geometry/shapeRecipe';
 import { chainIssue } from '../../geometry/curveSegments';
 import type { CurveSegment } from '../../model/curve';
 import { isVec2 } from '../../lib/vec2';
+import { MAX_IMAGE_DATA_URL_LENGTH } from '../limits';
 
 export function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === 'string');
@@ -30,7 +31,22 @@ const POSITIVE_FIELDS: Readonly<Record<string, readonly string[]>> = {
   rectangle: ['width', 'height'],
   ellipse: ['radiusX', 'radiusY'],
   text: ['height'],
+  image: ['width', 'height', 'pixelWidth', 'pixelHeight'],
 };
+
+/** First problem of a saved image underlay's raster fields, or null (the payload is not decoded). */
+function imageProblem(v: Record<string, unknown>): string | null {
+  const dataUrl = v['dataUrl'];
+  if (typeof dataUrl !== 'string' || !/^data:image\/(png|jpeg|jpg);base64,/.test(dataUrl))
+    return 'dataUrl must be a base64 data:image/png or data:image/jpeg URL';
+  if (dataUrl.length > MAX_IMAGE_DATA_URL_LENGTH)
+    return `dataUrl exceeds ${MAX_IMAGE_DATA_URL_LENGTH} characters`;
+  const opacity = v['opacity'];
+  if (!isFiniteNumber(opacity) || opacity < 0 || opacity > 1)
+    return `opacity must be in [0, 1], got ${String(opacity)}`;
+  if (typeof v['locked'] !== 'boolean') return 'locked must be a boolean';
+  return null;
+}
 
 /** First structural problem of a saved sweep (path chain + section), or null. */
 function sweepProblem(v: Record<string, unknown>): string | null {
@@ -171,6 +187,11 @@ export function validateEntityValue(v: unknown): string | null {
     case 'sweep': {
       const problem = sweepProblem(v);
       if (problem !== null) return `entity ${id} (sweep): ${problem}`;
+      break;
+    }
+    case 'image': {
+      const problem = imageProblem(v);
+      if (problem !== null) return `entity ${id} (image): ${problem}`;
       break;
     }
     case 'mesh': {

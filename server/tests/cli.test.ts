@@ -147,6 +147,27 @@ describe('llull CLI — local document', () => {
     expect(entityIds()).toHaveLength(2);
   });
 
+  it('loads key=@img:<file> as an image data URL (add_image_underlay)', async () => {
+    const scan = path.join(workDir, 'scan.png');
+    const size = (n: number): number[] => [0, 0, n >> 8, n & 255];
+    const ihdr = [0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, ...size(300), ...size(150), 8, 6, 0, 0, 0];
+    writeFileSync(scan, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...ihdr]));
+    const added = capture();
+    const argv = ['exec', 'add_image_underlay', `dataUrl=@img:${scan}`, 'pixelSize=1.5'];
+    expect(await runCli([...argv, ...docFlag()], added.io)).toBe(EXIT_OK);
+    expect(added.out[0]).toMatch(/\(300×150 px\) as 450×225 units/);
+    const notImage = path.join(workDir, 'notes.txt');
+    writeFileSync(notImage, 'hello');
+    const rejected = capture();
+    const bad = ['exec', 'add_image_underlay', `dataUrl=@img:${notImage}`, ...docFlag()];
+    expect(await runCli(bad, rejected.io)).toBe(EXIT_USAGE);
+    expect(rejected.err[0]).toMatch(/not a PNG or JPEG/);
+    const missing = capture();
+    const gone = ['exec', 'add_image_underlay', 'dataUrl=@img:gone.png', ...docFlag()];
+    expect(await runCli(gone, missing.io)).toBe(EXIT_USAGE);
+    expect(missing.err[0]).toMatch(/cannot read gone\.png/);
+  });
+
   it('exits 1 on a rejected command and 2 on unreadable params', async () => {
     const rejected = capture();
     expect(await runCli(['exec', 'add_box', 'size=[-1,1,1]', ...docFlag()], rejected.io)).toBe(

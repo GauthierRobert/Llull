@@ -1,4 +1,4 @@
-import type { CadDocument, Entity, Vec3 } from '../../model/types';
+import type { CadDocument, Entity, ImageEntity, Vec3 } from '../../model/types';
 import { ORIGIN, add3 } from '../../lib/vec3';
 import { computeSceneSnapshot } from '../inspect/scene';
 import { boundsCenter, boundsRadius } from '../../geometry/bounds';
@@ -54,6 +54,12 @@ export function renderDocument(
     }
   }
 
+  // Underlays are never capped by MAX_POLYGONS: they are one <image> each, painted first.
+  const underlays = doc.order.flatMap((id) => {
+    const e = doc.entities[id];
+    return e ? drawableEntities(doc, e).filter((d): d is ImageEntity => d.kind === 'image') : [];
+  });
+
   return {
     view,
     width,
@@ -61,6 +67,6 @@ export function renderDocument(
     entityCount: snapshot.entityCount,
     bounds,
     camera: cam,
-    svg: buildSvg(polygons, cam, orthoHalf, width, height, view, snapshot.entityCount),
+    svg: buildSvg(polygons, underlays, cam, orthoHalf, width, height, view, snapshot.entityCount),
   };
 }

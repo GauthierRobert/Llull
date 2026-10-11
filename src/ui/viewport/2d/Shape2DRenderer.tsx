@@ -15,6 +15,7 @@ import { PointRenderer } from './entities/PointRenderer';
 import { SplineRenderer } from './entities/SplineRenderer';
 import { TextRenderer2D } from './entities/TextRenderer2D';
 import { DimensionRenderer2D } from './entities/DimensionRenderer2D';
+import { ImageUnderlayRenderer } from './entities/ImageUnderlayRenderer';
 
 type RenderBranch<E> = (props: { entity: E; selected: boolean }) => React.ReactElement | null;
 
@@ -29,6 +30,7 @@ const RENDERERS: { [K in Shape2DKind]: RenderBranch<Extract<Entity, { kind: K }>
   spline: SplineRenderer,
   text: TextRenderer2D,
   dimension: DimensionRenderer2D,
+  image: ImageUnderlayRenderer,
 };
 
 export function Shape2DRenderer({

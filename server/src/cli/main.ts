@@ -38,6 +38,7 @@ import {
   type CatalogEntry,
 } from './catalog';
 import { planText, resultJson, resultText, type PrintableResult } from './output';
+import { resolveImageRefs } from './imageParams';
 import { saveDataFiles, withoutPayloads } from './saveFiles';
 import { USAGE } from './usage';
 
@@ -112,7 +113,26 @@ function stringParamKeys(name: string): ReadonlySet<string> {
   );
 }
 
+function readImageBytes(source: string): Buffer {
+  try {
+    return fs.readFileSync(source);
+  } catch (error) {
+    throw new UsageError(`cannot read ${source}: ${errorMessage(error)}`);
+  }
+}
+
+/** Params of `name`, with `@img:<path>` values loaded as image data URLs. */
 async function paramsOf(name: string, tokens: readonly string[], io: CliIo): Promise<unknown> {
+  const params = await rawParamsOf(name, tokens, io);
+  try {
+    return resolveImageRefs(params, readImageBytes);
+  } catch (error) {
+    if (error instanceof UsageError) throw error;
+    throw new UsageError(errorMessage(error));
+  }
+}
+
+async function rawParamsOf(name: string, tokens: readonly string[], io: CliIo): Promise<unknown> {
   let source: ReturnType<typeof paramsSource>;
   try {
     source = paramsSource(tokens, stringParamKeys(name));

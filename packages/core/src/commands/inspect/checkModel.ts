@@ -97,6 +97,11 @@ function checkDegenerateGeometry(e: Entity): Issue[] {
       return e.section.shape === 'circle'
         ? nonPositive('section radius', e.section.radius, 'Radius must be > 0.')
         : [];
+    case 'image':
+      return [
+        ...nonPositive('width', e.width, 'Underlay width must be > 0.'),
+        ...nonPositive('height', e.height, 'Underlay height must be > 0.'),
+      ];
     case 'text':
       return [
         ...nonPositive('height', e.height, 'Height must be > 0.'),
