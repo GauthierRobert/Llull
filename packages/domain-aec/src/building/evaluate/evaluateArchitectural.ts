@@ -43,8 +43,8 @@ import {
   wallExtent,
   wallFrame,
   wallPieces,
-  type WallExtent,
 } from '../geometry/wallGeometry';
+import type { WallExtent } from '../geometry/wallExtent';
 import { stairPoint } from '../geometry/stairGeometry';
 
 export interface EvaluationContext {

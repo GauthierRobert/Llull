@@ -19,7 +19,7 @@ surface that bypasses a command.
 `src/ui`, `server/` → `src/app` → `packages/{mcp, domain-aec, kernel-*}` → `packages/core`
 (`@lib` inside core). No package imports `src/ui`; `packages/core` imports no other package. No
 `packages/*/src` touches `react`, `window`, `document`, `fetch`, `localStorage`, or the DOM — put
-side effects in `src/ui/`, `server/`, or behind an injected interface. No runtime import cycles.
+side effects in `src/ui/`, `server/`, or behind an injected interface. No import cycles (type-only included).
 Inside core: `commands`/`codegen`/`plugins` → `geometry` → `model` → `lib`. Enforced by `npm run arch`
 and `enforce-architecture.mjs`; if blocked, move the code to the correct layer — never loosen a rule.
 

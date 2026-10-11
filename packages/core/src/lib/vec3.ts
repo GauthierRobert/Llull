@@ -1,4 +1,4 @@
-import type { Vec3 } from '../model/types';
+import type { Vec3 } from '../model/vectors';
 
 /** The world origin `[0, 0, 0]`. */
 export const ORIGIN: Vec3 = Object.freeze<Vec3>([0, 0, 0]);

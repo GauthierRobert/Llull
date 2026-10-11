@@ -3,13 +3,9 @@
  * native ops, so commands exercise recipes, caching and handles without WASM.
  */
 import { afterEach, beforeEach } from 'vitest';
-import {
-  setGeometryKernel,
-  type GeometryKernel,
-  type MeshData,
-  type ShapeTopology,
-} from '@core/geometry/kernel';
-import type { BooleanOp, ShapeRecipe } from '@core/geometry/shapeRecipe';
+import { setGeometryKernel, type GeometryKernel, type ShapeTopology } from '@core/geometry/kernel';
+import type { MeshData } from '@core/model/types';
+import type { BooleanOp, ShapeRecipe } from '@core/model/types';
 import { kernelFromOps, type CachingKernel } from '@core/geometry/shapeKernel';
 import type { Entity } from '@core/model/types';
 

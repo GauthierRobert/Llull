@@ -50,7 +50,7 @@ export const fooThing = defineCommand({
   `commands`. Never edit `registry.ts` for a new command.
 - Tests (`tests/unit/**`): happy path + failure path + `is pure`. Assert `affected`, `summary`,
   observable entities — not internals. Coverage gate 90/85/90/90 on
-  `packages/core/src/commands/**` + `packages/domain-aec/src/**`.
+  `packages/core/src/{commands,geometry}/**` + `packages/domain-aec/src/**`.
 - Tool-schema snapshot (`tests/unit/contract/__snapshots__`) and golden corpus
   (`tests/golden/__snapshots__`) diffs must be intended; never `-u` to make red go green.
 
@@ -70,7 +70,7 @@ export const fooThing = defineCommand({
 
 ## Kernel (L9, as built)
 
-- Shape boundary: commands pass a `ShapeRecipe` (`@core/geometry/shapeRecipe`) and get an opaque
+- Shape boundary: commands pass a `ShapeRecipe` (type: `@core/model/types`; helpers: `@core/geometry/shapeRecipe`) and get an opaque
   `ShapeHandle`; kernels implement `KernelOps<S>` on their native shape and wrap it with
   `kernelFromOps` (`@core/geometry/shapeKernel`: cache by `recipeKey`, rebuild on eviction). Meshes
   only come OUT (`tessellate`). Results store their recipe as `mesh.brep`; never feed a mesh back

@@ -162,7 +162,7 @@ No id-counter reset exists; tests rely on step-scoped determinism.
 
 ## History & regeneration
 
-- `replayHistory(base, history, getCommand, warnings?, onStep?)` (`history/history.ts`): replays live steps
+- `replayHistory(base, history, getCommand, warnings?, onStep?)` (`history/replay.ts`): replays live steps
   from an empty doc keeping document-level state; reuses `ctx.replayCache` prefixes
   (`history/replayCache.ts`); refuses when a live step `requiresKernel` and no kernel is installed.
 - `set_parameter` / `delete_parameter` (`metaHistory`) → `regenerateParameterDependents`

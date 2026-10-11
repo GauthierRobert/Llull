@@ -14,25 +14,11 @@ import {
   isConnectionRefusal,
   postCommand,
 } from './serverCommands';
-import type { CadStoreState, StoreGet, StoreSet } from './storeTypes';
+import type { CadStoreState, OutboxCommand, StoreGet, StoreSet } from './storeTypes';
 import { resetGraceRuns } from './graceRuns';
 
 const SYNC_RETRY_BASE_MS = 1000;
 const SYNC_RETRY_MAX_MS = 30000;
-
-/** One locally executed mutating command awaiting replay on the server. */
-export interface OutboxCommand {
-  /** Client-generated idempotency key; the flush acks by this id and sends it as `commandId`. */
-  readonly commandId: string;
-  readonly name: string;
-  readonly params: unknown;
-  /** Ids the local run produced; zipped with the server's `affected` to remap later entries. */
-  readonly affected: readonly string[];
-  /** Part of the previous entry's undo step (a `coalesce` dispatch): undo / redo move them together. */
-  readonly coalesced?: boolean;
-  /** Never sent to the server (autosave restore and its follow-ups): the server document stays the truth. */
-  readonly localOnly?: boolean;
-}
 
 /** Guards against concurrent pushes. */
 let syncInFlight = false;

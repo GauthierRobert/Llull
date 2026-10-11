@@ -7,7 +7,7 @@
  * @see docs/CONSTRUCTION.md, packages/domain-aec/src/evaluate.ts
  */
 
-import type { Vec2, Vec3 } from './types';
+import type { Vec2, Vec3 } from './vectors';
 
 /** Building element categories (Revit/IFC-like). */
 export type BimCategory =

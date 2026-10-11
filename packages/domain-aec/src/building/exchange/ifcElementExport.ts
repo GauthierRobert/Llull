@@ -9,7 +9,8 @@ import type {
   WallElement,
 } from '@core/model/building';
 import { orderedElements } from '../model';
-import { openingsOf, wallExtent, wallFrame, type WallExtent } from '../geometry/wallGeometry';
+import { openingsOf, wallExtent, wallFrame } from '../geometry/wallGeometry';
+import type { WallExtent } from '../geometry/wallExtent';
 import {
   curvedBandBetween,
   curvedWallArc,

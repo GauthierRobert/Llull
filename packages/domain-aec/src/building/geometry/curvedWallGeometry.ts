@@ -8,7 +8,7 @@ import type { BuildingModel, CurvedWallElement, WallElement } from '@core/model/
 import type { Vec2 } from '@core/model/types';
 import { distance, toCounterClockwise } from '@lib/polygon';
 import { elementsOf } from '../model';
-import type { WallExtent } from './wallGeometry';
+import type { WallExtent } from './wallExtent';
 
 /** Circle arc through three points: centre, radius, start angle and signed sweep (radians). */
 interface Arc {

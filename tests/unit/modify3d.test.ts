@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { type MeshSolidEntity, type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { type MeshData, setGeometryKernel } from '@core/geometry/kernel';
+import { setGeometryKernel } from '@core/geometry/kernel';
+import type { MeshData } from '@core/model/types';
 import {
   TETRA,
   fakeKernel,

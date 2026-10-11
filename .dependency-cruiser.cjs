@@ -7,20 +7,18 @@
  * Inside core:      commands, codegen, plugins → geometry → model → lib
  */
 
-/** Runtime edges only: `import type` is erased at build time and may follow recursive data. */
-const RUNTIME = { dependencyTypesNot: ['type-only'] };
-
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {
   forbidden: [
     {
-      name: 'no-runtime-cycles',
+      name: 'no-cycles',
       comment:
-        'A runtime import cycle makes module init order matter and hides layering. Break it by ' +
-        'moving the shared piece down a layer (see commands/commandTable.ts for the pattern).',
+        'An import cycle (type-only included) makes init order matter and hides layering. Break ' +
+        'it by moving the shared piece down a layer (commands/commandTable.ts, model/vectors.ts ' +
+        'show the pattern); mutually recursive types belong in one module.',
       severity: 'error',
       from: {},
-      to: { ...RUNTIME, circular: true, viaOnly: RUNTIME },
+      to: { circular: true },
     },
     {
       name: 'core-imports-no-package',
@@ -75,17 +73,24 @@ module.exports = {
     },
     {
       name: 'lib-is-a-leaf',
-      comment: '@lib holds tiny pure helpers; it depends on nothing else in the repo.',
+      comment: '@lib holds tiny pure helpers; it depends on nothing but the vector types.',
       severity: 'error',
       from: { path: '^packages/core/src/lib/' },
-      to: { ...RUNTIME, path: '^packages/', pathNot: '^packages/core/src/lib/' },
+      to: { path: '^packages/', pathNot: '^packages/core/src/(lib/|model/vectors\\.ts$)' },
     },
     {
-      name: 'model-below-commands',
-      comment: 'The model is data; it never reaches up into commands, codegen or plugins.',
+      name: 'model-is-the-data-layer',
+      comment: 'The model is data: it depends only on itself and lib, even for types.',
       severity: 'error',
-      from: { path: '^packages/core/src/(model|geometry)/' },
-      to: { ...RUNTIME, path: '^packages/core/src/(commands|codegen|plugins)/' },
+      from: { path: '^packages/core/src/model/' },
+      to: { path: '^packages/core/src/(?!model/|lib/)' },
+    },
+    {
+      name: 'geometry-below-commands',
+      comment: 'Geometry (kernel contract, recipes, pure geometry) never reaches up into commands.',
+      severity: 'error',
+      from: { path: '^packages/core/src/geometry/' },
+      to: { path: '^packages/core/src/(commands|codegen|plugins)/' },
     },
     {
       name: 'server-is-thin',

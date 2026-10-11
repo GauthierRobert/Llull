@@ -11,7 +11,7 @@
  * @failure unsupported kind / non-manifold mesh / OCC refusal or failure -> null
  */
 
-import type { BooleanOp, ShapeRecipe } from '@core/geometry/shapeRecipe';
+import type { BooleanOp, ShapeRecipe } from '@core/model/types';
 import type { Vec3 } from '@core/model/types';
 import { kernelFromOps, type CachingKernel, type KernelOps } from '@core/geometry/shapeKernel';
 import { errorMessage } from '@lib/errorMessage';

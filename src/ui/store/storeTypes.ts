@@ -2,7 +2,6 @@
 
 import type { CadDocument, EntityId } from '@core/model/types';
 import type { LiveCommandEvent, LiveSnapshotEvent } from '@mcp/liveSync';
-import type { OutboxCommand } from './outbox';
 
 /** The structured result of the most recently dispatched read-only/query command. */
 export interface LastMeasure {
@@ -133,3 +132,17 @@ export type StoreSet = (
   partial: Partial<CadStoreState> | ((state: CadStoreState) => Partial<CadStoreState>),
 ) => void;
 export type StoreGet = () => CadStoreState;
+
+/** One locally executed mutating command awaiting replay on the server. */
+export interface OutboxCommand {
+  /** Client-generated idempotency key; the flush acks by this id and sends it as `commandId`. */
+  readonly commandId: string;
+  readonly name: string;
+  readonly params: unknown;
+  /** Ids the local run produced; zipped with the server's `affected` to remap later entries. */
+  readonly affected: readonly string[];
+  /** Part of the previous entry's undo step (a `coalesce` dispatch): undo / redo move them together. */
+  readonly coalesced?: boolean;
+  /** Never sent to the server (autosave restore and its follow-ups): the server document stays the truth. */
+  readonly localOnly?: boolean;
+}

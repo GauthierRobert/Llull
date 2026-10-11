@@ -36,7 +36,7 @@ scale:
   uniform scaling live in `core/geometry/` (under the coverage gate), so kernels, plugins and
   the viewport no longer import command modules for math.
 - **Architecture as code.** `.dependency-cruiser.cjs` encodes the laws; `npm run arch` runs in
-  `npm run check`. Rules: no runtime cycles, core imports no package, headless packages,
+  `npm run check`. Rules: no import cycles, core imports no package, headless packages,
   plugins/kernels use only core's public API, MCP depends on no plugin or kernel, `lib` is a
   leaf, `model`/`geometry` stay below `commands`, app and server never import each other. The
   hook stays as fast feedback for agents.
@@ -57,8 +57,12 @@ scale:
 
 ## Consequences
 
-- Zero runtime cycles; the few type-only cycles that remain come from recursive data
-  (`Entity` ↔ `ShapeRecipe`, `CadDocument` ↔ `BuildingModel`) and are allowed.
+- Zero import cycles, type-only included (from 161). The persisted shape types (`MeshData`,
+  `ShapeRecipe`) moved from `geometry/` into `model/types.ts`, the vector types into the leaf
+  `model/vectors.ts`, so `model` imports nothing above it and `lib` only the vectors.
+- Core commands register catalog by catalog (document, solids, draw2d, …), so `listCommands()`,
+  the command palette and MCP `tools/list` group related commands together; the agent-facing
+  schema snapshot is sorted by name and unaffected.
 - Adding a core command touches its feature folder (+ the toolset list); parallel lanes in
   different folders do not collide.
 - Paths changed (`@core/commands/geometryBasic` → `@core/commands/solids/basic`, …). File names

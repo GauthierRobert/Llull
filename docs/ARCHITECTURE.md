@@ -61,8 +61,9 @@ in isolation, reusable by the headless MCP server, and open to new domains witho
 The core is layered too, bottom to top:
 
 ```
-lib/        tiny pure helpers (vectors, polygons, ids, hashing) — depend on nothing
-model/      the document and entity types, units — data only
+lib/        tiny pure helpers (vectors, polygons, ids, hashing) — depend only on model/vectors
+model/      the document and entity types (incl. MeshData, ShapeRecipe), vectors, units —
+            data only; imports nothing outside model/ and lib/
 geometry/   kernel interface, shape recipes, and pure geometry shared by commands, kernels,
             plugins and the viewport: tessellation, triangles, bounds, instance expansion
 commands/   the command layer (below)            plugins/  plugin contract and host
@@ -101,14 +102,14 @@ The dependency laws are executable. `npm run arch` (part of `npm run check`) run
 [dependency-cruiser](https://github.com/sverweij/dependency-cruiser) with the rules in
 `.dependency-cruiser.cjs`:
 
-- no runtime import cycles anywhere (type-only cycles of recursive data are allowed);
+- no import cycles anywhere, type-only imports included;
 - `packages/core` imports no other package; no package imports the app or the server;
 - packages are headless: no React, three.js or UI state;
 - plugins and kernels see only core's public API — `model`, `lib`, `geometry`, the plugin
   contract and the command-authoring API (`schema`, `types`, `noop`, `derivation`,
   `registry`); composing another command goes through `execute`;
-- MCP never depends on a plugin or a concrete kernel; `lib` is a leaf; `model` and
-  `geometry` never reach up into commands;
+- MCP never depends on a plugin or a concrete kernel; `lib` is a leaf; `model` imports only
+  itself and `lib`; `geometry` never reaches up into commands;
 - the web app and the server never import each other.
 
 A contract test (`tests/unit/contract/catalogs.test.ts`) checks that every exported command

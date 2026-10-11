@@ -7,7 +7,7 @@
  */
 
 import { type CadDocument, type Entity, type Vec3, is3D } from '../../model/types';
-import type { ShapeRecipe } from '../../geometry/shapeRecipe';
+import type { ShapeRecipe } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
 import { selectEdges } from './edgeSelection';

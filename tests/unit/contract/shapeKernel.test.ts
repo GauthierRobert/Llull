@@ -1,7 +1,7 @@
 /** kernelFromOps: recipe evaluation, per-recipe shape cache, handle lifetime, native ownership. */
 import { describe, it, expect, vi } from 'vitest';
 import type { BoxEntity, Entity } from '@core/model/types';
-import type { ShapeRecipe } from '@core/geometry/shapeRecipe';
+import type { ShapeRecipe } from '@core/model/types';
 import {
   handleOf,
   keyOnlyHandle,
@@ -9,7 +9,8 @@ import {
   SHAPE_NOT_CACHED,
   type KernelOps,
 } from '@core/geometry/shapeKernel';
-import type { MeshData, ShapeTopology } from '@core/geometry/kernel';
+import type { ShapeTopology } from '@core/geometry/kernel';
+import type { MeshData } from '@core/model/types';
 import { TETRA } from '../../helpers/fakeKernel';
 
 /** Native shape of the counting ops: a serial number plus how it was built. */

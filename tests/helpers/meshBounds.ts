@@ -1,4 +1,4 @@
-import type { MeshData } from '@core/geometry/kernel';
+import type { MeshData } from '@core/model/types';
 import type { Vec3 } from '@core/model/types';
 
 /** Axis-aligned bounds of a mesh's vertex positions. */

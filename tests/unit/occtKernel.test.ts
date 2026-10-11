@@ -20,7 +20,7 @@
 import { describe, it, expect } from 'vitest';
 import type { BoxEntity } from '@core/model/types';
 import type { GeometryKernel } from '@core/geometry/kernel';
-import type { ShapeRecipe } from '@core/geometry/shapeRecipe';
+import type { ShapeRecipe } from '@core/model/types';
 
 // Test entities — two 2×2×2 boxes (as in docs/decisions/KI4-occt-spike.md).
 

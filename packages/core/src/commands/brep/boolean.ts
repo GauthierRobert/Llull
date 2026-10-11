@@ -10,7 +10,7 @@
 import { type CadDocument, type Entity, is3D } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
-import type { BooleanOp, ShapeRecipe } from '../../geometry/shapeRecipe';
+import type { BooleanOp, ShapeRecipe } from '../../model/types';
 import { currentContext } from '../context';
 import type { ExecutionContext } from '../types';
 import { kernelUnavailable } from '../kernelRefusal';

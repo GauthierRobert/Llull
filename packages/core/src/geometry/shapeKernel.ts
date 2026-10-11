@@ -13,9 +13,9 @@
  * @failure an op returning null or throwing -> that recipe (and every recipe built on it) is null
  */
 
-import type { Entity, Vec3 } from '../model/types';
-import type { GeometryKernel, MeshData, ShapeHandle, ShapeTopology } from './kernel';
-import { type BooleanOp, type ShapeRecipe, recipeKey } from './shapeRecipe';
+import type { BooleanOp, Entity, MeshData, ShapeRecipe, Vec3 } from '../model/types';
+import type { GeometryKernel, ShapeHandle, ShapeTopology } from './kernel';
+import { recipeKey } from './shapeRecipe';
 
 /**
  * Native operations of a concrete kernel. Each returns a NEW native shape (never one of its inputs:

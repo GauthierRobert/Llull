@@ -1,17 +1,13 @@
 /** Domain model — the single source of truth for a CAD document; changed only by commands. */
 
-import type { MeshData } from '../geometry/kernel';
-import type { ShapeRecipe } from '../geometry/shapeRecipe';
+import type { Vec2, Vec3 } from './vectors';
 import type { BuildingModel } from './building';
 import type { CivilModel } from './civil';
-export type { MeshData };
+
+/** Re-exported: every model consumer reads its vectors from here. */
+export type { Vec2, Vec3 };
 
 export type EntityId = string;
-
-export type Vec3 = readonly [number, number, number];
-
-/** 2D coordinate in a local work plane. */
-export type Vec2 = readonly [number, number];
 
 export const DOCUMENT_UNITS = ['mm', 'cm', 'm', 'in', 'ft'] as const;
 
@@ -576,3 +572,45 @@ export function createEmptyDocument(): CadDocument {
     driveRelationOrder: [],
   };
 }
+
+/**
+ * World-space triangle mesh.
+ * `positions`: flat xyz triples (length 3 × vertexCount); `indices`: flat triangle vertex indices.
+ */
+export interface MeshData {
+  readonly positions: ReadonlyArray<number>;
+  readonly indices: ReadonlyArray<number>;
+}
+
+export type BooleanOp = 'union' | 'subtract' | 'intersect';
+
+/**
+ * Shape recipe: the serializable construction tree of a solid, stored on kernel results
+ * (`MeshSolidEntity.brep`) and evaluated by the kernel (`@core/geometry/shapeRecipe`).
+ */
+export type ShapeRecipe =
+  /** A solid entity as authored (primitive, profile solid, or a plain triangle mesh). */
+  | { readonly op: 'solid'; readonly entity: Entity }
+  | {
+      readonly op: 'boolean';
+      readonly boolean: BooleanOp;
+      readonly a: ShapeRecipe;
+      readonly b: ShapeRecipe;
+    }
+  /** `edges`: 0-based indices into the source's unique edges (`ShapeTopology.edges`); [] = all. */
+  | {
+      readonly op: 'fillet' | 'chamfer';
+      readonly source: ShapeRecipe;
+      readonly edges: readonly number[];
+      readonly size: number;
+    }
+  | { readonly op: 'shell'; readonly source: ShapeRecipe; readonly thickness: number }
+  /** Rotate (M = Rx·Ry·Rz, radians) then translate. */
+  | {
+      readonly op: 'place';
+      readonly source: ShapeRecipe;
+      readonly position: Vec3;
+      readonly rotation: Vec3;
+    }
+  /** Uniform scale about the world origin. */
+  | { readonly op: 'scale'; readonly source: ShapeRecipe; readonly factor: number };

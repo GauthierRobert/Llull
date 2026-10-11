@@ -7,8 +7,10 @@
  */
 
 import type { CadDocument, Entity } from '../../model/types';
-import type { GeometryKernel, MeshData, ShapeHandle } from '../../geometry/kernel';
-import { type ShapeRecipe, meshRecipeOf, recipeOf } from '../../geometry/shapeRecipe';
+import type { GeometryKernel, ShapeHandle } from '../../geometry/kernel';
+import type { MeshData } from '../../model/types';
+import { meshRecipeOf, recipeOf } from '../../geometry/shapeRecipe';
+import type { ShapeRecipe } from '../../model/types';
 import { newEntity } from '../entity/newEntity';
 import { nextId } from '../../lib/id';
 import { referenceLossSuffix, replaceEntities } from '../entity/entityOps';

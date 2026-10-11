@@ -45,7 +45,7 @@ Rules are already in context (`rules/commands.md` loads when you touch `packages
    ⇒ no-op). Ids are step-scoped and deterministic — no reset needed.
 5. Update + review the tool-schema snapshot (`npx vitest run tests/unit/contract -u`); keep
    the golden corpus green. Run `npm run check`. Fix until green. Confirm the coverage gate
-   (90/85/90/90 on `packages/core/src/commands/**`, `packages/domain-aec/src/**`) still holds.
+   (90/85/90/90 on `packages/core/src/{commands,geometry}/**`, `packages/domain-aec/src/**`) still holds.
 
 ## Add structured doc-comments
 

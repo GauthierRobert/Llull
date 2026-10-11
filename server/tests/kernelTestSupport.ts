@@ -6,8 +6,9 @@
 import { beforeAll, expect } from 'vitest';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createNodeOcctKernel } from '../src/occtNode';
-import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
-import type { BooleanOp, ShapeRecipe } from '@core/geometry/shapeRecipe';
+import type { GeometryKernel } from '@core/geometry/kernel';
+import type { MeshData } from '@core/model/types';
+import type { BooleanOp, ShapeRecipe } from '@core/model/types';
 import type { Entity, Vec3 } from '@core/model/types';
 import { meshBounds } from '../../tests/helpers/meshBounds';
 

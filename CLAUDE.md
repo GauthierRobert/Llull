@@ -36,7 +36,7 @@ npm workspaces (`packages/*`); the web app and `server/` stay at the repo root.
 ```
 packages/core/src/          @core  Framework-agnostic brain. NO react / DOM / window / fetch.
   lib/                      @lib   Tiny pure helpers (id, hash, polygon, triangulate, lruCache) — a leaf
-  model/                           types.ts (CadDocument, Entity) · units.ts · building.ts · civil.ts
+  model/                           types.ts (CadDocument, Entity, MeshData, ShapeRecipe) · vectors.ts · units.ts · building.ts · civil.ts
   geometry/                        kernel.ts (GeometryKernel) · shapeRecipe.ts · shapeKernel.ts ·
                                    pure geometry: tessellation, triangles, bounds, instanceExpansion
   commands/                        THE command layer. Engine at the root: types.ts · schema.ts
@@ -61,7 +61,7 @@ server/                            Express MCP host (optional; own package.json,
 **Dependency direction is one-way: `src/ui`, `server` → `src/app`, plugins, kernels, `@mcp` → `packages/core`.**
 Inside core: `commands`, `codegen`, `plugins` → `geometry` → `model` → `lib`. Enforced for every
 change by `npm run arch` (dependency-cruiser, `.dependency-cruiser.cjs`, part of `npm run check`):
-no runtime import cycles; core imports no package; packages are headless; plugins and kernels
+no import cycles (type-only included); core imports no package; packages are headless; plugins and kernels
 import only core's public API (`model`, `lib`, `geometry`, `plugins/plugin`, `commands/{schema,
 types,noop,derivation,registry}`). A PreToolUse hook (`.claude/hooks/enforce-architecture.mjs`)
 gives agents the same feedback at edit time.
@@ -131,7 +131,7 @@ npm --prefix server install && npm --prefix server run dev   # optional backend 
 2. New command ⇒ `defineCommand({ name, description, params: z.object(…), run })` ⇒ registered
    (core: its feature folder's `catalog.ts`; domain: its plugin's `commands`) ⇒ unit test (happy +
    failure path).
-3. `packages/core/src/commands/**` and `packages/domain-aec/src/**` hold **90% statements /
+3. `packages/core/src/{commands,geometry}/**` and `packages/domain-aec/src/**` hold **90% statements /
    85% branches / 90% functions / 90% lines**.
 4. Tool/command `name` is `snake_case` (it is the MCP tool name that agents call).
 5. TypeScript strict, no `any`. Max 500 code lines per file (ESLint, no allowlist). `npm run check` green.

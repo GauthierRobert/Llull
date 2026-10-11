@@ -9,38 +9,15 @@
  *   layer, tags, material) never reach it, so a recolored operand reuses the cached shape
  */
 
-import { type Entity, type MeshSolidEntity, type Vec3, SOLID_KINDS } from '../model/types';
+import {
+  type Entity,
+  type MeshSolidEntity,
+  type ShapeRecipe,
+  type Vec3,
+  SOLID_KINDS,
+} from '../model/types';
 import { hashText } from '../lib/hash';
 import { isRecord } from '../lib/isRecord';
-
-export type BooleanOp = 'union' | 'subtract' | 'intersect';
-
-export type ShapeRecipe =
-  /** A solid entity as authored (primitive, profile solid, or a plain triangle mesh). */
-  | { readonly op: 'solid'; readonly entity: Entity }
-  | {
-      readonly op: 'boolean';
-      readonly boolean: BooleanOp;
-      readonly a: ShapeRecipe;
-      readonly b: ShapeRecipe;
-    }
-  /** `edges`: 0-based indices into the source's unique edges (`ShapeTopology.edges`); [] = all. */
-  | {
-      readonly op: 'fillet' | 'chamfer';
-      readonly source: ShapeRecipe;
-      readonly edges: readonly number[];
-      readonly size: number;
-    }
-  | { readonly op: 'shell'; readonly source: ShapeRecipe; readonly thickness: number }
-  /** Rotate (M = Rx·Ry·Rz, radians) then translate. */
-  | {
-      readonly op: 'place';
-      readonly source: ShapeRecipe;
-      readonly position: Vec3;
-      readonly rotation: Vec3;
-    }
-  /** Uniform scale about the world origin. */
-  | { readonly op: 'scale'; readonly source: ShapeRecipe; readonly factor: number };
 
 const PRESENTATION_FIELDS = new Set(['id', 'name', 'color', 'layerId', 'tags', 'materialId']);
 

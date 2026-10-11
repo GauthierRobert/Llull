@@ -22,7 +22,8 @@ import { distance } from '@lib/polygon';
 import { findTwin, sameSegment } from '../../shared/duplicates';
 import { noop } from '@core/commands/noop';
 import { commitBuilding, regenerateBuilding } from '../evaluate/evaluateElements';
-import { builtExtent, openingsOf, wallFrame, type WallExtent } from '../geometry/wallGeometry';
+import { builtExtent, openingsOf, wallFrame } from '../geometry/wallGeometry';
+import type { WallExtent } from '../geometry/wallExtent';
 
 /**
  * Why `opening` does not fit in `wall` (alongside `others`), or null when it fits.

@@ -11,6 +11,7 @@ import type {
 } from '@core/model/building';
 import { projectOntoSegment, distance } from '@lib/polygon';
 import { arcOffsetOf, curvedWallExtent, tangentWall } from './curvedWallGeometry';
+import type { WallExtent } from './wallExtent';
 import { elementsOf, orderedElements } from '../model';
 
 interface WallFrame {
@@ -107,12 +108,6 @@ export function endAdjustment(
     if (projection.distance <= tolerance && projection.t > 0 && projection.t < 1) return retraction;
   }
   return 0;
-}
-
-/** Along-wall interval [start, end] actually occupied by the wall body (joints applied). */
-export interface WallExtent {
-  readonly start: number;
-  readonly end: number;
 }
 
 export function wallExtent(building: BuildingModel, wall: WallElement): WallExtent {

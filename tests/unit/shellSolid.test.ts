@@ -1,7 +1,8 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { type MeshSolidEntity, createEmptyDocument } from '@core/model/types';
 import { execute, getCommand } from '@core/commands/registry';
-import { type MeshData, setGeometryKernel } from '@core/geometry/kernel';
+import { setGeometryKernel } from '@core/geometry/kernel';
+import type { MeshData } from '@core/model/types';
 import { fakeKernel, type FakeKernel } from '../helpers/fakeKernel';
 
 const SHELL_MESH: MeshData = {

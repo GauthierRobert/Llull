@@ -1,4 +1,4 @@
-import type { Vec2 } from '../model/types';
+import type { Vec2 } from '../model/vectors';
 
 /** @pure component-wise a + b */
 export function add2(a: Vec2, b: Vec2): Vec2 {

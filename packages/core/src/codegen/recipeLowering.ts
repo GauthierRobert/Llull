@@ -8,8 +8,9 @@
  */
 
 import type { Entity, Vec3 } from '../model/types';
-import type { GeometryKernel, MeshData } from '../geometry/kernel';
-import type { ShapeRecipe } from '../geometry/shapeRecipe';
+import type { GeometryKernel } from '../geometry/kernel';
+import type { MeshData } from '../model/types';
+import type { ShapeRecipe } from '../model/types';
 import type { Feature, FeatureBase, Term } from './program';
 
 const BOOLEAN_OPS = { union: 'union', subtract: 'cut', intersect: 'intersect' } as const;

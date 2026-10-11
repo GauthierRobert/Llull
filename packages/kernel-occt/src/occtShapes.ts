@@ -5,7 +5,7 @@
  * entity's rotation and position; the caller owns (releases) it.
  */
 
-import type { MeshData } from '@core/geometry/kernel';
+import type { MeshData } from '@core/model/types';
 import { type Entity, type Vec3, createEmptyDocument } from '@core/model/types';
 import { entityTrianglePositions } from '@core/geometry/entityTriangles';
 import { cross3, dot3, sub3 } from '@lib/vec3';

@@ -38,7 +38,7 @@ Get the diff (`git diff` if initialized, else inspect changed files). Check, in 
 
 ### Tests & quality (blocking)
 - [ ] New command has happy + failure-path tests.
-- [ ] `npm run check` green; coverage gate on `packages/core/src/commands/**` +
+- [ ] `npm run check` green; coverage gate on `packages/core/src/{commands,geometry}/**` +
       `packages/domain-aec/src/**` satisfied (run it).
 - [ ] `toToolSchemas()` length == `listCommands()` length; schema snapshot / golden corpus
       diffs are intended and explained.

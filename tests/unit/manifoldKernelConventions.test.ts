@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { type Entity, type Vec3, createEmptyDocument } from '@core/model/types';
-import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
+import type { GeometryKernel } from '@core/geometry/kernel';
+import type { MeshData } from '@core/model/types';
 import { entityToTriangles } from '@core/geometry/entityTriangles';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { meshOf, booleanMesh } from '../helpers/manifoldMesh';

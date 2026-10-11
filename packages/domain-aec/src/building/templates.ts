@@ -206,7 +206,7 @@ export const addBuildingTemplate = defineCommand({
     template: z.enum(['house', 'office']).describe('Which starter building.'),
     origin: vec2('Plan origin [x, y]. Default [0, 0].').optional(),
   }),
-  run: (doc, { template, origin: requestedOrigin }): CommandResult => {
+  run: (doc, { template, origin: requestedOrigin }, ctx): CommandResult => {
     const origin: Vec2 = requestedOrigin ?? [0, 0];
     let current = doc;
     const created: Record<string, string[]> = {};
@@ -226,7 +226,7 @@ export const addBuildingTemplate = defineCommand({
         created[kind] = [...(created[kind] ?? []), id];
       }
     }
-    current = execute(current, 'fit_view', { direction: 'iso' }).document;
+    current = execute(current, 'fit_view', { direction: 'iso' }, ctx).document;
     const building = getBuilding(current);
     const before = new Set(Object.keys(getBuilding(doc).elements));
     const newElements = building.elementOrder.filter((id) => !before.has(id));

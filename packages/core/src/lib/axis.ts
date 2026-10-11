@@ -3,7 +3,7 @@
  * @pure
  */
 
-import type { Vec3 } from '../model/types';
+import type { Vec3 } from '../model/vectors';
 
 /** The vector of an axis param: 'x' | 'y' | 'z' map to unit vectors; a Vec3 is returned as given. */
 export function axisVector(axis: 'x' | 'y' | 'z' | Vec3): Vec3 {
