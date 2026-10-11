@@ -21,14 +21,24 @@ export function entityTrianglePositions(e: Entity, doc: CadDocument): number[] {
   return entityToTriangles(e, doc).flatMap((triangle) => triangle.flat());
 }
 
+/** One exportable 3D entity with its world-space triangles (the unit of per-entity exports). */
+export interface ExportPart {
+  readonly id: string;
+  /** `set_entity_name` label, when set. */
+  readonly name: string | undefined;
+  /** Entity hex color, e.g. "#c8553d". */
+  readonly color: string;
+  readonly tris: Triangle[];
+}
+
 /**
- * World-space triangles of the entities named by `requestedIds` (all of `doc.order` when
- * undefined/empty). Unknown ids are reported, 2D entities are counted and skipped.
+ * The exportable 3D entities named by `requestedIds` (all of `doc.order` when undefined/empty),
+ * each with its world-space triangles. Unknown ids are reported, 2D entities are counted and skipped.
  */
-export function collectExportTriangles(
+export function collectExportParts(
   doc: CadDocument,
   requestedIds: readonly string[] | undefined,
-): { tris: Triangle[]; skipped2D: number; unknownIds: string[] } {
+): { parts: ExportPart[]; skipped2D: number; unknownIds: string[] } {
   const unknownIds: string[] = [];
   let idsToProcess: readonly string[] = doc.order;
   if (requestedIds && requestedIds.length > 0) {
@@ -38,7 +48,7 @@ export function collectExportTriangles(
       return known;
     });
   }
-  const tris: Triangle[] = [];
+  const parts: ExportPart[] = [];
   let skipped2D = 0;
   for (const id of idsToProcess) {
     const entity = doc.entities[id];
@@ -47,9 +57,23 @@ export function collectExportTriangles(
       skipped2D++;
       continue;
     }
-    for (const t of entityToTriangles(entity, doc)) tris.push(t);
+    parts.push({
+      id,
+      name: entity.name,
+      color: entity.color,
+      tris: entityToTriangles(entity, doc),
+    });
   }
-  return { tris, skipped2D, unknownIds };
+  return { parts, skipped2D, unknownIds };
+}
+
+/** Flattened `collectExportParts`: every triangle of the selection in one list. */
+export function collectExportTriangles(
+  doc: CadDocument,
+  requestedIds: readonly string[] | undefined,
+): { tris: Triangle[]; skipped2D: number; unknownIds: string[] } {
+  const { parts, skipped2D, unknownIds } = collectExportParts(doc, requestedIds);
+  return { tris: parts.flatMap((part) => part.tris), skipped2D, unknownIds };
 }
 
 /** Summary line shared by the mesh export commands. */
