@@ -117,11 +117,7 @@
       "sha256": "3674e4b01ee0e983c81ed170f0574cda201ad08e0f7b46e05e4f4613400fd5f7",
       "bytes": 1793282,
       "license": "LGPL-2.1-only WITH OCCT-exception-1.0",
-      "knownIssues": [],
-      "displayKnownIssues": [
-        "fit-all-button",
-        "top-view-button"
-      ]
+      "knownIssues": []
     },
     {
       "id": "ventilator",
@@ -134,11 +130,7 @@
       "sha256": "19a11c6949aff4d003a4750d0d9f7e4ee21ab12401dfb07bd97350777266e4d5",
       "bytes": 2257591,
       "license": "LGPL-3.0",
-      "knownIssues": [],
-      "displayKnownIssues": [
-        "fit-all-button",
-        "top-view-button"
-      ]
+      "knownIssues": []
     },
     {
       "id": "part-11752",
@@ -153,10 +145,6 @@
       "license": "LGPL-3.0",
       "knownIssues": [
         "colors"
-      ],
-      "displayKnownIssues": [
-        "fit-all-button",
-        "top-view-button"
       ]
     },
     {
@@ -279,10 +267,6 @@
       "license": "CC-BY-3.0",
       "knownIssues": [
         "colors"
-      ],
-      "displayKnownIssues": [
-        "fit-all-button",
-        "top-view-button"
       ]
     },
     {
@@ -299,10 +283,6 @@
       "knownIssues": [
         "colors",
         "part-names"
-      ],
-      "displayKnownIssues": [
-        "fit-all-button",
-        "top-view-button"
       ]
     },
     {
@@ -316,11 +296,7 @@
       "sha256": "00563aca19a218704799e413bc63b323474b6fd7720b12625ae15421a7f569fa",
       "bytes": 8075316,
       "license": "CC-BY-3.0",
-      "knownIssues": [],
-      "displayKnownIssues": [
-        "fit-all-button",
-        "top-view-button"
-      ]
+      "knownIssues": []
     },
     {
       "id": "fc-raspberry-pi-4b",
@@ -441,11 +417,7 @@
       "description": "0.5 mm plate with 100 holes (thin, genus 100)",
       "source": "synthetic",
       "generator": "quality/synthetic_step.py",
-      "knownIssues": [],
-      "displayKnownIssues": [
-        "fit-all-button",
-        "top-view-button"
-      ]
+      "knownIssues": []
     },
     {
       "id": "syn-helical-spring",
@@ -459,10 +431,6 @@
       "knownIssues": [
         "volume",
         "intent-geometry"
-      ],
-      "displayKnownIssues": [
-        "fit-all-button",
-        "top-view-button"
       ]
     },
     {
@@ -474,11 +442,7 @@
       "description": "400 instances of one bolt, each rotated + moved",
       "source": "synthetic",
       "generator": "quality/synthetic_step.py",
-      "knownIssues": [],
-      "displayKnownIssues": [
-        "fit-all-button",
-        "top-view-button"
-      ]
+      "knownIssues": []
     },
     {
       "id": "syn-huge-sphere",
