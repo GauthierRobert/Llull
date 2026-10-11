@@ -8,13 +8,16 @@
  *   expr   = term { ('+' | '-') term }
  *   term   = factor { ('*' | '/') factor }
  *   factor = ['-'] primary
- *   primary = NUMBER | IDENT | '(' expr ')'
+ *   primary = NUMBER | IDENT | IDENT '(' [expr {',' expr}] ')' | '(' expr ')'
  *   NUMBER  = digits with optional decimal fraction and optional exponent (1e-3, .5, 2.5E+4)
  *   IDENT   = letter/underscore followed by alphanumerics/underscore
  *
- * Limitations (intentional for v1):
- *   - No exponentiation, modulo, or built-in functions.
- *   - References must be resolved names in the supplied `env` map.
+ * Built-ins: constants `pi`, `tau` (a name in `env` shadows them) and functions sin cos tan asin
+ * acos atan atan2 sqrt abs floor ceil round trunc sign exp ln log10 pow hypot mod min max
+ * (`name(a, b)` with comma-separated args). Trig is in radians. `^` is not supported (use `pow`).
+ *
+ * Limitations:
+ *   - References must be resolved names in the supplied `env` map (or a built-in constant).
  *   - Non-finite results (e.g. divide-by-zero) are reported as errors.
  */
 
@@ -34,7 +37,7 @@ interface EvalErr {
 
 export type EvalResult = EvalOk | EvalErr;
 
-type TokenKind = 'number' | 'ident' | 'op' | 'lparen' | 'rparen' | 'eof';
+type TokenKind = 'number' | 'ident' | 'op' | 'lparen' | 'rparen' | 'comma' | 'eof';
 
 interface Token {
   readonly kind: TokenKind;
@@ -43,9 +46,44 @@ interface Token {
 
 const EOF_TOKEN: Token = { kind: 'eof', text: '' };
 
+const BUILTIN_CONSTANTS: Readonly<Record<string, number>> = { pi: Math.PI, tau: 2 * Math.PI };
+
+/** Built-in functions: accepted argument count range and implementation. */
+const BUILTIN_FUNCTIONS: Readonly<
+  Record<string, { min: number; max: number; fn: (...args: number[]) => number }>
+> = {
+  sin: { min: 1, max: 1, fn: Math.sin },
+  cos: { min: 1, max: 1, fn: Math.cos },
+  tan: { min: 1, max: 1, fn: Math.tan },
+  asin: { min: 1, max: 1, fn: Math.asin },
+  acos: { min: 1, max: 1, fn: Math.acos },
+  atan: { min: 1, max: 1, fn: Math.atan },
+  atan2: { min: 2, max: 2, fn: Math.atan2 },
+  sqrt: { min: 1, max: 1, fn: Math.sqrt },
+  abs: { min: 1, max: 1, fn: Math.abs },
+  floor: { min: 1, max: 1, fn: Math.floor },
+  ceil: { min: 1, max: 1, fn: Math.ceil },
+  round: { min: 1, max: 1, fn: Math.round },
+  trunc: { min: 1, max: 1, fn: Math.trunc },
+  sign: { min: 1, max: 1, fn: Math.sign },
+  exp: { min: 1, max: 1, fn: Math.exp },
+  ln: { min: 1, max: 1, fn: Math.log },
+  log10: { min: 1, max: 1, fn: Math.log10 },
+  pow: { min: 2, max: 2, fn: Math.pow },
+  hypot: { min: 1, max: 8, fn: Math.hypot },
+  mod: { min: 2, max: 2, fn: (a, b) => a - b * Math.floor(a / b) },
+  min: { min: 1, max: 16, fn: Math.min },
+  max: { min: 1, max: 16, fn: Math.max },
+};
+
+/** True when `name` is a built-in constant (`pi`, `tau`). */
+export function isBuiltinConstant(name: string): boolean {
+  return Object.hasOwn(BUILTIN_CONSTANTS, name);
+}
+
 /** Optional whitespace, then one token (the group name is its kind) or the end of the input. */
 const TOKEN_PATTERN =
-  /[ \t\n\r]*(?:(?<number>(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)|(?<ident>[A-Za-z_]\w*)|(?<op>[-+*/])|(?<lparen>\()|(?<rparen>\))|$)/y;
+  /[ \t\n\r]*(?:(?<number>(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)|(?<ident>[A-Za-z_]\w*)|(?<op>[-+*/])|(?<lparen>\()|(?<rparen>\))|(?<comma>,)|$)/y;
 
 function tokenize(src: string): Token[] | string {
   const pattern = new RegExp(TOKEN_PATTERN);
@@ -118,6 +156,37 @@ function parseFactor(s: ParseState): EvalResult {
   return parsePrimary(s);
 }
 
+/** `name(arg, ...)` — the ident is consumed, the next token is '('. */
+function parseCall(s: ParseState, name: string): EvalResult {
+  const def = Object.hasOwn(BUILTIN_FUNCTIONS, name) ? BUILTIN_FUNCTIONS[name] : undefined;
+  if (def === undefined) return { ok: false, error: `unknown function: ${name}` };
+  consume(s); // '('
+  const args: number[] = [];
+  if (peek(s).kind !== 'rparen') {
+    for (;;) {
+      const arg = parseExpr(s);
+      if (!arg.ok) return arg;
+      args.push(arg.value);
+      if (peek(s).kind !== 'comma') break;
+      consume(s);
+    }
+  }
+  if (peek(s).kind !== 'rparen') {
+    return { ok: false, error: `expected ')' in call to ${name}` };
+  }
+  consume(s);
+  if (args.length < def.min || args.length > def.max) {
+    return {
+      ok: false,
+      error: `${name}() takes ${def.min}-${def.max} argument(s), got ${args.length}`,
+    };
+  }
+  const value = def.fn(...args);
+  return Number.isNaN(value)
+    ? { ok: false, error: `${name}() is undefined for these arguments` }
+    : { ok: true, value };
+}
+
 function parsePrimary(s: ParseState): EvalResult {
   const t = peek(s);
 
@@ -128,10 +197,13 @@ function parsePrimary(s: ParseState): EvalResult {
 
   if (t.kind === 'ident') {
     consume(s);
-    const value = Object.hasOwn(s.env, t.text) ? s.env[t.text] : undefined;
-    return typeof value === 'number'
-      ? { ok: true, value }
-      : { ok: false, error: `unknown parameter: ${t.text}` };
+    if (peek(s).kind === 'lparen') return parseCall(s, t.text);
+    const value =
+      (Object.hasOwn(s.env, t.text) ? s.env[t.text] : undefined) ??
+      (Object.hasOwn(BUILTIN_CONSTANTS, t.text) ? BUILTIN_CONSTANTS[t.text] : undefined);
+    return value === undefined
+      ? { ok: false, error: `unknown parameter: ${t.text}` }
+      : { ok: true, value };
   }
 
   if (t.kind === 'lparen') {
@@ -215,9 +287,10 @@ export function extractReferences(expression: string): ReadonlySet<string> {
   const tokensOrError = tokenize(expression);
   if (typeof tokensOrError === 'string') return new Set();
   const refs = new Set<string>();
-  for (const tok of tokensOrError) {
-    if (tok.kind === 'ident') refs.add(tok.text);
-  }
+  tokensOrError.forEach((tok, i) => {
+    // `name(` is a function call, not a parameter reference.
+    if (tok.kind === 'ident' && tokensOrError[i + 1]?.kind !== 'lparen') refs.add(tok.text);
+  });
   return refs;
 }
 

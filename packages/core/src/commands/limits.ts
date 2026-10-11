@@ -5,6 +5,8 @@ export const MAX_GEAR_TEETH = 1_000;
 export const MAX_PROJECT_ACTIONS = 1_000;
 export const MAX_PROJECT_STEPS = 10_000;
 export const MAX_PROJECT_DEPTH = 4;
+/** Total loop iterations (all loops, nested included) one build_project plan may expand to. */
+export const MAX_LOOP_ITERATIONS = 1_000;
 export const MAX_SPLINE_CONTROL_POINTS = 10_000;
 export const MAX_TEMPLATE_ENTITIES = 10_000;
 export const MAX_BATCH_IDS = 10_000;
