@@ -9,6 +9,7 @@ import { sweepProfile } from './sweep';
 import { loftSections } from './loft';
 import { addSubdivisionSolid } from './subdivision';
 import { editSubdivisionCage } from './subdivisionCage';
+import { surfaceFromCurves } from './surfaceFromCurves';
 import { makeTubeBetween } from './composite';
 import { addSpurGear } from './gears';
 
@@ -27,6 +28,7 @@ export const solidsCommands = commandCatalog(
   loftSections,
   addSubdivisionSolid,
   editSubdivisionCage,
+  surfaceFromCurves,
   makeTubeBetween,
   addSpurGear,
 );

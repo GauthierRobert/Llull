@@ -7,6 +7,7 @@
  */
 
 import type { Feature, FeatureProgram, ShapeSpec, Term, Term2, Term3 } from './program';
+import { subdivisionTriangles } from '../geometry/subdivision';
 import {
   commentText,
   featureLinesWithHeadings,
@@ -82,6 +83,9 @@ function shapeSource(shape: ShapeSpec): string {
       if (shape.axis === 'y') return `rotate([-90, 0, 0]) ${body(`-(${angle})`)}`;
       return body(angle);
     }
+    case 'subdivision':
+      // OpenSCAD has no freeform surfaces: the subdivided surface as a polyhedron (local frame).
+      return meshPolyhedron(subdivisionTriangles(shape).flat(2));
     case 'mesh':
       return meshPolyhedron(shape.positions);
   }

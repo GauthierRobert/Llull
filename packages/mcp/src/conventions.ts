@@ -157,6 +157,7 @@ wildly unexpected orientation. Always use radians.
 | \`pattern_along_path\` | Oriented copies along a curve (chain links, tread, teeth) |
 | \`add_subdivision_solid\` | Freeform smooth solid from a cage (saddle, hoods, grips) |
 | \`edit_subdivision_cage\` | Sculpt it: move/scale cage regions, crease edges |
+| \`surface_from_curves\` | Shell part spanning 2 or 4 boundary curves (hoods, panels) |
 | \`revolve_profile\` | Turned part from a profile or a sketched spline loop |
 | \`move_entity\`     | Translate an entity by a delta vector              |
 | \`delete_entity\`   | Remove an entity by id                             |

@@ -10,6 +10,8 @@
  * @see apply_code_trace (consumes LLULL_TRACE), server/python/llull_bridge.py (runs the script)
  */
 
+import { OCP_SUBDIVISION_PY, SUBDIVISION_PY, SUBDIVISION_TRACE_PY } from './pythonSubdivision';
+
 export type PythonBackend = 'cadquery' | 'build123d';
 
 const TRACE_RUNTIME = String.raw`
@@ -532,7 +534,15 @@ def export_step(model, path):
 /** Full runtime block for a backend: geometry builders first, then the traced helpers. */
 export function pythonRuntime(backend: PythonBackend): string {
   const builders = backend === 'cadquery' ? CADQUERY_BACKEND : BUILD123D_BACKEND;
-  return ['import math', builders, SHARED_GEOMETRY, TRACE_RUNTIME]
+  return [
+    'import math',
+    builders,
+    SHARED_GEOMETRY,
+    SUBDIVISION_PY,
+    OCP_SUBDIVISION_PY,
+    TRACE_RUNTIME,
+    SUBDIVISION_TRACE_PY,
+  ]
     .map((block) => block.trim())
     .join('\n\n\n')
     .concat('\n');

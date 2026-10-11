@@ -40,6 +40,14 @@ export type ShapeSpec =
       readonly angle: Term;
       readonly segments: number;
     }
+  /** Catmull-Clark solid over a closed cage (local frame), emitted as exact B-spline patches. */
+  | {
+      readonly kind: 'subdivision';
+      readonly vertices: ReadonlyArray<readonly [number, number, number]>;
+      readonly faces: ReadonlyArray<ReadonlyArray<number>>;
+      readonly creases: ReadonlyArray<readonly [number, number]>;
+      readonly levels: number;
+    }
   /** Fallback for geometry without an analytic form: world-space triangle soup (9 numbers each). */
   | { readonly kind: 'mesh'; readonly positions: readonly number[] };
 

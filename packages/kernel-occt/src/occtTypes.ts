@@ -100,6 +100,7 @@ export interface OccSewing extends OccHandle {
   Add(shape: OccShape): void;
   Perform(progress: unknown): void;
   SewedShape(): OccShape;
+  NbFreeEdges(): number;
 }
 
 export interface OccMakeSolid extends OccBuilder {

@@ -266,6 +266,38 @@ export const plans: Record<string, GoldenAction[]> = {
       },
     },
   ],
+  surface_from_curves_hood: [
+    {
+      command: 'surface_from_curves',
+      params: {
+        curves: [
+          [
+            [0, 0, 0],
+            [40, 0, 18],
+            [80, 0, 0],
+          ],
+          [
+            [0, 50, 0],
+            [40, 50, 10],
+            [80, 50, 0],
+          ],
+        ],
+        thickness: 2,
+        cells: [6, 4],
+        name: 'hood',
+      },
+      as: 'hood',
+    },
+    {
+      command: 'edit_subdivision_cage',
+      params: {
+        id: '$hood',
+        region: { min: [30, -10, 0], max: [50, 60, 40] },
+        translate: [0, 0, 4],
+        falloff: 20,
+      },
+    },
+  ],
   loft_and_variable_sweep: [
     {
       command: 'loft_sections',

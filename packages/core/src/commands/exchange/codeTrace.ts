@@ -46,6 +46,7 @@ const TRACE_COMMANDS: ReadonlySet<string> = new Set([
   'extrude_profile',
   'revolve_profile',
   'import_mesh',
+  'add_subdivision_solid',
   'boolean_union',
   'boolean_subtract',
   'boolean_intersect',

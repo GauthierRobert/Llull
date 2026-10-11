@@ -47,6 +47,13 @@ export function shapeCallOpen(shape: ShapeSpec): string {
         `revolve(${points(shape.profile)}, axis=${quote(shape.axis)}, ` +
         `angle=${pythonDegrees(shape.angle)}, segments=${formatNumber(Math.trunc(shape.segments))}`
       );
+    case 'subdivision':
+      return (
+        `subdivision([\n    ${shape.vertices.map((p) => `(${p.map(formatNumber).join(', ')})`).join(',\n    ')},\n], ` +
+        `[${shape.faces.map((face) => `(${face.join(', ')})`).join(', ')}], ` +
+        `creases=[${shape.creases.map(([a, b]) => `(${a}, ${b})`).join(', ')}], ` +
+        `levels=${formatNumber(Math.trunc(shape.levels))}`
+      );
     case 'mesh':
       return `mesh([\n    ${numberRows(shape.positions, 9).join(',\n    ')},\n]`;
   }

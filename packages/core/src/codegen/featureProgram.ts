@@ -127,6 +127,14 @@ function lowerShape(entity: Entity, doc: CadDocument, raw: unknown, ctx: LowerCo
         // Untrusted documents (load_document) reach code generation: force a safe integer.
         segments: safeSegments(entity.segments),
       };
+    case 'subdivision':
+      return {
+        kind: 'subdivision',
+        vertices: entity.vertices,
+        faces: entity.faces,
+        creases: entity.creases,
+        levels: entity.levels,
+      };
     default: {
       return { kind: 'mesh', positions: entityTrianglePositions(entity, doc) };
     }

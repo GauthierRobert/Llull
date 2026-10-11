@@ -123,6 +123,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'remove_decal',
     'add_subdivision_solid',
     'edit_subdivision_cage',
+    'surface_from_curves',
   ],
   measure: [
     'measure_distance',

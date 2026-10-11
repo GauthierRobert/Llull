@@ -124,7 +124,9 @@ export const addSubdivisionSolid = defineCommand({
     'with soft falloff; crease edges). The surface stays inside the cage and is smooth (2-3 levels); ' +
     'creased edges stay sharp. Returns data { vertexCount, faceCount, vertices } (cage vertices in ' +
     'world coordinates, by index) to aim later edits. A closed solid: booleans, blend_union, ' +
-    'measurement and export (OCC: sewn faceted B-rep of the subdivided surface) all work.',
+    'measurement and export all work. With the OCC kernel a smooth solid (levels >= 1) is an exact ' +
+    'B-spline solid — one bicubic face per refined cage quad, exactly the limit surface away from ' +
+    'extraordinary vertices and creases (close to it there) — so STEP export and booleans are exact; levels 0 stays faceted.',
   params: z.object({
     box: z
       .object({

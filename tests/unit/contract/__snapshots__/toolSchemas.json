@@ -2238,7 +2238,7 @@
     "name": "add_steel_member"
   },
   {
-    "description": "Create a freeform solid as a Catmull-Clark subdivision surface over a coarse polygon control cage — for organic shapes no primitive gives (saddles, shifter hoods, grips, dropouts, fairings, handles). Start from a `box` cage (size + segments per axis) or a `cylinder` cage (radius, height, sides, segments along Z), both centred on `position`, or give a custom closed cage (`vertices` local to `position` + `faces` as vertex-index loops wound counter-clockwise seen from outside). Then shape it with edit_subdivision_cage (move / scale regions of cage vertices, with soft falloff; crease edges). The surface stays inside the cage and is smooth (2-3 levels); creased edges stay sharp. Returns data { vertexCount, faceCount, vertices } (cage vertices in world coordinates, by index) to aim later edits. A closed solid: booleans, blend_union, measurement and export (OCC: sewn faceted B-rep of the subdivided surface) all work.",
+    "description": "Create a freeform solid as a Catmull-Clark subdivision surface over a coarse polygon control cage — for organic shapes no primitive gives (saddles, shifter hoods, grips, dropouts, fairings, handles). Start from a `box` cage (size + segments per axis) or a `cylinder` cage (radius, height, sides, segments along Z), both centred on `position`, or give a custom closed cage (`vertices` local to `position` + `faces` as vertex-index loops wound counter-clockwise seen from outside). Then shape it with edit_subdivision_cage (move / scale regions of cage vertices, with soft falloff; crease edges). The surface stays inside the cage and is smooth (2-3 levels); creased edges stay sharp. Returns data { vertexCount, faceCount, vertices } (cage vertices in world coordinates, by index) to aim later edits. A closed solid: booleans, blend_union, measurement and export all work. With the OCC kernel a smooth solid (levels >= 1) is an exact B-spline solid — one bicubic face per refined cage quad, exactly the limit surface away from extraordinary vertices and creases (close to it there) — so STEP export and booleans are exact; levels 0 stays faceted.",
     "input_schema": {
       "properties": {
         "box": {
@@ -8089,6 +8089,74 @@
       "type": "object"
     },
     "name": "surface_elevation"
+  },
+  {
+    "description": "Create a freeform shell part from boundary curves — hoods, fairings, fenders, panels, saddle tops, aero covers. Give 4 curves that close a loop (any order or direction; ends must meet) for a Coons patch spanning them, or 2 opposite curves for a surface ruled between them. Curves are `curves` (each 2+ world points; 3+ points pass a smooth curve through them) or `curveIds` (2D sketch curves — line, arc, polyline, spline — each in its own plane). The surface is thickened by `thickness` behind its front side (flip: in front) into a closed solid with a sharp rim, stored as a subdivision solid: reshape it with edit_subdivision_cage; with the OCC kernel it is an exact B-spline solid (STEP). The smooth surface follows the curves within the smoothing of a `cells` grid (more cells = closer). Returns data { vertexCount, faceCount, vertices }.",
+    "input_schema": {
+      "properties": {
+        "cells": {
+          "description": "Cage cells [along the first curve, across] (1..24 each; default [8, 8]).",
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "color": {
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
+          "type": "string"
+        },
+        "curveIds": {
+          "description": "2 or 4 ids of 2D sketch curves bounding the patch (alternative to curves).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "curves": {
+          "description": "2 or 4 boundary curves as world point lists (alternative to curveIds).",
+          "items": {
+            "items": {
+              "description": "Curve point [x, y, z] in world coordinates.",
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "flip": {
+          "description": "Thicken toward the other side of the surface (default false).",
+          "type": "boolean"
+        },
+        "id": {
+          "description": "Optional explicit entity id. If omitted a unique id is generated.",
+          "type": "string"
+        },
+        "layerId": {
+          "description": "Layer id to assign the entity to. Defaults to the document default layer.",
+          "type": "string"
+        },
+        "levels": {
+          "description": "Subdivision levels 0..4 (0 = the faceted cage itself; 2-3 is smooth; each level quadruples the face count).",
+          "type": "integer"
+        },
+        "name": {
+          "description": "Optional display name.",
+          "type": "string"
+        },
+        "thickness": {
+          "description": "Wall thickness in document units (> 0).",
+          "type": "number"
+        }
+      },
+      "required": [
+        "thickness"
+      ],
+      "type": "object"
+    },
+    "name": "surface_from_curves"
   },
   {
     "annotations": {

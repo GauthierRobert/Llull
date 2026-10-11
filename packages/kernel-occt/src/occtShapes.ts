@@ -23,6 +23,7 @@ import {
   type OccTopoDS,
 } from './occtTypes';
 import { chainFace, loftedSolid, sweptSolid } from './occtCurves';
+import { subdivisionBSplineSolid } from './occtPatches';
 
 /** Planar OCC face of a closed polygon wire through `corners`, or null when OCC rejects it. */
 function polygonFace(api: OccApi, corners: readonly Vec3[]): OccShape | null {
@@ -279,11 +280,8 @@ function meshSolid(api: OccApi, entity: Entity): OccShape | null {
     : shape;
 }
 
-/**
- * Pyramids (planar faces only, so their sewn triangles are already exact) and subdivision solids
- * (a faceted surface by definition) use their triangles.
- */
-const TRIANGULATED_KINDS: ReadonlySet<Entity['kind']> = new Set(['pyramid', 'subdivision']);
+/** Pyramids (planar faces only, so their sewn triangles are already exact) use their triangles. */
+const TRIANGULATED_KINDS: ReadonlySet<Entity['kind']> = new Set(['pyramid']);
 
 /** Primitive tessellation never reads components; instances are not boolean operands. */
 const NO_COMPONENTS = createEmptyDocument();
@@ -327,6 +325,13 @@ export function entityToOccShape(api: OccApi, entity: Entity): OccShape | null {
   if (entity.kind === 'wedge') return wedgeSolid(api, entity);
   if (entity.kind === 'revolution') return revolvedProfile(api, entity);
   if (entity.kind === 'mesh') return meshSolid(api, entity);
+  if (entity.kind === 'subdivision') {
+    // Smooth cages become exact B-spline faces; a faceted (level 0) cage keeps its triangles.
+    const shape = entity.levels > 0 ? subdivisionBSplineSolid(api, entity) : null;
+    return shape === null
+      ? tessellatedSolid(api, entity)
+      : placed(api, shape, placementTransform(api, entity.rotation, entity.position));
+  }
   if (entity.kind === 'loft') {
     const shape = loftedSolid(api, entity);
     return shape === null
