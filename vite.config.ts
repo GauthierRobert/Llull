@@ -1,6 +1,7 @@
 import { defineConfig, configDefaults } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'node:path';
+import { workspaceAliases } from './workspaceAliases';
 
 export default defineConfig(({ command }) => ({
   plugins: [react()],
@@ -17,7 +18,11 @@ export default defineConfig(({ command }) => ({
       output: {
         manualChunks(id: string): string | undefined {
           if (!id.includes('node_modules')) return undefined;
-          if (id.includes('/three/') || id.includes('three-stdlib') || id.includes('three-mesh-bvh'))
+          if (
+            id.includes('/three/') ||
+            id.includes('three-stdlib') ||
+            id.includes('three-mesh-bvh')
+          )
             return 'vendor-three';
           if (id.includes('@react-three') || id.includes('/postprocessing/')) return 'vendor-r3f';
           if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/scheduler/'))
@@ -42,14 +47,7 @@ export default defineConfig(({ command }) => ({
       ...(command === 'build'
         ? { 'node:module': resolve(__dirname, 'src/ui/geometry/nodeModuleStub.ts') }
         : {}),
-      '@core': resolve(__dirname, 'packages/core/src'),
-      '@lib': resolve(__dirname, 'packages/core/src/lib'),
-      '@mcp': resolve(__dirname, 'packages/mcp/src'),
-      '@aec': resolve(__dirname, 'packages/domain-aec/src'),
-      '@kernel-manifold': resolve(__dirname, 'packages/kernel-manifold/src'),
-      '@kernel-occt': resolve(__dirname, 'packages/kernel-occt/src'),
-      '@ui': resolve(__dirname, 'src/ui'),
-      '@app': resolve(__dirname, 'src/app'),
+      ...workspaceAliases(),
     },
   },
   test: {

@@ -2,23 +2,14 @@
  * Vitest config for server-side tests.
  *
  * Uses the Node environment (no jsdom — the server has no DOM).
- * Resolves the same path aliases as server/tsconfig.json so server tests can
- * import @core/* and @lib/* without relative ../../ gymnastics.
+ * Path aliases come from tsconfig.base.json (workspaceAliases), like every other config.
  */
 import { defineConfig } from 'vitest/config';
-import { resolve } from 'node:path';
+import { workspaceAliases } from '../workspaceAliases';
 
 export default defineConfig({
   resolve: {
-    alias: {
-      '@core': resolve(__dirname, '../packages/core/src'),
-      '@lib': resolve(__dirname, '../packages/core/src/lib'),
-      '@mcp': resolve(__dirname, '../packages/mcp/src'),
-      '@aec': resolve(__dirname, '../packages/domain-aec/src'),
-      '@kernel-manifold': resolve(__dirname, '../packages/kernel-manifold/src'),
-      '@kernel-occt': resolve(__dirname, '../packages/kernel-occt/src'),
-      '@app': resolve(__dirname, '../src/app'),
-    },
+    alias: workspaceAliases(),
   },
   test: {
     globals: true,
