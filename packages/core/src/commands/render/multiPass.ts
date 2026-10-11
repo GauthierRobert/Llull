@@ -6,10 +6,10 @@
 
 import type { CadDocument, Vec3 } from '../../model/types';
 import { escapeXml } from '../../lib/escapeXml';
-import { type ViewName, makeProjector, computeOrthoHalf } from './camera';
+import { type ViewName, makeProjector } from './camera';
 import { renderDocument } from './scene';
-import type { RenderViewData } from './types';
-import { extractSvgInner, r2, svgDocument } from './svg';
+import type { CutSpec, RenderOptions, RenderViewData } from './types';
+import { DEFAULT_BACKGROUND, extractSvgInner, r2, svgDocument } from './svg';
 import { computeSceneSnapshot } from '../inspect/scene';
 import { boundsCenter, boundsExtent } from '../../geometry/bounds';
 import { ORIGIN } from '../../lib/vec3';
@@ -22,11 +22,16 @@ function renderSubset(
   view: ViewName,
   width: number,
   height: number,
+  options: RenderOptions,
 ): RenderViewData {
   const order = doc.order.filter((id) => keep(id) && doc.entities[id] !== undefined);
   const entities: CadDocument['entities'] = {};
   for (const id of order) entities[id] = doc.entities[id] as CadDocument['entities'][string];
-  return renderDocument({ ...doc, entities, order }, view, width, height);
+  return renderDocument({ ...doc, entities, order }, view, width, height, {
+    ...options,
+    frame: computeSceneSnapshot(doc).bounds,
+    background: null,
+  });
 }
 
 /** Copy of `doc` with every entity rotated by `angleRad` about the vertical axis through (cx, cy). */
@@ -46,6 +51,31 @@ function rotateAroundZ(doc: CadDocument, cx: number, cy: number, angleRad: numbe
   return { ...doc, entities };
 }
 
+const backgroundOf = (options: RenderOptions): string | null =>
+  options.background === undefined ? DEFAULT_BACKGROUND : options.background;
+
+/** The cut planes turned with the model, so every turntable frame cuts the same part. */
+function rotateCut(cut: CutSpec, cx: number, cy: number, angleRad: number): CutSpec {
+  const cos = Math.cos(angleRad);
+  const sin = Math.sin(angleRad);
+  return {
+    ...cut,
+    planes: cut.planes.map(({ normal, offset }) => {
+      const [nx, ny, nz] = normal;
+      const turned: Vec3 = [cos * nx - sin * ny, sin * nx + cos * ny, nz];
+      // Keep the plane through the same (turned) point: n'·(c + R(p − c)) with p = n·offset/|n|².
+      const lengthSq = nx * nx + ny * ny + nz * nz;
+      const pointOffset = offset / (lengthSq || 1);
+      const p: Vec3 = [nx * pointOffset - cx, ny * pointOffset - cy, nz * pointOffset];
+      const moved: Vec3 = [cx + cos * p[0] - sin * p[1], cy + sin * p[0] + cos * p[1], p[2]];
+      return {
+        normal: turned,
+        offset: turned[0] * moved[0] + turned[1] * moved[1] + turned[2] * moved[2],
+      };
+    }),
+  };
+}
+
 /**
  * Horizontal strip of `frames` views, the scene rotated evenly about Z through its center.
  * @returns the strip SVG and its total pixel width (`width * frames`).
@@ -56,25 +86,29 @@ export function buildTurntableSvg(
   view: ViewName,
   width: number,
   height: number,
+  options: RenderOptions = {},
 ): { svg: string; width: number } {
   const bounds = computeSceneSnapshot(doc).bounds;
   const [cx, cy] = bounds ? boundsCenter(bounds) : ORIGIN;
   const layers: string[] = [];
   const angleLabels: string[] = [];
   for (let i = 0; i < frames; i++) {
-    const frame = renderDocument(
-      rotateAroundZ(doc, cx, cy, (2 * Math.PI * i) / frames),
-      view,
-      width,
-      height,
-    );
+    const angle = (2 * Math.PI * i) / frames;
+    const frame = renderDocument(rotateAroundZ(doc, cx, cy, angle), view, width, height, {
+      ...options,
+      background: null,
+      ...(options.cut ? { cut: rotateCut(options.cut, cx, cy, angle) } : {}),
+    });
     layers.push(`  <g transform="translate(${i * width}, 0)">${extractSvgInner(frame.svg)}</g>`);
     angleLabels.push(
       `  <text x="${r2(i * width + 4)}" y="32" font-family="monospace" font-size="13" fill="#aaaacc">${Math.round((360 * i) / frames)}°</text>`,
     );
   }
   const totalWidth = width * frames;
-  return { svg: svgDocument(totalWidth, height, [...layers, ...angleLabels]), width: totalWidth };
+  return {
+    svg: svgDocument(totalWidth, height, [...layers, ...angleLabels], backgroundOf(options)),
+    width: totalWidth,
+  };
 }
 
 /** Highlighted entities at full color over the rest at low opacity, with an ISOLATED caption. */
@@ -84,16 +118,22 @@ export function buildIsolateSvg(
   view: ViewName,
   width: number,
   height: number,
+  options: RenderOptions = {},
 ): string {
   const highlighted = new Set(highlightIds);
-  const dim = renderSubset(doc, (id) => !highlighted.has(id), view, width, height);
-  const lit = renderSubset(doc, (id) => highlighted.has(id), view, width, height);
+  const dim = renderSubset(doc, (id) => !highlighted.has(id), view, width, height, options);
+  const lit = renderSubset(doc, (id) => highlighted.has(id), view, width, height, options);
   const caption = highlightIds.slice(0, 3).join(', ') + (highlightIds.length > 3 ? '…' : '');
-  return svgDocument(width, height, [
-    `  <g opacity="0.15">${extractSvgInner(dim.svg)}</g>`,
-    `  <g>${extractSvgInner(lit.svg)}</g>`,
-    `  <text x="8" y="${height - 10}" font-family="monospace" font-size="11" fill="#ffdd44">ISOLATED: ${escapeXml(caption)}</text>`,
-  ]);
+  return svgDocument(
+    width,
+    height,
+    [
+      `  <g opacity="0.15">${extractSvgInner(dim.svg)}</g>`,
+      `  <g>${extractSvgInner(lit.svg)}</g>`,
+      `  <text x="8" y="${height - 10}" font-family="monospace" font-size="11" fill="#ffdd44">ISOLATED: ${escapeXml(caption)}</text>`,
+    ],
+    backgroundOf(options),
+  );
 }
 
 /** Entities at or beyond the plane at full color, the rest dimmed, plus a dashed cut line. */
@@ -104,18 +144,24 @@ export function buildSectionSvg(
   view: ViewName,
   width: number,
   height: number,
+  options: RenderOptions = {},
 ): string {
   const axisIndex = 'xyz'.indexOf(axis);
   const onKeptSide = (id: string): boolean =>
     (doc.entities[id]?.position[axisIndex] ?? 0) >= offset;
-  const kept = renderSubset(doc, onKeptSide, view, width, height);
-  const cut = renderSubset(doc, (id) => !onKeptSide(id), view, width, height);
-  return svgDocument(width, height, [
-    `  <g opacity="0.25">${extractSvgInner(cut.svg)}</g>`,
-    `  <g>${extractSvgInner(kept.svg)}</g>`,
-    sectionPlaneLine(kept, axis, offset),
-    `  <text x="8" y="${height - 10}" font-family="monospace" font-size="11" fill="#ff8844">SECTION ${axis.toUpperCase()}=${offset}</text>`,
-  ]);
+  const kept = renderSubset(doc, onKeptSide, view, width, height, options);
+  const cut = renderSubset(doc, (id) => !onKeptSide(id), view, width, height, options);
+  return svgDocument(
+    width,
+    height,
+    [
+      `  <g opacity="0.25">${extractSvgInner(cut.svg)}</g>`,
+      `  <g>${extractSvgInner(kept.svg)}</g>`,
+      sectionPlaneLine(kept, axis, offset),
+      `  <text x="8" y="${height - 10}" font-family="monospace" font-size="11" fill="#ff8844">SECTION ${axis.toUpperCase()}=${offset}</text>`,
+    ],
+    backgroundOf(options),
+  );
 }
 
 function sectionPlaneLine(data: RenderViewData, axis: 'x' | 'y' | 'z', offset: number): string {
@@ -128,12 +174,7 @@ function sectionPlaneLine(data: RenderViewData, axis: 'x' | 'y' | 'z', offset: n
       : axis === 'y'
         ? [cx + t, offset, cz]
         : [offset, cy + t, cz];
-  const project = makeProjector(
-    data.camera,
-    computeOrthoHalf(data.bounds),
-    data.width,
-    data.height,
-  );
+  const project = makeProjector(data.camera, data.orthoHalf, data.width, data.height);
   const s0 = project(along(-ext));
   const s1 = project(along(ext));
   return [

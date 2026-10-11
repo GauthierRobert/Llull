@@ -8,7 +8,7 @@ import type { Entity, Vec3 } from '../../model/types';
 import type { RenderViewData } from './types';
 import { boundsCorners, entityBounds } from '../../geometry/bounds';
 import { escapeXml } from '../../lib/escapeXml';
-import { type Projector, makeProjector, computeOrthoHalf } from './camera';
+import { type Projector, makeProjector } from './camera';
 import { appendBeforeClose, r2, svgDot } from './svg';
 
 /** Colour-coding group of an entity in the label overlay. */
@@ -116,7 +116,7 @@ export function appendEntityLabels(
   entities: ReadonlyArray<Entity>,
 ): string {
   const { camera, width, height } = data;
-  const project = makeProjector(camera, computeOrthoHalf(data.bounds), width, height);
+  const project = makeProjector(camera, data.orthoHalf, width, height);
 
   const lines: string[] = ['  <!-- entity labels overlay -->'];
   const labelStyle = `font-family="monospace" font-size="10" stroke="#0d0d1a" stroke-width="2.5" paint-order="stroke"`;
