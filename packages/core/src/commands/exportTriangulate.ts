@@ -16,6 +16,11 @@ export function entityToTriangles(e: Entity, doc: CadDocument): Triangle[] {
   return solidTriangles(e);
 }
 
+/** Flat xyz triple list of `entityToTriangles` (the input of mesh welding / sewing). */
+export function entityTrianglePositions(e: Entity, doc: CadDocument): number[] {
+  return entityToTriangles(e, doc).flatMap((triangle) => triangle.flat());
+}
+
 /**
  * World-space triangles of the entities named by `requestedIds` (all of `doc.order` when
  * undefined/empty). Unknown ids are reported, 2D entities are counted and skipped.

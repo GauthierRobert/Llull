@@ -106,6 +106,17 @@ function applyConstraintGradient(
     deltas.set(entityId, [existing[0] + dx, existing[1] + dy]);
   }
 
+  /** Turns line b toward the nearest multiple of PI from `offset` relative to a; returns err². */
+  function turnToLattice(pair: Constraint, offset: number): number {
+    if (!('a' in pair) || !('b' in pair)) return 0;
+    const da = resolveDirection(doc, pair.a);
+    const db = resolveDirection(doc, pair.b);
+    if (!da || !db) return 0;
+    const err = distanceToLattice(Math.atan2(cross2(da, db), dot2(da, db)), offset, Math.PI);
+    addTurn(pair.b.entityId, -TURN_RELAXATION * err);
+    return err * err;
+  }
+
   /** Gradient of (|pa - pb| - target)²; returns the squared error. */
   function pullToDistance(
     idA: string,
@@ -161,25 +172,11 @@ function applyConstraintGradient(
       return err * err;
     }
 
-    case 'parallel': {
-      const da = resolveDirection(doc, c.a);
-      const db = resolveDirection(doc, c.b);
-      if (!da || !db) return 0;
-      // Error: signed angle from b to the nearest parallel (or anti-parallel) direction of a.
-      const err = distanceToLattice(Math.atan2(cross2(da, db), dot2(da, db)), 0, Math.PI);
-      addTurn(c.b.entityId, -TURN_RELAXATION * err);
-      return err * err;
-    }
+    case 'parallel':
+      return turnToLattice(c, 0);
 
-    case 'perpendicular': {
-      const da = resolveDirection(doc, c.a);
-      const db = resolveDirection(doc, c.b);
-      if (!da || !db) return 0;
-      // Error: signed angle from b to the nearest perpendicular direction of a.
-      const err = distanceToLattice(Math.atan2(cross2(da, db), dot2(da, db)), Math.PI / 2, Math.PI);
-      addTurn(c.b.entityId, -TURN_RELAXATION * err);
-      return err * err;
-    }
+    case 'perpendicular':
+      return turnToLattice(c, Math.PI / 2);
 
     case 'tangent': {
       const rA = resolveRadius(doc, c.a);

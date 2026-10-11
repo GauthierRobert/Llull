@@ -17,6 +17,11 @@ import { rotatePoint2 } from '../lib/polygon';
 import { replaceEntity } from './entityOps';
 import { rotateEulerAboutWorldZ } from '../lib/eulerRotation';
 
+const arrayCountField = z
+  .number()
+  .int()
+  .describe('Total number of instances including the original. Must be an integer >= 2.');
+
 /** True for exactly three finite numbers (looseVec3 params are unchecked at the schema level). */
 function isFiniteVec3(v: readonly number[]): boolean {
   return v.length === 3 && v.every(Number.isFinite);
@@ -279,10 +284,7 @@ export const arrayLinear = defineCommand({
     'original.position + k*offset (k = 1..count-1). count must be an integer >= 2.',
   params: z.object({
     id: z.string().describe('Id of the entity to array.'),
-    count: z
-      .number()
-      .int()
-      .describe('Total number of instances including the original. Must be an integer >= 2.'),
+    count: arrayCountField,
     offset: looseVec3(
       'World-space translation vector [dx, dy, dz] between consecutive instances. ' +
         'All components must be finite numbers.',
@@ -337,10 +339,7 @@ export const arrayPolar = defineCommand({
     'count must be >= 2.',
   params: z.object({
     id: z.string().describe('Id of the entity to array.'),
-    count: z
-      .number()
-      .int()
-      .describe('Total number of instances including the original. Must be an integer >= 2.'),
+    count: arrayCountField,
     center: looseVec3(
       'World-space center point [cx, cy, cz] for the polar rotation axis (Z axis through this point). ' +
         'Only cx and cy are used for the rotation; cz is ignored.',

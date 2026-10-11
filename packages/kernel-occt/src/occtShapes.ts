@@ -7,7 +7,7 @@
 
 import type { MeshData } from '@core/geometry/kernel';
 import { type Entity, type Vec3, createEmptyDocument } from '@core/model/types';
-import { entityToTriangles } from '@core/commands/exportTriangulate';
+import { entityTrianglePositions } from '@core/commands/exportTriangulate';
 import { cross3, dot3, sub3 } from '@lib/vec3';
 import { isValidPolygon, toCounterClockwise } from '@lib/polygon';
 import {
@@ -294,10 +294,7 @@ function soupVolume(positions: readonly number[]): number {
 
 /** Sewn solid from the entity's own (already world-space, outward-wound) triangles. */
 function tessellatedSolid(api: OccApi, entity: Entity): OccShape | null {
-  const positions: number[] = [];
-  for (const triangle of entityToTriangles(entity, NO_COMPONENTS)) {
-    for (const [x, y, z] of triangle) positions.push(x, y, z);
-  }
+  const positions = entityTrianglePositions(entity, NO_COMPONENTS);
   if (positions.length === 0) return null;
   if (soupVolume(positions) < 0) {
     for (let i = 0; i + 8 < positions.length; i += 9) {

@@ -11,7 +11,7 @@ import type { CommandDefinition } from '../commands/types';
 import { replayHistory, type ReplayStepEvent } from '../commands/replay';
 import { buildParamEnv } from '../commands/regenerate';
 import { evaluateExpression, extractReferences } from '../commands/expression';
-import { entityToTriangles } from '../commands/exportTriangulate';
+import { entityTrianglePositions } from '../commands/exportTriangulate';
 import { Namer, translateExpression } from './identifiers';
 import type { GeometryKernel } from '../geometry/kernel';
 import { recipeOf } from '../geometry/shapeRecipe';
@@ -128,11 +128,7 @@ function lowerShape(entity: Entity, doc: CadDocument, raw: unknown, ctx: LowerCo
         segments: safeSegments(entity.segments),
       };
     default: {
-      const positions: number[] = [];
-      for (const triangle of entityToTriangles(entity, doc)) {
-        for (const vertex of triangle) positions.push(vertex[0], vertex[1], vertex[2]);
-      }
-      return { kind: 'mesh', positions };
+      return { kind: 'mesh', positions: entityTrianglePositions(entity, doc) };
     }
   }
 }

@@ -14,7 +14,7 @@ import type { MeshData } from '@core/geometry/kernel';
 import type { BooleanOp } from '@core/geometry/shapeRecipe';
 import { kernelFromOps, type CachingKernel, type KernelOps } from '@core/geometry/shapeKernel';
 import { type Entity, createEmptyDocument } from '@core/model/types';
-import { entityToTriangles } from '@core/commands/exportTriangulate';
+import { entityTrianglePositions } from '@core/commands/exportTriangulate';
 import { toCounterClockwise } from '@lib/polygon';
 
 // Minimal local interface for the Manifold WASM module (avoids `any`).
@@ -215,13 +215,8 @@ function entityToManifold(m: ManifoldModule, entity: Entity): ManifoldShape | nu
     case 'torus':
     case 'wedge':
     case 'pyramid':
-    case 'revolution': {
-      const positions: number[] = [];
-      for (const triangle of entityToTriangles(entity, NO_COMPONENTS)) {
-        for (const [x, y, z] of triangle) positions.push(x, y, z);
-      }
-      return weldedManifold(m, positions, undefined, entity);
-    }
+    case 'revolution':
+      return weldedManifold(m, entityTrianglePositions(entity, NO_COMPONENTS), undefined, entity);
     case 'box':
     case 'cylinder':
     case 'sphere':

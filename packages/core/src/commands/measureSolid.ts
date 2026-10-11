@@ -184,13 +184,7 @@ export const measureVolume = defineCommand({
         // Bake the instance (scale, rotation, translation) and sum its solid children.
         volume = 0;
         for (const child of expandInstance(e, component)) {
-          const part = measureVolume.run(
-            { ...doc, entities: { [child.id]: child } },
-            {
-              entityId: child.id,
-            },
-          );
-          volume += (part.data as MeasureVolumeData | undefined)?.volume ?? 0;
+          volume += childVolume(doc, child);
         }
         break;
       }
@@ -238,6 +232,14 @@ interface MassPropertiesData {
   unit: string;
 }
 
+function childVolume(doc: CadDocument, child: Entity): number {
+  const part = measureVolume.run(
+    { ...doc, entities: { [child.id]: child } },
+    { entityId: child.id },
+  );
+  return (part.data as MeasureVolumeData | undefined)?.volume ?? 0;
+}
+
 /**
  * Volume and mass of a baked instance: every solid child uses its own material density, else the
  * instance's material, else `fallbackDensity`. Nested instances recurse; 2D children weigh nothing.
@@ -264,13 +266,7 @@ function instanceMass(
       mass += nested.mass;
       continue;
     }
-    const part = measureVolume.run(
-      { ...doc, entities: { [child.id]: child } },
-      {
-        entityId: child.id,
-      },
-    );
-    const partVolume = (part.data as MeasureVolumeData | undefined)?.volume ?? 0;
+    const partVolume = childVolume(doc, child);
     volume += partVolume;
     mass += partVolume * density;
   }
