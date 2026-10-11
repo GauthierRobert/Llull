@@ -99,6 +99,7 @@ const ICON_PATHS = {
   search: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM21 21l-4.35-4.35',
   arrowLeft: 'M19 12H5M12 19l-7-7 7-7',
   keyboard: 'M3 6h18v12H3zM7 10h.01M11 10h.01M15 10h.01M17 10h.01M7 14h.01M17 14h.01M10 14h4',
+  image: 'M3 5h18v14H3zM3 16l5-5 4 4 3-3 6 6M15.5 9.5h.01',
 } as const;
 
 export type IconName = keyof typeof ICON_PATHS;

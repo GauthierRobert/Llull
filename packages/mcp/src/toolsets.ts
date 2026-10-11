@@ -88,6 +88,10 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'chamfer_2d',
     'add_text',
     'add_dimension',
+    'add_image_underlay',
+    'calibrate_underlay',
+    'set_underlay',
+    'image_to_world',
   ],
   '3d': [
     'add_box',

@@ -3,6 +3,8 @@
  * Plans reference earlier results via `as` aliases, never literal ids.
  */
 
+import { pngDataUrl } from '../helpers/imageFixtures';
+
 export interface GoldenAction {
   command?: string;
   params?: Record<string, unknown>;
@@ -93,6 +95,21 @@ export const plans: Record<string, GoldenAction[]> = {
       },
     },
     { command: 'draw_ellipse', params: { center: [0, 0], radiusX: 6, radiusY: 3 } },
+  ],
+  '2d_image_underlay': [
+    { command: 'add_image_underlay', params: { dataUrl: pngDataUrl(400, 300) }, as: 'scan' },
+    {
+      command: 'calibrate_underlay',
+      params: {
+        id: '$scan',
+        pixelA: [50, 250],
+        pixelB: [350, 245],
+        distance: 450,
+        origin: { pixel: [50, 250], world: [0, 0, 0] },
+        align: 'x',
+      },
+    },
+    { command: 'set_underlay', params: { id: '$scan', opacity: 0.3, locked: true } },
   ],
   '2d_text_dimensions': [
     { command: 'draw_point', params: { position: [0, 0, 0] }, as: 'p1' },

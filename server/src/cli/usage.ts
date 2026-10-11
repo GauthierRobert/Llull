@@ -15,7 +15,8 @@ Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first cha
   exec <command> [params]     run one command; params are key=value pairs (values parsed as
                               JSON unless the param is a string: size=[1,2,3] name=123),
                               one JSON object,
-                              @params.json or - (stdin)
+                              @params.json or - (stdin); a value @img:scan.png is
+                              read as an image data URL (add_image_underlay dataUrl=…)
   <command> [params]          shorthand for exec
   run <plan.json | ->         build_project: an actions array or { actions, onError }
                               [--validate] dry-run check  [--continue] onError=continue

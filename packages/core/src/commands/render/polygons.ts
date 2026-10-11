@@ -384,6 +384,8 @@ export function tessellateEntity(e: Entity): PreDepthPolygon[] {
       return []; // not drawn in render_view SVG; the viewport renders text
     case 'dimension':
       return []; // not drawn in render_view SVG; the viewport renders dimensions
+    case 'image':
+      return []; // drawn by renderScene as an <image> underlay behind every polygon
     case 'instance':
       return []; // drawn by renderScene, which bakes the instance into its component's entities first
     default: {

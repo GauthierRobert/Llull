@@ -16,11 +16,13 @@ import type {
   DimensionEntity,
   Entity,
   EntityId,
+  ImageEntity,
   TextEntity,
   Vec2,
 } from '@core/model/types';
 import { is3D } from '@core/model/types';
 import { GLYPH_WIDTH_RATIO, textLocalBounds } from '@core/geometry/bounds';
+import { underlayCorners } from '@core/geometry/imageUnderlay';
 import { DEFAULT_OFFSET, dimensionDrawing } from './entities/dimensionGeometry';
 import { nearestOnArc } from './snapping/geometry';
 import { ringsDistSq, solidOutline } from './solidOutline';
@@ -110,7 +112,7 @@ function pointToSegDistSq(p: Vec2, a: Vec2, b: Vec2): number {
  * the entity's local frame and all geometry is compared in that frame.
  *
  * Handles: line, polyline, circle, rectangle, point, arc (swept range only),
- * ellipse (sampled), spline (through its control points).
+ * ellipse (sampled), spline (through its control points), image (its frame, unless locked).
  * Returns Infinity for unsupported kinds.
  *
  * @pure
@@ -178,9 +180,23 @@ export function entityDistSq(entity: Entity, worldPick: Vec2): number {
       });
       return chainDistSq(pick, samples, false);
     }
+    case 'image': {
+      const frame = underlayFrame(entity);
+      return frame === null ? Infinity : chainDistSq(worldPick, frame, true);
+    }
     default:
       return Infinity;
   }
+}
+
+/**
+ * World-XY frame (4 corners, pixel order) of an image underlay; null when it is locked, so a locked
+ * underlay is never picked or box-selected while tracing over it.
+ * @pure
+ */
+export function underlayFrame(entity: ImageEntity): Vec2[] | null {
+  if (entity.locked) return null;
+  return underlayCorners(entity).map(([x, y]): Vec2 => [x, y]);
 }
 
 /**
