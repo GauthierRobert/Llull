@@ -1,5 +1,11 @@
 import type { CurveSegment } from '../../model/curve';
-import { type SweepSection, type Vec2, type Vec3, DEFAULT_LAYER_ID } from '../../model/types';
+import {
+  type SweepSection,
+  type SweepStation,
+  type Vec2,
+  type Vec3,
+  DEFAULT_LAYER_ID,
+} from '../../model/types';
 import type { CommandResult } from '../types';
 import { colorField, defineCommand, untypedArray, z } from '../schema';
 import { noop } from '../noop';
@@ -11,6 +17,8 @@ import { newEntity } from '../entity/newEntity';
 import { DEFAULT_SOLID_COLOR, commitSolid } from './shared';
 import { MAX_PROFILE_POINTS } from '../limits';
 import { sketchLoop, sketchPath } from './sketchCurves';
+import { type SectionSpec, sectionSpecFields, specRing } from './sectionSpecs';
+import { alignRing } from '../../geometry/sectionRing';
 import {
   catmullRomBeziers,
   chainIssue,
@@ -66,6 +74,33 @@ function resolveSection(
     section: { shape: 'profile', profile, ...(exact ? { curves } : {}) },
     halfSize: Math.max(...profile.map(([x, y]) => Math.hypot(x, y))),
   };
+}
+
+/** Station rings (aligned to their predecessor) and the largest half-size, or an error message. */
+function resolveStations(
+  doc: Parameters<typeof sketchLoop>[0],
+  raw: ReadonlyArray<SectionSpec & { at: number }>,
+): { section: SweepSection; halfSize: number; stations: SweepStation[] } | string {
+  if (raw.length < 2) return `stations needs >= 2 entries (got ${raw.length})`;
+  const stations: SweepStation[] = [];
+  let halfSize = 0;
+  for (let i = 0; i < raw.length; i++) {
+    const spec = raw[i] as SectionSpec & { at: number };
+    const previous = stations[i - 1];
+    if (!(spec.at >= 0 && spec.at <= 1))
+      return `station ${i}: at must be in [0, 1] (got ${spec.at})`;
+    if (previous !== undefined && !(spec.at > previous.at))
+      return `station ${i}: at must be greater than the previous station (${previous.at})`;
+    const resolved = specRing(doc, spec);
+    if (typeof resolved === 'string') return `station ${i}: ${resolved}`;
+    halfSize = Math.max(halfSize, resolved.halfSize);
+    const ring = previous === undefined ? resolved.ring : alignRing(resolved.ring, previous.ring);
+    stations.push({ at: spec.at, ring });
+  }
+  const first = stations[0] as SweepStation;
+  const last = stations[stations.length - 1] as SweepStation;
+  if (first.at !== 0 || last.at !== 1) return 'the first station must be at 0 and the last at 1';
+  return { section: { shape: 'profile', profile: first.ring }, halfSize, stations };
 }
 
 /** World path from points (bends or smooth spline) or a 2D sketch entity, or an error message. */
@@ -167,6 +202,20 @@ export const sweepProfile = defineCommand({
           'its local coordinates (relative to its own position) become section coordinates; curves stay exact.',
       )
       .optional(),
+    stations: z
+      .array(
+        z.object({
+          at: z.number().describe('Path fraction of this section: 0 = path start, 1 = path end.'),
+          ...sectionSpecFields,
+        }),
+      )
+      .describe(
+        'Variable section: >= 2 cross-sections along the path, with `at` strictly increasing from 0 ' +
+          'to 1, each a radius, radiusX+radiusY ellipse, section polygon or sectionId. The section ' +
+          'blends smoothly between stations (taper, flatten, round-to-oval, any shape to any shape). ' +
+          'Replaces radius / innerRadius / section / sectionId.',
+      )
+      .optional(),
     layerId: z
       .string()
       .describe('Layer id to assign the entity to. Defaults to the document default layer.')
@@ -188,6 +237,7 @@ export const sweepProfile = defineCommand({
       innerRadius,
       section: rawSection,
       sectionId,
+      stations: rawStations,
       layerId,
       color = DEFAULT_SOLID_COLOR,
       id: explicitId,
@@ -200,9 +250,16 @@ export const sweepProfile = defineCommand({
       Object.hasOwn(doc.entities, explicitId)
     )
       return fail(`entity id "${explicitId}" already exists`);
-    const resolved = resolveSection(doc, radius, innerRadius, rawSection, sectionId);
+    const resolved =
+      rawStations === undefined
+        ? resolveSection(doc, radius, innerRadius, rawSection, sectionId)
+        : [radius, innerRadius, rawSection, sectionId].some((v) => v !== undefined)
+          ? 'with stations, give each section inside its station (not radius / section / sectionId)'
+          : resolveStations(doc, rawStations);
     if (typeof resolved === 'string') return fail(resolved);
     const { section, halfSize } = resolved;
+    const stations: SweepStation[] | undefined =
+      'stations' in resolved ? (resolved.stations as SweepStation[]) : undefined;
     const bendRadius = rawBend ?? DEFAULT_BEND_FACTOR * halfSize;
     if (!(bendRadius > 0)) return fail(`bendRadius must be > 0 (got ${bendRadius})`);
     const path = resolvePath(doc, rawPath, pathId, smooth, bendRadius);
@@ -222,7 +279,9 @@ export const sweepProfile = defineCommand({
     const start = path[0]?.points[0] as Vec3;
     const local = path.map((segment) => mapSegment(segment, (p: Vec3): Vec3 => sub3(p, start)));
     const id = explicitId !== undefined && explicitId.length > 0 ? explicitId : nextId('swp');
-    const entity = newEntity('sweep', id, { path: local, section }, start, color, {
+    const geometry =
+      stations === undefined ? { path: local, section } : { path: local, section, stations };
+    const entity = newEntity('sweep', id, geometry, start, color, {
       layerId:
         layerId !== undefined && Object.hasOwn(doc.layers, layerId) ? layerId : DEFAULT_LAYER_ID,
     });
@@ -231,9 +290,11 @@ export const sweepProfile = defineCommand({
     for (let i = 1; i < samples.length; i++)
       length += Math.hypot(...sub3(samples[i] as Vec3, samples[i - 1] as Vec3));
     const shape =
-      section.shape === 'circle'
-        ? `round section r=${section.radius}${section.innerRadius !== undefined ? ` bore ${section.innerRadius}` : ''}`
-        : `${section.profile.length}-point section`;
+      stations !== undefined
+        ? `${stations.length}-station variable section`
+        : section.shape === 'circle'
+          ? `round section r=${section.radius}${section.innerRadius !== undefined ? ` bore ${section.innerRadius}` : ''}`
+          : `${section.profile.length}-point section`;
     return commitSolid(
       doc,
       entity,

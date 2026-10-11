@@ -39,6 +39,8 @@ function sweepProblem(v: Record<string, unknown>): string | null {
     return 'path must be a non-empty array of line/arc/bezier segments with [x, y, z] points';
   const pathIssue = chainIssue(path as CurveSegment<Vec3>[], false);
   if (pathIssue !== null) return `path invalid — ${pathIssue}`;
+  const stations = stationsProblem(v['stations']);
+  if (stations !== null) return stations;
   const section = v['section'];
   if (!isRecord(section)) return 'section must be an object';
   if (section['shape'] === 'circle') {
@@ -57,6 +59,38 @@ function sweepProblem(v: Record<string, unknown>): string | null {
   )
     return "section must be { shape: 'circle', radius } or { shape: 'profile', profile (>= 3 points) }";
   return curvesProblem(section['curves']);
+}
+
+/** Rings: >= `minRings` arrays of equal length >= 3 holding finite points of `dims` numbers. */
+function ringsProblem(rings: unknown, dims: number, minRings: number): string | null {
+  const isPoint = (p: unknown): boolean =>
+    Array.isArray(p) && p.length === dims && p.every(isFiniteNumber);
+  if (!Array.isArray(rings) || rings.length < minRings) return `needs >= ${minRings} rings`;
+  const size = Array.isArray(rings[0]) ? rings[0].length : 0;
+  const ok = rings.every(
+    (ring) => Array.isArray(ring) && ring.length === size && size >= 3 && ring.every(isPoint),
+  );
+  return ok ? null : `rings must share one length >= 3 and hold finite ${dims}D points`;
+}
+
+/** Optional variable-section stations of a sweep, or null when absent / valid. */
+function stationsProblem(stations: unknown): string | null {
+  if (stations === undefined) return null;
+  if (!Array.isArray(stations) || !stations.every((s) => isRecord(s) && isFiniteNumber(s['at'])))
+    return 'stations must be { at, ring } entries';
+  const ats = stations.map((s) => (s as Record<string, unknown>)['at'] as number);
+  if (
+    ats[0] !== 0 ||
+    ats[ats.length - 1] !== 1 ||
+    ats.some((at, i) => i > 0 && !(at > (ats[i - 1] as number)))
+  )
+    return 'station at values must rise strictly from 0 to 1';
+  const problem = ringsProblem(
+    stations.map((s) => (s as Record<string, unknown>)['ring']),
+    2,
+    2,
+  );
+  return problem === null ? null : `stations ${problem}`;
 }
 
 /** Optional exact 2D boundary (`curves`) problem, or null. */
@@ -171,6 +205,12 @@ export function validateEntityValue(v: unknown): string | null {
     case 'sweep': {
       const problem = sweepProblem(v);
       if (problem !== null) return `entity ${id} (sweep): ${problem}`;
+      break;
+    }
+    case 'loft': {
+      const problem = ringsProblem(v['rings'], 3, 2);
+      if (problem !== null) return `entity ${id} (loft): ${problem}`;
+      if (typeof v['ruled'] !== 'boolean') return `entity ${id} (loft): ruled must be a boolean`;
       break;
     }
     case 'mesh': {

@@ -28,6 +28,7 @@ import { WedgeMesh } from './entities/WedgeMesh';
 import { PyramidMesh } from './entities/PyramidMesh';
 import { RevolutionMesh } from './entities/RevolutionMesh';
 import { SweepMesh } from './entities/SweepMesh';
+import { LoftMesh } from './entities/LoftMesh';
 import { TextMesh } from './entities/TextMesh';
 import { Shape2DRenderer } from '../2d/Shape2DRenderer';
 import { isBatchable, groupEntitiesForInstancing } from './grouping';
@@ -54,6 +55,7 @@ const SOLID_MESHES: { [K in SolidKind]: SolidMeshBranch<Extract<Entity, { kind: 
   pyramid: PyramidMesh,
   revolution: RevolutionMesh,
   sweep: SweepMesh,
+  loft: LoftMesh,
 };
 
 /**

@@ -225,6 +225,42 @@ export const plans: Record<string, GoldenAction[]> = {
       },
     },
   ],
+  loft_and_variable_sweep: [
+    {
+      command: 'loft_sections',
+      params: {
+        sections: [
+          { center: [0, 0, 0], radius: 2 },
+          {
+            center: [0, 0, 4],
+            section: [
+              [-1.5, -1.5],
+              [1.5, -1.5],
+              [1.5, 1.5],
+              [-1.5, 1.5],
+            ],
+          },
+          { center: [1, 0, 8], radiusX: 2.5, radiusY: 0.8, rotation: [0, 0.25, 0] },
+        ],
+      },
+    },
+    {
+      command: 'sweep_profile',
+      params: {
+        path: [
+          [6, 0, 0],
+          [16, 0, 0],
+          [16, 0, 10],
+        ],
+        bendRadius: 4,
+        stations: [
+          { at: 0, radius: 1.2 },
+          { at: 0.5, radiusX: 0.8, radiusY: 1.6 },
+          { at: 1, radius: 0.6 },
+        ],
+      },
+    },
+  ],
   bell_nozzle_and_plumbing: [
     {
       command: 'draw_spline',

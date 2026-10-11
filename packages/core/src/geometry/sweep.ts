@@ -3,15 +3,18 @@
  * Sweep tessellation shared by export, kernels' mesh path and the viewport: the section is carried
  * along the sampled path by a rotation-minimizing frame (double reflection, Wang et al. 2008).
  * Start frame: binormal (section +y) is world +Z projected off the tangent (+Y when the path starts
- * vertical), normal (section +x) = binormal × tangent.
+ * vertical), normal (section +x) = binormal × tangent. Variable sections (`stations`) blend
+ * section rings (./sectionRing) along the arc length and are skinned by ./skin.
  */
 
 import type { CurveSegment } from '../model/curve';
-import type { SweepSection, Vec2, Vec3 } from '../model/types';
+import type { SweepEntity, SweepSection, SweepStation, Vec2, Vec3 } from '../model/types';
 import { add3, cross3, dot3, normalize3, scale3, sub3 } from '../lib/vec3';
 import { signedArea } from '../lib/polygon';
 import { triangulatePolygon } from '../lib/triangulate';
 import { segmentPoint, segmentSteps, segmentTangent } from './curveSegments';
+import { sampleRing } from './sectionRing';
+import { skinTriangles } from './skin';
 
 /** Vertices around a circular sweep section. */
 export const SWEEP_CIRCLE_SEGMENTS = 24;
@@ -96,17 +99,20 @@ export function sectionLoops(section: SweepSection): { outer: Vec2[]; inner: Vec
  * Outer section rings grouped per path segment (each group includes the joint ring it starts
  * from), carried by the same continuous frames as `sweepTriangles`.
  */
-export function sweepSegmentRings(
-  path: ReadonlyArray<CurveSegment<Vec3>>,
-  section: SweepSection,
-): Vec3[][] {
+export function sweepSegmentRings(sweep: SweepShape): Vec3[][] {
+  const { path, section, stations } = sweep;
   const frames = sweepFrames(path);
+  const fractions = frameFractions(frames);
   const { outer } = sectionLoops(section);
+  const loopAt = (i: number): Vec2[] =>
+    stations !== undefined && stations.length >= 2
+      ? stationLoopAt(stations, fractions[i] as number)
+      : outer;
   return path.map((_, index) =>
     frames
       .filter((frame, i) => frame.segment === index || frames[i + 1]?.segment === index)
       .flatMap((frame) =>
-        outer.map(([x, y]) =>
+        loopAt(frames.indexOf(frame)).map(([x, y]) =>
           add3(frame.point, add3(scale3(frame.normal, x), scale3(frame.binormal, y))),
         ),
       ),
@@ -127,15 +133,80 @@ function walls(lower: readonly Vec3[], upper: readonly Vec3[], flip: boolean): T
   });
 }
 
+/** What a sweep's geometry depends on (a SweepEntity satisfies it). */
+export type SweepShape = Pick<SweepEntity, 'path' | 'section'> & {
+  readonly stations?: SweepEntity['stations'];
+};
+
+/** Arc-length fraction (0..1) of every frame along the path. */
+function frameFractions(frames: readonly SweepFrame[]): number[] {
+  const distances = [0];
+  for (let i = 1; i < frames.length; i++) {
+    const step = sub3((frames[i] as SweepFrame).point, (frames[i - 1] as SweepFrame).point);
+    distances.push((distances[i - 1] as number) + Math.hypot(...step));
+  }
+  const total = distances[distances.length - 1] as number;
+  return distances.map((d) => (total > 0 ? d / total : 0));
+}
+
+/** Point and section axes at path fraction `t` (0..1), interpolated between sampled frames. */
+export function frameAtFraction(
+  path: ReadonlyArray<CurveSegment<Vec3>>,
+  t: number,
+): Pick<SweepFrame, 'point' | 'normal' | 'binormal'> {
+  const frames = sweepFrames(path);
+  const fractions = frameFractions(frames);
+  let i = 0;
+  while (i < frames.length - 2 && t > (fractions[i + 1] as number)) i++;
+  const a = frames[i] as SweepFrame;
+  const b = (frames[i + 1] ?? a) as SweepFrame;
+  const span = (fractions[i + 1] ?? 1) - (fractions[i] ?? 0);
+  const u = span > 0 ? Math.min(1, Math.max(0, (t - (fractions[i] as number)) / span)) : 0;
+  const lerp = (p: Vec3, q: Vec3): Vec3 => add3(p, scale3(sub3(q, p), u));
+  const normal = normalize3(lerp(a.normal, b.normal));
+  const tangent = normalize3(lerp(a.tangent, b.tangent));
+  return { point: lerp(a.point, b.point), normal, binormal: cross3(tangent, normal) };
+}
+
+/**
+ * Section ring (SECTION_RING_POINTS points, section coordinates) at path fraction `t`: the two
+ * neighbouring station rings blended with a smoothstep weight (tangent-continuous at stations).
+ */
+export function stationRingAt(stations: ReadonlyArray<SweepStation>, t: number): Vec2[] {
+  let span = 0;
+  while (span < stations.length - 2 && t > (stations[span + 1] as SweepStation).at) span++;
+  const a = stations[span] as SweepStation;
+  const b = stations[span + 1] as SweepStation;
+  const u = Math.min(1, Math.max(0, (t - a.at) / Math.max(1e-12, b.at - a.at)));
+  const w = u * u * (3 - 2 * u);
+  return a.ring.map((p, i): Vec2 => {
+    const q = b.ring[i] as Vec2;
+    return [p[0] + w * (q[0] - p[0]), p[1] + w * (q[1] - p[1])];
+  });
+}
+
+/** Dense section loop at path fraction `t` (the sampled curve of `stationRingAt`). */
+export function stationLoopAt(stations: ReadonlyArray<SweepStation>, t: number): Vec2[] {
+  return sampleRing(stationRingAt(stations, t)).map(([x, y]): Vec2 => [x, y]);
+}
+
 /**
  * Closed, outward-wound triangles of a sweep; `origin` is added to every vertex.
  * @invariant shared ring vertices are the same Vec3 values, so the soup welds watertight
  */
-export function sweepTriangles(
-  path: ReadonlyArray<CurveSegment<Vec3>>,
-  section: SweepSection,
-  origin: Vec3 = [0, 0, 0],
-): Triangle[] {
+export function sweepTriangles(sweep: SweepShape, origin: Vec3 = [0, 0, 0]): Triangle[] {
+  const { path, section, stations } = sweep;
+  if (stations !== undefined && stations.length >= 2) {
+    const frames = sweepFrames(path);
+    const fractions = frameFractions(frames);
+    return skinTriangles(
+      frames.map((frame, i) =>
+        stationLoopAt(stations, fractions[i] as number).map(([x, y]) =>
+          add3(origin, add3(frame.point, add3(scale3(frame.normal, x), scale3(frame.binormal, y)))),
+        ),
+      ),
+    );
+  }
   const frames = sweepFrames(path);
   const { outer, inner } = sectionLoops(section);
   if (frames.length < 2 || outer.length < 3) return [];

@@ -7,7 +7,8 @@
 
 import type { CurveSegment } from '@core/model/curve';
 import type { Entity, Vec2, Vec3 } from '@core/model/types';
-import { sweepStartAxes } from '@core/geometry/sweep';
+import { frameAtFraction, stationRingAt, sweepStartAxes } from '@core/geometry/sweep';
+import { ringCurves } from '@core/geometry/sectionRing';
 import { reverseChain, sampleProfile, segmentTangent } from '@core/geometry/curveSegments';
 import { add3, scale3 } from '@lib/vec3';
 import { signedArea } from '@lib/polygon';
@@ -159,11 +160,82 @@ function sectionFace(api: OccApi, entity: Extract<Entity, { kind: 'sweep' }>): O
   return chainFace(api, curves, place, true);
 }
 
+/** Wire of a section ring's closed curve (one Bézier edge per ring point). */
+function ringWire(api: OccApi, ring: ReadonlyArray<Vec3>): OccShape | null {
+  return chainWire(api, ringCurves(ring));
+}
+
+/** Skin sections per path segment of a variable sweep (BRepOffsetAPI_MakePipeShell.Build is
+ * unusable in this opencascade.js build, so the sweep is skinned through placed sections). */
+const SKIN_SECTIONS_PER_SEGMENT = 8;
+
+/**
+ * Variable-section sweep: a smooth BRepOffsetAPI_ThruSections skin through the core station rings
+ * (`stationRingAt`) placed in the core sweep frame at evenly spaced path fractions plus every
+ * station; null when OCC fails.
+ */
+function stationSweep(api: OccApi, entity: Extract<Entity, { kind: 'sweep' }>): OccShape | null {
+  const stations = entity.stations ?? [];
+  const count = Math.min(64, Math.max(8, entity.path.length * SKIN_SECTIONS_PER_SEGMENT));
+  const fractions = [
+    ...new Set([
+      ...Array.from({ length: count + 1 }, (_, k) => k / count),
+      ...stations.map((station) => station.at),
+    ]),
+  ].sort((a, b) => a - b);
+  const rings = fractions.map((t) => {
+    const frame = frameAtFraction(entity.path, t);
+    return stationRingAt(stations, t).map(([x, y]) =>
+      add3(frame.point, add3(scale3(frame.normal, x), scale3(frame.binormal, y))),
+    );
+  });
+  return skinnedSolid(api, rings, false);
+}
+
+/** Smooth or ruled BRepOffsetAPI_ThruSections solid through ring wires; null when OCC fails. */
+function skinnedSolid(
+  api: OccApi,
+  rings: ReadonlyArray<ReadonlyArray<Vec3>>,
+  ruled: boolean,
+): OccShape | null {
+  const maker = new api.BRepOffsetAPI_ThruSections(true, ruled, 1e-6) as OccHandle & {
+    AddWire(wire: OccShape): void;
+    CheckCompatibility(check: boolean): void;
+    Build(): void;
+    IsDone(): boolean;
+    Shape(): OccShape;
+  };
+  maker.CheckCompatibility(false);
+  const wires: OccShape[] = [];
+  for (const ring of rings) {
+    const wire = ringWire(api, ring);
+    if (wire === null) {
+      [maker, ...wires].forEach(release);
+      return null;
+    }
+    maker.AddWire(wire);
+    wires.push(wire);
+  }
+  maker.Build();
+  const shape = maker.IsDone() ? maker.Shape() : null;
+  [maker, ...wires].forEach(release);
+  return shape;
+}
+
+/** Exact loft in the entity's local frame: BRepOffsetAPI_ThruSections through the ring wires. */
+export function loftedSolid(api: OccApi, entity: Entity): OccShape | null {
+  return entity.kind === 'loft' ? skinnedSolid(api, entity.rings, entity.ruled) : null;
+}
+
 /** Exact swept solid in the entity's local frame (not yet placed); null when OCC fails. */
 export function sweptSolid(api: OccApi, entity: Entity): OccShape | null {
   if (entity.kind !== 'sweep') return null;
   const spine = chainWire(api, entity.path);
   if (spine === null) return null;
+  if (entity.stations !== undefined && entity.stations.length >= 2) {
+    release(spine);
+    return stationSweep(api, entity);
+  }
   const face = sectionFace(api, entity);
   if (face === null) {
     release(spine);

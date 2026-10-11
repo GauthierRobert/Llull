@@ -14,7 +14,7 @@ type Vec3 = readonly [number, number, number];  // world, right-handed, +Z up
 // and persistence validation): DOCUMENT_UNITS, SOLID_KINDS, SHAPE2D_KINDS, CONSTRAINT_KINDS.
 type DocumentUnit = (typeof DOCUMENT_UNITS)[number];  // 'mm' | 'cm' | 'm' | 'in' | 'ft'
 type SolidKind = (typeof SOLID_KINDS)[number];  // 'box' | 'cylinder' | 'sphere' | 'extrusion'
-               // | 'mesh' | 'cone' | 'torus' | 'wedge' | 'pyramid' | 'revolution' | 'sweep'
+               // | 'mesh' | 'cone' | 'torus' | 'wedge' | 'pyramid' | 'revolution' | 'sweep' | 'loft'
 type Shape2DKind = (typeof SHAPE2D_KINDS)[number];  // 'line' | 'polyline' | 'arc' | 'circle'
                // | 'rectangle' | 'point' | 'ellipse' | 'spline' | 'text' | 'dimension'
 type EntityKind = SolidKind | Shape2DKind | 'instance';
@@ -44,7 +44,8 @@ TorusEntity      'torus'      ringRadius; tubeRadius
 WedgeEntity      'wedge'      size: Vec3
 PyramidEntity    'pyramid'    baseWidth; baseDepth; height
 RevolutionEntity 'revolution' profile; axis: Vec3; angle; segments; curves?  // same rule as extrusion
-SweepEntity      'sweep'      path: CurveSegment<Vec3>[] (local, open, G1); section: {shape:'circle'; radius; innerRadius?} | {shape:'profile'; profile; curves?}
+SweepEntity      'sweep'      path: CurveSegment<Vec3>[] (local, open, G1); section: {shape:'circle'; radius; innerRadius?} | {shape:'profile'; profile; curves?}; stations?: {at; ring: Vec2[]}[]  // variable section
+LoftEntity       'loft'       rings: Vec3[][] (local, SECTION_RING_POINTS each, aligned); ruled
 // 2D (geometry LOCAL to the work plane placed by position/rotation; default z=0, normal +Z)
 LineEntity       'line'       start: Vec2; end: Vec2
 PolylineEntity   'polyline'   points: Vec2[]; closed

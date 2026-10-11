@@ -26,6 +26,7 @@ export const SOLID_KINDS = [
   'pyramid',
   'revolution',
   'sweep',
+  'loft',
 ] as const;
 
 export type SolidKind = (typeof SOLID_KINDS)[number];
@@ -183,6 +184,30 @@ export interface SweepEntity extends BaseEntity {
   readonly kind: 'sweep';
   path: ReadonlyArray<CurveSegment<Vec3>>;
   section: SweepSection;
+  /**
+   * Variable section: rings (SECTION_RING_POINTS points, section coordinates, read as closed
+   * Catmull-Rom curves) at path fractions `at`, blended in between; replaces `section` geometry.
+   * @invariant >= 2 stations, `at` strictly increasing from 0 to 1, equal ring point counts
+   */
+  stations?: ReadonlyArray<SweepStation>;
+}
+
+/** One cross-section of a variable sweep at path fraction `at` (0 = start, 1 = end). */
+export interface SweepStation {
+  readonly at: number;
+  readonly ring: ReadonlyArray<Vec2>;
+}
+
+/**
+ * Solid skinned through ordered 3D section rings (local to `position`), each a closed Catmull-Rom
+ * curve through SECTION_RING_POINTS aligned points; `ruled` joins neighbours with straight lines.
+ * @invariant >= 2 rings, equal point counts, consistent winding
+ * @see loft_sections
+ */
+export interface LoftEntity extends BaseEntity {
+  readonly kind: 'loft';
+  rings: ReadonlyArray<ReadonlyArray<Vec3>>;
+  ruled: boolean;
 }
 
 export interface LineEntity extends BaseEntity {
@@ -293,6 +318,7 @@ export type Entity =
   | PyramidEntity
   | RevolutionEntity
   | SweepEntity
+  | LoftEntity
   | LineEntity
   | PolylineEntity
   | ArcEntity

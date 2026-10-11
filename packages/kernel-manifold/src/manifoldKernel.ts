@@ -217,6 +217,7 @@ function entityToManifold(m: ManifoldModule, entity: Entity): ManifoldShape | nu
     case 'pyramid':
     case 'revolution':
     case 'sweep':
+    case 'loft':
       return weldedManifold(m, entityTrianglePositions(entity, NO_COMPONENTS), undefined, entity);
     case 'box':
     case 'cylinder':

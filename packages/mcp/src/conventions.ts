@@ -59,6 +59,7 @@ corner. Knowing the anchor lets you place objects without offset math errors.
 | \`add_pyramid\`   | **base-center** (centroid of the rectangular base) |
 | \`extrude_profile\` | **origin** of the 2D profile in the XY plane  |
 | \`sweep_profile\` | **path start** (the first path point; path stored relative to it) |
+| \`loft_sections\` | **first section centre** (rings stored relative to it) |
 
 **Common pitfall**: center-anchored primitives are half-buried at \`position[2] = 0\`.
 To sit them ON the ground (Z=0), set \`position[2]\` to half their height:
@@ -149,7 +150,8 @@ wildly unexpected orientation. Always use radians.
 | \`add_torus\`       | Create a torus/donut (center anchor)               |
 | \`add_wedge\`       | Create a wedge/ramp (lower-front-left anchor)      |
 | \`add_pyramid\`     | Create a rectangular pyramid (base-center anchor)  |
-| \`sweep_profile\`   | Pipe/tube/rail: section swept along a bent or spline path |
+| \`sweep_profile\`   | Pipe/tube/rail along a path; \`stations\` = tapered/variable section |
+| \`loft_sections\`   | Skin a solid through 2+ sections (round→square, tapered bodies) |
 | \`revolve_profile\` | Turned part from a profile or a sketched spline loop |
 | \`move_entity\`     | Translate an entity by a delta vector              |
 | \`delete_entity\`   | Remove an entity by id                             |

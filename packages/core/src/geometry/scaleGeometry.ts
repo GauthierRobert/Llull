@@ -147,8 +147,21 @@ export function scaleGeometry(e: Entity, f: number): { scaled: Entity; dims: str
           ...e,
           path: e.path.map((segment) => mapSegment(segment, (p: Vec3) => scale3(p, f))),
           section: scaledSection(e.section, f),
+          ...(e.stations !== undefined
+            ? {
+                stations: e.stations.map((station) => ({
+                  at: station.at,
+                  ring: station.ring.map((p) => scale2(p, f)),
+                })),
+              }
+            : {}),
         },
         dims: `scaled ${e.path.length}-segment path and section`,
+      };
+    case 'loft':
+      return {
+        scaled: { ...e, rings: e.rings.map((ring) => ring.map((p) => scale3(p, f))) },
+        dims: `scaled ${e.rings.length} section rings`,
       };
     case 'instance': {
       const scale = scale3(e.scale ?? [1, 1, 1], f);

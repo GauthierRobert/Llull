@@ -409,7 +409,7 @@ describe('sweep entity across the kind dispatch', () => {
       expect(dot(frame.binormal, frame.normal)).toBeCloseTo(0, 9);
       expect(dot(frame.normal, frame.normal)).toBeCloseTo(1, 9);
     }
-    expect(sweepTriangles([], { shape: 'circle', radius: 1 })).toEqual([]);
+    expect(sweepTriangles({ path: [], section: { shape: 'circle', radius: 1 } })).toEqual([]);
   });
 
   it('starts vertical paths with the section +y along world +Y', () => {
@@ -543,7 +543,7 @@ describe('sweep review fixes', () => {
 
   it('per-segment outline rings follow the continuous frame', () => {
     const pipe = sweepOf(empty, { path: L_PATH, radius: 1, bendRadius: 2 });
-    const rings = sweepSegmentRings(pipe.path, pipe.section);
+    const rings = sweepSegmentRings(pipe);
     expect(rings).toHaveLength(3);
     expect(rings.every((ring) => ring.length > 0)).toBe(true);
   });

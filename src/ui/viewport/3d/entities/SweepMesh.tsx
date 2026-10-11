@@ -19,13 +19,14 @@ export function SweepMesh({
   entity,
   ...shell
 }: SolidMeshKindProps<SweepEntity>): React.ReactElement | null {
-  const { path, section } = entity;
+  const { path, section, stations } = entity;
   const geometry = useMemo(() => {
-    const positions = sweepTriangles(path, section).flat(2);
+    const shape = stations === undefined ? { path, section } : { path, section, stations };
+    const positions = sweepTriangles(shape).flat(2);
     if (positions.length === 0) return null;
     const indices = Array.from({ length: positions.length / 3 }, (_, corner) => corner);
     return buildMeshSolidGeometry({ positions, indices });
-  }, [path, section]);
+  }, [path, section, stations]);
 
   if (geometry === null) return null;
   return <SolidMeshShell entity={entity} geometry={geometry} surface={SWEEP_SURFACE} {...shell} />;

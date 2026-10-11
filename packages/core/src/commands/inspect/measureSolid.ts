@@ -10,6 +10,7 @@ import { polygonArea, polygonCentroid } from '../../lib/polygon';
 import { noop, report } from '../noop';
 import { chainLength } from '../../geometry/curveSegments';
 import { sweepTriangles } from '../../geometry/sweep';
+import { loftTriangles } from '../../geometry/loft';
 
 interface MeasureBoundingBoxData {
   min: Vec3;
@@ -95,11 +96,15 @@ interface MeasureVolumeData {
 /** Round sections: annulus area × path length (Pappus); other sections: tessellated volume. */
 function sweepVolume(e: Extract<Entity, { kind: 'sweep' }>): number {
   const { section } = e;
-  if (section.shape === 'circle') {
+  if (section.shape === 'circle' && e.stations === undefined) {
     const bore = section.innerRadius ?? 0;
     return Math.PI * (section.radius ** 2 - bore ** 2) * chainLength(e.path);
   }
-  const positions = sweepTriangles(e.path, section).flat(2);
+  return closedMeshVolume(sweepTriangles(e).flat(2));
+}
+
+/** Volume of a closed, outward-wound triangle soup. */
+function closedMeshVolume(positions: number[]): number {
   const indices = Array.from({ length: positions.length / 3 }, (_, corner) => corner);
   return Math.abs(meshVolume(positions, indices));
 }
@@ -142,7 +147,7 @@ export const measureVolume = defineCommand({
     "'instance' (sum of its component's solid children, baked with the instance scale), " +
     "'revolution' (Pappus's centroid theorem: sweepAngle × |x_centroid| × profileArea; " +
     'falls back to bounding-box approximation if the profile crosses the revolution axis), ' +
-    "'sweep' (round section: section area × exact path length; other sections: closed-mesh sum). " +
+    "'sweep' (round section: section area × exact path length; other sections: closed-mesh sum), 'loft' (closed-mesh sum). " +
     'Returns data: { volume, unit } where unit is the cubed document unit (e.g. "mm³"). ' +
     '2D shape entities are rejected. Does not modify the document.',
   params: z.object({
@@ -150,7 +155,7 @@ export const measureVolume = defineCommand({
       .string()
       .describe(
         "Id of the 3D solid entity to measure. Supported kinds: 'box', 'cylinder', 'sphere', " +
-          "'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep'.",
+          "'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft'.",
       ),
   }),
   run: (doc, { entityId }): CommandResult => {
@@ -226,11 +231,14 @@ export const measureVolume = defineCommand({
       case 'sweep':
         volume = sweepVolume(e);
         break;
+      case 'loft':
+        volume = closedMeshVolume(loftTriangles(e).flat(2));
+        break;
       default:
         return noop(
           doc,
           `measure_volume: entity '${entityId}' is kind '${e.kind}'; ` +
-            "supported kinds are 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep'.",
+            "supported kinds are 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft'.",
         );
     }
 
@@ -311,7 +319,7 @@ export const massProperties = defineCommand({
   description:
     'Compute the mass of a 3D solid from its volume and density. ' +
     "Supported entity kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', " +
-    "'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', and 'instance' (assembly: the sum over its " +
+    "'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', and 'instance' (assembly: the sum over its " +
     'component solids, each with its own material density, else the instance material, else the density param). ' +
     'Density resolution: if the entity has a material assigned (via assign_material) and that ' +
     "material exists in doc.materials, the material's density is used automatically — the density " +
@@ -324,7 +332,7 @@ export const massProperties = defineCommand({
       .string()
       .describe(
         "Id of the 3D solid entity to compute mass for. Supported kinds: 'box', 'cylinder', 'sphere', " +
-          "'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep'.",
+          "'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft'.",
       ),
     density: z
       .number()

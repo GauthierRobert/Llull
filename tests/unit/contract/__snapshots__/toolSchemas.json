@@ -5688,7 +5688,7 @@
           "type": "array"
         },
         "kind": {
-          "description": "Filter by entity kind. One of: \"box\", \"cylinder\", \"sphere\", \"extrusion\", \"mesh\", \"cone\", \"torus\", \"wedge\", \"pyramid\", \"revolution\", \"sweep\", \"line\", \"polyline\", \"arc\", \"circle\", \"rectangle\", \"point\", \"ellipse\", \"spline\", \"text\", \"dimension\", \"instance\". Omit to match all kinds.",
+          "description": "Filter by entity kind. One of: \"box\", \"cylinder\", \"sphere\", \"extrusion\", \"mesh\", \"cone\", \"torus\", \"wedge\", \"pyramid\", \"revolution\", \"sweep\", \"loft\", \"line\", \"polyline\", \"arc\", \"circle\", \"rectangle\", \"point\", \"ellipse\", \"spline\", \"text\", \"dimension\", \"instance\". Omit to match all kinds.",
           "enum": [
             "box",
             "cylinder",
@@ -5701,6 +5701,7 @@
             "pyramid",
             "revolution",
             "sweep",
+            "loft",
             "line",
             "polyline",
             "arc",
@@ -6214,6 +6215,85 @@
     "name": "load_document"
   },
   {
+    "description": "Loft a solid through 2+ cross-sections placed in 3D, in order: transitions such as round-to-square ducts, tapered and flattened bike tubes, bottle and nozzle bodies, boat hulls, aero fairings. Right-handed world frame, +Z up. Give either `sectionIds` (closed 2D sketches: circle, ellipse, rectangle, closed polyline or spline; each placed by its own work-plane position and rotation) or inline `sections` (each a center [x, y, z], optional plane rotation (Euler XYZ radians, [0,0,0] = an XY-plane section), and one of radius, radiusX+radiusY, section points or sectionId). Sections are resampled to the same point count and aligned so the surface does not twist; ruled: false (default) blends smoothly through all sections, ruled: true joins neighbours with straight lines. Kept exact for the OCC kernel and STEP export (B-spline skin through the sections).",
+    "input_schema": {
+      "properties": {
+        "color": {
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
+          "type": "string"
+        },
+        "id": {
+          "description": "Optional explicit entity id. If omitted a unique id is generated.",
+          "type": "string"
+        },
+        "layerId": {
+          "description": "Layer id to assign the entity to. Defaults to the document default layer.",
+          "type": "string"
+        },
+        "ruled": {
+          "description": "true: straight lines between neighbouring sections; false (default): smooth blend.",
+          "type": "boolean"
+        },
+        "sectionIds": {
+          "description": "Ids of closed 2D sketches, in loft order, each in its own (parallel or tilted) plane.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "sections": {
+          "description": "Inline sections in loft order (alternative to sectionIds).",
+          "items": {
+            "properties": {
+              "center": {
+                "description": "Section plane origin [x, y, z] in world coordinates.",
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              "radius": {
+                "description": "Round section radius (> 0).",
+                "type": "number"
+              },
+              "radiusX": {
+                "description": "Elliptical section: half-width along section x (> 0); give with radiusY.",
+                "type": "number"
+              },
+              "radiusY": {
+                "description": "Elliptical section: half-height along section y (> 0); give with radiusX.",
+                "type": "number"
+              },
+              "rotation": {
+                "description": "Section plane rotation, Euler XYZ radians; [0, 0, 0] lays the section in the XY plane.",
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              "section": {
+                "description": "Polygon section: closed [x, y] points (>= 3).",
+                "type": "array"
+              },
+              "sectionId": {
+                "description": "Id of a closed 2D sketch (circle, ellipse, rectangle, closed polyline/spline).",
+                "type": "string"
+              }
+            },
+            "required": [
+              "center"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "loft_sections"
+  },
+  {
     "annotations": {
       "idempotentHint": true
     },
@@ -6283,7 +6363,7 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Compute the mass of a 3D solid from its volume and density. Supported entity kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', and 'instance' (assembly: the sum over its component solids, each with its own material density, else the instance material, else the density param). Density resolution: if the entity has a material assigned (via assign_material) and that material exists in doc.materials, the material's density is used automatically — the density param is ignored for that entity. Otherwise the caller-supplied density param is used (back-compat). The density is in g/(document-unit)³ — e.g. for a document in mm: steel ≈ 0.00785, aluminium ≈ 0.0027. Returns data: { volume, density, mass, unit } where unit describes the mass unit (grams). Does not modify the document.",
+    "description": "Compute the mass of a 3D solid from its volume and density. Supported entity kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', and 'instance' (assembly: the sum over its component solids, each with its own material density, else the instance material, else the density param). Density resolution: if the entity has a material assigned (via assign_material) and that material exists in doc.materials, the material's density is used automatically — the density param is ignored for that entity. Otherwise the caller-supplied density param is used (back-compat). The density is in g/(document-unit)³ — e.g. for a document in mm: steel ≈ 0.00785, aluminium ≈ 0.0027. Returns data: { volume, density, mass, unit } where unit describes the mass unit (grams). Does not modify the document.",
     "input_schema": {
       "properties": {
         "density": {
@@ -6291,7 +6371,7 @@
           "type": "number"
         },
         "entityId": {
-          "description": "Id of the 3D solid entity to compute mass for. Supported kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep'.",
+          "description": "Id of the 3D solid entity to compute mass for. Supported kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft'.",
           "type": "string"
         }
       },
@@ -6440,11 +6520,11 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Compute the volume of a 3D solid entity. Supported kinds: 'box' (w×h×d), 'cylinder' (π r² h), 'sphere' (4/3 π r³), 'extrusion' (profile area × depth), 'mesh' (signed-tetrahedra sum — assumes closed, consistently wound mesh), 'cone' (π r² h / 3), 'torus' (2 π² · ringRadius · tubeRadius²), 'wedge' (w×h×d / 2 — half the enclosing box), 'pyramid' (baseWidth × baseDepth × height / 3), 'instance' (sum of its component's solid children, baked with the instance scale), 'revolution' (Pappus's centroid theorem: sweepAngle × |x_centroid| × profileArea; falls back to bounding-box approximation if the profile crosses the revolution axis), 'sweep' (round section: section area × exact path length; other sections: closed-mesh sum). Returns data: { volume, unit } where unit is the cubed document unit (e.g. \"mm³\"). 2D shape entities are rejected. Does not modify the document.",
+    "description": "Compute the volume of a 3D solid entity. Supported kinds: 'box' (w×h×d), 'cylinder' (π r² h), 'sphere' (4/3 π r³), 'extrusion' (profile area × depth), 'mesh' (signed-tetrahedra sum — assumes closed, consistently wound mesh), 'cone' (π r² h / 3), 'torus' (2 π² · ringRadius · tubeRadius²), 'wedge' (w×h×d / 2 — half the enclosing box), 'pyramid' (baseWidth × baseDepth × height / 3), 'instance' (sum of its component's solid children, baked with the instance scale), 'revolution' (Pappus's centroid theorem: sweepAngle × |x_centroid| × profileArea; falls back to bounding-box approximation if the profile crosses the revolution axis), 'sweep' (round section: section area × exact path length; other sections: closed-mesh sum), 'loft' (closed-mesh sum). Returns data: { volume, unit } where unit is the cubed document unit (e.g. \"mm³\"). 2D shape entities are rejected. Does not modify the document.",
     "input_schema": {
       "properties": {
         "entityId": {
-          "description": "Id of the 3D solid entity to measure. Supported kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep'.",
+          "description": "Id of the 3D solid entity to measure. Supported kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft'.",
           "type": "string"
         }
       },
@@ -7692,6 +7772,42 @@
         "smooth": {
           "description": "With path points (or a polyline pathId): true = smooth spline through the points (centripetal Catmull-Rom), false (default) = straight runs with circular bends.",
           "type": "boolean"
+        },
+        "stations": {
+          "description": "Variable section: >= 2 cross-sections along the path, with `at` strictly increasing from 0 to 1, each a radius, radiusX+radiusY ellipse, section polygon or sectionId. The section blends smoothly between stations (taper, flatten, round-to-oval, any shape to any shape). Replaces radius / innerRadius / section / sectionId.",
+          "items": {
+            "properties": {
+              "at": {
+                "description": "Path fraction of this section: 0 = path start, 1 = path end.",
+                "type": "number"
+              },
+              "radius": {
+                "description": "Round section radius (> 0).",
+                "type": "number"
+              },
+              "radiusX": {
+                "description": "Elliptical section: half-width along section x (> 0); give with radiusY.",
+                "type": "number"
+              },
+              "radiusY": {
+                "description": "Elliptical section: half-height along section y (> 0); give with radiusX.",
+                "type": "number"
+              },
+              "section": {
+                "description": "Polygon section: closed [x, y] points (>= 3).",
+                "type": "array"
+              },
+              "sectionId": {
+                "description": "Id of a closed 2D sketch (circle, ellipse, rectangle, closed polyline/spline).",
+                "type": "string"
+              }
+            },
+            "required": [
+              "at"
+            ],
+            "type": "object"
+          },
+          "type": "array"
         }
       },
       "required": [],

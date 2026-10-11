@@ -101,6 +101,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'extrude_sketch',
     'revolve_profile',
     'sweep_profile',
+    'loft_sections',
     'boolean_union',
     'boolean_subtract',
     'boolean_intersect',

@@ -6,6 +6,7 @@ import { addCylinder, addSphere, addCone, addTorus } from './round';
 import { addWedge, addPyramid } from './prismatic';
 import { extrudeSketch, revolveProfile } from './profile';
 import { sweepProfile } from './sweep';
+import { loftSections } from './loft';
 import { makeTubeBetween } from './composite';
 import { addSpurGear } from './gears';
 
@@ -21,6 +22,7 @@ export const solidsCommands = commandCatalog(
   extrudeSketch,
   revolveProfile,
   sweepProfile,
+  loftSections,
   makeTubeBetween,
   addSpurGear,
 );
