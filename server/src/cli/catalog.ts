@@ -1,11 +1,14 @@
 /**
  * @layer server
- * The `llull` CLI's discovery views over the registry: list, search, describe, toolsets. Read-only
- * projections of `listCommands()` and `@mcp/toolsets` — never a hand-written command list (L5).
+ * The `llull` CLI's discovery views over the registry (+ the exchange tools): list, search,
+ * describe, toolsets. Read-only projections of `listCommands()`, `buildExchangeToolDefinitions()`
+ * and `@mcp/toolsets` — never a hand-written command list (L5).
  */
 
 import { getCommand, listCommands } from '@core/commands/registry';
-import type { CommandDefinition, ParamItemSpec } from '@core/commands/types';
+import type { CommandDefinition, ParamItemSpec, ParamsSchema } from '@core/commands/types';
+import type { McpToolDefinition } from '@mcp/tools';
+import { exchangeTool, exchangeToolDefinitions } from './exchange';
 import {
   TOOLSET_NAMES,
   closestToolNames,
@@ -31,12 +34,51 @@ export interface CatalogEntry {
   readonly readOnly: boolean;
 }
 
-function entryOf(def: CommandDefinition<unknown>, full: boolean): CatalogEntry {
+/** A callable tool: a registry command, or an exchange tool (Python / DWG I/O, `./exchange`). */
+interface CatalogTool {
+  readonly name: string;
+  readonly description: string;
+  readonly flags: readonly string[];
+  readonly schema: ParamsSchema;
+  readonly annotations: unknown;
+}
+
+function commandTool(def: CommandDefinition<unknown>): CatalogTool {
+  const annotations = def.annotations ?? {};
   return {
     name: def.name,
-    toolset: toolsetOf(def.name) ?? 'core',
-    description: full ? def.description : shortDescription(def.description),
-    readOnly: def.annotations?.readOnly === true,
+    description: def.description,
+    flags: Object.entries(annotations)
+      .filter(([, on]) => on === true)
+      .map(([flag]) => flag),
+    schema: def.paramsSchema,
+    annotations,
+  };
+}
+
+function exchangeCatalogTool(tool: McpToolDefinition): CatalogTool {
+  return {
+    name: tool.name,
+    description: tool.description,
+    flags: ['exchange', ...Object.keys(tool.annotations ?? {})],
+    schema: tool.inputSchema,
+    annotations: tool.annotations ?? {},
+  };
+}
+
+function toolNamed(name: string): CatalogTool | undefined {
+  const def = getCommand(name);
+  if (def !== undefined) return commandTool(def);
+  const tool = exchangeTool(name);
+  return tool === undefined ? undefined : exchangeCatalogTool(tool);
+}
+
+function entryOf(tool: CatalogTool): CatalogEntry {
+  return {
+    name: tool.name,
+    toolset: toolsetOf(tool.name) ?? 'core',
+    description: shortDescription(tool.description),
+    readOnly: tool.flags.includes('readOnly'),
   };
 }
 
@@ -44,23 +86,23 @@ export function isToolsetName(value: string): value is ToolsetName {
   return (TOOLSET_NAMES as readonly string[]).includes(value);
 }
 
-/** Every registry command (optionally one toolset), sorted by toolset order then name. */
+/** Every callable tool (optionally one toolset), sorted by toolset order then name. */
 export function listCatalog(toolset?: ToolsetName): CatalogEntry[] {
   const order = (name: ToolsetName): number => TOOLSET_NAMES.indexOf(name);
-  return listCommands()
-    .map((def) => entryOf(def, false))
+  return [...listCommands().map(commandTool), ...exchangeToolDefinitions().map(exchangeCatalogTool)]
+    .map(entryOf)
     .filter((entry) => toolset === undefined || entry.toolset === toolset)
     .sort((a, b) => order(a.toolset) - order(b.toolset) || a.name.localeCompare(b.name));
 }
 
-/** Registry commands matching `query` (the MCP `search_tools` ranking, minus MCP-only tools). */
+/** Tools matching `query` (the MCP `search_tools` ranking, minus the MCP discovery tools). */
 export function searchCatalog(query: string, limit: number): CatalogEntry[] {
   const everyToolset = new Set<ToolsetName>(TOOLSET_NAMES);
   return searchTools(query, limit * 2, everyToolset)
-    .map((hit) => getCommand(hit.name))
-    .filter((def): def is CommandDefinition<unknown> => def !== undefined)
+    .map((hit) => toolNamed(hit.name))
+    .filter((tool): tool is CatalogTool => tool !== undefined)
     .slice(0, limit)
-    .map((def) => entryOf(def, false));
+    .map(entryOf);
 }
 
 /** Command counts per toolset (toolsets with no registry command are listed with 0). */
@@ -74,7 +116,7 @@ export function toolsetCounts(): { toolset: ToolsetName; commands: number }[] {
 
 /** Typo hints for an unknown command name: registry commands only. */
 export function suggestNames(name: string): string[] {
-  return closestToolNames(name, 6).filter((candidate) => getCommand(candidate) !== undefined);
+  return closestToolNames(name, 6).filter((candidate) => toolNamed(candidate) !== undefined);
 }
 
 function typeLabel(spec: ParamItemSpec): string {
@@ -100,19 +142,15 @@ function paramLines(
   });
 }
 
-/** The full contract of one command, as text (agents) or a JSON-ready record. */
+/** The full contract of one tool, as text (agents) or a JSON-ready record. */
 export function describeCommand(name: string): { text: string; json: unknown } | null {
-  const def = getCommand(name);
-  if (def === undefined) return null;
-  const annotations = def.annotations ?? {};
-  const flags = Object.entries(annotations)
-    .filter(([, on]) => on === true)
-    .map(([flag]) => flag);
-  const schema = def.paramsSchema;
-  const params = paramLines(schema.properties, schema.required, '');
+  const tool = toolNamed(name);
+  if (tool === undefined) return null;
+  const params = paramLines(tool.schema.properties, tool.schema.required, '');
+  const toolset = toolsetOf(tool.name) ?? 'core';
   const text = [
-    `${def.name} [${toolsetOf(def.name) ?? 'core'}]${flags.length > 0 ? ` (${flags.join(', ')})` : ''}`,
-    def.description,
+    `${tool.name} [${toolset}]${tool.flags.length > 0 ? ` (${tool.flags.join(', ')})` : ''}`,
+    tool.description,
     '',
     params.length > 0 ? 'Params:' : 'Params: none',
     ...params,
@@ -120,11 +158,11 @@ export function describeCommand(name: string): { text: string; json: unknown } |
   return {
     text,
     json: {
-      name: def.name,
-      toolset: toolsetOf(def.name) ?? 'core',
-      description: def.description,
-      annotations,
-      params: schema,
+      name: tool.name,
+      toolset,
+      description: tool.description,
+      annotations: tool.annotations,
+      params: tool.schema,
     },
   };
 }

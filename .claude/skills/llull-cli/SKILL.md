@@ -1,26 +1,26 @@
 ---
 name: llull-cli
-description: Drive llull from the shell with the `llull` CLI — the same command registry as the UI and MCP, without a running server or MCP connection. Use when you have a terminal (Claude Code, CI, a cloud session) and need to build, inspect, measure, render or export a model; when the llull MCP server is not connected; when a plan should live in a file (write plan.json, validate, apply); or when an export/render must land on disk (STL, STEP, code, sheets, PNG). Pairs with design-model (what to build) — this skill is how to run it.
+description: Drive llull from the shell with the `llull` CLI — the local agent path (MCP is for cloud agents). Same command registry as the UI. Use when you have a terminal (Claude Code, CI, a cloud session) and need to build, inspect, measure, render or export a model — in the open llull desktop app (`--app`, the user sees it live) or on a document file; when a plan should live in a file (write plan.json, validate, apply); or when an export/render must land on disk (STL, STEP, code, sheets, PNG). Pairs with design-model (what to build) — this skill is how to run it.
 ---
 
 # Skill: llull-cli
 
-`node server/bin/llull.cjs …` (alias `npm run -s llull -- …`) runs any registry command on a
-local document file, or on a running server's live document with `--server`. It is a third
-caller of `execute` (L1): no capability of its own, so every command — present and future — is
-available with no CLI change. Code: `server/src/cli/` · help: `llull help`.
+The CLI is **the local agent path** (Claude Code, scripts, CI); MCP is for cloud agents. It runs
+any registry command — a third caller of `execute` (L1), so every command, present and future,
+is there with no CLI change. Help: `llull help` · code: `server/src/cli/`.
 
-> First call bundles the CLI (~0.6 s); later calls reuse the bundle (~0.3 s) until a source changes.
-> In the snippets `llull` = `node server/bin/llull.cjs` (from the repo root).
+**Invoke** `llull …` when installed (desktop app: Help › Install Command Line Tool → `~/.llull/bin`),
+else from the repo `node server/bin/llull.cjs …` (bundles on first call, ~0.3 s per warm call).
 
-## When CLI vs MCP
-| Situation | Use |
-| --------- | --- |
-| Terminal agent, no server / MCP not connected | CLI on a local `--doc` file |
-| Many steps | ONE `llull run plan.json` (build_project) — not many single calls |
-| Exports / renders you need as files | CLI `--save PATH` |
-| The user watches the open app | CLI `--server http://localhost:3001` (or the MCP tools) |
-| Client without a shell (Claude Desktop, claude.ai) | MCP only |
+## Pick the target first: `llull status`
+| Situation | Target |
+| --------- | ------ |
+| The llull desktop app is running (status says so) | `--app` — the open window's document; the user sees each change live and can undo it (Ctrl+Z / `llull undo --app`) |
+| No app, work on a file (headless, CI, a cloud session) | `--doc part.llull` (default `model.llull.json`, created on first change) |
+| A deployed / dev server | `--server URL --token T` |
+| Agent without a shell (Claude Desktop, claude.ai) | not this skill: MCP |
+
+Always one call per plan (`llull run plan.json`), not a loop of single calls.
 
 ## Procedure
 1. **Find commands without loading schemas into context.**
@@ -34,15 +34,20 @@ available with no CLI change. Code: `server/src/cli/` · help: `llull help`.
      { "command": "boolean_subtract", "params": { "a": "$plate", "b": "$hole" } } ]
    ```
 3. **Validate, then apply** (aborts and rolls back on the first failing step):
-   `llull run plan.json --validate --doc part.llull.json` → fix issues → `llull run plan.json --doc part.llull.json`.
+   `llull run plan.json --validate --app` → fix issues → `llull run plan.json --app`
+   (or `--doc part.llull` instead of `--app`).
    The report prints one line per step with the ids it created.
 4. **Inspect / measure** (read-only, never written): `llull describe_scene`,
    `llull measure_volume entityId=mesh-4.1`, `llull check_model`.
-5. **Look at it**: `llull render_view view=iso --save view.png` then read the PNG.
-6. **Export**: `llull export_stl format=binary --save out/part.stl`,
+5. **Look at it**: `llull render_view view=iso --save view.png --app` then read the PNG.
+6. **Exchange (Python/CadQuery bundled in the desktop app)**: `llull import_step file=supplier.step --app`,
+   `llull export_step --save out/part.step --app` (exact B-rep), `llull import_dwg file=site.dwg
+   target=drawing` (needs a DWG converter). `llull list exchange` shows them all.
+   **Export**: `llull export_stl format=binary --save out/part.stl`,
    `llull export_code language=cadquery --save out/`, sheets / `export_nc_files --save out/nc/`.
-7. **Small fixes**: one `llull <command> key=value …` per edit; `llull undo` reverts the last
-   saved change (one level: the `.bak` copy).
+7. **Small fixes**: one `llull <command> key=value …` per edit. Undo: `--app` → the app's full
+   history; `--doc` → one level (the `.bak` copy).
+8. **Saving** with `--app` is the user's File › Save; tell them, or work on a `--doc` copy.
 
 ## Params syntax
 - `key=value` pairs, each value parsed as JSON when possible: `size=[10,20,5] name=lid count=4`
@@ -52,7 +57,8 @@ available with no CLI change. Code: `server/src/cli/` · help: `llull help`.
 - `llull <command> …` is shorthand for `llull exec <command> …`.
 
 ## Flags
-`--doc FILE` (default `$LLULL_DOC` or `model.llull.json`, created on first change) ·
+`--app` (desktop window; `LLULL_SERVER=app`) · `--doc FILE` (default `$LLULL_DOC` or
+`model.llull.json`, created on first change) ·
 `--server URL` / `--token T` (`$LLULL_SERVER`, `$LLULL_TOKEN`) · `--dry-run` (local, never writes) ·
 `--save PATH` (`.png` rasterizes svg; several files → directory) · `--json` (one object: `ok`,
 `summary`, `affected`, `changed`, `data`, `saved`) · `--quiet` · `--kernel occt` (exact B-rep:

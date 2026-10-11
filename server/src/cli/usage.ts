@@ -10,6 +10,7 @@ Discover
   describe <command…>         full description + params schema
   toolsets                    toolset names and command counts
   guide                       CAD modeling conventions (units, axes, ids, plans)
+  status                      is the desktop app running? which document would --doc use?
 
 Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first change)
   exec <command> [params]     run one command; params are key=value pairs (values parsed as
@@ -17,12 +18,16 @@ Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first cha
                               one JSON object,
                               @params.json or - (stdin)
   <command> [params]          shorthand for exec
+                              exchange tools too (export_step, import_step, import_dwg,
+                              import_code): file=PATH reads a local file into their content
   run <plan.json | ->         build_project: an actions array or { actions, onError }
                               [--validate] dry-run check  [--continue] onError=continue
   new [--force]               write an empty document
   undo | redo                 local: swap with FILE.bak (one level); server: shared history
 
 Flags
+  --app                       act on the running llull desktop app (what the user sees;
+                              found via ~/.llull/desktop.json, token included)
   --doc FILE                  local document file
   --server URL                act on a running llull server's live document instead
                               ($LLULL_SERVER; --token T or $LLULL_TOKEN for Bearer auth)

@@ -28,6 +28,8 @@ This is the whole design. Protect it.
 | Tests      | Vitest + Testing Library                |
 | Lint/fmt   | ESLint + Prettier (`npm run check`)     |
 | Backend    | Node + Express (optional: MCP host + shared live document) |
+| Desktop    | Electron shell (`desktop/`) over the unchanged server + web app; bundled CPython + CadQuery |
+| Agents     | Local: Claude Code + `llull` CLI (`--app` drives the desktop window). Cloud: MCP (`/mcp`) |
 
 ## LAYER MAP & DEPENDENCY LAW
 
@@ -56,9 +58,10 @@ src/app/                    @app   Composition root: installDefaultPlugins()
 src/ui/                     @ui    React. Presentation + param-gathering ONLY. No business logic.
 src/main.tsx                       installs the kernel (`?kernel=occt`) + default plugins, mounts <App>
 server/                            Express MCP host + `llull` CLI (src/cli/) (optional; own package.json, not a workspace)
+desktop/                           Electron app: starts server/ locally, File menu, CLI hand-off (own package.json)
 ```
 
-**Dependency direction is one-way: `src/ui`, `server` → `src/app`, plugins, kernels, `@mcp` → `packages/core`.**
+**Dependency direction is one-way: `desktop` → `server` (CLI discovery); `src/ui`, `server` → `src/app`, plugins, kernels, `@mcp` → `packages/core`.**
 Inside core: `commands`, `codegen`, `plugins` → `geometry` → `model` → `lib`. Enforced for every
 change by `npm run arch` (dependency-cruiser, `.dependency-cruiser.cjs`, part of `npm run check`):
 no import cycles (type-only included); core imports no package; packages are headless; plugins and kernels
@@ -99,7 +102,7 @@ Main thread by default; delegate for ≥ 2 independent lanes or > ~4 files in on
 ## SKILLS (invoke when the trigger matches)
 
 - `design-model` — design a complete CAD model/assembly end-to-end by composing existing commands into a validated `build_project` plan, then measure/check/render/export
-- `llull-cli` — drive the registry from the shell (`node server/bin/llull.cjs`): local doc files or `--server`, plan files, `--save` exports/renders; no MCP needed
+- `llull-cli` — THE local agent path: drive the registry from the shell (`llull`): `--app` (the open desktop window), local doc files or `--server`; plan files, `--save` exports/renders. MCP is for cloud agents
 - `add-command` — add a CAD operation (the most common task; UI + MCP in one)
 - `add-entity-kind` — add a new 2D shape or 3D solid kind (types → commands → kernels → codegen → UI → tests)
 - `fix-bug` — reproduce first (failing test / golden plan), then fix
@@ -122,7 +125,8 @@ npm run claude:lint  # .claude/ references (skills, agents, paths) resolve — r
 npm run test:coverage
 npm run quality       # import + display quality gates on real CAD files (docs/QUALITY_GATES.md)
 npm run production    # engineering-office job scenarios via /mcp + the browser (docs/PRODUCTION_GATE.md)
-node server/bin/llull.cjs help   # llull CLI: any command on a local doc file or --server (llull-cli skill)
+node server/bin/llull.cjs help   # llull CLI: any command on a local doc file, --app (desktop) or --server (llull-cli skill)
+npm --prefix desktop install && npm --prefix desktop test   # desktop app (Electron-free tests); start: npm --prefix desktop start
 npm --prefix server install && npm --prefix server run dev   # optional backend (not a workspace)
 ```
 

@@ -45,11 +45,12 @@ from `toToolSchemas()`; `paramsSchema` is derived from zod `params` — never ha
 feature-step append). MCP exposure is a VIEW (`@mcp/toolsets`); hidden tools stay callable via
 `execute`.
 
-## L6 — Backend is optional and thin
+## L6 — Backend is optional and thin (desktop + CLI are hosts, not logic)
 
 The app is fully usable offline. `server/` hosts `/mcp` and the shared live document; no business
 logic — it forwards to the same registry. Live sync = the command log (`@mcp/liveSync`), never a
-document diff.
+document diff. `desktop/` (Electron) only starts that server and wires menus/files; the `llull`
+CLI (`server/src/cli`) is a third caller of `execute`. Local agents use the CLI; MCP = cloud.
 
 ## L7 — 2D and 3D are one model, one command layer
 

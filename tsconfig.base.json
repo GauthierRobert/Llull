@@ -8,7 +8,8 @@
       "@kernel-manifold/*": ["./packages/kernel-manifold/src/*"],
       "@kernel-occt/*": ["./packages/kernel-occt/src/*"],
       "@ui/*": ["./src/ui/*"],
-      "@app/*": ["./src/app/*"]
+      "@app/*": ["./src/app/*"],
+      "@server/*": ["./server/src/*"]
     }
   }
 }
