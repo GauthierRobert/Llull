@@ -27,6 +27,7 @@ import {
 } from './draw2dBasic';
 import { loadDocument } from './persistence';
 import { extrudeSketch, revolveProfile } from './profile';
+import { sweepProfile } from './sweep';
 import { duplicateEntity, groupEntities, ungroupEntities, setEntityName } from './edit';
 import { booleanUnion, booleanSubtract, booleanIntersect } from './boolean';
 import { describeScene } from './scene';
@@ -109,6 +110,7 @@ const rawDefinitions = [
   loadDocument,
   extrudeSketch,
   revolveProfile,
+  sweepProfile,
   duplicateEntity,
   groupEntities,
   ungroupEntities,

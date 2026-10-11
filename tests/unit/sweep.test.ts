@@ -1,0 +1,550 @@
+import { describe, it, expect } from 'vitest';
+import {
+  type CadDocument,
+  type Entity,
+  type SweepEntity,
+  DEFAULT_LAYER_ID,
+  createEmptyDocument,
+} from '@core/model/types';
+import { execute } from '@core/commands/registry';
+import { serializeDocument } from '@core/commands/persistence';
+import { entityBounds } from '@core/commands/sceneBounds';
+import { solidTriangles } from '@core/commands/solidTriangulation';
+import { tessellateEntity } from '@core/commands/renderTessellation';
+import { sweepFrames, sweepSegmentRings, sweepTriangles } from '@core/geometry/sweep';
+import { expectNoOp } from '../helpers/expectNoOp';
+
+const empty = createEmptyDocument();
+
+const L_PATH = [
+  [0, 0, 0],
+  [10, 0, 0],
+  [10, 10, 0],
+];
+
+/** Doc holding 2D fixture entities (test setup only). */
+function docWith(...shapes: Array<Record<string, unknown>>): CadDocument {
+  const entities = Object.fromEntries(
+    shapes.map((shape) => [
+      shape['id'] as string,
+      {
+        position: [0, 0, 0],
+        rotation: [0, 0, 0],
+        layerId: DEFAULT_LAYER_ID,
+        color: '#ffffff',
+        ...shape,
+      } as unknown as Entity,
+    ]),
+  );
+  return { ...empty, entities, order: Object.keys(entities) };
+}
+
+function sweepOf(doc: CadDocument, params: Record<string, unknown>): SweepEntity {
+  const result = execute(doc, 'sweep_profile', params);
+  expect(result.affected, result.summary).toHaveLength(1);
+  return result.document.entities[result.affected[0] as string] as SweepEntity;
+}
+
+function volumeOf(entity: Entity): number {
+  const doc = { ...empty, entities: { [entity.id]: entity }, order: [entity.id] };
+  return (execute(doc, 'measure_volume', { entityId: entity.id }).data as { volume: number })
+    .volume;
+}
+
+/** Every undirected edge of a closed triangle soup is shared by exactly two triangles. */
+function isWatertight(
+  triangles: ReadonlyArray<readonly [readonly number[], ...unknown[]]>,
+): boolean {
+  const key = (p: readonly number[]): string => p.map((v) => v.toFixed(9)).join(',');
+  const edges = new Map<string, number>();
+  for (const triangle of triangles as ReadonlyArray<ReadonlyArray<readonly number[]>>) {
+    for (let k = 0; k < 3; k++) {
+      const [a, b] = [key(triangle[k] as number[]), key(triangle[(k + 1) % 3] as number[])];
+      const edge = a < b ? `${a}|${b}` : `${b}|${a}`;
+      edges.set(edge, (edges.get(edge) ?? 0) + 1);
+    }
+  }
+  return [...edges.values()].every((count) => count === 2);
+}
+
+describe('sweep_profile — happy paths', () => {
+  it('round pipe along a bent polyline: lines + exact bend arc, positioned at the start', () => {
+    const result = execute(empty, 'sweep_profile', {
+      path: [
+        [5, 5, 1],
+        [15, 5, 1],
+        [15, 15, 1],
+      ],
+      radius: 1,
+      bendRadius: 2,
+    });
+    expect(result.affected).toHaveLength(1);
+    const pipe = result.document.entities[result.affected[0] as string] as SweepEntity;
+    expect(pipe.kind).toBe('sweep');
+    expect(pipe.position).toEqual([5, 5, 1]);
+    expect(pipe.path.map((s) => s.type)).toEqual(['line', 'arc', 'line']);
+    expect(pipe.path[0]?.points[0]).toEqual([0, 0, 0]);
+    expect(pipe.section).toEqual({ shape: 'circle', radius: 1 });
+    expect(result.summary).toContain('sweep_profile: created sweep');
+    // Pappus: π r² × (8 + π + 8)
+    expect(volumeOf(pipe)).toBeCloseTo(Math.PI * (16 + Math.PI), 9);
+  });
+
+  it('defaults the bend to three section radii (long-radius elbow)', () => {
+    const pipe = sweepOf(empty, { path: L_PATH, radius: 1 });
+    const arc = pipe.path[1];
+    expect(arc?.type).toBe('arc');
+    expect(arc?.points[0]).toEqual([7, 0, 0]);
+  });
+
+  it('hollow pipe subtracts the bore from the volume', () => {
+    const tube = sweepOf(empty, { path: L_PATH, radius: 1, innerRadius: 0.8, bendRadius: 2 });
+    expect(tube.section).toEqual({ shape: 'circle', radius: 1, innerRadius: 0.8 });
+    expect(volumeOf(tube)).toBeCloseTo(Math.PI * 0.36 * (16 + Math.PI), 9);
+  });
+
+  it('smooth: true runs a spline through the points', () => {
+    const hose = sweepOf(empty, {
+      path: [
+        [0, 0, 0],
+        [5, 2, 1],
+        [10, 0, 3],
+      ],
+      smooth: true,
+      radius: 0.4,
+    });
+    expect(hose.path.map((s) => s.type)).toEqual(['bezier', 'bezier']);
+  });
+
+  it('polygon section gets a closed-mesh volume of area × length on a straight run', () => {
+    const bar = sweepOf(empty, {
+      path: [
+        [0, 0, 0],
+        [0, 0, 10],
+      ],
+      section: [
+        [-1, -0.5],
+        [1, -0.5],
+        [1, 0.5],
+        [-1, 0.5],
+      ],
+    });
+    expect(bar.section.shape).toBe('profile');
+    expect(volumeOf(bar)).toBeCloseTo(20, 9);
+    const b = entityBounds(bar);
+    expect(b.max[2] - b.min[2]).toBeCloseTo(10, 9);
+  });
+
+  it('sectionId takes a sketched circle (exact arcs) as the section', () => {
+    const doc = docWith({ id: 'sec', kind: 'circle', center: [0, 0], radius: 0.5 });
+    const rod = sweepOf(doc, { path: L_PATH, sectionId: 'sec', bendRadius: 3 });
+    expect(rod.section.shape).toBe('profile');
+    expect(rod.section.shape === 'profile' && rod.section.curves?.length).toBe(2);
+    expect(volumeOf(rod) / (Math.PI * 0.25 * (14 + 1.5 * Math.PI))).toBeCloseTo(1, 1);
+  });
+
+  it.each([
+    ['line', { kind: 'line', start: [0, 0], end: [8, 0] }, ['line']],
+    ['arc', { kind: 'arc', center: [0, 0], radius: 5, startAngle: 0, endAngle: Math.PI }, ['arc']],
+    [
+      'polyline (bent)',
+      {
+        kind: 'polyline',
+        closed: false,
+        points: [
+          [0, 0],
+          [8, 0],
+          [8, 8],
+        ],
+      },
+      ['line', 'arc', 'line'],
+    ],
+    [
+      'spline',
+      {
+        kind: 'spline',
+        closed: false,
+        points: [
+          [0, 0],
+          [4, 3],
+          [8, 0],
+        ],
+      },
+      ['bezier', 'bezier'],
+    ],
+  ])('pathId %s follows the sketch in its work plane', (_label, shape, types) => {
+    const doc = docWith({ id: 'route', position: [0, 0, 2], ...shape });
+    const pipe = sweepOf(doc, { pathId: 'route', radius: 0.5, bendRadius: 2 });
+    expect(pipe.path.map((s) => s.type)).toEqual(types);
+    expect(pipe.position[2]).toBe(2);
+  });
+
+  it('a polyline pathId can be smoothed and a rotated sketch is placed by its plane', () => {
+    const doc = docWith({
+      id: 'route',
+      kind: 'polyline',
+      closed: false,
+      rotation: [Math.PI / 2, 0, 0],
+      points: [
+        [0, 0],
+        [4, 4],
+        [8, 0],
+      ],
+    });
+    const pipe = sweepOf(doc, { pathId: 'route', smooth: true, radius: 0.5 });
+    expect(pipe.path.every((s) => s.type === 'bezier')).toBe(true);
+    const peak = pipe.path[0]?.points[3];
+    expect(peak?.[1]).toBeCloseTo(0, 9);
+    expect(peak?.[2]).toBeCloseTo(4, 9);
+  });
+
+  it('honours explicit id, layer and color', () => {
+    const result = execute(empty, 'sweep_profile', {
+      path: L_PATH,
+      radius: 1,
+      id: 'pipe-a',
+      color: '#123456',
+      layerId: 'missing',
+    });
+    const pipe = result.document.entities['pipe-a'] as SweepEntity;
+    expect(pipe.color).toBe('#123456');
+    expect(pipe.layerId).toBe(DEFAULT_LAYER_ID);
+  });
+
+  it('is pure', () => {
+    const doc = docWith({ id: 'sec', kind: 'rectangle', width: 1, height: 1 });
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'sweep_profile', { path: L_PATH, sectionId: 'sec' });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+});
+
+describe('sweep_profile — failures are no-ops', () => {
+  const rect = docWith(
+    { id: 'rect', kind: 'rectangle', width: 1, height: 1 },
+    {
+      id: 'open',
+      kind: 'polyline',
+      closed: false,
+      points: [
+        [0, 0],
+        [1, 0],
+      ],
+    },
+    { id: 'ring', kind: 'circle', center: [0, 0], radius: 3 },
+    { id: 'label', kind: 'text', content: 'x', height: 1 },
+  );
+  it.each([
+    ['no section', { path: L_PATH }, 'exactly one of radius'],
+    [
+      'two sections',
+      {
+        path: L_PATH,
+        radius: 1,
+        section: [
+          [0, 0],
+          [1, 0],
+          [0, 1],
+        ],
+      },
+      'exactly one',
+    ],
+    ['radius <= 0', { path: L_PATH, radius: 0 }, 'radius must be > 0'],
+    ['bore too big', { path: L_PATH, radius: 1, innerRadius: 1 }, 'innerRadius must be'],
+    [
+      'bore on a polygon',
+      {
+        path: L_PATH,
+        section: [
+          [0, 0],
+          [1, 0],
+          [0, 1],
+        ],
+        innerRadius: 0.1,
+      },
+      'only applies',
+    ],
+    ['bad section point', { path: L_PATH, section: [[0, 0], [1], [0, 1]] }, 'section point 1'],
+    [
+      'short section',
+      {
+        path: L_PATH,
+        section: [
+          [0, 0],
+          [1, 0],
+        ],
+      },
+      'section needs',
+    ],
+    [
+      'flat section',
+      {
+        path: L_PATH,
+        section: [
+          [0, 0],
+          [1, 0],
+          [2, 0],
+        ],
+      },
+      'no area',
+    ],
+    ['open sectionId', { path: L_PATH, sectionId: 'open' }, 'not closed'],
+    ['missing sectionId', { path: L_PATH, sectionId: 'nope' }, 'no entity'],
+    ['no path', { radius: 1 }, 'exactly one of path or pathId'],
+    ['path and pathId', { path: L_PATH, pathId: 'open', radius: 1 }, 'exactly one of path'],
+    [
+      'bad path point',
+      {
+        path: [
+          [0, 0, 0],
+          [1, 1],
+        ],
+        radius: 1,
+      },
+      'path point 1',
+    ],
+    ['one point', { path: [[0, 0, 0]], radius: 0.1 }, 'path needs'],
+    ['closed pathId', { pathId: 'ring', radius: 0.1 }, 'closed'],
+    ['non-curve pathId', { pathId: 'label', radius: 0.1 }, 'not a 2D curve'],
+    ['missing pathId', { pathId: 'nope', radius: 0.1 }, 'no entity'],
+    [
+      'U-turn',
+      {
+        path: [
+          [0, 0, 0],
+          [5, 0, 0],
+          [0, 0, 0],
+        ],
+        radius: 0.1,
+      },
+      'doubles back',
+    ],
+    ['bend > run', { path: L_PATH, radius: 1, bendRadius: 20 }, 'too large'],
+    ['bend too tight', { path: L_PATH, radius: 1, bendRadius: 0.5 }, 'not wider than the section'],
+    ['bendRadius <= 0', { path: L_PATH, radius: 1, bendRadius: -1 }, 'bendRadius must be > 0'],
+    [
+      'closed loop',
+      {
+        path: [
+          [0, 0, 0],
+          [5, 0, 0],
+          [0, 0, 0.0000001],
+        ],
+        smooth: true,
+        radius: 0.1,
+      },
+      'path invalid',
+    ],
+  ])('%s', (_label, params, text) => {
+    expectNoOp(execute(rect, 'sweep_profile', params), rect, text);
+  });
+
+  it('an arc path tighter than the section is rejected; a polyline path gets bends', () => {
+    const doc = docWith({
+      id: 'zig',
+      kind: 'polyline',
+      closed: false,
+      points: [
+        [0, 0],
+        [4, 0],
+        [4, 4],
+      ],
+    });
+    const kink = docWith({
+      id: 'kink',
+      kind: 'arc',
+      center: [0, 0],
+      radius: 0.05,
+      startAngle: 0,
+      endAngle: Math.PI,
+    });
+    expectNoOp(execute(kink, 'sweep_profile', { pathId: 'kink', radius: 1 }), kink, 'not wider');
+    expect(execute(doc, 'sweep_profile', { pathId: 'zig', radius: 0.2 }).affected).toHaveLength(1);
+  });
+
+  it('rejects a duplicate explicit id', () => {
+    const first = execute(empty, 'sweep_profile', { path: L_PATH, radius: 1, id: 'p' }).document;
+    expectNoOp(
+      execute(first, 'sweep_profile', { path: L_PATH, radius: 1, id: 'p' }),
+      first,
+      'already exists',
+    );
+  });
+});
+
+describe('sweep entity across the kind dispatch', () => {
+  const pipe = sweepOf(empty, {
+    id: 'pipe',
+    path: L_PATH,
+    radius: 1,
+    innerRadius: 0.5,
+    bendRadius: 2,
+  });
+  const bar = sweepOf(empty, {
+    id: 'bar',
+    path: L_PATH,
+    smooth: true,
+    section: [
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [0, 1],
+    ],
+  });
+
+  it('tessellates watertight with outward winding (hollow and polygon sections)', () => {
+    for (const solid of [pipe, bar]) {
+      const triangles = solidTriangles(solid);
+      expect(triangles.length).toBeGreaterThan(0);
+      expect(isWatertight(triangles)).toBe(true);
+    }
+    expect(tessellateEntity(pipe).length).toBe(solidTriangles(pipe).length);
+  });
+
+  it('rotation-minimizing frames stay orthonormal along the path', () => {
+    for (const frame of sweepFrames(bar.path)) {
+      const dot = (a: readonly number[], b: readonly number[]): number =>
+        a.reduce((sum, v, k) => sum + v * (b[k] ?? 0), 0);
+      expect(dot(frame.normal, frame.tangent)).toBeCloseTo(0, 9);
+      expect(dot(frame.binormal, frame.normal)).toBeCloseTo(0, 9);
+      expect(dot(frame.normal, frame.normal)).toBeCloseTo(1, 9);
+    }
+    expect(sweepTriangles([], { shape: 'circle', radius: 1 })).toEqual([]);
+  });
+
+  it('starts vertical paths with the section +y along world +Y', () => {
+    const [first] = sweepFrames([
+      {
+        type: 'line',
+        points: [
+          [0, 0, 0],
+          [0, 0, 5],
+        ],
+      },
+    ]);
+    expect(first?.binormal).toEqual([0, 1, 0]);
+  });
+
+  it('scale_entity scales path, radii and section curves', () => {
+    const doc = { ...empty, entities: { [pipe.id]: pipe }, order: [pipe.id] };
+    const scaled = execute(doc, 'scale_entity', { id: pipe.id, factor: 2 }).document.entities[
+      pipe.id
+    ] as SweepEntity;
+    expect(scaled.section).toEqual({ shape: 'circle', radius: 2, innerRadius: 1 });
+    expect(scaled.path[2]?.points[1]).toEqual([20, 20, 0]);
+    expect(volumeOf(scaled)).toBeCloseTo(volumeOf(pipe) * 8, 6);
+
+    const sketched = sweepOf(
+      docWith({ id: 'e', kind: 'ellipse', center: [0, 0], radiusX: 1, radiusY: 0.5 }),
+      {
+        path: L_PATH,
+        sectionId: 'e',
+      },
+    );
+    const big = execute(
+      { ...empty, entities: { [sketched.id]: sketched }, order: [sketched.id] },
+      'scale_entity',
+      { id: sketched.id, factor: 3 },
+    ).document.entities[sketched.id] as SweepEntity;
+    expect(big.section.shape === 'profile' && big.section.curves?.[0]?.points[0]).toEqual([3, 0]);
+  });
+
+  it('round-trips through save → load and rejects a corrupt saved sweep', () => {
+    const doc = {
+      ...empty,
+      entities: { [pipe.id]: pipe, [bar.id]: bar },
+      order: [pipe.id, bar.id],
+    };
+    const loaded = execute(createEmptyDocument(), 'load_document', {
+      json: serializeDocument(doc),
+    });
+    expect(loaded.document.entities[pipe.id]).toEqual(pipe);
+    expect(loaded.document.entities[bar.id]).toEqual(bar);
+
+    const corrupt = (patch: Record<string, unknown>): string =>
+      serializeDocument({ ...doc, entities: { [pipe.id]: { ...pipe, ...patch } as Entity } });
+    for (const patch of [
+      { path: [] },
+      { path: [{ type: 'line', points: [[0, 0]] }] },
+      { section: null },
+      { section: { shape: 'circle', radius: -1 } },
+      { section: { shape: 'circle', radius: 1, innerRadius: 2 } },
+      { section: { shape: 'profile', profile: [[0, 0]] } },
+      {
+        section: {
+          shape: 'profile',
+          profile: [
+            [0, 0],
+            [1, 0],
+            [0, 1],
+          ],
+          curves: [{ type: 'arc', points: [] }],
+        },
+      },
+    ]) {
+      const result = execute(createEmptyDocument(), 'load_document', { json: corrupt(patch) });
+      expect(result.affected).toHaveLength(0);
+      expect(result.summary).toContain('sweep');
+    }
+  });
+
+  it('check_model flags a degenerate round section', () => {
+    const broken = { ...pipe, section: { shape: 'circle', radius: 0 } } as SweepEntity;
+    const doc = { ...empty, entities: { [broken.id]: broken }, order: [broken.id] };
+    const report = execute(doc, 'check_model', {}).data as { issues: Array<{ code: string }> };
+    expect(report.issues.some((i) => i.code === 'degenerate_size')).toBe(true);
+    const fine = { ...empty, entities: { [bar.id]: bar }, order: [bar.id] };
+    const ok = execute(fine, 'check_model', {}).data as { issues: Array<{ code: string }> };
+    expect(ok.issues.some((i) => i.code === 'degenerate_size')).toBe(false);
+  });
+});
+
+describe('sweep review fixes', () => {
+  it('rejects a smooth spline path that curls tighter than the section', () => {
+    const params = {
+      path: [
+        [0, 0, 0],
+        [10, 0, 0],
+        [10.5, 0.5, 0],
+        [0, 1, 0],
+      ],
+      smooth: true,
+      radius: 2,
+    };
+    expectNoOp(execute(empty, 'sweep_profile', params), empty, 'spline curvature');
+  });
+
+  it('a corrupt saved path that is not connected is refused on load', () => {
+    const pipe = sweepOf(empty, { path: L_PATH, radius: 1 });
+    const broken = {
+      ...pipe,
+      path: [
+        {
+          type: 'line',
+          points: [
+            [0, 0, 0],
+            [1, 0, 0],
+          ],
+        },
+        {
+          type: 'line',
+          points: [
+            [2, 0, 0],
+            [3, 0, 0],
+          ],
+        },
+      ],
+    } as unknown as Entity;
+    const json = serializeDocument({ ...empty, entities: { [pipe.id]: broken }, order: [pipe.id] });
+    const result = execute(createEmptyDocument(), 'load_document', { json });
+    expect(result.affected).toHaveLength(0);
+    expect(result.summary).toContain('path invalid');
+  });
+
+  it('per-segment outline rings follow the continuous frame', () => {
+    const pipe = sweepOf(empty, { path: L_PATH, radius: 1, bendRadius: 2 });
+    const rings = sweepSegmentRings(pipe.path, pipe.section);
+    expect(rings).toHaveLength(3);
+    expect(rings.every((ring) => ring.length > 0)).toBe(true);
+  });
+});

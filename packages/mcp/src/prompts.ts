@@ -121,7 +121,7 @@ const modelBracket: PromptTemplate = {
         `\`\`\`\n\n` +
         `**Key points**\n` +
         `- \`draw_rectangle\` requires only \`width\` and \`height\`; \`position\` (optional [x,y,z]) places the work-plane origin.\n` +
-        `- \`extrude_sketch\` accepts only \`id\` and \`depth\`; it inherits the sketch's position automatically.\n` +
+        `- \`extrude_sketch\` takes \`id\` (or \`ids\` of open pieces forming one loop) and \`depth\`; it inherits the sketch's position automatically.\n` +
         `- \`boolean_subtract\` uses params \`a\` (base solid) and \`b\` (tool solid); BOTH operands are consumed and replaced by a new mesh entity — bind the result with \`as\` so later steps can reference it.\n` +
         `- Each subtract chains to the previous result: body → body_0 → body_1 → … The final mesh alias is \`$${finalBodyAlias}\`.\n` +
         `- \`$alias\` references let later steps use entity ids created in earlier steps without knowing them in advance.\n` +
@@ -239,7 +239,7 @@ const parametricPart: PromptTemplate = {
         `      "as": "base_profile" },\n` +
         `\n` +
         `    // Step 1 — extrude into body solid\n` +
-        `    // extrude_sketch accepts only id and depth; it inherits the sketch's position.\n` +
+        `    // extrude_sketch takes id (or ids of loop pieces) and depth; it inherits the sketch's position.\n` +
         `    { "command": "extrude_sketch",\n` +
         `      "params": { "id": "$base_profile", "depth": 10 },\n` +
         `      "as": "body" },\n` +

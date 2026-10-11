@@ -32,6 +32,7 @@ import type {
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { ORIGIN } from '../lib/vec3';
 import { revolutionPolygons } from '../geometry/revolution';
+import { sweepTriangles } from '../geometry/sweep';
 import {
   SEG_CIRCLE,
   boxExtents,
@@ -356,6 +357,13 @@ export function tessellateEntity(e: Entity): PreDepthPolygon[] {
       return rotated(tessellateRevolution(e));
     case 'mesh':
       return rotated(tessellateMesh(e));
+    case 'sweep':
+      return rotated(
+        makePolygons(
+          sweepTriangles(e.path, e.section, e.position).map((triangle) => [...triangle]),
+          e.color,
+        ),
+      );
     case 'line':
       return tessellate2DLine(e);
     case 'polyline':

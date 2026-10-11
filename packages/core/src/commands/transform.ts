@@ -5,7 +5,9 @@
  * @layer core/commands
  */
 
-import type { CadDocument, Entity, Vec3 } from '../model/types';
+import type { CadDocument, Entity, SweepSection, Vec2, Vec3 } from '../model/types';
+import type { CurveSegment } from '../model/curve';
+import { mapSegment } from '../geometry/curveSegments';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 } from './schema';
 import { changed, noop } from './noop';
@@ -62,6 +64,32 @@ export const rotateEntity = defineCommand({
   },
 });
 
+/** `{ curves }` scaled by `f` when the entity carries exact curves. */
+function scaledCurves(
+  e: { curves?: ReadonlyArray<CurveSegment<Vec2>> },
+  f: number,
+): { curves?: ReadonlyArray<CurveSegment<Vec2>> } {
+  return e.curves === undefined
+    ? {}
+    : { curves: e.curves.map((segment) => mapSegment(segment, (p: Vec2) => scale2(p, f))) };
+}
+
+function scaledSection(section: SweepSection, f: number): SweepSection {
+  if (section.shape === 'circle') {
+    const { radius, innerRadius } = section;
+    return {
+      shape: 'circle',
+      radius: radius * f,
+      ...(innerRadius !== undefined ? { innerRadius: innerRadius * f } : {}),
+    };
+  }
+  return {
+    shape: 'profile',
+    profile: section.profile.map((p) => scale2(p, f)),
+    ...scaledCurves(section, f),
+  };
+}
+
 /** Scaled copy of `e` about its local origin plus the summary fragment describing the result. */
 export function scaleGeometry(e: Entity, f: number): { scaled: Entity; dims: string } {
   switch (e.kind) {
@@ -83,7 +111,7 @@ export function scaleGeometry(e: Entity, f: number): { scaled: Entity; dims: str
     case 'extrusion': {
       const depth = e.depth * f;
       return {
-        scaled: { ...e, profile: e.profile.map((p) => scale2(p, f)), depth },
+        scaled: { ...e, profile: e.profile.map((p) => scale2(p, f)), depth, ...scaledCurves(e, f) },
         dims: `new depth ${depth}`,
       };
     }
@@ -163,8 +191,17 @@ export function scaleGeometry(e: Entity, f: number): { scaled: Entity; dims: str
     case 'revolution':
       // Radial and axial profile offsets scale; axis direction is unchanged.
       return {
-        scaled: { ...e, profile: e.profile.map((p) => scale2(p, f)) },
+        scaled: { ...e, profile: e.profile.map((p) => scale2(p, f)), ...scaledCurves(e, f) },
         dims: `scaled ${e.profile.length}-point profile`,
+      };
+    case 'sweep':
+      return {
+        scaled: {
+          ...e,
+          path: e.path.map((segment) => mapSegment(segment, (p: Vec3) => scale3(p, f))),
+          section: scaledSection(e.section, f),
+        },
+        dims: `scaled ${e.path.length}-segment path and section`,
       };
     case 'instance': {
       const scale = scale3(e.scale ?? [1, 1, 1], f);
