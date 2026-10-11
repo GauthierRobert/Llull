@@ -214,6 +214,149 @@
     "name": "add_bearing"
   },
   {
+    "description": "Create a straight bevel gear with real involute-style teeth as ONE closed mesh solid (no booleans). The pitch cone is derived from teeth, matingTeeth and shaftAngle (90° default): pitchAngle = atan(sin(shaft)/(matingTeeth/teeth + cos(shaft))); or pass pitchAngle explicitly. Heel (large end) face lies at the local z = 0 plane centred on `position`; the tooth profile is the module*teeth/2 pitch-circle spur outline and shrinks linearly towards the cone apex, which lies on the axis at +axis side (apex height = coneDistance*cos(pitchAngle)). `axis` selects the world direction of the gear axis (apex side), `rotation` is then applied about `position`. Tooth form is approximate (no Tredgold back-cone correction). `bore` cuts a cylindrical through hole. For two meshing gears use add_bevel_gear_pair. Result is a world-space mesh entity.",
+    "input_schema": {
+      "properties": {
+        "axis": {
+          "description": "World direction of the gear axis (towards the apex). Default \"z\".",
+          "enum": [
+            "x",
+            "y",
+            "z"
+          ],
+          "type": "string"
+        },
+        "bore": {
+          "description": "Radius of a central through hole, >= 0. Default 0 (solid).",
+          "type": "number"
+        },
+        "color": {
+          "description": "Hex color. Default \"#b08d57\".",
+          "type": "string"
+        },
+        "faceWidth": {
+          "description": "Tooth length along the cone element (heel to toe), > 0 and <= 0.7 * cone distance; usual practice <= cone distance / 3.",
+          "type": "number"
+        },
+        "matingTeeth": {
+          "description": "Tooth count of the mating gear, integer >= 6. Default: same as teeth (miter gear).",
+          "type": "number"
+        },
+        "module": {
+          "description": "Gear module (metric) at the heel (large end), > 0.",
+          "type": "number"
+        },
+        "name": {
+          "description": "Optional display name.",
+          "type": "string"
+        },
+        "pitchAngle": {
+          "description": "Pitch-cone half angle in RADIANS, in (0, π/2). Overrides the value derived from the tooth counts.",
+          "type": "number"
+        },
+        "position": {
+          "description": "World-space location of the anchor point [x, y, z] in document units. Right-handed frame, +Z up. Centre of the heel face. Defaults to [0, 0, 0]. Format [x, y, z]; [x, y] is accepted and placed at z=0.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "pressureAngle": {
+          "description": "Pressure angle in RADIANS, in (0, π/2). Default 0.3491 (20°).",
+          "type": "number"
+        },
+        "rotation": {
+          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X). Applied about `position` after `axis`.  Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "shaftAngle": {
+          "description": "Angle between the two shaft axes in RADIANS, in (0, π). Default π/2 (90°).",
+          "type": "number"
+        },
+        "teeth": {
+          "description": "Tooth count of THIS gear, integer >= 6.",
+          "type": "number"
+        },
+        "toothPhase": {
+          "description": "Rotation of the tooth pattern about the gear axis in RADIANS. Default 0 (tooth 0 centred on +X).",
+          "type": "number"
+        }
+      },
+      "required": [
+        "module",
+        "faceWidth",
+        "teeth"
+      ],
+      "type": "object"
+    },
+    "name": "add_bevel_gear"
+  },
+  {
+    "description": "Create a meshing pair of straight bevel gears at a 90° shaft angle: a pinion (axis along world Z) and a wheel (axis along world X) whose pitch-cone apexes coincide at `position` (the cone apex, default origin). The pinion heel face lies at z = apex - apexHeight, the wheel heel face at x = apex - apexHeight; teeth are phased so they mesh with backlash. Pitch angles: pinion atan(pinionTeeth/wheelTeeth), wheel 90° minus that. Returns affected = [pinion, wheel] and data {ratio, pinionPitchAngle, wheelPitchAngle, coneDistance}.",
+    "input_schema": {
+      "properties": {
+        "faceWidth": {
+          "description": "Tooth length along the cone element (heel to toe), > 0 and <= 0.7 * cone distance; usual practice <= cone distance / 3.",
+          "type": "number"
+        },
+        "module": {
+          "description": "Gear module (metric) at the heel (large end), > 0.",
+          "type": "number"
+        },
+        "namePrefix": {
+          "description": "Name prefix: \"<prefix>_pinion\", \"<prefix>_wheel\".",
+          "type": "string"
+        },
+        "pinionBore": {
+          "description": "Pinion through-hole radius, >= 0. Default 0.",
+          "type": "number"
+        },
+        "pinionColor": {
+          "description": "Pinion hex color. Default \"#b08d57\".",
+          "type": "string"
+        },
+        "pinionTeeth": {
+          "description": "Pinion tooth count, integer >= 6.",
+          "type": "number"
+        },
+        "position": {
+          "description": "World-space location of the anchor point [x, y, z] in document units. Right-handed frame, +Z up. This is the common cone apex. Defaults to [0, 0, 0]. Format [x, y, z]; [x, y] is accepted and placed at z=0.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "pressureAngle": {
+          "description": "Pressure angle in RADIANS, in (0, π/2). Default 0.3491 (20°).",
+          "type": "number"
+        },
+        "wheelBore": {
+          "description": "Wheel through-hole radius, >= 0. Default 0.",
+          "type": "number"
+        },
+        "wheelColor": {
+          "description": "Wheel hex color. Default \"#7a9cbb\".",
+          "type": "string"
+        },
+        "wheelTeeth": {
+          "description": "Wheel tooth count, integer >= 6.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "module",
+        "faceWidth",
+        "pinionTeeth",
+        "wheelTeeth"
+      ],
+      "type": "object"
+    },
+    "name": "add_bevel_gear_pair"
+  },
+  {
     "description": "Create a rectangular box solid. Right-handed world frame, +Z up. size is [width, height, depth] in document units; all components must be > 0. anchor controls which point on the entity the position refers to: \"center\" (default) = geometric center; \"min\" = min-XYZ corner; \"base-center\" = center of bottom face (mid X/Y, min Z). The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.",
     "input_schema": {
       "properties": {
@@ -1226,6 +1369,63 @@
     "name": "add_helix_spring"
   },
   {
+    "description": "Create an internal (ring) involute gear: a cylindrical rim whose bore carries inward-pointing teeth, as ONE closed mesh solid built without booleans. Same tooth convention as add_spur_gear (addendum 1·module, dedendum 1.25·module), tooth spaces widened by 0.05·module backlash so an external gear of the same module and pressure angle meshes without interference. The ring is centred on its axis (+Z, z from 0 to faceWidth) at `position`; tooth pitch diameter = module * teeth. Pair with add_spur_gear: centre distance = module * (ringTeeth - pinionTeeth) / 2. For a complete sun/planet/ring set use add_planetary_gearset (it phases the teeth for you). The result is a world-space mesh entity (position/rotation are baked in).",
+    "input_schema": {
+      "properties": {
+        "color": {
+          "description": "Hex color. Default \"#8892a0\".",
+          "type": "string"
+        },
+        "faceWidth": {
+          "description": "Gear thickness along the axis (+Z), > 0.",
+          "type": "number"
+        },
+        "module": {
+          "description": "Gear module (metric), > 0. pitchDiameter = module * teeth.",
+          "type": "number"
+        },
+        "name": {
+          "description": "Optional display name.",
+          "type": "string"
+        },
+        "outerRadius": {
+          "description": "Radius of the cylindrical rim (outside of the ring). Must be >= pitchRadius + 2.25 * module so that material remains behind the tooth spaces.",
+          "type": "number"
+        },
+        "position": {
+          "description": "World-space location of the anchor point [x, y, z] in document units. Right-handed frame, +Z up. Centre of the ring on its axis (z = bottom face). Defaults to [0, 0, 0]. Format [x, y, z]; [x, y] is accepted and placed at z=0.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "pressureAngle": {
+          "description": "Pressure angle in RADIANS, in (0, π/2). Default 0.3491 (20°).",
+          "type": "number"
+        },
+        "rotation": {
+          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X). Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "teeth": {
+          "description": "Number of internal teeth, integer >= 12 and <= 1000. Typical ring gears have 40-120.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "module",
+        "teeth",
+        "faceWidth",
+        "outerRadius"
+      ],
+      "type": "object"
+    },
+    "name": "add_internal_gear"
+  },
+  {
     "description": "Add a kinematic joint between two InstanceEntity frames to model a mechanism. A \"revolute\" joint allows rotation of instance b around the given axis through instance a's origin. A \"prismatic\" joint allows translation of instance b along the given axis from instance a's origin. \"a\" and \"b\" are MateRef objects: { instanceId: \"<id>\", frame?: \"origin\"|\"axis-x\"|\"axis-y\"|\"axis-z\" }. \"axis\" is the rotation/slide axis: use \"x\", \"y\", or \"z\" for world axes, or a [x,y,z] unit vector. Initial joint value (angle / displacement) defaults to 0. Use set_joint_value to drive the joint. Use evaluate_motion or bake_motion to apply motion to instances. Returns the new joint id in affected[0].",
     "input_schema": {
       "properties": {
@@ -1301,6 +1501,77 @@
       "type": "object"
     },
     "name": "add_joint"
+  },
+  {
+    "description": "Create a round shaft along +Z (z from 0 to length) with a rectangular keyway (pocket) on its +X side, built as one closed mesh solid without booleans. Keyway width b, groove depth t1 (from the shaft surface to the groove floor) and the optional key height h default to the DIN 6885 form A values for the shaft diameter (e.g. d=40 -> b=12, t1=5, h=8). The pocket spans keyLength starting keyOffset above the bottom end (defaults: keyLength = 60% of length, centred); keyOffset 0 or reaching the top gives an open-ended keyway. includeKey=true also creates the matching parallel key as a separate mesh solid seated in the groove (affected = [shaft, key]). Result is world-space mesh entities.",
+    "input_schema": {
+      "properties": {
+        "color": {
+          "description": "Shaft hex color. Default \"#9aa3ad\".",
+          "type": "string"
+        },
+        "diameter": {
+          "description": "Shaft diameter, > 0.",
+          "type": "number"
+        },
+        "includeKey": {
+          "description": "Also create the parallel key part. Default false.",
+          "type": "boolean"
+        },
+        "keyColor": {
+          "description": "Key hex color. Default \"#c0a060\".",
+          "type": "string"
+        },
+        "keyDepth": {
+          "description": "Groove depth t1 measured from the shaft surface. Default from DIN 6885.",
+          "type": "number"
+        },
+        "keyHeight": {
+          "description": "Key height h (only used when includeKey is true). Default from DIN 6885.",
+          "type": "number"
+        },
+        "keyLength": {
+          "description": "Keyway length along the shaft, > 0 and <= length. Default 60% of length.",
+          "type": "number"
+        },
+        "keyOffset": {
+          "description": "Distance from the shaft bottom end (z = 0) to the keyway start, >= 0. Default centred.",
+          "type": "number"
+        },
+        "keyWidth": {
+          "description": "Keyway width b. Default from DIN 6885 for the diameter.",
+          "type": "number"
+        },
+        "length": {
+          "description": "Shaft length along +Z, > 0.",
+          "type": "number"
+        },
+        "name": {
+          "description": "Optional display name for the shaft.",
+          "type": "string"
+        },
+        "position": {
+          "description": "World-space location of the anchor point [x, y, z] in document units. Right-handed frame, +Z up. Centre of the shaft bottom face. Defaults to [0, 0, 0]. Format [x, y, z]; [x, y] is accepted and placed at z=0.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "rotation": {
+          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X). Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "diameter",
+        "length"
+      ],
+      "type": "object"
+    },
+    "name": "add_keyed_shaft"
   },
   {
     "description": "Create a new layer with the given name and append it to the layer order. Returns the new layer id in affected. The layer starts visible and unlocked.",
@@ -1712,6 +1983,83 @@
       "type": "object"
     },
     "name": "add_pipe_support"
+  },
+  {
+    "description": "Create a complete planetary (epicyclic) gear stage: one sun gear, planetCount planet gears and an internal ring gear, all sharing one module and pressure angle, with tooth phasing computed so that every planet meshes with the sun and the ring without interference. ringTeeth = sunTeeth + 2*planetTeeth. Assembly condition: (sunTeeth + ringTeeth) must be divisible by planetCount (e.g. sun 12, planet 18 -> ring 48, sum 60: planetCount 1-6, 10 or 12 work); otherwise the command is rejected and the summary lists the valid planetCounts. Centre distance (sun-planet) = module*(sunTeeth+planetTeeth)/2. Planets below ~12 teeth can show tip interference with the ring (undercut) - prefer planetTeeth >= 12. Gear ratio (sun in, ring fixed, carrier out) = 1 + ringTeeth/sunTeeth. All gears share the axis direction (default +Z); the sun and ring are centred on `position`, planets orbit it. Returns affected = [sun, ...planets, ring] and data {ringTeeth, ratio, centerDistance, ringPitchRadius, ids:{sun, planets, ring}}. The sun and planets are extrusion entities, the ring a mesh entity.",
+    "input_schema": {
+      "properties": {
+        "axis": {
+          "description": "Direction of the gear axis in world space. Default \"z\" (gears lie in the XY plane).",
+          "enum": [
+            "x",
+            "y",
+            "z"
+          ],
+          "type": "string"
+        },
+        "faceWidth": {
+          "description": "Thickness of every gear along the axis, > 0.",
+          "type": "number"
+        },
+        "module": {
+          "description": "Gear module (metric), > 0, shared by sun, planets and ring.",
+          "type": "number"
+        },
+        "namePrefix": {
+          "description": "Prefix for entity names: \"<prefix>_sun\", \"<prefix>_planet_1\".., \"<prefix>_ring\".",
+          "type": "string"
+        },
+        "planetColor": {
+          "description": "Planet hex color. Default \"#7a9cbb\".",
+          "type": "string"
+        },
+        "planetCount": {
+          "description": "Number of planets, integer in [1, 12]. (sunTeeth + ringTeeth) must be divisible by it.",
+          "type": "number"
+        },
+        "planetTeeth": {
+          "description": "Planet gear tooth count, integer >= 6.",
+          "type": "number"
+        },
+        "position": {
+          "description": "World-space location of the anchor point [x, y, z] in document units. Right-handed frame, +Z up. Centre of the sun/ring on the axis (z = bottom face). Defaults to [0, 0, 0]. Format [x, y, z]; [x, y] is accepted and placed at z=0.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "pressureAngle": {
+          "description": "Pressure angle in RADIANS, in (0, π/2). Default 0.3491 (20°).",
+          "type": "number"
+        },
+        "ringColor": {
+          "description": "Ring hex color. Default \"#8892a0\".",
+          "type": "string"
+        },
+        "ringOuterRadius": {
+          "description": "Outer radius of the ring gear rim, >= ring pitch radius + 2.25*module (the command reports the minimum).",
+          "type": "number"
+        },
+        "sunColor": {
+          "description": "Sun hex color. Default \"#d9a441\".",
+          "type": "string"
+        },
+        "sunTeeth": {
+          "description": "Sun gear tooth count, integer >= 6.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "module",
+        "sunTeeth",
+        "planetTeeth",
+        "planetCount",
+        "faceWidth",
+        "ringOuterRadius"
+      ],
+      "type": "object"
+    },
+    "name": "add_planetary_gearset"
   },
   {
     "description": "Grade a flat building pad (platform) into an existing-ground surface. Give the pad outline `boundary` (plan polygon, >= 3 simple [x, y] vertices inside the surface) and the finished level `elevation`, both in document units. Cut and fill batters (side slopes, horizontal per 1 vertical; defaults 1.5 cut, 2 fill) are projected to the ground, producing the pad, its daylight line and cut / fill volumes. Returns data { platformId, cutM3, fillM3, netM3 }. Edit later with update_platform; find the balancing level with balance_platform.",
@@ -2126,11 +2474,67 @@
     "name": "add_sphere"
   },
   {
-    "description": "Create a parametric involute spur gear solid (extrusion). Computes the full closed 2D tooth profile from module, tooth count, and pressure angle, then extrudes it by faceWidth along +Z. module (metric) sets the tooth scale: pitchDiameter = module * teeth. pressureAngle is in RADIANS; standard value is 0.3491 rad (20 degrees = Math.PI/9). faceWidth is the gear thickness along Z. bore is a central hole radius; if > 0 it is currently ignored (kernel hole not yet wired) and noted in the summary. position is [x, y, z] of the gear center; rotation is three.js intrinsic XYZ Euler angles in radians (about world Z, then Y, then X). Right-handed frame, +Z up.",
+    "description": "Create an involute spline shaft in the style of DIN 5480 (e.g. W200x5x38 = referenceDiameter 200, module 5, 38 teeth) as one extrusion along +Z (z from 0 to length). Tooth count follows DIN 5480: teeth = referenceDiameter/module - 2 (override with `teeth`). Flanks are involutes of the generating circle (module*teeth/2) at the 30° pressure angle; the nominal tooth thickness on the reference circle is half the pitch; tip radius = referenceDiameter/2 - 0.1*module, tooth depth 0.9*module (approximation of the DIN tolerances). Tooth flanks are sampled coarsely (7 points) to keep STEP/boolean cost low.",
+    "input_schema": {
+      "properties": {
+        "color": {
+          "description": "Hex color. Default \"#9aa3ad\".",
+          "type": "string"
+        },
+        "length": {
+          "description": "Shaft length along +Z, > 0.",
+          "type": "number"
+        },
+        "module": {
+          "description": "Spline module, > 0 (e.g. 5 for W200x5x38).",
+          "type": "number"
+        },
+        "name": {
+          "description": "Optional display name.",
+          "type": "string"
+        },
+        "position": {
+          "description": "World-space location of the anchor point [x, y, z] in document units. Right-handed frame, +Z up. Centre of the bottom face. Defaults to [0, 0, 0]. Format [x, y, z]; [x, y] is accepted and placed at z=0.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "pressureAngle": {
+          "description": "Flank pressure angle in RADIANS, in (0, π/2). Default 0.5236 (30°, DIN 5480).",
+          "type": "number"
+        },
+        "referenceDiameter": {
+          "description": "DIN 5480 reference diameter dB, > 0 (e.g. 200 for W200x5x38).",
+          "type": "number"
+        },
+        "rotation": {
+          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X). Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "teeth": {
+          "description": "Tooth count, integer >= 6. Default round(referenceDiameter/module) - 2 (DIN 5480).",
+          "type": "number"
+        }
+      },
+      "required": [
+        "referenceDiameter",
+        "module",
+        "length"
+      ],
+      "type": "object"
+    },
+    "name": "add_spline_shaft"
+  },
+  {
+    "description": "Create a parametric involute spur gear solid (extrusion with exact Bézier/arc tooth curves; mesh when bore > 0). Computes the full closed 2D tooth profile from module, tooth count, and pressure angle, then extrudes it by faceWidth along +Z. module (metric) sets the tooth scale: pitchDiameter = module * teeth. pressureAngle is in RADIANS; standard value is 0.3491 rad (20 degrees = Math.PI/9). faceWidth is the gear thickness along Z. bore is a central hole radius; if > 0 the gear is emitted as a closed mesh solid with a through hole (no boolean needed). position is [x, y, z] of the gear center; rotation is three.js intrinsic XYZ Euler angles in radians (about world Z, then Y, then X). Right-handed frame, +Z up.",
     "input_schema": {
       "properties": {
         "bore": {
-          "description": "Central bore hole radius in document units. >= 0. Default 0 (solid hub). Currently ignored if > 0 (kernel hole not yet wired); a note appears in the summary.",
+          "description": "Central bore hole radius in document units. >= 0 and < pitch radius. Default 0 (solid hub, extrusion entity). When > 0 the result is a mesh solid with a through hole.",
           "type": "number"
         },
         "color": {

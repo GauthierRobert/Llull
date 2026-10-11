@@ -10,6 +10,10 @@ import { makeTubeBetween } from './composite';
 import { addSpurGear } from './gears';
 import { addHelixSpring } from './helixSpring';
 import { addBearing } from './bearings';
+import { addInternalGear } from './gearsInternal';
+import { addPlanetaryGearset } from './gearsPlanetary';
+import { addBevelGear, addBevelGearPair } from './gearsBevel';
+import { addSplineShaft, addKeyedShaft } from './shafts';
 
 export const solidsCommands = commandCatalog(
   addBox,
@@ -27,4 +31,10 @@ export const solidsCommands = commandCatalog(
   addSpurGear,
   addHelixSpring,
   addBearing,
+  addInternalGear,
+  addPlanetaryGearset,
+  addBevelGear,
+  addBevelGearPair,
+  addSplineShaft,
+  addKeyedShaft,
 );
