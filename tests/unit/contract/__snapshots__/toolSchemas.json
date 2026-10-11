@@ -6686,9 +6686,68 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Render the document to a self-contained SVG image string so an AI agent can SEE the scene and self-correct. Returns the unchanged document plus a `data` object containing: `svg` (complete SVG string), `view` (resolved view name), `width`, `height`, `entityCount`, `bounds` (world AABB or null), and `camera` ({position, target, up}). Choose `view` to orient the render: \"iso\" (default isometric), \"top\", \"bottom\", \"front\", \"back\", \"left\", or \"right\" (all orthographic). Adjust `width`/`height` (pixels, clamped to [64, 2000], default 800×600) for resolution. The SVG uses flat Lambertian shading on 3D solids and stroked paths for 2D shapes. Enrichments: turntable (multi-frame strip), isolate (highlight entities), section (cut-plane view), showDimensions (bbox labels), showAxes (world triad, default on), showGrid (ground grid, default on), showLabels (entity id/name labels + key-point markers, default off). Does NOT modify the document; `affected` is always [].",
+    "description": "Render the document to a self-contained SVG image string so an AI agent can SEE the scene and self-correct. Returns the unchanged document plus a `data` object containing: `svg` (complete SVG string), `view` (resolved view name), `width`, `height`, `entityCount`, `bounds` (world AABB or null), and `camera` ({position, target, up}). Choose `view` to orient the render: \"iso\" (default isometric), \"top\", \"bottom\", \"front\", \"back\", \"left\", or \"right\" (all orthographic). Adjust `width`/`height` (pixels, clamped to [64, 2000], default 800×600) for resolution. The SVG uses flat Lambertian shading on 3D solids and stroked paths for 2D shapes. Camera: `zoom` (>1 magnifies), `direction` ([x,y,z] vector from the scene toward the camera, overrides `view`), `target` (point to look at). `title` draws text top-left, `background` sets the image color. Cutaway: `cut` clips solids (triangles are split, not dropped) and draws the section as a hatched cap, e.g. remove the quadrant x>0,y<0 with planes [{normal:[1,0,0],offset:0},{normal:[0,-1,0],offset:0}] and mode \"intersection\". Large scenes are never silently truncated: the polygon budget (`maxPolygons`) is shared fairly between entities, and `data.simplifiedEntityIds` / `data.skippedEntityIds` / `data.polygonCount` report what was reduced. Enrichments: turntable (multi-frame strip), isolate (highlight entities), section (cut-plane view), showDimensions (bbox labels), showAxes (world triad, default on), showGrid (ground grid, default on), showLabels (entity id/name labels + key-point markers, default off). Does NOT modify the document; `affected` is always [].",
     "input_schema": {
       "properties": {
+        "background": {
+          "description": "Background CSS color: \"#rrggbb\", \"#rgb\", a color name (\"white\") or rgb()/hsl(). Default \"#1a1a2e\" (dark navy).",
+          "type": "string"
+        },
+        "cut": {
+          "description": "Cutaway: clips the selected 3D solids against the planes (triangles are split exactly) and draws the exposed section as a light, hatched, outlined cap so solids do not look hollow. Rendered together with isolate/section/turntable.",
+          "properties": {
+            "entityIds": {
+              "description": "Entity ids to cut. Omit to cut every solid; other entities stay whole.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "mode": {
+              "description": "\"intersection\" (default): remove only the region on the cut side of ALL planes (e.g. a quadrant or octant notch). \"union\": remove everything on the cut side of ANY plane.",
+              "enum": [
+                "intersection",
+                "union"
+              ],
+              "type": "string"
+            },
+            "planes": {
+              "description": "1 to 6 cut planes. Each removes the half-space dot(unitNormal, p) > offset.",
+              "items": {
+                "properties": {
+                  "normal": {
+                    "description": "Plane normal [x, y, z] (any non-zero length). It points to the REMOVED side.",
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array"
+                  },
+                  "offset": {
+                    "description": "Plane position: points p with dot(unitNormal, p) = offset lie on the plane.",
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "normal",
+                  "offset"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "planes"
+          ],
+          "type": "object"
+        },
+        "direction": {
+          "description": "Custom viewing direction: a non-zero [x, y, z] vector pointing from the scene center toward the camera (Z-up). Overrides `view`; e.g. [1,-1,0.5] looks from +X/-Y above. Result `view` is \"custom\".",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
         "height": {
           "description": "Output image height in pixels. Clamped to [64, 2000]. Default: 600.",
           "type": "number"
@@ -6696,6 +6755,10 @@
         "isolate": {
           "description": "Entity id (or array of ids) to highlight. All other entities are rendered dimmed/desaturated; the specified id(s) are shown at full color.",
           "type": "string"
+        },
+        "maxPolygons": {
+          "description": "Polygon budget, clamped to [500, 100000], default 20000. Entities over their fair share are decimated (see data.simplifiedEntityIds); raise it for finer detail at the cost of a larger SVG.",
+          "type": "number"
         },
         "section": {
           "description": "Render a section-plane view: entities on the negative side of the cut plane are dimmed; a colored dashed line marks the cut. axis: \"x\"|\"y\"|\"z\"; offset: world-space position of the plane.",
@@ -6736,6 +6799,17 @@
           "description": "When true, overlay per-entity id/name labels and key-point markers on the image. Each entity shows its name (or id) at the centroid of its key points (endpoints, center, corners, AABB corners for solids). Markers are color-coded by category: orange=point, cyan=2D curve, purple=3D solid, yellow=annotation. A legend appears in the top-right corner. Default: false (opt in to avoid clutter).",
           "type": "boolean"
         },
+        "target": {
+          "description": "World point the camera looks at (default: center of the scene bounds). Combine with `zoom` to inspect a detail.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "title": {
+          "description": "Text drawn top-left of the image (max 120 characters, longer is truncated).",
+          "type": "string"
+        },
         "turntable": {
           "description": "Produce a horizontal strip of N evenly-spaced rotation frames around the Z (up) axis. frames: integer 1..12. When omitted, behavior is unchanged (single frame).",
           "properties": {
@@ -6764,6 +6838,10 @@
         },
         "width": {
           "description": "Output image width in pixels. Clamped to [64, 2000]. Default: 800.",
+          "type": "number"
+        },
+        "zoom": {
+          "description": "Magnification of the framed scene, clamped to [0.1, 50]. 1 (default) fits the whole scene; 3 shows a third of it.",
           "type": "number"
         }
       },

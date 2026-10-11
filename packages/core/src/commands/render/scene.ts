@@ -2,10 +2,12 @@ import type { CadDocument, Entity, Vec3 } from '../../model/types';
 import { ORIGIN, add3 } from '../../lib/vec3';
 import { computeSceneSnapshot } from '../inspect/scene';
 import { boundsCenter, boundsRadius } from '../../geometry/bounds';
-import type { RenderViewData, Polygon3D } from './types';
+import type { PreDepthPolygon, Polygon3D, RenderOptions, RenderViewData } from './types';
 import { type ViewName, cameraForView, cameraBasis, projectPoint } from './camera';
 import { tessellateEntity } from './polygons';
-import { MAX_POLYGONS, buildSvg } from './svg';
+import { DEFAULT_BACKGROUND, buildSvg } from './svg';
+import { MAX_POLYGONS, applyBudget, type EntityPolygons } from './budget';
+import { cutEntityPolygons, unitPlanes } from './clip';
 import { expandInstance } from '../../geometry/instanceExpansion';
 
 /** Component instances nested deeper than this are not drawn (guards against reference cycles). */
@@ -31,28 +33,46 @@ export function renderDocument(
   view: ViewName,
   width: number,
   height: number,
+  options: RenderOptions = {},
 ): RenderViewData {
   const snapshot = computeSceneSnapshot(doc);
-  const bounds = snapshot.bounds;
+  const bounds = options.frame !== undefined ? options.frame : snapshot.bounds;
 
   const radius = bounds ? boundsRadius(bounds) : 5; // 5 frames an empty scene
-  const cam = cameraForView(view, bounds ? boundsCenter(bounds) : ORIGIN, radius);
+  const center = options.target ?? (bounds ? boundsCenter(bounds) : ORIGIN);
+  const cam = cameraForView(view, center, radius, options.direction);
   const basis = cameraBasis(cam);
-  const orthoHalf = radius * 1.2;
+  const orthoHalf = (radius * 1.2) / (options.zoom ?? 1);
+  const budget = options.maxPolygons ?? MAX_POLYGONS;
 
-  // Tessellate in doc.order up to MAX_POLYGONS (no spread: a mesh can exceed the argument limit).
-  const polygons: Polygon3D[] = [];
-  collect: for (const id of doc.order) {
+  const cut = options.cut;
+  const planes = cut ? unitPlanes(cut) : [];
+  const cutIds = cut?.entityIds ? new Set(cut.entityIds) : null;
+  const tolerance = Math.max(radius, 1e-6) * 1e-6;
+  const cutEntityIds: string[] = [];
+
+  const items: EntityPolygons[] = [];
+  for (const id of doc.order) {
     const e = doc.entities[id];
     if (!e) continue;
-    for (const drawable of drawableEntities(doc, e)) {
-      for (const p of tessellateEntity(drawable)) {
-        if (polygons.length >= MAX_POLYGONS) break collect;
-        const [, , depth] = projectPoint(centroid3(p.verts), cam, basis);
-        polygons.push({ ...p, depth });
-      }
+    let polygons: PreDepthPolygon[] = drawableEntities(doc, e).flatMap(tessellateEntity);
+    if (cut && (cutIds === null || cutIds.has(id))) {
+      const result = cutEntityPolygons(polygons, cut, planes, tolerance);
+      polygons = result.polygons;
+      if (result.cut) cutEntityIds.push(id);
     }
+    items.push({ id, polygons });
   }
+
+  const fitted = applyBudget(items, budget);
+  const polygons: Polygon3D[] = fitted.polygons.map((p) => {
+    // Caps sit on the nearest face of their outline; everything else sorts by centroid.
+    const depth = p.loops
+      ? p.verts.reduce((nearest, v) => Math.min(nearest, projectPoint(v, cam, basis)[2]), Infinity)
+      : projectPoint(centroid3(p.verts), cam, basis)[2];
+    return { ...p, depth };
+  });
+  const background = options.background === undefined ? DEFAULT_BACKGROUND : options.background;
 
   return {
     view,
@@ -61,6 +81,12 @@ export function renderDocument(
     entityCount: snapshot.entityCount,
     bounds,
     camera: cam,
-    svg: buildSvg(polygons, cam, orthoHalf, width, height, view, snapshot.entityCount),
+    orthoHalf,
+    polygonCount: polygons.filter((p) => !p.stroke).length,
+    polygonBudget: budget,
+    simplifiedEntityIds: fitted.simplifiedEntityIds,
+    skippedEntityIds: fitted.skippedEntityIds,
+    cutEntityIds,
+    svg: buildSvg(polygons, cam, orthoHalf, width, height, view, snapshot.entityCount, background),
   };
 }

@@ -1,9 +1,7 @@
 import type { Vec3 } from '../../model/types';
 import { sub3, dot3, cross3, normalize3 } from '../../lib/vec3';
-import type { Bounds } from '../../geometry/bounds';
-import { boundsRadius } from '../../geometry/bounds';
 
-export type ViewName = 'top' | 'bottom' | 'front' | 'back' | 'left' | 'right' | 'iso';
+export type ViewName = 'top' | 'bottom' | 'front' | 'back' | 'left' | 'right' | 'iso' | 'custom';
 
 /** Camera described in world space (all Z-up). */
 export interface Camera {
@@ -13,7 +11,12 @@ export interface Camera {
 }
 
 /** Build an orthographic camera for a named view at a given scene radius. */
-export function cameraForView(view: ViewName, center: Vec3, radius: number): Camera {
+export function cameraForView(
+  view: ViewName,
+  center: Vec3,
+  radius: number,
+  direction?: Vec3,
+): Camera {
   const d = radius * 2.5;
   const [cx, cy, cz] = center;
   const target: [number, number, number] = [cx, cy, cz];
@@ -36,6 +39,11 @@ export function cameraForView(view: ViewName, center: Vec3, radius: number): Cam
       return at([-1, 0, 0], [0, 0, 1]);
     case 'right':
       return at([1, 0, 0], [0, 0, 1]);
+    case 'custom': {
+      const dir = normalize3(direction ?? [1, -1.4, 1]);
+      // Looking (almost) straight along Z leaves "up" undefined: fall back to +Y.
+      return at(dir, Math.abs(dir[2]) > 0.999 ? [0, 1, 0] : [0, 0, 1]);
+    }
     case 'iso':
       // Fixed isometric direction: roughly from (+1, -1.4, +1) relative to center.
       return at(normalize3([1, -1.4, 1]), [0, 0, 1]);
@@ -79,11 +87,6 @@ export function makeProjector(
     const [u, v] = projectPoint(p, cam, basis);
     return [width / 2 + u * scale, height / 2 - v * scale];
   };
-}
-
-/** Half-width of the orthographic frustum (world units) the SVG overlays project with. */
-export function computeOrthoHalf(bounds: Bounds | null): number {
-  return bounds ? boundsRadius(bounds) * 1.2 * 1.2 : 1;
 }
 
 /** Fixed directional light direction in world space (Z-up). */

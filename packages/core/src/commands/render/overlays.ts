@@ -1,7 +1,7 @@
 import type { CadDocument } from '../../model/types';
 import type { RenderViewData } from './types';
 import { escapeXml } from '../../lib/escapeXml';
-import { type Projector, makeProjector, computeOrthoHalf } from './camera';
+import { type Projector, makeProjector } from './camera';
 import { appendBeforeClose, r2, svgDot, svgLine } from './svg';
 import { appendEntityLabels } from './labels';
 
@@ -50,7 +50,7 @@ function appendDimensionLabels(svgString: string, data: RenderViewData): string 
   const h = r2(Math.abs(max[2] - min[2]));
 
   const { camera, width, height } = data;
-  const project = makeProjector(camera, computeOrthoHalf(data.bounds), width, height);
+  const project = makeProjector(camera, data.orthoHalf, width, height);
 
   // Midpoints of the 3 dimension edges of the bounding box.
   const cx = (min[0] + max[0]) / 2;
@@ -173,7 +173,7 @@ function appendAxesAndGrid(
   showGrid: boolean,
 ): string {
   const { camera, width, height } = data;
-  const orthoHalf = computeOrthoHalf(data.bounds);
+  const orthoHalf = data.orthoHalf;
   const project = makeProjector(camera, orthoHalf, width, height);
   const axisLength = Math.max(orthoHalf * 0.2, 0.5);
 
