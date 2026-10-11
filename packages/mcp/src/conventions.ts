@@ -60,6 +60,7 @@ corner. Knowing the anchor lets you place objects without offset math errors.
 | \`extrude_profile\` | **origin** of the 2D profile in the XY plane  |
 | \`sweep_profile\` | **path start** (the first path point; path stored relative to it) |
 | \`loft_sections\` | **first section centre** (rings stored relative to it) |
+| \`add_subdivision_solid\` | **cage origin** (box / cylinder cages are centred on it) |
 
 **Common pitfall**: center-anchored primitives are half-buried at \`position[2] = 0\`.
 To sit them ON the ground (Z=0), set \`position[2]\` to half their height:
@@ -154,6 +155,8 @@ wildly unexpected orientation. Always use radians.
 | \`loft_sections\`   | Skin a solid through 2+ sections (round→square, tapered bodies) |
 | \`blend_union\`     | Weld solids into one piece with filleted joints (frames, tees) |
 | \`pattern_along_path\` | Oriented copies along a curve (chain links, tread, teeth) |
+| \`add_subdivision_solid\` | Freeform smooth solid from a cage (saddle, hoods, grips) |
+| \`edit_subdivision_cage\` | Sculpt it: move/scale cage regions, crease edges |
 | \`revolve_profile\` | Turned part from a profile or a sketched spline loop |
 | \`move_entity\`     | Translate an entity by a delta vector              |
 | \`delete_entity\`   | Remove an entity by id                             |

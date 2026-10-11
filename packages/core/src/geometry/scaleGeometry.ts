@@ -8,6 +8,7 @@
 import type { Entity, SweepSection, Vec2, Vec3 } from '../model/types';
 import type { CurveSegment } from '../model/curve';
 import { mapSegment } from './curveSegments';
+import { scaledDecals } from './decal';
 import { scale3 } from '../lib/vec3';
 import { scale2 } from '../lib/vec2';
 
@@ -39,6 +40,15 @@ function scaledSection(section: SweepSection, f: number): SweepSection {
 
 /** Scaled copy of `e` about its local origin plus the summary fragment describing the result. */
 export function scaleGeometry(e: Entity, f: number): { scaled: Entity; dims: string } {
+  const result = scaleKindGeometry(e, f);
+  if (e.decals === undefined) return result;
+  return {
+    scaled: { ...result.scaled, decals: scaledDecals(e.decals, f) } as Entity,
+    dims: result.dims,
+  };
+}
+
+function scaleKindGeometry(e: Entity, f: number): { scaled: Entity; dims: string } {
   switch (e.kind) {
     case 'box':
     case 'wedge': {
@@ -162,6 +172,11 @@ export function scaleGeometry(e: Entity, f: number): { scaled: Entity; dims: str
       return {
         scaled: { ...e, rings: e.rings.map((ring) => ring.map((p) => scale3(p, f))) },
         dims: `scaled ${e.rings.length} section rings`,
+      };
+    case 'subdivision':
+      return {
+        scaled: { ...e, vertices: e.vertices.map((p) => scale3(p, f)) },
+        dims: `scaled ${e.vertices.length}-vertex cage`,
       };
     case 'instance': {
       const scale = scale3(e.scale ?? [1, 1, 1], f);

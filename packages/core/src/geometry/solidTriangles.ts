@@ -10,6 +10,7 @@ import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { revolutionTriangles } from './revolution';
 import { sweepTriangles } from './sweep';
 import { loftTriangles } from './loft';
+import { subdivisionTriangles } from './subdivision';
 import {
   SEG_CIRCLE,
   boxExtents,
@@ -169,6 +170,8 @@ function unrotatedTriangles(e: Entity): Triangle[] {
       return sweepTriangles(e, e.position);
     case 'loft':
       return loftTriangles(e, e.position);
+    case 'subdivision':
+      return subdivisionTriangles(e, e.position);
     default:
       return []; // 2D shapes and instances
   }
@@ -177,4 +180,9 @@ function unrotatedTriangles(e: Entity): Triangle[] {
 /** World-space triangles of one entity without resolving instances (instances and 2D shapes return []). */
 export function solidTriangles(e: Entity): Triangle[] {
   return applyRotationToTriangles(unrotatedTriangles(e), e.position, e.rotation);
+}
+
+/** Triangles of `e` in its own frame (before its rotation and position): decals and texture UVs. */
+export function localTriangles(e: Entity): Triangle[] {
+  return solidTriangles({ ...e, position: [0, 0, 0], rotation: [0, 0, 0] } as Entity);
 }

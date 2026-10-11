@@ -608,6 +608,68 @@
     "name": "add_cylinder"
   },
   {
+    "description": "Paint a line of text onto a 3D solid as a decal (logo, brand, part number, sidewall lettering): it is projected along -normal onto the faces turned toward it within the decal box, keeps following the solid when it moves or rotates, shows in the viewport and is exported to glTF as a textured overlay (never part of STL / STEP solids). Text uses the built-in block font (A–Z, 0–9, - . , : / + & ! ? ' #; lower case prints as capitals). Place it with `at` (a world point on the surface) and `normal` (the outward surface direction there).",
+    "input_schema": {
+      "properties": {
+        "angle": {
+          "description": "Rotation of the text about the normal, radians (default 0).",
+          "type": "number"
+        },
+        "at": {
+          "description": "World point on the surface at the decal centre.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "background": {
+          "description": "Optional #rrggbb background behind the letters (default transparent).",
+          "type": "string"
+        },
+        "color": {
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#ffffff\".",
+          "type": "string"
+        },
+        "depth": {
+          "description": "Projection depth through curved surfaces (> 0). Default: 2 × height.",
+          "type": "number"
+        },
+        "height": {
+          "description": "Letter block height in document units (> 0).",
+          "type": "number"
+        },
+        "id": {
+          "description": "Id of the 3D solid to paint.",
+          "type": "string"
+        },
+        "normal": {
+          "description": "Outward surface direction at `at` (world); the decal projects along -normal.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "text": {
+          "description": "Text, 1..64 characters.",
+          "type": "string"
+        },
+        "width": {
+          "description": "Decal width (> 0). Default: from the text length at this height.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "text",
+        "at",
+        "normal",
+        "height"
+      ],
+      "type": "object"
+    },
+    "name": "add_decal"
+  },
+  {
     "description": "Place an associative dimension annotation in the document. `dimensionKind` controls the measurement type: 'linear' — straight-line distance between 2 line or point entities (entityIds length=2); 'aligned' — distance parallel to the segment between 2 line or point entities (entityIds length=2); 'radial' — radius of a circle, arc, or ellipse entity (entityIds length=1); 'angular' — angle at the vertex between 2 line segments or 3 points (entityIds length=3: vertex point first, then 2 line or point entities). `entityIds` is an array of existing entity ids whose geometry the dimension measures; the count must match the kind. Optional `offset` is the perpendicular distance (model units) from the measured geometry to the dimension line (default 5). Optional `precision` overrides the document display precision (decimal places) for this dimension. Optional `label` replaces the computed numeric value with a custom string (e.g. 'REF' or '≈ 42 mm'). Optional `layer` is the target layer id.",
     "input_schema": {
       "properties": {
@@ -2176,6 +2238,131 @@
     "name": "add_steel_member"
   },
   {
+    "description": "Create a freeform solid as a Catmull-Clark subdivision surface over a coarse polygon control cage — for organic shapes no primitive gives (saddles, shifter hoods, grips, dropouts, fairings, handles). Start from a `box` cage (size + segments per axis) or a `cylinder` cage (radius, height, sides, segments along Z), both centred on `position`, or give a custom closed cage (`vertices` local to `position` + `faces` as vertex-index loops wound counter-clockwise seen from outside). Then shape it with edit_subdivision_cage (move / scale regions of cage vertices, with soft falloff; crease edges). The surface stays inside the cage and is smooth (2-3 levels); creased edges stay sharp. Returns data { vertexCount, faceCount, vertices } (cage vertices in world coordinates, by index) to aim later edits. A closed solid: booleans, blend_union, measurement and export (OCC: sewn faceted B-rep of the subdivided surface) all work.",
+    "input_schema": {
+      "properties": {
+        "box": {
+          "description": "Box cage centred on position.",
+          "properties": {
+            "segments": {
+              "description": "Cage faces along x, y, z (1..32; default [1, 1, 1]).",
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "size": {
+              "description": "Cage size [x, y, z] (> 0); the smooth surface sits inside it.",
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "size"
+          ],
+          "type": "object"
+        },
+        "color": {
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
+          "type": "string"
+        },
+        "creases": {
+          "description": "Cage edges kept sharp, as [vertexIndex, vertexIndex] pairs (each must be an edge of a face).",
+          "items": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "cylinder": {
+          "description": "Cylinder (n-gon prism) cage along Z centred on position.",
+          "properties": {
+            "height": {
+              "description": "Cage height along Z (> 0).",
+              "type": "number"
+            },
+            "radius": {
+              "description": "Cage circumradius (> 0).",
+              "type": "number"
+            },
+            "segments": {
+              "description": "Side-face rings along Z (1..32; default 1).",
+              "type": "integer"
+            },
+            "sides": {
+              "description": "Sides of the cage polygon (3..64; default 8).",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "radius",
+            "height"
+          ],
+          "type": "object"
+        },
+        "faces": {
+          "description": "Custom cage faces (use with vertices); the cage must be closed.",
+          "items": {
+            "description": "Vertex indices of one face, counter-clockwise from outside.",
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "id": {
+          "description": "Optional explicit entity id. If omitted a unique id is generated.",
+          "type": "string"
+        },
+        "layerId": {
+          "description": "Layer id to assign the entity to. Defaults to the document default layer.",
+          "type": "string"
+        },
+        "levels": {
+          "description": "Subdivision levels 0..4 (0 = the faceted cage itself; 2-3 is smooth; each level quadruples the face count).",
+          "type": "integer"
+        },
+        "name": {
+          "description": "Optional display name.",
+          "type": "string"
+        },
+        "position": {
+          "description": "World position of the cage origin. Defaults to [0, 0, 0]. Format [x, y, z]; [x, y] is accepted and placed at z=0.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "rotation": {
+          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X). Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "vertices": {
+          "description": "Custom cage vertices (use with faces).",
+          "items": {
+            "description": "Cage vertex [x, y, z], local to position.",
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "add_subdivision_solid"
+  },
+  {
     "description": "Place an annotation text label in the document. `content` is the text string (must not be empty). `position` is the world-space anchor [x, y, z] — for 2D annotations use z=0 (the default work plane). `height` is the cap-height in model units (must be > 0). Optional `rotation` is Euler angles [rx, ry, rz] in radians that orient the work plane (default [0,0,0]). Optional `anchor` controls horizontal alignment: 'left' (default) — position is left edge; 'center' — position is horizontal midpoint; 'right' — position is right edge. Optional `color` is a hex string (e.g. \"#333333\"). Optional `layer` is the target layer id.",
     "input_schema": {
       "properties": {
@@ -3653,12 +3840,35 @@
     "description": "Define or replace a named material in the document material library. A material carries a physical density (used by mass_properties for mass = volume × density) and PBR visual properties (color, metalness, roughness) used by the 3D viewport renderer. If a material with the same name already exists it is fully replaced. Density units match the document unit system: for a mm document, density is in g/mm³ (steel ≈ 0.00785, aluminium ≈ 0.0027, PLA ≈ 0.00124). Assign the material to entities with assign_material.",
     "input_schema": {
       "properties": {
+        "clearcoat": {
+          "description": "Clear lacquer over the finish in [0, 1] (glossy carbon, painted parts). Default 0.",
+          "type": "number"
+        },
         "color": {
           "description": "Diffuse/albedo color as a 6-digit CSS hex string, e.g. \"#b0b0b0\" for grey steel. Must match the pattern #rrggbb (exactly 6 hex digits after the #). Used by the 3D viewport PBR renderer.",
           "type": "string"
         },
+        "color2": {
+          "description": "Secondary #rrggbb colour of the finish (crossing tows, checker squares).",
+          "type": "string"
+        },
         "density": {
           "description": "Density in (mass-unit) per (document-length-unit)³. Must be > 0 and finite. For a document in mm: g/mm³ — steel ≈ 0.00785, aluminium ≈ 0.0027, PLA ≈ 0.00124, titanium ≈ 0.00445, copper ≈ 0.00893. This value is used by mass_properties when the material is assigned to an entity.",
+          "type": "number"
+        },
+        "finish": {
+          "description": "Optional procedural surface texture (albedo + normal + roughness maps, box-projected, shown in the viewport and embedded in export_gltf): carbon_twill (2×2 twill carbon weave), carbon_plain (plain weave), brushed (brushed metal), knurl (diamond knurling), checker. Carbon fibre: color \"#16181b\", metalness 0.2, roughness 0.35, finish \"carbon_twill\", clearcoat 1.",
+          "enum": [
+            "carbon_twill",
+            "carbon_plain",
+            "brushed",
+            "knurl",
+            "checker"
+          ],
+          "type": "string"
+        },
+        "finishScale": {
+          "description": "Size of one texture tile in document units (> 0; a carbon tile holds 8 tows). Default 24.",
           "type": "number"
         },
         "metalness": {
@@ -3668,6 +3878,10 @@
         "name": {
           "description": "Human-readable material name used as the lookup key, e.g. \"steel\", \"aluminium_6061\". Must be a non-empty string. Case-sensitive. Used with assign_material to reference this material.",
           "type": "string"
+        },
+        "normalStrength": {
+          "description": "Relief depth of the finish normal map in [0, 2]. Default 1.",
+          "type": "number"
         },
         "roughness": {
           "description": "PBR roughness factor in [0, 1]. 0 = mirror-smooth (polished metal), 1 = fully diffuse/matte (rough concrete, unfinished wood). Brushed aluminium ≈ 0.3, matte plastic ≈ 0.7.",
@@ -4877,6 +5091,86 @@
     "name": "edit_step_params"
   },
   {
+    "description": "Sculpt a subdivision solid (add_subdivision_solid) by editing its control cage: select cage vertices by `vertexIndices` or by a world-space `region` box (none = all), optionally with a soft `falloff` distance so neighbours follow smoothly, then `translate` them (world vector), `scale` them about `pivot` (per axis of the solid; pivot defaults to the selection centre), and/or set `crease` (true: cage edges between selected vertices turn sharp; false: smooth again). `levels` changes the refinement. Order: scale, then translate. Returns data { vertexCount, faceCount, vertices, selected } (world cage vertices; indices of fully selected vertices).",
+    "input_schema": {
+      "properties": {
+        "crease": {
+          "description": "true: make edges between selected vertices sharp; false: make them smooth.",
+          "type": "boolean"
+        },
+        "falloff": {
+          "description": "Soft-selection distance (>= 0, default 0): vertices this close to the selection move partly (smoothstep).",
+          "type": "number"
+        },
+        "id": {
+          "description": "Id of the subdivision solid.",
+          "type": "string"
+        },
+        "levels": {
+          "description": "Subdivision levels 0..4 (0 = the faceted cage itself; 2-3 is smooth; each level quadruples the face count).",
+          "type": "integer"
+        },
+        "pivot": {
+          "description": "World-space scale centre. Default: centre of the fully selected vertices.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "region": {
+          "description": "Select the cage vertices inside this world-space box (alternative to indices).",
+          "properties": {
+            "max": {
+              "description": "World-space maximum corner [x, y, z] of the selection box.",
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "min": {
+              "description": "World-space minimum corner [x, y, z] of the selection box.",
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "min",
+            "max"
+          ],
+          "type": "object"
+        },
+        "scale": {
+          "description": "Scale factors [sx, sy, sz] (> 0) along the solid axes about the pivot (e.g. [0.6, 0.6, 1] narrows).",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "translate": {
+          "description": "World-space move [dx, dy, dz] of the selection.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "vertexIndices": {
+          "description": "Cage vertex indices to select (from the data of add_subdivision_solid).",
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "edit_subdivision_cage"
+  },
+  {
     "annotations": {
       "idempotentHint": true,
       "readOnlyHint": true
@@ -5716,7 +6010,7 @@
           "type": "array"
         },
         "kind": {
-          "description": "Filter by entity kind. One of: \"box\", \"cylinder\", \"sphere\", \"extrusion\", \"mesh\", \"cone\", \"torus\", \"wedge\", \"pyramid\", \"revolution\", \"sweep\", \"loft\", \"line\", \"polyline\", \"arc\", \"circle\", \"rectangle\", \"point\", \"ellipse\", \"spline\", \"text\", \"dimension\", \"instance\". Omit to match all kinds.",
+          "description": "Filter by entity kind. One of: \"box\", \"cylinder\", \"sphere\", \"extrusion\", \"mesh\", \"cone\", \"torus\", \"wedge\", \"pyramid\", \"revolution\", \"sweep\", \"loft\", \"subdivision\", \"line\", \"polyline\", \"arc\", \"circle\", \"rectangle\", \"point\", \"ellipse\", \"spline\", \"text\", \"dimension\", \"instance\". Omit to match all kinds.",
           "enum": [
             "box",
             "cylinder",
@@ -5730,6 +6024,7 @@
             "revolution",
             "sweep",
             "loft",
+            "subdivision",
             "line",
             "polyline",
             "arc",
@@ -6391,7 +6686,7 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Compute the mass of a 3D solid from its volume and density. Supported entity kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', and 'instance' (assembly: the sum over its component solids, each with its own material density, else the instance material, else the density param). Density resolution: if the entity has a material assigned (via assign_material) and that material exists in doc.materials, the material's density is used automatically — the density param is ignored for that entity. Otherwise the caller-supplied density param is used (back-compat). The density is in g/(document-unit)³ — e.g. for a document in mm: steel ≈ 0.00785, aluminium ≈ 0.0027. Returns data: { volume, density, mass, unit } where unit describes the mass unit (grams). Does not modify the document.",
+    "description": "Compute the mass of a 3D solid from its volume and density. Supported entity kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', 'subdivision', and 'instance' (assembly: the sum over its component solids, each with its own material density, else the instance material, else the density param). Density resolution: if the entity has a material assigned (via assign_material) and that material exists in doc.materials, the material's density is used automatically — the density param is ignored for that entity. Otherwise the caller-supplied density param is used (back-compat). The density is in g/(document-unit)³ — e.g. for a document in mm: steel ≈ 0.00785, aluminium ≈ 0.0027. Returns data: { volume, density, mass, unit } where unit describes the mass unit (grams). Does not modify the document.",
     "input_schema": {
       "properties": {
         "density": {
@@ -6399,7 +6694,7 @@
           "type": "number"
         },
         "entityId": {
-          "description": "Id of the 3D solid entity to compute mass for. Supported kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft'.",
+          "description": "Id of the 3D solid entity to compute mass for. Supported kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', 'subdivision'.",
           "type": "string"
         }
       },
@@ -6548,11 +6843,11 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Compute the volume of a 3D solid entity. Supported kinds: 'box' (w×h×d), 'cylinder' (π r² h), 'sphere' (4/3 π r³), 'extrusion' (profile area × depth), 'mesh' (signed-tetrahedra sum — assumes closed, consistently wound mesh), 'cone' (π r² h / 3), 'torus' (2 π² · ringRadius · tubeRadius²), 'wedge' (w×h×d / 2 — half the enclosing box), 'pyramid' (baseWidth × baseDepth × height / 3), 'instance' (sum of its component's solid children, baked with the instance scale), 'revolution' (Pappus's centroid theorem: sweepAngle × |x_centroid| × profileArea; falls back to bounding-box approximation if the profile crosses the revolution axis), 'sweep' (round section: section area × exact path length; other sections: closed-mesh sum), 'loft' (closed-mesh sum). Returns data: { volume, unit } where unit is the cubed document unit (e.g. \"mm³\"). 2D shape entities are rejected. Does not modify the document.",
+    "description": "Compute the volume of a 3D solid entity. Supported kinds: 'box' (w×h×d), 'cylinder' (π r² h), 'sphere' (4/3 π r³), 'extrusion' (profile area × depth), 'mesh' (signed-tetrahedra sum — assumes closed, consistently wound mesh), 'cone' (π r² h / 3), 'torus' (2 π² · ringRadius · tubeRadius²), 'wedge' (w×h×d / 2 — half the enclosing box), 'pyramid' (baseWidth × baseDepth × height / 3), 'instance' (sum of its component's solid children, baked with the instance scale), 'revolution' (Pappus's centroid theorem: sweepAngle × |x_centroid| × profileArea; falls back to bounding-box approximation if the profile crosses the revolution axis), 'sweep' (round section: section area × exact path length; other sections: closed-mesh sum), 'loft' and 'subdivision' (closed-mesh sum). Returns data: { volume, unit } where unit is the cubed document unit (e.g. \"mm³\"). 2D shape entities are rejected. Does not modify the document.",
     "input_schema": {
       "properties": {
         "entityId": {
-          "description": "Id of the 3D solid entity to measure. Supported kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft'.",
+          "description": "Id of the 3D solid entity to measure. Supported kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', 'subdivision'.",
           "type": "string"
         }
       },
@@ -6806,6 +7101,27 @@
       "type": "object"
     },
     "name": "quantity_takeoff"
+  },
+  {
+    "description": "Remove one decal (by its id, from add_decal) from a solid.",
+    "input_schema": {
+      "properties": {
+        "decalId": {
+          "description": "Id of the decal to remove.",
+          "type": "string"
+        },
+        "id": {
+          "description": "Id of the solid carrying the decal.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "decalId"
+      ],
+      "type": "object"
+    },
+    "name": "remove_decal"
   },
   {
     "annotations": {

@@ -14,6 +14,7 @@ import { boundsCorners, localBounds } from '@core/geometry/bounds';
 import { applyEulerXYZ } from '@core/lib/eulerRotation';
 import { sweepSegmentRings } from '@core/geometry/sweep';
 import { loftRings } from '@core/geometry/loft';
+import { subdivide } from '@core/geometry/subdivision';
 import {
   type CadDocument,
   type Entity,
@@ -180,6 +181,8 @@ function outlineRings(document: ComponentsDoc, e: Entity, depth: number): Outlin
     }
     case 'loft':
       return [convexHull(toWorldXY(e, loftRings(e).flat()))];
+    case 'subdivision':
+      return [convexHull(toWorldXY(e, subdivide(e, Math.min(e.levels, 2)).vertices))];
     case 'sweep':
       // One hull per path segment so an elbowed pipe reads as its run, not one convex blob.
       return sweepSegmentRings(e).map((ring) => convexHull(toWorldXY(e, ring)));

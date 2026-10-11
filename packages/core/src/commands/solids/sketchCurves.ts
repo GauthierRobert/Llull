@@ -6,7 +6,7 @@
 
 import type { CurveSegment } from '../../model/curve';
 import type { CadDocument, Entity, Vec2, Vec3 } from '../../model/types';
-import { applyEulerXYZ } from '../../lib/eulerRotation';
+import { applyEulerXYZ, inverseEulerXYZ } from '../../lib/eulerRotation';
 import { add3, distance3, sub3 } from '../../lib/vec3';
 import {
   JOINT_TOLERANCE,
@@ -124,15 +124,7 @@ export function entityCurves(
   }
 }
 
-/** Inverse of the intrinsic XYZ Euler rotation (Rx·Ry·Rz)⁻¹ = Rz⁻¹·Ry⁻¹·Rx⁻¹. */
-function unrotate(v: Vec3, [rx, ry, rz]: Vec3): Vec3 {
-  const o: Vec3 = [0, 0, 0];
-  return applyEulerXYZ(applyEulerXYZ(applyEulerXYZ(v, o, [-rx, 0, 0]), o, [0, -ry, 0]), o, [
-    0,
-    0,
-    -rz,
-  ]);
-}
+const unrotate = inverseEulerXYZ;
 
 const firstPoint = (chain: ReadonlyArray<CurveSegment<Vec2>>): Vec2 | undefined =>
   chain[0]?.points[0];

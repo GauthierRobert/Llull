@@ -9,11 +9,33 @@
  * @failure unknown material or unknown entity id → no-op per-entity, summary lists failures
  */
 
-import type { CadDocument, Material } from '../../model/types';
+import {
+  type CadDocument,
+  type Material,
+  type MaterialFinish,
+  FINISH_PATTERNS,
+} from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { isHexColor } from '../../lib/isHexColor';
 import { changed, noop, report } from '../noop';
+
+/** First problem of the finish options, or null. */
+function finishProblem(
+  scale: number,
+  color2: string | undefined,
+  normalStrength: number | undefined,
+  clearcoat: number | undefined,
+): string | null {
+  if (!(scale > 0)) return `finishScale must be > 0, got ${scale}`;
+  if (color2 !== undefined && !isHexColor(color2))
+    return `color2 must be a 6-digit hex string, got "${color2}"`;
+  if (normalStrength !== undefined && !(normalStrength >= 0 && normalStrength <= 2))
+    return `normalStrength must be in [0, 2], got ${normalStrength}`;
+  if (clearcoat !== undefined && !(clearcoat >= 0 && clearcoat <= 1))
+    return `clearcoat must be in [0, 1], got ${clearcoat}`;
+  return null;
+}
 
 /**
  * @command create_material
@@ -69,9 +91,52 @@ export const createMaterial = defineCommand({
           '1 = fully diffuse/matte (rough concrete, unfinished wood). ' +
           'Brushed aluminium ≈ 0.3, matte plastic ≈ 0.7.',
       ),
+    finish: z
+      .enum(FINISH_PATTERNS)
+      .describe(
+        'Optional procedural surface texture (albedo + normal + roughness maps, box-projected, shown in ' +
+          'the viewport and embedded in export_gltf): carbon_twill (2×2 twill carbon weave), carbon_plain ' +
+          '(plain weave), brushed (brushed metal), knurl (diamond knurling), checker. Carbon fibre: ' +
+          'color "#16181b", metalness 0.2, roughness 0.35, finish "carbon_twill", clearcoat 1.',
+      )
+      .optional(),
+    finishScale: z
+      .number()
+      .describe(
+        'Size of one texture tile in document units (> 0; a carbon tile holds 8 tows). Default 24.',
+      )
+      .optional(),
+    color2: z
+      .string()
+      .describe('Secondary #rrggbb colour of the finish (crossing tows, checker squares).')
+      .optional(),
+    normalStrength: z
+      .number()
+      .describe('Relief depth of the finish normal map in [0, 2]. Default 1.')
+      .optional(),
+    clearcoat: z
+      .number()
+      .describe(
+        'Clear lacquer over the finish in [0, 1] (glossy carbon, painted parts). Default 0.',
+      )
+      .optional(),
   }),
   annotations: { idempotent: true },
-  run: (doc, { name, density, color, metalness, roughness }): CommandResult => {
+  run: (
+    doc,
+    {
+      name,
+      density,
+      color,
+      metalness,
+      roughness,
+      finish: pattern,
+      finishScale: requestedScale,
+      color2,
+      normalStrength,
+      clearcoat,
+    },
+  ): CommandResult => {
     if (name.trim() === '')
       return noop(doc, 'create_material failed: name must be a non-empty string.');
 
@@ -101,7 +166,33 @@ export const createMaterial = defineCommand({
       );
     }
 
-    const material: Material = { name, density, color, metalness, roughness };
+    const finishOptions = [requestedScale, color2, normalStrength, clearcoat];
+    if (pattern === undefined && finishOptions.some((option) => option !== undefined))
+      return noop(
+        doc,
+        `create_material '${name}' failed: finishScale / color2 / normalStrength / clearcoat need a finish pattern.`,
+      );
+    const finishScale = requestedScale ?? 24;
+    const finishIssue = finishProblem(finishScale, color2, normalStrength, clearcoat);
+    if (finishIssue !== null) return noop(doc, `create_material '${name}' failed: ${finishIssue}.`);
+    const finish: MaterialFinish | undefined =
+      pattern === undefined
+        ? undefined
+        : {
+            pattern,
+            scale: finishScale,
+            ...(color2 !== undefined ? { color2 } : {}),
+            ...(normalStrength !== undefined ? { normalStrength } : {}),
+            ...(clearcoat !== undefined ? { clearcoat } : {}),
+          };
+    const material: Material = {
+      name,
+      density,
+      color,
+      metalness,
+      roughness,
+      ...(finish !== undefined ? { finish } : {}),
+    };
     const newDoc: CadDocument = {
       ...doc,
       materials: { ...doc.materials, [name]: material },
@@ -110,7 +201,7 @@ export const createMaterial = defineCommand({
     const action = doc.materials[name] ? 'replaced' : 'created';
     return report(
       newDoc,
-      `create_material '${name}': ${action} (density=${density} g/${doc.units}³, color=${color}, metalness=${metalness}, roughness=${roughness}).`,
+      `create_material '${name}': ${action} (density=${density} g/${doc.units}³, color=${color}, metalness=${metalness}, roughness=${roughness}${finish !== undefined ? `, finish=${finish.pattern} every ${finish.scale} ${doc.units}` : ''}).`,
     );
   },
 });

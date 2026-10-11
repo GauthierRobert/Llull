@@ -34,6 +34,7 @@ import { ORIGIN } from '../../lib/vec3';
 import { revolutionPolygons } from '../../geometry/revolution';
 import { sweepTriangles } from '../../geometry/sweep';
 import { loftTriangles } from '../../geometry/loft';
+import { subdivisionTriangles } from '../../geometry/subdivision';
 import {
   SEG_CIRCLE,
   boxExtents,
@@ -362,6 +363,13 @@ export function tessellateEntity(e: Entity): PreDepthPolygon[] {
       return rotated(
         makePolygons(
           loftTriangles(e, e.position).map((triangle) => [...triangle]),
+          e.color,
+        ),
+      );
+    case 'subdivision':
+      return rotated(
+        makePolygons(
+          subdivisionTriangles(e, e.position).map((triangle) => [...triangle]),
           e.color,
         ),
       );

@@ -234,6 +234,38 @@ export const plans: Record<string, GoldenAction[]> = {
       params: { sourceId: '$link', count: 12, pathId: '$loop', rollStep: Math.PI / 2 },
     },
   ],
+  subdivision_saddle: [
+    {
+      command: 'add_subdivision_solid',
+      params: { box: { size: [270, 140, 30], segments: [4, 2, 1] }, levels: 2, name: 'saddle' },
+      as: 'saddle',
+    },
+    {
+      command: 'edit_subdivision_cage',
+      params: {
+        id: '$saddle',
+        region: { min: [60, -100, -50], max: [200, 100, 50] },
+        scale: [1, 0.3, 0.7],
+        falloff: 60,
+      },
+    },
+    {
+      command: 'edit_subdivision_cage',
+      params: {
+        id: '$saddle',
+        region: { min: [-200, -100, -50], max: [-100, 100, 50] },
+        translate: [0, 0, 12],
+      },
+    },
+    {
+      command: 'edit_subdivision_cage',
+      params: {
+        id: '$saddle',
+        region: { min: [-200, -100, -50], max: [200, 100, -1] },
+        crease: true,
+      },
+    },
+  ],
   loft_and_variable_sweep: [
     {
       command: 'loft_sections',

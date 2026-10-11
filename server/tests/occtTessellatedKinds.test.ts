@@ -1,6 +1,6 @@
 /**
  * @layer server/tests
- * Live OpenCascade vs Manifold: wedge, pyramid and revolution (no exact OCC maker; their
+ * Live OpenCascade vs Manifold: wedge, pyramid, revolution and subdivision (no exact OCC maker; their
  * triangles are sewn into a solid) are valid boolean operands that agree with Manifold, which
  * works from the same triangles.
  */
@@ -11,6 +11,7 @@ import type { GeometryKernel } from '@core/geometry/kernel';
 import type { MeshData } from '@core/model/types';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createNodeOcctKernel } from '../src/occtNode';
+import { boxCage } from '@core/geometry/subdivision';
 import { common, booleanMesh, box, meshOf, volume } from './kernelTestSupport';
 
 const at = (
@@ -44,6 +45,17 @@ const shapes: Array<[string, (position: Vec3, rotation: Vec3) => Entity]> = [
         axis: [0, 0, 1],
         angle: Math.PI * 2,
         segments: 24,
+        ...at(p, r),
+      }) as Entity,
+  ],
+  [
+    'subdivision',
+    (p, r) =>
+      ({
+        id: 's',
+        kind: 'subdivision',
+        ...boxCage([4, 3, 5], [2, 1, 1]),
+        levels: 2,
         ...at(p, r),
       }) as Entity,
   ],

@@ -12,7 +12,7 @@ import { uint8ArrayToBase64 } from '../../lib/base64';
 import { collectExportTriangles, exportSummary } from '../../geometry/entityTriangles';
 import type { Triangle } from '../../geometry/triangles';
 import { facetNormal } from '../../geometry/tessellation';
-import { buildGltfScene, collectExportParts } from './gltfScene';
+import { buildGltfScene, collectDecalParts, collectExportParts } from './gltfScene';
 
 const entityIdsField = z
   .array(z.string())
@@ -174,7 +174,7 @@ export const exportGltf = defineCommand({
         ? entityIds.filter((id) => doc.entities[id] !== undefined)
         : doc.order;
     const parts = collectExportParts(doc, ids);
-    const { json, bin } = buildGltfScene(parts);
+    const { json, bin } = buildGltfScene(parts, collectDecalParts(doc, ids));
     const materialCount = (json['materials'] as unknown[]).length;
     const summary = `${exportSummary('export_gltf', binary ? 'glb' : 'gltf', collected)} ${parts.length} part(s), ${materialCount} material(s).`;
 

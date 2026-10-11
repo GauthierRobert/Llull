@@ -1,7 +1,8 @@
 /**
  * glTF 2.0 scene of a document: one node + mesh per exported part (an entity, or each child of an
  * instance) and one deduplicated PBR material per appearance (assigned document material, else the
- * entity colour with the viewport's default metalness/roughness). Colours are converted from sRGB
+ * entity colour with the viewport's default metalness/roughness; a material finish embeds its
+ * procedural albedo / normal / roughness maps with box-projected UVs). Colours are converted from sRGB
  * hex to the linear factors glTF requires; normals are creased (smooth below CREASE_ANGLE) so
  * curved surfaces shade smoothly in external renderers.
  *
@@ -9,11 +10,18 @@
  * @pure
  */
 
-import type { CadDocument, Entity } from '../../model/types';
+import type { CadDocument, Entity, MaterialFinish, Vec3 } from '../../model/types';
+import { decalPatch } from '../../geometry/decal';
+import { rasterizeText } from '../../lib/blockFont';
+import { applyEulerXYZ } from '../../lib/eulerRotation';
+import { add3 } from '../../lib/vec3';
+import { boxUv, finishMaps } from '../../geometry/finishMaps';
+import { encodePng } from '../../lib/png';
+import { GltfBuilder } from './gltfBuilder';
 import type { Triangle } from '../../geometry/triangles';
 import { facetNormal } from '../../geometry/tessellation';
 import { expandInstance } from '../../geometry/instanceExpansion';
-import { solidTriangles } from '../../geometry/solidTriangles';
+import { localTriangles, solidTriangles } from '../../geometry/solidTriangles';
 
 /** Metalness / roughness of a solid without an assigned material (matches the viewport). */
 export const DEFAULT_METALNESS = 0.08;
@@ -28,6 +36,7 @@ export interface PartAppearance {
   readonly color: string;
   readonly metalness: number;
   readonly roughness: number;
+  readonly finish?: MaterialFinish;
 }
 
 /** One exported part: its world-space triangles and appearance. */
@@ -36,14 +45,16 @@ export interface ExportPart {
   readonly entityId: string;
   readonly kind: Entity['kind'];
   readonly tris: Triangle[];
+  /** The same triangles in the part's own frame: texture UVs follow the part, as in the viewport. */
+  readonly localTris: Triangle[];
   readonly appearance: PartAppearance;
 }
 
 function appearanceOf(doc: CadDocument, entity: Entity, inherited?: string): PartAppearance {
   const material = doc.materials[entity.materialId ?? inherited ?? ''];
   if (material !== undefined) {
-    const { name, color, metalness, roughness } = material;
-    return { name, color, metalness, roughness };
+    const { name, color, metalness, roughness, finish } = material;
+    return { name, color, metalness, roughness, ...(finish !== undefined ? { finish } : {}) };
   }
   return {
     name: `paint ${entity.color.toLowerCase()}`,
@@ -74,6 +85,7 @@ export function collectExportParts(doc: CadDocument, ids: readonly string[]): Ex
           entityId: entity.id,
           kind: child.kind,
           tris,
+          localTris: localTriangles(child),
           appearance: appearanceOf(doc, child, entity.materialId),
         });
       }
@@ -86,8 +98,49 @@ export function collectExportParts(doc: CadDocument, ids: readonly string[]): Ex
       entityId: id,
       kind: entity.kind,
       tris,
+      localTris: localTriangles(entity),
       appearance: appearanceOf(doc, entity),
     });
+  }
+  return parts;
+}
+
+/** A decal overlay: world-space patch triangles with UVs and its rasterized text image. */
+export interface DecalPart {
+  readonly name: string;
+  readonly entityId: string;
+  readonly positions: number[];
+  readonly uvs: number[];
+  readonly image: { readonly width: number; readonly height: number; readonly rgba: Uint8Array };
+}
+
+/** Decal overlays of the entities named by `ids` (patches placed by each entity's transform). */
+export function collectDecalParts(doc: CadDocument, ids: readonly string[]): DecalPart[] {
+  const parts: DecalPart[] = [];
+  for (const id of ids) {
+    const entity = doc.entities[id];
+    if (entity?.decals === undefined || entity.kind === 'instance') continue;
+    const local = localTriangles(entity);
+    for (const decal of entity.decals) {
+      const patch = decalPatch(decal, local);
+      if (patch.positions.length === 0) continue;
+      const positions: number[] = [];
+      for (let i = 0; i < patch.positions.length; i += 3) {
+        const p: Vec3 = [
+          patch.positions[i] ?? 0,
+          patch.positions[i + 1] ?? 0,
+          patch.positions[i + 2] ?? 0,
+        ];
+        positions.push(...add3(applyEulerXYZ(p, [0, 0, 0], entity.rotation), entity.position));
+      }
+      parts.push({
+        name: `${entity.name ?? entity.id}/decal "${decal.text}"`,
+        entityId: entity.id,
+        positions,
+        uvs: patch.uvs,
+        image: rasterizeText(decal.text, decal.color, decal.background),
+      });
+    }
   }
   return parts;
 }
@@ -143,92 +196,110 @@ export function creasedNormals(tris: readonly Triangle[]): Float32Array {
   return out;
 }
 
-/** Component-wise min/max of a flat xyz array (all-zero when empty). */
-function aabb(positions: Float32Array): { min: number[]; max: number[] } {
-  const min = [Infinity, Infinity, Infinity];
-  const max = [-Infinity, -Infinity, -Infinity];
-  positions.forEach((value, i) => {
-    const axis = i % 3;
-    if (value < (min[axis] as number)) min[axis] = value;
-    if (value > (max[axis] as number)) max[axis] = value;
+/** Box-projected TEXCOORD_0 of a local-frame triangle soup (one finish tile per `scale` units). */
+function boxUvs(tris: readonly Triangle[], scale: number): Float32Array {
+  const uvs = new Float32Array(tris.length * 6);
+  tris.forEach((tri, t) => {
+    const normal = facetNormal(...tri);
+    tri.forEach((v, k) => uvs.set(boxUv(v, normal, scale), t * 6 + k * 2));
   });
-  return Number.isFinite(min[0]) ? { min, max } : { min: [0, 0, 0], max: [0, 0, 0] };
+  return uvs;
+}
+
+/** glTF material of an appearance; a finish embeds its maps (+ clearcoat extension). */
+function materialOf(builder: GltfBuilder, appearance: PartAppearance): Record<string, unknown> {
+  const maps = finishMaps(appearance);
+  if (maps === null || appearance.finish === undefined) {
+    return {
+      name: appearance.name,
+      pbrMetallicRoughness: {
+        baseColorFactor: linearColorFactor(appearance.color),
+        metallicFactor: appearance.metalness,
+        roughnessFactor: appearance.roughness,
+      },
+    };
+  }
+  const png = (rgba: Uint8Array): Uint8Array => encodePng(maps.size, maps.size, rgba);
+  const clearcoat = appearance.finish.clearcoat ?? 0;
+  if (clearcoat > 0) builder.useExtension('KHR_materials_clearcoat');
+  return {
+    name: appearance.name,
+    pbrMetallicRoughness: {
+      baseColorTexture: { index: builder.texture(png(maps.albedo)) },
+      metallicRoughnessTexture: { index: builder.texture(png(maps.metallicRoughness)) },
+      metallicFactor: 1,
+      roughnessFactor: 1,
+    },
+    normalTexture: { index: builder.texture(png(maps.normal)) },
+    ...(clearcoat > 0
+      ? {
+          extensions: {
+            KHR_materials_clearcoat: { clearcoatFactor: clearcoat, clearcoatRoughnessFactor: 0.04 },
+          },
+        }
+      : {}),
+  };
 }
 
 /** glTF JSON (without buffer uri) and its BIN payload for `parts`. */
-export function buildGltfScene(parts: readonly ExportPart[]): {
+export function buildGltfScene(
+  parts: readonly ExportPart[],
+  decals: readonly DecalPart[] = [],
+): {
   json: Record<string, unknown>;
   bin: Uint8Array;
 } {
-  const materials: Array<Record<string, unknown>> = [];
-  const materialIndex = new Map<string, number>();
-  const chunks: Float32Array[] = [];
-  const accessors: Array<Record<string, unknown>> = [];
-  const bufferViews: Array<Record<string, unknown>> = [];
-  const meshes: Array<Record<string, unknown>> = [];
-  const nodes: Array<Record<string, unknown>> = [];
-  let byteOffset = 0;
-  const pushView = (data: Float32Array, withBounds: boolean): number => {
-    bufferViews.push({ buffer: 0, byteOffset, byteLength: data.byteLength, target: 34962 });
-    accessors.push({
-      bufferView: bufferViews.length - 1,
-      componentType: 5126,
-      count: data.length / 3,
-      type: 'VEC3',
-      ...(withBounds ? aabb(data) : {}),
-    });
-    chunks.push(data);
-    byteOffset += data.byteLength;
-    return accessors.length - 1;
-  };
+  const builder = new GltfBuilder();
   for (const part of parts) {
     const { appearance } = part;
-    const materialKey = `${appearance.name}|${appearance.color}|${appearance.metalness}|${appearance.roughness}`;
-    let material = materialIndex.get(materialKey);
-    if (material === undefined) {
-      material = materials.length;
-      materialIndex.set(materialKey, material);
-      materials.push({
-        name: appearance.name,
-        pbrMetallicRoughness: {
-          baseColorFactor: linearColorFactor(appearance.color),
-          metallicFactor: appearance.metalness,
-          roughnessFactor: appearance.roughness,
-        },
-      });
-    }
+    const key = JSON.stringify(appearance);
+    const material = builder.material(key, () => materialOf(builder, appearance));
     const positions = new Float32Array(part.tris.length * 9);
     part.tris.forEach((tri, t) => tri.forEach((v, k) => positions.set(v, t * 9 + k * 3)));
-    const position = pushView(positions, true);
-    const normal = pushView(creasedNormals(part.tris), false);
-    meshes.push({
-      name: part.name,
-      primitives: [{ attributes: { POSITION: position, NORMAL: normal }, mode: 4, material }],
-    });
-    nodes.push({
-      name: part.name,
-      mesh: meshes.length - 1,
-      extras: { llullId: part.entityId, kind: part.kind },
-    });
+    const attributes: Record<string, number> = {
+      POSITION: builder.vertexData(positions, 3, true),
+      NORMAL: builder.vertexData(creasedNormals(part.tris), 3),
+    };
+    if (appearance.finish !== undefined)
+      attributes['TEXCOORD_0'] = builder.vertexData(
+        boxUvs(part.localTris, appearance.finish.scale),
+        2,
+      );
+    builder.mesh(part.name, attributes, material, { llullId: part.entityId, kind: part.kind });
   }
-  const bin = new Uint8Array(byteOffset);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bin.set(new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength), offset);
-    offset += chunk.byteLength;
-  }
-  return {
-    json: {
-      asset: { version: '2.0', generator: 'llull' },
-      scene: 0,
-      scenes: [{ nodes: nodes.map((_, i) => i) }],
-      nodes,
-      meshes,
-      materials,
-      accessors,
-      bufferViews,
-      buffers: [{ byteLength: bin.byteLength }],
-    },
-    bin,
-  };
+  decals.forEach((decal, index) => {
+    const material = builder.material(`decal:${index}`, () => ({
+      name: decal.name,
+      alphaMode: 'BLEND',
+      pbrMetallicRoughness: {
+        baseColorTexture: {
+          index: builder.texture(
+            encodePng(decal.image.width, decal.image.height, decal.image.rgba),
+          ),
+        },
+        metallicFactor: 0,
+        roughnessFactor: 0.6,
+      },
+    }));
+    const tris: Triangle[] = [];
+    for (let i = 0; i < decal.positions.length; i += 9) {
+      const at = (k: number): Vec3 => [
+        decal.positions[i + k * 3] ?? 0,
+        decal.positions[i + k * 3 + 1] ?? 0,
+        decal.positions[i + k * 3 + 2] ?? 0,
+      ];
+      tris.push([at(0), at(1), at(2)]);
+    }
+    builder.mesh(
+      decal.name,
+      {
+        POSITION: builder.vertexData(new Float32Array(decal.positions), 3, true),
+        NORMAL: builder.vertexData(creasedNormals(tris), 3),
+        TEXCOORD_0: builder.vertexData(new Float32Array(decal.uvs), 2),
+      },
+      material,
+      { llullId: decal.entityId, kind: 'decal' },
+    );
+  });
+  return builder.result();
 }

@@ -20,7 +20,7 @@ import type { Material } from '@core/model/types';
 import { type DisplayMode, useViewportStore } from '@ui/store';
 
 /** Document-material fields that drive a mesh's PBR surface. */
-export type PbrMaterial = Pick<Material, 'color' | 'metalness' | 'roughness'>;
+export type PbrMaterial = Pick<Material, 'color' | 'metalness' | 'roughness' | 'finish'>;
 
 interface MaterialProps {
   color: string;

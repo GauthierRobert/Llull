@@ -6,11 +6,13 @@
  * memoized geometry and base surface constants.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 import * as THREE from 'three';
 import type { BaseEntity } from '@core/model/types';
 import { selectOnClick } from '@ui/viewport/selectClick';
 import { useMaterialProps, type PbrMaterial } from '../useMaterialProps';
+import { applyBoxUvs, useFinishTextures } from '../useFinishTextures';
+import { useViewportStore } from '@ui/store';
 
 export interface SolidSurface {
   roughness: number;
@@ -69,6 +71,14 @@ export function SolidMeshShell({
   }, [geometry, boundsTree]);
 
   const matProps = useMaterialProps({ color, selected, ...surface, pbrOverride: pbrMaterial });
+  const displayMode = useViewportStore((s) => s.displayMode);
+  const finishScale = pbrMaterial?.finish?.scale;
+  const textures = useFinishTextures(pbrMaterial);
+  // The finish maps need UVs: box-projected once per geometry / tile size, before the frame draws.
+  useLayoutEffect(() => {
+    if (finishScale !== undefined) applyBoxUvs(geometry, finishScale);
+  }, [geometry, finishScale]);
+  const textured = textures !== null && displayMode === 'shaded';
 
   return (
     <mesh
@@ -81,13 +91,33 @@ export function SolidMeshShell({
       receiveShadow
     >
       {/* Pushed back slightly so lines drawn on the surface (contours, outlines) stay visible. */}
-      <meshStandardMaterial
-        {...matProps}
-        side={doubleSided ? THREE.DoubleSide : matProps.side}
-        polygonOffset
-        polygonOffsetFactor={1}
-        polygonOffsetUnits={1}
-      />
+      {textured ? (
+        <meshPhysicalMaterial
+          {...matProps}
+          color="#ffffff"
+          roughness={1}
+          metalness={1}
+          map={textures.map}
+          normalMap={textures.normalMap}
+          normalScale={new THREE.Vector2(textures.normalScale, textures.normalScale)}
+          roughnessMap={textures.roughnessMap}
+          metalnessMap={textures.roughnessMap}
+          clearcoat={textures.clearcoat}
+          clearcoatRoughness={0.04}
+          side={doubleSided ? THREE.DoubleSide : matProps.side}
+          polygonOffset
+          polygonOffsetFactor={1}
+          polygonOffsetUnits={1}
+        />
+      ) : (
+        <meshStandardMaterial
+          {...matProps}
+          side={doubleSided ? THREE.DoubleSide : matProps.side}
+          polygonOffset
+          polygonOffsetFactor={1}
+          polygonOffsetUnits={1}
+        />
+      )}
     </mesh>
   );
 }

@@ -27,6 +27,7 @@ export const SOLID_KINDS = [
   'revolution',
   'sweep',
   'loft',
+  'subdivision',
 ] as const;
 
 export type SolidKind = (typeof SOLID_KINDS)[number];
@@ -65,6 +66,30 @@ export interface BaseEntity {
   tags?: readonly string[];
   /** Key into `CadDocument.materials`; set by `assign_material`. */
   materialId?: string;
+  /** Decals painted on this solid (entity-local frame); set by `add_decal`. */
+  decals?: ReadonlyArray<Decal>;
+}
+
+/**
+ * Text decal projected onto its solid along `-normal` (paint: shown and exported to glTF, not a
+ * solid). All vectors are in the owning entity's local frame (before its rotation / position).
+ * @invariant width, height, depth > 0; normal non-zero; text non-empty
+ */
+export interface Decal {
+  readonly id: string;
+  readonly text: string;
+  readonly center: Vec3;
+  /** Outward surface direction the decal faces (it projects along -normal). */
+  readonly normal: Vec3;
+  /** Rotation of the text about `normal`, radians (0 = text +x along the projected world X/Y). */
+  readonly angle: number;
+  readonly width: number;
+  readonly height: number;
+  /** Projection depth through the surface. */
+  readonly depth: number;
+  readonly color: string;
+  /** Optional opaque background behind the text. */
+  readonly background?: string;
 }
 
 export interface BoxEntity extends BaseEntity {
@@ -210,6 +235,20 @@ export interface LoftEntity extends BaseEntity {
   ruled: boolean;
 }
 
+/**
+ * Freeform solid: a closed polygon control cage (local to `position`) refined `levels` times by
+ * Catmull-Clark subdivision; cage edges listed in `creases` stay sharp.
+ * @invariant closed 2-manifold cage, faces wound counter-clockwise seen from outside, 0..4 levels
+ * @see add_subdivision_solid, edit_subdivision_cage
+ */
+export interface SubdivisionEntity extends BaseEntity {
+  readonly kind: 'subdivision';
+  vertices: ReadonlyArray<Vec3>;
+  faces: ReadonlyArray<ReadonlyArray<number>>;
+  creases: ReadonlyArray<readonly [number, number]>;
+  levels: number;
+}
+
 export interface LineEntity extends BaseEntity {
   readonly kind: 'line';
   start: Vec2;
@@ -319,6 +358,7 @@ export type Entity =
   | RevolutionEntity
   | SweepEntity
   | LoftEntity
+  | SubdivisionEntity
   | LineEntity
   | PolylineEntity
   | ArcEntity
@@ -593,6 +633,34 @@ export interface Material {
   color: string;
   metalness: number;
   roughness: number;
+  /** Procedural surface texture (albedo + normal + roughness maps); absent = plain PBR colour. */
+  finish?: MaterialFinish;
+}
+
+export const FINISH_PATTERNS = [
+  'carbon_twill',
+  'carbon_plain',
+  'brushed',
+  'knurl',
+  'checker',
+] as const;
+
+export type FinishPattern = (typeof FINISH_PATTERNS)[number];
+
+/**
+ * Tileable procedural finish: one texture tile spans `scale` document units, box-projected onto
+ * the part (glTF export + viewport use the same maps).
+ * @invariant scale > 0; normalStrength in [0, 2]; clearcoat in [0, 1]
+ */
+export interface MaterialFinish {
+  readonly pattern: FinishPattern;
+  readonly scale: number;
+  /** Secondary colour (alternate tows, checker squares); default derived from `color`. */
+  readonly color2?: string;
+  /** Normal-map strength (relief depth), default 1. */
+  readonly normalStrength?: number;
+  /** Clear lacquer layer over the finish (0 = none, 1 = full gloss coat), default 0. */
+  readonly clearcoat?: number;
 }
 
 export const DEFAULT_LAYER_ID = 'layer-default';

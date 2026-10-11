@@ -119,6 +119,10 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'instantiate_template',
     'create_material',
     'assign_material',
+    'add_decal',
+    'remove_decal',
+    'add_subdivision_solid',
+    'edit_subdivision_cage',
   ],
   measure: [
     'measure_distance',

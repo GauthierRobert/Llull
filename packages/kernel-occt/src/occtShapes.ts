@@ -279,8 +279,11 @@ function meshSolid(api: OccApi, entity: Entity): OccShape | null {
     : shape;
 }
 
-/** Pyramids (planar faces only, so their sewn triangles are already exact) use their triangles. */
-const TRIANGULATED_KINDS: ReadonlySet<Entity['kind']> = new Set(['pyramid']);
+/**
+ * Pyramids (planar faces only, so their sewn triangles are already exact) and subdivision solids
+ * (a faceted surface by definition) use their triangles.
+ */
+const TRIANGULATED_KINDS: ReadonlySet<Entity['kind']> = new Set(['pyramid', 'subdivision']);
 
 /** Primitive tessellation never reads components; instances are not boolean operands. */
 const NO_COMPONENTS = createEmptyDocument();
