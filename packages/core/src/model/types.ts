@@ -660,13 +660,19 @@ export type ShapeRecipe =
       readonly a: ShapeRecipe;
       readonly b: ShapeRecipe;
     }
-  /** `edges`: 0-based indices into the source's unique edges (`ShapeTopology.edges`); [] = all. */
+  /**
+   * `edges`: 0-based indices into the source's unique edges (`ShapeTopology.edges`); [] = all.
+   * `sizeEnd` (fillet only): radius at each edge's end, varying linearly from `size` at its start.
+   */
   | {
       readonly op: 'fillet' | 'chamfer';
       readonly source: ShapeRecipe;
       readonly edges: readonly number[];
       readonly size: number;
+      readonly sizeEnd?: number;
     }
+  /** One-piece union of `sources` with every new intersection (joint) edge filleted by `radius`. */
+  | { readonly op: 'blend'; readonly sources: readonly ShapeRecipe[]; readonly radius: number }
   | { readonly op: 'shell'; readonly source: ShapeRecipe; readonly thickness: number }
   /** Rotate (M = Rx·Ry·Rz, radians) then translate. */
   | {

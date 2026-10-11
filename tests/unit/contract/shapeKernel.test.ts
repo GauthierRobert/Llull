@@ -37,6 +37,7 @@ function countingOps(overrides: Partial<KernelOps<Native>> = {}): {
     solid: (entity) => make(`solid:${entity.id}`),
     boolean: (op, a, b) => make(`${op}(${a.label},${b.label})`),
     fillet: (s, edges, size) => make(`fillet(${s.label},${edges.join('|')},${size})`),
+    blend: (shapes, radius) => make(`blend(${shapes.map((s) => s.label).join('|')},${radius})`),
     chamfer: (s) => make(`chamfer(${s.label})`),
     shell: (s) => make(`shell(${s.label})`),
     place: (s) => make(`place(${s.label})`),

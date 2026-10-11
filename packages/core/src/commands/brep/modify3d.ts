@@ -18,7 +18,7 @@ import { commitKernelResult, evaluateRecipe, operandRecipe } from './kernelShape
 import { noop } from '../noop';
 
 /** Surface-neutral pointer to the B-rep kernel (browser URL flag or server env var). */
-const OCC_KERNEL_HINT =
+export const OCC_KERNEL_HINT =
   'the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server)';
 
 function validateSolidTarget(
@@ -147,18 +147,33 @@ export const filletEdge = defineCommand({
       )
       .optional(),
     radius: z.number().describe('Fillet radius in document units. Must be > 0.'),
+    radiusEnd: z
+      .number()
+      .describe(
+        'Variable fillet: radius at the END of each selected edge (> 0); the radius varies linearly ' +
+          'from radius at the edge start to radiusEnd. Omit for a constant radius.',
+      )
+      .optional(),
   }),
-  run: (doc, { id, edgeIndices = [], edgesNear = [], radius }, ctx): CommandResult =>
-    modifyEdges(doc, ctx, {
-      command: 'fillet_edge',
-      pastTense: 'filleted',
-      amountName: 'radius',
-      amount: radius,
-      id,
-      edges: edgeIndices,
-      near: edgesNear,
-      recipe: (source, edges) => ({ op: 'fillet', source, edges: [...edges], size: radius }),
-    }),
+  run: (doc, { id, edgeIndices = [], edgesNear = [], radius, radiusEnd }, ctx): CommandResult =>
+    radiusEnd !== undefined && !(radiusEnd > 0)
+      ? noop(doc, `fillet_edge: radiusEnd must be > 0 (got ${radiusEnd}).`)
+      : modifyEdges(doc, ctx, {
+          command: 'fillet_edge',
+          pastTense: 'filleted',
+          amountName: 'radius',
+          amount: radius,
+          id,
+          edges: edgeIndices,
+          near: edgesNear,
+          recipe: (source, edges) => ({
+            op: 'fillet',
+            source,
+            edges: [...edges],
+            size: radius,
+            ...(radiusEnd === undefined ? {} : { sizeEnd: radiusEnd }),
+          }),
+        }),
 });
 
 /**

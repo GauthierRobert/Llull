@@ -50,7 +50,9 @@ function keyText(recipe: ShapeRecipe): string {
       return `${recipe.boolean}(${recipeKey(recipe.a)},${recipeKey(recipe.b)})`;
     case 'fillet':
     case 'chamfer':
-      return `${recipe.op}(${recipeKey(recipe.source)},${recipe.size},[${recipe.edges.join(',')}])`;
+      return `${recipe.op}(${recipeKey(recipe.source)},${recipe.size}${recipe.sizeEnd === undefined ? '' : `>${recipe.sizeEnd}`},[${recipe.edges.join(',')}])`;
+    case 'blend':
+      return `blend(${recipe.sources.map(recipeKey).join(',')},${recipe.radius})`;
     case 'shell':
       return `shell(${recipeKey(recipe.source)},${recipe.thickness})`;
     case 'place':
@@ -139,7 +141,20 @@ function nodeError(
         return `${String(node['op'])}: edges must be non-negative integers`;
       if (!finite(node['size']) || node['size'] <= 0)
         return `${String(node['op'])}: size must be > 0`;
+      const sizeEnd = node['sizeEnd'];
+      if (sizeEnd !== undefined && (!finite(sizeEnd) || sizeEnd <= 0))
+        return `${String(node['op'])}: sizeEnd must be > 0`;
       return child(node['source']);
+    }
+    case 'blend': {
+      const sources = node['sources'];
+      if (!Array.isArray(sources) || sources.length < 2) return 'blend: needs >= 2 sources';
+      if (!finite(node['radius']) || node['radius'] <= 0) return 'blend: radius must be > 0';
+      for (const source of sources) {
+        const problem = child(source);
+        if (problem !== null) return problem;
+      }
+      return null;
     }
     case 'shell':
       if (!finite(node['thickness']) || node['thickness'] <= 0)

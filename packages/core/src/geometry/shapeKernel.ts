@@ -30,8 +30,10 @@ export interface KernelOps<S> {
   boolean(op: BooleanOp, a: S, b: S): S | null;
   /** Optional rewrite of a boolean's operand recipes before they are built (degenerate-contact guards). */
   prepareBoolean?(a: ShapeRecipe, b: ShapeRecipe): [ShapeRecipe, ShapeRecipe];
-  /** `edges`: 0-based unique-edge indices ([] = all). */
-  fillet(shape: S, edges: readonly number[], radius: number): S | null;
+  /** `edges`: 0-based unique-edge indices ([] = all); `radiusEnd` varies the radius along each edge. */
+  fillet(shape: S, edges: readonly number[], radius: number, radiusEnd?: number): S | null;
+  /** Union of `shapes` with the new intersection (joint) edges filleted by `radius`. */
+  blend(shapes: readonly S[], radius: number): S | null;
   chamfer(shape: S, edges: readonly number[], distance: number): S | null;
   shell(shape: S, thickness: number): S | null;
   place(shape: S, position: Vec3, rotation: Vec3): S | null;
@@ -95,8 +97,17 @@ function build<S>(
       const source = child(recipe.source);
       if (source === null) return null;
       return recipe.op === 'fillet'
-        ? ops.fillet(source, recipe.edges, recipe.size)
+        ? ops.fillet(source, recipe.edges, recipe.size, recipe.sizeEnd)
         : ops.chamfer(source, recipe.edges, recipe.size);
+    }
+    case 'blend': {
+      const shapes: S[] = [];
+      for (const source of recipe.sources) {
+        const shape = child(source);
+        if (shape === null) return null;
+        shapes.push(shape);
+      }
+      return ops.blend(shapes, recipe.radius);
     }
     case 'shell': {
       const source = child(recipe.source);

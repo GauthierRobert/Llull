@@ -105,6 +105,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'boolean_union',
     'boolean_subtract',
     'boolean_intersect',
+    'blend_union',
     'fillet_edge',
     'chamfer_edge',
     'shell_solid',

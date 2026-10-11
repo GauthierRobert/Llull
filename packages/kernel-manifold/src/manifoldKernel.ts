@@ -281,14 +281,15 @@ const COMBINE = { union: 'add', subtract: 'subtract', intersect: 'intersect' } a
 
 /**
  * Native Manifold operations behind the recipe evaluator. Manifold is a mesh kernel: no B-rep, so
- * fillet / chamfer / shell, `topology` and `exportStep` are null.
+ * fillet / chamfer / shell / blend, `topology` and `exportStep` are null.
  */
 export function manifoldOps(mod: ManifoldModule): KernelOps<ManifoldShape> {
   return {
-    unsupported: new Set(['fillet', 'chamfer', 'shell']),
+    unsupported: new Set(['fillet', 'chamfer', 'shell', 'blend']),
     solid: (entity) => withSolids(() => entityToManifold(mod, entity)),
     boolean: (op: BooleanOp, a, b) => withSolids(() => a[COMBINE[op]](b)),
     fillet: () => null,
+    blend: () => null,
     chamfer: () => null,
     shell: () => null,
     place: (shape, position, rotation) =>
