@@ -7,7 +7,7 @@
 
 import { shapeToolCallContent } from '@mcp/index';
 import { isRecord } from '@lib/isRecord';
-import type { CliRunResult } from './backend';
+import type { CliRunResult } from './result';
 import type { SavedFile } from './saveFiles';
 
 /** Affected ids printed per plan step in text mode. */

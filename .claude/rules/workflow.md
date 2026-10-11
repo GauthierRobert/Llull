@@ -28,7 +28,8 @@ answer it (add the test, or state why none is needed / why the snapshot diff is 
 | `tests/golden/` | `build_project` plans → id-normalized snapshots + replay equality; one plan per regression |
 | `tests/integration/` | `store.dispatch` end-to-end (undo, live sync, outbox) |
 | `tests/component/` | panels & param-gathering (Testing Library), never geometry math |
-| `tests/e2e/`, `server/tests/` | Playwright (`npm run test:e2e`); server (`npm --prefix server test`) |
+| `tests/e2e/`, `server/tests/` | Playwright (`npm run test:e2e`); server + CLI (`npm --prefix server test`) |
+| `desktop/tests/` | desktop app without Electron: real backend, File ops, CLI `--app` (`npm --prefix desktop test`) |
 
 `tests/setup.ts` installs default plugins. Ids are deterministic per document; never assert on
 `Date.now()`. Assert observed behavior (entities, `affected`, `summary`), not internals.

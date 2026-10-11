@@ -1,0 +1,32 @@
+{
+  "name": "llull-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "llull desktop app: the web app + local backend (server/) + CLI + Python/CadQuery in one installable, offline app",
+  "type": "commonjs",
+  "main": "dist/main.js",
+  "scripts": {
+    "build:web": "cd .. && cross-env VITE_LLULL_SERVER_URL=same-origin npm run build",
+    "build:server": "npm --prefix ../server run build",
+    "build:main": "node scripts/build-main.mjs",
+    "build": "npm run build:web && npm run build:server && npm run build:main",
+    "start": "npm run build:main && electron .",
+    "prepare:python": "node scripts/prepare-python.mjs",
+    "dist": "npm run build && npm run stage:server && npm run prepare:python && electron-builder --config electron-builder.yml",
+    "typecheck": "tsc --noEmit",
+    "test": "npm --prefix ../server run --silent bundle && vitest run --config vitest.config.ts",
+    "stage:server": "node scripts/stage-server.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "cross-env": "^7.0.3",
+    "electron": "^38.8.6",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.9"
+  },
+  "engines": {
+    "node": ">=20.12"
+  }
+}

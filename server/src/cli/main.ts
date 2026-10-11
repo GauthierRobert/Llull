@@ -26,7 +26,6 @@ import {
   createRemoteBackend,
   writeDocumentFile,
   type CliBackend,
-  type CliRunResult,
 } from './backend';
 import {
   describeCommand,
@@ -39,6 +38,11 @@ import {
 } from './catalog';
 import { planText, resultJson, resultText, type PrintableResult } from './output';
 import { saveDataFiles, withoutPayloads } from './saveFiles';
+import { llullHome, readDesktopDiscovery } from './desktopDiscovery';
+import { exchangeTool, withFileContent } from './exchange';
+import type { CliRunResult } from './result';
+import { exchangeOptionsWithDwg } from '../dwgConvert';
+import type { ExchangeOptions } from '../pythonExchange';
 import { USAGE } from './usage';
 
 export interface CliIo {
@@ -48,6 +52,8 @@ export interface CliIo {
   readonly env: Readonly<Record<string, string | undefined>>;
   /** Install the geometry kernel before a local command runs (no-op in tests that skip it). */
   readonly prepareKernel: () => Promise<void>;
+  /** Injected for tests: Python / DWG ports of the exchange tools (default: from `env`). */
+  readonly exchangeOptions?: () => ExchangeOptions;
   /** Injected for tests of `--server`; the global `fetch` otherwise. */
   readonly fetchImpl?: (url: string, init: RequestInit) => Promise<Response>;
 }
@@ -67,7 +73,30 @@ function docPathOf(args: ParsedArgv, io: CliIo): string {
 }
 
 function serverOf(args: ParsedArgv, io: CliIo): string | undefined {
+  if (booleanFlag(args, 'app')) return APP_SERVER;
   return stringFlag(args, 'server') ?? io.env['LLULL_SERVER'];
+}
+
+/** `--app` / `--server app`: the running desktop app, from its discovery file. */
+const APP_SERVER = 'app';
+
+function remoteTargetOf(
+  server: string,
+  args: ParsedArgv,
+  io: CliIo,
+): { url: string; token?: string } {
+  const flagToken = stringFlag(args, 'token');
+  if (server !== APP_SERVER) {
+    const token = flagToken ?? io.env['LLULL_TOKEN'];
+    return { url: server, ...(token !== undefined ? { token } : {}) };
+  }
+  const app = readDesktopDiscovery(llullHome(io.env));
+  if (app === null)
+    throw new UsageError(
+      'the llull desktop app is not running (llull status). Start it, or drop --app to work on a local --doc file.',
+    );
+  // $LLULL_TOKEN belongs to --server (often a cloud token); the app has its own per-launch token.
+  return { url: app.url, token: flagToken ?? app.token };
 }
 
 async function backendOf(args: ParsedArgv, io: CliIo): Promise<CliBackend> {
@@ -75,14 +104,17 @@ async function backendOf(args: ParsedArgv, io: CliIo): Promise<CliBackend> {
   if (server !== undefined) {
     if (booleanFlag(args, 'dry-run'))
       throw new UsageError('--dry-run works on a local --doc only; the server applies every call.');
-    const token = stringFlag(args, 'token') ?? io.env['LLULL_TOKEN'];
-    return createRemoteBackend(server, {
-      token,
+    const target = remoteTargetOf(server, args, io);
+    return createRemoteBackend(target.url, {
+      token: target.token,
       ...(io.fetchImpl !== undefined ? { fetchImpl: io.fetchImpl } : {}),
     });
   }
   await io.prepareKernel();
-  return createLocalBackend(docPathOf(args, io), { dryRun: booleanFlag(args, 'dry-run') });
+  return createLocalBackend(docPathOf(args, io), {
+    dryRun: booleanFlag(args, 'dry-run'),
+    exchangeOptions: io.exchangeOptions ?? (() => exchangeOptionsWithDwg({ ...io.env })),
+  });
 }
 
 async function readSource(source: string, io: CliIo): Promise<string> {
@@ -104,7 +136,8 @@ function parseJson(text: string, origin: string): unknown {
 
 /** Top-level params declared as plain strings: their `key=value` values are never JSON-parsed. */
 function stringParamKeys(name: string): ReadonlySet<string> {
-  const properties = getCommand(name)?.paramsSchema.properties ?? {};
+  const properties =
+    getCommand(name)?.paramsSchema.properties ?? exchangeTool(name)?.inputSchema.properties ?? {};
   return new Set(
     Object.entries(properties)
       .filter(([, spec]) => spec.type === 'string')
@@ -198,10 +231,20 @@ async function runExec(args: ParsedArgv, io: CliIo): Promise<number> {
   const [, name, ...rest] = args.positionals;
   if (name === undefined)
     throw new UsageError('exec needs a command name: llull exec <command> [params]');
-  if (getCommand(name) === undefined) unknownCommand(name);
-  const params = await paramsOf(name, rest, io);
+  const isExchange = exchangeTool(name) !== undefined;
+  if (getCommand(name) === undefined && !isExchange) unknownCommand(name);
+  const raw = await paramsOf(name, rest, io);
+  let params: unknown = raw;
+  try {
+    params = isExchange ? withFileContent(name, raw) : raw;
+  } catch (error) {
+    throw new UsageError(errorMessage(error));
+  }
   const backend = await backendOf(args, io);
-  return finish(withOutcome(name, await backend.run(name, params)), args, io);
+  const result = isExchange
+    ? await backend.exchange(name, params)
+    : await backend.run(name, params);
+  return finish(withOutcome(name, result), args, io);
 }
 
 async function runPlan(args: ParsedArgv, io: CliIo): Promise<number> {
@@ -281,6 +324,46 @@ function runToolsets(args: ParsedArgv, io: CliIo): number {
   return EXIT_OK;
 }
 
+/** Where commands would go: the desktop app (if running) and the local document fallback. */
+/** The app answers `/health` (its pid may have been reused after a crash). */
+async function appReachable(url: string, io: CliIo): Promise<boolean> {
+  const fetchImpl = io.fetchImpl ?? ((target: string, init: RequestInit) => fetch(target, init));
+  try {
+    const response = await fetchImpl(`${url}/health`, { signal: AbortSignal.timeout(2_000) });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function runStatus(args: ParsedArgv, io: CliIo): Promise<number> {
+  const found = readDesktopDiscovery(llullHome(io.env));
+  const app = found !== null && (await appReachable(found.url, io)) ? found : null;
+  const docPath = docPathOf(args, io);
+  if (booleanFlag(args, 'json')) {
+    io.stdout(
+      JSON.stringify({
+        app:
+          app === null
+            ? null
+            : { url: app.url, pid: app.pid, documentPath: app.documentPath, version: app.version },
+        doc: docPath,
+        docExists: fs.existsSync(docPath),
+      }),
+    );
+    return EXIT_OK;
+  }
+  io.stdout(
+    [
+      app === null
+        ? 'Desktop app: not running.'
+        : `Desktop app: running at ${app.url} (pid ${app.pid}, v${app.version}), document ${app.documentPath ?? '(unsaved)'} — use --app to act on it.`,
+      `Local document: ${docPath}${fs.existsSync(docPath) ? '' : ' (not created yet)'}.`,
+    ].join('\n'),
+  );
+  return EXIT_OK;
+}
+
 async function runHistory(
   direction: 'undo' | 'redo',
   args: ParsedArgv,
@@ -317,6 +400,8 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
       case 'guide':
         io.stdout(CONVENTIONS_GUIDE);
         return EXIT_OK;
+      case 'status':
+        return await runStatus(args, io);
       case 'new':
         return runNew(args, io);
       case 'undo':
@@ -324,7 +409,7 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
         return await runHistory(subcommand, args, io);
       default:
         // `llull add_box width=10` is `llull exec add_box width=10`.
-        if (getCommand(subcommand) !== undefined)
+        if (getCommand(subcommand) !== undefined || exchangeTool(subcommand) !== undefined)
           return await runExec(parseArgv(['exec', ...argv]), io);
         throw new UsageError(`unknown subcommand "${subcommand}"; see: llull help`);
     }

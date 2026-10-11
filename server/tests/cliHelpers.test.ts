@@ -24,6 +24,7 @@ import {
 } from '../src/cli/catalog';
 import { filesOfData, saveDataFiles, withoutPayloads } from '../src/cli/saveFiles';
 import { listCommands } from '@core/commands/registry';
+import { exchangeToolDefinitions } from '../src/cli/exchange';
 
 describe('parseArgv', () => {
   it('splits positionals, value flags, boolean flags and --k=v', () => {
@@ -86,9 +87,10 @@ describe('paramsSource', () => {
 });
 
 describe('catalog', () => {
-  it('lists every registry command exactly once, filterable by toolset', () => {
+  it('lists every registry command and exchange tool exactly once, filterable by toolset', () => {
     const all = listCatalog();
-    expect(all).toHaveLength(listCommands().length);
+    expect(all).toHaveLength(listCommands().length + exchangeToolDefinitions().length);
+    expect(new Set(all.map((entry) => entry.name)).size).toBe(all.length);
     const twoD = listCatalog('2d');
     expect(twoD.length).toBeGreaterThan(0);
     expect(twoD.every((entry) => entry.toolset === '2d')).toBe(true);

@@ -1,0 +1,38 @@
+# llull desktop packaging. Run `npm run dist` on each target OS (native wheels and the bundled
+# Python are per platform). Signing/notarization: set the usual electron-builder env
+# (CSC_LINK / CSC_KEY_PASSWORD, APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID).
+appId: app.llull.desktop
+productName: llull
+copyright: Copyright © llull
+directories:
+  output: release
+files:
+  - dist/**
+  - package.json
+extraResources:
+  # Web app built with VITE_LLULL_SERVER_URL=same-origin (npm run build:web).
+  - from: ../dist
+    to: web
+  # Server bundle + CLI (dist/cli.js) + production node_modules + Python bridge script.
+  - from: build/server
+    to: server
+  # Relocatable CPython with CadQuery (npm run prepare:python).
+  - from: build/python
+    to: python
+fileAssociations:
+  - ext: llull
+    name: llull document
+    role: Editor
+mac:
+  category: public.app-category.graphics-design
+  hardenedRuntime: true
+  target: [dmg, zip]
+win:
+  target: [nsis]
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+linux:
+  category: Graphics
+  target: [AppImage, deb]

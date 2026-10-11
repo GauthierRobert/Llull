@@ -14,8 +14,16 @@ function readEnvString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
 }
 
-export const SERVER_BASE: string = (
-  readEnvString(import.meta.env['VITE_LLULL_SERVER_URL']) ?? DEFAULT_SERVER_BASE
+/** `VITE_LLULL_SERVER_URL=same-origin`: the server serves this page (desktop app, on-prem image). */
+const SAME_ORIGIN = 'same-origin';
+
+function serverBaseOf(configured: string | undefined): string {
+  if (configured !== SAME_ORIGIN) return configured ?? DEFAULT_SERVER_BASE;
+  return typeof window === 'undefined' ? DEFAULT_SERVER_BASE : window.location.origin;
+}
+
+export const SERVER_BASE: string = serverBaseOf(
+  readEnvString(import.meta.env['VITE_LLULL_SERVER_URL']),
 ).replace(/\/+$/, '');
 
 const BUILD_API_TOKEN: string | undefined = readEnvString(import.meta.env['VITE_LLULL_API_TOKEN']);

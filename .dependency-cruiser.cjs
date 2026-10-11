@@ -3,7 +3,7 @@
  * checked by `npm run arch` (part of `npm run check`) for every change, human or agent.
  * The PreToolUse hook gives agents early feedback; this file is the authority.
  *
- * Layers (one-way): src/ui, server → src/app → packages/{mcp, domain-aec, kernel-*} → packages/core
+ * Layers (one-way): desktop → server; src/ui, server → src/app → packages/{mcp, domain-aec, kernel-*} → packages/core
  * Inside core:      commands, codegen, plugins → geometry → model → lib
  */
 
@@ -105,6 +105,21 @@ module.exports = {
       severity: 'error',
       from: { path: '^src/' },
       to: { path: '^server/' },
+    },
+    {
+      name: 'nothing-imports-desktop',
+      comment: 'KI6: desktop/ is the outermost host (Electron shell); no package, app or server code depends on it.',
+      severity: 'error',
+      from: { path: '^(packages|src|server)/' },
+      to: { path: '^desktop/' },
+    },
+    {
+      name: 'desktop-is-a-host',
+      comment:
+        'L6/KI6: the desktop shell starts the server and loads the web app over HTTP; it never imports the UI.',
+      severity: 'error',
+      from: { path: '^desktop/' },
+      to: { path: '^src/' },
     },
     {
       name: 'not-to-unresolvable',

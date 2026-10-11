@@ -12,21 +12,16 @@ import { serializeDocument, deserializeDocument } from '@core/commands/persisten
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
-
-/** One command outcome, the same shape whichever backend ran it. */
-export interface CliRunResult {
-  readonly summary: string;
-  readonly affected: readonly string[];
-  readonly isError: boolean;
-  /** The document was replaced (and saved, for a local backend not in dry-run). */
-  readonly changed: boolean;
-  readonly data?: unknown;
-}
+import type { ExchangeOptions } from '../pythonExchange';
+import { runLocalExchange } from './exchange';
+import type { CliRunResult } from './result';
 
 export interface CliBackend {
   /** Human label: the document path or the server URL. */
   readonly target: string;
   run(name: string, params: unknown): Promise<CliRunResult>;
+  /** An exchange tool (export_step, import_step, import_dwg, import_code). */
+  exchange(name: string, params: unknown): Promise<CliRunResult>;
   /** Step back one change (local: swap with the `.bak` copy; server: `POST /undo`). */
   undo(): Promise<CliRunResult>;
   /** Re-apply the undone change (local: the same swap; server: `POST /redo`). */
@@ -60,11 +55,40 @@ export function writeDocumentFile(docPath: string, doc: CadDocument): void {
 interface LocalOptions {
   /** Run and report, but never write the document file. */
   readonly dryRun: boolean;
+  /** Python / DWG ports for the exchange tools, created on first use. */
+  readonly exchangeOptions: () => ExchangeOptions;
 }
 
 /** Offline backend over a document file: load, `execute`, save when the document changed. */
 export function createLocalBackend(docPath: string, options: LocalOptions): CliBackend {
   let doc: CadDocument | null = null;
+  const currentDoc = (): CadDocument => {
+    doc ??= readDocumentFile(docPath);
+    return doc;
+  };
+  const runCommand = (name: string, params: unknown): CliRunResult => {
+    try {
+      const prior = currentDoc();
+      const result = execute(prior, name, params);
+      const changed = result.document !== prior;
+      doc = result.document;
+      if (changed && !options.dryRun) writeDocumentFile(docPath, result.document);
+      return {
+        summary: result.summary,
+        affected: result.affected,
+        isError: result.rejected === true,
+        changed,
+        ...(result.data !== undefined ? { data: result.data } : {}),
+      };
+    } catch (error) {
+      return {
+        summary: `Command ${name} failed: ${errorMessage(error)}`,
+        affected: [],
+        isError: true,
+        changed: false,
+      };
+    }
+  };
   const swapWithBackup = (label: string): Promise<CliRunResult> => {
     const backup = backupPathOf(docPath);
     if (!fs.existsSync(backup)) {
@@ -92,29 +116,13 @@ export function createLocalBackend(docPath: string, options: LocalOptions): CliB
   };
   return {
     target: docPath,
-    run(name, params) {
-      try {
-        const prior = doc ?? readDocumentFile(docPath);
-        const result = execute(prior, name, params);
-        const changed = result.document !== prior;
-        doc = result.document;
-        if (changed && !options.dryRun) writeDocumentFile(docPath, result.document);
-        return Promise.resolve({
-          summary: result.summary,
-          affected: result.affected,
-          isError: result.rejected === true,
-          changed,
-          ...(result.data !== undefined ? { data: result.data } : {}),
-        });
-      } catch (error) {
-        return Promise.resolve({
-          summary: `Command ${name} failed: ${errorMessage(error)}`,
-          affected: [],
-          isError: true,
-          changed: false,
-        });
-      }
-    },
+    run: (name, params) => Promise.resolve(runCommand(name, params)),
+    exchange: (name, params) =>
+      runLocalExchange(name, params, {
+        options: options.exchangeOptions(),
+        getDoc: currentDoc,
+        runCommand,
+      }),
     undo: () => swapWithBackup('undo'),
     redo: () => swapWithBackup('redo'),
   };
@@ -189,6 +197,7 @@ export function createRemoteBackend(serverUrl: string, options: RemoteOptions): 
   return {
     target: base,
     run: (name, params) => post('/command', { name, params }),
+    exchange: (name, params) => post('/exchange', { name, params }),
     undo: () => post('/undo', {}),
     redo: () => post('/redo', {}),
   };
