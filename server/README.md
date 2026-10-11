@@ -208,6 +208,26 @@ Done. Client closed cleanly.
 
 ---
 
+## CLI (`llull`)
+
+The registry from a shell — for terminal agents (Claude Code), scripts and CI. Same commands as
+the UI and `/mcp`, no server needed: it runs them on a local document file, or forwards them to a
+running server's live document with `--server`.
+
+```bash
+node server/bin/llull.cjs help                       # or: npm run -s llull -- help (repo root)
+node server/bin/llull.cjs search fillet edge         # discover; describe <cmd> for the params
+node server/bin/llull.cjs add_box size=[10,10,10] --doc part.llull.json
+node server/bin/llull.cjs run plan.json --validate   # build_project plan file (then without --validate)
+node server/bin/llull.cjs export_stl format=binary --save out/part.stl
+node server/bin/llull.cjs render_view --save view.png
+node server/bin/llull.cjs add_box size=[1,1,1] --server http://localhost:3001 --token $LLULL_TOKEN
+```
+
+`server/bin/llull.cjs` bundles `src/cli/bin.ts` with esbuild into `dist/llull-cli.cjs` when a source
+changed, then runs the bundle. Exit codes: 0 ok, 1 the command failed or changed nothing, 2 usage.
+Agent procedure: `.claude/skills/llull-cli/SKILL.md`.
+
 ## Environment variables
 
 | Variable                                      | Required    | Default                                                             | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
