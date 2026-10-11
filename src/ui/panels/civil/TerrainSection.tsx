@@ -9,7 +9,7 @@ import React, { useMemo, useState } from 'react';
 import type { SurfaceObject } from '@core/model/civil';
 import { useStore } from '@ui/store';
 import { PanelSection } from '@ui/panels/PanelParts';
-import { CivilObjectRow, useCivilObjects } from './CivilParts';
+import { CivilObjectRow, useCivilObjects, NumberField, TextField } from './CivilParts';
 import { optionalNumber, parseNumber } from './civilInput';
 import { runQuery } from './civilQuery';
 
@@ -32,12 +32,11 @@ function SurfaceRow({ surface }: { surface: SurfaceObject }): React.ReactElement
   };
   return (
     <CivilObjectRow object={surface} detail={report}>
-      <input
-        type="number"
+      <NumberField
         value={interval}
-        placeholder={String(surface.contourInterval)}
-        aria-label={`Contour interval of ${surface.name}`}
-        onChange={(event) => setIntervalText(event.target.value)}
+        set={setIntervalText}
+        hint={String(surface.contourInterval)}
+        label={`Contour interval of ${surface.name}`}
       />
       <button type="button" className="btn btn--ghost btn--sm" onClick={applyInterval}>
         Set interval
@@ -78,32 +77,24 @@ export function TerrainSection(): React.ReactElement {
       testId="civil-terrain"
     >
       <form className="building-inline-form" onSubmit={handleSubmit} aria-label="Create surface">
-        <input
-          value={name}
-          placeholder="Surface name"
-          aria-label="Surface name"
-          onChange={(event) => setName(event.target.value)}
-        />
-        <input
-          type="number"
+        <TextField value={name} set={setName} hint="Surface name" label="Surface name" />
+        <NumberField
           value={interval}
-          placeholder="Contour interval"
-          aria-label="Contour interval"
-          onChange={(event) => setIntervalText(event.target.value)}
+          set={setIntervalText}
+          hint="Contour interval"
+          label="Contour interval"
         />
-        <input
-          type="number"
+        <NumberField
           value={majorEvery}
-          placeholder="Major every"
-          aria-label="Major contour every"
-          onChange={(event) => setMajorEvery(event.target.value)}
+          set={setMajorEvery}
+          hint="Major every"
+          label="Major contour every"
         />
-        <input
-          type="number"
+        <NumberField
           value={maxEdge}
-          placeholder="Max edge (optional)"
-          aria-label="Maximum triangle edge"
-          onChange={(event) => setMaxEdge(event.target.value)}
+          set={setMaxEdge}
+          hint="Max edge (optional)"
+          label="Maximum triangle edge"
         />
         <button type="submit" className="btn btn--primary btn--sm" disabled={groups.length === 0}>
           Create surface

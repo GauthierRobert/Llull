@@ -7,8 +7,8 @@
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
-import { PanelSection } from '@ui/panels/PanelParts';
-import { chosenId, CivilObjectSelect, useCivilObjects } from './CivilParts';
+import { PanelSection, FormError } from '@ui/panels/PanelParts';
+import { chosenId, CivilObjectSelect, useCivilObjects, NumberField, TextField } from './CivilParts';
 import {
   formatPoints,
   optionalNumber,
@@ -80,28 +80,28 @@ export function RoadsSection(): React.ReactElement {
     >
       <form className="civil-form" onSubmit={handleSubmit} aria-label="Add alignment">
         <div className="building-inline-form">
-          <input
+          <TextField
             value={points}
-            placeholder="x,y; x,y; x,y; …"
-            aria-label="Alignment points"
-            onChange={(event) => setPoints(event.target.value)}
+            set={setPoints}
+            hint="x,y; x,y; x,y; …"
+            label="Alignment points"
           />
           <button type="button" className="btn btn--ghost btn--sm" onClick={takeSelection}>
             From selection
           </button>
         </div>
         <div className="building-inline-form">
-          <input
+          <TextField
             value={radii}
-            placeholder="Radii per interior PI"
-            aria-label="Curve radii"
-            onChange={(event) => setRadii(event.target.value)}
+            set={setRadii}
+            hint="Radii per interior PI"
+            label="Curve radii"
           />
-          <input
+          <TextField
             value={spirals}
-            placeholder="Spiral lengths (clothoid)"
-            aria-label="Spiral lengths"
-            onChange={(event) => setSpirals(event.target.value)}
+            set={setSpirals}
+            hint="Spiral lengths (clothoid)"
+            label="Spiral lengths"
           />
           <CivilObjectSelect
             objects={surfaces}
@@ -110,28 +110,18 @@ export function RoadsSection(): React.ReactElement {
             emptyLabel="No ground surface"
             onChange={setSurface}
           />
-          <input
-            type="number"
+          <NumberField
             value={interval}
-            placeholder="Station interval"
-            aria-label="Station interval"
-            onChange={(event) => setIntervalText(event.target.value)}
+            set={setIntervalText}
+            hint="Station interval"
+            label="Station interval"
           />
-          <input
-            value={name}
-            placeholder="Name"
-            aria-label="Alignment name"
-            onChange={(event) => setName(event.target.value)}
-          />
+          <TextField value={name} set={setName} hint="Name" label="Alignment name" />
           <button type="submit" className="btn btn--primary btn--sm">
             Add alignment
           </button>
         </div>
-        {error !== '' && (
-          <p className="panel__error" role="alert">
-            {error}
-          </p>
-        )}
+        <FormError text={error} />
       </form>
       {alignments.length > 0 && (
         <ul className="civil-list" aria-label="Alignments">

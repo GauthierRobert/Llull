@@ -155,3 +155,13 @@ export function IconButton({
     </button>
   );
 }
+
+/** Inline form error; renders nothing while `text` is empty. */
+export function FormError({ text }: { text: string }): React.ReactElement | null {
+  if (text === '') return null;
+  return (
+    <p className="panel__error" role="alert">
+      {text}
+    </p>
+  );
+}

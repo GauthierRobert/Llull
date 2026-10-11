@@ -26,7 +26,8 @@ import { flattenDxf, parseDxf, type DxfPrimitive } from '../lib/dxfRead';
 import { aciToHex, insUnitsMillimetres } from '../lib/dxfUnits';
 import { MAX_IMPORT_TRIANGLES } from './limits';
 
-const MM_PER_UNIT: Readonly<Record<DocumentUnit, number>> = {
+/** Millimetres in one document unit. */
+export const MM_PER_UNIT: Readonly<Record<DocumentUnit, number>> = {
   mm: 1,
   cm: 10,
   m: 1000,

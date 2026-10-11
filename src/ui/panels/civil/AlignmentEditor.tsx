@@ -11,7 +11,7 @@ import type { AlignmentObject } from '@core/model/civil';
 import { PAPER_SIZES, type PaperSize } from '@aec/sheet';
 import { useStore } from '@ui/store';
 import { OptionSelect } from '@ui/panels/OptionSelect';
-import { CivilObjectRow, CivilStatus } from './CivilParts';
+import { CivilObjectRow, CivilStatus, NumberField } from './CivilParts';
 import { optionalNumber, parseNumber, parsePvis } from './civilInput';
 import { downloadQuery } from './civilQuery';
 
@@ -115,24 +115,22 @@ export function AlignmentEditor({ alignment }: { alignment: AlignmentObject }): 
             </button>
           </div>
           <div className="building-inline-form">
-            <input
-              type="number"
+            <NumberField
               value={superelevation}
-              placeholder="Superelevation (0.06)"
-              aria-label={`Superelevation of ${label}`}
-              onChange={(event) => setSuperelevation(event.target.value)}
+              set={setSuperelevation}
+              hint="Superelevation (0.06)"
+              label={`Superelevation of ${label}`}
             />
             <button type="button" className="btn btn--ghost btn--sm" onClick={applySuperelevation}>
               Set superelevation
             </button>
           </div>
           <div className="building-actions">
-            <input
-              type="number"
+            <NumberField
               value={designSpeed}
-              placeholder="Design speed km/h"
-              aria-label={`Design speed of ${label}`}
-              onChange={(event) => setDesignSpeed(event.target.value)}
+              set={setDesignSpeed}
+              hint="Design speed km/h"
+              label={`Design speed of ${label}`}
             />
             <button
               type="button"

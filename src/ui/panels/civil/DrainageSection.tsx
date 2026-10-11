@@ -12,7 +12,7 @@ import { useStore } from '@ui/store';
 import { downloadText } from '@ui/download';
 import { isCsvData } from '@ui/resultData';
 import { PanelSection } from '@ui/panels/PanelParts';
-import { CivilObjectRow, CivilStatus, useCivilObjects } from './CivilParts';
+import { CivilObjectRow, CivilStatus, useCivilObjects, NumberField } from './CivilParts';
 import { ManholeForm, PipeForm } from './DrainageForms';
 import { optionalNumber, parseNumber } from './civilInput';
 import { downloadQuery, runQuery } from './civilQuery';
@@ -63,12 +63,11 @@ function NetworkChecks(): React.ReactElement {
   return (
     <>
       <div className="building-actions">
-        <input
-          type="number"
+        <NumberField
           value={rainfall}
-          placeholder="Rainfall mm/h (50)"
-          aria-label="Rainfall intensity"
-          onChange={(event) => setRainfall(event.target.value)}
+          set={setRainfall}
+          hint="Rainfall mm/h (50)"
+          label="Rainfall intensity"
         />
         {IDF_FIELDS.map((key) => (
           <input

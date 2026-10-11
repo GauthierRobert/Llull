@@ -91,6 +91,11 @@ const EMPTY_FORM = {
   roughness: '0.45',
 };
 
+const SLIDERS = [
+  { field: 'metalness', title: 'Metalness' },
+  { field: 'roughness', title: 'Roughness' },
+] as const;
+
 /** NaN is outside the interval. */
 const isUnitInterval = (value: number): boolean => value >= 0 && value <= 1;
 
@@ -196,45 +201,27 @@ function CreateMaterialForm(): React.ReactElement {
         </span>
       </div>
 
-      <div className="field">
-        <label className="field__label" htmlFor="material-create-metalness">
-          Metalness
-        </label>
-        <input
-          id="material-create-metalness"
-          type="range"
-          min="0"
-          max="1"
-          step="0.01"
-          className="material-create-range"
-          value={metalness}
-          onChange={setField('metalness')}
-          aria-label="Material metalness (0 to 1)"
-          aria-valuemin={0}
-          aria-valuemax={1}
-        />
-        <span className="field__value">{parseFloat(metalness).toFixed(2)}</span>
-      </div>
-
-      <div className="field">
-        <label className="field__label" htmlFor="material-create-roughness">
-          Roughness
-        </label>
-        <input
-          id="material-create-roughness"
-          type="range"
-          min="0"
-          max="1"
-          step="0.01"
-          className="material-create-range"
-          value={roughness}
-          onChange={setField('roughness')}
-          aria-label="Material roughness (0 to 1)"
-          aria-valuemin={0}
-          aria-valuemax={1}
-        />
-        <span className="field__value">{parseFloat(roughness).toFixed(2)}</span>
-      </div>
+      {SLIDERS.map(({ field, title }) => (
+        <div className="field" key={field}>
+          <label className="field__label" htmlFor={`material-create-${field}`}>
+            {title}
+          </label>
+          <input
+            id={`material-create-${field}`}
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            className="material-create-range"
+            value={form[field]}
+            onChange={setField(field)}
+            aria-label={`Material ${field} (0 to 1)`}
+            aria-valuemin={0}
+            aria-valuemax={1}
+          />
+          <span className="field__value">{parseFloat(form[field]).toFixed(2)}</span>
+        </div>
+      ))}
 
       <button
         type="submit"

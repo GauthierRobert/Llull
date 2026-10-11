@@ -13,6 +13,7 @@ import {
 } from '@core/model/civil';
 import { fromMm, toMetres } from '../model';
 import { dependentsOf } from './integrity';
+import { MM_PER_UNIT } from '@core/commands/import_dxf';
 
 export function getCivil(doc: Pick<CadDocument, 'civil'>): CivilModel {
   return doc.civil ?? createEmptyCivil();
@@ -100,14 +101,6 @@ export function formatStation(metres: number): string {
   const rest = value - kilometres * 1000;
   return `${sign}${kilometres}+${rest.toFixed(2).padStart(6, '0')}`;
 }
-
-const MM_PER_UNIT: Readonly<Record<DocumentUnit, number>> = {
-  mm: 1,
-  cm: 10,
-  m: 1000,
-  in: 25.4,
-  ft: 304.8,
-};
 
 /** Converts a length given in `unit` into the document's units. */
 export function fromUnit(

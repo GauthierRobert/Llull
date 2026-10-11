@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { optionalNumber, parseNumber, parsePoints } from './civilInput';
+import { NumberField, TextField } from './CivilParts';
 
 export function CivilCrsSection(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
@@ -59,25 +60,9 @@ export function CivilCrsSection(): React.ReactElement {
     >
       <form className="civil-form" onSubmit={applyCrs} aria-label="Coordinate system">
         <div className="building-inline-form">
-          <input
-            value={name}
-            placeholder="CRS name"
-            aria-label="CRS name"
-            onChange={(event) => setName(event.target.value)}
-          />
-          <input
-            type="number"
-            value={epsg}
-            placeholder="EPSG"
-            aria-label="EPSG code"
-            onChange={(event) => setEpsg(event.target.value)}
-          />
-          <input
-            value={datum}
-            placeholder="Vertical datum"
-            aria-label="Vertical datum"
-            onChange={(event) => setDatum(event.target.value)}
-          />
+          <TextField value={name} set={setName} hint="CRS name" label="CRS name" />
+          <NumberField value={epsg} set={setEpsg} hint="EPSG" label="EPSG code" />
+          <TextField value={datum} set={setDatum} hint="Vertical datum" label="Vertical datum" />
           <button type="submit" className="btn btn--primary btn--sm" disabled={name.trim() === ''}>
             Set CRS
           </button>
@@ -85,32 +70,15 @@ export function CivilCrsSection(): React.ReactElement {
       </form>
       <form className="civil-form" onSubmit={applyCalibration} aria-label="Site calibration">
         <div className="building-inline-form">
-          <input
+          <TextField
             value={localOrigin}
-            placeholder="Local x, y"
-            aria-label="Local origin"
-            onChange={(event) => setLocalOrigin(event.target.value)}
+            set={setLocalOrigin}
+            hint="Local x, y"
+            label="Local origin"
           />
-          <input
-            value={gridOrigin}
-            placeholder="Grid E, N"
-            aria-label="Grid origin"
-            onChange={(event) => setGridOrigin(event.target.value)}
-          />
-          <input
-            type="number"
-            value={rotation}
-            placeholder="Rotation deg"
-            aria-label="Rotation"
-            onChange={(event) => setRotation(event.target.value)}
-          />
-          <input
-            type="number"
-            value={scale}
-            placeholder="Scale factor"
-            aria-label="Scale factor"
-            onChange={(event) => setScale(event.target.value)}
-          />
+          <TextField value={gridOrigin} set={setGridOrigin} hint="Grid E, N" label="Grid origin" />
+          <NumberField value={rotation} set={setRotation} hint="Rotation deg" label="Rotation" />
+          <NumberField value={scale} set={setScale} hint="Scale factor" label="Scale factor" />
           <button type="submit" className="btn btn--primary btn--sm">
             Calibrate
           </button>
