@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { type BoxEntity, type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { stripOuterParens } from '@core/commands/code_trace';
+import { stripOuterParens } from '@core/commands/exchange/codeTrace';
 import { MAX_TRACE_FEATURES } from '@core/commands/limits';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';

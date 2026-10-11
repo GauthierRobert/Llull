@@ -12,8 +12,8 @@ import type {
 } from '@core/model/types';
 import { execute, listCommands } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
-import { evaluateExpression } from '@core/commands/expression';
-import { entityToTriangles } from '@core/commands/exportTriangulate';
+import { evaluateExpression } from '@core/commands/parametric/expression';
+import { entityToTriangles } from '@core/geometry/entityTriangles';
 import { composeEulerXYZ, applyEulerXYZ, rotateEulerAboutWorldZ } from '@lib/eulerRotation';
 import { isVec2, isVec2List } from '@lib/vec2';
 import { elementAt } from '@lib/elementAt';

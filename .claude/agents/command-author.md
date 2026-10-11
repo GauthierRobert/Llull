@@ -28,7 +28,7 @@ Rules are already in context (`rules/commands.md` loads when you touch `packages
 
 ## Procedure (every command)
 
-1. Read neighbors in the target domain file (e.g. `geometryBasic.ts`, `units.ts`) and copy
+1. Read neighbors in the target domain file (e.g. `solids/basic.ts`, `document/units.ts`) and copy
    the `defineCommand` skeleton from `conventions.md` (C5). Match the existing style exactly.
    Domain commands (building, industrial) go in their plugin package, not core.
 2. If the op needs a new entity kind: add the literal to `SOLID_KINDS` (3D) or

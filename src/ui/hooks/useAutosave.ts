@@ -12,7 +12,7 @@
  */
 
 import { useEffect } from 'react';
-import { serializeDocument } from '@core/commands/persistence';
+import { serializeDocument } from '@core/commands/persistence/serialization';
 import { useStore } from '@ui/store';
 import { useSessionStore } from '@ui/store/sessionStore';
 import {

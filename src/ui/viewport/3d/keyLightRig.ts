@@ -7,7 +7,7 @@
  * (world - renderOrigin), the space the light lives in.
  */
 
-import type { Bounds } from '@core/commands/sceneTypes';
+import type { Bounds } from '@core/geometry/bounds';
 import type { Vec3 } from '@core/model/types';
 
 /** Half-size of the shadow frustum used for scenes smaller than this (the original fixed rig). */

@@ -4,7 +4,7 @@ import { execute } from '@core/commands/registry';
 import { arcThrough, curvedWallBand, curvedWallLength } from '@aec/curvedWallGeometry';
 import { buildPlanDrawing } from '@aec/planDrawing';
 import { buildingErrors } from '@aec/validate';
-import { serializeDocument } from '@core/commands/persistence';
+import { serializeDocument } from '@core/commands/persistence/serialization';
 import type { CurvedWallElement } from '@core/model/building';
 import type { TakeoffLine } from '@aec/takeoffBasics';
 import type { IfcExport } from '@aec/ifcBuild';

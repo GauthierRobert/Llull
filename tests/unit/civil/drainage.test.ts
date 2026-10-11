@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { deserializeDocument, serializeDocument } from '@core/commands/persistence';
+import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import {
   manningFullFlow,
   partialFlowDischarge,

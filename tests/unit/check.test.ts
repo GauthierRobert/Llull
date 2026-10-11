@@ -12,9 +12,9 @@
 import { describe, it, expect } from 'vitest';
 import { type CadDocument, type Entity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { withEntity } from '@core/commands/entityOps';
+import { withEntity } from '@core/commands/entity/entityOps';
 import { groupedBoxes } from '../helpers/groupedBoxes';
-import { type CheckResult, runModelChecks } from '@core/commands/check';
+import { type CheckResult, runModelChecks } from '@core/commands/inspect/checkModel';
 
 // Helpers
 

@@ -11,7 +11,7 @@ import {
   entityBounds,
   instanceBoundsFromDoc,
   mergeBounds,
-} from '@core/commands/sceneBounds';
+} from '@core/geometry/bounds';
 import { VIEWPORT_FOV_DEGREES } from '@core/model/viewport';
 
 /** Margin applied on top of the exact fit distance. */

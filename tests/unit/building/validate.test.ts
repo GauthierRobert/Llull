@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { buildingErrors } from '@aec/validate';
-import { serializeDocument } from '@core/commands/persistence';
+import { serializeDocument } from '@core/commands/persistence/serialization';
 
 const house = execute(createEmptyDocument(), 'add_building_template', {
   template: 'house',

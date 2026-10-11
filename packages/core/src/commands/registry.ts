@@ -1,22 +1,19 @@
 /**
  * @layer core/commands
- * The registry: core `definitions` + every installed plugin's commands. UI menus, MCP tool
- * schemas (`toToolSchemas`) and `execute` all read it — register once, every surface gains it.
+ * The registry: the composition point that fills the command table with the core catalog and
+ * every installed plugin's commands. UI menus, MCP tool schemas (`toToolSchemas`) and `execute`
+ * all read that table — register once, every surface gains it. Surfaces import from this module
+ * so that importing the API also guarantees the core catalog is registered.
  */
 
-import type { CadDocument, FeatureStep } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
-import { type ExecutionContext, currentContext, runInContext } from './context';
-import { guardCommand } from './guard';
-import { kernelUnavailable } from './kernelRefusal';
-import { rejection } from './noop';
-import { stepIdSource } from '../lib/id';
-import { addWedge, addPyramid } from './geometryPrismatic';
-import { addCylinder, addSphere, addCone, addTorus } from './geometryRound';
-import { addBox, extrude, move, deleteEntity } from './geometryBasic';
-import { rotateEntity, scaleEntity, mirrorEntity, arrayLinear, arrayPolar } from './transform';
-import { drawBeltAround } from './draw2dBelt';
-import { drawEllipse, drawSpline, drawInvolute } from './draw2dCurves';
+import type { CommandDefinition } from './types';
+import { registerCommands } from './commandTable';
+import { addWedge, addPyramid } from './solids/prismatic';
+import { addCylinder, addSphere, addCone, addTorus } from './solids/round';
+import { addBox, extrude, move, deleteEntity } from './solids/basic';
+import { rotateEntity, scaleEntity, mirrorEntity, arrayLinear, arrayPolar } from './edit/transform';
+import { drawBeltAround } from './draw2d/belt';
+import { drawEllipse, drawSpline, drawInvolute } from './draw2d/curves';
 import {
   drawLine,
   drawPolyline,
@@ -24,31 +21,31 @@ import {
   drawCircle,
   drawRectangle,
   drawPoint,
-} from './draw2dBasic';
-import { loadDocument } from './persistence';
-import { extrudeSketch, revolveProfile } from './profile';
-import { duplicateEntity, groupEntities, ungroupEntities, setEntityName } from './edit';
-import { booleanUnion, booleanSubtract, booleanIntersect } from './boolean';
-import { describeScene } from './scene';
-import { animateSpin, animateOscillate, stopAnimation } from './animation';
-import { findEntities } from './query';
-import { buildProject } from './project';
-import { setUnits } from './units';
-import { setParameter, deleteParameter } from './parameters';
-import { checkModel } from './check';
-import { renderView } from './render';
-import { makeTubeBetween } from './composite';
-import { addText, addDimension } from './annotate';
-import { filletEdge, chamferEdge, shellSolid } from './modify3d';
-import { inspectTopology, exportStepExact } from './brep';
-import { instantiateTemplate } from './templates';
-import { historyCommands } from './history';
-import { createConfiguration, activateConfiguration } from './configurations';
-import { createMaterial, assignMaterial } from './materials';
-import { saveRecipe, instantiateRecipe } from './recipes';
-import { fillet2D, chamfer2D } from './modify2dCorners';
-import { trim, extend } from './modify2dTrimExtend';
-import { explodePolyline, offset2D } from './modify2dBasic';
+} from './draw2d/basic';
+import { loadDocument } from './persistence/serialization';
+import { extrudeSketch, revolveProfile } from './solids/profile';
+import { duplicateEntity, groupEntities, ungroupEntities, setEntityName } from './edit/basic';
+import { booleanUnion, booleanSubtract, booleanIntersect } from './brep/boolean';
+import { describeScene } from './inspect/scene';
+import { animateSpin, animateOscillate, stopAnimation } from './motion/animation';
+import { findEntities } from './inspect/query';
+import { buildProject } from './project/buildProject';
+import { setUnits } from './document/units';
+import { setParameter, deleteParameter } from './parametric/parameters';
+import { checkModel } from './inspect/checkModel';
+import { renderView } from './render/renderView';
+import { makeTubeBetween } from './solids/composite';
+import { addText, addDimension } from './draw2d/annotate';
+import { filletEdge, chamferEdge, shellSolid } from './brep/modify3d';
+import { inspectTopology, exportStepExact } from './brep/topology';
+import { instantiateTemplate } from './project/templates';
+import { historyCommands } from './history/history';
+import { createConfiguration, activateConfiguration } from './parametric/configurations';
+import { createMaterial, assignMaterial } from './document/materials';
+import { saveRecipe, instantiateRecipe } from './parametric/recipes';
+import { fillet2D, chamfer2D } from './modify2d/corners';
+import { trim, extend } from './modify2d/trimExtend';
+import { explodePolyline, offset2D } from './modify2d/basic';
 import {
   addLayer,
   renameLayer,
@@ -56,33 +53,43 @@ import {
   setLayerLock,
   setEntityLayer,
   deleteLayer,
-} from './layers';
-import { measureBoundingBox, measureVolume, massProperties } from './measureSolid';
-import { measureArea, measurePerimeter } from './measureAreaPerimeter';
-import { measureDistance, measureAngle } from './measureDistanceAngle';
-import { exportStl } from './export';
-import { exportObj, exportGltf } from './export_formats';
-import { exportCode } from './code_exchange';
-import { applyCodeTrace } from './code_trace';
-import { importMesh } from './import_mesh';
-import { importDxf } from './import_dxf';
-import { createComponent, insertInstance, explodeInstance } from './assemblies';
-import { clearDocument } from './document';
-import { setCamera, lookAt, fitView } from './camera';
-import { align, distribute, stackOn } from './place';
-import { arrayAlongPath, distributeOnArc } from './array_along_path';
-import { addConstraint, deleteConstraint, updateConstraint, solveConstraints } from './constraints';
-import { addMate } from './mates';
-import { billOfMaterials } from './billOfMaterials';
-import { addDriveRelation, deleteDriveRelation, evaluateMotion, bakeMotion } from './jointsDrive';
-import { addJoint, deleteJoint, setJointValue } from './jointsEdit';
-import { motionStudy } from './motion_study';
-import { addSpurGear } from './gears';
-import { distributeAlongPath } from './distribute';
-import { deleteEntities, duplicateEntities, moveEntities } from './batch';
+} from './document/layers';
+import { measureBoundingBox, measureVolume, massProperties } from './inspect/measureSolid';
+import { measureArea, measurePerimeter } from './inspect/measureAreaPerimeter';
+import { measureDistance, measureAngle } from './inspect/measureDistanceAngle';
+import { exportStl } from './exchange/exportStl';
+import { exportObj, exportGltf } from './exchange/exportFormats';
+import { exportCode } from './exchange/exportCode';
+import { applyCodeTrace } from './exchange/codeTrace';
+import { importMesh } from './exchange/importMesh';
+import { importDxf } from './exchange/importDxf';
+import { createComponent, insertInstance, explodeInstance } from './assembly/assemblies';
+import { clearDocument } from './document/clearDocument';
+import { setCamera, lookAt, fitView } from './document/camera';
+import { align, distribute, stackOn } from './edit/place';
+import { arrayAlongPath, distributeOnArc } from './edit/arrayAlongPath';
+import {
+  addConstraint,
+  deleteConstraint,
+  updateConstraint,
+  solveConstraints,
+} from './parametric/constraints';
+import { addMate } from './assembly/mates';
+import { billOfMaterials } from './assembly/billOfMaterials';
+import {
+  addDriveRelation,
+  deleteDriveRelation,
+  evaluateMotion,
+  bakeMotion,
+} from './motion/jointsDrive';
+import { addJoint, deleteJoint, setJointValue } from './motion/jointsEdit';
+import { motionStudy } from './motion/motionStudy';
+import { addSpurGear } from './solids/gears';
+import { distributeAlongPath } from './edit/distribute';
+import { deleteEntities, duplicateEntities, moveEntities } from './edit/batch';
 import { onPluginInstalled } from '../plugins/host';
 
-const rawDefinitions = [
+const coreCommands = [
   addBox,
   addCylinder,
   addSphere,
@@ -204,108 +211,8 @@ const rawDefinitions = [
   duplicateEntities,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
-/** Core commands, then every installed plugin's commands in installation order. */
-const definitions: CommandDefinition<unknown>[] = rawDefinitions.map(guardCommand);
+registerCommands('core', coreCommands);
+onPluginInstalled((plugin) => registerCommands(`plugin '${plugin.name}'`, plugin.commands));
 
-const byName = new Map<string, CommandDefinition<unknown>>(definitions.map((d) => [d.name, d]));
-
-onPluginInstalled((plugin) => {
-  const names = plugin.commands.map((command) => command.name);
-  const clash = plugin.commands.find(
-    (command, index) => byName.has(command.name) || names.indexOf(command.name) !== index,
-  );
-  if (clash) {
-    throw new Error(`plugin '${plugin.name}': command '${clash.name}' is already registered`);
-  }
-  for (const command of plugin.commands) {
-    const guarded = guardCommand(command);
-    definitions.push(guarded);
-    byName.set(guarded.name, guarded);
-  }
-});
-
-export function listCommands(): ReadonlyArray<CommandDefinition<unknown>> {
-  return definitions;
-}
-
-export function getCommand(name: string): CommandDefinition<unknown> | undefined {
-  return byName.get(name);
-}
-
-/**
- * The single choke point every surface calls (architecture L5, L8).
- * @invariant a mutating command (not `readOnly` / `metaHistory`) that changes the document appends
- * FeatureStep `step-<n>` (n = doc.nextStepNumber) and mints ids `<prefix>-<n>.<k>`, so replay
- * re-mints identical ids; an execute nested inside a running step joins it (no extra step)
- * @failure unknown command, or `requiresKernel` while ctx.kernel is null -> no-op, affected:[], rejected:true
- */
-export function execute(
-  doc: CadDocument,
-  commandName: string,
-  params: unknown,
-  ctx: ExecutionContext = currentContext(),
-): CommandResult {
-  const def = byName.get(commandName);
-  if (!def) return rejection(doc, `Unknown command: ${commandName}`);
-  const annotations = def.annotations;
-  if (annotations?.requiresKernel === true && ctx.kernel === null)
-    return rejection(doc, kernelUnavailable(commandName));
-  const recordsStep = annotations?.readOnly !== true && annotations?.metaHistory !== true;
-  if (!recordsStep || ctx.stepKey !== undefined) {
-    // Queries, history meta-commands, and executes nested inside a running step append nothing.
-    return runInContext(ctx, () => def.run(doc, params, ctx));
-  }
-
-  const stepNumber = doc.nextStepNumber ?? 1;
-  const stepKey = String(stepNumber);
-  const stepContext: ExecutionContext = { ...ctx, ids: stepIdSource(stepKey), stepKey };
-  const result = runInContext(stepContext, () => def.run(doc, params, stepContext));
-
-  if (result.document === doc) return result;
-
-  const step: FeatureStep = {
-    id: `step-${stepKey}`,
-    name: commandName,
-    params,
-    suppressed: false,
-    affected: result.affected,
-  };
-
-  return {
-    ...result,
-    document: {
-      ...result.document,
-      featureHistory: [...result.document.featureHistory, step],
-      nextStepNumber: Math.max(result.document.nextStepNumber ?? 1, stepNumber + 1),
-    },
-  };
-}
-
-/** One registry entry as an AI/MCP tool schema. */
-export interface ToolSchema {
-  name: string;
-  description: string;
-  input_schema: CommandDefinition<unknown>['paramsSchema'];
-  annotations?: { readOnlyHint?: true; destructiveHint?: true; idempotentHint?: true };
-}
-
-function toolAnnotations(def: CommandDefinition<unknown>): ToolSchema['annotations'] {
-  const ann: NonNullable<ToolSchema['annotations']> = {};
-  if (def.annotations?.readOnly === true) ann.readOnlyHint = true;
-  if (def.annotations?.destructive === true) ann.destructiveHint = true;
-  if (def.annotations?.idempotent === true) ann.idempotentHint = true;
-  return Object.keys(ann).length > 0 ? ann : undefined;
-}
-
-/** Generate AI/MCP tool schemas from the registry. */
-export function toToolSchemas(): ToolSchema[] {
-  return definitions.map((d) => {
-    const annotations = toolAnnotations(d);
-    return {
-      name: d.name,
-      description: d.description,
-      input_schema: d.paramsSchema,
-      ...(annotations ? { annotations } : {}),
-    };
-  });
-}
+export { execute } from './execute';
+export { getCommand, listCommands, toToolSchemas, type ToolSchema } from './commandTable';

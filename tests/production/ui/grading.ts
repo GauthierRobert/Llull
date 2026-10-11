@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import { deserializeDocument } from '@core/commands/persistence';
+import { deserializeDocument } from '@core/commands/persistence/serialization';
 import type { CadDocument } from '@core/model/types';
 import type { Scenario } from '../contract';
 import { gradeContext, gradeScenario } from '../grade';

@@ -8,7 +8,7 @@ import type { Clash } from '@aec/industrial/clash';
 import { buildPlanDrawing } from '@aec/planDrawing';
 import type { TakeoffLine } from '@aec/takeoffBasics';
 import type { IfcExport } from '@aec/ifcBuild';
-import { serializeDocument } from '@core/commands/persistence';
+import { serializeDocument } from '@core/commands/persistence/serialization';
 import { buildingErrors } from '@aec/validate';
 import { polygonArea } from '@lib/polygon';
 import { rawBuilding } from './elementEdits';

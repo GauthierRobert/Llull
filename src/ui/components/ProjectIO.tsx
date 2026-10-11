@@ -14,7 +14,7 @@ import { useSessionStore } from '@ui/store/sessionStore';
 import { browserStorage, clearAutosave, writeAutosave } from '@ui/store/autosave';
 import { ConfirmDialog } from '@ui/components/ConfirmDialog';
 import { projectFileStem } from '@ui/components/projectName';
-import { serializeDocument } from '@core/commands/persistence';
+import { serializeDocument } from '@core/commands/persistence/serialization';
 import { Icon } from '@ui/components/Icon';
 import { downloadBlob } from '@ui/download';
 

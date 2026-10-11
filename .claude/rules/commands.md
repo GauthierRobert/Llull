@@ -61,11 +61,11 @@ export const fooThing = defineCommand({
   `delete_step`.
 - Ids: step n mints `<prefix>-<n>.<k>` (`doc.nextStepNumber`, never reused; `@lib/id`
   `stepIdSource`). Never `uniqueId()` / `Date.now()` in a command.
-- Replay prefix cache (`commands/replayCache.ts`, `ctx.replayCache`): editing step k re-runs k..n.
+- Replay prefix cache (`commands/history/replayCache.ts`, `ctx.replayCache`): editing step k re-runs k..n.
 - Parameters (`set_parameter`, `=expr` strings in step params) regenerate only dependents
-  (`commands/dependents.ts`). Constraints + pure solver (`solve_constraints`), configurations, recipes.
-- CONSTRUCTIVE vs EVALUATED: `@core/model/partition` (`definitionOf` / `evaluatedOf`). Plugin-derived
-  entities are omitted from saved files (llull-document v2) and re-derived on load; v1 still read.
+  (`commands/history/dependents.ts`). Constraints + pure solver (`solve_constraints`), configurations, recipes.
+- CONSTRUCTIVE vs EVALUATED: `entities`/`order` are evaluated, the rest is definition. Plugin-derived
+  entities (`derivedEntityIds`, `@core/plugins/host`) are omitted from saved files (llull-document v2) and re-derived on load; v1 still read.
 
 ## Kernel (L9, as built)
 
@@ -73,7 +73,7 @@ export const fooThing = defineCommand({
   `ShapeHandle`; kernels implement `KernelOps<S>` on their native shape and wrap it with
   `kernelFromOps` (`@core/geometry/shapeKernel`: cache by `recipeKey`, rebuild on eviction). Meshes
   only come OUT (`tessellate`). Results store their recipe as `mesh.brep`; never feed a mesh back
-  into the kernel when a recipe exists (`kernelShape.ts` `operandRecipe`).
+  into the kernel when a recipe exists (`brep/kernelShape.ts` `operandRecipe`).
 - Kernel only from `ctx.kernel` (it caches its own shapes by recipe key). Never import a concrete
   kernel or call `getGeometryKernel()` in a command.
 - Prefer deriving evaluated geometry from the document rather than storing it (L8).

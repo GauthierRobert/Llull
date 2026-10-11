@@ -2,8 +2,8 @@
 import { describe, it, expect } from 'vitest';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { deserializeDocument, serializeDocument } from '@core/commands/persistence';
-import { derivedEntityIds } from '@core/model/partition';
+import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
+import { derivedEntityIds } from '@core/plugins/host';
 
 function hall(): CadDocument {
   let doc = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
-import type { ExportStlData } from '@core/commands/export';
+import type { ExportStlData } from '@core/commands/exchange/exportStl';
 import { execute } from '@core/commands/registry';
 
 describe('export_stl solid name', () => {

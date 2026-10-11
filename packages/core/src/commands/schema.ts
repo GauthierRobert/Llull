@@ -10,7 +10,7 @@
 import { z } from 'zod';
 import { isHexColor } from '../lib/isHexColor';
 import type { CadDocument, Vec2, Vec3 } from '../model/types';
-import type { ExecutionContext } from './context';
+import type { ExecutionContext } from './types';
 import type {
   CommandAnnotations,
   CommandDefinition,

@@ -8,10 +8,10 @@
 
 import { type CadDocument, type Entity, type FeatureStep, type Vec3, is3D } from '../model/types';
 import type { CommandDefinition } from '../commands/types';
-import { replayHistory, type ReplayStepEvent } from '../commands/replay';
-import { buildParamEnv } from '../commands/regenerate';
-import { evaluateExpression, extractReferences } from '../commands/expression';
-import { entityTrianglePositions } from '../commands/exportTriangulate';
+import { replayHistory, type ReplayStepEvent } from '../commands/history/replay';
+import { buildParamEnv } from '../commands/history/regenerate';
+import { evaluateExpression, extractReferences } from '../commands/parametric/expression';
+import { entityTrianglePositions } from '../geometry/entityTriangles';
 import { Namer, translateExpression } from './identifiers';
 import type { GeometryKernel } from '../geometry/kernel';
 import { recipeOf } from '../geometry/shapeRecipe';

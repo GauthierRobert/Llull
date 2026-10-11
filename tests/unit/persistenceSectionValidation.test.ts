@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
-import { validateDocumentValues } from '@core/commands/persistenceValidation';
+import { validateDocumentValues } from '@core/commands/persistence/validation';
 
 const base = (): Record<string, unknown> =>
   JSON.parse(JSON.stringify(createEmptyDocument())) as Record<string, unknown>;

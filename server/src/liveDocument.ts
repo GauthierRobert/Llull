@@ -11,7 +11,7 @@ import { randomUUID } from 'crypto';
 import { createAutosaver } from './autosave';
 import type { Response } from 'express';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
-import { serializeDocument, deserializeDocument } from '@core/commands/persistence';
+import { serializeDocument, deserializeDocument } from '@core/commands/persistence/serialization';
 import { errorMessage } from '@lib/errorMessage';
 import { type LiveCommandEvent, type LiveSnapshotEvent, documentHash } from '@mcp/liveSync';
 import { setAuditDefaultDirectory } from './audit';

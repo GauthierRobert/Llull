@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { evaluateExpression, expressionSyntaxError } from '@core/commands/expression';
+import { evaluateExpression, expressionSyntaxError } from '@core/commands/parametric/expression';
 
 const value = (expression: string, env: Record<string, number> = {}): number | string => {
   const result = evaluateExpression(expression, env);

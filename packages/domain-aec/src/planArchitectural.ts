@@ -16,7 +16,7 @@ import type {
 import { polygonArea, polygonCentroid } from '@lib/polygon';
 import { curvedBandBetween, curvedWallExtent, tangentWall } from './curvedWallGeometry';
 import { fromMm, toMetres } from './model';
-import { gridBubbleCenters } from './grid';
+import { gridBubbleCenters } from './gridGeometry';
 import {
   doorSwing,
   openingsOf,

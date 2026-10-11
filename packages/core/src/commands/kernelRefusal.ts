@@ -8,7 +8,8 @@
  */
 
 import type { CadDocument, FeatureStep } from '../model/types';
-import { type CommandLookup, type ExecutionContext, currentContext } from './context';
+import { currentContext } from './context';
+import type { CommandLookup, ExecutionContext } from './types';
 
 function recipeSteps(doc: Pick<CadDocument, 'recipes'>, step: FeatureStep): FeatureStep[] {
   if (step.name !== 'instantiate_recipe') return [];

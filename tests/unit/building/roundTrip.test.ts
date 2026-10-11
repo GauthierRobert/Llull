@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
-import { deserializeDocument, serializeDocument } from '@core/commands/persistence';
+import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { applySteps } from './applySteps';
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
-import { deserializeDocument, serializeDocument } from '@core/commands/persistence';
+import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { flattenDxf, parseDxf } from '@core/lib/dxfRead';
 import { civilErrors } from '@aec/civil/validate';
 import { gridSize, MAX_SAMPLES } from '@aec/civil/earthworksMath';

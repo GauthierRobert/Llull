@@ -20,7 +20,7 @@ import type {
   Vec2,
 } from '@core/model/types';
 import { is3D } from '@core/model/types';
-import { GLYPH_WIDTH_RATIO, textLocalBounds } from '@core/commands/sceneBounds';
+import { GLYPH_WIDTH_RATIO, textLocalBounds } from '@core/geometry/bounds';
 import { DEFAULT_OFFSET, dimensionDrawing } from './entities/dimensionGeometry';
 import { nearestOnArc } from './snapping/geometry';
 import { ringsDistSq, solidOutline } from './solidOutline';

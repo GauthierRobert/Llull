@@ -5,7 +5,7 @@
  * (map keys + `id` fields) AND via the current `nextId` pattern.
  */
 import type { CadDocument } from '@core/model/types';
-import { serializeDocument } from '@core/commands/persistence';
+import { serializeDocument } from '@core/commands/persistence/serialization';
 
 /** Legacy `prefix-<time36>-<counter36>` ids, step-scoped `prefix-<n>.<k>` ids, and `step-<n>`. */
 const NEXT_ID_PATTERN =

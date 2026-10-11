@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import type { RenderViewData } from '@core/commands/renderTypes';
+import type { RenderViewData } from '@core/commands/render/types';
 
 const bare = { showAxes: false, showGrid: false } as const;
 

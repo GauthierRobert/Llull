@@ -6,8 +6,8 @@
 
 import { Router, type Response } from 'express';
 import { exportStepFile } from '@mcp/index';
-import type { ExportStlData } from '@core/commands/export';
-import type { ExportStepExactData } from '@core/commands/brep';
+import type { ExportStlData } from '@core/commands/exchange/exportStl';
+import type { ExportStepExactData } from '@core/commands/brep/topology';
 import { errorMessage } from '@lib/errorMessage';
 import { applyCommand } from './commandBus';
 import { getLiveDoc } from './liveDocument';

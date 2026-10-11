@@ -12,7 +12,6 @@ import { distance } from '@lib/polygon';
 import { sameSegment } from './duplicates';
 import { noop } from '@core/commands/noop';
 import { commitBuilding } from './evaluateElements';
-import { wallFrame } from './wallGeometry';
 
 export function gridLabels(building: BuildingModel): Set<string> {
   return new Set(
@@ -208,12 +207,3 @@ export const addGridSystem = defineCommand({
     );
   },
 });
-
-/** Bubble centres of a grid axis: one `radius` beyond each end, along the axis. */
-export function gridBubbleCenters(grid: GridElement, radius: number): [start: Vec2, end: Vec2] {
-  const { direction } = wallFrame(grid);
-  return [
-    [grid.start[0] - direction[0] * radius, grid.start[1] - direction[1] * radius],
-    [grid.end[0] + direction[0] * radius, grid.end[1] + direction[1] * radius],
-  ];
-}

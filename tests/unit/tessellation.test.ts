@@ -17,7 +17,7 @@ import {
   SEG_TORUS_TUBE,
   circlePoints,
   earClipTriangulate,
-} from '@core/commands/tessellation';
+} from '@core/geometry/tessellation';
 
 describe('tessellation — shared constants', () => {
   it('segmentation constants are positive integers', () => {

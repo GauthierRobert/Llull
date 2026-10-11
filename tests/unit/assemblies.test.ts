@@ -9,8 +9,8 @@ import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument, Component, InstanceEntity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { rotatedEntityBounds } from '@core/commands/sceneRotatedBounds';
-import { expandInstance } from '@core/commands/instanceExpansion';
+import { rotatedEntityBounds } from '@core/geometry/rotatedBounds';
+import { expandInstance } from '@core/geometry/instanceExpansion';
 import { expectNoOp } from '../helpers/expectNoOp';
 
 interface Comp {

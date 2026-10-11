@@ -2,7 +2,7 @@
 
 Ground-truth reference for `packages/core/src/commands` (`@core/commands/*`). Mirror these
 signatures exactly. Source: `types.ts`, `schema.ts`, `context.ts`, `registry.ts`,
-`entityOps.ts`, `commitEntity.ts`; ids in `packages/core/src/lib/id.ts`; plugins in `packages/core/src/plugins/`.
+`entity/entityOps.ts`, `entity/commitEntity.ts`; ids in `packages/core/src/lib/id.ts`; plugins in `packages/core/src/plugins/`.
 
 ## Contracts (`types.ts`)
 
@@ -123,7 +123,7 @@ pluginToolNames(toolset): string[]
 interface DerivationGuard { readonly domain: string; check(previous, next): string | null }
 ```
 
-## Purity helper pattern (`entityOps.ts`, `commitEntity.ts`)
+## Purity helper pattern (`entity/entityOps.ts`, `entity/commitEntity.ts`)
 
 ```ts
 function withEntity(doc: CadDocument, entity: Entity): CadDocument {
@@ -133,9 +133,9 @@ function withEntity(doc: CadDocument, entity: Entity): CadDocument {
 function commitEntity(doc: CadDocument, entity: Entity, summary: string): CommandResult;
 ```
 
-Commands to imitate: `add_box` (`geometryBasic.ts`), `set_units` (`units.ts`),
-`extrude_sketch` / `revolve_profile` (`profile.ts`), `boolean_subtract` (`boolean.ts`, kernel),
-`measure_distance` (`measureDistanceAngle.ts`, query), a building command in `packages/domain-aec/src`.
+Commands to imitate: `add_box` (`solids/basic.ts`), `set_units` (`document/units.ts`),
+`extrude_sketch` / `revolve_profile` (`solids/profile.ts`), `boolean_subtract` (`brep/boolean.ts`, kernel),
+`measure_distance` (`inspect/measureDistanceAngle.ts`, query), a building command in `packages/domain-aec/src`.
 
 - Create: build entity with `nextId(prefix)` from `@lib/id` (scoped to the step's id source),
   `layerId: DEFAULT_LAYER_ID`.
@@ -159,11 +159,11 @@ No id-counter reset exists; tests rely on step-scoped determinism.
 
 ## History & regeneration
 
-- `replayHistory(base, history, getCommand, warnings?, onStep?)` (`history.ts`): replays live steps
+- `replayHistory(base, history, getCommand, warnings?, onStep?)` (`history/history.ts`): replays live steps
   from an empty doc keeping document-level state; reuses `ctx.replayCache` prefixes
-  (`replayCache.ts`); refuses when a live step `requiresKernel` and no kernel is installed.
+  (`history/replayCache.ts`); refuses when a live step `requiresKernel` and no kernel is installed.
 - `set_parameter` / `delete_parameter` (`metaHistory`) → `regenerateParameterDependents`
-  (`dependents.ts`): replays only when a step's `=expr` params read a changed parameter.
+  (`history/dependents.ts`): replays only when a step's `=expr` params read a changed parameter.
 
 ## How the surfaces consume this (do not bypass)
 

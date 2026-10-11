@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { type ExtrusionEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { buildSpurGearProfile } from '@core/commands/gears';
+import { buildSpurGearProfile } from '@core/commands/solids/gears';
 import { expectSingleEntity } from '../helpers/expectNoOp';
 
 describe('add_spur_gear', () => {

@@ -15,7 +15,7 @@ import { addDoor, addWindow } from './openings';
 import { addBeam, addColumn, addSlab, addStair } from './structure';
 import { addRoom, copyLevelElements, deleteBuildingElement } from './elements';
 import { addSlabOpening } from './slabOpenings';
-import { fitView } from '@core/commands/camera';
+import { fitView } from '@core/commands/document/camera';
 
 type Step = (doc: CadDocument) => CommandResult;
 

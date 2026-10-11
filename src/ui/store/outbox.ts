@@ -6,7 +6,7 @@
  */
 
 import type { CadDocument, EntityId } from '@core/model/types';
-import { extendIdMap, mapStringLeaves, remapIds } from '@core/commands/regenerate';
+import { extendIdMap, mapStringLeaves, remapIds } from '@core/commands/history/regenerate';
 import { errorMessage } from '@lib/errorMessage';
 import {
   fetchLiveSnapshot,

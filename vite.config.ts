@@ -72,6 +72,7 @@ export default defineConfig(({ command }) => ({
       exclude: ['packages/*/src/**/types.ts', 'packages/*/src/**/*.d.ts'],
       thresholds: {
         'packages/core/src/commands/**': { statements: 90, branches: 85, functions: 90, lines: 90 },
+        'packages/core/src/geometry/**': { statements: 90, branches: 85, functions: 90, lines: 90 },
         'packages/domain-aec/src/**': { statements: 90, branches: 85, functions: 90, lines: 90 },
       },
     },

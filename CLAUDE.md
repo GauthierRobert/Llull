@@ -35,7 +35,7 @@ npm workspaces (`packages/*`); the web app and `server/` stay at the repo root.
 
 ```
 packages/core/src/          @core  Framework-agnostic brain. NO react / DOM / window / fetch.
-  model/                           types.ts (CadDocument, Entity) · partition.ts · building.ts (types)
+  model/                           types.ts (CadDocument, Entity) · building.ts · civil.ts (types)
   commands/                        THE command layer — schema.ts (defineCommand), context.ts,
                                    registry.ts, types.ts, one file per domain
   geometry/                        kernel.ts (GeometryKernel) · shapeRecipe.ts · shapeKernel.ts · kernelChoice.ts

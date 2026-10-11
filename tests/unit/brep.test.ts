@@ -6,7 +6,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { type CadDocument, type MeshSolidEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
-import { serializeDocument } from '@core/commands/persistence';
+import { serializeDocument } from '@core/commands/persistence/serialization';
 import { setGeometryKernel, type GeometryKernel, type ShapeTopology } from '@core/geometry/kernel';
 import { fakeKernel, TETRA } from '../helpers/fakeKernel';
 

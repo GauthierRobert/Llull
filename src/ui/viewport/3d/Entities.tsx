@@ -33,7 +33,7 @@ import { isBatchable, groupEntitiesForInstancing } from './grouping';
 import { InstancedRenderer } from './InstancedRenderer';
 import { GridAnnotations3D } from './GridAnnotations3D';
 import { GRID_LAYER_NAME } from './gridAnnotations';
-import { expandInstance } from '@core/commands/instanceExpansion';
+import { expandInstance } from '@core/geometry/instanceExpansion';
 import type { PbrMaterial } from './useMaterialProps';
 import type { SolidMeshKindProps } from './entities/SolidMeshShell';
 

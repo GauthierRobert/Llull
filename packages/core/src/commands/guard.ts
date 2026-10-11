@@ -4,7 +4,6 @@
  */
 
 import type { CommandDefinition, CommandResult, ParamsSchema } from './types';
-import { currentContext } from './context';
 import { formatIssues } from './schema';
 import { derivationViolation } from './derivation';
 import { pluginGuards } from '../plugins/host';
@@ -119,7 +118,7 @@ export function guardCommand(def: CommandDefinition<unknown>): CommandDefinition
       }
       let result: CommandResult;
       try {
-        result = def.run(doc, safeParams, ctx ?? currentContext());
+        result = def.run(doc, safeParams, ctx);
       } catch (error) {
         const reason = warnAndDescribe(`command '${def.name}' threw:`, error);
         return rejection(doc, `${def.name} failed: ${reason}; document unchanged.`);

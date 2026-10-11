@@ -35,7 +35,7 @@ import { fromMm, toMetres } from './model';
 import { prismMesh } from './mesh';
 import { base, CATEGORY_LAYER, colorForMaterial, meshEntity, orientedBox } from './entities';
 import { curvedBandBetween } from './curvedWallGeometry';
-import { gridBubbleCenters } from './grid';
+import { gridBubbleCenters } from './gridGeometry';
 import {
   doorSwing,
   openingsOf,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument, type Vec2, type Vec3 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { deserializeDocument, serializeDocument } from '@core/commands/persistence';
+import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { civilObject, getCivil } from '@aec/civil/model';
 
 function step(doc: CadDocument, name: string, params: Record<string, unknown>): CadDocument {

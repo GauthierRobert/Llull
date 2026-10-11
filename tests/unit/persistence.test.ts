@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { serializeDocument, deserializeDocument } from '@core/commands/persistence';
+import { serializeDocument, deserializeDocument } from '@core/commands/persistence/serialization';
 import { expectDocumentEnvelope } from '../helpers/documentEnvelope';
 
 // Helpers — build minimal valid envelopes without going through commands

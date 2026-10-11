@@ -24,7 +24,7 @@ interface in `packages/core/src/model/types.ts` (Vec2 geometry in the entity's l
 
 ### 2. Drawing command(s) — command-author / add-command skill
 Each draw op is a pure `defineCommand`, snake_case, drafting-verb named, in
-`packages/core/src/commands/draw2d*.ts` / `modify2d*.ts` / `annotate.ts` (`draw_line`,
+`packages/core/src/commands/draw2d/` / `modify2d/` (`draw_line`,
 `draw_polyline`, `draw_arc`, `draw_circle`, `draw_rectangle`, `draw_ellipse`, `draw_spline`,
 `add_dimension`, `offset_2d`, `trim`, …). Points: `vec2()` / `looseVec2()` schema helpers. Same
 rules as any command: pure, registered (+ `2d` toolset in `packages/mcp/src/toolsets.ts`),

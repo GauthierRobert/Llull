@@ -9,7 +9,7 @@
  * hull of its projected bounding box / vertices (mesh, revolution, wedge, pyramid, box, instance).
  */
 
-import { boundsCorners, localBounds } from '@core/commands/sceneBounds';
+import { boundsCorners, localBounds } from '@core/geometry/bounds';
 import { applyEulerXYZ } from '@core/lib/eulerRotation';
 import {
   type CadDocument,

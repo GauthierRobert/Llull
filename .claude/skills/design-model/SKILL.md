@@ -17,7 +17,7 @@ verify and refine.
 > *uses* the commands that already exist.
 
 ## References
-- Plan transaction & aliasing: `packages/core/src/commands/project.ts` (`build_project`)
+- Plan transaction & aliasing: `packages/core/src/commands/project/buildProject.ts` (`build_project`)
 - Full command vocabulary: `listCommands()` (`registry.ts` + plugins) · Schema: `.claude/context/model.md`
 - Over MCP only the `core` toolset is listed by default: `search_tools` to find a tool,
   `enable_toolset` to load its toolset (`build_project` steps can use any command regardless).

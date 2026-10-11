@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { type CadDocument, type BoxEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { executeRecorded } from '@core/commands/record';
+import { executeRecorded } from '@core/commands/history/record';
 
 function project(doc: CadDocument, actions: unknown[]): ReturnType<typeof execute> {
   return execute(doc, 'build_project', { actions });

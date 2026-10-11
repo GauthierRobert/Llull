@@ -5,8 +5,8 @@
  */
 
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
-import { type Triangle } from '@core/commands/exportMath';
-import { entityToTriangles } from '@core/commands/exportTriangulate';
+import { type Triangle } from '@core/geometry/triangles';
+import { entityToTriangles } from '@core/geometry/entityTriangles';
 import { cross3, dot3, sub3 } from '@lib/vec3';
 
 export const ELEVATION_DIRECTIONS = ['north', 'south', 'east', 'west'] as const;

@@ -13,7 +13,7 @@ import {
 } from '@core/model/civil';
 import { fromMm, toMetres } from '../model';
 import { dependentsOf } from './integrity';
-import { MM_PER_UNIT } from '@core/commands/import_dxf';
+import { MM_PER_UNIT } from '@core/commands/exchange/importDxf';
 
 export function getCivil(doc: Pick<CadDocument, 'civil'>): CivilModel {
   return doc.civil ?? createEmptyCivil();

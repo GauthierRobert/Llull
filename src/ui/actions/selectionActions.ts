@@ -7,7 +7,7 @@
 
 import type { Vec3 } from '@core/model/types';
 import { buildingElementOf } from '@aec/index';
-import { rotatedEntityBounds } from '@core/commands/sceneRotatedBounds';
+import { rotatedEntityBounds } from '@core/geometry/rotatedBounds';
 import { useStore } from '@ui/store';
 
 /**

@@ -7,6 +7,7 @@
 
 import type { CadPlugin, DocumentExtension } from './plugin';
 import type { DerivationGuard } from '../commands/derivation';
+import type { CadDocument } from '../model/types';
 
 const installed: CadPlugin[] = [];
 const listeners: Array<(plugin: CadPlugin) => void> = [];
@@ -38,6 +39,14 @@ export function pluginGuards(): DerivationGuard[] {
 
 export function documentExtensions(): DocumentExtension[] {
   return installed.flatMap((plugin) => (plugin.document ? [plugin.document] : []));
+}
+
+/**
+ * Entity ids regenerated from the definition by an installed plugin's pure deriver (today: the
+ * building plugin). Persistence omits these and re-derives them on load (architecture L8).
+ */
+export function derivedEntityIds(doc: CadDocument): Set<string> {
+  return new Set(documentExtensions().flatMap((extension) => [...extension.derivedEntityIds(doc)]));
 }
 
 /** Command names a toolset gets from installed plugins. */
