@@ -19,9 +19,7 @@ import { createEmptyDocument } from '@core/model/types';
 import { StatusBar } from '@ui/components/StatusBar';
 import { localDispatch } from '../helpers/storeTestHelpers';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function resetStore(): void {
   useStore.setState({
@@ -37,9 +35,7 @@ function createBox(): string {
   return result.affected[0]!;
 }
 
-// ---------------------------------------------------------------------------
 // StatusBar — live indicator
-// ---------------------------------------------------------------------------
 
 describe('StatusBar — live indicator', () => {
   beforeEach(() => {
@@ -65,9 +61,7 @@ describe('StatusBar — live indicator', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // StatusBar — units display
-// ---------------------------------------------------------------------------
 
 describe('StatusBar — units', () => {
   beforeEach(() => {
@@ -98,9 +92,7 @@ describe('StatusBar — units', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // StatusBar — selection count
-// ---------------------------------------------------------------------------
 
 describe('StatusBar — selection count', () => {
   beforeEach(() => {
@@ -138,9 +130,7 @@ describe('StatusBar — selection count', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // StatusBar — last summary
-// ---------------------------------------------------------------------------
 
 describe('StatusBar — last command summary', () => {
   beforeEach(() => {
@@ -177,9 +167,7 @@ describe('StatusBar — last command summary', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // StatusBar — entity count
-// ---------------------------------------------------------------------------
 
 describe('StatusBar — entity count', () => {
   beforeEach(() => {

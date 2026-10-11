@@ -12,9 +12,7 @@ import { buildMcpTools, listMcpResources, readMcpResource, CAD_RESOURCE_URIS } f
 import { applyToolCall } from '../helpers/applyToolCall';
 import { expectDocumentEnvelope } from '../helpers/documentEnvelope';
 
-// ---------------------------------------------------------------------------
 // buildMcpTools
-// ---------------------------------------------------------------------------
 
 describe('buildMcpTools()', () => {
   it('returns one tool per registered command', () => {
@@ -52,9 +50,7 @@ describe('buildMcpTools()', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // applyToolCall — happy path
-// ---------------------------------------------------------------------------
 
 describe('applyToolCall() — known command', () => {
   it('add_box: returns a new document containing the box', () => {
@@ -99,9 +95,7 @@ describe('applyToolCall() — known command', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // applyToolCall — unknown tool
-// ---------------------------------------------------------------------------
 
 describe('applyToolCall() — unknown tool name', () => {
   it('returns isError true', () => {
@@ -129,9 +123,7 @@ describe('applyToolCall() — unknown tool name', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Purity
-// ---------------------------------------------------------------------------
 
 describe('applyToolCall() — purity', () => {
   it('input document is not mutated by a successful command', () => {
@@ -149,9 +141,7 @@ describe('applyToolCall() — purity', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // listMcpResources
-// ---------------------------------------------------------------------------
 
 describe('listMcpResources()', () => {
   it('returns exactly four resource descriptors', () => {
@@ -203,9 +193,7 @@ describe('listMcpResources()', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // readMcpResource — cad://document
-// ---------------------------------------------------------------------------
 
 describe('readMcpResource() — cad://document', () => {
   it('returns non-null content for an empty document', () => {
@@ -235,9 +223,7 @@ describe('readMcpResource() — cad://document', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // readMcpResource — cad://scene
-// ---------------------------------------------------------------------------
 
 describe('readMcpResource() — cad://scene', () => {
   it('returns non-null content for an empty document', () => {
@@ -277,9 +263,7 @@ describe('readMcpResource() — cad://scene', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // readMcpResource — cad://selection
-// ---------------------------------------------------------------------------
 
 describe('readMcpResource() — cad://selection', () => {
   it('returns non-null content', () => {
@@ -310,9 +294,7 @@ describe('readMcpResource() — cad://selection', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // readMcpResource — unknown URI
-// ---------------------------------------------------------------------------
 
 describe('readMcpResource() — unknown URI', () => {
   it('returns null for an unknown URI', () => {

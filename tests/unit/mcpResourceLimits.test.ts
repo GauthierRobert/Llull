@@ -2,17 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { MAX_RESOURCE_ITEMS, readMcpResource } from '@mcp/resources';
+import { boxRowPlan } from '../helpers/boxRowPlan';
 
 function documentWithBoxes(count: number): CadDocument {
-  const plan = {
-    actions: [
-      {
-        repeat: { count, as: 'row' },
-        step: { command: 'add_box', params: { size: [1, 1, 1], position: ['=$i', 0, 0] } },
-      },
-    ],
-  };
-  return execute(createEmptyDocument(), 'build_project', plan).document;
+  return execute(createEmptyDocument(), 'build_project', boxRowPlan(count)).document;
 }
 
 const read = (doc: CadDocument, uri: string): Record<string, unknown> =>

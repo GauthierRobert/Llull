@@ -5,9 +5,7 @@ import { sampleInvolute } from '@core/commands/gears';
 import { expectSingleEntity } from '../helpers/expectNoOp';
 
 describe('draw_involute', () => {
-  // ---------------------------------------------------------------------------
   // Happy path — basic shape
-  // ---------------------------------------------------------------------------
 
   it('creates exactly one open polyline entity', () => {
     const doc = createEmptyDocument();
@@ -49,9 +47,7 @@ describe('draw_involute', () => {
     expect(Math.abs(actualR - expectedR)).toBeLessThan(1e-9);
   });
 
-  // ---------------------------------------------------------------------------
   // Math cross-check with add_spur_gear (shared helper proves one source of truth)
-  // ---------------------------------------------------------------------------
 
   it('endpoint radius matches gear outerRadius — proves shared sampleInvolute helper', () => {
     // Derive the gear parameters used in addSpurGear tests:
@@ -75,9 +71,7 @@ describe('draw_involute', () => {
     expect(Math.abs(actualR - outerRadius)).toBeLessThan(1e-9);
   });
 
-  // ---------------------------------------------------------------------------
   // samples param
-  // ---------------------------------------------------------------------------
 
   it('explicit samples=10 produces 10 points', () => {
     const doc = createEmptyDocument();
@@ -103,9 +97,7 @@ describe('draw_involute', () => {
     expect(poly.points).toHaveLength(2);
   });
 
-  // ---------------------------------------------------------------------------
   // startAngle default
-  // ---------------------------------------------------------------------------
 
   it('omitting startAngle defaults to 0 — same as explicit startAngle=0', () => {
     const doc = createEmptyDocument();
@@ -120,9 +112,7 @@ describe('draw_involute', () => {
     }
   });
 
-  // ---------------------------------------------------------------------------
   // position / rotation placement
-  // ---------------------------------------------------------------------------
 
   it('position is stored on the entity', () => {
     const doc = createEmptyDocument();
@@ -154,9 +144,7 @@ describe('draw_involute', () => {
     expect(r1.document.entities[r1.affected[0]!]!.position[0]).toBe(0);
   });
 
-  // ---------------------------------------------------------------------------
   // Summary
-  // ---------------------------------------------------------------------------
 
   it('summary contains entity id, baseRadius, sweep range, and sample count', () => {
     const doc = createEmptyDocument();
@@ -174,9 +162,7 @@ describe('draw_involute', () => {
     expect(result.summary).toContain('12'); // samples
   });
 
-  // ---------------------------------------------------------------------------
   // Failure paths
-  // ---------------------------------------------------------------------------
 
   it('baseRadius=0 -> no-op, affected:[], summary mentions baseRadius', () => {
     const doc = createEmptyDocument();
@@ -260,9 +246,7 @@ describe('draw_involute', () => {
     expect(result.document).toBe(doc);
   });
 
-  // ---------------------------------------------------------------------------
   // Purity
-  // ---------------------------------------------------------------------------
 
   it('is pure — happy path does not mutate input doc', () => {
     const doc = createEmptyDocument();

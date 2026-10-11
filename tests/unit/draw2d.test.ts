@@ -18,9 +18,7 @@ function expectPure(name: string, params: unknown): void {
 }
 
 describe('2D draw commands', () => {
-  // -------------------------------------------------------------------------
   // draw_line
-  // -------------------------------------------------------------------------
 
   describe('draw_line', () => {
     it('creates a line entity with correct geometry', () => {
@@ -72,9 +70,7 @@ describe('2D draw commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // draw_polyline
-  // -------------------------------------------------------------------------
 
   describe('draw_polyline', () => {
     it('creates a polyline entity with correct geometry', () => {
@@ -135,9 +131,7 @@ describe('2D draw commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // draw_arc
-  // -------------------------------------------------------------------------
 
   describe('draw_arc', () => {
     it('creates an arc entity with correct geometry', () => {
@@ -189,9 +183,7 @@ describe('2D draw commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // draw_circle
-  // -------------------------------------------------------------------------
 
   describe('draw_circle', () => {
     it('creates a circle entity with correct geometry', () => {
@@ -226,9 +218,7 @@ describe('2D draw commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // draw_rectangle
-  // -------------------------------------------------------------------------
 
   describe('draw_rectangle', () => {
     it('creates a rectangle entity with correct geometry', () => {
@@ -264,9 +254,7 @@ describe('2D draw commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // draw_point
-  // -------------------------------------------------------------------------
 
   describe('draw_point', () => {
     it('creates a point entity at the given position', () => {
@@ -294,9 +282,7 @@ describe('2D draw commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // is2D / is3D helpers
-  // -------------------------------------------------------------------------
 
   describe('is2D / is3D', () => {
     it('is2D returns true for all 2D shape kinds', () => {
@@ -340,9 +326,7 @@ describe('2D draw commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // scale_entity — 2D branches
-  // -------------------------------------------------------------------------
 
   describe('scale_entity on 2D shapes', () => {
     it('scales a line start and end points', () => {

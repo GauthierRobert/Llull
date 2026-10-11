@@ -20,9 +20,7 @@ import { DEFAULT_LAYER_ID } from '@core/model/types';
 import { LayersPanel } from '@ui/panels/LayersPanel';
 import { localDispatch } from '../helpers/storeTestHelpers';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function resetStore(): void {
   // setDocument also clears local-edit bookkeeping left by a previous test.
@@ -38,9 +36,7 @@ function addLayer(name: string, color?: string): string {
   return result.affected[0]!;
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 describe('LayersPanel — read-only viewer', () => {
   beforeEach(() => {

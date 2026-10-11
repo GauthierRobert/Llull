@@ -14,21 +14,18 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { frameEntityIds, makeFakeRes, parseSseFrame } from './sseTestHelpers';
+import { boxRowPlan } from '../../tests/helpers/boxRowPlan';
 import { applyCommand, undo, redo, canUndo, canRedo, _resetHistory } from '../src/commandBus';
 import { getLiveDoc, _resetLiveDoc, subscribeLive } from '../src/liveDocument';
 
-// ---------------------------------------------------------------------------
 // Reset shared state before each test.
-// ---------------------------------------------------------------------------
 
 beforeEach(() => {
   _resetLiveDoc();
   _resetHistory();
 });
 
-// ---------------------------------------------------------------------------
 // (a) Mutating command updates live doc + pushes undo history
-// ---------------------------------------------------------------------------
 
 describe('applyCommand — mutating command', () => {
   it('adds an entity to the live document', () => {
@@ -74,9 +71,7 @@ describe('applyCommand — mutating command', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (b) Query command — data returned, no history push, no doc change
-// ---------------------------------------------------------------------------
 
 describe('applyCommand — query command (measure_volume)', () => {
   it('returns data and leaves the live document unchanged', () => {
@@ -115,9 +110,7 @@ describe('applyCommand — query command (measure_volume)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (c) No-op — graceful bad params, no history push
-// ---------------------------------------------------------------------------
 
 describe('applyCommand — no-op (bad params)', () => {
   it('does not push history when the document is unchanged', () => {
@@ -131,9 +124,7 @@ describe('applyCommand — no-op (bad params)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (d) Unknown command → isError true
-// ---------------------------------------------------------------------------
 
 describe('applyCommand — unknown command', () => {
   it('returns isError true and leaves the doc unchanged', () => {
@@ -155,9 +146,7 @@ describe('applyCommand — unknown command', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (e) undo / redo
-// ---------------------------------------------------------------------------
 
 describe('undo / redo', () => {
   it('undo with empty stack returns "Nothing to undo." without error', () => {
@@ -249,9 +238,7 @@ describe('undo / redo', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (f) canUndo / canRedo module-level helpers
-// ---------------------------------------------------------------------------
 
 describe('canUndo / canRedo', () => {
   it('start false on a clean state', () => {
@@ -276,21 +263,13 @@ describe('applyCommand — idempotent commandId', () => {
   });
 
   it('a replay keeps small result data but drops a huge payload and says so', () => {
-    const plan = (count: number): unknown => ({
-      actions: [
-        {
-          repeat: { count, as: 'row' },
-          step: { command: 'add_box', params: { size: [1, 1, 1], position: ['=$i', 0, 0] } },
-        },
-      ],
-    });
-    const small = applyCommand('build_project', plan(2), 'small');
+    const small = applyCommand('build_project', boxRowPlan(2), 'small');
     expect(small.data).toBeDefined();
-    expect(applyCommand('build_project', plan(2), 'small')).toEqual(small);
+    expect(applyCommand('build_project', boxRowPlan(2), 'small')).toEqual(small);
 
-    const big = applyCommand('build_project', plan(400), 'big');
+    const big = applyCommand('build_project', boxRowPlan(400), 'big');
     expect(JSON.stringify(big.data).length).toBeGreaterThan(64 * 1024);
-    const replay = applyCommand('build_project', plan(400), 'big');
+    const replay = applyCommand('build_project', boxRowPlan(400), 'big');
     expect(replay.data).toBeUndefined();
     expect(replay.affected).toEqual(big.affected);
     expect(replay.changed).toBe(true);

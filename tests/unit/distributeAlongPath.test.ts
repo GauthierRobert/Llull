@@ -8,9 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { type InstanceEntity, type PolylineEntity, createEmptyDocument } from '@core/model/types';
 import { execute, listCommands, toToolSchemas } from '@core/commands/registry';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 interface DocWithComponent {
   doc: ReturnType<typeof createEmptyDocument>;
@@ -99,9 +97,7 @@ function drawBeltLoop(doc: ReturnType<typeof createEmptyDocument>): {
   return { doc: result.document, pathId, totalLength };
 }
 
-// ---------------------------------------------------------------------------
 // Test suite
-// ---------------------------------------------------------------------------
 
 type Doc = ReturnType<typeof createEmptyDocument>;
 type Drawn = { doc: Doc; pathId: string };

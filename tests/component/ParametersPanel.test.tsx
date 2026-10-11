@@ -23,9 +23,7 @@ import { createEmptyDocument } from '@core/model/types';
 import { ParametersPanel } from '@ui/panels/ParametersPanel';
 import { answerDispatch, localDispatch } from '../helpers/storeTestHelpers';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function resetStore(): void {
   useStore.setState({
@@ -43,9 +41,7 @@ function patchDispatch(spy: ReturnType<typeof vi.fn>): void {
   useStore.setState({ dispatch: spy } as any);
 }
 
-// ---------------------------------------------------------------------------
 // Rendering tests
-// ---------------------------------------------------------------------------
 
 describe('ParametersPanel — rendering', () => {
   beforeEach(() => {
@@ -114,9 +110,7 @@ describe('ParametersPanel — rendering', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Editing expression tests
-// ---------------------------------------------------------------------------
 
 describe('ParametersPanel — editing expression', () => {
   beforeEach(() => {
@@ -185,9 +179,7 @@ describe('ParametersPanel — editing expression', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Delete parameter tests
-// ---------------------------------------------------------------------------
 
 describe('ParametersPanel — delete parameter', () => {
   beforeEach(() => {
@@ -208,9 +200,7 @@ describe('ParametersPanel — delete parameter', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Add parameter form tests
-// ---------------------------------------------------------------------------
 
 describe('ParametersPanel — add parameter form', () => {
   beforeEach(() => {

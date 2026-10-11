@@ -8,9 +8,7 @@ function lastBoolean(fake: FakeKernel): FakeCall | undefined {
   return [...fake.calls].reverse().find((call) => call.op === 'boolean');
 }
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function docWithTwoBoxes(): { doc: CadDocument; idA: string; idB: string } {
   let doc = createEmptyDocument();
@@ -33,9 +31,7 @@ function docWithBoxes(count: number): { doc: CadDocument; ids: string[] } {
   return { doc, ids };
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 describe('boolean commands', () => {
   let fake: FakeKernel;
@@ -49,9 +45,7 @@ describe('boolean commands', () => {
     setGeometryKernel(null);
   });
 
-  // -------------------------------------------------------------------------
   // boolean_union — happy path
-  // -------------------------------------------------------------------------
 
   describe('boolean_union', () => {
     it('creates one mesh entity and reports it as affected', () => {
@@ -142,9 +136,7 @@ describe('boolean commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // boolean_subtract — operand order
-  // -------------------------------------------------------------------------
 
   describe('boolean_subtract', () => {
     it('passes operands to the kernel in the correct order (a first, b second)', () => {
@@ -170,9 +162,7 @@ describe('boolean commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // boolean_intersect
-  // -------------------------------------------------------------------------
 
   describe('boolean_intersect', () => {
     it('passes op = intersect to the kernel and creates mesh entity', () => {
@@ -185,9 +175,7 @@ describe('boolean commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // No-op: missing ids
-  // -------------------------------------------------------------------------
 
   describe('no-op paths', () => {
     it('no-op when a is missing', () => {
@@ -243,9 +231,7 @@ describe('boolean commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // Group handling — operands pruned from groups
-  // -------------------------------------------------------------------------
 
   describe('group handling', () => {
     it('prunes operand ids from groups and dissolves groups that drop below 2 members', () => {
@@ -291,9 +277,7 @@ describe('boolean commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // Purity
-  // -------------------------------------------------------------------------
 
   describe('purity', () => {
     it.each(['boolean_union', 'boolean_subtract', 'boolean_intersect'])(
@@ -307,9 +291,7 @@ describe('boolean commands', () => {
     );
   });
 
-  // -------------------------------------------------------------------------
   // Kernel injection round-trip
-  // -------------------------------------------------------------------------
 
   it('getGeometryKernel returns null after afterEach cleanup', () => {
     // afterEach calls setGeometryKernel(null); this test confirms the module
@@ -318,9 +300,7 @@ describe('boolean commands', () => {
     expect(getGeometryKernel()).toBeNull();
   });
 
-  // -------------------------------------------------------------------------
   // scale_entity on a boolean-result mesh (exercises the transform.ts mesh branch)
-  // -------------------------------------------------------------------------
 
   it('scale_entity scales every position of a mesh entity by the factor', () => {
     const { doc, idA, idB } = docWithTwoBoxes();

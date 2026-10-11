@@ -21,15 +21,11 @@ import { ViewportControls } from '@ui/viewport/3d/ViewportControls';
 import { useStore } from '@ui/store';
 import { resetViewportStores } from '../helpers/componentEntities';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 const resetStores = (): void => resetViewportStores({ qualityOverride: 'auto' });
 
-// ---------------------------------------------------------------------------
 // QualityControl rendering
-// ---------------------------------------------------------------------------
 
 describe('ViewportControls — Quality selector', () => {
   beforeEach(() => {
@@ -113,9 +109,7 @@ describe('ViewportControls — Quality selector', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // viewportStore — setQualityOverride action
-// ---------------------------------------------------------------------------
 
 describe('viewportStore — setQualityOverride action', () => {
   beforeEach(() => {

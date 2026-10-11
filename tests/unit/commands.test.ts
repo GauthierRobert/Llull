@@ -465,9 +465,7 @@ describe('command layer', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Expression evaluator unit tests
-// ---------------------------------------------------------------------------
 
 import { evaluateExpression, extractReferences } from '@core/commands/expression';
 
@@ -610,9 +608,7 @@ describe('extractReferences', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // set_parameter / delete_parameter command tests
-// ---------------------------------------------------------------------------
 
 describe('set_parameter', () => {
   it('creates a literal parameter and reports it in summary', () => {
@@ -819,9 +815,7 @@ describe('delete_parameter', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // draw_ellipse
-// ---------------------------------------------------------------------------
 
 describe('draw_ellipse', () => {
   it('creates one ellipse entity with correct geometry', () => {
@@ -882,9 +876,7 @@ describe('draw_ellipse', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // draw_spline
-// ---------------------------------------------------------------------------
 
 describe('draw_spline', () => {
   it('creates one spline entity with correct through-points', () => {
@@ -972,9 +964,7 @@ describe('draw_spline', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // scale_entity — ellipse and spline branches
-// ---------------------------------------------------------------------------
 
 describe('scale_entity — ellipse and spline', () => {
   it('scales ellipse radiusX, radiusY, and center by factor', () => {
@@ -1717,9 +1707,7 @@ describe('scale_entity — ellipse and spline', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // render_view
-// ---------------------------------------------------------------------------
 
 describe('render_view', () => {
   it('empty doc returns a valid SVG, entityCount 0, bounds null', () => {
@@ -2084,9 +2072,7 @@ describe('render_view', () => {
     expect(firstBlueIdx).toBeLessThan(firstRedIdx);
   });
 
-  // ---------------------------------------------------------------------------
   // add_text
-  // ---------------------------------------------------------------------------
 
   it('add_text — happy path: creates text entity with correct fields', () => {
     const doc = createEmptyDocument();
@@ -2204,9 +2190,7 @@ describe('render_view', () => {
     expect(scaled.summary).toContain('height');
   });
 
-  // ---------------------------------------------------------------------------
   // Kinematic joints + drive relations
-  // ---------------------------------------------------------------------------
 
   /**
    * Helper: build a minimal doc with two InstanceEntities.
@@ -2661,9 +2645,7 @@ describe('render_view', () => {
     expect(reloaded.driveRelationOrder).toContain(drid);
   });
 
-  // ---------------------------------------------------------------------------
   // motion_study
-  // ---------------------------------------------------------------------------
 
   it('motion_study — joint sweep: instanceRotations change monotonically and doc is unchanged', () => {
     // A revolute joint swept from π/4 to 3π/4 in 5 steps.
@@ -2945,9 +2927,7 @@ describe('render_view', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // add_dimension
-// ---------------------------------------------------------------------------
 
 describe('add_dimension', () => {
   // Helpers to seed reference entities
@@ -2977,9 +2957,7 @@ describe('add_dimension', () => {
     };
   }
 
-  // ------------------------------------------------------------------
   // Happy paths
-  // ------------------------------------------------------------------
 
   it('linear — creates a dimension entity referencing 2 point entities', () => {
     const { doc, pointId1, pointId2 } = makeDoc();
@@ -3114,9 +3092,7 @@ describe('add_dimension', () => {
     expect(is2D(e)).toBe(true);
   });
 
-  // ------------------------------------------------------------------
   // Purity
-  // ------------------------------------------------------------------
 
   it('is pure — input document is not mutated', () => {
     const { doc, pointId1, pointId2 } = makeDoc();
@@ -3125,9 +3101,7 @@ describe('add_dimension', () => {
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 
-  // ------------------------------------------------------------------
   // Failure paths
-  // ------------------------------------------------------------------
 
   it('failure — unknown dimensionKind is a no-op', () => {
     const { doc, pointId1, pointId2 } = makeDoc();
@@ -3233,9 +3207,7 @@ describe('add_dimension', () => {
     expect(result.summary).toContain('angular');
   });
 
-  // ------------------------------------------------------------------
   // scale_entity on dimension
-  // ------------------------------------------------------------------
 
   it('scale_entity — dimension: scales offset, leaves entityIds unchanged', () => {
     const { doc, pointId1, pointId2 } = makeDoc();
@@ -3266,9 +3238,7 @@ describe('add_dimension', () => {
     expect(e.offset).toBeUndefined();
   });
 
-  // ------------------------------------------------------------------
   // check_model — dangling_dimension_ref
-  // ------------------------------------------------------------------
 
   it('check_model — flags dangling_dimension_ref when a referenced entity is deleted', () => {
     const { doc, pointId1, pointId2 } = makeDoc();
@@ -3685,9 +3655,7 @@ describe('add_dimension', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Constructive vs evaluated geometry: =expr resolution in replay
-// ---------------------------------------------------------------------------
 
 import { resolveStepParams, buildParamEnv } from '@core/commands/regenerate';
 
@@ -4584,9 +4552,7 @@ describe('=expr param resolution in replay_history', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Stable entity ids across replayHistory (id-remapping)
-// ---------------------------------------------------------------------------
 
 describe('Q4 — replayHistory id-remapping', () => {
   // ── AC1: move + assign_material + delete all survive replay ─────────────
@@ -5136,9 +5102,7 @@ describe('instantiate_template (templates.ts generators)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // export_stl — ASCII + binary STL export
-// ---------------------------------------------------------------------------
 
 describe('export_stl', () => {
   // ── helpers ───────────────────────────────────────────────────────────────
@@ -5786,9 +5750,7 @@ describe('export_stl', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Rotation param at creation + AABB in summaries
-// ---------------------------------------------------------------------------
 
 describe('W4A/W4C — rotation at creation and AABB summaries', () => {
   // ── add_box ──────────────────────────────────────────────────────────────
@@ -6070,12 +6032,10 @@ describe('W4A/W4C — rotation at creation and AABB summaries', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Unified placement anchor ('center' | 'min' | 'base-center')
 // Each add_* command keeps its CURRENT default placement when `anchor` is
 // omitted (back-compat lock); an explicit anchor places the corresponding
 // point of the world AABB at the supplied `position`.
-// ---------------------------------------------------------------------------
 
 describe('W4B — unified placement anchor', () => {
   /** Per-component near-equality on a Vec3 (avoids -0 / float noise). */
@@ -6367,9 +6327,7 @@ describe('clear_document', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // set_camera
-// ---------------------------------------------------------------------------
 
 describe('set_camera', () => {
   it('updates all four camera fields when all are provided', () => {
@@ -6437,9 +6395,7 @@ describe('set_camera', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // look_at
-// ---------------------------------------------------------------------------
 
 describe('look_at', () => {
   it('sets target and preserves distance', () => {
@@ -6515,9 +6471,7 @@ describe('look_at', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // fit_view
-// ---------------------------------------------------------------------------
 
 describe('fit_view', () => {
   it('fits all entities — target near scene centre, distance > 0', () => {
@@ -6662,9 +6616,7 @@ describe('fit_view', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // export_obj — Wavefront OBJ export
-// ---------------------------------------------------------------------------
 
 describe('export_obj', () => {
   /** Helper: decode base64 to Uint8Array (same as in export_stl tests). */
@@ -6810,9 +6762,7 @@ describe('export_obj', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // export_gltf — glTF 2.0 / GLB export
-// ---------------------------------------------------------------------------
 
 describe('export_gltf', () => {
   /** Decode base64 → Uint8Array. */
@@ -7021,9 +6971,7 @@ describe('export_gltf', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // export_stl + export_obj + export_gltf — revolution regression (all three)
-// ---------------------------------------------------------------------------
 
 describe('export revolution regression', () => {
   type StlData = { format: string; triangleCount: number; stl?: string };
@@ -7089,9 +7037,7 @@ describe('export revolution regression', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // align
-// ---------------------------------------------------------------------------
 
 describe('align', () => {
   it('aligns min-x of targets to reference min-x', () => {
@@ -7172,9 +7118,7 @@ describe('align', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // distribute
-// ---------------------------------------------------------------------------
 
 describe('distribute', () => {
   it('distributes 3 boxes with equal-spacing along x', () => {
@@ -7251,9 +7195,7 @@ describe('distribute', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // stack_on
-// ---------------------------------------------------------------------------
 
 describe('stack_on', () => {
   it('stacks a box on top of another box along z (default)', () => {
@@ -7321,9 +7263,7 @@ describe('stack_on', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // array_along_path
-// ---------------------------------------------------------------------------
 
 describe('array_along_path', () => {
   it('places count=5 copies of a box along a straight path', () => {
@@ -7450,9 +7390,7 @@ describe('array_along_path', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // distribute_on_arc
-// ---------------------------------------------------------------------------
 
 describe('distribute_on_arc', () => {
   it('places count=4 copies around a full circle in XY plane', () => {
@@ -7578,9 +7516,7 @@ describe('distribute_on_arc', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // build_project — repeat / for_each control-flow
-// ---------------------------------------------------------------------------
 
 describe('build_project repeat/for_each', () => {
   it('repeat: creates 5 boxes using count literal', () => {

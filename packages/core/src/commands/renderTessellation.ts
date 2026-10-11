@@ -48,9 +48,7 @@ import {
 } from './tessellation';
 import type { PreDepthPolygon } from './renderTypes';
 
-// ---------------------------------------------------------------------------
 // 3D solids
-// ---------------------------------------------------------------------------
 
 /** Filled polygon whose normal comes from its first 3 vertices (degenerate faces face up). */
 function makePolygon(verts: Vec3[], color: string): PreDepthPolygon {
@@ -206,9 +204,7 @@ function applyRotation(
   }));
 }
 
-// ---------------------------------------------------------------------------
 // 2D shapes: one stroked path each, lifted from the local plane to world space
-// ---------------------------------------------------------------------------
 
 function place2D(localPt: Vec2, position: Vec3): Vec3 {
   return [position[0] + localPt[0], position[1] + localPt[1], position[2]];

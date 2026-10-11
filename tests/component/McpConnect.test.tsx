@@ -20,9 +20,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { listCommands } from '@core/commands/registry';
 import { McpConnect, McpConnectButton } from '@ui/components/McpConnect';
 
-// ---------------------------------------------------------------------------
 // Mock clipboard
-// ---------------------------------------------------------------------------
 
 const writeTextMock: Mock<(text: string) => Promise<void>> = vi.fn((_text: string) =>
   Promise.resolve(),
@@ -37,9 +35,7 @@ beforeEach(() => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // McpConnect modal — structure
-// ---------------------------------------------------------------------------
 
 describe('McpConnect — structure', () => {
   it('renders with role=dialog and aria-modal=true', () => {
@@ -91,9 +87,7 @@ describe('McpConnect — structure', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // McpConnect modal — close behavior
-// ---------------------------------------------------------------------------
 
 describe('McpConnect — close behavior', () => {
   it('calls onClose when the close button is clicked', () => {
@@ -130,9 +124,7 @@ describe('McpConnect — close behavior', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // McpConnect modal — focus management
-// ---------------------------------------------------------------------------
 
 const openDialog = async (): Promise<HTMLElement> => {
   await act(async () => {
@@ -182,9 +174,7 @@ describe('McpConnect — focus management', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // McpConnect modal — quickstart content
-// ---------------------------------------------------------------------------
 
 describe('McpConnect — quickstart content', () => {
   it('shows the install+start server section label', () => {
@@ -209,9 +199,7 @@ describe('McpConnect — quickstart content', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // McpConnectButton — launcher
-// ---------------------------------------------------------------------------
 
 describe('McpConnectButton', () => {
   it('renders a "Connect agent" trigger button', () => {
@@ -254,9 +242,7 @@ describe('McpConnectButton', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Copy buttons
-// ---------------------------------------------------------------------------
 
 describe('McpConnect — copy buttons', () => {
   it.each<[string, RegExp, string]>([

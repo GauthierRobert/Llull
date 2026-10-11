@@ -54,9 +54,7 @@ function expectPure(doc: CadDocument, run: () => unknown): void {
 }
 
 describe('assemblies', () => {
-  // ---------------------------------------------------------------------------
   // Regression — rotated-entity summary AABB is expanded vs. unrotated
-  // ---------------------------------------------------------------------------
 
   it('add_box summary AABB is expanded when rotation is applied (B1 regression)', () => {
     const doc = createEmptyDocument();
@@ -112,9 +110,7 @@ describe('assemblies', () => {
     expect(result.summary).toContain('world AABB');
   });
 
-  // ---------------------------------------------------------------------------
   // create_component
-  // ---------------------------------------------------------------------------
 
   it('create_component promotes entities into a component and replaces them with one instance', () => {
     let doc = createEmptyDocument();
@@ -193,9 +189,7 @@ describe('assemblies', () => {
     expect(result.document.selection).not.toContain(idB);
   });
 
-  // ---------------------------------------------------------------------------
   // insert_instance
-  // ---------------------------------------------------------------------------
 
   it('insert_instance adds an instance entity with correct transform', () => {
     const { doc, componentId } = makeComponent('Widget');
@@ -240,9 +234,7 @@ describe('assemblies', () => {
     expect(Object.keys(doc.components[componentId]!.entities)).toHaveLength(1);
   });
 
-  // ---------------------------------------------------------------------------
   // explode_instance
-  // ---------------------------------------------------------------------------
 
   it('explode_instance replaces instance with baked world-space entities', () => {
     const c = withSecondInstance(
@@ -311,9 +303,7 @@ describe('assemblies', () => {
     expectNoOp(execute(doc, 'explode_instance', { id: c.instanceId }), doc, 'not found');
   });
 
-  // ---------------------------------------------------------------------------
   // describe_scene — instance bounds
-  // ---------------------------------------------------------------------------
 
   it('describe_scene reports an instance world AABB from its component extent (not a point)', () => {
     // Box size [2,2,2] at origin → local AABB [-1,-1,-1]..[1,1,1]; second instance at [10,0,0].
@@ -340,9 +330,7 @@ describe('assemblies', () => {
     expect((scaled.document.entities[instanceId] as InstanceEntity).scale).toEqual([3, 3, 3]);
   });
 
-  // ---------------------------------------------------------------------------
   // expandInstance — deterministic id mapping (deferred-nits Item B)
-  // ---------------------------------------------------------------------------
 
   it('expandInstance returns byte-identical ids on repeated calls (deterministic)', () => {
     // Expanded ids must match across calls — a per-expansion nextId() would mint fresh ids on

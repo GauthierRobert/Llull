@@ -26,9 +26,7 @@ import {
 import { snap, applyOrthoPolar } from '../../src/ui/viewport/2d/snapping/resolveSnap';
 import { collectSnapCandidates } from '../../src/ui/viewport/2d/snapping/candidates';
 
-// ---------------------------------------------------------------------------
 // Test document builders
-// ---------------------------------------------------------------------------
 
 function docWithLine(start: [number, number], end: [number, number]): CadDocument {
   const doc = createEmptyDocument();
@@ -135,9 +133,7 @@ function docWithTwoLines(): CadDocument {
   };
 }
 
-// ---------------------------------------------------------------------------
 // collectSnapCandidates
-// ---------------------------------------------------------------------------
 
 describe('collectSnapCandidates', () => {
   it('returns endpoint and midpoint for a line', () => {
@@ -339,9 +335,7 @@ describe('collectSnapCandidates', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // snap
-// ---------------------------------------------------------------------------
 
 describe('snap', () => {
   const GRID = 1;
@@ -428,9 +422,7 @@ describe('snap', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // applyOrthoPolar
-// ---------------------------------------------------------------------------
 
 describe('applyOrthoPolar', () => {
   it('returns cursor unchanged when both ortho and polar are false', () => {
@@ -513,9 +505,7 @@ describe('applyOrthoPolar', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // snapPerpendicular
-// ---------------------------------------------------------------------------
 
 describe('snapPerpendicular', () => {
   it('returns foot within segment (happy path)', () => {
@@ -548,9 +538,7 @@ describe('snapPerpendicular', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // tangentPointsToCircle
-// ---------------------------------------------------------------------------
 
 describe('tangentPointsToCircle', () => {
   it('returns 2 tangent points from an external point', () => {
@@ -589,9 +577,7 @@ describe('tangentPointsToCircle', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // snapTangentToCircle
-// ---------------------------------------------------------------------------
 
 describe('snapTangentToCircle', () => {
   it('returns 2 SnapPoints from an external point', () => {
@@ -610,9 +596,7 @@ describe('snapTangentToCircle', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // snapExtension
-// ---------------------------------------------------------------------------
 
 describe('snapExtension', () => {
   it('returns extension snap beyond the end of segment (t > 1)', () => {
@@ -652,9 +636,7 @@ describe('snapExtension', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // nearestOnSegment
-// ---------------------------------------------------------------------------
 
 describe('nearestOnSegment', () => {
   it('returns the projected foot when cursor is perpendicular to middle of segment', () => {
@@ -683,9 +665,7 @@ describe('nearestOnSegment', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // nearestOnArc
-// ---------------------------------------------------------------------------
 
 describe('nearestOnArc', () => {
   it('returns radial foot for a full circle', () => {
@@ -713,9 +693,7 @@ describe('nearestOnArc', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // collectSnapCandidates — advanced snaps wired in
-// ---------------------------------------------------------------------------
 
 describe('collectSnapCandidates — advanced snaps', () => {
   it('emits perpendicular snap for a line when fromPoint is provided', () => {
@@ -809,9 +787,7 @@ describe('collectSnapCandidates — advanced snaps', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // snap priority — new types lower priority than classic ones
-// ---------------------------------------------------------------------------
 
 describe('snap priority — advanced types', () => {
   it('prefers endpoint over perpendicular at equal distance', () => {

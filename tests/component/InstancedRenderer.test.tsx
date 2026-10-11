@@ -37,9 +37,7 @@ function getVisibleEntities(): Entity[] {
   return order.map((id) => entities[id]).filter((e): e is Entity => e !== undefined);
 }
 
-// ---------------------------------------------------------------------------
 // Integration: dispatch → store entities → grouping
-// ---------------------------------------------------------------------------
 
 describe('InstancedRenderer integration — 100 identical boxes → 1 batch', () => {
   beforeEach(() => {
@@ -253,9 +251,7 @@ describe('InstancedRenderer integration — entityIdFromInstanceId', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Instance materials — per-instance color must not require vertex colors
-// ---------------------------------------------------------------------------
 
 describe('InstancedRenderer — material args', () => {
   it.each(['shaded', 'wireframe', 'xray'] as const)(

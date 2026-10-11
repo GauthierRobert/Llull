@@ -38,9 +38,7 @@ const docWithLine = (): { doc: Doc; id: string } =>
 const extrusionOf = (result: ReturnType<typeof execute>): ExtrusionEntity =>
   result.document.entities[result.affected[0]!] as ExtrusionEntity;
 
-// ---------------------------------------------------------------------------
 // extrude_sketch
-// ---------------------------------------------------------------------------
 
 describe('extrude_sketch', () => {
   it('circle → creates an extrusion with 32 profile points and correct depth', () => {
@@ -151,9 +149,7 @@ describe('extrude_sketch', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // revolve_profile — full implementation
-// ---------------------------------------------------------------------------
 
 /** Triangle profile for revolution tests: 3 points in the +X half-plane */
 const TRI_PROFILE: ReadonlyArray<readonly [number, number]> = [

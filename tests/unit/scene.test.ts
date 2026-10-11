@@ -216,9 +216,7 @@ describe('entityBounds — per kind', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // rotatedEntityBounds — OBB-aware world-space AABB
-// ---------------------------------------------------------------------------
 
 describe('rotatedEntityBounds — zero rotation is byte-for-byte identical to entityBounds', () => {
   it('box with zero rotation: no oriented flag, same values as entityBounds', () => {
@@ -372,9 +370,7 @@ describe('rotatedEntityBounds — non-zero rotation produces oriented:true and c
   });
 });
 
-// ---------------------------------------------------------------------------
 // instanceBoundsFromDoc — assembly bounds
-// ---------------------------------------------------------------------------
 
 describe('instanceBoundsFromDoc — instance world AABB', () => {
   it('happy path: instance bounds reflect the component child geometry', () => {

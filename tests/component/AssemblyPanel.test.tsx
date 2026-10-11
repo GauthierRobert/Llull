@@ -19,17 +19,13 @@ import { createEmptyDocument } from '@core/model/types';
 import { AssemblyPanel } from '@ui/panels/AssemblyPanel';
 import { localDispatch } from '../helpers/storeTestHelpers';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function resetStore(): void {
   useStore.setState({ document: createEmptyDocument(), lastSummary: null });
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 /** A unit box wrapped in component `name` and instanced once; returns the instance id. */
 function insertedInstance(name: string): string {

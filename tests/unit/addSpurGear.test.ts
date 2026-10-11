@@ -5,9 +5,7 @@ import { buildSpurGearProfile } from '@core/commands/gears';
 import { expectSingleEntity } from '../helpers/expectNoOp';
 
 describe('add_spur_gear', () => {
-  // ---------------------------------------------------------------------------
   // Happy path
-  // ---------------------------------------------------------------------------
 
   it('creates exactly one extrusion entity', () => {
     const doc = createEmptyDocument();
@@ -211,9 +209,7 @@ describe('add_spur_gear', () => {
     expect(result.document.entities[result.affected[0]!]).toBeDefined();
   });
 
-  // ---------------------------------------------------------------------------
   // Small tooth count (undercut regime)
-  // ---------------------------------------------------------------------------
 
   it('works for teeth=3 (minimum, severe undercut clamped)', () => {
     const doc = createEmptyDocument();
@@ -227,9 +223,7 @@ describe('add_spur_gear', () => {
     expect(gear.profile.length).toBeGreaterThan(3);
   });
 
-  // ---------------------------------------------------------------------------
   // Failure paths
-  // ---------------------------------------------------------------------------
 
   it('teeth=2 is rejected — unchanged doc, affected:[], summary names invariant', () => {
     const doc = createEmptyDocument();
@@ -373,9 +367,7 @@ describe('add_spur_gear', () => {
     expect(result.document).toBe(doc);
   });
 
-  // ---------------------------------------------------------------------------
   // Purity
-  // ---------------------------------------------------------------------------
 
   it('is pure — input document is never mutated', () => {
     const doc = createEmptyDocument();

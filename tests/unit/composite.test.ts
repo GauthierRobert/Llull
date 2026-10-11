@@ -13,9 +13,7 @@ import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 
-// ---------------------------------------------------------------------------
 // Mirror of applyEulerXYZ from render.ts (intrinsic XYZ = Rz * Ry * Rx)
-// ---------------------------------------------------------------------------
 
 type Vec3 = readonly [number, number, number];
 
@@ -80,9 +78,7 @@ function expectClose(actual: Vec3, expected: Vec3, eps = 1e-6, label = ''): void
   expect(maxErr, `${label} max error ${maxErr} >= ${eps}`).toBeLessThan(eps);
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 describe('make_tube_between', () => {
   /** Create the tube and return its endpoints as recovered from the stored transform. */

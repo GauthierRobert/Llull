@@ -10,9 +10,7 @@ import {
   type FakeKernelSpec,
 } from '../helpers/fakeKernel';
 
-// ---------------------------------------------------------------------------
 // Canned meshes
-// ---------------------------------------------------------------------------
 
 const FILLET_MESH: MeshData = {
   positions: [0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 1, 1, 0, 1, 0, 1],
@@ -46,9 +44,7 @@ function freshKernel(spec: FakeKernelSpec = {}): FakeKernel {
   return fakeKernel({ solid: TETRA, fillet: FILLET_MESH, chamfer: CHAMFER_MESH, ...spec });
 }
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function docWithBox(): { doc: CadDocument; boxId: string } {
   const doc = createEmptyDocument();
@@ -62,9 +58,7 @@ function docWithLine(): { doc: CadDocument; lineId: string } {
   return { doc: r.document, lineId: r.affected[0]! };
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 const CASES = [
   {
@@ -283,9 +277,7 @@ describe('modify3d commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // Group handling — source pruned from groups
-  // -------------------------------------------------------------------------
 
   describe('group handling', () => {
     it('fillet_edge: dissolves a group that drops below 2 members after source is consumed', () => {

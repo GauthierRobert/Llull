@@ -23,9 +23,7 @@ import { ViewportControls } from '@ui/viewport/3d/ViewportControls';
 import { resetViewportStores } from '../helpers/componentEntities';
 import { findClickAnimationsForEntity } from '@ui/viewport/3d/animationClickHelpers';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function makeAnimation(overrides: Partial<Animation> & { id: string }): Animation {
   const base: Animation = {
@@ -53,9 +51,7 @@ const resetStores = (): void =>
     animationResetNonce: 0,
   });
 
-// ---------------------------------------------------------------------------
 // Part A — viewportStore animation actions
-// ---------------------------------------------------------------------------
 
 describe('viewportStore — animation state defaults', () => {
   beforeEach(() => {
@@ -176,9 +172,7 @@ describe('viewportStore — toggleClickAnimation', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Part D — AnimationTransportControls inside ViewportControls
-// ---------------------------------------------------------------------------
 
 describe('ViewportControls — animation transport controls (no animations)', () => {
   beforeEach(() => {
@@ -254,9 +248,7 @@ describe('ViewportControls — animation transport controls (with animations)', 
   });
 });
 
-// ---------------------------------------------------------------------------
 // Part C — findClickAnimationsForEntity pure helper
-// ---------------------------------------------------------------------------
 
 const clickAnim = (
   id: string,

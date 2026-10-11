@@ -5,9 +5,7 @@ import { formatLength } from '@core/commands/units';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence';
 
 describe('set_units command', () => {
-  // ---------------------------------------------------------------------------
   // Happy paths
-  // ---------------------------------------------------------------------------
 
   it('sets units to in with precision 2', () => {
     const doc = createEmptyDocument();
@@ -51,9 +49,7 @@ describe('set_units command', () => {
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 
-  // ---------------------------------------------------------------------------
   // Failure paths (graceful no-ops)
-  // ---------------------------------------------------------------------------
 
   it('rejects an invalid unit string — no-op, affected:[]', () => {
     const doc = createEmptyDocument();
@@ -91,9 +87,7 @@ describe('set_units command', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // formatLength helper
-// ---------------------------------------------------------------------------
 
 describe('formatLength', () => {
   it('formats with document units and displayPrecision', () => {
@@ -117,9 +111,7 @@ describe('formatLength', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Persistence round-trip
-// ---------------------------------------------------------------------------
 
 describe('persistence — units + displayPrecision', () => {
   it('round-trips units and displayPrecision through serialize/deserialize', () => {

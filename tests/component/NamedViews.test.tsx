@@ -26,9 +26,7 @@ import { createEmptyDocument } from '@core/model/types';
 import { NamedViewsOverlay } from '@ui/viewport/3d/NamedViews';
 import type { NamedViewCamera } from '@ui/store';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 const MOCK_CAMERA_A: NamedViewCamera = {
   position: [5, 10, 15],
@@ -55,9 +53,7 @@ function nullSnapshot(): null {
   return null;
 }
 
-// ---------------------------------------------------------------------------
 // namedViewStore — saveNamedView
-// ---------------------------------------------------------------------------
 
 describe('namedViewStore — saveNamedView', () => {
   beforeEach(() => {
@@ -110,9 +106,7 @@ describe('namedViewStore — saveNamedView', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // namedViewStore — restoreNamedView
-// ---------------------------------------------------------------------------
 
 describe('namedViewStore — restoreNamedView', () => {
   beforeEach(() => {
@@ -149,9 +143,7 @@ describe('namedViewStore — restoreNamedView', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // namedViewStore — deleteNamedView
-// ---------------------------------------------------------------------------
 
 describe('namedViewStore — deleteNamedView', () => {
   beforeEach(() => {
@@ -180,9 +172,7 @@ describe('namedViewStore — deleteNamedView', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // NamedViewsOverlay component
-// ---------------------------------------------------------------------------
 
 describe('NamedViewsOverlay — toggle button', () => {
   beforeEach(() => {

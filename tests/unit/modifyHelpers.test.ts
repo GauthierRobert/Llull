@@ -13,9 +13,7 @@ import {
 import type { Vec2 } from '@core/model/types';
 import type { LineEntity, PolylineEntity, CircleEntity, RectangleEntity } from '@core/model/types';
 
-// ---------------------------------------------------------------------------
 // nearestVertex
-// ---------------------------------------------------------------------------
 
 describe('nearestVertex', () => {
   it('returns null for an empty points array', () => {
@@ -89,9 +87,7 @@ describe('nearestVertex', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // offsetSideSign
-// ---------------------------------------------------------------------------
 
 describe('offsetSideSign', () => {
   it('returns +1 when pick is to the left of start→end (upward direction)', () => {
@@ -125,9 +121,7 @@ describe('offsetSideSign', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // entityDistSq — position-aware pick distance
-// ---------------------------------------------------------------------------
 
 /** Minimal base entity fields shared by all test fixtures. */
 const BASE = {

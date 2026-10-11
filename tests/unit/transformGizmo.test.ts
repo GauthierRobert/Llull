@@ -40,9 +40,7 @@ describe('TransformGizmo pure delta helpers', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Regression: scene-graph membership test
-// ---------------------------------------------------------------------------
 
 describe('TransformGizmo scene-graph attachment invariant (regression)', () => {
   it('a detached Object3D has parent === null — confirming the original bug', () => {

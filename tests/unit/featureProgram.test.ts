@@ -334,9 +334,7 @@ describe('format helpers', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Emitters, driven by hand-built programs covering every ShapeSpec kind
-// ---------------------------------------------------------------------------
 
 const origin3 = [t(0), t(0), t(0)] as const;
 const profile = [

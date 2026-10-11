@@ -27,9 +27,7 @@ function composeAnimatedPose(
   return { position: [p.x, p.y, p.z], quaternion: [q.x, q.y, q.z, q.w] };
 }
 
-// ---------------------------------------------------------------------------
 // evaluateAnimationScalar
-// ---------------------------------------------------------------------------
 
 describe('evaluateAnimationScalar', () => {
   const base = { speed: 2, amplitude: 3, frequency: 0.5 };
@@ -62,9 +60,7 @@ describe('evaluateAnimationScalar', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // composeAnimatedPose
-// ---------------------------------------------------------------------------
 
 const contribution = (
   channel: 'rotation' | 'position',

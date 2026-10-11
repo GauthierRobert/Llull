@@ -30,9 +30,7 @@ import {
 import type { ServerCommandResponse } from '@ui/store/serverCommands';
 import { mockFetch } from '../helpers/integrationFetch';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 /** Run a command locally and return the first affected id. */
 function dispatchId(name: string, params: unknown): string {
@@ -98,9 +96,7 @@ const DEFAULT_RESPONSE: ServerCommandResponse = {
   canRedo: false,
 };
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 describe('CadStore — networked dispatch', () => {
   beforeEach(() => {
@@ -339,9 +335,7 @@ describe('CadStore — networked dispatch', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // renderOrigin — floating-origin render state (render-only, NOT in document)
-// ---------------------------------------------------------------------------
 
 describe('CadStore — renderOrigin (floating-origin)', () => {
   beforeEach(() => {
@@ -367,9 +361,7 @@ describe('CadStore — renderOrigin (floating-origin)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Offline fallback + reconnect reconciliation
-// ---------------------------------------------------------------------------
 
 describe('CadStore — offline fallback', () => {
   beforeEach(() => {
@@ -528,9 +520,7 @@ describe('CadStore — offline fallback', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Sync races (select during push, failed push retry, patches, SSE-open network errors)
-// ---------------------------------------------------------------------------
 
 function httpFail(status: number): { ok: false; status: number; json: () => Promise<object> } {
   return { ok: false, status, json: () => Promise.resolve({}) };

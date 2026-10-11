@@ -9,6 +9,7 @@ import { createNodeOcctKernel } from '../src/occtNode';
 import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
 import type { BooleanOp, ShapeRecipe } from '@core/geometry/shapeRecipe';
 import type { Entity, Vec3 } from '@core/model/types';
+import { meshBounds } from '../../tests/helpers/meshBounds';
 
 export const leaf = (entity: Entity): ShapeRecipe => ({ op: 'solid', entity });
 
@@ -42,17 +43,7 @@ export const common = { layerId: 'layer-default', color: '#888888' };
 export const box = (position: Vec3, size: Vec3): Entity =>
   ({ id: 'b', kind: 'box', position, rotation: [0, 0, 0], size, ...common }) as Entity;
 
-export function bounds(mesh: MeshData): { min: number[]; max: number[] } {
-  const min = [Infinity, Infinity, Infinity];
-  const max = [-Infinity, -Infinity, -Infinity];
-  for (let i = 0; i < mesh.positions.length; i += 3) {
-    for (let k = 0; k < 3; k++) {
-      min[k] = Math.min(min[k] ?? 0, mesh.positions[i + k] ?? 0);
-      max[k] = Math.max(max[k] ?? 0, mesh.positions[i + k] ?? 0);
-    }
-  }
-  return { min, max };
-}
+export const bounds = meshBounds;
 
 /** Signed volume by the divergence theorem: positive when the mesh is wound outward. */
 export function volume(mesh: MeshData): number {

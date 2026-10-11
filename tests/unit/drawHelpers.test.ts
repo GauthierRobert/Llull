@@ -10,9 +10,7 @@ import {
   circleRadiusFromPoints,
 } from '../../src/ui/viewport/2d/drawHelpers';
 
-// ---------------------------------------------------------------------------
 // rectParamsFromCorners
-// ---------------------------------------------------------------------------
 
 describe('rectParamsFromCorners', () => {
   it.each([
@@ -60,9 +58,7 @@ describe('rectParamsFromCorners', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // circleRadiusFromPoints
-// ---------------------------------------------------------------------------
 
 describe('circleRadiusFromPoints', () => {
   it('computes the Euclidean distance between center and rim', () => {

@@ -4,10 +4,8 @@ import { execute } from '@core/commands/registry';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence';
 import { expectDocumentEnvelope } from '../helpers/documentEnvelope';
 
-// ---------------------------------------------------------------------------
 // Helpers — build minimal valid envelopes without going through commands
 // (needed to inject edge-case entity shapes that commands would reject)
-// ---------------------------------------------------------------------------
 
 /** Minimum valid camera state accepted by validateCamera. */
 const VALID_CAMERA = {
@@ -259,10 +257,8 @@ describe('load_document command', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Validation branches: entity kind-specific guards
 // These tests target the text and default switch/case branches in validateEntityValue.
-// ---------------------------------------------------------------------------
 
 describe('deserializeDocument — entity kind-specific validation', () => {
   // ── text — valid passes, invalid height fails ────────────────────────────
@@ -635,9 +631,7 @@ describe('deserializeDocument — entity kind-specific validation', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Material validation branches
-// ---------------------------------------------------------------------------
 
 describe('deserializeDocument — material validation', () => {
   it('accepts a valid material and round-trips it', () => {
@@ -732,9 +726,7 @@ describe('deserializeDocument — material validation', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Parameter validation branches
-// ---------------------------------------------------------------------------
 
 describe('deserializeDocument — parameter validation', () => {
   it('throws when a parameter entry is not an object', () => {
@@ -784,9 +776,7 @@ describe('deserializeDocument — parameter validation', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Migration: older documents missing optional fields get correct defaults
-// ---------------------------------------------------------------------------
 
 describe('deserializeDocument — migration / back-compat defaults', () => {
   it('fills parameters: {} when the field is absent', () => {
@@ -879,9 +869,7 @@ describe('deserializeDocument — migration / back-compat defaults', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // add_box guard branches: NaN / Infinity / unresolved-expression-string
-// ---------------------------------------------------------------------------
 
 describe('add_box — dimension guard branches', () => {
   it('NaN width is a safe no-op', () => {
@@ -908,9 +896,7 @@ describe('add_box — dimension guard branches', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // delete_entity on doc where groups is undefined
-// ---------------------------------------------------------------------------
 
 describe('delete_entity — doc.groups null-safety', () => {
   it('deletes an entity safely when doc.groups is undefined', () => {

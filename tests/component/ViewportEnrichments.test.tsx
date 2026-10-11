@@ -21,13 +21,9 @@ import { PropertiesPanel } from '@ui/panels/PropertiesPanel';
 import { localDispatch } from '../helpers/storeTestHelpers';
 import { resetViewportStores } from '../helpers/componentEntities';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
 // Store unit tests — viewportStore actions
-// ---------------------------------------------------------------------------
 
 describe('viewportStore — displayMode', () => {
   beforeEach(() => {
@@ -132,9 +128,7 @@ describe('viewportStore — hiddenEntityIds', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // ViewportControls component tests
-// ---------------------------------------------------------------------------
 
 describe('ViewportControls — display mode buttons', () => {
   beforeEach(() => {
@@ -247,9 +241,7 @@ describe('ViewportControls — section plane toggle', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // PropertiesPanel — Hide/Show visibility toggle
-// ---------------------------------------------------------------------------
 
 function selectNewBox(): string {
   const entityId = localDispatch('add_box', { size: [2, 2, 2] }).affected[0]!;

@@ -17,9 +17,7 @@ import { buildMcpTools, listMcpResources, readMcpResource, CAD_RESOURCE_URIS } f
 import { CONVENTIONS_GUIDE, CONVENTIONS_URI } from '@mcp/index';
 import { createEmptyDocument } from '@core/model/types';
 
-// ---------------------------------------------------------------------------
 // (A) conventions resource is listed
-// ---------------------------------------------------------------------------
 
 describe('cad://conventions resource listing', () => {
   it('is included in listMcpResources()', () => {
@@ -45,9 +43,7 @@ describe('cad://conventions resource listing', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (B) conventions resource is readable
-// ---------------------------------------------------------------------------
 
 describe('cad://conventions resource read', () => {
   it('readMcpResource returns text/markdown content for cad://conventions', () => {
@@ -121,9 +117,7 @@ describe('cad://conventions resource read', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (C) Tool-count invariant: conventions is a RESOURCE, not a tool
-// ---------------------------------------------------------------------------
 
 describe('tool-count invariant', () => {
   it('buildMcpTools().length === listCommands().length (core registry only)', () => {

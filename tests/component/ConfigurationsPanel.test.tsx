@@ -24,9 +24,7 @@ import { useStore } from '@ui/store';
 import { type Configuration, createEmptyDocument } from '@core/model/types';
 import { ConfigurationsPanel } from '@ui/panels/ConfigurationsPanel';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function resetStore(): void {
   useStore.setState({
@@ -67,9 +65,7 @@ function fillRow(form: HTMLElement, row: number, name: string, expression: strin
   });
 }
 
-// ---------------------------------------------------------------------------
 // Rendering tests
-// ---------------------------------------------------------------------------
 
 describe('ConfigurationsPanel — rendering', () => {
   beforeEach(() => {
@@ -130,9 +126,7 @@ describe('ConfigurationsPanel — rendering', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Activate tests
-// ---------------------------------------------------------------------------
 
 describe('ConfigurationsPanel — activate', () => {
   beforeEach(() => {
@@ -172,9 +166,7 @@ describe('ConfigurationsPanel — activate', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Create form tests
-// ---------------------------------------------------------------------------
 
 describe('ConfigurationsPanel — create form', () => {
   beforeEach(() => {
@@ -295,9 +287,7 @@ describe('ConfigurationsPanel — rejected create', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Add / remove parameter rows
-// ---------------------------------------------------------------------------
 
 describe('ConfigurationsPanel — parameter row management', () => {
   beforeEach(() => {

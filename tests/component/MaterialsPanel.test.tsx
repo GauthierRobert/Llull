@@ -23,9 +23,7 @@ import { useStore } from '@ui/store';
 import { type Material, createEmptyDocument } from '@core/model/types';
 import { MaterialsPanel } from '@ui/panels/MaterialsPanel';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function resetStore(): void {
   useStore.setState({
@@ -56,9 +54,7 @@ function patchDispatch(spy: ReturnType<typeof vi.fn>): void {
   useStore.setState({ dispatch: spy } as any);
 }
 
-// ---------------------------------------------------------------------------
 // Rendering tests
-// ---------------------------------------------------------------------------
 
 function renderCreateForm(): {
   form: HTMLElement;
@@ -151,9 +147,7 @@ describe('MaterialsPanel — rendering', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Assign tests
-// ---------------------------------------------------------------------------
 
 describe('MaterialsPanel — assign', () => {
   beforeEach(() => {
@@ -224,9 +218,7 @@ describe('MaterialsPanel — assign', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Create form tests
-// ---------------------------------------------------------------------------
 
 describe('MaterialsPanel — create form', () => {
   beforeEach(() => {
@@ -315,9 +307,7 @@ describe('MaterialsPanel — create form', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Per-entity PBR resolution test
-// ---------------------------------------------------------------------------
 
 describe('MaterialsPanel — per-entity PBR resolution', () => {
   beforeEach(() => {

@@ -23,9 +23,7 @@ import {
 } from '../helpers/storeTestHelpers';
 import { mockFetch } from '../helpers/integrationFetch';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function resetStore(): void {
   useStore.setState({
@@ -143,9 +141,7 @@ describe('undo — document arrives via live sync', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // canUndo / canRedo — UI state driven by server responses
-// ---------------------------------------------------------------------------
 
 describe('canUndo / canRedo state', () => {
   beforeEach(() => {

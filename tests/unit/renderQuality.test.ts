@@ -10,9 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { deriveQualityTier, resolveQualityTier } from '@ui/viewport/3d/useRenderQuality';
 
-// ---------------------------------------------------------------------------
 // deriveQualityTier — auto thresholds
-// ---------------------------------------------------------------------------
 
 describe('deriveQualityTier — auto thresholds', () => {
   it('0 entities → high', () => {
@@ -52,9 +50,7 @@ describe('deriveQualityTier — auto thresholds', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // resolveQualityTier — override takes precedence over entity count
-// ---------------------------------------------------------------------------
 
 describe('resolveQualityTier — explicit override ignores entity count', () => {
   it('override=high with 500 entities → high', () => {

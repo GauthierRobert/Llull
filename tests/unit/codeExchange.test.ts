@@ -300,9 +300,7 @@ describe('stripOuterParens', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // apply_code_trace
-// ---------------------------------------------------------------------------
 
 /** What the generated CadQuery runtime records for: width/thickness params, box, cylinder, cut, name. */
 /** Traced `position` and `rotation` at the origin, no rotation. */

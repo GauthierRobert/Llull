@@ -35,9 +35,7 @@ import * as registry from '@core/commands/registry';
 import { buildDiscoveryToolDefinitions, buildExchangeToolDefinitions } from '@mcp/index';
 import { mcpRequest } from './mcpTestSupport';
 
-// ---------------------------------------------------------------------------
 // SSE parsing helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Parse the JSON-RPC result from an SSE response body.
@@ -64,18 +62,14 @@ function parseSseResult(text: string, rpcId: number): unknown {
   return undefined;
 }
 
-// ---------------------------------------------------------------------------
 // JSON-RPC id counter — each request needs a unique id.
-// ---------------------------------------------------------------------------
 
 let rpcId = 1;
 function nextId(): number {
   return rpcId++;
 }
 
-// ---------------------------------------------------------------------------
 // Transport helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Perform the MCP `initialize` handshake and return the session id.
@@ -162,9 +156,7 @@ async function mcpListTools(sessionId: string): Promise<Array<{ name: string }>>
   return result!.tools ?? [];
 }
 
-// ---------------------------------------------------------------------------
 // Reset shared state before each test.
-// ---------------------------------------------------------------------------
 
 beforeEach(() => {
   rpcId = 1;
@@ -172,9 +164,7 @@ beforeEach(() => {
   _resetHistory();
 });
 
-// ---------------------------------------------------------------------------
 // (a) MCP initialize handshake
-// ---------------------------------------------------------------------------
 
 describe('MCP initialize handshake', () => {
   it('returns 200 and a non-empty mcp-session-id header', async () => {
@@ -189,9 +179,7 @@ describe('MCP initialize handshake', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (b) tools/list — tool count == listCommands()
-// ---------------------------------------------------------------------------
 
 describe('MCP tools/list', () => {
   it('returns one tool per registered command plus the exchange tools', async () => {
@@ -222,9 +210,7 @@ describe('MCP tools/list', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (c) tools/call add_box — mutation → summary block + affected block
-// ---------------------------------------------------------------------------
 
 describe('MCP tools/call — mutation (add_box)', () => {
   it('returns isError:false with summary and affected-ids content blocks', async () => {
@@ -273,9 +259,7 @@ describe('MCP tools/call — mutation (add_box)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (d) tools/call measure_volume (query) → json data block + structuredContent
-// ---------------------------------------------------------------------------
 
 describe('MCP tools/call — query (measure_volume)', () => {
   it('returns json data block and structuredContent with volume record', async () => {
@@ -325,9 +309,7 @@ describe('MCP tools/call — query (measure_volume)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (e) MCP tools/call mutation → REST /undo reverts it (shared history interop)
-// ---------------------------------------------------------------------------
 
 describe('MCP tools/call + REST /undo interop', () => {
   it('POST /undo after MCP add_box reverts the entity (shared history)', async () => {
@@ -362,9 +344,7 @@ describe('MCP tools/call + REST /undo interop', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (g) tools/call render_view → image block present, no raw SVG in any text block
-// ---------------------------------------------------------------------------
 
 describe('MCP tools/call — render_view (SVG stripping)', () => {
   /** A fresh session with one box, then render_view. */
@@ -428,9 +408,7 @@ describe('MCP tools/call — render_view (SVG stripping)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (f) Unknown tool name → isError:true
-// ---------------------------------------------------------------------------
 
 describe('MCP tools/call — unknown tool name', () => {
   it('returns isError:true with an explanatory summary content block', async () => {

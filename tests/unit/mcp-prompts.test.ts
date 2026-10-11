@@ -15,9 +15,7 @@ import { listMcpPrompts, getMcpPrompt } from '@mcp/index';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
 
-// ---------------------------------------------------------------------------
 // listMcpPrompts
-// ---------------------------------------------------------------------------
 
 describe('listMcpPrompts()', () => {
   it('returns at least one prompt template', () => {
@@ -62,9 +60,7 @@ describe('listMcpPrompts()', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // getMcpPrompt — unknown name
-// ---------------------------------------------------------------------------
 
 describe('getMcpPrompt() — unknown name', () => {
   it('returns null for an unregistered prompt name', () => {
@@ -76,9 +72,7 @@ describe('getMcpPrompt() — unknown name', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // getMcpPrompt — model_bracket
-// ---------------------------------------------------------------------------
 
 describe('getMcpPrompt("model_bracket")', () => {
   it('returns a non-null result', () => {
@@ -156,9 +150,7 @@ describe('getMcpPrompt("model_bracket")', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // getMcpPrompt — orthographic_setup
-// ---------------------------------------------------------------------------
 
 describe('getMcpPrompt("orthographic_setup")', () => {
   it('returns a non-null result for default view', () => {
@@ -203,9 +195,7 @@ describe('getMcpPrompt("orthographic_setup")', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // getMcpPrompt — parametric_part
-// ---------------------------------------------------------------------------
 
 describe('getMcpPrompt("parametric_part")', () => {
   it('returns a non-null result', () => {
@@ -261,9 +251,7 @@ describe('getMcpPrompt("parametric_part")', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Content type invariants
-// ---------------------------------------------------------------------------
 
 describe('getMcpPrompt() — content type invariants', () => {
   const templateNames = ['model_bracket', 'orthographic_setup', 'parametric_part'];
@@ -287,9 +275,7 @@ describe('getMcpPrompt() — content type invariants', () => {
   }
 });
 
-// ---------------------------------------------------------------------------
 // build_project validate regression — binds prompt templates to live registry
-// ---------------------------------------------------------------------------
 //
 // For each prompt that emits a ```json fenced build_project plan, we:
 //   1. Extract the JSON block from the assistant message text.
@@ -300,7 +286,6 @@ describe('getMcpPrompt() — content type invariants', () => {
 //
 // validate:true never mutates the document; it only checks names/params/aliases.
 // A param rename in any command will immediately fail this suite.
-// ---------------------------------------------------------------------------
 
 /** Extract the first ```json ... ``` block from a string and parse it. */
 function extractJsonBlock(text: string): unknown {

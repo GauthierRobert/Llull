@@ -18,9 +18,7 @@ import { execute } from '@core/commands/registry';
 import { cross2, dot2, len2, normalize2, perp2 } from '@lib/vec2';
 import { segIntersect, evalLine, offsetSegment, miterJoin } from '@core/commands/modify2dGeometry';
 
-// ---------------------------------------------------------------------------
 // Geometry helper unit tests
-// ---------------------------------------------------------------------------
 
 describe('geometry helpers', () => {
   describe('cross2', () => {
@@ -177,14 +175,10 @@ describe('geometry helpers', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Command tests
-// ---------------------------------------------------------------------------
 
 describe('2D modify commands', () => {
-  // -------------------------------------------------------------------------
   // Purity guard (shared)
-  // -------------------------------------------------------------------------
   it('all modify commands are pure — input document is never mutated', () => {
     let doc = createEmptyDocument();
     // Build a simple scene
@@ -229,9 +223,7 @@ describe('2D modify commands', () => {
     expect(JSON.stringify(doc)).toBe(snap);
   });
 
-  // -------------------------------------------------------------------------
   // explode_polyline
-  // -------------------------------------------------------------------------
 
   describe('explode_polyline', () => {
     it('happy path: open polyline → N-1 lines', () => {
@@ -358,9 +350,7 @@ describe('2D modify commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // offset_2d
-  // -------------------------------------------------------------------------
 
   describe('offset_2d', () => {
     it('happy path: offsets a line to the left', () => {
@@ -504,9 +494,7 @@ describe('2D modify commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // trim
-  // -------------------------------------------------------------------------
 
   describe('trim', () => {
     it('happy path: trims the start-closer endpoint', () => {
@@ -631,9 +619,7 @@ describe('2D modify commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // extend
-  // -------------------------------------------------------------------------
 
   describe('extend', () => {
     it('happy path: extends the start-closer endpoint to boundary', () => {
@@ -727,9 +713,7 @@ describe('2D modify commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // fillet_2d
-  // -------------------------------------------------------------------------
 
   describe('fillet_2d', () => {
     it('happy path: fillets an interior vertex of an open polyline', () => {
@@ -999,9 +983,7 @@ describe('2D modify commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // chamfer_2d
-  // -------------------------------------------------------------------------
 
   describe('chamfer_2d', () => {
     it('happy path: chamfers an interior vertex of an open polyline', () => {

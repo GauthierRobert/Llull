@@ -13,9 +13,7 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 
 describe('measure commands', () => {
-  // ---------------------------------------------------------------------------
   // Shared helpers
-  // ---------------------------------------------------------------------------
 
   function addBox(
     doc: CadDocument,
@@ -32,9 +30,7 @@ describe('measure commands', () => {
     return execute(doc, 'add_cylinder', { radius, height, position: [0, 0, 0] });
   }
 
-  // ---------------------------------------------------------------------------
   // 1. measure_distance
-  // ---------------------------------------------------------------------------
 
   describe('measure_distance', () => {
     it('happy: point↔point distance', () => {
@@ -109,9 +105,7 @@ describe('measure commands', () => {
     });
   });
 
-  // ---------------------------------------------------------------------------
   // 2. measure_angle
-  // ---------------------------------------------------------------------------
 
   describe('measure_angle', () => {
     it('happy: 90° angle from three points', () => {
@@ -218,9 +212,7 @@ describe('measure commands', () => {
     });
   });
 
-  // ---------------------------------------------------------------------------
   // 3. measure_area
-  // ---------------------------------------------------------------------------
 
   describe('measure_area', () => {
     it('happy: circle area', () => {
@@ -356,9 +348,7 @@ describe('measure commands', () => {
     });
   });
 
-  // ---------------------------------------------------------------------------
   // 4. measure_perimeter
-  // ---------------------------------------------------------------------------
 
   describe('measure_perimeter', () => {
     it('happy: line length', () => {
@@ -484,9 +474,7 @@ describe('measure commands', () => {
     });
   });
 
-  // ---------------------------------------------------------------------------
   // 5. measure_bounding_box
-  // ---------------------------------------------------------------------------
 
   describe('measure_bounding_box', () => {
     it('happy: single entity AABB', () => {
@@ -565,9 +553,7 @@ describe('measure commands', () => {
     });
   });
 
-  // ---------------------------------------------------------------------------
   // 6. measure_volume
-  // ---------------------------------------------------------------------------
 
   describe('measure_volume', () => {
     it('happy: box volume', () => {
@@ -750,9 +736,7 @@ describe('measure commands', () => {
       expect(JSON.stringify(doc)).toBe(snapshot);
     });
 
-    // -------------------------------------------------------------------------
     // A — Pappus volume for revolution entities
-    // -------------------------------------------------------------------------
 
     /** Inject a RevolutionEntity directly (no command needed for unit tests). */
     function makeRevolution(
@@ -920,9 +904,7 @@ describe('measure commands', () => {
     });
   });
 
-  // ---------------------------------------------------------------------------
   // 7. mass_properties
-  // ---------------------------------------------------------------------------
 
   describe('mass_properties', () => {
     it('happy: steel box mass', () => {

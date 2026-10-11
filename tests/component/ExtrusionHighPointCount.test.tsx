@@ -33,9 +33,7 @@ import {
   shapeFromProfile,
 } from '../helpers/componentEntities';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Generate a synthetic gear-like concave polygon with approximately `targetPoints`
@@ -91,9 +89,7 @@ function buildSyntheticGearProfile(
   return pts;
 }
 
-// ---------------------------------------------------------------------------
 // Geometry-level tests — THREE.ExtrudeGeometry on high-point-count concave profiles
-// ---------------------------------------------------------------------------
 
 function extrudedVertexCount(
   profile: ReadonlyArray<readonly [number, number]>,
@@ -132,9 +128,7 @@ describe('ExtrusionMesh — THREE.ExtrudeGeometry with 840-point concave profile
   });
 });
 
-// ---------------------------------------------------------------------------
 // profileKey stability — distinct profiles produce distinct keys (memo guard)
-// ---------------------------------------------------------------------------
 
 /**
  * Reimplementation of the profileKey function from ExtrusionMesh.tsx.
@@ -170,9 +164,7 @@ describe('profileKey — memo stability for multi-gear scenes', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Store / entity tests — add_spur_gear via command registry
-// ---------------------------------------------------------------------------
 
 describe('add_spur_gear — extrusion entity in the store', () => {
   beforeEach(resetStore);

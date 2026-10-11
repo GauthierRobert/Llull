@@ -21,9 +21,7 @@ import { describe, it, expect } from 'vitest';
 import { rasterizeSvg, buildImageBlock, stripSvgFromData, MAX_RASTER_PX } from '../src/renderImage';
 import { shapeToolCallContent } from '@mcp/index';
 
-// ---------------------------------------------------------------------------
 // Fixtures
-// ---------------------------------------------------------------------------
 
 /** A minimal valid 100×100 SVG with one rect — the smallest valid test vector. */
 const VALID_SVG =
@@ -34,9 +32,7 @@ const VALID_SVG =
 /** PNG magic bytes as a hex string: \x89PNG */
 const PNG_MAGIC_HEX = '89504e47';
 
-// ---------------------------------------------------------------------------
 // (a) rasterizeSvg — valid SVG → PNG magic bytes
-// ---------------------------------------------------------------------------
 
 describe('rasterizeSvg — valid SVG', () => {
   it('returns a non-empty base64 string', () => {
@@ -92,9 +88,7 @@ describe('rasterizeSvg — size cap', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (b) rasterizeSvg — malformed / empty SVG → null, no throw
-// ---------------------------------------------------------------------------
 
 describe('rasterizeSvg — failure cases', () => {
   it('returns null for an empty string (does not throw)', () => {
@@ -110,9 +104,7 @@ describe('rasterizeSvg — failure cases', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (c) buildImageBlock — data with svg field → image content block
-// ---------------------------------------------------------------------------
 
 describe('buildImageBlock — data with svg field', () => {
   it('returns an image content block with mimeType image/png', () => {
@@ -136,9 +128,7 @@ describe('buildImageBlock — data with svg field', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (d) buildImageBlock — data without svg field → null
-// ---------------------------------------------------------------------------
 
 describe('buildImageBlock — no svg field', () => {
   it('returns null when data has no svg property', () => {
@@ -150,9 +140,7 @@ describe('buildImageBlock — no svg field', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (e) buildImageBlock — empty svg string → null
-// ---------------------------------------------------------------------------
 
 describe('buildImageBlock — empty svg string', () => {
   it('returns null for an empty svg string', () => {
@@ -160,9 +148,7 @@ describe('buildImageBlock — empty svg string', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (f) buildImageBlock — non-object/null/undefined data → null
-// ---------------------------------------------------------------------------
 
 describe('buildImageBlock — non-object data', () => {
   it('returns null for null', () => {
@@ -186,9 +172,7 @@ describe('buildImageBlock — non-object data', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // stripSvgFromData — removes svg field, preserves metadata, leaves non-records intact
-// ---------------------------------------------------------------------------
 
 describe('stripSvgFromData', () => {
   it('removes the svg field and keeps all other fields', () => {
@@ -240,9 +224,7 @@ describe('stripSvgFromData', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // svg-stripping integration — text/json block must NOT contain raw svg markup
-// ---------------------------------------------------------------------------
 
 describe('svg stripping in MCP content shaping', () => {
   it('text block does not contain raw svg markup after stripping', () => {
@@ -335,9 +317,7 @@ describe('svg stripping in MCP content shaping', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (g) MCP shaping hook — busResult with data.svg includes image block + text block
-// ---------------------------------------------------------------------------
 
 const RENDERED = {
   summary: 'Rendered view.',
@@ -375,9 +355,7 @@ describe('MCP shaping hook — content augmentation with SVG data', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (h) MCP shaping hook — busResult without svg → no image block
-// ---------------------------------------------------------------------------
 
 describe('MCP shaping hook — no image block for non-SVG results', () => {
   it('buildImageBlock returns null for a normal mutation result (no data)', () => {

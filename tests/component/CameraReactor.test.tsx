@@ -23,9 +23,7 @@ function resetStore(): void {
   useStore.setState({ document: createEmptyDocument(), lastSummary: null });
 }
 
-// ---------------------------------------------------------------------------
 // Store-level tests — set_camera updates document.camera
-// ---------------------------------------------------------------------------
 
 describe('CameraReactor — document.camera updated by set_camera command', () => {
   beforeEach(() => {
@@ -64,9 +62,7 @@ describe('CameraReactor — document.camera updated by set_camera command', () =
   });
 });
 
-// ---------------------------------------------------------------------------
 // sphericalToCartesian math tests — the eye position computed from CameraState
-// ---------------------------------------------------------------------------
 
 describe('CameraReactor — sphericalToCartesian eye position', () => {
   it('polar=0 places the camera directly above the target along +Z', () => {
@@ -102,9 +98,7 @@ describe('CameraReactor — sphericalToCartesian eye position', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // fit_view command — updates document.camera when entities exist
-// ---------------------------------------------------------------------------
 
 describe('CameraReactor — fit_view updates document.camera', () => {
   beforeEach(() => {

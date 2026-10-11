@@ -3,9 +3,7 @@ import { createEmptyDocument, DEFAULT_LAYER_ID } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 
 describe('transform commands', () => {
-  // -------------------------------------------------------------------------
   // Helpers
-  // -------------------------------------------------------------------------
 
   function docWithBox(
     position = [0, 0, 0] as [number, number, number],
@@ -52,9 +50,7 @@ describe('transform commands', () => {
     return { created, id, result: execute(created.document, cmd, { id, ...extra }) };
   }
 
-  // -------------------------------------------------------------------------
   // rotate_entity
-  // -------------------------------------------------------------------------
 
   describe('rotate_entity', () => {
     it('adds the delta to the existing rotation', () => {
@@ -103,9 +99,7 @@ describe('transform commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // scale_entity
-  // -------------------------------------------------------------------------
 
   describe('scale_entity', () => {
     it('scales a box size by the factor', () => {
@@ -229,9 +223,7 @@ describe('transform commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // mirror_entity
-  // -------------------------------------------------------------------------
 
   describe('mirror_entity', () => {
     it('mirrors across x-axis by negating position.x', () => {
@@ -293,9 +285,7 @@ describe('transform commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // array_linear
-  // -------------------------------------------------------------------------
 
   describe('array_linear', () => {
     it('creates count-1 copies with correct positions', () => {
@@ -366,9 +356,7 @@ describe('transform commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // array_polar
-  // -------------------------------------------------------------------------
 
   describe('array_polar', () => {
     it('creates count-1 copies for a full-circle array', () => {

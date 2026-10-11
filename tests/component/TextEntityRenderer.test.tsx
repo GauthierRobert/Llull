@@ -27,9 +27,7 @@ function resetStore(): void {
   useStore.setState({ document: createEmptyDocument(), lastSummary: null });
 }
 
-// ---------------------------------------------------------------------------
 // 1. Basic render shape — content and fontSize (height)
-// ---------------------------------------------------------------------------
 
 describe('TextEntity — add_text produces correct entity shape', () => {
   beforeEach(() => {
@@ -85,9 +83,7 @@ describe('TextEntity — add_text produces correct entity shape', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // 2. Selection — selecting a text entity id updates document.selection
-// ---------------------------------------------------------------------------
 
 describe('TextEntity — selection dispatches correctly', () => {
   beforeEach(() => {
@@ -109,9 +105,7 @@ describe('TextEntity — selection dispatches correctly', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // 3. Anchor — anchor:'center' propagates to entity.anchor
-// ---------------------------------------------------------------------------
 
 describe('TextEntity — anchor prop', () => {
   beforeEach(() => {
@@ -156,9 +150,7 @@ describe('TextEntity — anchor prop', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // 4. Empty content — defensive: add_text with empty content is a graceful no-op
-// ---------------------------------------------------------------------------
 
 describe('TextEntity — empty content guard', () => {
   beforeEach(() => {
@@ -186,9 +178,7 @@ describe('TextEntity — empty content guard', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // 5. Grouping / instancing — text is NOT batchable (falls to per-entity path)
-// ---------------------------------------------------------------------------
 
 describe('TextEntity — not routed through instanced renderer', () => {
   beforeEach(() => {

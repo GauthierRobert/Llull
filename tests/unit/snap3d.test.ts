@@ -11,9 +11,7 @@ import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument, CylinderEntity, Entity } from '@core/model/types';
 import { type SnapPoint3D, collectSnapCandidates3D, snap3d } from '../../src/ui/viewport/3d/snap3d';
 
-// ---------------------------------------------------------------------------
 // Document builders
-// ---------------------------------------------------------------------------
 
 function emptyDoc(): CadDocument {
   return createEmptyDocument();
@@ -78,9 +76,7 @@ function docWithExtrusion(id: string, px: number, py: number, pz: number): CadDo
   });
 }
 
-// ---------------------------------------------------------------------------
 // collectSnapCandidates3D
-// ---------------------------------------------------------------------------
 
 describe('collectSnapCandidates3D', () => {
   it('returns empty array for document with no 3D entities', () => {
@@ -241,9 +237,7 @@ describe('collectSnapCandidates3D', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // snap3d
-// ---------------------------------------------------------------------------
 
 describe('snap3d', () => {
   const TOLERANCE = 0.5;
@@ -382,9 +376,7 @@ describe('snap3d', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Integration: collectSnapCandidates3D + snap3d round-trip
-// ---------------------------------------------------------------------------
 
 describe('snap3d integration with collectSnapCandidates3D', () => {
   it('snaps to the corner of a box when cursor is close', () => {

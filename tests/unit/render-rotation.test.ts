@@ -19,9 +19,7 @@ import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { applyEulerXYZ } from '@core/lib/eulerRotation';
 
-// ---------------------------------------------------------------------------
 // SVG bbox helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Parse all `points="..."` attributes from SVG polygon/polyline elements and
@@ -70,9 +68,7 @@ function bboxHeight(b: { minY: number; maxY: number }): number {
   return b.maxY - b.minY;
 }
 
-// ---------------------------------------------------------------------------
 // Helper: render a doc and return the SVG string for a named view
-// ---------------------------------------------------------------------------
 
 function renderSvg(doc: ReturnType<typeof createEmptyDocument>, view: string): string {
   const result = execute(doc, 'render_view', { view, width: 400, height: 400 });
@@ -109,7 +105,6 @@ function frontPair(
   return { a: a!, b: b! };
 }
 
-// ---------------------------------------------------------------------------
 // Cylinder rotation test
 //
 // Unrotated cylinder: axis along Z (Z-up document convention).
@@ -123,7 +118,6 @@ function frontPair(
 //     screen axes.  Width ≈ Height ≈ 2*radius (< height when height > diameter).
 //
 // For radius=1, height=4: unrotated front-view height >> width; rotated ≈ square.
-// ---------------------------------------------------------------------------
 
 describe('render_view rotation — cylinder', () => {
   const cyl = { radius: 1, height: 4 };
@@ -150,12 +144,10 @@ describe('render_view rotation — cylinder', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Box rotation test
 //
 // Unrotated box [1,1,4] (slim Z-tall box): from front view it's tall and narrow.
 // Rotated [π/2,0,0]: the tall axis swings to Y (into camera); box looks square-ish.
-// ---------------------------------------------------------------------------
 
 describe('render_view rotation — box', () => {
   const slim = { size: [1, 1, 4] };
@@ -180,13 +172,11 @@ describe('render_view rotation — box', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Torus rotation test
 //
 // Unrotated torus: ring in XY plane, from front view it looks like an ellipse.
 // Rotated [π/2,0,0]: the ring plane swings to XZ, from front view it looks like
 // a circle — the screen height shrinks.
-// ---------------------------------------------------------------------------
 
 describe('render_view rotation — torus', () => {
   it('torus rotated [π/2,0,0] produces different bbox from unrotated torus', () => {
@@ -195,13 +185,11 @@ describe('render_view rotation — torus', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Cone rotation test
 //
 // Unrotated cone: base in XY, apex along +Z. From front: tall triangle.
 // Rotated [π/2,0,0]: apex points along +Y (into camera from front).
 // From front: roughly circular / disc shape.
-// ---------------------------------------------------------------------------
 
 describe('render_view rotation — cone', () => {
   it('cone rotated [π/2,0,0] has different front-view height than unrotated', () => {
@@ -210,9 +198,7 @@ describe('render_view rotation — cone', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Zero rotation regression — must produce identical SVG
-// ---------------------------------------------------------------------------
 
 describe('render_view rotation — zero rotation is a no-op', () => {
   it.each([
@@ -225,9 +211,7 @@ describe('render_view rotation — zero rotation is a no-op', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Pyramid and Wedge rotation tests
-// ---------------------------------------------------------------------------
 
 describe('render_view rotation — pyramid', () => {
   it('pyramid rotated [π/2,0,0] has different front-view bbox than unrotated', () => {
@@ -244,13 +228,11 @@ describe('render_view rotation — wedge', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Compound-rotation tests — these FAIL on the old Rz·Ry·Rx (wrong) order and
 // PASS on the corrected Rx·Ry·Rz (three.js XYZ) order.
 //
 // These are the discriminating tests: single-axis rotations commute trivially,
 // so only multi-axis inputs expose the convention difference.
-// ---------------------------------------------------------------------------
 
 describe('applyEulerXYZ — compound rotation math (convention discriminator)', () => {
   const EPS = 1e-10;
@@ -301,7 +283,6 @@ describe('applyEulerXYZ — compound rotation math (convention discriminator)', 
   });
 });
 
-// ---------------------------------------------------------------------------
 // End-to-end compound-rotation test: a thin elongated box rotated [π/2, π/2, 0]
 //
 // Box size [100, 4, 4]. When unrotated, from front view: wide (100 screen-units
@@ -317,7 +298,6 @@ describe('applyEulerXYZ — compound rotation math (convention discriminator)', 
 //   Rx first: +Z corners swing to +Y; then Ry(π/2): X-corners swing to +Z.
 //   Long axis ends up along Z (screen-Y in front view): box appears TALL not wide.
 //   bboxWidth ≈ 4, bboxHeight ≈ 100 — opposite of the correct result.
-// ---------------------------------------------------------------------------
 
 describe('render_view rotation — compound-rotation end-to-end (convention discriminator)', () => {
   it('thin box [100,4,4] rotated [π/2, π/2, 0]: front-view appears nearly square (long axis into depth)', () => {

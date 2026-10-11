@@ -16,9 +16,7 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 
-// ---------------------------------------------------------------------------
 // Helper: make + dispose pattern (mirrors what each mesh component does)
-// ---------------------------------------------------------------------------
 
 function withDisposeSpy<T extends THREE.BufferGeometry | THREE.Material>(
   make: () => T,
@@ -36,9 +34,7 @@ function withDisposeSpy<T extends THREE.BufferGeometry | THREE.Material>(
   return { disposeCalled: called };
 }
 
-// ---------------------------------------------------------------------------
 // BoxGeometry — useMemo([sx, sy, sz]) / useEffect cleanup
-// ---------------------------------------------------------------------------
 
 describe('Disposal audit — BoxGeometry', () => {
   it('dispose() is called on the geometry created by BoxMesh pattern', () => {
@@ -52,9 +48,7 @@ describe('Disposal audit — BoxGeometry', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // SphereGeometry — useMemo([radius]) / useEffect cleanup
-// ---------------------------------------------------------------------------
 
 describe('Disposal audit — SphereGeometry', () => {
   it('dispose() is called on the geometry created by SphereMesh pattern', () => {
@@ -68,9 +62,7 @@ describe('Disposal audit — SphereGeometry', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // CylinderGeometry — useMemo([radius, height]) / useEffect cleanup
-// ---------------------------------------------------------------------------
 
 describe('Disposal audit — CylinderGeometry', () => {
   it('dispose() is called on the geometry created by CylinderMesh pattern', () => {
@@ -84,9 +76,7 @@ describe('Disposal audit — CylinderGeometry', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // ConeGeometry — useMemo([radius, height]) / useEffect cleanup
-// ---------------------------------------------------------------------------
 
 describe('Disposal audit — ConeGeometry', () => {
   it('dispose() is called on the geometry created by ConeMesh pattern', () => {
@@ -100,9 +90,7 @@ describe('Disposal audit — ConeGeometry', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // TorusGeometry — useMemo([ringRadius, tubeRadius]) / useEffect cleanup
-// ---------------------------------------------------------------------------
 
 describe('Disposal audit — TorusGeometry', () => {
   it('dispose() is called on the geometry created by TorusMesh pattern', () => {
@@ -116,9 +104,7 @@ describe('Disposal audit — TorusGeometry', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // ExtrudeGeometry — useMemo([pKey, depth]) / useEffect cleanup
-// ---------------------------------------------------------------------------
 
 describe('Disposal audit — ExtrudeGeometry', () => {
   it('dispose() is called on the geometry created by ExtrusionMesh pattern', () => {
@@ -138,9 +124,7 @@ describe('Disposal audit — ExtrudeGeometry', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Custom BufferGeometry (wedge / pyramid / MeshSolid) — useEffect cleanup
-// ---------------------------------------------------------------------------
 
 describe('Disposal audit — custom BufferGeometry', () => {
   it('dispose() is called on a BufferGeometry built for WedgeMesh / PyramidMesh / MeshSolidMesh', () => {
@@ -162,9 +146,7 @@ describe('Disposal audit — custom BufferGeometry', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // OctahedronGeometry (SnapIndicator3D) — separate useEffect for geometry
-// ---------------------------------------------------------------------------
 
 describe('Disposal audit — SnapIndicator3D geometry', () => {
   it('geometry.dispose() is called independently of material.dispose()', () => {
@@ -196,9 +178,7 @@ describe('Disposal audit — SnapIndicator3D geometry', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // LineBasicMaterial (MeasureBBoxWireframe) — useEffect cleanup
-// ---------------------------------------------------------------------------
 
 describe('Disposal audit — MeasureBBoxWireframe material', () => {
   it('LineBasicMaterial.dispose() is called on unmount', () => {
@@ -212,9 +192,7 @@ describe('Disposal audit — MeasureBBoxWireframe material', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // MeshStandardMaterial (InstancedRenderer) — useEffect cleanup
-// ---------------------------------------------------------------------------
 
 describe('Disposal audit — InstancedRenderer MeshStandardMaterial', () => {
   it('MeshStandardMaterial.dispose() is called when batch unmounts', () => {

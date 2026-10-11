@@ -23,9 +23,7 @@ import { type FeatureStep, createEmptyDocument } from '@core/model/types';
 import { FeatureHistoryPanel } from '@ui/panels/FeatureHistoryPanel';
 import { localDispatch, liveSnapshot } from '../helpers/storeTestHelpers';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 /** The store's real dispatch, captured before any test swaps in a spy via `patchDispatch`. */
 const realDispatch = useStore.getState().dispatch;
@@ -61,9 +59,7 @@ function patchDispatch(spy: ReturnType<typeof vi.fn>): void {
   useStore.setState({ dispatch: spy } as any);
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 function expectBoxSize(size: number[]): void {
   const box = Object.values(useStore.getState().document.entities).find((e) => e?.kind === 'box');

@@ -23,17 +23,13 @@ import {
 import { applyToolCall } from '../../tests/helpers/applyToolCall';
 import { createEmptyDocument } from '@core/model/types';
 
-// ---------------------------------------------------------------------------
 // Reset shared state before each test so tests are independent.
-// ---------------------------------------------------------------------------
 
 beforeEach(() => {
   _resetLiveDoc();
 });
 
-// ---------------------------------------------------------------------------
 // (a) Mutating MCP tool call updates the shared live document
-// ---------------------------------------------------------------------------
 
 describe('setLiveDoc via applyToolCall', () => {
   it('starts with an empty document (0 entities)', () => {
@@ -87,9 +83,7 @@ describe('setLiveDoc via applyToolCall', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (b) subscribeLive: initial snapshot + broadcast on mutation
-// ---------------------------------------------------------------------------
 
 describe('subscribeLive', () => {
   it('immediately writes the current document as an SSE data event on subscribe', () => {

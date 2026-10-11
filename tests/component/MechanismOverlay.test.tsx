@@ -25,9 +25,7 @@ function resetStore(): void {
   useViewportStore.setState({ mechanismSelection: null });
 }
 
-// ---------------------------------------------------------------------------
 // Constraint geometry test — line between two entity positions
-// ---------------------------------------------------------------------------
 
 /** Create a box and a sphere joined by a constraint of `kind`; returns the constraint id. */
 function addConstraint(kind: 'coincident' | 'parallel'): string {
@@ -87,9 +85,7 @@ describe('MechanismOverlay — constraint line geometry', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Joint arrow geometry test — ArrowHelper with correct color
-// ---------------------------------------------------------------------------
 
 describe('MechanismOverlay — joint arrow', () => {
   beforeEach(() => {

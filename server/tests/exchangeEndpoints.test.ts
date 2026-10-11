@@ -85,9 +85,7 @@ function seedPlateWithHole(server: LoadedServer): void {
   server.applyCommand('set_entity_name', { id: cut.affected[0], name: 'Base plate' });
 }
 
-// ---------------------------------------------------------------------------
 // GET /export/code
-// ---------------------------------------------------------------------------
 
 describe('GET /export/code', () => {
   it('defaults to cadquery and sends an attachment', async () => {
@@ -138,9 +136,7 @@ describe('GET /export/code', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // GET /export/step
-// ---------------------------------------------------------------------------
 
 describe('GET /export/step without Python', () => {
   it('returns 503 with an explanatory error when LLULL_PYTHON=off', async () => {
@@ -216,9 +212,7 @@ describe.skipIf(!hasBuild123d)('GET /export/step with build123d', () => {
   }, 120_000);
 });
 
-// ---------------------------------------------------------------------------
 // MCP end-to-end
-// ---------------------------------------------------------------------------
 
 interface ToolResult {
   content: Array<{ type: string; text?: string }>;

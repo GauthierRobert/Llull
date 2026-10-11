@@ -28,9 +28,7 @@ const SQUARE_PROFILE: ReadonlyArray<readonly [number, number]> = [
   [1, 3],
 ];
 
-// ---------------------------------------------------------------------------
 // Store-level tests — verify the command produces the right entity
-// ---------------------------------------------------------------------------
 
 describe('RevolutionMesh — revolve_profile command → kind "revolution"', () => {
   beforeEach(resetStore);
@@ -73,10 +71,8 @@ describe('RevolutionMesh — revolve_profile command → kind "revolution"', () 
   });
 });
 
-// ---------------------------------------------------------------------------
 // Geometry-level tests — LatheGeometry vertex count > 0
 // (mirrors what RevolutionMesh builds; jsdom can run THREE without WebGL)
-// ---------------------------------------------------------------------------
 
 describe('RevolutionMesh — THREE.LatheGeometry vertex count', () => {
   it('full revolution (2π) with 4-point profile and 32 segments produces vertices', () => {

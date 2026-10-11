@@ -36,9 +36,7 @@ const port = createPythonExchangePort({
   exchangeDir: null,
 });
 
-// ---------------------------------------------------------------------------
 // Fixture model
-// ---------------------------------------------------------------------------
 
 type Vec3 = readonly [number, number, number];
 interface Box3 {
@@ -217,9 +215,7 @@ const deviationTable: Array<{
   tolerance: number;
 }> = [];
 
-// ---------------------------------------------------------------------------
 // Suites
-// ---------------------------------------------------------------------------
 
 function describeLanguage(language: PythonLanguage, enabled: boolean): void {
   describe.skipIf(!enabled)(`${language} exchange against the real bridge`, () => {

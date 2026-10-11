@@ -4,6 +4,7 @@ import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
 import { entityToTriangles } from '@core/commands/exportTriangulate';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { meshOf, booleanMesh } from '../helpers/manifoldMesh';
+import { meshBounds } from '../helpers/meshBounds';
 
 let kernel: GeometryKernel;
 
@@ -18,19 +19,6 @@ function solid(fields: Record<string, unknown>): Entity {
 }
 
 type Bounds = { min: Vec3; max: Vec3 };
-
-function meshBounds(mesh: MeshData): Bounds {
-  const min = [Infinity, Infinity, Infinity];
-  const max = [-Infinity, -Infinity, -Infinity];
-  for (let i = 0; i < mesh.positions.length; i += 3) {
-    for (let k = 0; k < 3; k++) {
-      const v = mesh.positions[i + k]!;
-      min[k] = Math.min(min[k]!, v);
-      max[k] = Math.max(max[k]!, v);
-    }
-  }
-  return { min: min as unknown as Vec3, max: max as unknown as Vec3 };
-}
 
 function llullBounds(entity: Entity): Bounds {
   const positions: number[] = [];

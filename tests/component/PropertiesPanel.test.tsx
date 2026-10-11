@@ -17,9 +17,7 @@ import { createEmptyDocument } from '@core/model/types';
 import { PropertiesPanel } from '@ui/panels/PropertiesPanel';
 import { localDispatch } from '../helpers/storeTestHelpers';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function resetStore(): void {
   useStore.setState({ document: createEmptyDocument(), lastSummary: null });
@@ -30,9 +28,7 @@ function createBox(size: [number, number, number] = [2, 2, 2]): string {
   return result.affected[0]!;
 }
 
-// ---------------------------------------------------------------------------
 // SelectionSection tests
-// ---------------------------------------------------------------------------
 
 describe('PropertiesPanel — selection inspector', () => {
   beforeEach(() => {
@@ -79,9 +75,7 @@ describe('PropertiesPanel — selection inspector', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Viewer mode — no mutation controls
-// ---------------------------------------------------------------------------
 
 describe('PropertiesPanel — no mutation controls in viewer mode', () => {
   beforeEach(() => {
@@ -104,9 +98,7 @@ describe('PropertiesPanel — no mutation controls in viewer mode', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Editing — every committed field dispatches a command
-// ---------------------------------------------------------------------------
 
 describe('PropertiesPanel — editing', () => {
   beforeEach(() => {
