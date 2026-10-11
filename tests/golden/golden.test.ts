@@ -1,5 +1,24 @@
-import { describe } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { plans } from './plans';
 import { describePlans } from './describePlans';
+import { execute } from '@core/commands/registry';
+import { runPlan } from './runPlan';
+import type { CadDocument } from '@core/model/types';
+import type { GoldenAction } from './plans';
 
 describe('golden replay corpus', () => describePlans(plans));
+
+describe('loops_polar_pattern parametric regeneration', () => {
+  const cylinderCount = (doc: CadDocument): number =>
+    Object.values(doc.entities).filter((e) => e.kind === 'cylinder').length;
+
+  it('set_parameter n=9 regenerates nine radial cylinders (and n=4 four)', () => {
+    const built = runPlan(plans['loops_polar_pattern'] as GoldenAction[]).document;
+    expect(cylinderCount(built)).toBe(7);
+    const nine = execute(built, 'set_parameter', { name: 'n', expression: '9' }).document;
+    expect(cylinderCount(nine)).toBe(9);
+    expect(nine.order).toHaveLength(9);
+    const four = execute(nine, 'set_parameter', { name: 'n', expression: '4' }).document;
+    expect(cylinderCount(four)).toBe(4);
+  });
+});

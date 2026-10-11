@@ -10,6 +10,8 @@ export interface GoldenAction {
   repeat?: { count: number | string; as?: string };
   for_each?: { values: unknown[] | string; as: string };
   step?: { command: string; params?: Record<string, unknown> };
+  for?: { var: string; from: number | string; to: number | string; step?: number | string };
+  actions?: GoldenAction[];
 }
 
 const CUBE_COMPONENT: GoldenAction[] = [
@@ -336,6 +338,25 @@ export const plans: Record<string, GoldenAction[]> = {
       for_each: { values: [1, 2, 3], as: 'r' },
       step: { command: 'add_sphere', params: { radius: '=$r', position: ['=$r * 10', 5, 0] } },
     },
+  ],
+  loops_polar_pattern: [
+    { command: 'set_parameter', params: { name: 'n', expression: '7' } },
+    { command: 'set_parameter', params: { name: 'r', expression: '50' } },
+    {
+      repeat: { count: '=n', as: 'i' },
+      actions: [
+        {
+          command: 'add_cylinder',
+          as: 'piston{i}',
+          params: {
+            radius: 4,
+            height: 30,
+            position: ['=r*cos(2*pi*i/n)', '=r*sin(2*pi*i/n)', 80],
+          },
+        },
+      ],
+    },
+    { command: 'move_entity', params: { id: '$piston0', delta: [0, 0, 5] } },
   ],
   configurations: [
     { command: 'set_parameter', params: { name: 'w', expression: '10' } },

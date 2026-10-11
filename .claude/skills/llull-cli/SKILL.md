@@ -14,25 +14,66 @@ available with no CLI change. Code: `server/src/cli/` · help: `llull help`.
 > In the snippets `llull` = `node server/bin/llull.cjs` (from the repo root).
 
 ## When CLI vs MCP
-| Situation | Use |
-| --------- | --- |
-| Terminal agent, no server / MCP not connected | CLI on a local `--doc` file |
-| Many steps | ONE `llull run plan.json` (build_project) — not many single calls |
-| Exports / renders you need as files | CLI `--save PATH` |
-| The user watches the open app | CLI `--server http://localhost:3001` (or the MCP tools) |
-| Client without a shell (Claude Desktop, claude.ai) | MCP only |
+
+| Situation                                          | Use                                                               |
+| -------------------------------------------------- | ----------------------------------------------------------------- |
+| Terminal agent, no server / MCP not connected      | CLI on a local `--doc` file                                       |
+| Many steps                                         | ONE `llull run plan.json` (build_project) — not many single calls |
+| Exports / renders you need as files                | CLI `--save PATH`                                                 |
+| The user watches the open app                      | CLI `--server http://localhost:3001` (or the MCP tools)           |
+| Client without a shell (Claude Desktop, claude.ai) | MCP only                                                          |
 
 ## Procedure
+
 1. **Find commands without loading schemas into context.**
    `llull search fillet edge` → `llull describe fillet_edge` (params, required, enums).
    `llull list 3d` for a toolset; `llull toolsets`; `llull guide` for units/axes/id conventions.
 2. **Write the plan as a file** (format: `design-model` skill; aliases `$name`, `=expr`):
    ```json
-   [ { "command": "set_units", "params": { "units": "mm" } },
+   [
+     { "command": "set_units", "params": { "units": "mm" } },
      { "command": "add_box", "params": { "size": [80, 60, 10] }, "as": "plate" },
      { "command": "add_cylinder", "params": { "radius": 4, "height": 20 }, "as": "hole" },
-     { "command": "boolean_subtract", "params": { "a": "$plate", "b": "$hole" } } ]
+     { "command": "boolean_subtract", "params": { "a": "$plate", "b": "$hole" } }
+   ]
    ```
+   **Loops / parameters:** don't generate long plans in a script. Use nestable loops and `=expr`
+   (functions `sin cos sqrt min max floor round ...`, `pi`, loop var `i`); aliases interpolate:
+   ```json
+   [
+     { "command": "set_parameter", "params": { "name": "n", "expression": "7" } },
+     { "command": "set_parameter", "params": { "name": "r", "expression": "50" } },
+     {
+       "repeat": { "count": "=n", "as": "i" },
+       "actions": [
+         {
+           "command": "add_cylinder",
+           "as": "piston{i}",
+           "params": {
+             "radius": 4,
+             "height": 30,
+             "position": ["=r*cos(2*pi*i/n)", "=r*sin(2*pi*i/n)", 80]
+           }
+         }
+       ]
+     }
+   ]
+   ```
+   (`for: {var, from, to, step}` also works; max 1000 iterations.) Then
+   `llull set_parameter name=n expression=9 --doc part.llull.json` regenerates 9 pistons.
+   `--validate` reports issues by path (`step 2 › iter 3 › step 0`).
+   **Loops / parameters:** don't generate long plans in a script. Use nestable loops and `=expr`
+   (functions `sin cos sqrt min max floor round ...`, `pi`, loop var `i`); aliases interpolate:
+   ```json
+   [ { "command": "set_parameter", "params": { "name": "n", "expression": "7" } },
+     { "command": "set_parameter", "params": { "name": "r", "expression": "50" } },
+     { "repeat": { "count": "=n", "as": "i" }, "actions": [
+       { "command": "add_cylinder", "as": "piston{i}",
+         "params": { "radius": 4, "height": 30, "position": ["=r*cos(2*pi*i/n)", "=r*sin(2*pi*i/n)", 80] } } ] } ]
+   ```
+   (`for: {var, from, to, step}` also works; max 1000 iterations.) Then
+   `llull set_parameter name=n expression=9 --doc part.llull.json` regenerates 9 pistons.
+   `--validate` reports issues by path (`step 2 › iter 3 › step 0`).
 3. **Validate, then apply** (aborts and rolls back on the first failing step):
    `llull run plan.json --validate --doc part.llull.json` → fix issues → `llull run plan.json --doc part.llull.json`.
    The report prints one line per step with the ids it created.
@@ -45,6 +86,7 @@ available with no CLI change. Code: `server/src/cli/` · help: `llull help`.
    saved change (one level: the `.bak` copy).
 
 ## Params syntax
+
 - `key=value` pairs, each value parsed as JSON when possible: `size=[10,20,5] name=lid count=4`
   (string-typed params stay strings: `name=123` is `"123"`).
   Quote for the shell: `'position=[0,0,5]'`, `"name=top plate"`.
@@ -52,6 +94,7 @@ available with no CLI change. Code: `server/src/cli/` · help: `llull help`.
 - `llull <command> …` is shorthand for `llull exec <command> …`.
 
 ## Flags
+
 `--doc FILE` (default `$LLULL_DOC` or `model.llull.json`, created on first change) ·
 `--server URL` / `--token T` (`$LLULL_SERVER`, `$LLULL_TOKEN`) · `--dry-run` (local, never writes) ·
 `--save PATH` (`.png` rasterizes svg; several files → directory) · `--json` (one object: `ok`,
@@ -59,12 +102,14 @@ available with no CLI change. Code: `server/src/cli/` · help: `llull help`.
 `export_step_exact`, real fillets).
 
 ## Exit codes (script on them)
+
 `0` ok · `1` the command failed, a plan step failed, a change command changed nothing (read the
 summary; setters and history commands are exempt), or `--save` could not write · `2` usage
 error (unknown command — the message suggests close names; bad JSON; unreadable file; a value
 flag such as `--save` given without its value).
 
 ## Rules
+
 - Never edit the `.llull.json` document by hand — every change is a command (PRIME DIRECTIVE).
 - Prefer one plan over a loop of single calls: one process, one transaction, one rollback.
 - Output is capped like MCP results; for big data use `--json` with `jq`, or narrow the query

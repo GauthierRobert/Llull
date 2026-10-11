@@ -1,0 +1,70 @@
+import type { CadDocument } from '../../model/types';
+import { getCommand } from '../commandTable';
+import { executeRecorded } from '../history/record';
+import { type StepReport } from './types';
+import { resolveExprInParam, recordableParams, STEP_PARAM_COMMANDS } from './resolve';
+
+export interface PlanRun {
+  current: CadDocument;
+  readonly bindings: Record<string, string[]>;
+  readonly steps: StepReport[];
+  readonly allAffected: string[];
+  readonly onError: 'abort' | 'continue';
+  executedSteps: number;
+  /** Loop iterations expanded so far (capped by MAX_LOOP_ITERATIONS). */
+  loopIterations: number;
+}
+
+/** Records a failed control-flow step; true when the run must abort. */
+export function failStep(
+  run: PlanRun,
+  index: number,
+  command: string,
+  summary: string,
+  path?: string,
+): boolean {
+  run.steps.push({ index, command, ok: false, summary, affected: [], ...(path ? { path } : {}) });
+  return run.onError === 'abort';
+}
+
+/** Runs one command; `label` (loop bodies only) prefixes the step summaries. */
+export function execStep(
+  run: PlanRun,
+  index: number,
+  command: string,
+  params: Record<string, unknown>,
+  bindings: Record<string, string[]>,
+  env: Record<string, number>,
+  label?: string,
+  path?: string,
+): { ok: boolean; affected: string[] } {
+  const report = (
+    ok: boolean,
+    summary: string,
+    affected: string[] = [],
+  ): { ok: boolean; affected: string[] } => {
+    run.steps.push({ index, command, ok, summary, affected, ...(path ? { path } : {}) });
+    return { ok, affected };
+  };
+  if (!getCommand(command)) {
+    return report(false, `Unknown command: ${command}${label ? ` (${label})` : ''}`);
+  }
+  const resolved = resolveExprInParam(params, bindings, env);
+  if (resolved.error) {
+    return report(false, `Param error${label ? ` in ${label}` : ''}: ${resolved.error}`);
+  }
+  const recorded = recordableParams(params, resolved.value, run.current.parameters);
+  const result = executeRecorded(
+    run.current,
+    command,
+    STEP_PARAM_COMMANDS.has(command) ? recorded : resolved.value,
+    recorded,
+  );
+  // A graceful no-op (no change + nothing affected) is a soft failure for a plan step.
+  const ok = result.affected.length > 0 || result.document !== run.current;
+  report(ok, label ? `${label}: ${result.summary}` : result.summary, result.affected);
+  if (!ok) return { ok, affected: [] };
+  run.current = result.document;
+  run.allAffected.push(...result.affected);
+  return { ok, affected: result.affected };
+}
