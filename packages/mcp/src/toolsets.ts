@@ -95,6 +95,8 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'add_sphere',
     'add_cone',
     'add_torus',
+    'add_helix_spring',
+    'add_bearing',
     'add_wedge',
     'add_pyramid',
     'extrude_profile',

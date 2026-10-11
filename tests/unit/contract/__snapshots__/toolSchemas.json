@@ -156,6 +156,64 @@
     "name": "add_beam"
   },
   {
+    "description": "Create a simplified rolling bearing: an inner ring and an outer ring (revolved raceway sections) plus a ring of rolling elements (balls for deep_groove_ball; straight rollers for spherical_roller / cylindrical_roller; rollers tilted 12 degrees for tapered_roller), all grouped under one named group (group_entities semantics). Size it with designation (ISO 15 boundary dimensions in MILLIMETRES, converted to the document units; case/space-insensitive, a suffix after \"-\" is ignored; known: 60xx/62xx/63xx deep groove e.g. \"6205\", 222xx spherical roller e.g. \"22220\", 302xx tapered roller e.g. \"30210\", NU2xx/NU3xx cylindrical roller e.g. \"NU210\") OR explicit bore, outerDiameter, width in document units (type then defaults to deep_groove_ball). An unknown designation, or a type that contradicts the designation, is rejected. The bearing is centered on position with its rotation axis along axis (default +Z). Returns affected = [inner ring, outer ring, ...rolling elements, group id] and data {groupId, innerRingId, outerRingId, rollingElementIds, type, bore, outerDiameter, width, designation?}.",
+    "input_schema": {
+      "properties": {
+        "axis": {
+          "description": "Rotation axis direction [dx, dy, dz] (non-zero, normalized) of the bearing. Defaults to [0, 0, 1].",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "bore": {
+          "description": "Bore (inner diameter) in document units. Needed with outerDiameter and width when no designation.",
+          "type": "number"
+        },
+        "color": {
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#b0b6bf\".",
+          "type": "string"
+        },
+        "designation": {
+          "description": "Bearing designation, e.g. \"6205\", \"22220\", \"30210\", \"NU210\". Dimensions in mm, scaled to document units.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Optional group name. Defaults to \"Bearing <designation|type>\".",
+          "type": "string"
+        },
+        "outerDiameter": {
+          "description": "Outer diameter in document units. Must exceed bore by >= 20% of itself.",
+          "type": "number"
+        },
+        "position": {
+          "description": "World-space location of the anchor point [x, y, z] in document units. Right-handed frame, +Z up. Center of the bearing (mid-width on its axis). Defaults to [0, 0, 0]. Format [x, y, z]; [x, y] is accepted and placed at z=0.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "type": {
+          "description": "Bearing type. Optional when designation is given (inferred); must match it if both are given.",
+          "enum": [
+            "deep_groove_ball",
+            "spherical_roller",
+            "tapered_roller",
+            "cylindrical_roller"
+          ],
+          "type": "string"
+        },
+        "width": {
+          "description": "Bearing width along the axis in document units.",
+          "type": "number"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "add_bearing"
+  },
+  {
     "description": "Create a rectangular box solid. Right-handed world frame, +Z up. size is [width, height, depth] in document units; all components must be > 0. anchor controls which point on the entity the position refers to: \"center\" (default) = geometric center; \"min\" = min-XYZ corner; \"base-center\" = center of bottom face (mid X/Y, min Z). The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.",
     "input_schema": {
       "properties": {
@@ -316,7 +374,7 @@
     "name": "add_column"
   },
   {
-    "description": "Create a cone solid. Right-handed world frame, +Z up. radius and height must both be > 0. anchor controls which point the position refers to: \"base-center\" (default) = center of the circular base (the apex is at position + [0,0,height]); \"center\" = geometric center of the AABB; \"min\" = min-XYZ corner of the AABB. The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.",
+    "description": "Create a cone solid. Right-handed world frame, +Z up. radius and height must both be > 0. anchor controls which point the position refers to: \"base-center\" (default) = center of the circular base (the apex is at position + [0,0,height]); \"center\" = geometric center of the AABB; \"min\" = min-XYZ corner of the AABB. The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin. Orientation: pass EITHER rotation (Euler radians) OR axis [dx,dy,dz] = direction the local +Z (symmetry) axis should point in world space; axis wins when both are given and Euler angles are derived and stored.",
     "input_schema": {
       "properties": {
         "anchor": {
@@ -327,6 +385,13 @@
             "base-center"
           ],
           "type": "string"
+        },
+        "axis": {
+          "description": "Optional direction [dx, dy, dz] (any non-zero length, normalized) that the primitive local +Z axis (its symmetry axis) points along in world space, e.g. [1, 0, 0] lays it along +X. When given it OVERRIDES rotation (the rotation param is ignored and the resolved Euler angles are stored). A zero-length or malformed axis is rejected as a no-op.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
         },
         "color": {
           "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
@@ -560,7 +625,7 @@
     "name": "add_curved_wall"
   },
   {
-    "description": "Create a cylinder solid. Right-handed world frame, +Z up. radius and height must both be > 0. anchor controls which point the position refers to: \"center\" (default) = geometric center (cylinder spans ±height/2 about stored position along its axis); \"min\" = min-XYZ corner of the AABB; \"base-center\" = center of the bottom face (mid X/Y, min Z of AABB). The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.",
+    "description": "Create a cylinder solid. Right-handed world frame, +Z up. radius and height must both be > 0. anchor controls which point the position refers to: \"center\" (default) = geometric center (cylinder spans ±height/2 about stored position along its axis); \"min\" = min-XYZ corner of the AABB; \"base-center\" = center of the bottom face (mid X/Y, min Z of AABB). The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin. Orientation: pass EITHER rotation (Euler radians) OR axis [dx,dy,dz] = direction the local +Z (symmetry) axis should point in world space; axis wins when both are given and Euler angles are derived and stored.",
     "input_schema": {
       "properties": {
         "anchor": {
@@ -571,6 +636,13 @@
             "base-center"
           ],
           "type": "string"
+        },
+        "axis": {
+          "description": "Optional direction [dx, dy, dz] (any non-zero length, normalized) that the primitive local +Z axis (its symmetry axis) points along in world space, e.g. [1, 0, 0] lays it along +X. When given it OVERRIDES rotation (the rotation param is ignored and the resolved Euler angles are stored). A zero-length or malformed axis is rejected as a no-op.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
         },
         "color": {
           "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
@@ -1090,6 +1162,68 @@
       "type": "object"
     },
     "name": "add_grid_system"
+  },
+  {
+    "description": "Create a helical compression spring as one sweep solid (round wire swept along a smooth helix spline). The spring axis runs from position along axis (default +Z); the base plane center is at position and the spring extends to position + axis * free length, wire thickness included. Wire size: give wireRadius or wireDiameter. coilRadius is the MEAN coil radius (axis to wire centerline) and must exceed wireRadius. Give at least two of pitch (centerline advance per turn, >= wire diameter), turns (number of coils, may be fractional, <= 200) and length (free length = overall extent along the axis incl. wire). Pitch and turns win if all three are given. closedEnds=true flattens the first and last turn (pitch = wire diameter) like ground/closed spring ends; the middle turns get the pitch needed to keep the overall length (requires turns > 2). The result is a sweep entity, so booleans, measuring, rendering and STEP/STL export work like any solid. Returns the entity id and data {freeLength, turns, pitch, wireDiameter, outerDiameter}.",
+    "input_schema": {
+      "properties": {
+        "axis": {
+          "description": "Direction [dx, dy, dz] (non-zero, normalized) the spring extends along from position. Defaults to [0, 0, 1].",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "closedEnds": {
+          "description": "Flatten the first and last turn to wire-diameter pitch. Default false. Needs turns > 2.",
+          "type": "boolean"
+        },
+        "coilRadius": {
+          "description": "Mean coil radius (axis to wire centerline) in document units; must be > wire radius.",
+          "type": "number"
+        },
+        "color": {
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#8a8f98\".",
+          "type": "string"
+        },
+        "length": {
+          "description": "Free length along the axis incl. wire thickness, document units.",
+          "type": "number"
+        },
+        "name": {
+          "description": "Optional entity name, e.g. \"Return spring\".",
+          "type": "string"
+        },
+        "pitch": {
+          "description": "Centerline advance along the axis per full turn, document units; >= wire diameter.",
+          "type": "number"
+        },
+        "position": {
+          "description": "World-space location of the anchor point [x, y, z] in document units. Right-handed frame, +Z up. Center of the spring base plane (start of the spring). Defaults to [0, 0, 0]. Format [x, y, z]; [x, y] is accepted and placed at z=0.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "turns": {
+          "description": "Number of coils (may be fractional), 0 < turns <= 200.",
+          "type": "number"
+        },
+        "wireDiameter": {
+          "description": "Wire diameter in document units (> 0). Used when wireRadius is absent.",
+          "type": "number"
+        },
+        "wireRadius": {
+          "description": "Wire radius in document units (> 0). Alternative: wireDiameter.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "coilRadius"
+      ],
+      "type": "object"
+    },
+    "name": "add_helix_spring"
   },
   {
     "description": "Add a kinematic joint between two InstanceEntity frames to model a mechanism. A \"revolute\" joint allows rotation of instance b around the given axis through instance a's origin. A \"prismatic\" joint allows translation of instance b along the given axis from instance a's origin. \"a\" and \"b\" are MateRef objects: { instanceId: \"<id>\", frame?: \"origin\"|\"axis-x\"|\"axis-y\"|\"axis-z\" }. \"axis\" is the rotation/slide axis: use \"x\", \"y\", or \"z\" for world axes, or a [x,y,z] unit vector. Initial joint value (angle / displacement) defaults to 0. Use set_joint_value to drive the joint. Use evaluate_motion or bake_motion to apply motion to instances. Returns the new joint id in affected[0].",
@@ -2224,7 +2358,7 @@
     "name": "add_text"
   },
   {
-    "description": "Create a torus (donut) solid. Right-handed world frame, +Z up. ringRadius is the distance from the torus center to the tube center (major radius); tubeRadius is the radius of the tube cross-section (minor radius). Both must be > 0; tubeRadius < ringRadius for a non-self-intersecting torus. anchor controls which point the position refers to: \"center\" (default) = geometric center of the torus; \"min\" = min-XYZ corner of the AABB; \"base-center\" = center of the bottom face (mid X/Y, min Z). The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.",
+    "description": "Create a torus (donut) solid. Right-handed world frame, +Z up. ringRadius is the distance from the torus center to the tube center (major radius); tubeRadius is the radius of the tube cross-section (minor radius). Both must be > 0; tubeRadius < ringRadius for a non-self-intersecting torus. anchor controls which point the position refers to: \"center\" (default) = geometric center of the torus; \"min\" = min-XYZ corner of the AABB; \"base-center\" = center of the bottom face (mid X/Y, min Z). The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin. Orientation: pass EITHER rotation (Euler radians) OR axis [dx,dy,dz] = direction the local +Z (symmetry) axis should point in world space; axis wins when both are given and Euler angles are derived and stored.",
     "input_schema": {
       "properties": {
         "anchor": {
@@ -2235,6 +2369,13 @@
             "base-center"
           ],
           "type": "string"
+        },
+        "axis": {
+          "description": "Optional direction [dx, dy, dz] (any non-zero length, normalized) that the primitive local +Z axis (its symmetry axis) points along in world space, e.g. [1, 0, 0] lays it along +X. When given it OVERRIDES rotation (the rotation param is ignored and the resolved Euler angles are stored). A zero-length or malformed axis is rejected as a no-op.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
         },
         "color": {
           "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
@@ -2649,15 +2790,22 @@
     "name": "array_linear"
   },
   {
-    "description": "Duplicate an entity into a polar (circular) pattern around the Z axis through center. The original counts as instance 0; count-1 new copies are created. Copy k is rotated by k*(angle/count) radians around center (XY plane). angle defaults to 2*PI (full circle). Each copy also has rotation[2] incremented by the same step so the part faces outward consistently. Z position and other rotation components are unchanged. count must be >= 2.",
+    "description": "Duplicate an entity into a polar (circular) pattern about an axis line through center. The original counts as instance 0; count-1 new copies are created. Copy k is the original rigidly rotated by k*(angle/count) radians about the axis: its position orbits the axis line and its orientation is composed with the same rotation (R_axis(k*step) applied after the existing rotation), so already-rotated parts (e.g. radial cylinders) stay correctly oriented. axis defaults to [0, 0, 1] (world Z; then center only uses cx, cy and Z position is unchanged). angle defaults to 2*PI (full circle). count must be >= 2.",
     "input_schema": {
       "properties": {
         "angle": {
           "description": "Total sweep angle in radians over which instances are distributed. Defaults to 2*PI (full 360-degree circle). A partial angle (e.g. PI) fans the instances over that arc.",
           "type": "number"
         },
+        "axis": {
+          "description": "Optional rotation axis direction [dx, dy, dz] (any non-zero length, normalized). Defaults to [0, 0, 1]. Right-hand rule gives the positive angle direction.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
         "center": {
-          "description": "World-space center point [cx, cy, cz] for the polar rotation axis (Z axis through this point). Only cx and cy are used for the rotation; cz is ignored.",
+          "description": "World-space point [cx, cy, cz] the rotation axis passes through. With the default Z axis only cx and cy matter.",
           "items": {
             "type": "number"
           },
@@ -5519,9 +5667,16 @@
     "name": "extend"
   },
   {
-    "description": "Extrude a closed 2D polygon profile along +Z into a solid. Right-handed world frame, +Z up. position is the origin of the profile plane [x, y, z] in document units; the solid spans from position.z to position.z + depth. depth must be > 0.",
+    "description": "Extrude a closed 2D polygon profile along +Z into a solid. Right-handed world frame, +Z up. position is the origin of the profile plane [x, y, z] in document units; the solid spans from position.z to position.z + depth. depth must be > 0. Orientation: pass EITHER rotation (Euler radians) OR axis [dx,dy,dz] = the extrusion direction (the profile plane normal; local +Z maps to it). axis wins when both are given; the derived Euler angles are stored.",
     "input_schema": {
       "properties": {
+        "axis": {
+          "description": "Optional direction [dx, dy, dz] (any non-zero length, normalized) that is the extrusion direction (local +Z) points along in world space, e.g. [1, 0, 0] lays it along +X. When given it OVERRIDES rotation (the rotation param is ignored and the resolved Euler angles are stored). A zero-length or malformed axis is rejected as a no-op.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
         "color": {
           "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#c8553d\".",
           "type": "string"

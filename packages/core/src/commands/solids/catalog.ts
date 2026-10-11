@@ -8,6 +8,8 @@ import { extrudeSketch, revolveProfile } from './profile';
 import { sweepProfile } from './sweep';
 import { makeTubeBetween } from './composite';
 import { addSpurGear } from './gears';
+import { addHelixSpring } from './helixSpring';
+import { addBearing } from './bearings';
 
 export const solidsCommands = commandCatalog(
   addBox,
@@ -23,4 +25,6 @@ export const solidsCommands = commandCatalog(
   sweepProfile,
   makeTubeBetween,
   addSpurGear,
+  addHelixSpring,
+  addBearing,
 );
