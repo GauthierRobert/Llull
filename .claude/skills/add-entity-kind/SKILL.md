@@ -45,7 +45,7 @@ Delegate in parallel when large: Lane 1 (`command-author`) model→codegen, Lane
 - ⚠ `codegen/program.ts` `ShapeSpec` member (then ⚠ `openscad.ts` `shapeSource`, ⚠ `pythonCalls.ts`
   `shapeCallOpen`), `featureProgram.ts` `lowerShape`, `pythonRuntime.ts` (cq + bd makers),
   `freecad.ts`, `identifiers.ts` reserved names, `commands/exchange/codeTrace.ts` `add_*` list.
-- 2D: `packages/domain-aec/src/dxfExport.ts` case (default skips). `exchange/exportStl.ts` description string.
+- 2D: `packages/domain-aec/src/building/exchange/dxfExport.ts` case (default skips). `exchange/exportStl.ts` description string.
 
 ## 6. MCP
 - `packages/mcp/src/toolsets.ts` (place the command), `conventions.ts` tables, `resources.ts`

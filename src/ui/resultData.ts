@@ -5,7 +5,7 @@
  */
 
 import type { CostLine } from '@aec/index';
-import type { Clash } from '@aec/industrial/clash';
+import type { Clash } from '@aec/industrial/clash/clash';
 
 type DataRecord = Record<string, unknown>;
 

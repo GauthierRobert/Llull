@@ -7,7 +7,7 @@ import {
   partialFlowDischarge,
   rationalFlowLps,
   solvePartialFlow,
-} from '@aec/civil/hydraulics';
+} from '@aec/civil/drainage/hydraulics';
 
 function run(
   doc: CadDocument,

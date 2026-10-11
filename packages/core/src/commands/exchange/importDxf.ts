@@ -9,7 +9,6 @@
 
 import {
   type CadDocument,
-  type DocumentUnit,
   type Entity,
   type Layer,
   type Vec2,
@@ -25,15 +24,7 @@ import { newEntity } from '../entity/newEntity';
 import { flattenDxf, parseDxf, type DxfPrimitive } from '../../lib/dxfRead';
 import { aciToHex, insUnitsMillimetres } from '../../lib/dxfUnits';
 import { MAX_IMPORT_TRIANGLES } from '../limits';
-
-/** Millimetres in one document unit. */
-export const MM_PER_UNIT: Readonly<Record<DocumentUnit, number>> = {
-  mm: 1,
-  cm: 10,
-  m: 1000,
-  in: 25.4,
-  ft: 304.8,
-};
+import { MM_PER_UNIT } from '../../model/units';
 
 /** Entities created by one import at most (larger drawings are truncated, and say so). */
 export const MAX_DXF_ENTITIES = 20000;

@@ -9,10 +9,10 @@
 import type { CadDocument } from '@core/model/types';
 import type { CadPlugin, DocumentExtension } from '@core/plugins/plugin';
 import { buildingCommands, industrialCommands } from './index';
-import { buildingDerivationGuard } from './integrity';
-import { mergeRestored } from './derived';
-import { buildingErrors } from './validate';
-import { regenerateBuilding } from './evaluateElements';
+import { buildingDerivationGuard } from './building/evaluate/integrity';
+import { mergeRestored } from './shared/derived';
+import { buildingErrors } from './building/validate';
+import { regenerateBuilding } from './building/evaluate/evaluateElements';
 
 function derivedEntityIds(doc: CadDocument): Set<string> {
   const ids = new Set<string>();

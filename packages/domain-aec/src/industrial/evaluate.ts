@@ -16,13 +16,19 @@ import type {
   PipeElement,
   SteelMemberElement,
 } from '@core/model/building';
-import { fromMm, toMm } from '../model';
-import { base, colorForMaterial, MEMBER_LAYER, meshEntity, orientedBox } from '../entities';
-import { prismMesh, sweepMesh } from '../mesh';
+import { fromMm, toMm } from '../building/model';
+import {
+  base,
+  colorForMaterial,
+  MEMBER_LAYER,
+  meshEntity,
+  orientedBox,
+} from '../building/evaluate/entities';
+import { prismMesh, sweepMesh } from '../shared/mesh';
 import { circleOutline, findProfile, profileOutline } from '../steel/profiles';
 import { cross3, dot3, sub3 } from '@lib/vec3';
-import { normalize } from '../vec3';
-import { shapeOf } from './equipmentShape';
+import { normalize } from '../shared/vec3';
+import { shapeOf } from './equipment/equipmentShape';
 
 const ROLE_LABEL: Readonly<Record<MemberRole, string>> = {
   column: 'Column',

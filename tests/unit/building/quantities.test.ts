@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { type TakeoffLine } from '@aec/takeoffBasics';
-import { toCsv } from '@aec/csv';
-import { rateFor, type CostLine } from '@aec/costing';
+import { type TakeoffLine } from '@aec/building/quantities/takeoffBasics';
+import { toCsv } from '@aec/shared/csv';
+import { rateFor, type CostLine } from '@aec/building/quantities/costing';
 import { drawHouseWalls, run } from './runFixtures';
 
 /** A 10 m × 8 m single-storey house shell. */

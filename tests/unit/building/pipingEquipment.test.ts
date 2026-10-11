@@ -2,16 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import type { BuildingElement, EquipmentElement, PipeElement } from '@core/model/building';
-import { buildPlanDrawing } from '@aec/planDrawing';
-import { outsideDiameterMm } from '@aec/industrial/pipeSizes';
-import { buildingErrors } from '@aec/validate';
-import type { IfcExport } from '@aec/ifcBuild';
-import type { DxfExport } from '@aec/dxfExport';
+import { buildPlanDrawing } from '@aec/building/drawings/planDrawing';
+import { outsideDiameterMm } from '@aec/industrial/piping/pipeSizes';
+import { buildingErrors } from '@aec/building/validate';
+import type { IfcExport } from '@aec/building/exchange/ifcBuild';
+import type { DxfExport } from '@aec/building/exchange/dxfExport';
 interface ScheduleTable {
   columns: string[];
   rows: unknown[][];
 }
-import type { PlanSheet } from '@aec/sheet';
+import type { PlanSheet } from '@aec/building/drawings/sheet';
 import { rawBuilding } from './elementEdits';
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {

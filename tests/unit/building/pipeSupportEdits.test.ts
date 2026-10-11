@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { reconcilePipeSupports, reconciliationNote } from '@aec/industrial/pipeSupportAttach';
+import {
+  reconcilePipeSupports,
+  reconciliationNote,
+} from '@aec/industrial/piping/pipeSupportAttach';
 import { step } from './steelFixtures';
 import { shoeDoc, supportsOf } from './pipeSupportFixtures';
 

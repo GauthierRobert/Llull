@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute, getCommand } from '@core/commands/registry';
-import { checkSteelMembers } from '@aec/industrial/steelMembersCheck';
-import { pipeWeightPerMetre } from '@aec/industrial/pipeWeight';
+import { checkSteelMembers } from '@aec/industrial/steelDesign/steelMembersCheck';
+import { pipeWeightPerMetre } from '@aec/industrial/piping/pipeWeight';
 import { findProfile, sectionProperties } from '@aec/steel/profiles';
 import {
   G,

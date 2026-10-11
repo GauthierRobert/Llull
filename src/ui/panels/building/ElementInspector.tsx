@@ -9,7 +9,7 @@ import { useStore } from '@ui/store';
 import { deleteSelection } from '@ui/actions/selectionActions';
 import type { BuildingElement, BuildingModel, SteelMemberElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
-import { toMetres, toMm } from '@aec/model';
+import { toMetres, toMm } from '@aec/building/model';
 import { findProfile } from '@aec/steel/profiles';
 import { Icon } from '@ui/components/Icon';
 import { PanelSection } from '@ui/panels/PanelParts';

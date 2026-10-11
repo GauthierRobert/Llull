@@ -7,11 +7,11 @@ import type {
   SteelMemberElement,
 } from '@core/model/building';
 import { execute } from '@core/commands/registry';
-import { framesOf } from '@aec/industrial/frameModelFrames';
-import { baseReactions } from '@aec/industrial/frameModelSolve';
-import type { PurlinRow, ZoneSummary } from '@aec/industrial/purlinModel';
-import type { ElevationSheet } from '@aec/elevation';
-import type { IfcExport } from '@aec/ifcBuild';
+import { framesOf } from '@aec/industrial/frames/frameModelFrames';
+import { baseReactions } from '@aec/industrial/frames/frameModelSolve';
+import type { PurlinRow, ZoneSummary } from '@aec/industrial/purlins/purlinModel';
+import type { ElevationSheet } from '@aec/building/drawings/elevation';
+import type { IfcExport } from '@aec/building/exchange/ifcBuild';
 
 const HALL = { span: 24000, length: 30000 };
 const PITCH = (6 * Math.PI) / 180;

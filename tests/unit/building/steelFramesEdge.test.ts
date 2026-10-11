@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import type { CadDocument } from '@core/model/types';
-import { buildingErrors } from '@aec/validate';
-import type { FrameReport } from '@aec/industrial/steelFrameAnalysis';
+import { buildingErrors } from '@aec/building/validate';
+import type { FrameReport } from '@aec/industrial/steelDesign/steelFrameAnalysis';
 import {
   check as baseCheck,
   rowOf,

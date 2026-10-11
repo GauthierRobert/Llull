@@ -51,6 +51,22 @@ module.exports = {
       to: { path: '^packages/(?!core/)', pathNot: '^packages/$1/' },
     },
     {
+      name: 'plugins-use-the-core-public-api',
+      comment:
+        'L10: plugins and kernels see core through its published surface — model, lib, geometry, ' +
+        'the plugin contract and the command-authoring API (schema, types, noop, derivation, ' +
+        'registry). Composing another command goes through `execute`, never its module.',
+      severity: 'error',
+      from: { path: '^packages/(domain-[^/]+|kernel-[^/]+)/' },
+      to: {
+        path: '^packages/core/src/',
+        pathNot:
+          '^packages/core/src/(model|lib|geometry)/|' +
+          '^packages/core/src/plugins/plugin\\.ts$|' +
+          '^packages/core/src/commands/(schema|types|noop|derivation|registry)\\.ts$',
+      },
+    },
+    {
       name: 'mcp-is-a-view-of-the-registry',
       comment: 'L5: MCP exposes the registry; it never depends on a plugin or a concrete kernel.',
       severity: 'error',

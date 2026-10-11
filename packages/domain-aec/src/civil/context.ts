@@ -5,7 +5,7 @@
 
 import type { CadDocument } from '@core/model/types';
 import type { CivilModel } from '@core/model/civil';
-import { fromMm } from '../model';
+import { fromMm } from '../building/model';
 
 export interface CivilContext {
   readonly doc: CadDocument;

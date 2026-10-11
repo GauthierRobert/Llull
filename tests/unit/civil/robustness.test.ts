@@ -3,9 +3,9 @@ import { execute } from '@core/commands/registry';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { flattenDxf, parseDxf } from '@core/lib/dxfRead';
 import { civilErrors } from '@aec/civil/validate';
-import { gridSize, MAX_SAMPLES } from '@aec/civil/earthworksMath';
-import { drawnInterval, MAX_CONTOUR_LEVELS } from '@aec/civil/surfaceEvaluate';
-import { buildTin } from '@aec/civil/tin';
+import { gridSize, MAX_SAMPLES } from '@aec/civil/earthworks/earthworksMath';
+import { drawnInterval, MAX_CONTOUR_LEVELS } from '@aec/civil/surface/surfaceEvaluate';
+import { buildTin } from '@aec/civil/surface/tin';
 import { MAX_SURFACE_POINTS } from '@aec/civil/model';
 import { metricDocument, surveyedDocument } from './fixtures';
 

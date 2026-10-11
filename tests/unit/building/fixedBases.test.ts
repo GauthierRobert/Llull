@@ -2,15 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { BasePlateElement } from '@core/model/building';
 import { execute } from '@core/commands/registry';
-import { type FrameLoads } from '@aec/industrial/frameModelTypes';
-import { framesOf } from '@aec/industrial/frameModelFrames';
-import { baseReactions, solveCombination } from '@aec/industrial/frameModelSolve';
-import { BEARING_STRENGTH, checkPlateMN, sizeBasePlate } from '@aec/industrial/basePlateMN';
-import { type FoundationRow } from '@aec/industrial/foundationModel';
-import { footingMoment } from '@aec/industrial/foundationCombinations';
-import type { FootingDesignRow } from '@aec/industrial/footingModel';
+import { type FrameLoads } from '@aec/industrial/frames/frameModelTypes';
+import { framesOf } from '@aec/industrial/frames/frameModelFrames';
+import { baseReactions, solveCombination } from '@aec/industrial/frames/frameModelSolve';
+import {
+  BEARING_STRENGTH,
+  checkPlateMN,
+  sizeBasePlate,
+} from '@aec/industrial/connections/basePlateMN';
+import { type FoundationRow } from '@aec/industrial/foundations/foundationModel';
+import { footingMoment } from '@aec/industrial/foundations/foundationCombinations';
+import type { FootingDesignRow } from '@aec/industrial/foundations/footingModel';
 import { findProfile } from '@aec/steel/profiles';
-import { buildingErrors } from '@aec/validate';
+import { buildingErrors } from '@aec/building/validate';
 import { HALL, hall } from './hallFixtures';
 
 const LOADS: FrameLoads = { deadLoad: 0.5, snowLoad: 0.8, windPressure: 0.7 };

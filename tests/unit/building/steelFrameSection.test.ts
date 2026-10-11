@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { findProfile, sectionProperties, type SteelProfile } from '@aec/steel/profiles';
-import { memberBuckling, sectionResistance } from '@aec/industrial/steelDesign';
+import { memberBuckling, sectionResistance } from '@aec/industrial/steelDesign/steelDesign';
 import {
   columnBendingAxis,
   inPlaneInertia,
   shearReducedMoment,
   weakAxisBuckling,
   weakAxisResistance,
-} from '@aec/industrial/steelFrameSection';
+} from '@aec/industrial/steelDesign/steelFrameSection';
 
 const profile = (name: string): SteelProfile => {
   const found = findProfile(name);

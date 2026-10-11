@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { boundsOf, dimensionLabel } from '@aec/planArchitectural';
-import { buildPlanDrawing } from '@aec/planDrawing';
-import { type DxfExport } from '@aec/dxfExport';
-import { DxfWriter, dxfLayerName, dxfText } from '@aec/dxfWriter';
+import { boundsOf, dimensionLabel } from '@aec/building/drawings/planArchitectural';
+import { buildPlanDrawing } from '@aec/building/drawings/planDrawing';
+import { type DxfExport } from '@aec/building/exchange/dxfExport';
+import { DxfWriter, dxfLayerName, dxfText } from '@aec/building/exchange/dxfWriter';
 import { escapeXml } from '@lib/escapeXml';
-import { fitScale, type PlanSheet } from '@aec/sheet';
-import { type IfcExport } from '@aec/ifcBuild';
-import { ifcGuid, ifcReal, ifcString } from '@aec/ifcStep';
-import { fileSlug } from '@aec/model';
+import { fitScale, type PlanSheet } from '@aec/building/drawings/sheet';
+import { type IfcExport } from '@aec/building/exchange/ifcBuild';
+import { ifcGuid, ifcReal, ifcString } from '@aec/building/exchange/ifcStep';
+import { fileSlug } from '@aec/building/model';
 import { drawHouseWalls, run } from './runFixtures';
 
 /** True for code points XML 1.0 forbids (C0 controls other than tab, LF, CR; U+FFFE; U+FFFF). */

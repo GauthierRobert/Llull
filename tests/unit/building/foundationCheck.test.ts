@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { ultimateCombinations } from '@aec/industrial/foundationCombinations';
-import { type ClayLayer, type FoundationRow } from '@aec/industrial/foundationModel';
-import { foundationCheck } from '@aec/industrial/foundationCheckRun';
-import { consolidationSettlement } from '@aec/industrial/foundationSettlement';
-import { baseReactions } from '@aec/industrial/frameModelSolve';
-import { anchorBoltResistance, boltResistance } from '@aec/industrial/steelDesign';
+import { ultimateCombinations } from '@aec/industrial/foundations/foundationCombinations';
+import { type ClayLayer, type FoundationRow } from '@aec/industrial/foundations/foundationModel';
+import { foundationCheck } from '@aec/industrial/foundations/foundationCheckRun';
+import { consolidationSettlement } from '@aec/industrial/foundations/foundationSettlement';
+import { baseReactions } from '@aec/industrial/frames/frameModelSolve';
+import { anchorBoltResistance, boltResistance } from '@aec/industrial/steelDesign/steelDesign';
 import { mapElements } from './elementEdits';
 
 const HALL = { span: 24000, length: 30000 };

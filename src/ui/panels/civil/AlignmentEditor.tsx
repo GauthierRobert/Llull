@@ -8,7 +8,7 @@
 
 import React, { useState } from 'react';
 import type { AlignmentObject } from '@core/model/civil';
-import { PAPER_SIZES, type PaperSize } from '@aec/sheet';
+import { PAPER_SIZES, type PaperSize } from '@aec/building/drawings/sheet';
 import { useStore } from '@ui/store';
 import { OptionSelect } from '@ui/panels/OptionSelect';
 import { CivilObjectRow, CivilStatus, NumberField } from './CivilParts';

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { gridLetter } from '@aec/grid';
+import { gridLetter } from '@aec/building/elements/grid';
 import { run } from './runFixtures';
 
 describe('add_level / update_level / delete_level / set_active_level', () => {

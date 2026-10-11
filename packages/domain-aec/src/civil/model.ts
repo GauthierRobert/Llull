@@ -11,9 +11,9 @@ import {
   type CivilObject,
   createEmptyCivil,
 } from '@core/model/civil';
-import { fromMm, toMetres } from '../model';
+import { fromMm, toMetres } from '../building/model';
 import { dependentsOf } from './integrity';
-import { MM_PER_UNIT } from '@core/commands/exchange/importDxf';
+import { MM_PER_UNIT } from '@core/model/units';
 
 export function getCivil(doc: Pick<CadDocument, 'civil'>): CivilModel {
   return doc.civil ?? createEmptyCivil();

@@ -1,0 +1,286 @@
+/**
+ * Doors and windows hosted by walls.
+ * @layer domain-aec
+ */
+
+import type { CadDocument, Vec2 } from '@core/model/types';
+import type {
+  BuildingModel,
+  CurvedWallElement,
+  OpeningElement,
+  WallElement,
+} from '@core/model/building';
+import type { CommandResult } from '@core/commands/types';
+import { defineCommand, z, vec2 } from '@core/commands/schema';
+import { projectOntoSegment } from '@lib/polygon';
+import { fromMm, getBuilding, nextElementId, nextMark, withElement } from '../model';
+import { commitBuilding } from '../evaluate/evaluateElements';
+import { noop } from '@core/commands/noop';
+import { builtExtent, openingsOf, wallFrame } from '../geometry/wallGeometry';
+import { arcOffsetOf, curvedWallLength } from '../geometry/curvedWallGeometry';
+import { openingFitError } from './walls';
+
+type OpeningKind = 'door' | 'window';
+
+const DEFAULTS_MM: Readonly<
+  Record<OpeningKind, { width: number; height: number; sill: number; material: string }>
+> = {
+  door: { width: 900, height: 2100, sill: 0, material: 'timber' },
+  window: { width: 1200, height: 1200, sill: 900, material: 'glass' },
+};
+
+function resolveOffset(
+  wall: WallElement | CurvedWallElement,
+  offset: number | undefined,
+  at: Vec2 | undefined,
+): number {
+  if (offset !== undefined) return offset;
+  if (wall.category === 'curvedWall')
+    return at ? arcOffsetOf(wall, at) : curvedWallLength(wall) / 2;
+  const { length } = wallFrame(wall);
+  return at ? projectOntoSegment(at, wall.start, wall.end).t * length : length / 2;
+}
+
+/** Another door / window (same category) already carrying `mark`. */
+function markHolder(
+  building: BuildingModel,
+  category: OpeningKind,
+  mark: string,
+  exceptId?: string,
+): OpeningElement | undefined {
+  return Object.values(building.elements).find(
+    (element): element is OpeningElement =>
+      element.category === category && element.mark === mark && element.id !== exceptId,
+  );
+}
+
+function addOpening(doc: CadDocument, kind: OpeningKind, params: AddOpeningParams): CommandResult {
+  const name = `add_${kind}`;
+  const building = getBuilding(doc);
+  const wall = building.elements[params.wallId];
+  if (!wall || (wall.category !== 'wall' && wall.category !== 'curvedWall')) {
+    return noop(
+      doc,
+      `${name} failed: no wall '${params.wallId}'. Use describe_building to list walls.`,
+    );
+  }
+  const defaults = DEFAULTS_MM[kind];
+  const width = params.width ?? fromMm(doc, defaults.width);
+  const height = params.height ?? Math.min(fromMm(doc, defaults.height), wall.height);
+  const sillHeight = params.sillHeight ?? fromMm(doc, defaults.sill);
+  const offset = resolveOffset(wall, params.offset, params.at);
+  if (width <= 0 || height <= 0 || sillHeight < 0)
+    return noop(doc, `${name} failed: width/height must be > 0, sillHeight >= 0.`);
+  const requestedMark = params.mark?.trim();
+  const markOwner = requestedMark ? markHolder(building, kind, requestedMark) : undefined;
+  if (markOwner) {
+    return noop(
+      doc,
+      `${name} failed: mark '${requestedMark ?? ''}' is already used by ${markOwner.id}; schedule marks must be unique per category.`,
+    );
+  }
+  const opening: OpeningElement = {
+    id: nextElementId(building, kind),
+    category: kind,
+    mark: requestedMark || nextMark(building, kind),
+    entityIds: [],
+    hostId: wall.id,
+    offset,
+    width,
+    height,
+    sillHeight,
+    swing: params.swing ?? 'left',
+    material: params.material?.trim() || defaults.material,
+  };
+  const fitError = openingFitError(
+    wall,
+    opening,
+    openingsOf(building, wall.id),
+    builtExtent(building, wall),
+  );
+  if (fitError) return noop(doc, `${name} failed: ${fitError}.`);
+  return commitBuilding(
+    doc,
+    withElement(building, opening),
+    [opening.id, wall.id],
+    `Added ${kind} ${opening.mark} (${opening.id}) ${width}×${height} in wall ${wall.mark} at ` +
+      `${offset.toFixed(3)} from its start, sill ${sillHeight}.`,
+    { elementId: opening.id },
+  );
+}
+
+interface OpeningShape {
+  wallId: z.ZodString;
+  offset: z.ZodOptional<z.ZodNumber>;
+  at: z.ZodOptional<ReturnType<typeof vec2>>;
+  width: z.ZodOptional<z.ZodNumber>;
+  height: z.ZodOptional<z.ZodNumber>;
+  sillHeight: z.ZodOptional<z.ZodNumber>;
+  material: z.ZodOptional<z.ZodString>;
+  mark: z.ZodOptional<z.ZodString>;
+}
+
+function openingShape(kind: OpeningKind): OpeningShape {
+  const defaults = DEFAULTS_MM[kind];
+  return {
+    wallId: z
+      .string()
+      .describe('Host wall element id: a straight ("wall-1") or curved ("curvedWall-1") wall.'),
+    offset: z
+      .number()
+      .optional()
+      .describe(
+        'Distance along the wall from its start to the opening CENTER, in document units (arc length on a curved wall). Takes precedence over at. Default: wall midpoint.',
+      ),
+    at: vec2(
+      'Alternative to offset: a plan point [x, y] projected onto the wall to place the opening center. Ignored when offset is given.',
+    ).optional(),
+    width: z
+      .number()
+      .optional()
+      .describe(`Opening width in document units (> 0). Default ${defaults.width} mm.`),
+    height: z
+      .number()
+      .optional()
+      .describe(
+        `Opening height in document units (> 0). Default ${defaults.height} mm, limited to the wall height.`,
+      ),
+    sillHeight: z
+      .number()
+      .optional()
+      .describe(
+        `Height of the opening bottom above the wall base, in document units (>= 0). Default ${defaults.sill} mm.`,
+      ),
+    material: z.string().optional().describe(`Material. Default ${defaults.material}.`),
+    mark: z
+      .string()
+      .optional()
+      .describe(
+        `Schedule mark, unique among ${kind}s. Default next ${kind === 'door' ? 'D' : 'WN'}n.`,
+      ),
+  };
+}
+
+const doorParams = z.object({
+  ...openingShape('door'),
+  swing: z
+    .enum(['left', 'right'])
+    .optional()
+    .describe(
+      'Hinge side looking from wall start to end. The door opens toward the wall’s left side. Default left.',
+    ),
+});
+
+const windowParams = z.object(openingShape('window'));
+
+type AddOpeningParams = z.output<typeof doorParams>;
+
+/**
+ * @command add_door
+ * @pure
+ * @affects creates the door (leaf + plan swing) and re-cuts the host wall
+ * @failure unknown wall / does not fit / overlaps another opening -> no-op
+ */
+export const addDoor = defineCommand({
+  name: 'add_door',
+  description:
+    'Insert a door into a wall: cuts the wall, adds the door leaf (3D) and its swing arc (plan). ' +
+    'Refused if it does not fit in the wall or overlaps another opening.',
+  params: doorParams,
+  run: (doc, params): CommandResult => addOpening(doc, 'door', params),
+});
+
+/**
+ * @command add_window
+ * @pure
+ * @affects creates the window glazing and re-cuts the host wall
+ * @failure unknown wall / does not fit / overlaps another opening -> no-op
+ */
+export const addWindow = defineCommand({
+  name: 'add_window',
+  description:
+    'Insert a window into a wall: cuts the wall between sill and head and adds the glazing. ' +
+    'Refused if it does not fit in the wall or overlaps another opening.',
+  params: windowParams,
+  run: (doc, params): CommandResult => addOpening(doc, 'window', params),
+});
+
+/**
+ * @command update_opening
+ * @pure
+ * @affects regenerates the opening and its host wall
+ * @failure unknown opening / invalid values / would not fit -> no-op
+ */
+export const updateOpening = defineCommand({
+  name: 'update_opening',
+  description:
+    'Edit a door or window: slide it along its wall (offset), resize it, change sill height, swing, ' +
+    'material or mark. The host wall is re-cut.',
+  params: z.object({
+    openingId: z.string().describe('Door/window element id, e.g. "door-1".'),
+    offset: z
+      .number()
+      .optional()
+      .describe('New distance from the wall start to the opening center, in document units.'),
+    width: z.number().optional().describe('New width in document units (> 0).'),
+    height: z.number().optional().describe('New height in document units (> 0).'),
+    sillHeight: z
+      .number()
+      .optional()
+      .describe('New sill height above the level floor, in document units (>= 0).'),
+    swing: z.enum(['left', 'right']).optional().describe('Door hinge side (doors only).'),
+    material: z.string().optional().describe('New material; blank keeps the current one.'),
+    mark: z
+      .string()
+      .optional()
+      .describe(
+        'New schedule mark, unique among doors / windows of the same kind; blank keeps the current one.',
+      ),
+  }),
+  run: (
+    doc,
+    { openingId, offset, width, height, sillHeight, swing, material, mark },
+  ): CommandResult => {
+    const building = getBuilding(doc);
+    const opening = building.elements[openingId];
+    if (!opening || (opening.category !== 'door' && opening.category !== 'window'))
+      return noop(doc, `update_opening failed: no door or window '${openingId}'.`);
+    const wall = building.elements[opening.hostId];
+    if (!wall || (wall.category !== 'wall' && wall.category !== 'curvedWall'))
+      return noop(doc, `update_opening failed: host wall '${opening.hostId}' is missing.`);
+    const updated: OpeningElement = {
+      ...opening,
+      offset: offset ?? opening.offset,
+      width: width ?? opening.width,
+      height: height ?? opening.height,
+      sillHeight: sillHeight ?? opening.sillHeight,
+      swing: swing ?? opening.swing,
+      material: material?.trim() || opening.material,
+      mark: mark?.trim() || opening.mark,
+    };
+    if (updated.width <= 0 || updated.height <= 0 || updated.sillHeight < 0)
+      return noop(doc, 'update_opening failed: width/height must be > 0, sillHeight >= 0.');
+    const markOwner = markHolder(building, opening.category, updated.mark, opening.id);
+    if (markOwner) {
+      return noop(
+        doc,
+        `update_opening failed: mark '${updated.mark}' is already used by ${markOwner.id}; schedule marks must be unique per category.`,
+      );
+    }
+    if (JSON.stringify(updated) === JSON.stringify(opening))
+      return noop(doc, `update_opening: ${openingId} already has these values; nothing changed.`);
+    const fitError = openingFitError(
+      wall,
+      updated,
+      openingsOf(building, wall.id),
+      builtExtent(building, wall),
+    );
+    if (fitError) return noop(doc, `update_opening refused: ${fitError}.`);
+    return commitBuilding(
+      doc,
+      withElement(building, updated),
+      [openingId, wall.id],
+      `Updated ${updated.category} ${updated.mark} (${openingId}): ${updated.width}×${updated.height} at ${updated.offset.toFixed(3)}, sill ${updated.sillHeight}.`,
+    );
+  },
+});

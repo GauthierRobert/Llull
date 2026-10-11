@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import type { FootingElement } from '@core/model/building';
-import { footingRebarMass, scaleFor, stairVolume } from '@aec/takeoffBasics';
+import { footingRebarMass, scaleFor, stairVolume } from '@aec/building/quantities/takeoffBasics';
 
 const footing = (width: number, length: number): FootingElement => ({
   id: 'footing-1',

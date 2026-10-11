@@ -1,0 +1,241 @@
+/**
+ * Starter building templates composed from the building commands (one undo step).
+ * @layer domain-aec
+ */
+
+import type { CadDocument, Vec2 } from '@core/model/types';
+import type { CommandResult } from '@core/commands/types';
+import { defineCommand, z, vec2 } from '@core/commands/schema';
+import { elementAffected, fromMm, getBuilding } from './model';
+import { noop } from '@core/commands/noop';
+import { addLevel, setProjectInfo } from './elements/levels';
+import { addGridSystem } from './elements/grid';
+import { addWall, drawWalls } from './elements/walls';
+import { addDoor, addWindow } from './elements/openings';
+import { addBeam, addColumn, addSlab, addStair } from './elements/structure';
+import { addRoom, copyLevelElements, deleteBuildingElement } from './elements/elements';
+import { addSlabOpening } from './elements/slabOpenings';
+import { execute } from '@core/commands/registry';
+
+type Step = (doc: CadDocument) => CommandResult;
+
+type BuildingTemplate = 'house' | 'office';
+
+/**
+ * Template steps. Ids are looked up in `created` (filled by the run loop with the element / level ids
+ * each step actually created, per kind, in order) — never predicted.
+ */
+function steps(
+  doc: CadDocument,
+  template: BuildingTemplate,
+  origin: Vec2,
+  created: Record<string, string[]>,
+): Step[] {
+  const mm = (value: number): number => fromMm(doc, value);
+  const at = (x: number, y: number): [number, number] => [origin[0] + mm(x), origin[1] + mm(y)];
+  const rectangle = (x0: number, y0: number, x1: number, y1: number): [number, number][] => [
+    at(x0, y0),
+    at(x1, y0),
+    at(x1, y1),
+    at(x0, y1),
+  ];
+  const building = getBuilding(doc);
+  const nth = (kind: string, n: number): string => created[kind]?.[n - 1] ?? `missing-${kind}-${n}`;
+  const level = (n: number): string => nth('level', n);
+  const wall = (n: number): string => nth('wall', n);
+  const door = (n: number): string => nth('door', n);
+  const stair = (n: number): string => nth('stair', n);
+  const perimeter = (): string[] => [wall(1), wall(2), wall(3), wall(4)];
+  const levelStep =
+    (name: string, elevation: number, height: number, makeActive = false): Step =>
+    (d) =>
+      addLevel.run(d, { name, elevation: mm(elevation), height: mm(height), makeActive });
+  const windowStep =
+    (wallNumber: number, offset: number, width: number, height?: number): Step =>
+    (d) =>
+      addWindow.run(d, {
+        wallId: wall(wallNumber),
+        offset: mm(offset),
+        width: mm(width),
+        ...(height === undefined ? {} : { height: mm(height) }),
+      });
+  const naming: Step[] =
+    building.project.name === 'Untitled project'
+      ? [
+          (d) =>
+            setProjectInfo.run(d, {
+              name: template === 'house' ? 'Two-storey house' : 'Office building',
+            }),
+        ]
+      : [];
+  if (template === 'house') {
+    return [
+      ...naming,
+      levelStep('Ground floor', 0, 2900, true),
+      levelStep('First floor', 2900, 2900),
+      levelStep('Roof', 5800, 1000),
+      (d) =>
+        addGridSystem.run(d, {
+          xSpacings: [mm(5000), mm(5000)],
+          ySpacings: [mm(8000)],
+          origin: at(0, 0),
+        }),
+      (d) =>
+        drawWalls.run(d, {
+          points: rectangle(0, 0, 10000, 8000),
+          closed: true,
+          thickness: mm(300),
+          material: 'masonry',
+        }),
+      (d) =>
+        addWall.run(d, {
+          start: at(5000, 0),
+          end: at(5000, 8000),
+          thickness: mm(100),
+          material: 'gypsum',
+        }),
+      (d) => addDoor.run(d, { wallId: wall(1), offset: mm(2500) }),
+      (d) => addDoor.run(d, { wallId: wall(5), offset: mm(4000), swing: 'right', width: mm(800) }),
+      windowStep(1, 7500, 1800),
+      windowStep(2, 4000, 1400),
+      windowStep(3, 2500, 1800),
+      windowStep(3, 7500, 1800),
+      windowStep(4, 4000, 1400),
+      (d) => addSlab.run(d, { wallIds: perimeter(), thickness: mm(200) }),
+      (d) =>
+        addStair.run(d, { start: at(5400, 6900), angle: 0, width: mm(900), treadDepth: mm(250) }),
+      (d) => addRoom.run(d, { name: 'Living room', boundary: rectangle(150, 150, 4950, 7850) }),
+      (d) => addRoom.run(d, { name: 'Kitchen', boundary: rectangle(5050, 150, 9850, 7850) }),
+      (d) =>
+        copyLevelElements.run(d, {
+          sourceLevelId: level(1),
+          targetLevelIds: [level(2)],
+          categories: ['wall', 'slab'],
+        }),
+      (d) => deleteBuildingElement.run(d, { elementIds: [door(3)] }),
+      (d) => addSlabOpening.run(d, { stairId: stair(1) }),
+      windowStep(6, 2500, 1400),
+      (d) =>
+        addRoom.run(d, {
+          name: 'Bedroom',
+          boundary: rectangle(150, 150, 4950, 7850),
+          levelId: level(2),
+        }),
+      (d) =>
+        addRoom.run(d, {
+          name: 'Bedroom',
+          boundary: rectangle(5050, 150, 9850, 7850),
+          levelId: level(2),
+        }),
+      (d) =>
+        addSlab.run(d, {
+          boundary: rectangle(-300, -300, 10300, 8300),
+          thickness: mm(250),
+          offset: mm(250),
+          role: 'roof',
+          levelId: level(3),
+        }),
+    ];
+  }
+  return [
+    ...naming,
+    levelStep('Level 0', 0, 3600, true),
+    levelStep('Level 1', 3600, 3600),
+    levelStep('Level 2', 7200, 3600),
+    levelStep('Roof', 10800, 1000),
+    (d) =>
+      addGridSystem.run(d, {
+        xSpacings: [mm(7500), mm(7500), mm(7500)],
+        ySpacings: [mm(7500), mm(5000)],
+        origin: at(0, 0),
+      }),
+    (d) =>
+      drawWalls.run(d, {
+        points: rectangle(0, 0, 22500, 12500),
+        closed: true,
+        thickness: mm(250),
+        material: 'concrete',
+      }),
+    (d) => addColumn.run(d, { atGridIntersections: true, width: mm(400) }),
+    (d) =>
+      addBeam.run(d, { start: at(0, 7500), end: at(22500, 7500), width: mm(300), depth: mm(600) }),
+    (d) =>
+      addDoor.run(d, { wallId: wall(1), offset: mm(11250), width: mm(1800), height: mm(2400) }),
+    ...[3750, 7500 + 3750, 15000 + 3750].map((offset) => windowStep(3, offset, 3000, 1800)),
+    windowStep(1, 3750, 3000, 1800),
+    windowStep(1, 18750, 3000, 1800),
+    (d) => addSlab.run(d, { wallIds: perimeter(), thickness: mm(250) }),
+    (d) =>
+      addStair.run(d, { start: at(16000, 9000), angle: 0, width: mm(1200), treadDepth: mm(280) }),
+    (d) => addRoom.run(d, { name: 'Open office', boundary: rectangle(125, 125, 22375, 7300) }),
+    (d) => addRoom.run(d, { name: 'Meeting', boundary: rectangle(125, 7700, 15000, 12375) }),
+    (d) =>
+      copyLevelElements.run(d, {
+        sourceLevelId: level(1),
+        targetLevelIds: [level(2), level(3)],
+        categories: ['wall', 'column', 'beam', 'slab', 'room'],
+      }),
+    (d) => deleteBuildingElement.run(d, { elementIds: [door(2), door(3)] }),
+    (d) => addSlabOpening.run(d, { stairId: stair(1) }),
+    ...[2, 3].map((floor) => windowStep(1 + floor * 4 - 4, 11250, 3000, 1800)),
+    (d) =>
+      addSlab.run(d, {
+        boundary: rectangle(-125, -125, 22625, 12625),
+        thickness: mm(300),
+        offset: mm(300),
+        role: 'roof',
+        levelId: level(4),
+      }),
+  ];
+}
+
+/**
+ * @command add_building_template
+ * @pure
+ * @affects creates a complete multi-level building (all-or-nothing)
+ * @failure unknown template / any step fails -> no-op with the failing step's summary
+ */
+export const addBuildingTemplate = defineCommand({
+  name: 'add_building_template',
+  description:
+    'Create a complete starter building to edit or learn from: "house" (two-storey 10 × 8 m house: grid, ' +
+    'masonry walls, partition, doors, windows, slabs, stair, rooms, roof) or "office" (three-storey ' +
+    '22.5 × 12.5 m concrete frame: grid, columns at intersections, beams, façade openings, slabs, stair, ' +
+    'rooms, roof). The camera is framed on the result. All-or-nothing: the document is unchanged if any step fails.',
+  params: z.object({
+    template: z.enum(['house', 'office']).describe('Which starter building.'),
+    origin: vec2('Plan origin [x, y]. Default [0, 0].').optional(),
+  }),
+  run: (doc, { template, origin: requestedOrigin }): CommandResult => {
+    const origin: Vec2 = requestedOrigin ?? [0, 0];
+    let current = doc;
+    const created: Record<string, string[]> = {};
+    for (const [index, step] of steps(doc, template, origin, created).entries()) {
+      const before = getBuilding(current);
+      const result = step(current);
+      if (result.document === current)
+        return noop(doc, `add_building_template failed at step ${index + 1}: ${result.summary}`);
+      current = result.document;
+      const after = getBuilding(current);
+      const fresh = [
+        ...after.levelOrder.filter((id) => before.levels[id] === undefined),
+        ...after.elementOrder.filter((id) => before.elements[id] === undefined),
+      ];
+      for (const id of fresh) {
+        const kind = id.replace(/-\d+$/, '');
+        created[kind] = [...(created[kind] ?? []), id];
+      }
+    }
+    current = execute(current, 'fit_view', { direction: 'iso' }).document;
+    const building = getBuilding(current);
+    const before = new Set(Object.keys(getBuilding(doc).elements));
+    const newElements = building.elementOrder.filter((id) => !before.has(id));
+    const newLevels = building.levelOrder.filter((id) => getBuilding(doc).levels[id] === undefined);
+    return {
+      document: current,
+      summary: `Added ${template} template: ${building.levelOrder.length} level(s), ${newElements.length} building element(s) added on ${newLevels.length} new level(s).`,
+      affected: elementAffected(current, newElements),
+      data: { elementIds: newElements },
+    };
+  },
+});

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import type { CadDocument } from '@core/model/types';
-import type { FrameReport } from '@aec/industrial/steelFrameAnalysis';
+import type { FrameReport } from '@aec/industrial/steelDesign/steelFrameAnalysis';
 import { check as baseCheck, rowOf, step, twoLevels, type CheckData } from './steelFixtures';
 import {
   BEAM_Z,

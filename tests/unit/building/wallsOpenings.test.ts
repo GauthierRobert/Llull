@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type BoxEntity, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { endAdjustment, wallPieces } from '@aec/wallGeometry';
+import { endAdjustment, wallPieces } from '@aec/building/geometry/wallGeometry';
 import type { WallElement } from '@core/model/building';
 import { run } from './runFixtures';
 
@@ -307,7 +307,7 @@ describe('feature-history replay keeps hosts linked', () => {
 
 describe('built wall extents', () => {
   it('quantities measure the abutting wall body at a T joint', async () => {
-    const { wallQuantities } = await import('@aec/takeoffBasics');
+    const { wallQuantities } = await import('@aec/building/quantities/takeoffBasics');
     let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [8000, 0] });
     doc = run(doc, 'add_wall', { start: [4000, 0], end: [4000, 5000] });
     expect(wallQuantities(doc.building!, wall(doc, 'wall-2')).length).toBeCloseTo(4900);

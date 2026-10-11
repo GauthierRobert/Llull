@@ -1,0 +1,51 @@
+/**
+ * Pipe support schedule: one row per support with its pipe, line, type, steel it bears on, position
+ * and hanger rod length.
+ * @layer domain-aec
+ * @pure
+ */
+
+import type { CadDocument } from '@core/model/types';
+import { elementsOf, getBuilding } from '../../building/model';
+import { round } from '../../shared/numeric';
+
+export function supportSchedule(doc: CadDocument): {
+  columns: string[];
+  rows: Array<Array<string | number>>;
+} {
+  const building = getBuilding(doc);
+  const rows = elementsOf(building, 'pipeSupport').map((support) => {
+    const pipe = building.elements[support.pipeId];
+    const member = support.memberId === null ? undefined : building.elements[support.memberId];
+    const level = building.levels[support.levelId];
+    return [
+      support.mark,
+      pipe?.category === 'pipe' ? (pipe.line ?? '') : '',
+      pipe?.mark ?? support.pipeId,
+      support.type,
+      member?.category === 'member' ? member.mark : '',
+      round(support.position[0], 1),
+      round(support.position[1], 1),
+      round((level?.elevation ?? 0) + support.position[2], 1),
+      support.type === 'hanger' ? round(support.rodLength, 1) : '',
+      level?.name ?? support.levelId,
+      member?.category === 'member' ? 'attached' : 'UNATTACHED',
+    ];
+  });
+  return {
+    columns: [
+      'Mark',
+      'Line',
+      'Pipe',
+      'Type',
+      'Bears on',
+      'x',
+      'y',
+      'z',
+      `Rod length (${doc.units})`,
+      'Level',
+      'Status',
+    ],
+    rows,
+  };
+}
