@@ -20,12 +20,13 @@ verify and refine.
 
 - Plan transaction & aliasing: `packages/core/src/commands/project/buildProject.ts` (`build_project`)
 - Full command vocabulary: `listCommands()` (`registry.ts` + plugins) · Schema: `.claude/context/model.md`
-- Over MCP only the `core` toolset is listed by default: `search_tools` to find a tool,
+- Cloud agents over MCP: only the `core` toolset is listed by default: `search_tools` to find a tool,
   `enable_toolset` to load its toolset (`build_project` steps can use any command regardless).
 - 2D drafting: `draw-2d` skill · Parametrics & history: `parametric` skill
 - Read-only inspection/sizing: `measure` skill · Drive the live app: `verify-llull`
-- No MCP connection / working from a terminal: run the same plan with the `llull-cli` skill
-  (`llull run plan.json --validate`, then without `--validate`; `--save` for renders/exports)
+- **Running the plan locally (Claude Code): the `llull-cli` skill** — `llull run plan.json
+  --validate --app` (open desktop window) or `--doc file`, then without `--validate`; `--save`
+  for renders/exports. MCP tools (below) are the cloud-agent path.
 
 ## The command vocabulary (what you compose)
 

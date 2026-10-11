@@ -14,6 +14,7 @@ const BOOLEAN_FLAGS: ReadonlySet<string> = new Set([
   'help',
   'quiet',
   'progress',
+  'app',
 ]);
 
 export interface ParsedArgv {

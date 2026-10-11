@@ -7,7 +7,7 @@
 
 import { shapeToolCallContent } from '@mcp/index';
 import { isRecord } from '@lib/isRecord';
-import type { CliRunResult } from './backend';
+import type { CliRunResult } from './result';
 import { formatDuration } from './progress';
 import type { SavedFile } from './saveFiles';
 

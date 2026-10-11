@@ -1,5 +1,5 @@
 # Runs the same gate as `npm run check` (typecheck + architecture rules + lint + format + tests)
-# plus the coverage gate and the server suite, so the architecture laws hold for every change.
+# plus the coverage gate and the server + desktop suites, so the architecture laws hold for every change.
 name: check
 
 on:
@@ -22,8 +22,13 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             server/package-lock.json
+            desktop/package-lock.json
       - run: npm ci
       - run: npm --prefix server ci
+      # Electron's binary is not needed: the desktop suite runs the real backend without it.
+      - run: npm --prefix desktop ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       - run: npm run typecheck
       - run: npm run arch
       - run: npm run lint
@@ -31,3 +36,5 @@ jobs:
       - run: npm run test:coverage
       - run: npm --prefix server run typecheck
       - run: npm --prefix server test
+      - run: npm --prefix desktop run typecheck
+      - run: npm --prefix desktop test

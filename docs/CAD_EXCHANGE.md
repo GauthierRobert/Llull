@@ -127,6 +127,21 @@ a hostile document loaded with `load_document` cannot inject code into `export_s
 HTTP downloads for the browser: `GET /export/code?language=cadquery|build123d|openscad|freecad`
 and `GET /export/step` (503 when the bridge is not configured).
 
+### CLI (local agents, desktop app)
+
+The same tools run from the `llull` CLI: in-process on a `--doc` file, or through
+`POST /exchange { name, params }` with `--app` / `--server`. `file=<path>` reads a local file
+into the content parameter (`stepBase64`, `dwgBase64`, or `code`), and `--save` writes the result:
+
+```bash
+llull export_step --save part.step --app
+llull import_step file=supplier.step --app
+llull import_code file=bracket.py mode=append --doc part.llull   # needs LLULL_ALLOW_CODE_EXECUTION=1
+```
+
+The desktop app ships its own Python with CadQuery (`desktop/scripts/prepare-python.mjs`), so
+these tools work there with nothing else installed.
+
 ## DWG import (optional converter)
 
 DWG is proprietary, so llull converts it to ASCII DXF on the server (core stays pure) and then runs
