@@ -14,7 +14,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
-import { liveSnapshot, localDispatch, flushPromises, getState } from '../helpers/storeTestHelpers';
+import {
+  expectUndoRedoFlagsAfterDispatch,
+  liveSnapshot,
+  localDispatch,
+  flushPromises,
+  getState,
+} from '../helpers/storeTestHelpers';
 import { mockFetch } from '../helpers/integrationFetch';
 
 // ---------------------------------------------------------------------------
@@ -164,11 +170,7 @@ describe('canUndo / canRedo state', () => {
       canRedo: false,
     });
 
-    getState().dispatch('add_box', { size: [1, 1, 1] });
-    await flushPromises();
-
-    expect(getState().canUndo).toBe(true);
-    expect(getState().canRedo).toBe(false);
+    await expectUndoRedoFlagsAfterDispatch(true, false);
   });
 
   it('setDocument resets canUndo and canRedo to false', () => {

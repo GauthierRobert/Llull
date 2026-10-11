@@ -305,6 +305,12 @@ describe('stripOuterParens', () => {
 // ---------------------------------------------------------------------------
 
 /** What the generated CadQuery runtime records for: width/thickness params, box, cylinder, cut, name. */
+/** Traced `position` and `rotation` at the origin, no rotation. */
+const ORIGIN_POSE = {
+  position: [{ value: 0 }, { value: 0 }, { value: 0 }],
+  rotation: [{ value: 0 }, { value: 0 }, { value: 0 }],
+};
+
 function plateTrace(): unknown {
   return {
     parameters: [
@@ -321,8 +327,7 @@ function plateTrace(): unknown {
             { value: 40 },
             { value: 8, expression: '(width / 10)' },
           ],
-          position: [{ value: 0 }, { value: 0 }, { value: 0 }],
-          rotation: [{ value: 0 }, { value: 0 }, { value: 0 }],
+          ...ORIGIN_POSE,
           color: '#112233',
         },
       },
@@ -637,8 +642,7 @@ describe('apply_code_trace', () => {
             ref: 'f1',
             params: {
               size: [{ value: 4 }, { value: 4 }, { value: 4 }],
-              position: [{ value: 0 }, { value: 0 }, { value: 0 }],
-              rotation: [{ value: 0 }, { value: 0 }, { value: 0 }],
+              ...ORIGIN_POSE,
             },
           },
           {
@@ -647,8 +651,7 @@ describe('apply_code_trace', () => {
             params: {
               radius: { value: 1 },
               height: { value: 10 },
-              position: [{ value: 0 }, { value: 0 }, { value: 0 }],
-              rotation: [{ value: 0 }, { value: 0 }, { value: 0 }],
+              ...ORIGIN_POSE,
             },
           },
           {

@@ -34,6 +34,13 @@ function stubPendingFetch(): Array<(reason: Error) => void> {
   return settle;
 }
 
+/** Dispatches `add_box` (held by the connect grace), then swaps in a fresh document. */
+function dispatchThenReplaceDocument(): void {
+  useStore.getState().dispatch('add_box', { size: [1, 1, 1] });
+  useStore.getState().setDocument(createEmptyDocument());
+  useStore.setState({ liveStatus: 'connecting', sseEverConnected: false });
+}
+
 describe('dispatch while connecting', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -112,9 +119,7 @@ describe('dispatch while connecting', () => {
 
   it('setDocument cancels pending grace runs: the old command never lands in the new document', async () => {
     const settle = stubPendingFetch();
-    useStore.getState().dispatch('add_box', { size: [1, 1, 1] });
-    useStore.getState().setDocument(createEmptyDocument());
-    useStore.setState({ liveStatus: 'connecting', sseEverConnected: false });
+    dispatchThenReplaceDocument();
 
     await vi.advanceTimersByTimeAsync(CONNECT_GRACE_MS * 2);
     settle[0]?.(new Error('refused'));
@@ -126,9 +131,7 @@ describe('dispatch while connecting', () => {
 
   it('a cancelled dispatch settling late does not disturb a newer grace run', async () => {
     const settle = stubPendingFetch();
-    useStore.getState().dispatch('add_box', { size: [1, 1, 1] });
-    useStore.getState().setDocument(createEmptyDocument());
-    useStore.setState({ liveStatus: 'connecting', sseEverConnected: false });
+    dispatchThenReplaceDocument();
     useStore.getState().dispatch('add_sphere', { radius: 1 });
     settle[0]?.(new Error('refused'));
     await vi.advanceTimersByTimeAsync(CONNECT_GRACE_MS);

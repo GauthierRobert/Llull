@@ -12,13 +12,9 @@ const captured = vi.hoisted(() => ({
 }));
 
 vi.mock('@react-three/fiber', () => ({ flushSync: captured.flushSync }));
-vi.mock('@ui/viewport/2d/GroundPlane', () => ({
-  GroundPlane: (props: Record<string, (event: unknown) => void>) => {
-    captured.handlers = props;
-    return null;
-  },
-  toDocumentPoint: (hit: { x: number; y: number }): Vec2 => [hit.x, hit.y],
-}));
+vi.mock('@ui/viewport/2d/GroundPlane', async () =>
+  (await import('../helpers/groundPlaneMock')).groundPlaneMock(captured),
+);
 vi.mock('@ui/viewport/2d/useSnap', () => ({
   useZoomSnap: (cursor: Vec2 | null) => (cursor ? { x: cursor[0], y: cursor[1] } : null),
 }));

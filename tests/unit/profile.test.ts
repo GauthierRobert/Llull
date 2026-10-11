@@ -3,6 +3,7 @@ import { createEmptyDocument } from '@core/model/types';
 import type { Entity, ExtrusionEntity, RevolutionEntity } from '@core/model/types';
 import { DEFAULT_LAYER_ID } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import { expectNoOp } from '../helpers/expectNoOp';
 
 type Doc = ReturnType<typeof createEmptyDocument>;
 
@@ -34,11 +35,8 @@ const docWithPolyline = (closed: boolean, id: string): { doc: Doc; id: string } 
 const docWithLine = (): { doc: Doc; id: string } =>
   docWith('line-1', { kind: 'line', start: [0, 0], end: [5, 5] });
 
-function expectNoOp(result: ReturnType<typeof execute>, doc: Doc, summary?: string): void {
-  expect(result.affected).toHaveLength(0);
-  expect(result.document).toBe(doc);
-  if (summary) expect(result.summary).toContain(summary);
-}
+const extrusionOf = (result: ReturnType<typeof execute>): ExtrusionEntity =>
+  result.document.entities[result.affected[0]!] as ExtrusionEntity;
 
 // ---------------------------------------------------------------------------
 // extrude_sketch
@@ -70,7 +68,7 @@ describe('extrude_sketch', () => {
   it('circle extrude: profile points lie on the correct radius', () => {
     const { doc, id } = docWithCircle();
     const result = execute(doc, 'extrude_sketch', { id, depth: 2 });
-    const ext = result.document.entities[result.affected[0]!] as ExtrusionEntity;
+    const ext = extrusionOf(result);
     for (const [x, y] of ext.profile) {
       expect(Math.sqrt(x * x + y * y)).toBeCloseTo(5, 5);
     }
@@ -81,7 +79,7 @@ describe('extrude_sketch', () => {
     const result = execute(doc, 'extrude_sketch', { id, depth: 3 });
 
     expect(result.affected).toHaveLength(1);
-    const ext = result.document.entities[result.affected[0]!] as ExtrusionEntity;
+    const ext = extrusionOf(result);
     expect(ext.kind).toBe('extrusion');
     expect(ext.depth).toBe(3);
     // lower-left origin: corners should be (0,0),(4,0),(4,3),(0,3)
@@ -98,7 +96,7 @@ describe('extrude_sketch', () => {
     const result = execute(doc, 'extrude_sketch', { id, depth: 7 });
 
     expect(result.affected).toHaveLength(1);
-    const ext = result.document.entities[result.affected[0]!] as ExtrusionEntity;
+    const ext = extrusionOf(result);
     expect(ext.kind).toBe('extrusion');
     expect(ext.profile).toEqual(TRI_POINTS);
     expect(ext.depth).toBe(7);

@@ -60,6 +60,20 @@ function patchDispatch(spy: ReturnType<typeof vi.fn>): void {
 // Rendering tests
 // ---------------------------------------------------------------------------
 
+function renderCreateForm(): {
+  form: HTMLElement;
+  nameInput: HTMLElement;
+  densityInput: HTMLElement;
+} {
+  render(<MaterialsPanel />);
+  const form = screen.getByTestId('material-create-form');
+  return {
+    form,
+    nameInput: within(form).getByRole('textbox', { name: /new material name/i }),
+    densityInput: within(form).getByRole('spinbutton', { name: /material density/i }),
+  };
+}
+
 describe('MaterialsPanel — rendering', () => {
   beforeEach(() => {
     resetStore();
@@ -241,10 +255,7 @@ describe('MaterialsPanel — create form', () => {
   });
 
   it('Create button is enabled when name and valid density are filled', () => {
-    render(<MaterialsPanel />);
-    const form = screen.getByTestId('material-create-form');
-    const nameInput = within(form).getByRole('textbox', { name: /new material name/i });
-    const densityInput = within(form).getByRole('spinbutton', { name: /material density/i });
+    const { nameInput, densityInput } = renderCreateForm();
 
     fireEvent.change(nameInput, { target: { value: 'steel' } });
     fireEvent.change(densityInput, { target: { value: '0.00785' } });
@@ -257,11 +268,7 @@ describe('MaterialsPanel — create form', () => {
     const dispatchSpy = vi.fn();
     patchDispatch(dispatchSpy);
 
-    render(<MaterialsPanel />);
-    const form = screen.getByTestId('material-create-form');
-
-    const nameInput = within(form).getByRole('textbox', { name: /new material name/i });
-    const densityInput = within(form).getByRole('spinbutton', { name: /material density/i });
+    const { form, nameInput, densityInput } = renderCreateForm();
 
     fireEvent.change(nameInput, { target: { value: 'aluminium' } });
     fireEvent.change(densityInput, { target: { value: '0.0027' } });

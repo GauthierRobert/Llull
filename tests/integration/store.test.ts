@@ -23,6 +23,7 @@ import {
   localDispatch,
   liveSnapshot,
   TEST_EPOCH,
+  expectUndoRedoFlagsAfterDispatch,
   flushPromises,
   getState,
 } from '../helpers/storeTestHelpers';
@@ -60,6 +61,28 @@ function resetStore(): void {
 }
 
 /** Go online against a simulated server: hydrate an empty snapshot and wait for the outbox replay. */
+/** Offline: a client box moved +5 x; the simulated server meanwhile got an agent box. */
+function offlineMoveBesideAgentBox(): {
+  server: ReturnType<typeof simulatedServer>;
+  agentBoxId: string;
+  localBoxId: string;
+} {
+  useStore.setState({ liveStatus: 'disconnected' });
+  getState().dispatch('add_box', { size: [1, 1, 1] });
+  const localBoxId = getState().document.order[0]!;
+  getState().dispatch('move_entity', { id: localBoxId, delta: [5, 0, 0] });
+  const server = simulatedServer();
+  const agentBoxId = server.inject('add_box', { size: [2, 2, 2] })[0]!;
+  return { server, agentBoxId, localBoxId };
+}
+
+/** The agent's box stayed at the origin; the other box carries the client's +5 x move. */
+function expectMoveOnClientBox(serverDoc: CadDocument, agentBoxId: string): void {
+  const clientBoxId = serverDoc.order.find((id) => id !== agentBoxId)!;
+  expect(serverDoc.entities[agentBoxId]?.position).toEqual([0, 0, 0]);
+  expect(serverDoc.entities[clientBoxId]?.position).toEqual([5, 0, 0]);
+}
+
 async function reconnectTo(server: ReturnType<typeof simulatedServer>): Promise<void> {
   vi.stubGlobal('fetch', server.fetch);
   useStore.setState({ liveStatus: 'connected' });
@@ -115,11 +138,7 @@ describe('CadStore — networked dispatch', () => {
   it('dispatch updates canUndo and canRedo from the server response', async () => {
     mockFetch({ ...DEFAULT_RESPONSE, canUndo: true, canRedo: false });
 
-    getState().dispatch('add_box', { size: [1, 1, 1] });
-    await flushPromises();
-
-    expect(getState().canUndo).toBe(true);
-    expect(getState().canRedo).toBe(false);
+    await expectUndoRedoFlagsAfterDispatch(true, false);
   });
 
   it('dispatch sets lastMeasure when the response includes data', async () => {
@@ -797,13 +816,7 @@ describe('CadStore — outbox flush correctness', () => {
   });
 
   it('flush remaps ids: a later move lands on the client box, not a concurrent agent box', async () => {
-    useStore.setState({ liveStatus: 'disconnected' });
-    getState().dispatch('add_box', { size: [1, 1, 1] });
-    const localBoxId = getState().document.order[0]!;
-    getState().dispatch('move_entity', { id: localBoxId, delta: [5, 0, 0] });
-
-    const server = simulatedServer();
-    const agentBoxId = server.inject('add_box', { size: [2, 2, 2] })[0]!;
+    const { server, agentBoxId, localBoxId } = offlineMoveBesideAgentBox();
     expect(agentBoxId).toBe(localBoxId); // step-scoped ids collide across branches
     vi.stubGlobal('fetch', server.fetch);
     useStore.setState({ liveStatus: 'connected' });
@@ -812,20 +825,13 @@ describe('CadStore — outbox flush correctness', () => {
 
     const serverDoc = server.doc();
     expect(serverDoc.order).toHaveLength(2);
-    const clientBoxId = serverDoc.order.find((id) => id !== agentBoxId)!;
-    expect(serverDoc.entities[agentBoxId]?.position).toEqual([0, 0, 0]);
-    expect(serverDoc.entities[clientBoxId]?.position).toEqual([5, 0, 0]);
+    expectMoveOnClientBox(serverDoc, agentBoxId);
     expect(getState().document.order).toEqual(serverDoc.order);
   });
 
   it('the id map survives a failed attempt (retry still remaps)', async () => {
     vi.useFakeTimers();
-    useStore.setState({ liveStatus: 'disconnected' });
-    getState().dispatch('add_box', { size: [1, 1, 1] });
-    const localBoxId = getState().document.order[0]!;
-    getState().dispatch('move_entity', { id: localBoxId, delta: [5, 0, 0] });
-    const server = simulatedServer();
-    const agentBoxId = server.inject('add_box', { size: [2, 2, 2] })[0]!;
+    const { server, agentBoxId } = offlineMoveBesideAgentBox();
     const realFetch = server.fetch;
     let posts = 0;
     vi.stubGlobal(
@@ -845,10 +851,7 @@ describe('CadStore — outbox flush correctness', () => {
     await vi.advanceTimersByTimeAsync(1000);
 
     expect(getState().syncState).toBe('idle');
-    const serverDoc = server.doc();
-    const clientBoxId = serverDoc.order.find((id) => id !== agentBoxId)!;
-    expect(serverDoc.entities[agentBoxId]?.position).toEqual([0, 0, 0]);
-    expect(serverDoc.entities[clientBoxId]?.position).toEqual([5, 0, 0]);
+    expectMoveOnClientBox(server.doc(), agentBoxId);
   });
 
   it('offline add_box, undo, add_box does not re-mint the undone id', () => {

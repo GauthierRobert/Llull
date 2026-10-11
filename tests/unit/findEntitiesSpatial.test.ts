@@ -42,6 +42,19 @@ function annotate(doc: Doc, id: string, params: Record<string, unknown>): Doc {
   return execute(doc, 'set_entity_name', { id, ...params }).document;
 }
 
+/** Two boxes 5 apart, annotated with `first` and `second`; returns the doc and the first id. */
+function annotatedPair(
+  first: Record<string, unknown>,
+  second: Record<string, unknown>,
+): { doc: Doc; a: string } {
+  const boxes = addBoxes([
+    [0, 0, 0],
+    [5, 0, 0],
+  ]);
+  const [a, b] = boxes.ids as [string, string];
+  return { doc: annotate(annotate(boxes.doc, a, first), b, second), a };
+}
+
 const box = (min: Vec3, max: Vec3): [Vec3, Vec3] => [min, max];
 
 describe('find_entities — spatial & fuzzy filters', () => {
@@ -188,13 +201,7 @@ describe('find_entities — spatial & fuzzy filters', () => {
 
   describe('nameFuzzy', () => {
     it('matches entities whose name contains the substring (case-insensitive)', () => {
-      const boxes = addBoxes([
-        [0, 0, 0],
-        [5, 0, 0],
-      ]);
-      const [a, b] = boxes.ids as [string, string];
-      let doc = annotate(boxes.doc, a, { name: 'Left WALL' });
-      doc = annotate(doc, b, { name: 'Right Floor' });
+      const { doc, a } = annotatedPair({ name: 'Left WALL' }, { name: 'Right Floor' });
 
       const { ids, count } = find(doc, { nameFuzzy: 'wall' });
       expect(count).toBe(1);
@@ -216,13 +223,10 @@ describe('find_entities — spatial & fuzzy filters', () => {
 
   describe('tagFuzzy', () => {
     it('matches entities with a tag containing the substring (case-insensitive)', () => {
-      const boxes = addBoxes([
-        [0, 0, 0],
-        [5, 0, 0],
-      ]);
-      const [a, b] = boxes.ids as [string, string];
-      let doc = annotate(boxes.doc, a, { tags: ['STRUCTURAL', 'visible'] });
-      doc = annotate(doc, b, { tags: ['decorative'] });
+      const { doc, a } = annotatedPair(
+        { tags: ['STRUCTURAL', 'visible'] },
+        { tags: ['decorative'] },
+      );
 
       const { ids, count } = find(doc, { tagFuzzy: 'struct' });
       expect(count).toBe(1);
@@ -260,14 +264,11 @@ describe('find_entities — spatial & fuzzy filters', () => {
     });
 
     it('ANDs nameFuzzy with tagFuzzy — must satisfy both', () => {
-      const boxes = addBoxes([
-        [0, 0, 0],
-        [5, 0, 0],
-      ]);
-      const [a, b] = boxes.ids as [string, string];
       // A: name "wall", tag "struct"; B: name "wall" but tag does NOT contain "struct"
-      let doc = annotate(boxes.doc, a, { name: 'Left Wall', tags: ['structural'] });
-      doc = annotate(doc, b, { name: 'Right Wall', tags: ['decorative'] });
+      const { doc, a } = annotatedPair(
+        { name: 'Left Wall', tags: ['structural'] },
+        { name: 'Right Wall', tags: ['decorative'] },
+      );
 
       const { ids, count } = find(doc, { nameFuzzy: 'wall', tagFuzzy: 'struct' });
       expect(count).toBe(1);

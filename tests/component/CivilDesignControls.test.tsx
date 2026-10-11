@@ -4,22 +4,25 @@
  * alignment, and the IDF design storm + outfall tailwater of the drainage check and sizing.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
-import { CivilPanel } from '@ui/panels/civil/CivilPanel';
-import { downloadText } from '@ui/download';
-import { localDispatch, spyDispatch } from '../helpers/storeTestHelpers';
+import {
+  CivilPanel,
+  downloadText,
+  localDispatch,
+  spyDispatch,
+  setupCivilStore,
+  surveyed,
+} from '../helpers/civilPanel';
 
 vi.mock('@ui/download', () => ({ downloadText: vi.fn(), downloadBlob: vi.fn() }));
 
 const SURVEY = ['1,0,0,10', '2,100,0,11', '3,0,100,12', '4,100,100,13'].join('\n');
 
 function site(): void {
-  localDispatch('set_units', { units: 'm' });
-  localDispatch('import_survey_points', { text: SURVEY, name: 'Topo' });
-  localDispatch('create_surface', {});
+  surveyed(SURVEY);
   localDispatch('add_alignment', {
     name: 'Road',
     points: [
@@ -46,10 +49,7 @@ function site(): void {
   localDispatch('add_pipe', { fromId: 'manhole-1', toId: 'manhole-2' });
 }
 
-beforeEach(() => {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
-  vi.mocked(downloadText).mockClear();
-});
+setupCivilStore();
 
 describe('Civil design controls', () => {
   it('adds an alignment with clothoid spiral lengths and refuses a malformed list', () => {

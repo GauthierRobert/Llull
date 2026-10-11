@@ -124,6 +124,19 @@ function scene(draw: (doc: Doc) => Drawn = (d) => drawHorizontalPolyline(d, 10))
   };
 }
 
+function expectInstances(
+  result: ReturnType<typeof execute>,
+  componentId: string,
+  count: number,
+): void {
+  expect(result.affected).toHaveLength(count);
+  for (const id of result.affected) {
+    const inst = result.document.entities[id] as InstanceEntity;
+    expect(inst.kind).toBe('instance');
+    expect(inst.componentId).toBe(componentId);
+  }
+}
+
 const rotations = (r: ReturnType<typeof execute>): number[][] =>
   r.affected.map((id) => [...(r.document.entities[id] as InstanceEntity).rotation]);
 
@@ -132,14 +145,8 @@ describe('distribute_along_path', () => {
     const { componentId, run } = scene((d) => drawHorizontalPolyline(d, 40));
     const result = run({ count: 5 });
 
-    expect(result.affected).toHaveLength(5);
+    expectInstances(result, componentId, 5);
     expect(result.affected.every((id) => id in result.document.entities)).toBe(true);
-
-    for (const id of result.affected) {
-      const inst = result.document.entities[id] as InstanceEntity;
-      expect(inst.kind).toBe('instance');
-      expect(inst.componentId).toBe(componentId);
-    }
 
     const xPositions = result.affected.map((id) => result.document.entities[id]!.position[0]);
     for (let i = 1; i < xPositions.length; i++) {
@@ -226,12 +233,7 @@ describe('distribute_along_path', () => {
     it('count=20: creates 20 instances around the loop', () => {
       const { componentId, run } = scene((d) => drawBeltLoop(d));
       const result = run({ count: 20 });
-      expect(result.affected).toHaveLength(20);
-      for (const id of result.affected) {
-        const inst = result.document.entities[id] as InstanceEntity;
-        expect(inst.kind).toBe('instance');
-        expect(inst.componentId).toBe(componentId);
-      }
+      expectInstances(result, componentId, 20);
     });
 
     it('count=20: instances cover the full loop (x-span covers both pulleys)', () => {

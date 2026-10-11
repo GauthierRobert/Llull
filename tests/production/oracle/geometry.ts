@@ -69,6 +69,18 @@ export function distance(a: Vec3, b: Vec3): number {
   return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 }
 
+/** Whether two routes join the same two end points (either direction) within `tolerance`. */
+export function sameEnds(routeA: Vec3[], routeB: Vec3[], tolerance: number): boolean {
+  const a = routeA[0] ?? [0, 0, 0];
+  const b = routeA.at(-1) ?? [0, 0, 0];
+  const first = routeB[0] ?? [0, 0, 0];
+  const last = routeB.at(-1) ?? [0, 0, 0];
+  return (
+    (distance(a, first) <= tolerance && distance(b, last) <= tolerance) ||
+    (distance(a, last) <= tolerance && distance(b, first) <= tolerance)
+  );
+}
+
 export function polylineLength(points: Vec3[]): number {
   let length = 0;
   for (let i = 1; i < points.length; i++) {

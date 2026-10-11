@@ -13,6 +13,18 @@ import {
  * of docs/CONSTRUCTION_PLAN.md.
  */
 
+/** Switches to 2D, arms the Wall tool and returns the canvas with its bounding box. */
+async function armWallTool(
+  page: Page,
+): Promise<{ canvas: ReturnType<Page['locator']>; box: { width: number; height: number } }> {
+  await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.getByRole('button', { name: 'Wall', exact: true }).click();
+  const canvas = page.locator('.viewport-2d-wrapper canvas');
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('2D canvas not visible');
+  return { canvas, box };
+}
+
 /** Levels + grid + perimeter walls: the base most steps build on. */
 async function shell(page: Page): Promise<void> {
   await page.getByLabel('New level name').fill('Ground floor');
@@ -55,11 +67,7 @@ test.describe('construction workflow', () => {
     await shell(page);
     await expect(status(page)).toContainText('total length 36000.000 mm');
 
-    await page.getByRole('button', { name: '2D', exact: true }).click();
-    await page.getByRole('button', { name: 'Wall', exact: true }).click();
-    const canvas = page.locator('.viewport-2d-wrapper canvas');
-    const box = await canvas.boundingBox();
-    if (!box) throw new Error('2D canvas not visible');
+    const { canvas, box } = await armWallTool(page);
     await canvas.click({ position: { x: box.width * 0.3, y: box.height * 0.5 } });
     await canvas.click({ position: { x: box.width * 0.5, y: box.height * 0.5 } });
     await canvas.click({ position: { x: box.width * 0.5, y: box.height * 0.3 } });
@@ -72,11 +80,7 @@ test.describe('construction workflow', () => {
   }) => {
     await openBuilding(page);
     await page.getByRole('button', { name: 'Starter office' }).click();
-    await page.getByRole('button', { name: '2D', exact: true }).click();
-    await page.getByRole('button', { name: 'Wall', exact: true }).click();
-    const canvas = page.locator('.viewport-2d-wrapper canvas');
-    const box = await canvas.boundingBox();
-    if (!box) throw new Error('2D canvas not visible');
+    const { canvas, box } = await armWallTool(page);
     await canvas.click({ position: { x: box.width * 0.45, y: box.height * 0.5 } });
     await canvas.click({ position: { x: box.width * 0.55, y: box.height * 0.5 } });
     await page.keyboard.press('Enter');

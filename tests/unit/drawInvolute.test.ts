@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { type PolylineEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { sampleInvolute } from '@core/commands/gears';
+import { expectSingleEntity } from '../helpers/expectNoOp';
 
 describe('draw_involute', () => {
   // ---------------------------------------------------------------------------
@@ -11,11 +12,8 @@ describe('draw_involute', () => {
   it('creates exactly one open polyline entity', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'draw_involute', { baseRadius: 4, endAngle: Math.PI });
-    expect(result.affected).toHaveLength(1);
-    expect(result.document.order).toHaveLength(1);
-    const id = result.affected[0]!;
-    const entity = result.document.entities[id]!;
-    expect(entity.kind).toBe('polyline');
+    expectSingleEntity(result, 'polyline');
+    const entity = result.document.entities[result.affected[0]!]!;
     expect((entity as PolylineEntity).closed).toBe(false);
   });
 

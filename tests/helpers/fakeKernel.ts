@@ -19,6 +19,9 @@ export const TETRA: MeshData = {
   indices: [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3],
 };
 
+/** One triangle: the smallest mesh a kernel can return. */
+export const TRIANGLE: MeshData = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] };
+
 /** Native fake shape: the mesh it tessellates to, and the entity of a leaf. */
 export interface FakeShape {
   readonly mesh: MeshData;
@@ -90,4 +93,9 @@ export function fakeKernel(spec: FakeKernelSpec = {}): FakeKernel {
 export function installKernelPerTest(kernel: GeometryKernel): void {
   beforeEach(() => setGeometryKernel(kernel));
   afterEach(() => setGeometryKernel(null));
+}
+
+/** A fake kernel whose solids, booleans, fillets and chamfers are all `TRIANGLE`. */
+export function triangleKernel(): FakeKernel {
+  return fakeKernel({ solid: TRIANGLE, boolean: TRIANGLE, fillet: TRIANGLE, chamfer: TRIANGLE });
 }

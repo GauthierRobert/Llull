@@ -74,6 +74,15 @@ export async function downloadText(
 }
 
 /** Loads `text` into the project file input as if the user picked a file. */
+/** Selects the `kind` schedule and downloads it as CSV. */
+export async function scheduleCsv(
+  page: Page,
+  kind: string,
+): Promise<{ name: string; text: string }> {
+  await page.getByLabel('Schedule').selectOption(kind);
+  return downloadText(page, () => page.getByRole('button', { name: 'Schedule CSV' }).click());
+}
+
 export async function openProjectFile(page: Page, text: string): Promise<void> {
   await page.locator('input[type="file"]').evaluate((input, content) => {
     const transfer = new DataTransfer();

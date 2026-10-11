@@ -3,28 +3,22 @@
  * Civil math is unit-tested in tests/unit/civil.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { act, render, screen, fireEvent } from '@testing-library/react';
 import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
-import { CivilPanel } from '@ui/panels/civil/CivilPanel';
-import { downloadText } from '@ui/download';
-import { localDispatch, spyDispatch } from '../helpers/storeTestHelpers';
+import {
+  CivilPanel,
+  downloadText,
+  localDispatch,
+  spyDispatch,
+  setupCivilStore,
+  SURVEY,
+  surveyed,
+} from '../helpers/civilPanel';
 
 vi.mock('@ui/download', () => ({ downloadText: vi.fn(), downloadBlob: vi.fn() }));
 
-const SURVEY = ['1,0,0,10,TOPO', '2,20,0,11,TOPO', '3,0,20,12,TOPO', '4,20,20,13,TOPO'].join('\n');
-
-function surveyed(): void {
-  localDispatch('set_units', { units: 'm' });
-  localDispatch('import_survey_points', { text: SURVEY, name: 'Topo' });
-  localDispatch('create_surface', {});
-}
-
-beforeEach(() => {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
-  vi.mocked(downloadText).mockClear();
-});
+setupCivilStore();
 
 describe('CivilPanel', () => {
   it('shows the empty state and imports survey text with format and unit', () => {

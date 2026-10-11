@@ -11,6 +11,7 @@ import type { CadDocument, Component, InstanceEntity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { rotatedEntityBounds } from '@core/commands/sceneRotatedBounds';
 import { expandInstance } from '@core/commands/instanceExpansion';
+import { expectNoOp } from '../helpers/expectNoOp';
 
 interface Comp {
   doc: CadDocument;
@@ -44,12 +45,6 @@ function withSecondInstance(
 ): Comp & { inst2Id: string } {
   const inst2 = execute(c.doc, 'insert_instance', { componentId: c.componentId, position });
   return { ...c, doc: inst2.document, inst2Id: inst2.affected[0]! };
-}
-
-function expectNoOp(result: ReturnType<typeof execute>, doc: CadDocument, summary?: string): void {
-  expect(result.affected).toHaveLength(0);
-  expect(result.document).toBe(doc);
-  if (summary) expect(result.summary).toContain(summary);
 }
 
 function expectPure(doc: CadDocument, run: () => unknown): void {

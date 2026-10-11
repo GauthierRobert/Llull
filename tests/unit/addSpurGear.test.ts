@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { type ExtrusionEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { buildSpurGearProfile } from '@core/commands/gears';
+import { expectSingleEntity } from '../helpers/expectNoOp';
 
 describe('add_spur_gear', () => {
   // ---------------------------------------------------------------------------
@@ -17,12 +18,7 @@ describe('add_spur_gear', () => {
       faceWidth: 10,
     });
 
-    expect(result.affected).toHaveLength(1);
-    expect(result.document.order).toHaveLength(1);
-
-    const id = result.affected[0]!;
-    const entity = result.document.entities[id]!;
-    expect(entity.kind).toBe('extrusion');
+    expectSingleEntity(result, 'extrusion');
   });
 
   it('extrusion depth equals faceWidth', () => {

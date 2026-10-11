@@ -10,6 +10,7 @@ import { createEmptyDocument } from '@core/model/types';
 import { listCommands } from '@core/commands/registry';
 import { buildMcpTools, listMcpResources, readMcpResource, CAD_RESOURCE_URIS } from '@mcp/index';
 import { applyToolCall } from '../helpers/applyToolCall';
+import { expectDocumentEnvelope } from '../helpers/documentEnvelope';
 
 // ---------------------------------------------------------------------------
 // buildMcpTools
@@ -223,9 +224,7 @@ describe('readMcpResource() — cad://document', () => {
     const doc = createEmptyDocument();
     const content = readMcpResource(doc, 'cad://document');
     const parsed = JSON.parse(content!.text) as Record<string, unknown>;
-    expect(parsed['format']).toBe('llull-document');
-    expect(parsed['version']).toBe(2);
-    expect(parsed['document']).toBeDefined();
+    expectDocumentEnvelope(parsed);
   });
 
   it('does not mutate the input document', () => {

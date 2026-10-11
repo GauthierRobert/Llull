@@ -65,6 +65,11 @@ function patchDispatch(spy: ReturnType<typeof vi.fn>): void {
 // Tests
 // ---------------------------------------------------------------------------
 
+function expectBoxSize(size: number[]): void {
+  const box = Object.values(useStore.getState().document.entities).find((e) => e?.kind === 'box');
+  expect(box?.kind === 'box' ? box.size : null).toEqual(size);
+}
+
 describe('FeatureHistoryPanel — rendering', () => {
   beforeEach(() => {
     resetStore();
@@ -287,8 +292,7 @@ describe('FeatureHistoryPanel — per-step params editor', () => {
     fireEvent.change(within(form).getByLabelText(/^Size/), { target: { value: '4, 5, 6' } });
     fireEvent.click(within(form).getByRole('button', { name: /^Apply/ }));
 
-    const box = Object.values(useStore.getState().document.entities).find((e) => e?.kind === 'box');
-    expect(box?.kind === 'box' ? box.size : null).toEqual([4, 5, 6]);
+    expectBoxSize([4, 5, 6]);
     expect(screen.queryByRole('form', { name: /add box parameters/i })).toBeNull();
   });
 
@@ -300,8 +304,7 @@ describe('FeatureHistoryPanel — per-step params editor', () => {
     expect(screen.getByRole('form', { name: /add box parameters/i })).toBeDefined();
     const alerts = screen.getAllByRole('alert').map((alert) => alert.textContent ?? '');
     expect(alerts.some((text) => /changed nothing when replayed/.test(text))).toBe(true);
-    const box = Object.values(useStore.getState().document.entities).find((e) => e?.kind === 'box');
-    expect(box?.kind === 'box' ? box.size : null).toEqual([2, 2, 2]);
+    expectBoxSize([2, 2, 2]);
   });
 
   it('dispatches a schema-invalid edit and shows the core refusal instead of pre-validating', () => {
@@ -310,8 +313,7 @@ describe('FeatureHistoryPanel — per-step params editor', () => {
     fireEvent.click(within(form).getByRole('button', { name: /^Apply/ }));
 
     expect(screen.getByRole('form', { name: /add box parameters/i })).toBeDefined();
-    const box = Object.values(useStore.getState().document.entities).find((e) => e?.kind === 'box');
-    expect(box?.kind === 'box' ? box.size : null).toEqual([2, 2, 2]);
+    expectBoxSize([2, 2, 2]);
   });
 
   it('Cancel closes the editor without dispatching', () => {

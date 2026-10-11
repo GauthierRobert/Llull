@@ -28,6 +28,16 @@ function countOf(fake: FakeKernel, op: string): number {
   return fake.calls.filter((call) => call.op === op).length;
 }
 
+function expectUnchanged(result: ReturnType<typeof execute>, doc: CadDocument): void {
+  expect(result.affected).toHaveLength(0);
+  expect(result.document).toBe(doc);
+}
+
+function expectSourceKept(result: ReturnType<typeof execute>, doc: CadDocument, id: string): void {
+  expectUnchanged(result, doc);
+  expect(result.document.entities[id]).toBeDefined();
+}
+
 function lastCall(fake: FakeKernel, op: string): FakeCall | undefined {
   return [...fake.calls].reverse().find((call) => call.op === op);
 }
@@ -193,8 +203,7 @@ describe('modify3d commands', () => {
     it('no-op when target id does not exist', () => {
       const { doc } = docWithBox();
       const result = run(doc, 'ghost');
-      expect(result.affected).toHaveLength(0);
-      expect(result.document).toBe(doc);
+      expectUnchanged(result, doc);
       expect(result.summary).toContain('ghost');
       expect(countOf(fake, 'solid')).toBe(0);
       expect(countOf(fake, op)).toBe(0);
@@ -203,8 +212,7 @@ describe('modify3d commands', () => {
     it('no-op when target is a 2D entity', () => {
       const { doc, lineId } = docWithLine();
       const result = run(doc, lineId);
-      expect(result.affected).toHaveLength(0);
-      expect(result.document).toBe(doc);
+      expectUnchanged(result, doc);
       expect(result.summary).toContain('2D');
       expect(countOf(fake, 'solid')).toBe(0);
       expect(countOf(fake, op)).toBe(0);
@@ -213,8 +221,7 @@ describe('modify3d commands', () => {
     it('no-op when size is zero', () => {
       const { doc, boxId } = docWithBox();
       const result = run(doc, boxId, { [key]: 0 });
-      expect(result.affected).toHaveLength(0);
-      expect(result.document).toBe(doc);
+      expectUnchanged(result, doc);
       expect(result.summary).toContain(key);
       expect(countOf(fake, 'solid')).toBe(0);
       expect(countOf(fake, op)).toBe(0);
@@ -223,8 +230,7 @@ describe('modify3d commands', () => {
     it('no-op when size is negative', () => {
       const { doc, boxId } = docWithBox();
       const result = run(doc, boxId, { [key]: -1 });
-      expect(result.affected).toHaveLength(0);
-      expect(result.document).toBe(doc);
+      expectUnchanged(result, doc);
       expect(countOf(fake, op)).toBe(0);
     });
 
@@ -232,8 +238,7 @@ describe('modify3d commands', () => {
       setGeometryKernel(null);
       const { doc, boxId } = docWithBox();
       const result = run(doc, boxId);
-      expect(result.affected).toHaveLength(0);
-      expect(result.document).toBe(doc);
+      expectUnchanged(result, doc);
       expect(result.summary).toContain('kernel not available');
     });
 
@@ -241,9 +246,7 @@ describe('modify3d commands', () => {
       setGeometryKernel((fake = freshKernel({ solid: null })));
       const { doc, boxId } = docWithBox();
       const result = run(doc, boxId);
-      expect(result.affected).toHaveLength(0);
-      expect(result.document).toBe(doc);
-      expect(result.document.entities[boxId]).toBeDefined();
+      expectSourceKept(result, doc, boxId);
       expect(countOf(fake, op)).toBe(0);
     });
 
@@ -251,9 +254,7 @@ describe('modify3d commands', () => {
       setGeometryKernel((fake = freshKernel({ [op]: null })));
       const { doc, boxId } = docWithBox();
       const result = run(doc, boxId);
-      expect(result.affected).toHaveLength(0);
-      expect(result.document).toBe(doc);
-      expect(result.document.entities[boxId]).toBeDefined();
+      expectSourceKept(result, doc, boxId);
       expect(result.summary).toContain('returned null');
       expect(result.summary).toContain('LLULL_KERNEL=occt on the server');
       expect(result.summary).not.toContain('Try ?kernel=occt');

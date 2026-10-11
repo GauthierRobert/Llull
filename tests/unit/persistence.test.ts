@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence';
+import { expectDocumentEnvelope } from '../helpers/documentEnvelope';
 
 // ---------------------------------------------------------------------------
 // Helpers — build minimal valid envelopes without going through commands
@@ -88,9 +89,7 @@ describe('serializeDocument / deserializeDocument', () => {
     const doc = createEmptyDocument();
     const json = serializeDocument(doc);
     const parsed = JSON.parse(json) as Record<string, unknown>;
-    expect(parsed['format']).toBe('llull-document');
-    expect(parsed['version']).toBe(2);
-    expect(parsed['document']).toBeDefined();
+    expectDocumentEnvelope(parsed);
   });
 
   it('throws on invalid JSON', () => {

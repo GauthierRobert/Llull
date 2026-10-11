@@ -1,21 +1,19 @@
 /** Component tests: civil CRS + calibration form, plan sheet and plan-profile downloads. */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
-import { CivilPanel } from '@ui/panels/civil/CivilPanel';
-import { downloadText } from '@ui/download';
-import { localDispatch, spyDispatch } from '../helpers/storeTestHelpers';
+import {
+  CivilPanel,
+  downloadText,
+  localDispatch,
+  spyDispatch,
+  setupCivilStore,
+  surveyed,
+} from '../helpers/civilPanel';
 
 vi.mock('@ui/download', () => ({ downloadText: vi.fn(), downloadBlob: vi.fn() }));
 
-const SURVEY = ['1,0,0,10,TOPO', '2,20,0,11,TOPO', '3,0,20,12,TOPO', '4,20,20,13,TOPO'].join('\n');
-
-beforeEach(() => {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
-  vi.mocked(downloadText).mockClear();
-});
+setupCivilStore();
 
 describe('CivilCrsSection', () => {
   it('dispatches set_coordinate_system and set_site_calibration', () => {
@@ -62,9 +60,7 @@ describe('CivilCrsSection', () => {
 
 describe('civil sheets downloads', () => {
   it('downloads the plan sheet with the chosen paper and scale', () => {
-    localDispatch('set_units', { units: 'm' });
-    localDispatch('import_survey_points', { text: SURVEY, name: 'Topo' });
-    localDispatch('create_surface', {});
+    surveyed();
     render(<CivilPanel />);
     fireEvent.change(screen.getByLabelText('Sheet paper'), { target: { value: 'A2' } });
     fireEvent.change(screen.getByLabelText('Sheet scale'), { target: { value: '200' } });
@@ -76,9 +72,7 @@ describe('civil sheets downloads', () => {
   });
 
   it('downloads the plan-profile sheet from the alignment editor', () => {
-    localDispatch('set_units', { units: 'm' });
-    localDispatch('import_survey_points', { text: SURVEY, name: 'Topo' });
-    localDispatch('create_surface', {});
+    surveyed();
     localDispatch('add_alignment', {
       points: [
         [2, 10],

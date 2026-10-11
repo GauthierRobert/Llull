@@ -33,6 +33,15 @@ function program(doc: CadDocument): FeatureProgram {
 const t = (value: number, expression?: string): Term =>
   expression === undefined ? { value } : { value, expression };
 
+/** Solid constructors emitted identically by the build123d, CadQuery-style and FreeCAD macros. */
+const PYTHON_SOLID_LINES = [
+  's3 = cone(1, 2,',
+  's4 = torus(5, 1,',
+  's5 = wedge((1, 2, 3),',
+  's6 = pyramid(w, 3, 4,',
+  's7 = extrude([(1, 0), (3, 0), (3, h)], 5,',
+];
+
 describe('translateExpression', () => {
   const ids = new Map([
     ['width', 'width'],
@@ -435,11 +444,7 @@ describe('emitters', () => {
       );
       expect(text).toContain('s1 = cylinder(1, 2, position=(1, 0, 0)');
       expect(text).toContain('s2 = sphere(1,');
-      expect(text).toContain('s3 = cone(1, 2,');
-      expect(text).toContain('s4 = torus(5, 1,');
-      expect(text).toContain('s5 = wedge((1, 2, 3),');
-      expect(text).toContain('s6 = pyramid(w, 3, 4,');
-      expect(text).toContain('s7 = extrude([(1, 0), (3, 0), (3, h)], 5,');
+      for (const line of PYTHON_SOLID_LINES) expect(text).toContain(line);
       expect(text).toContain(
         's8 = revolve([(1, 0), (3, 0), (3, h)], axis="x", angle=180, segments=16',
       );
@@ -498,11 +503,7 @@ describe('emitters', () => {
     expect(text).toContain('s0 = box((1, 2, d), position=(1, 0, 0))');
     expect(text).toContain('s1 = cylinder(1, 2, position=(1, 0, 0))');
     expect(text).toContain('s2 = sphere(1, position=(1, 0, 0))');
-    expect(text).toContain('s3 = cone(1, 2,');
-    expect(text).toContain('s4 = torus(5, 1,');
-    expect(text).toContain('s5 = wedge((1, 2, 3),');
-    expect(text).toContain('s6 = pyramid(w, 3, 4,');
-    expect(text).toContain('s7 = extrude([(1, 0), (3, 0), (3, h)], 5,');
+    for (const line of PYTHON_SOLID_LINES) expect(text).toContain(line);
     expect(text).toContain('s8 = revolve([(1, 0), (3, 0), (3, h)], axis="x", angle=180,');
     expect(text).toContain('s11 = mesh([\n    0, 0, 0, 1, 0, 0, 0, 1, 0,\n])');
     expect(text).toContain('s0 = s0.fuse(s1).removeSplitter()');

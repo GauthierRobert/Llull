@@ -15,7 +15,7 @@
  * `core/commands/execute`, never inline.
  */
 
-import { vi } from 'vitest';
+import { expect, vi } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { type LiveSnapshotEvent, documentHash } from '@mcp/liveSync';
 import { execute } from '@core/commands/registry';
@@ -51,6 +51,17 @@ export function liveSnapshot(
 /** Flush all pending microtasks (multiple promise chain hops). */
 export async function flushPromises(): Promise<void> {
   for (let i = 0; i < 10; i++) await new Promise<void>((resolve) => resolve());
+}
+
+/** Dispatches `add_box` and checks the undo/redo flags the (mocked) server response set. */
+export async function expectUndoRedoFlagsAfterDispatch(
+  canUndo: boolean,
+  canRedo: boolean,
+): Promise<void> {
+  useStore.getState().dispatch('add_box', { size: [1, 1, 1] });
+  await flushPromises();
+  expect(useStore.getState().canUndo).toBe(canUndo);
+  expect(useStore.getState().canRedo).toBe(canRedo);
 }
 
 export function getState(): ReturnType<typeof useStore.getState> {

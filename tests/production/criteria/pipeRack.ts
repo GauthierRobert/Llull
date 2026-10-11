@@ -1,7 +1,14 @@
 import type { CableTrayElement, PipeElement } from '@core/model/building';
 import type { Vec3 } from '@core/model/types';
 import type { CheckOutcome, Criterion, GradeContext } from '../contract';
-import { absolute, distance, elementsOf, polylineLength, round } from '../oracle/geometry';
+import {
+  absolute,
+  distance,
+  elementsOf,
+  polylineLength,
+  round,
+  sameEnds,
+} from '../oracle/geometry';
 import { column, parseCsv } from '../oracle/csv';
 import {
   ofType,
@@ -433,16 +440,7 @@ function intendedLine(
   intent: PlantIntent,
   route: Vec3[],
 ): PlantIntent['pipes'][number] | undefined {
-  const a = route[0] ?? [0, 0, 0];
-  const b = route.at(-1) ?? [0, 0, 0];
-  return intent.pipes.find((line) => {
-    const first = line.route[0] ?? [0, 0, 0];
-    const last = line.route.at(-1) ?? [0, 0, 0];
-    return (
-      (distance(a, first) <= END_TOLERANCE && distance(b, last) <= END_TOLERANCE) ||
-      (distance(a, last) <= END_TOLERANCE && distance(b, first) <= END_TOLERANCE)
-    );
-  });
+  return intent.pipes.find((line) => sameEnds(route, line.route, END_TOLERANCE));
 }
 
 function ifcLinesCheck(intent: PlantIntent, ctx: GradeContext): CheckOutcome {
