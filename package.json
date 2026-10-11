@@ -26,7 +26,8 @@
     "production:scripted": "npm --prefix server run production:scripted",
     "production:agent": "npm --prefix server run production:agent",
     "production:ui": "playwright test --config playwright.production.config.ts",
-    "production": "npm run production:scripted && npm run production:ui"
+    "production": "npm run production:scripted && npm run production:ui",
+    "llull": "node server/bin/llull.cjs"
   },
   "dependencies": {
     "@fontsource/geist-mono": "^5.3.0",

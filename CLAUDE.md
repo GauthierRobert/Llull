@@ -49,7 +49,7 @@ packages/kernel-occt/src/   @kernel-occt       OpenCascade GeometryKernel
 src/app/                    @app   Composition root: installDefaultPlugins()
 src/ui/                     @ui    React. Presentation + param-gathering ONLY. No business logic.
 src/main.tsx                       installs the kernel (`?kernel=occt`) + default plugins, mounts <App>
-server/                            Express MCP host (optional; own package.json, not a workspace)
+server/                            Express MCP host + `llull` CLI (src/cli/) (optional; own package.json, not a workspace)
 ```
 
 **Dependency direction is one-way: `src/ui`, `server` → `src/app`, plugins, kernels, `@mcp` → `packages/core`.**
@@ -90,6 +90,7 @@ Main thread by default; delegate for ≥ 2 independent lanes or > ~4 files in on
 ## SKILLS (invoke when the trigger matches)
 
 - `design-model` — design a complete CAD model/assembly end-to-end by composing existing commands into a validated `build_project` plan, then measure/check/render/export
+- `llull-cli` — drive the registry from the shell (`node server/bin/llull.cjs`): local doc files or `--server`, plan files, `--save` exports/renders; no MCP needed
 - `add-command` — add a CAD operation (the most common task; UI + MCP in one)
 - `add-entity-kind` — add a new 2D shape or 3D solid kind (types → commands → kernels → codegen → UI → tests)
 - `fix-bug` — reproduce first (failing test / golden plan), then fix
@@ -111,6 +112,7 @@ npm run claude:lint  # .claude/ references (skills, agents, paths) resolve — r
 npm run test:coverage
 npm run quality       # import + display quality gates on real CAD files (docs/QUALITY_GATES.md)
 npm run production    # engineering-office job scenarios via /mcp + the browser (docs/PRODUCTION_GATE.md)
+node server/bin/llull.cjs help   # llull CLI: any command on a local doc file or --server (llull-cli skill)
 npm --prefix server install && npm --prefix server run dev   # optional backend (not a workspace)
 ```
 
