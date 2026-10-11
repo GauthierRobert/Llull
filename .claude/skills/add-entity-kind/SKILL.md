@@ -18,20 +18,20 @@ Delegate in parallel when large: Lane 1 (`command-author`) model→codegen, Lane
 - `.claude/context/model.md`: list the kind.
 
 ## 2. Commands (mandatory)
-- Creating command next to its family: `geometryRound.ts` (round solids), `geometryPrismatic.ts`
-  (wedge/pyramid-like), `draw2dCurves.ts` (2D curves; point series share `draw2dShared.ts`).
-  Register in `registry.ts`. Follow `rules/commands.md` (pure, `.describe()`, graceful failure).
-- ⚠ `commands/renderTessellation.ts` (`const exhaustive: never`), ⚠ `sceneBounds.ts` `localBounds`,
-  ⚠ `transform.ts` `scaleGeometry`.
-- `persistenceGuards.ts` `POSITIVE_FIELDS` (saved-doc validation); `check.ts`
+- Creating command next to its family: `solids/round.ts` (round solids), `solids/prismatic.ts`
+  (wedge/pyramid-like), `draw2d/curves.ts` (2D curves; point series share `draw2d/shared.ts`).
+  Register in the folder's `catalog.ts`. Follow `rules/commands.md` (pure, `.describe()`, graceful failure).
+- ⚠ `commands/render/polygons.ts` (`const exhaustive: never`), ⚠ `geometry/bounds.ts` `localBounds`,
+  ⚠ `geometry/scaleGeometry.ts`.
+- `persistence/guards.ts` `POSITIVE_FIELDS` (saved-doc validation); `inspect/checkModel.ts`
   `checkDegenerateGeometry` + its issue-code description.
 
 ## 3. Geometry & measure (mandatory for 3D)
-- `solidTriangulation.ts` `unrotatedTriangles` (default `[]` — feeds STL/OBJ, Manifold, mesh
-  fallback); shared generators in `tessellation.ts`.
-- `measureSolid.ts` `measure_volume` case + the kind lists in its description strings.
-- 2D: `measureAreaPerimeter.ts` if area/perimeter applies.
-- Optional: `sceneRotatedBounds.ts`, `instanceExpansion.ts`, `renderLabels.ts`.
+- `geometry/solidTriangles.ts` `unrotatedTriangles` (default `[]` — feeds STL/OBJ, Manifold, mesh
+  fallback); shared generators in `geometry/tessellation.ts`.
+- `inspect/measureSolid.ts` `measure_volume` case + the kind lists in its description strings.
+- 2D: `inspect/measureAreaPerimeter.ts` if area/perimeter applies.
+- Optional: `geometry/rotatedBounds.ts`, `geometry/instanceExpansion.ts`, `render/labels.ts`.
 
 ## 4. Kernels (mandatory for 3D booleans)
 - Kernel input is a `ShapeRecipe` whose leaves are any `SOLID_KINDS` entity — no recipe change;
@@ -44,8 +44,8 @@ Delegate in parallel when large: Lane 1 (`command-author`) model→codegen, Lane
 ## 5. Codegen & exchange (3D expected; 2D export)
 - ⚠ `codegen/program.ts` `ShapeSpec` member (then ⚠ `openscad.ts` `shapeSource`, ⚠ `pythonCalls.ts`
   `shapeCallOpen`), `featureProgram.ts` `lowerShape`, `pythonRuntime.ts` (cq + bd makers),
-  `freecad.ts`, `identifiers.ts` reserved names, `commands/code_trace.ts` `add_*` list.
-- 2D: `packages/domain-aec/src/dxfExport.ts` case (default skips). `export.ts` description string.
+  `freecad.ts`, `identifiers.ts` reserved names, `commands/exchange/codeTrace.ts` `add_*` list.
+- 2D: `packages/domain-aec/src/building/exchange/dxfExport.ts` case (default skips). `exchange/exportStl.ts` description string.
 
 ## 6. MCP
 - `packages/mcp/src/toolsets.ts` (place the command), `conventions.ts` tables, `resources.ts`
@@ -56,7 +56,7 @@ Delegate in parallel when large: Lane 1 (`command-author`) model→codegen, Lane
   `lodSegments.ts`, `src/ui/viewport/2d/solidOutline.ts` (top-view footprint),
   `toolbar/solidPresets.ts` + `Icon.tsx`.
 - 2D: `Entities2D.tsx` case + `entities/XRenderer.tsx`, `boxSelect.ts`, `modifyHelpers.ts`,
-  `snapping/candidates.ts`, `dimensionGeometry.ts` (+ `annotate.ts` radial kinds), draw tool:
+  `snapping/candidates.ts`, `dimensionGeometry.ts` (+ `draw2d/annotate.ts` radial kinds), draw tool:
   `store/toolStore.ts` `DrawToolKind`, `toolbar/drawTools.ts`, `hintText.ts`, `Icon.tsx`,
   `hooks/shortcuts.ts`, `2d/useDrawTool.ts`, `drawHelpers.ts`, `DrawPreview.tsx`, `lineGeometry.ts`.
 

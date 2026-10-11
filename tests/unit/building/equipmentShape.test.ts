@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument, type MeshSolidEntity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import type { EquipmentElement } from '@core/model/building';
-import { buildPlanDrawing } from '@aec/planDrawing';
-import { buildingErrors } from '@aec/validate';
-import type { IfcExport } from '@aec/ifcBuild';
+import { buildPlanDrawing } from '@aec/building/drawings/planDrawing';
+import { buildingErrors } from '@aec/building/validate';
+import type { IfcExport } from '@aec/building/exchange/ifcBuild';
 
 interface ScheduleTable {
   columns: string[];

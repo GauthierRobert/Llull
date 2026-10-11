@@ -8,9 +8,9 @@ import { describe, it, expect } from 'vitest';
 import { type CadDocument, type Entity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { groupedBoxes } from '../helpers/groupedBoxes';
-import { computeSceneSnapshot } from '@core/commands/scene';
-import { rotatedEntityBounds } from '@core/commands/sceneRotatedBounds';
-import { entityBounds, instanceBoundsFromDoc } from '@core/commands/sceneBounds';
+import { computeSceneSnapshot } from '@core/commands/inspect/scene';
+import { rotatedEntityBounds } from '@core/geometry/rotatedBounds';
+import { entityBounds, instanceBoundsFromDoc } from '@core/geometry/bounds';
 
 describe('describe_scene command', () => {
   it('returns a snapshot in data and leaves the document unchanged', () => {

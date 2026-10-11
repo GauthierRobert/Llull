@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { parseKernelChoice } from '@core/geometry/kernelChoice';
-import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
-import { defaultContext, type ExecutionContext } from '@core/commands/context';
+import type { GeometryKernel } from '@core/geometry/kernel';
+import type { MeshData } from '@core/model/types';
+import { defaultContext } from '@core/commands/context';
+import type { ExecutionContext } from '@core/commands/types';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
 import { type IdSource } from '@lib/id';

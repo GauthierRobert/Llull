@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { type Entity, type TextEntity, createEmptyDocument, is2D } from '@core/model/types';
 import { execute, toToolSchemas, listCommands, getCommand } from '@core/commands/registry';
-import { entityBounds } from '@core/commands/sceneBounds';
+import { entityBounds } from '@core/geometry/bounds';
 
 describe('command layer', () => {
   it('add_box creates one entity and reports it as affected', () => {
@@ -467,7 +467,7 @@ describe('command layer', () => {
 
 // Expression evaluator unit tests
 
-import { evaluateExpression, extractReferences } from '@core/commands/expression';
+import { evaluateExpression, extractReferences } from '@core/commands/parametric/expression';
 
 describe('evaluateExpression', () => {
   it('evaluates a plain integer literal', () => {
@@ -724,7 +724,8 @@ describe('set_parameter', () => {
   });
 
   it('parameters round-trip through serialize/deserialize', async () => {
-    const { serializeDocument, deserializeDocument } = await import('@core/commands/persistence');
+    const { serializeDocument, deserializeDocument } =
+      await import('@core/commands/persistence/serialization');
     let doc = createEmptyDocument();
     doc = execute(doc, 'set_parameter', { name: 'width', expression: '10' }).document;
     doc = execute(doc, 'set_parameter', { name: 'height', expression: 'width * 2' }).document;
@@ -738,7 +739,7 @@ describe('set_parameter', () => {
   });
 
   it('deserializing a pre-Q1 document without parameters key yields parameters: {}', async () => {
-    const { deserializeDocument } = await import('@core/commands/persistence');
+    const { deserializeDocument } = await import('@core/commands/persistence/serialization');
     const doc = createEmptyDocument();
     // Manually build an envelope that lacks the parameters field (older format).
     const envelope = {
@@ -2631,7 +2632,7 @@ describe('render_view', () => {
     const drid = doc.driveRelationOrder[0]!;
 
     // Save then reload
-    const { serializeDocument } = await import('@core/commands/persistence');
+    const { serializeDocument } = await import('@core/commands/persistence/serialization');
     const json = serializeDocument(doc);
     const loaded = execute(createEmptyDocument(), 'load_document', { json });
     const reloaded = loaded.document;
@@ -2674,7 +2675,7 @@ describe('render_view', () => {
     expect(result.document).toBe(doc);
     expect(result.affected).toHaveLength(0);
 
-    const data = result.data as import('@core/commands/motion_study').MotionStudyData;
+    const data = result.data as import('@core/commands/motion/motionStudy').MotionStudyData;
     expect(data.steps).toHaveLength(5);
 
     // Rotation of idB about Z increases monotonically as sweep value grows
@@ -2716,7 +2717,7 @@ describe('render_view', () => {
     expect(result.document).toBe(doc);
     expect(result.affected).toHaveLength(0);
 
-    const data = result.data as import('@core/commands/motion_study').MotionStudyData;
+    const data = result.data as import('@core/commands/motion/motionStudy').MotionStudyData;
     expect(data.steps).toHaveLength(4);
     expect(data.summary.totalSteps).toBe(4);
 
@@ -2763,7 +2764,7 @@ describe('render_view', () => {
       interferenceCheck: true,
     });
 
-    const data = result.data as import('@core/commands/motion_study').MotionStudyData;
+    const data = result.data as import('@core/commands/motion/motionStudy').MotionStudyData;
     // At least one step should detect the overlap (both instances share the same component
     // bounds centered at [0,0,0] with half-extents [1,1,1], instance B at [0.5,0,0])
     expect(data.interferences.length).toBeGreaterThan(0);
@@ -2809,7 +2810,7 @@ describe('render_view', () => {
       interferenceCheck: true,
     });
 
-    const data = result.data as import('@core/commands/motion_study').MotionStudyData;
+    const data = result.data as import('@core/commands/motion/motionStudy').MotionStudyData;
     expect(data.summary.framesWithInterference).toBe(0);
     expect(data.interferences).toHaveLength(0);
   });
@@ -2874,7 +2875,7 @@ describe('render_view', () => {
     });
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
-    const data = result.data as import('@core/commands/motion_study').MotionStudyData;
+    const data = result.data as import('@core/commands/motion/motionStudy').MotionStudyData;
     expect(data.steps).toHaveLength(0);
   });
 
@@ -2896,7 +2897,7 @@ describe('render_view', () => {
     expect(result.document).toBe(doc);
     expect(result.affected).toHaveLength(0);
     expect(result.summary).toContain('zero length');
-    const data = result.data as import('@core/commands/motion_study').MotionStudyData;
+    const data = result.data as import('@core/commands/motion/motionStudy').MotionStudyData;
     expect(data.steps).toHaveLength(0);
   });
 
@@ -3251,7 +3252,7 @@ describe('add_dimension', () => {
     const afterDelete = execute(dimCreated.document, 'delete_entity', { id: pointId1 });
     // Check model
     const checkResult = execute(afterDelete.document, 'check_model', {});
-    const data = checkResult.data as import('@core/commands/check').CheckResult;
+    const data = checkResult.data as import('@core/commands/inspect/checkModel').CheckResult;
     const danglingIssues = data.issues.filter((i) => i.code === 'dangling_dimension_ref');
     expect(danglingIssues).toHaveLength(1);
     expect(danglingIssues[0]!.severity).toBe('error');
@@ -3266,7 +3267,7 @@ describe('add_dimension', () => {
       entityIds: [pointId1, pointId2],
     });
     const checkResult = execute(dimCreated.document, 'check_model', {});
-    const data = checkResult.data as import('@core/commands/check').CheckResult;
+    const data = checkResult.data as import('@core/commands/inspect/checkModel').CheckResult;
     const danglingIssues = data.issues.filter((i) => i.code === 'dangling_dimension_ref');
     expect(danglingIssues).toHaveLength(0);
   });
@@ -3623,7 +3624,8 @@ describe('add_dimension', () => {
   // ── persistence: featureHistory round-trips through serializeDocument ─────
 
   it('featureHistory — round-trips through serializeDocument / deserializeDocument', async () => {
-    const { serializeDocument, deserializeDocument } = await import('@core/commands/persistence');
+    const { serializeDocument, deserializeDocument } =
+      await import('@core/commands/persistence/serialization');
     let doc = createEmptyDocument();
     doc = execute(doc, 'add_box', { size: [3, 3, 3] }).document;
     const json = serializeDocument(doc);
@@ -3633,7 +3635,7 @@ describe('add_dimension', () => {
   });
 
   it('featureHistory — deserializeDocument defaults to [] when featureHistory absent', async () => {
-    const { deserializeDocument } = await import('@core/commands/persistence');
+    const { deserializeDocument } = await import('@core/commands/persistence/serialization');
     // Simulate an old doc that has no featureHistory field.
     const oldDoc = {
       format: 'llull-document',
@@ -3657,7 +3659,7 @@ describe('add_dimension', () => {
 
 // Constructive vs evaluated geometry: =expr resolution in replay
 
-import { resolveStepParams, buildParamEnv } from '@core/commands/regenerate';
+import { resolveStepParams, buildParamEnv } from '@core/commands/history/regenerate';
 
 describe('=expr param resolution in replay_history', () => {
   // ── AC1: headline round-trip ─────────────────────────────────────────────
@@ -4064,7 +4066,8 @@ describe('=expr param resolution in replay_history', () => {
   // ── persistence round-trip includes configurations ───────────────────────
 
   it('persistence round-trip: configurations survive serialize/deserialize', async () => {
-    const { serializeDocument, deserializeDocument } = await import('@core/commands/persistence');
+    const { serializeDocument, deserializeDocument } =
+      await import('@core/commands/persistence/serialization');
     let doc = createEmptyDocument();
     doc = execute(doc, 'create_configuration', {
       name: 'large',
@@ -4078,7 +4081,7 @@ describe('=expr param resolution in replay_history', () => {
   });
 
   it('persistence: deserializeDocument defaults configurations to {} for old docs without it', async () => {
-    const { deserializeDocument } = await import('@core/commands/persistence');
+    const { deserializeDocument } = await import('@core/commands/persistence/serialization');
     // Simulate an old document envelope without a configurations field.
     const oldDoc = {
       format: 'llull-document',
@@ -4500,7 +4503,8 @@ describe('=expr param resolution in replay_history', () => {
   // ── persistence round-trip includes materials ────────────────────────────
 
   it('persistence round-trip: materials survive serialize/deserialize', async () => {
-    const { serializeDocument, deserializeDocument } = await import('@core/commands/persistence');
+    const { serializeDocument, deserializeDocument } =
+      await import('@core/commands/persistence/serialization');
     let doc = createEmptyDocument();
     doc = execute(doc, 'create_material', {
       name: 'steel',
@@ -4525,7 +4529,7 @@ describe('=expr param resolution in replay_history', () => {
   });
 
   it('persistence: deserializeDocument defaults materials to {} for old docs without it', async () => {
-    const { deserializeDocument } = await import('@core/commands/persistence');
+    const { deserializeDocument } = await import('@core/commands/persistence/serialization');
     const oldDoc = {
       format: 'llull-document',
       version: 1,
@@ -4717,7 +4721,7 @@ describe('Q4 — replayHistory id-remapping', () => {
   // ── remapIds unit tests ───────────────────────────────────────────────────
 
   it('remapIds: replaces a string value that is a key in idMap', async () => {
-    const { remapIds } = await import('@core/commands/regenerate');
+    const { remapIds } = await import('@core/commands/history/regenerate');
     const idMap = new Map([['old-1', 'new-1']]);
     const result = remapIds({ id: 'old-1', size: [1, 1, 1] }, idMap) as {
       id: string;
@@ -4728,14 +4732,14 @@ describe('Q4 — replayHistory id-remapping', () => {
   });
 
   it('remapIds: does not touch strings that are NOT in idMap', async () => {
-    const { remapIds } = await import('@core/commands/regenerate');
+    const { remapIds } = await import('@core/commands/history/regenerate');
     const idMap = new Map([['old-1', 'new-1']]);
     const result = remapIds({ id: 'some-label', count: 3 }, idMap) as { id: string };
     expect(result.id).toBe('some-label');
   });
 
   it('remapIds: remaps ids inside arrays', async () => {
-    const { remapIds } = await import('@core/commands/regenerate');
+    const { remapIds } = await import('@core/commands/history/regenerate');
     const idMap = new Map([
       ['a', 'x'],
       ['b', 'y'],
@@ -4747,7 +4751,7 @@ describe('Q4 — replayHistory id-remapping', () => {
   });
 
   it('remapIds: does not mutate the input params', async () => {
-    const { remapIds } = await import('@core/commands/regenerate');
+    const { remapIds } = await import('@core/commands/history/regenerate');
     const idMap = new Map([['old-1', 'new-1']]);
     const params = { id: 'old-1', nested: { ref: 'old-1' } };
     const snapshot = JSON.stringify(params);
@@ -4756,7 +4760,7 @@ describe('Q4 — replayHistory id-remapping', () => {
   });
 
   it('remapIds: empty idMap returns params unchanged (fast path)', async () => {
-    const { remapIds } = await import('@core/commands/regenerate');
+    const { remapIds } = await import('@core/commands/history/regenerate');
     const params = { id: 'some-id', size: [1, 2, 3] };
     const result = remapIds(params, new Map());
     // Fast path: same reference when idMap is empty.
@@ -5722,7 +5726,8 @@ describe('export_stl', () => {
     });
 
     it('recipe count and entity count survive serialise → deserialise round-trip', async () => {
-      const { serializeDocument, deserializeDocument } = await import('@core/commands/persistence');
+      const { serializeDocument, deserializeDocument } =
+        await import('@core/commands/persistence/serialization');
 
       let doc = createEmptyDocument();
       doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
@@ -8393,7 +8398,7 @@ describe('build_project repeat/for_each', () => {
     expect(doc.constraints['mate-rt']).toBeDefined();
 
     // Serialize and reload
-    const { serializeDocument } = await import('@core/commands/persistence');
+    const { serializeDocument } = await import('@core/commands/persistence/serialization');
     const json = serializeDocument(doc);
     const loaded = execute(createEmptyDocument(), 'load_document', { json });
     expect(loaded.document.constraints['mate-rt']).toBeDefined();

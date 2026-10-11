@@ -3,7 +3,7 @@
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import type { AlignmentObject } from '@core/model/civil';
 import { execute } from '@core/commands/registry';
-import { deserializeDocument, serializeDocument } from '@core/commands/persistence';
+import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { expect } from 'vitest';
 
 export function metricDocument(): CadDocument {

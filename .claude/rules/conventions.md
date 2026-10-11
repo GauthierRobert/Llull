@@ -26,7 +26,8 @@ If a comment restates the code, delete it. Prose belongs in `docs/` (the human l
 
 Aliases, never deep relatives across packages: `@core/*` `@lib/*` `@mcp/*` `@aec/*`
 `@kernel-manifold/*` `@kernel-occt/*` `@ui/*` `@app/*`. Inside `packages/core/src` use relative
-imports. `tsconfig.json` paths, `vite.config.ts` alias and `server/` config stay in sync.
+imports. Aliases are defined once, in `tsconfig.base.json` (extended by `tsconfig.json` and
+`server/tsconfig.json`; Vite/Vitest read it through `workspaceAliases.ts`) — add a package there only.
 
 ## C5 — Formatting
 

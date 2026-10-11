@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { checkSteelMembers } from '@aec/industrial/steelMembersCheck';
-import { checkBeam } from '@aec/industrial/steelBeamChecks';
-import { createBeamLoads } from '@aec/industrial/steelBeamLoads';
-import { collectSteelBars } from '@aec/industrial/steelMemberBars';
-import { analyseSimpleBeam } from '@aec/industrial/steelBeamAnalysis';
-import { analysedRow, skippedRow } from '@aec/industrial/steelMemberRows';
+import { checkSteelMembers } from '@aec/industrial/steelDesign/steelMembersCheck';
+import { checkBeam } from '@aec/industrial/steelDesign/steelBeamChecks';
+import { createBeamLoads } from '@aec/industrial/steelDesign/steelBeamLoads';
+import { collectSteelBars } from '@aec/industrial/steelDesign/steelMemberBars';
+import { analyseSimpleBeam } from '@aec/industrial/steelDesign/steelBeamAnalysis';
+import { analysedRow, skippedRow } from '@aec/industrial/steelDesign/steelMemberRows';
 import {
   beam,
   brace,

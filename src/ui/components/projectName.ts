@@ -4,7 +4,7 @@
  */
 
 import type { CadDocument } from '@core/model/types';
-import { fileSlug } from '@aec/model';
+import { fileSlug } from '@aec/building/model';
 
 const DEFAULT_PROJECT_NAME = 'Untitled project';
 

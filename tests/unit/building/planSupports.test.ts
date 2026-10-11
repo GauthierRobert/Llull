@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { buildPlanDrawing } from '@aec/planDrawing';
-import type { PlanPrimitive } from '@aec/planModel';
-import type { DxfExport } from '@aec/dxfExport';
-import type { PlanSheet } from '@aec/sheet';
+import { buildPlanDrawing } from '@aec/building/drawings/planDrawing';
+import type { PlanPrimitive } from '@aec/building/drawings/planModel';
+import type { DxfExport } from '@aec/building/exchange/dxfExport';
+import type { PlanSheet } from '@aec/building/drawings/sheet';
 import { step, twoLevels } from './steelFixtures';
 
 /** DN100 pipe along X at y = 2000 with one support of every type (all unattached: no steel). */

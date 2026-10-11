@@ -1,7 +1,7 @@
 /** Shape recipes: content keys, entity -> recipe, mesh fallback, validation of untrusted trees. */
 import { describe, it, expect } from 'vitest';
 import type { BoxEntity, Entity, MeshSolidEntity } from '@core/model/types';
-import type { ShapeRecipe } from '@core/geometry/shapeRecipe';
+import type { ShapeRecipe } from '@core/model/types';
 import {
   geometryKey,
   meshRecipeOf,

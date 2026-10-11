@@ -16,7 +16,7 @@ import type {
 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { cross2, dot2, len2, normalize2, perp2 } from '@lib/vec2';
-import { segIntersect, evalLine, offsetSegment, miterJoin } from '@core/commands/modify2dGeometry';
+import { segIntersect, evalLine, offsetSegment, miterJoin } from '@core/commands/modify2d/geometry';
 
 // Geometry helper unit tests
 

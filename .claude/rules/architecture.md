@@ -1,6 +1,7 @@
 # RULE: architecture (the laws)
 
-Authoritative. Violations are bugs, not style choices. Several are hook-enforced.
+Authoritative. Violations are bugs, not style choices. Dependency laws are checked by `npm run arch`
+(`.dependency-cruiser.cjs`, part of `npm run check`) and, at edit time, by a hook.
 Implementation detail loads on demand: `rules/commands.md` (packages/tests), `rules/sync.md`
 (MCP/server/store), `.claude/context/*`.
 
@@ -18,8 +19,9 @@ surface that bypasses a command.
 `src/ui`, `server/` → `src/app` → `packages/{mcp, domain-aec, kernel-*}` → `packages/core`
 (`@lib` inside core). No package imports `src/ui`; `packages/core` imports no other package. No
 `packages/*/src` touches `react`, `window`, `document`, `fetch`, `localStorage`, or the DOM — put
-side effects in `src/ui/`, `server/`, or behind an injected interface. Hook-enforced
-(`enforce-architecture.mjs`); if blocked, move the code to the correct layer.
+side effects in `src/ui/`, `server/`, or behind an injected interface. No import cycles (type-only included).
+Inside core: `commands`/`codegen`/`plugins` → `geometry` → `model` → `lib`. Enforced by `npm run arch`
+and `enforce-architecture.mjs`; if blocked, move the code to the correct layer — never loosen a rule.
 
 ## L3 — Purity
 
@@ -35,7 +37,8 @@ commands (`packages/core/src/commands` or a plugin's commands). No component or 
 
 ## L5 — Registry is the contract
 
-Registry = core `definitions` + each installed plugin's `commands`. It exposes `listCommands()`,
+Registry = every core feature catalog (`commands/<feature>/catalog.ts`) + each installed plugin's
+`commands`. It exposes `listCommands()`,
 `getCommand()`, `execute()`, `toToolSchemas()`. UI menus iterate `listCommands()`; MCP schemas come
 from `toToolSchemas()`; `paramsSchema` is derived from zod `params` — never hand-write either.
 `execute()` is the single choke point (validation, `requiresKernel`, derivation guards,
@@ -74,8 +77,10 @@ Installing a kernel is the composition root's job, never a command's.
 ## L10 — Domains are plugins
 
 A domain extends core through `CadPlugin` (`{ name, toolset, commands, guards?, document? }`),
-installed by `src/app/plugins.ts` `installDefaultPlugins()`. `packages/core` NEVER imports a plugin
-(hook-enforced). New domain capability ⇒ a command in its plugin package, not in core.
+installed by `src/app/plugins.ts` `installDefaultPlugins()`. `packages/core` NEVER imports a plugin.
+A plugin sees core only through its public API (`model`, `lib`, `geometry`, `plugins/plugin`,
+`commands/{schema,types,noop,derivation,registry}`) and composes other commands via `execute`.
+New domain capability ⇒ a command in its plugin package, not in core.
 
 ## Decision shortcuts
 

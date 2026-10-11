@@ -43,7 +43,7 @@ The repository is an npm-workspaces monorepo:
 packages/core            model, command layer, execution context, persistence,
                          geometry kernel interface, plugin host, code generators, pure helpers
 packages/mcp             MCP tools, resources, prompts, toolsets, discovery, live-sync protocol
-packages/domain-aec      building (AEC/BIM) and industrial-steel plugins
+packages/domain-aec      building (AEC/BIM), industrial-steel and civil plugins
 packages/kernel-manifold Manifold mesh kernel (default)
 packages/kernel-occt     OpenCascade B-rep kernel
 src/app                  composition root: installs the default plugins
@@ -55,7 +55,68 @@ server/                  Express MCP host (optional)
 root, which depends on the plugins, kernels and MCP layer, which all depend on the core.
 The core depends on nothing else in the repository. This is what keeps the brain testable
 in isolation, reusable by the headless MCP server, and open to new domains without edits.
-A Claude Code hook blocks writes that break it.
+
+## Inside the core
+
+The core is layered too, bottom to top:
+
+```
+lib/        tiny pure helpers (vectors, polygons, ids, hashing) — depend only on model/vectors
+model/      the document and entity types (incl. MeshData, ShapeRecipe), vectors, units —
+            data only; imports nothing outside model/ and lib/
+geometry/   kernel interface, shape recipes, and pure geometry shared by commands, kernels,
+            plugins and the viewport: tessellation, triangles, bounds, instance expansion
+commands/   the command layer (below)            plugins/  plugin contract and host
+codegen/    CadQuery / build123d / OpenSCAD / FreeCAD emitters
+```
+
+`commands/` separates the **engine** from the **features**. The engine sits at its root:
+
+| File | Role |
+| ---- | ---- |
+| `types.ts` | contracts: `CommandDefinition`, `CommandResult`, `ExecutionContext` |
+| `schema.ts` | `defineCommand` (one zod schema per command) and `commandCatalog` |
+| `context.ts` | the active execution context (kernel, ids, registry, replay cache) |
+| `commandTable.ts` | registered commands by name, `toToolSchemas`; imports no command |
+| `execute.ts` | the single choke point: validation, kernel check, feature-step append |
+| `guard.ts` | the safety wrapper every registered command runs inside |
+| `registry.ts` | composition: registers every feature catalog and every plugin |
+
+Every feature lives in its own folder with a `catalog.ts` that lists its commands:
+`solids`, `draw2d`, `modify2d`, `edit`, `brep` (kernel operations), `inspect` (read-only
+queries and measurements), `render`, `exchange` (import/export), `persistence`, `history`,
+`parametric`, `project` (`build_project`, templates), `assembly`, `motion`, `document`
+(units, layers, materials, camera), plus `entity` (shared construction helpers). Adding a
+command means editing one feature folder; `registry.ts` changes only when a folder is added.
+Because the lookup table imports no command, a command that runs other commands
+(`build_project`, history replay, recipes) never creates an import cycle.
+
+Plugins follow the same shape: `packages/domain-aec` splits into `building/` (elements,
+geometry, evaluate, drawings, exchange, quantities), `industrial/` (one folder per
+discipline: frames, purlins, foundations, piping, …) and `civil/` (alignment, road, drainage,
+surface, …), each with its plugin entry at its root.
+
+## Architecture as code
+
+The dependency laws are executable. `npm run arch` (part of `npm run check`) runs
+[dependency-cruiser](https://github.com/sverweij/dependency-cruiser) with the rules in
+`.dependency-cruiser.cjs`:
+
+- no import cycles anywhere, type-only imports included;
+- `packages/core` imports no other package; no package imports the app or the server;
+- packages are headless: no React, three.js or UI state;
+- plugins and kernels see only core's public API — `model`, `lib`, `geometry`, the plugin
+  contract and the command-authoring API (`schema`, `types`, `noop`, `derivation`,
+  `registry`); composing another command goes through `execute`;
+- MCP never depends on a plugin or a concrete kernel; `lib` is a leaf; `model` imports only
+  itself and `lib`; `geometry` never reaches up into commands;
+- the web app and the server never import each other.
+
+A contract test (`tests/unit/contract/catalogs.test.ts`) checks that every exported command
+definition is registered, so a command missing from its catalog fails the build. CI
+(`.github/workflows/check.yml`) runs the full gate, coverage and the server suite on every push
+and pull request; a Claude Code hook additionally gives agents immediate feedback while they edit.
+See `docs/decisions/AR1-modular-command-layer.md` for the reasoning.
 
 ## Plugins
 
@@ -171,8 +232,8 @@ The agent edits the same document the UI does because it is calling the same
 
 ## Testing strategy
 
-- **Unit tests** target the command layer and the domain plugins heavily (90 %
-  statements / 85 % branches / 90 % functions / 90 % lines). These are pure functions,
+- **Unit tests** target the command layer, the core geometry and the domain plugins heavily
+  (90 % statements / 85 % branches / 90 % functions / 90 % lines). These are pure functions,
   so they're fast and exhaustive.
 - **Contract tests** pin the cross-cutting guarantees: schema derivation, a snapshot of
   every tool schema agents see, the execution context, plugins, persistence, live sync.

@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { BuildingElement, FootingElement } from '@core/model/building';
 import { execute } from '@core/commands/registry';
-import { type FootingDesignRow } from '@aec/industrial/footingModel';
-import { designMat } from '@aec/industrial/footingMat';
-import { designFootings } from '@aec/industrial/footingDesignCommand';
-import { type FoundationRow } from '@aec/industrial/foundationModel';
-import { foundationCheck } from '@aec/industrial/foundationCheckRun';
-import type { TakeoffLine } from '@aec/takeoffBasics';
+import { type FootingDesignRow } from '@aec/industrial/foundations/footingModel';
+import { designMat } from '@aec/industrial/foundations/footingMat';
+import { designFootings } from '@aec/industrial/foundations/footingDesignCommand';
+import { type FoundationRow } from '@aec/industrial/foundations/foundationModel';
+import { foundationCheck } from '@aec/industrial/foundations/foundationCheckRun';
+import type { TakeoffLine } from '@aec/building/quantities/takeoffBasics';
 import { hall } from './hallFixtures';
 import { mapElements } from './elementEdits';
 

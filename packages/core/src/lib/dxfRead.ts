@@ -5,7 +5,7 @@
  * @pure
  */
 
-import type { Vec3 } from '../model/types';
+import type { Vec3 } from '../model/vectors';
 
 export interface DxfRecord {
   readonly type: string;

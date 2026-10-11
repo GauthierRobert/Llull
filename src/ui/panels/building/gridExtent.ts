@@ -6,7 +6,7 @@
  */
 
 import type { BuildingModel, GridElement } from '@core/model/building';
-import { crossGridLines } from '@aec/industrial/gridFraming';
+import { crossGridLines } from '@aec/industrial/framing/gridFraming';
 import type { PlanExtent } from './elementToolForm';
 
 /** Crossing tolerance relative to the grid's overall span, so it is unit-neutral. */

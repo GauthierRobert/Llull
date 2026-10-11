@@ -8,7 +8,7 @@
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import type { BuildingLevel } from '@core/model/building';
-import { COPYABLE } from '@aec/elements';
+import { COPYABLE } from '@aec/building/elements/elements';
 
 const CATEGORY_LABELS: Record<(typeof COPYABLE)[number], string> = {
   wall: 'Walls',

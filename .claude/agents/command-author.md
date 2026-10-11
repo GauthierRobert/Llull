@@ -28,7 +28,7 @@ Rules are already in context (`rules/commands.md` loads when you touch `packages
 
 ## Procedure (every command)
 
-1. Read neighbors in the target domain file (e.g. `geometryBasic.ts`, `units.ts`) and copy
+1. Read neighbors in the target domain file (e.g. `solids/basic.ts`, `document/units.ts`) and copy
    the `defineCommand` skeleton from `conventions.md` (C5). Match the existing style exactly.
    Domain commands (building, industrial) go in their plugin package, not core.
 2. If the op needs a new entity kind: add the literal to `SOLID_KINDS` (3D) or
@@ -37,7 +37,7 @@ Rules are already in context (`rules/commands.md` loads when you touch `packages
    and flag that the
    viewport needs a render branch (hand that to viewport-engineer). For 2D drafting
    specifics, follow the `draw-2d` skill.
-3. Register: core — import into `registry.ts`, append to `rawDefinitions`, add the name to
+3. Register: core — list it in its feature folder's `catalog.ts`, add the name to
    one toolset in `packages/mcp/src/toolsets.ts`; plugin — add to its command list
    (`packages/domain-aec/src/index.ts`).
 4. Write tests in `tests/unit/<domain>.test.ts` (plugins: `tests/unit/building/`): happy path (asserts `affected`,
@@ -45,7 +45,7 @@ Rules are already in context (`rules/commands.md` loads when you touch `packages
    ⇒ no-op). Ids are step-scoped and deterministic — no reset needed.
 5. Update + review the tool-schema snapshot (`npx vitest run tests/unit/contract -u`); keep
    the golden corpus green. Run `npm run check`. Fix until green. Confirm the coverage gate
-   (90/85/90/90 on `packages/core/src/commands/**`, `packages/domain-aec/src/**`) still holds.
+   (90/85/90/90 on `packages/core/src/{commands,geometry}/**`, `packages/domain-aec/src/**`) still holds.
 
 ## Add structured doc-comments
 

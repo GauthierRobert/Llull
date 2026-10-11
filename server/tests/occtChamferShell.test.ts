@@ -6,8 +6,9 @@
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import type { Entity } from '@core/model/types';
-import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
-import type { ShapeRecipe } from '@core/geometry/shapeRecipe';
+import type { GeometryKernel } from '@core/geometry/kernel';
+import type { MeshData } from '@core/model/types';
+import type { ShapeRecipe } from '@core/model/types';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createNodeOcctKernel } from '../src/occtNode';
 import { leaf, meshOf, volume } from './kernelTestSupport';

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { replaceEntitiesById, replaceEntity } from '@core/commands/entityOps';
+import { replaceEntitiesById, replaceEntity } from '@core/commands/entity/entityOps';
 
 describe('replaceEntitiesById', () => {
   const base = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });

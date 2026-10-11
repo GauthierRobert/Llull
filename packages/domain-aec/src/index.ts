@@ -3,7 +3,7 @@
  * @layer domain-aec
  */
 
-import type { CommandDefinition } from '@core/commands/types';
+import { commandCatalog } from '@core/commands/schema';
 import {
   addLevel,
   updateLevel,
@@ -11,49 +11,63 @@ import {
   setActiveLevel,
   setProjectInfo,
   describeBuilding,
-} from './levels';
-import { addGridLine, addGridSystem } from './grid';
-import { addWall, drawWalls, updateWall } from './walls';
-import { addDoor, addWindow, updateOpening } from './openings';
-import { addSlab, addColumn, addBeam, addStair } from './structure';
-import { addRoom, deleteBuildingElement, moveBuildingElement, copyLevelElements } from './elements';
-import { exportDxf } from './dxfExport';
-import { exportPlanSheet } from './sheet';
-import { exportElevationSheet } from './elevation';
-import { exportIfc } from './ifcBuild';
-import { addBuildingTemplate } from './templates';
-import { addSlabOpening, deleteSlabOpening } from './slabOpenings';
-import { listSteelProfiles } from './industrial/steelProfileList';
-import { addSteelMember, updateSteelMember } from './industrial/memberSteelCommands';
-import { addGridBeams, addGridBracing, addGridColumns } from './industrial/gridFramingCommands';
-import { addEquipmentOpenings } from './industrial/equipmentOpenings';
-import { addFooting, addPanel } from './industrial/memberFootingPanelCommands';
-import { addEquipment, addPipeRun } from './industrial/equipment';
-import { updateEquipment } from './industrial/equipmentUpdate';
-import { addCraneRunway, addPortalFrameBuilding } from './industrial/portal';
-import { checkClashes } from './industrial/clash';
-import { addCableTray } from './industrial/trays';
-import { addBasePlates } from './industrial/plates';
-import { addCurvedWall } from './curvedWalls';
-import { setWallLayers } from './wallLayers';
-import { addMomentConnections } from './industrial/connections';
-import { checkPortalFrames } from './industrial/frameCheckPortal';
-import { designPortalFrames } from './industrial/frameDesign';
-import { checkBracing } from './industrial/bracingCheckRun';
-import { foundationCheck } from './industrial/foundationCheckRun';
-import { designFootings } from './industrial/footingDesignCommand';
-import { exportNcFiles } from './industrial/ncExport';
-import { checkPurlins } from './industrial/purlinCheckRun';
-import { designPurlins } from './industrial/purlinDesign';
-import { exportAnchorPlan } from './industrial/anchorPlanExport';
-import { runwayCheck } from './industrial/runwayCheckRun';
-import { checkSteelMembers } from './industrial/steelMembersCheck';
-import { addPipeSupport } from './industrial/pipeSupports';
-import { checkPipeSupports } from './industrial/pipeSupportCheck';
-import { quantityTakeoff, buildingSchedule, setCostRates, estimateCost } from './takeoff';
+} from './building/elements/levels';
+import { addGridLine, addGridSystem } from './building/elements/grid';
+import { addWall, drawWalls, updateWall } from './building/elements/walls';
+import { addDoor, addWindow, updateOpening } from './building/elements/openings';
+import { addSlab, addColumn, addBeam, addStair } from './building/elements/structure';
+import {
+  addRoom,
+  deleteBuildingElement,
+  moveBuildingElement,
+  copyLevelElements,
+} from './building/elements/elements';
+import { exportDxf } from './building/exchange/dxfExport';
+import { exportPlanSheet } from './building/drawings/sheet';
+import { exportElevationSheet } from './building/drawings/elevation';
+import { exportIfc } from './building/exchange/ifcBuild';
+import { addBuildingTemplate } from './building/templates';
+import { addSlabOpening, deleteSlabOpening } from './building/elements/slabOpenings';
+import { listSteelProfiles } from './steel/steelProfileList';
+import { addSteelMember, updateSteelMember } from './industrial/framing/memberSteelCommands';
+import {
+  addGridBeams,
+  addGridBracing,
+  addGridColumns,
+} from './industrial/framing/gridFramingCommands';
+import { addEquipmentOpenings } from './industrial/equipment/equipmentOpenings';
+import { addFooting, addPanel } from './industrial/framing/memberFootingPanelCommands';
+import { addEquipment, addPipeRun } from './industrial/equipment/equipment';
+import { updateEquipment } from './industrial/equipment/equipmentUpdate';
+import { addCraneRunway, addPortalFrameBuilding } from './industrial/portal/portal';
+import { checkClashes } from './industrial/clash/clash';
+import { addCableTray } from './industrial/piping/trays';
+import { addBasePlates } from './industrial/connections/plates';
+import { addCurvedWall } from './building/elements/curvedWalls';
+import { setWallLayers } from './building/elements/wallLayers';
+import { addMomentConnections } from './industrial/connections/connections';
+import { checkPortalFrames } from './industrial/frames/frameCheckPortal';
+import { designPortalFrames } from './industrial/frames/frameDesign';
+import { checkBracing } from './industrial/bracing/bracingCheckRun';
+import { foundationCheck } from './industrial/foundations/foundationCheckRun';
+import { designFootings } from './industrial/foundations/footingDesignCommand';
+import { exportNcFiles } from './industrial/fabrication/ncExport';
+import { checkPurlins } from './industrial/purlins/purlinCheckRun';
+import { designPurlins } from './industrial/purlins/purlinDesign';
+import { exportAnchorPlan } from './industrial/anchorPlan/anchorPlanExport';
+import { runwayCheck } from './industrial/runway/runwayCheckRun';
+import { checkSteelMembers } from './industrial/steelDesign/steelMembersCheck';
+import { addPipeSupport } from './industrial/piping/pipeSupports';
+import { checkPipeSupports } from './industrial/piping/pipeSupportCheck';
+import {
+  quantityTakeoff,
+  buildingSchedule,
+  setCostRates,
+  estimateCost,
+} from './building/quantities/takeoff';
 
 /** AEC / BIM commands (levels, walls, openings, slabs, sheets, IFC, takeoff). */
-export const buildingCommands = [
+export const buildingCommands = commandCatalog(
   addLevel,
   updateLevel,
   deleteLevel,
@@ -89,10 +103,10 @@ export const buildingCommands = [
   addBuildingTemplate,
   addCurvedWall,
   setWallLayers,
-] as ReadonlyArray<CommandDefinition<unknown>>;
+);
 
 /** Industrial-steel commands (portal frames, members, checks, fabrication). */
-export const industrialCommands = [
+export const industrialCommands = commandCatalog(
   listSteelProfiles,
   addSteelMember,
   updateSteelMember,
@@ -124,10 +138,10 @@ export const industrialCommands = [
   addCraneRunway,
   addPortalFrameBuilding,
   checkClashes,
-] as ReadonlyArray<CommandDefinition<unknown>>;
-export { type PlanPrimitive } from './planModel';
-export { buildPlanDrawing } from './planDrawing';
-export { CATEGORY_LAYER } from './entities';
-export { fromMm } from './model';
-export { buildingElementOf } from './integrity';
-export type { CostLine } from './costing';
+);
+export { type PlanPrimitive } from './building/drawings/planModel';
+export { buildPlanDrawing } from './building/drawings/planDrawing';
+export { CATEGORY_LAYER } from './building/evaluate/entities';
+export { fromMm } from './building/model';
+export { buildingElementOf } from './building/evaluate/integrity';
+export type { CostLine } from './building/quantities/costing';

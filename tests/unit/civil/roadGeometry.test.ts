@@ -9,14 +9,14 @@ import {
   stationOffset,
   validateHorizontal,
   type ArcElement,
-} from '@aec/civil/alignmentGeometry';
+} from '@aec/civil/alignment/alignmentGeometry';
 import {
   designElevation,
   grades,
   validateProfile,
   verticalCurves,
   verticalCurveStations,
-} from '@aec/civil/profileGeometry';
+} from '@aec/civil/alignment/profileGeometry';
 
 const corner: { points: Vec2[]; radii: number[]; startStation: number } = {
   points: [

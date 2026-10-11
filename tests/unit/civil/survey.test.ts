@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { deserializeDocument, serializeDocument } from '@core/commands/persistence';
-import { parseSurvey } from '@aec/civil/surveyParse';
+import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
+import { parseSurvey } from '@aec/civil/survey/surveyParse';
 import { formatStation } from '@aec/civil/model';
 import { civilObjectOf } from '@aec/civil/integrity';
 import { gridSurvey, metricDocument, surveyedDocument } from './fixtures';

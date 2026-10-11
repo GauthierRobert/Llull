@@ -9,19 +9,7 @@
  * @layer core/geometry
  */
 
-import type { Vec3 } from '../model/types';
-import type { ShapeRecipe } from './shapeRecipe';
-
-export type { BooleanOp, ShapeRecipe } from './shapeRecipe';
-
-/**
- * World-space triangle mesh.
- * `positions`: flat xyz triples (length 3 × vertexCount); `indices`: flat triangle vertex indices.
- */
-export interface MeshData {
-  readonly positions: ReadonlyArray<number>;
-  readonly indices: ReadonlyArray<number>;
-}
+import type { MeshData, ShapeRecipe, Vec3 } from '../model/types';
 
 declare const shapeHandleBrand: unique symbol;
 

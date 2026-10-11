@@ -1,5 +1,5 @@
 import { execute } from '@core/commands/registry';
-import { serializeDocument } from '@core/commands/persistence';
+import { serializeDocument } from '@core/commands/persistence/serialization';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { Scenario } from '../contract';
 import { writeArtifact } from '../report';

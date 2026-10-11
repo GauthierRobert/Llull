@@ -9,7 +9,7 @@
  * SolidMeshShell (double-sided, no BVH).
  *
  * @see RevolutionEntity in core/model/types.ts
- * @see tessellateRevolution in core/commands/render.ts (reference tessellation)
+ * @see tessellateRevolution in core/commands/render/renderView.ts (reference tessellation)
  */
 
 import { useMemo } from 'react';

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { exportAnchorPlan as anchorPlan } from '@aec/industrial/anchorPlanExport';
+import { exportAnchorPlan as anchorPlan } from '@aec/industrial/anchorPlan/anchorPlanExport';
 
 interface AnchorData {
   svg: string;

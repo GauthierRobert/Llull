@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { deserializeDocument, serializeDocument } from '@core/commands/persistence';
+import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { civilErrors } from '@aec/civil/validate';
 import { metricDocument, surveyedDocument } from './fixtures';
 

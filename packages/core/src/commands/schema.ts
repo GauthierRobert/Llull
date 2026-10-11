@@ -10,7 +10,7 @@
 import { z } from 'zod';
 import { isHexColor } from '../lib/isHexColor';
 import type { CadDocument, Vec2, Vec3 } from '../model/types';
-import type { ExecutionContext } from './context';
+import type { ExecutionContext } from './types';
 import type {
   CommandAnnotations,
   CommandDefinition,
@@ -200,6 +200,16 @@ export function defineCommand<S extends ParamsObject>(
     run: spec.run,
   };
   return spec.annotations ? { ...definition, annotations: spec.annotations } : definition;
+}
+
+/**
+ * A feature's (or plugin's) command list, params erased to `unknown`. This is the one sanctioned
+ * erasure: `execute` validates params against each command's own schema before `run` sees them.
+ */
+export function commandCatalog(
+  ...commands: ReadonlyArray<CommandDefinition<never>>
+): ReadonlyArray<CommandDefinition<unknown>> {
+  return commands as ReadonlyArray<CommandDefinition<unknown>>;
 }
 
 /** 2-number vector `[x, y]` (local work-plane coordinates). */

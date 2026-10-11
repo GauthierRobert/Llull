@@ -3,8 +3,12 @@ import { describe, it, expect } from 'vitest';
 import { type BoxEntity, type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
-import { createReplayCache } from '@core/commands/replayCache';
-import { changedParameters, parametersReadBy, stepsReading } from '@core/commands/dependents';
+import { createReplayCache } from '@core/commands/history/replayCache';
+import {
+  changedParameters,
+  parametersReadBy,
+  stepsReading,
+} from '@core/commands/history/dependents';
 
 function parametricBox(): CadDocument {
   let doc = execute(createEmptyDocument(), 'set_parameter', {

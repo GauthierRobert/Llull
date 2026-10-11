@@ -1,0 +1,243 @@
+import type { CurveSegment } from '../../model/curve';
+import { type SweepSection, type Vec2, type Vec3, DEFAULT_LAYER_ID } from '../../model/types';
+import type { CommandResult } from '../types';
+import { colorField, defineCommand, untypedArray, z } from '../schema';
+import { noop } from '../noop';
+import { nextId } from '../../lib/id';
+import { isVec2 } from '../../lib/vec2';
+import { sub3 } from '../../lib/vec3';
+import { polygonArea } from '../../lib/polygon';
+import { newEntity } from '../entity/newEntity';
+import { DEFAULT_SOLID_COLOR, commitSolid } from './shared';
+import { MAX_PROFILE_POINTS } from '../limits';
+import { sketchLoop, sketchPath } from './sketchCurves';
+import {
+  catmullRomBeziers,
+  chainIssue,
+  filletPolyline,
+  firstCorner,
+  mapSegment,
+  minCurvatureRadius,
+  sampleChain,
+} from '../../geometry/curveSegments';
+
+/** Default bend radius as a multiple of the section half-size (a long-radius pipe elbow). */
+const DEFAULT_BEND_FACTOR = 3;
+
+const isVec3 = (value: unknown): value is Vec3 =>
+  Array.isArray(value) && value.length === 3 && value.every(Number.isFinite);
+
+/** Section and its half-size (largest distance from the path), or an error message. */
+function resolveSection(
+  doc: Parameters<typeof sketchLoop>[0],
+  radius: number | undefined,
+  innerRadius: number | undefined,
+  section: ReadonlyArray<unknown> | undefined,
+  sectionId: string | undefined,
+): { section: SweepSection; halfSize: number } | string {
+  const given = [radius, section, sectionId].filter((v) => v !== undefined).length;
+  if (given !== 1) return 'give exactly one of radius, section or sectionId';
+  if (radius !== undefined) {
+    if (!(radius > 0)) return `radius must be > 0 (got ${radius})`;
+    if (innerRadius !== undefined && !(innerRadius > 0 && innerRadius < radius))
+      return `innerRadius must be > 0 and < radius ${radius} (got ${innerRadius})`;
+    return {
+      section: { shape: 'circle', radius, ...(innerRadius !== undefined ? { innerRadius } : {}) },
+      halfSize: radius,
+    };
+  }
+  if (innerRadius !== undefined) return 'innerRadius only applies to a circular section (radius)';
+  let profile: Vec2[];
+  let curves: CurveSegment<Vec2>[] = [];
+  if (section !== undefined) {
+    const bad = section.findIndex((point) => !isVec2(point));
+    if (bad >= 0) return `section point ${bad} must be a finite [x, y] pair`;
+    profile = section as Vec2[];
+    if (profile.length < 3 || profile.length > MAX_PROFILE_POINTS)
+      return `section needs 3..${MAX_PROFILE_POINTS} points (got ${profile.length})`;
+  } else {
+    const loop = sketchLoop(doc, [sectionId as string]);
+    if (typeof loop === 'string') return `section ${loop}`;
+    ({ profile, curves } = loop);
+  }
+  if (polygonArea(profile) <= 1e-12) return 'section encloses no area';
+  const exact = curves.some((segment) => segment.type !== 'line');
+  return {
+    section: { shape: 'profile', profile, ...(exact ? { curves } : {}) },
+    halfSize: Math.max(...profile.map(([x, y]) => Math.hypot(x, y))),
+  };
+}
+
+/** World path from points (bends or smooth spline) or a 2D sketch entity, or an error message. */
+function resolvePath(
+  doc: Parameters<typeof sketchPath>[0],
+  path: ReadonlyArray<unknown> | undefined,
+  pathId: string | undefined,
+  smooth: boolean,
+  bendRadius: number,
+): CurveSegment<Vec3>[] | string {
+  if ((path === undefined) === (pathId === undefined)) return 'give exactly one of path or pathId';
+  if (path !== undefined) {
+    const bad = path.findIndex((point) => !isVec3(point));
+    if (bad >= 0) return `path point ${bad} must be a finite [x, y, z] triple`;
+    const points = path as Vec3[];
+    if (points.length < 2 || points.length > MAX_PROFILE_POINTS)
+      return `path needs 2..${MAX_PROFILE_POINTS} points (got ${points.length})`;
+    return smooth ? catmullRomBeziers(points, false) : filletPolyline(points, bendRadius);
+  }
+  const entity = doc.entities[pathId as string];
+  if (entity?.kind === 'polyline' && !entity.closed) {
+    const world = sketchPath(doc, pathId as string);
+    if (typeof world === 'string') return world;
+    const corners = [world[0]?.points[0] as Vec3, ...world.map((s) => s.points[1] as Vec3)];
+    return smooth ? catmullRomBeziers(corners, false) : filletPolyline(corners, bendRadius);
+  }
+  return sketchPath(doc, pathId as string);
+}
+
+/** Tightest radius of curvature on the path (Infinity when it is straight). */
+function tightestBend(path: ReadonlyArray<CurveSegment<Vec3>>): number {
+  return path.reduce((least, segment) => Math.min(least, minCurvatureRadius(segment)), Infinity);
+}
+
+/**
+ * @command sweep_profile
+ * @pure
+ * @layer core/commands
+ * @affects creates 1 sweep entity positioned at the path start
+ * @invariant path is open, connected and tangent-continuous (G1); bends are wider than the section
+ * @failure bad / ambiguous section or path, sharp corner, bend tighter than the section,
+ *   duplicate explicit id -> no-op, affected:[]
+ */
+export const sweepProfile = defineCommand({
+  name: 'sweep_profile',
+  description:
+    'Sweep a closed cross-section along a 3D path into a solid: pipes, tubes, hoses, handrails, ducts, ' +
+    'cable runs, coils. Right-handed world frame, +Z up. ' +
+    'Path: either `path`, world [x, y, z] points — joined by straight runs whose corners are rounded with ' +
+    'circular bends of bendRadius (pipe elbows), or with smooth: true a smooth spline through the points — ' +
+    'or `pathId`, an open 2D sketch entity (line, arc, open polyline, open spline) placed by its work plane. ' +
+    'Section (exactly one): `radius` for a round tube (+ innerRadius for a hollow pipe), `section` as ' +
+    '[x, y] polygon points, or `sectionId` of a closed 2D sketch (circle, ellipse, rectangle, closed ' +
+    'polyline/spline). The section is centred on the path; its +y axis points toward world +Z (toward +Y ' +
+    'when the path starts vertical) and it is carried along with a rotation-minimizing (twist-free) frame. ' +
+    'Paths, bends and sketched sections stay exact for the exact kernel and STEP export. ' +
+    'Booleans with other solids work like any primitive (e.g. boolean_union to weld pipes to a flange).',
+  params: z.object({
+    path: untypedArray(
+      'World-space [x, y, z] points the section follows (>= 2). Without smooth, consecutive points are ' +
+        'joined by straight runs and every corner gets a circular bend of bendRadius.',
+    ).optional(),
+    pathId: z
+      .string()
+      .describe(
+        'Id of an open 2D sketch entity (line, arc, open polyline, open spline) to use as the path instead of path.',
+      )
+      .optional(),
+    smooth: z
+      .boolean()
+      .describe(
+        'With path points (or a polyline pathId): true = smooth spline through the points (centripetal ' +
+          'Catmull-Rom), false (default) = straight runs with circular bends.',
+      )
+      .optional(),
+    bendRadius: z
+      .number()
+      .describe(
+        'Centre-line radius of the bend at each corner of a straight-run path, in document units. ' +
+          'Default: 3 × the section radius (a long-radius elbow). Must exceed the section radius.',
+      )
+      .optional(),
+    radius: z
+      .number()
+      .describe('Round section: outer radius (> 0). Use this for pipes, rods, tubes and wires.')
+      .optional(),
+    innerRadius: z
+      .number()
+      .describe('Round section only: bore radius for a hollow pipe (0 < innerRadius < radius).')
+      .optional(),
+    section: untypedArray(
+      'Polygon section: closed [x, y] points in section coordinates (centred on the path; +y toward world +Z). ' +
+        'Alternative to radius / sectionId.',
+    ).optional(),
+    sectionId: z
+      .string()
+      .describe(
+        'Id of a closed 2D sketch (circle, ellipse, rectangle, closed polyline or spline) used as the section; ' +
+          'its local coordinates (relative to its own position) become section coordinates; curves stay exact.',
+      )
+      .optional(),
+    layerId: z
+      .string()
+      .describe('Layer id to assign the entity to. Defaults to the document default layer.')
+      .optional(),
+    color: colorField(DEFAULT_SOLID_COLOR),
+    id: z
+      .string()
+      .describe('Optional explicit entity id. If omitted a unique id is generated.')
+      .optional(),
+  }),
+  run: (
+    doc,
+    {
+      path: rawPath,
+      pathId,
+      smooth = false,
+      bendRadius: rawBend,
+      radius,
+      innerRadius,
+      section: rawSection,
+      sectionId,
+      layerId,
+      color = DEFAULT_SOLID_COLOR,
+      id: explicitId,
+    },
+  ): CommandResult => {
+    const fail = (why: string): CommandResult => noop(doc, `sweep_profile: ${why}; no-op.`);
+    if (
+      explicitId !== undefined &&
+      explicitId.length > 0 &&
+      Object.hasOwn(doc.entities, explicitId)
+    )
+      return fail(`entity id "${explicitId}" already exists`);
+    const resolved = resolveSection(doc, radius, innerRadius, rawSection, sectionId);
+    if (typeof resolved === 'string') return fail(resolved);
+    const { section, halfSize } = resolved;
+    const bendRadius = rawBend ?? DEFAULT_BEND_FACTOR * halfSize;
+    if (!(bendRadius > 0)) return fail(`bendRadius must be > 0 (got ${bendRadius})`);
+    const path = resolvePath(doc, rawPath, pathId, smooth, bendRadius);
+    if (typeof path === 'string') return fail(path);
+    const issue = chainIssue(path, false);
+    if (issue !== null) return fail(`path invalid — ${issue}`);
+    const corner = firstCorner(path);
+    if (corner >= 0)
+      return fail(
+        `the path has a sharp corner at joint ${corner}; use a bendRadius or smooth: true`,
+      );
+    const bend = tightestBend(path);
+    if (bend <= halfSize)
+      return fail(
+        `a bend of radius ${bend.toFixed(3)} (arc or spline curvature) is not wider than the section (${halfSize.toFixed(3)}); the solid would self-intersect`,
+      );
+    const start = path[0]?.points[0] as Vec3;
+    const local = path.map((segment) => mapSegment(segment, (p: Vec3): Vec3 => sub3(p, start)));
+    const id = explicitId !== undefined && explicitId.length > 0 ? explicitId : nextId('swp');
+    const entity = newEntity('sweep', id, { path: local, section }, start, color, {
+      layerId:
+        layerId !== undefined && Object.hasOwn(doc.layers, layerId) ? layerId : DEFAULT_LAYER_ID,
+    });
+    const samples = sampleChain(path, false);
+    let length = 0;
+    for (let i = 1; i < samples.length; i++)
+      length += Math.hypot(...sub3(samples[i] as Vec3, samples[i - 1] as Vec3));
+    const shape =
+      section.shape === 'circle'
+        ? `round section r=${section.radius}${section.innerRadius !== undefined ? ` bore ${section.innerRadius}` : ''}`
+        : `${section.profile.length}-point section`;
+    return commitSolid(
+      doc,
+      entity,
+      `sweep_profile: created sweep "${id}" — ${shape} along a ${path.length}-segment path (≈${length.toFixed(3)} long)`,
+    );
+  },
+});

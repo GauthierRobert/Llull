@@ -5,7 +5,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { type CadDocument, type MeshSolidEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { type ExecutionContext, currentContext, defaultContext } from '@core/commands/context';
+import { currentContext, defaultContext } from '@core/commands/context';
+import type { ExecutionContext } from '@core/commands/types';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import type { IdSource } from '@lib/id';
 import { triangleKernel } from '../../helpers/fakeKernel';

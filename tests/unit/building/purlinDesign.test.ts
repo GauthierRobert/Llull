@@ -3,8 +3,8 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { SteelMemberElement } from '@core/model/building';
 import { execute } from '@core/commands/registry';
 import { findProfile } from '@aec/steel/profiles';
-import { nextSecondaryProfile } from '@aec/industrial/purlinDesign';
-import type { PurlinRow } from '@aec/industrial/purlinModel';
+import { nextSecondaryProfile } from '@aec/industrial/purlins/purlinDesign';
+import type { PurlinRow } from '@aec/industrial/purlins/purlinModel';
 
 const hall = (params: Record<string, unknown> = {}): CadDocument =>
   execute(createEmptyDocument(), 'add_portal_frame_building', {

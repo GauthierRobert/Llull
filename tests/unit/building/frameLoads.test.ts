@@ -1,26 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import type { CheckRow } from '@aec/industrial/frameCheckSolve';
+import type { CheckRow } from '@aec/industrial/frames/frameCheckSolve';
 import {
   bucklingReduction,
   criticalMoment,
   lateralTorsionalReduction,
   memberBuckling,
   sectionResistance,
-} from '@aec/industrial/steelDesign';
-import { framesOf } from '@aec/industrial/frameModelFrames';
+} from '@aec/industrial/steelDesign/steelDesign';
+import { framesOf } from '@aec/industrial/frames/frameModelFrames';
 import {
   craneActions,
   valleyLines,
   craneCapacityOf,
   DOWNWIND_ROOF_FACTOR,
-} from '@aec/industrial/frameModelTypes';
-import { baseReactions } from '@aec/industrial/frameModelSolve';
-import { frameRoofAverage } from '@aec/industrial/windCoefficients';
+} from '@aec/industrial/frames/frameModelTypes';
+import { baseReactions } from '@aec/industrial/frames/frameModelSolve';
+import { frameRoofAverage } from '@aec/industrial/common/windCoefficients';
 import { findProfile, sectionProperties } from '@aec/steel/profiles';
 import type { SteelMemberElement } from '@core/model/building';
-import { GRAVITY } from '@aec/numeric';
+import { GRAVITY } from '@aec/shared/numeric';
 import { hall } from './hallFixtures';
 
 const HOIST_10T = 10 * GRAVITY * 1000;

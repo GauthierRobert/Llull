@@ -1,4 +1,6 @@
 {
+  /* Path aliases live in tsconfig.base.json (also read by Vite/Vitest via workspaceAliases.ts). */
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2022",
     "useDefineForClassFields": true,
@@ -22,18 +24,6 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
-
-    /* Path aliases so imports read cleanly (resolved relative to this tsconfig) */
-    "paths": {
-      "@core/*": ["./packages/core/src/*"],
-      "@lib/*": ["./packages/core/src/lib/*"],
-      "@mcp/*": ["./packages/mcp/src/*"],
-      "@aec/*": ["./packages/domain-aec/src/*"],
-      "@kernel-manifold/*": ["./packages/kernel-manifold/src/*"],
-      "@kernel-occt/*": ["./packages/kernel-occt/src/*"],
-      "@ui/*": ["./src/ui/*"],
-      "@app/*": ["./src/app/*"]
-    }
   },
   "include": ["src", "packages", "tests"],
   /* Node-side quality and production gates have their own tsconfig.json. */

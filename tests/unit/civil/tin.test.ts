@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Vec2, Vec3 } from '@core/model/types';
-import { delaunay } from '@aec/civil/delaunay';
+import { delaunay } from '@aec/civil/surface/delaunay';
 import {
   buildTin,
   contourLevels,
@@ -11,7 +11,7 @@ import {
   tinPlanArea,
   traceContour,
   triangleCount,
-} from '@aec/civil/tin';
+} from '@aec/civil/surface/tin';
 
 function random(seed: number): () => number {
   let state = seed;

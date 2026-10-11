@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { GRAVITY } from '@aec/numeric';
-import { runwayCheck } from '@aec/industrial/runwayCheckRun';
+import { GRAVITY } from '@aec/shared/numeric';
+import { runwayCheck } from '@aec/industrial/runway/runwayCheckRun';
 import {
   bufferForce,
   wheelMoment,
   wheelShear,
   type RunwayCheckRow,
-} from '@aec/industrial/runwayCheckModel';
-import { craneActions } from '@aec/industrial/frameModelTypes';
+} from '@aec/industrial/runway/runwayCheckModel';
+import { craneActions } from '@aec/industrial/frames/frameModelTypes';
 
 function hall(capacity = 10): CadDocument {
   return execute(createEmptyDocument(), 'add_portal_frame_building', {

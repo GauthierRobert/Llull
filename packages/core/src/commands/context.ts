@@ -8,36 +8,11 @@
  *   runs the inner command in the caller's context unless it passes its own.
  */
 
-import { type GeometryKernel, getGeometryKernel } from '../geometry/kernel';
-import { type ReplayCache, createReplayCache } from './replayCache';
-import { type IdSource, counterIdSource, withIdSource } from '../lib/id';
-import type { CommandDefinition } from './types';
-import { getCommand } from './registry';
-
-export type CommandLookup = (name: string) => CommandDefinition<unknown> | undefined;
-
-export interface ExecutionContext {
-  /** Geometry kernel for booleans/fillets; null while none is installed or loaded. */
-  readonly kernel: GeometryKernel | null;
-  /** Mints every id the command creates. */
-  readonly ids: IdSource;
-  /** Resolves command names for commands that run other commands. */
-  readonly registry: CommandLookup;
-  /** Nesting depth of `build_project` plans (re-entrancy guard). */
-  readonly projectDepth: number;
-  /** Nesting depth of `instantiate_recipe` expansions (re-entrancy guard). */
-  readonly recipeDepth: number;
-  /**
-   * Key of the feature-history step currently running, if any. A nested `execute` inside a
-   * step belongs to that step: it mints from the same id source and appends no step of its own.
-   */
-  readonly stepKey?: string;
-  /**
-   * Replay prefix cache; null disables it. Results depend on the kernel, so the default
-   * context keeps one cache per installed kernel.
-   */
-  readonly replayCache: ReplayCache | null;
-}
+import { getGeometryKernel } from '../geometry/kernel';
+import { type ReplayCache, createReplayCache } from './history/replayCache';
+import { counterIdSource, withIdSource } from '../lib/id';
+import type { ExecutionContext } from './types';
+import { getCommand } from './commandTable';
 
 let activeContext: ExecutionContext | null = null;
 

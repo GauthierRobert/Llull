@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import type { CheckRow } from '@aec/industrial/frameCheckSolve';
-import { nextProfile } from '@aec/industrial/profileGroups';
-import { boltResistance, yieldStrength } from '@aec/industrial/steelDesign';
-import { connectionWelds } from '@aec/industrial/connections';
+import type { CheckRow } from '@aec/industrial/frames/frameCheckSolve';
+import { nextProfile } from '@aec/industrial/common/profileGroups';
+import { boltResistance, yieldStrength } from '@aec/industrial/steelDesign/steelDesign';
+import { connectionWelds } from '@aec/industrial/connections/connections';
 import type { MomentConnectionElement, SteelMemberElement } from '@core/model/building';
-import type { TakeoffLine } from '@aec/takeoffBasics';
+import type { TakeoffLine } from '@aec/building/quantities/takeoffBasics';
 import { hall } from './hallFixtures';
 
 describe('design helpers', () => {
@@ -204,7 +204,7 @@ describe('structural review regressions', () => {
   });
 
   it('sizes weld throats by steel grade', async () => {
-    const { fullStrengthFactor } = await import('@aec/industrial/connections');
+    const { fullStrengthFactor } = await import('@aec/industrial/connections/connections');
     expect(fullStrengthFactor(235)).toBeCloseTo(0.46, 2);
     expect(fullStrengthFactor(355)).toBeCloseTo(0.58, 2);
     expect(fullStrengthFactor(460)).toBeCloseTo(0.75, 2);

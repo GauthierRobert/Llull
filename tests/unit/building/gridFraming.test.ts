@@ -3,7 +3,11 @@ import type { GridElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import type { SteelMemberElement } from '@core/model/building';
 import { execute } from '@core/commands/registry';
-import { crossGridLines, crossingsOnLine, parseCrossingName } from '@aec/industrial/gridFraming';
+import {
+  crossGridLines,
+  crossingsOnLine,
+  parseCrossingName,
+} from '@aec/industrial/framing/gridFraming';
 import { step, twoLevels } from './steelFixtures';
 
 /** Lines A, B along X (y = 0, 6000); 1, 2, 3 along Y (x = 0, 5000, 10000). 6 intersections ... 2 x 3. */

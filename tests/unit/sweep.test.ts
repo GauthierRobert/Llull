@@ -7,10 +7,10 @@ import {
   createEmptyDocument,
 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { serializeDocument } from '@core/commands/persistence';
-import { entityBounds } from '@core/commands/sceneBounds';
-import { solidTriangles } from '@core/commands/solidTriangulation';
-import { tessellateEntity } from '@core/commands/renderTessellation';
+import { serializeDocument } from '@core/commands/persistence/serialization';
+import { entityBounds } from '@core/geometry/bounds';
+import { solidTriangles } from '@core/geometry/solidTriangles';
+import { tessellateEntity } from '@core/commands/render/polygons';
 import { sweepFrames, sweepSegmentRings, sweepTriangles } from '@core/geometry/sweep';
 import { expectNoOp } from '../helpers/expectNoOp';
 

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { CadDocument } from '@core/model/types';
 import { execute, getCommand } from '@core/commands/registry';
-import { deserializeDocument, serializeDocument } from '@core/commands/persistence';
-import { addPipeSupport } from '@aec/industrial/pipeSupports';
-import { buildingErrors } from '@aec/validate';
+import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
+import { addPipeSupport } from '@aec/industrial/piping/pipeSupports';
+import { buildingErrors } from '@aec/building/validate';
 import { beamOnColumns, column, step, twoLevels } from './steelFixtures';
 import { hangerDoc, shoeDoc, supportsOf } from './pipeSupportFixtures';
 

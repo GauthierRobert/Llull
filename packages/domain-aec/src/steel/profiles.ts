@@ -7,7 +7,7 @@
  */
 
 import type { Vec2 } from '@core/model/types';
-import { round } from '../numeric';
+import { round } from '../shared/numeric';
 
 type ProfileShape = 'I' | 'U' | 'C' | 'SHS' | 'RHS' | 'CHS' | 'L';
 

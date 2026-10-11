@@ -46,10 +46,11 @@ export const fooThing = defineCommand({
 - `run`: still validate semantics (ids exist, sizes > 0); on bad input return the **unchanged doc**,
   an explanatory `summary`, `affected: []`. Never throw for user error.
 - `summary` is the AI's feedback signal: specific and factual (ids, sizes, counts).
-- Register: core → `definitions` in `registry.ts`; domain → its plugin's `commands`.
+- Register: core → its feature folder's `catalog.ts` (`commandCatalog(...)`); domain → its plugin's
+  `commands`. Never edit `registry.ts` for a new command.
 - Tests (`tests/unit/**`): happy path + failure path + `is pure`. Assert `affected`, `summary`,
   observable entities — not internals. Coverage gate 90/85/90/90 on
-  `packages/core/src/commands/**` + `packages/domain-aec/src/**`.
+  `packages/core/src/{commands,geometry}/**` + `packages/domain-aec/src/**`.
 - Tool-schema snapshot (`tests/unit/contract/__snapshots__`) and golden corpus
   (`tests/golden/__snapshots__`) diffs must be intended; never `-u` to make red go green.
 
@@ -61,19 +62,19 @@ export const fooThing = defineCommand({
   `delete_step`.
 - Ids: step n mints `<prefix>-<n>.<k>` (`doc.nextStepNumber`, never reused; `@lib/id`
   `stepIdSource`). Never `uniqueId()` / `Date.now()` in a command.
-- Replay prefix cache (`commands/replayCache.ts`, `ctx.replayCache`): editing step k re-runs k..n.
+- Replay prefix cache (`commands/history/replayCache.ts`, `ctx.replayCache`): editing step k re-runs k..n.
 - Parameters (`set_parameter`, `=expr` strings in step params) regenerate only dependents
-  (`commands/dependents.ts`). Constraints + pure solver (`solve_constraints`), configurations, recipes.
-- CONSTRUCTIVE vs EVALUATED: `@core/model/partition` (`definitionOf` / `evaluatedOf`). Plugin-derived
-  entities are omitted from saved files (llull-document v2) and re-derived on load; v1 still read.
+  (`commands/history/dependents.ts`). Constraints + pure solver (`solve_constraints`), configurations, recipes.
+- CONSTRUCTIVE vs EVALUATED: `entities`/`order` are evaluated, the rest is definition. Plugin-derived
+  entities (`derivedEntityIds`, `@core/plugins/host`) are omitted from saved files (llull-document v2) and re-derived on load; v1 still read.
 
 ## Kernel (L9, as built)
 
-- Shape boundary: commands pass a `ShapeRecipe` (`@core/geometry/shapeRecipe`) and get an opaque
+- Shape boundary: commands pass a `ShapeRecipe` (type: `@core/model/types`; helpers: `@core/geometry/shapeRecipe`) and get an opaque
   `ShapeHandle`; kernels implement `KernelOps<S>` on their native shape and wrap it with
   `kernelFromOps` (`@core/geometry/shapeKernel`: cache by `recipeKey`, rebuild on eviction). Meshes
   only come OUT (`tessellate`). Results store their recipe as `mesh.brep`; never feed a mesh back
-  into the kernel when a recipe exists (`kernelShape.ts` `operandRecipe`).
+  into the kernel when a recipe exists (`brep/kernelShape.ts` `operandRecipe`).
 - Kernel only from `ctx.kernel` (it caches its own shapes by recipe key). Never import a concrete
   kernel or call `getGeometryKernel()` in a command.
 - Prefer deriving evaluated geometry from the document rather than storing it (L8).

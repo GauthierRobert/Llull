@@ -1,6 +1,7 @@
 import type { Entity } from '@core/model/types';
-import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
-import type { BooleanOp } from '@core/geometry/shapeRecipe';
+import type { GeometryKernel } from '@core/geometry/kernel';
+import type { MeshData } from '@core/model/types';
+import type { BooleanOp } from '@core/model/types';
 
 export function meshOf(kernel: GeometryKernel, entity: Entity): MeshData | null {
   const shape = kernel.evaluate({ op: 'solid', entity });

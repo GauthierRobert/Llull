@@ -9,7 +9,7 @@ import { useStore } from '@ui/store';
 import { useSessionStore } from '@ui/store/sessionStore';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { serializeDocument } from '@core/commands/persistence';
+import { serializeDocument } from '@core/commands/persistence/serialization';
 import {
   AUTOSAVE_KEY,
   clearAutosave,

@@ -11,14 +11,14 @@ import {
   validateHorizontal,
   type SpiralElement,
   type ArcElement,
-} from '@aec/civil/alignmentGeometry';
-import { clothoidLocal, spiralCurve } from '@aec/civil/alignmentSpiral';
+} from '@aec/civil/alignment/alignmentGeometry';
+import { clothoidLocal, spiralCurve } from '@aec/civil/alignment/alignmentSpiral';
 import {
   crossSlopesAt,
   superelevationRate,
   superelevationStations,
-} from '@aec/civil/superelevation';
-import { crossSectionAt } from '@aec/civil/roadSection';
+} from '@aec/civil/alignment/superelevation';
+import { crossSectionAt } from '@aec/civil/road/roadSection';
 import { civilErrors } from '@aec/civil/validate';
 import { alignmentOf, expectSaveLoadRoundTrip, surveyedDocument } from './fixtures';
 

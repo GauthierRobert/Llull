@@ -5,7 +5,9 @@
  */
 
 import type { CadDocument } from '../model/types';
-import type { ExecutionContext } from './context';
+import type { GeometryKernel } from '../geometry/kernel';
+import type { IdSource } from '../lib/id';
+import type { ReplayCache } from './history/replayCache';
 import type { ZodType } from 'zod';
 
 export interface CommandResult {
@@ -95,4 +97,34 @@ export interface ParamItemSpec {
 /** A named parameter: an item spec that must carry a `description`. */
 export interface ParamSpec extends ParamItemSpec {
   description: string;
+}
+
+/**
+ * Execution context — the injected dependencies of one `execute` call (runtime: `context.ts`).
+ * @invariant a command reads its kernel, id source and registry ONLY from its context
+ *   (architecture L9); no command touches a module-level singleton.
+ */
+export type CommandLookup = (name: string) => CommandDefinition<unknown> | undefined;
+
+export interface ExecutionContext {
+  /** Geometry kernel for booleans/fillets; null while none is installed or loaded. */
+  readonly kernel: GeometryKernel | null;
+  /** Mints every id the command creates. */
+  readonly ids: IdSource;
+  /** Resolves command names for commands that run other commands. */
+  readonly registry: CommandLookup;
+  /** Nesting depth of `build_project` plans (re-entrancy guard). */
+  readonly projectDepth: number;
+  /** Nesting depth of `instantiate_recipe` expansions (re-entrancy guard). */
+  readonly recipeDepth: number;
+  /**
+   * Key of the feature-history step currently running, if any. A nested `execute` inside a
+   * step belongs to that step: it mints from the same id source and appends no step of its own.
+   */
+  readonly stepKey?: string;
+  /**
+   * Replay prefix cache; null disables it. Results depend on the kernel, so the default
+   * context keeps one cache per installed kernel.
+   */
+  readonly replayCache: ReplayCache | null;
 }

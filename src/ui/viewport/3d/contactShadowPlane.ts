@@ -6,7 +6,7 @@
  * the scene footprint and keeps it on the ground (z = 0, or lower when the scene dips below it).
  */
 
-import type { Bounds } from '@core/commands/sceneTypes';
+import type { Bounds } from '@core/geometry/bounds';
 import type { Vec3 } from '@core/model/types';
 
 /** The original fixed patch, kept for an empty scene. */

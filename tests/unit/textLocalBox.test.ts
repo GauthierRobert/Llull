@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { type TextEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { textLocalBounds } from '@core/commands/sceneBounds';
+import { textLocalBounds } from '@core/geometry/bounds';
 import { entityDistSq, textLocalBox } from '../../src/ui/viewport/2d/modifyHelpers';
 import { entitiesInBox } from '../../src/ui/viewport/2d/boxSelect';
 

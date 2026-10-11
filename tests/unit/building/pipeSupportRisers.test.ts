@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { buildingErrors } from '@aec/validate';
-import { riserRuns } from '@aec/industrial/routeSupport';
-import type { PipeSupportRow } from '@aec/industrial/pipeSupportCheck';
+import { buildingErrors } from '@aec/building/validate';
+import { riserRuns } from '@aec/industrial/piping/routeSupport';
+import type { PipeSupportRow } from '@aec/industrial/piping/pipeSupportCheck';
 import { check } from './steelFixtures';
 import { step, twoLevels } from './steelFixtures';
 import { supportsOf } from './pipeSupportFixtures';

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { wallLoop, gridIntersections } from '@aec/structure';
+import { wallLoop, gridIntersections } from '@aec/building/elements/structure';
 import type { WallElement } from '@core/model/building';
 import { run } from './runFixtures';
 
@@ -381,7 +381,7 @@ describe('review follow-ups', () => {
   });
 
   it('copied room numbers stay unique and readable', async () => {
-    const { copiedRoomNumber } = await import('@aec/elements');
+    const { copiedRoomNumber } = await import('@aec/building/elements/elements');
     let doc = run(createEmptyDocument(), 'add_level', {});
     doc = run(doc, 'add_level', {});
     doc = run(doc, 'add_room', { name: 'A', number: '003', boundary: SQUARE, levelId: 'level-1' });

@@ -4,7 +4,7 @@
  * Output only: a mesh never goes back into the kernel.
  */
 
-import type { MeshData } from '@core/geometry/kernel';
+import type { MeshData } from '@core/model/types';
 import {
   explorer,
   release,

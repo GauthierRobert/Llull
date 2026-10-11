@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { type PolylineEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { sampleInvolute } from '@core/commands/gears';
+import { sampleInvolute } from '@core/commands/solids/gears';
 import { expectSingleEntity } from '../helpers/expectNoOp';
 
 describe('draw_involute', () => {

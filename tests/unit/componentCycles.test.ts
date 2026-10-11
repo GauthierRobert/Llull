@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { findComponentCycle } from '@core/commands/assemblies';
-import { validateDocumentValues } from '@core/commands/persistenceValidation';
+import { findComponentCycle } from '@core/commands/assembly/assemblies';
+import { validateDocumentValues } from '@core/commands/persistence/validation';
 
 function withComponentA(): { doc: CadDocument; instanceOfA: string } {
   const box = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });

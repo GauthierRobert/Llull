@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import type { Entity, Vec3 } from '@core/model/types';
-import type { MeshData } from '@core/geometry/kernel';
+import type { MeshData } from '@core/model/types';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createNodeOcctKernel } from '../src/occtNode';
 import { booleanMesh, bounds, meshOf } from './kernelTestSupport';

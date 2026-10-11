@@ -5,7 +5,7 @@
  */
 
 import { type Entity, type CadDocument, is3D } from '@core/model/types';
-import { rotatedEntityBounds } from '@core/commands/sceneRotatedBounds';
+import { rotatedEntityBounds } from '@core/geometry/rotatedBounds';
 import { applyEulerXYZ } from '@lib/eulerRotation';
 import { nearestSnap } from '../nearestSnap';
 

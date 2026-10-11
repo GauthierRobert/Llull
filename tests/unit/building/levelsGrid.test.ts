@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { gridLetter } from '@aec/grid';
+import { gridLetter } from '@aec/building/elements/grid';
 import { run } from './runFixtures';
 
 describe('add_level / update_level / delete_level / set_active_level', () => {
@@ -211,7 +211,8 @@ describe('integration with document-level commands', () => {
   });
 
   it('building survives a save/load round trip', async () => {
-    const { serializeDocument, deserializeDocument } = await import('@core/commands/persistence');
+    const { serializeDocument, deserializeDocument } =
+      await import('@core/commands/persistence/serialization');
     const doc = run(createEmptyDocument(), 'draw_walls', {
       points: [
         [0, 0],

@@ -10,7 +10,7 @@
  * per-segment hulls for a sweep.
  */
 
-import { boundsCorners, localBounds } from '@core/commands/sceneBounds';
+import { boundsCorners, localBounds } from '@core/geometry/bounds';
 import { applyEulerXYZ } from '@core/lib/eulerRotation';
 import { sweepSegmentRings } from '@core/geometry/sweep';
 import {

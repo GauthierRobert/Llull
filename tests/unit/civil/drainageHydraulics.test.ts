@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { deserializeDocument, serializeDocument } from '@core/commands/persistence';
-import { DEFAULT_CRITERIA, intensityAt } from '@aec/civil/drainageCriteria';
+import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
+import { DEFAULT_CRITERIA, intensityAt } from '@aec/civil/drainage/drainageCriteria';
 import { civilErrors } from '@aec/civil/validate';
-import { manningFullFlow } from '@aec/civil/hydraulics';
+import { manningFullFlow } from '@aec/civil/drainage/hydraulics';
 
 function run(
   doc: CadDocument,

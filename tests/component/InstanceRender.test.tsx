@@ -15,7 +15,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '@ui/store';
 import { type Component, type InstanceEntity } from '@core/model/types';
-import { expandInstance } from '@core/commands/instanceExpansion';
+import { expandInstance } from '@core/geometry/instanceExpansion';
 import { localDispatch } from '../helpers/storeTestHelpers';
 import { resetStore } from '../helpers/componentEntities';
 

@@ -7,12 +7,12 @@ import type { CadDocument, Entity } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import type { CivilModel, CivilObject } from '@core/model/civil';
 import { CIVIL_LAYER_COLOR } from './entities';
-import { regenerateOwned } from '../derived';
+import { regenerateOwned } from '../shared/derived';
 import { civilAffected } from './model';
-import { evaluatePointGroup, evaluateSurface } from './surfaceEvaluate';
-import { evaluatePlatform } from './platformEvaluate';
-import { evaluateAlignment } from './alignmentEvaluate';
-import { evaluateManhole, evaluatePipe } from './drainageEvaluate';
+import { evaluatePointGroup, evaluateSurface } from './surface/surfaceEvaluate';
+import { evaluatePlatform } from './earthworks/platformEvaluate';
+import { evaluateAlignment } from './alignment/alignmentEvaluate';
+import { evaluateManhole, evaluatePipe } from './drainage/drainageEvaluate';
 import type { CivilContext } from './context';
 
 function evaluateObject(context: CivilContext, object: CivilObject): Entity[] {

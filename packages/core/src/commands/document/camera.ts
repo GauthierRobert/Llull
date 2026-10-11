@@ -1,0 +1,229 @@
+/**
+ * Camera commands: write `document.camera` (view state, `metaHistory`: no FeatureStep).
+ * Convention (+Z up, matches Viewport3D): polar 0 = above along +Z, π/2 = in the XY plane; the eye
+ * sits at target + distance·(sin p·sin a, sin p·cos a, cos p), azimuth measured from +Y toward +X.
+ *
+ * @layer core/commands
+ */
+
+import type { CameraState } from '../../model/types';
+import { VIEWPORT_FOV_DEGREES } from '../../model/viewport';
+import { scale3, sub3, len3 } from '../../lib/vec3';
+import { boundsCenter } from '../../geometry/bounds';
+import type { CommandResult } from '../types';
+import { defineCommand, vec3, z } from '../schema';
+import { computeSceneSnapshot } from '../inspect/scene';
+import { noop, report } from '../noop';
+
+/** Half of the 3D viewport PerspectiveCamera's vertical field of view. */
+const HALF_FOV_RAD = (VIEWPORT_FOV_DEGREES / 2) * (Math.PI / 180);
+
+/** Direction presets (eye position → view); top/bottom stop short of the poles to avoid gimbal lock. */
+const DIRECTION_PRESETS: Record<string, { azimuth: number; polar: number }> = {
+  front: { azimuth: Math.PI, polar: Math.PI / 2 },
+  back: { azimuth: 0, polar: Math.PI / 2 },
+  right: { azimuth: Math.PI / 2, polar: Math.PI / 2 },
+  left: { azimuth: -Math.PI / 2, polar: Math.PI / 2 },
+  top: { azimuth: Math.PI, polar: 0.01 },
+  bottom: { azimuth: Math.PI, polar: Math.PI - 0.01 },
+  iso: { azimuth: (3 * Math.PI) / 4, polar: Math.PI / 4 },
+};
+
+const MIN_POLAR = 0.01;
+const MAX_POLAR = Math.PI - 0.01;
+
+/** `polar` limited to [0.01, π−0.01] so the eye never reaches a pole. */
+const clampPolar = (polar: number): number => Math.min(MAX_POLAR, Math.max(MIN_POLAR, polar));
+
+/**
+ * @command set_camera
+ * @pure
+ * @layer core/commands
+ * @affects nothing — writes only document.camera; affected:[]
+ * @invariant distance, if provided, must be > 0
+ * @failure distance <= 0 → no-op with explanatory summary
+ */
+export const setCamera = defineCommand({
+  name: 'set_camera',
+  description:
+    'Set one or more camera fields (target, azimuth, polar, distance). ' +
+    'Unspecified fields are preserved. ' +
+    'target is [x,y,z] world-space orbit centre. ' +
+    'azimuth is horizontal angle in radians (XY plane, measured from +Y toward +X). ' +
+    'polar is vertical angle in radians (0 = overhead along +Z, π/2 = eye-level). ' +
+    'distance is the radius of the orbit sphere; must be > 0. ' +
+    'Does NOT add to feature history.',
+  annotations: { metaHistory: true, idempotent: true },
+  params: z.object({
+    target: vec3('World-space orbit target [x, y, z]. Omit to keep current target.').optional(),
+    azimuth: z
+      .number()
+      .optional()
+      .describe(
+        'Horizontal orbit angle in radians measured in the XY plane from +Y toward +X. ' +
+          'Eye offset from target is (sin a, cos a) in XY: 0 = eye at +Y (back view), π = eye at -Y ' +
+          '(front view), π/2 = eye at +X (right view). Omit to keep current value.',
+      ),
+    polar: z
+      .number()
+      .optional()
+      .describe(
+        'Vertical orbit angle in radians. 0 = overhead (along +Z), π/2 = eye-level. ' +
+          'Clamped to [0.01, π−0.01] to avoid gimbal lock. Omit to keep current value.',
+      ),
+    distance: z
+      .number()
+      .optional()
+      .describe(
+        'Orbit radius — distance from target to camera eye. Must be > 0. Omit to keep current value.',
+      ),
+  }),
+  run: (doc, p): CommandResult => {
+    if (p.distance !== undefined && p.distance <= 0)
+      return noop(doc, `set_camera: distance must be > 0 (got ${p.distance}). Camera unchanged.`);
+
+    const prev: CameraState = doc.camera;
+    const next: CameraState = {
+      target: p.target ?? prev.target,
+      azimuth: p.azimuth ?? prev.azimuth,
+      polar: p.polar === undefined ? prev.polar : clampPolar(p.polar),
+      distance: p.distance ?? prev.distance,
+    };
+    const changed = (['target', 'azimuth', 'polar', 'distance'] as const).filter(
+      (field) => p[field] !== undefined,
+    );
+
+    if (changed.length === 0)
+      return noop(doc, 'set_camera: no fields specified; camera unchanged.');
+
+    return report(
+      { ...doc, camera: next },
+      `set_camera: updated ${changed.join(', ')}. target=${JSON.stringify(next.target)}, azimuth=${next.azimuth.toFixed(3)}, polar=${next.polar.toFixed(3)}, distance=${next.distance.toFixed(3)}.`,
+    );
+  },
+});
+
+/**
+ * @command look_at
+ * @pure
+ * @layer core/commands
+ * @affects nothing — writes only document.camera; affected:[]
+ * @invariant distance is preserved; only target (and optionally azimuth/polar) change
+ * @failure no params or bad target → no-op
+ */
+export const lookAt = defineCommand({
+  name: 'look_at',
+  description:
+    'Orbit the camera to look at a specific world-space point without changing the orbit distance. ' +
+    'Provide target [x, y, z] to set the orbit centre. ' +
+    'Optionally override azimuth and/or polar to also change camera direction. ' +
+    'distance is preserved. Use set_camera to change distance explicitly. ' +
+    'Does NOT add to feature history.',
+  annotations: { metaHistory: true, idempotent: true },
+  params: z.object({
+    target: vec3('World-space point [x, y, z] to set as the orbit centre.'),
+    azimuth: z
+      .number()
+      .optional()
+      .describe(
+        'Optional horizontal orbit angle in radians (measured from +Y toward +X in the XY plane). ' +
+          'Omit to keep the current azimuth.',
+      ),
+    polar: z
+      .number()
+      .optional()
+      .describe(
+        'Optional vertical orbit angle in radians (0 = overhead, π/2 = eye-level); clamped to (0.01, π−0.01). ' +
+          'Omit to keep the current polar angle.',
+      ),
+  }),
+  run: (doc, p): CommandResult => {
+    const prev: CameraState = doc.camera;
+    const next: CameraState = {
+      target: p.target,
+      azimuth: p.azimuth ?? prev.azimuth,
+      polar: p.polar === undefined ? prev.polar : clampPolar(p.polar),
+      distance: prev.distance,
+    };
+
+    return report(
+      { ...doc, camera: next },
+      `look_at: target set to ${JSON.stringify(next.target)}, azimuth=${next.azimuth.toFixed(3)}, polar=${next.polar.toFixed(3)}, distance preserved at ${next.distance.toFixed(3)}.`,
+    );
+  },
+});
+
+type FitDirection = 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom' | 'iso' | 'current';
+
+/**
+ * @command fit_view
+ * @pure
+ * @layer core/commands
+ * @affects nothing — writes only document.camera; affected:[]
+ * @invariant target = scene-bounds centre; distance = boundsRadius / sin(fov/2) * padding
+ * @failure empty doc → falls back to sensible default framing; unknown direction → no-op
+ */
+export const fitView = defineCommand({
+  name: 'fit_view',
+  description:
+    'Frame the entire document in the camera so all entities are visible. ' +
+    'direction presets the viewing angle: ' +
+    '"front" (eye at -Y looking along +Y), "back" (looking along -Y), "right" (looking along -X), "left" (looking along +X), ' +
+    '"top" (overhead +Z), "bottom" (below -Z), "iso" (isometric, default), ' +
+    '"current" (keep existing azimuth/polar, only adjust distance and target). ' +
+    'padding multiplies the computed distance so geometry has breathing room (default 1.2). ' +
+    'When the document is empty a default view is applied with an explanatory summary. ' +
+    'Does NOT add to feature history.',
+  annotations: { metaHistory: true, idempotent: true },
+  params: z.object({
+    direction: z
+      .enum(['front', 'back', 'left', 'right', 'top', 'bottom', 'iso', 'current'])
+      .optional()
+      .describe(
+        'Viewing direction preset. One of: front, back, left, right, top, bottom, iso, current. ' +
+          'Defaults to "iso". "current" keeps the existing azimuth and polar; only target and distance change.',
+      ),
+    padding: z
+      .number()
+      .optional()
+      .describe(
+        'Scale factor applied to the computed distance so geometry is not edge-clipped. ' +
+          'Default 1.2. Values < 1 crop the view; > 2 shows it very small. Must be > 0.',
+      ),
+  }),
+  run: (doc, p): CommandResult => {
+    const direction: FitDirection = p.direction ?? 'iso';
+    const padding: number = p.padding ?? 1.2;
+
+    if (padding <= 0)
+      return noop(doc, `fit_view: padding must be > 0 (got ${padding}). Camera unchanged.`);
+
+    const { bounds } = computeSceneSnapshot(doc);
+
+    const preset = direction === 'current' ? null : DIRECTION_PRESETS[direction];
+    const azimuth = preset ? preset.azimuth : doc.camera.azimuth;
+    const polar = preset ? preset.polar : doc.camera.polar;
+
+    if (!bounds) {
+      const distance = 10;
+      const next: CameraState = { target: [0, 0, 0], azimuth, polar, distance };
+      return report(
+        { ...doc, camera: next },
+        `fit_view (${direction}): document is empty — applied default framing: target=[0,0,0], distance=${distance}. azimuth=${azimuth.toFixed(3)}, polar=${polar.toFixed(3)}.`,
+      );
+    }
+
+    const target = boundsCenter(bounds);
+    const half = scale3(sub3(bounds.max, bounds.min), 0.5);
+    const boundsRadius = len3(half);
+    // A lone point has no extent: avoid a degenerate distance.
+    const safeRadius = boundsRadius < 0.001 ? 1 : boundsRadius;
+    const distance = (safeRadius / Math.sin(HALF_FOV_RAD)) * padding;
+
+    const next: CameraState = { target, azimuth, polar, distance };
+    return report(
+      { ...doc, camera: next },
+      `fit_view (${direction}): target=${JSON.stringify(target.map((v) => +v.toFixed(3)))}, distance=${distance.toFixed(3)}, azimuth=${azimuth.toFixed(3)}, polar=${polar.toFixed(3)}, padding=${padding}.`,
+    );
+  },
+});

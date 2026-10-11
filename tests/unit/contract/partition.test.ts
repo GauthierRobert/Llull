@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { derivedEntityIds } from '@core/model/partition';
+import { derivedEntityIds } from '@core/plugins/host';
 
 describe('document partition', () => {
   it('lists building-generated entities as derived, plain entities as not', () => {

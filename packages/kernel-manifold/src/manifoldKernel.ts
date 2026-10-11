@@ -10,11 +10,11 @@
  * @failure unsupported kind / degenerate size / non-closed mesh / Manifold error -> null
  */
 
-import type { MeshData } from '@core/geometry/kernel';
-import type { BooleanOp } from '@core/geometry/shapeRecipe';
+import type { MeshData } from '@core/model/types';
+import type { BooleanOp } from '@core/model/types';
 import { kernelFromOps, type CachingKernel, type KernelOps } from '@core/geometry/shapeKernel';
 import { type Entity, createEmptyDocument } from '@core/model/types';
-import { entityTrianglePositions } from '@core/commands/exportTriangulate';
+import { entityTrianglePositions } from '@core/geometry/entityTriangles';
 import { toCounterClockwise } from '@lib/polygon';
 
 // Minimal local interface for the Manifold WASM module (avoids `any`).

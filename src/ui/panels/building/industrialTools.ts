@@ -5,7 +5,7 @@
  * ONE command + params (param-gathering only, react R1).
  */
 
-import { PIPE_OUTSIDE_DIAMETER_MM } from '@aec/industrial/pipeSizes';
+import { PIPE_OUTSIDE_DIAMETER_MM } from '@aec/industrial/piping/pipeSizes';
 import { PIPE_SUPPORT_TOOL } from './pipeSupportTool';
 import {
   ALL_PROFILES,

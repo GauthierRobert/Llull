@@ -15,7 +15,7 @@ Rules are already in context (workflow W3 = test map). Read `.claude/context/com
 ## What to test where
 
 - `tests/unit/` — command layer + plugins (`tests/unit/building/`). The gate:
-  `packages/core/src/commands/**` and `packages/domain-aec/src/** = 90% statements / 85%
+  `packages/core/src/{commands,geometry}/**` and `packages/domain-aec/src/** = 90% statements / 85%
   branches / 90% functions / 90% lines`. Cover happy path + every failure branch (missing id,
   schema-rejected params, invalid input, no-op cases).
 - `tests/unit/contract/` — schema derivation/conformance, tool-schema snapshot, context,

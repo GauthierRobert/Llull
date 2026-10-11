@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { analyseSimpleBeam, loadTotals } from '@aec/industrial/steelBeamAnalysis';
-import { pipeWallThickness, pipeWeightPerMetre } from '@aec/industrial/pipeWeight';
+import { analyseSimpleBeam, loadTotals } from '@aec/industrial/steelDesign/steelBeamAnalysis';
+import { pipeWallThickness, pipeWeightPerMetre } from '@aec/industrial/piping/pipeWeight';
 
 const ULS = { permanent: 1.35, imposed: 1.5 };
 const ONE = { permanent: 1, imposed: 1 };

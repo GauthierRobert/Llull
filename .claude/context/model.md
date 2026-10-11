@@ -1,7 +1,7 @@
 # CONTEXT: document & entity schema
 
 Ground-truth reference for `packages/core/src/model/` (`@core/model/*`): `types.ts` (document,
-entities), `partition.ts` (constructive vs evaluated), `building.ts` (AEC types). Entities are
+entities), `building.ts` (AEC types). Entities are
 constructed ONLY inside commands (core or a plugin).
 
 ## Primitives
@@ -104,17 +104,16 @@ createEmptyDocument(): CadDocument   // one default layer 'Layer 0', every table
 ```
 
 Constraint kinds: geometric `coincident | parallel | perpendicular | tangent`, dimensional
-`distance | angle`; solved by the pure `solve_constraints` (`commands/constraintSolver.ts`).
+`distance | angle`; solved by the pure `solve_constraints` (`commands/parametric/constraintSolver.ts`).
 Joints: `revolute | prismatic`.
 
-## Constructive vs evaluated (`partition.ts`)
+## Constructive vs evaluated
+
+The document is flat; `entities` + `order` are the evaluated part, everything else (parameters,
+`featureHistory`, layers, materials, plugin data such as `building`) is the definition.
 
 ```ts
-EVALUATED_KEYS = ['entities', 'order']
-type EvaluatedModel = Pick<CadDocument, 'entities' | 'order'>;
-type DocumentDefinition = Omit<CadDocument, 'entities' | 'order'>;
-definitionOf(doc); evaluatedOf(doc); withEvaluated(definition, evaluated);
-derivedEntityIds(doc): Set<string>   // ids a plugin regenerates from its definition
+derivedEntityIds(doc): Set<string>   // @core/plugins/host — ids a plugin regenerates from its definition
 ```
 
 - The definition is the source of truth; evaluated geometry is derivable (replay
@@ -122,7 +121,7 @@ derivedEntityIds(doc): Set<string>   // ids a plugin regenerates from its defini
   guards reject it).
 - `CommandResult.data` carries query values; queries return the same doc and `affected: []`.
 
-## Persistence (`commands/persistence.ts`)
+## Persistence (`commands/persistence/serialization.ts`)
 
 Envelope `{ format: 'llull-document', version: 2, document }` (`serializeDocument(doc,
 { includeDerived? })` / `deserializeDocument(json)`, `load_document`). v2 omits plugin-derived
@@ -143,6 +142,6 @@ are still read and migrated.
 Types in `packages/core/src/model/building.ts` (levels, elements, project info, cost rates).
 Commands live in the building / industrial plugins (`packages/domain-aec/src`, `@aec/*`;
 industrial in `industrial/`, steel profiles in `steel/`). They edit the model and call
-`regenerateBuilding()` (`@aec/evaluateElements`), which replaces the evaluated entities (ids
+`regenerateBuilding()` (`@aec/building/evaluate/evaluateElements`), which replaces the evaluated entities (ids
 `<elementId>:<part>`, tag `bim`). No new entity kinds. Generated entities are read-only (building
 derivation guard) and are not stored in v2 files. Guides: `docs/CONSTRUCTION.md`, `docs/INDUSTRIAL.md`.

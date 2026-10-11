@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { rotatedEntityBounds } from '@core/commands/sceneRotatedBounds';
+import { rotatedEntityBounds } from '@core/geometry/rotatedBounds';
 import {
   SOLID_PRESETS,
   nextPlacement,

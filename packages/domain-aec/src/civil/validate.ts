@@ -9,8 +9,8 @@ import { type ProfilePvi, CIVIL_CATEGORIES } from '@core/model/civil';
 import type { Vec2 } from '@core/model/types';
 import { isRecord } from '@lib/isRecord';
 import { isValidPolygon } from '@lib/polygon';
-import { validateHorizontal } from './alignmentGeometry';
-import { validateProfile } from './profileGeometry';
+import { validateHorizontal } from './alignment/alignmentGeometry';
+import { validateProfile } from './alignment/profileGeometry';
 import { MAX_SURFACE_POINTS } from './model';
 
 type Check = (object: Record<string, unknown>) => string | null;

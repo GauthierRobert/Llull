@@ -8,7 +8,7 @@
 import fs from 'fs';
 import path from 'path';
 import { execute } from '@core/commands/registry';
-import { serializeDocument, deserializeDocument } from '@core/commands/persistence';
+import { serializeDocument, deserializeDocument } from '@core/commands/persistence/serialization';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';

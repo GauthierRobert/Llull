@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { formatLength } from '@core/commands/units';
-import { serializeDocument, deserializeDocument } from '@core/commands/persistence';
+import { formatLength } from '@core/commands/document/units';
+import { serializeDocument, deserializeDocument } from '@core/commands/persistence/serialization';
 
 describe('set_units command', () => {
   // Happy paths

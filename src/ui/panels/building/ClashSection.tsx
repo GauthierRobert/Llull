@@ -8,8 +8,8 @@
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import { execute } from '@core/commands/registry';
-import type { Clash } from '@aec/industrial/clash';
-import { toMetres } from '@aec/model';
+import type { Clash } from '@aec/industrial/clash/clash';
+import { toMetres } from '@aec/building/model';
 import type { BuildingModel } from '@core/model/building';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { isClashData } from '@ui/resultData';

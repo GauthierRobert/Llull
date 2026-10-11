@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { execute, getCommand } from '@core/commands/registry';
-import { checkPipeSupports, type PipeSupportRow } from '@aec/industrial/pipeSupportCheck';
-import { hangerRodDiameter, pipeSpanLimit } from '@aec/industrial/pipeSpans';
+import { checkPipeSupports, type PipeSupportRow } from '@aec/industrial/piping/pipeSupportCheck';
+import { hangerRodDiameter, pipeSpanLimit } from '@aec/industrial/piping/pipeSpans';
 import {
   arcLengths,
   nearestOnRoute,
   pointAtArc,
   spanCoordinate,
-} from '@aec/industrial/routeSupport';
+} from '@aec/industrial/piping/routeSupport';
 import { beam, step, twoLevels } from './steelFixtures';
 
 interface CheckData {

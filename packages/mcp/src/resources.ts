@@ -12,8 +12,8 @@
  */
 
 import type { CadDocument } from '@core/model/types';
-import { serializeDocument } from '@core/commands/persistence';
-import { computeSceneSnapshot } from '@core/commands/scene';
+import { serializeDocument } from '@core/commands/persistence/serialization';
+import { computeSceneSnapshot } from '@core/commands/inspect/scene';
 import { CONVENTIONS_GUIDE, CONVENTIONS_URI } from './conventions';
 
 /** A resource listing entry (MCP `Resource`); the transport casts it to the SDK type. */

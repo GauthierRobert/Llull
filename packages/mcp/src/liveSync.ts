@@ -11,7 +11,7 @@
 
 import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { serializeDocument } from '@core/commands/persistence';
+import { serializeDocument } from '@core/commands/persistence/serialization';
 import { hashText } from '@lib/hash';
 
 /** SSE `command` event: one mutating command, applied server-side as number `seq`. */

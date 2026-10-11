@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from 'vitest';
 import type { Entity } from '@core/model/types';
-import type { ShapeRecipe } from '@core/geometry/shapeRecipe';
+import type { ShapeRecipe } from '@core/model/types';
 import { createNodeOcctKernel } from '../src/occtNode';
 import { booleanRecipe, leaf, meshOf } from './kernelTestSupport';
 

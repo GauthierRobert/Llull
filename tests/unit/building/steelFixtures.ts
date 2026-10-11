@@ -1,8 +1,8 @@
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { SteelMemberElement } from '@core/model/building';
-import { checkSteelMembers } from '@aec/industrial/steelMembersCheck';
-import type { MemberRow } from '@aec/industrial/steelMemberRows';
+import { checkSteelMembers } from '@aec/industrial/steelDesign/steelMembersCheck';
+import type { MemberRow } from '@aec/industrial/steelDesign/steelMemberRows';
 
 /** Gravity used by the model, m/s². */
 export const G = 9.80665;

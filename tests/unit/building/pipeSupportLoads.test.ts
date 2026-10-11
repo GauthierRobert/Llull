@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { pipeWeightPerMetre } from '@aec/industrial/pipeWeight';
-import { tributaryLengths } from '@aec/industrial/steelSupportLoads';
+import { pipeWeightPerMetre } from '@aec/industrial/piping/pipeWeight';
+import { tributaryLengths } from '@aec/industrial/steelDesign/steelSupportLoads';
 import { findProfile } from '@aec/steel/profiles';
 import { G, beamOnColumns, check, column, rowOf, step, twoLevels } from './steelFixtures';
 import { hangerDoc, shoeDoc } from './pipeSupportFixtures';

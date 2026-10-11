@@ -10,22 +10,22 @@ A full CAD stores HOW a model was built, not just final geometry. Commands are p
 (architecture L8, "as built"). This skill extends it. Delegate command work to `command-author`.
 
 ## References
-- Model: `.claude/context/model.md` (Parameter, Constraint, FeatureStep, partition)
+- Model: `.claude/context/model.md` (Parameter, Constraint, FeatureStep, constructive vs evaluated)
 - Signatures: `.claude/context/command-layer.md` (History & regeneration, IDs)
 - Law: `.claude/rules/architecture.md` (L8, L9) + `.claude/rules/commands.md` (as built)
 
 ## What exists (extend, don't rebuild)
 | Piece | Where (`packages/core/src/commands/`) |
 | ----- | ----- |
-| Feature history: `execute` appends `FeatureStep { id: 'step-<n>' }` per mutating command | `registry.ts` |
-| History edits: `replay_history`, `edit_step_params`, `reorder_step`, `set_step_suppressed`, `insert_step`, `delete_step` (`metaHistory`) | `history.ts`, `history_carry.ts` |
-| Step-scoped ids `<prefix>-<n>.<k>` — replay re-mints identical ids (remap kept only for legacy, pre-step-scoped ids) | `@lib/id`, `regenerate.ts` |
-| Replay prefix cache (`ctx.replayCache`): unchanged prefixes reused; edit step k ⇒ re-run k..n | `replayCache.ts` |
-| Parameters + `=expr` step params (`set_parameter`, `delete_parameter`) | `parameters.ts`, `expression.ts` |
-| Parameter → step dependencies: regenerate only when a step reads a changed parameter | `dependents.ts` |
-| Configurations (design tables), recipes | `configurations.ts`, `recipes.ts` |
-| Constraints + pure solver (`add_constraint`, `solve_constraints`, …) | `constraints.ts`, `constraintSolver.ts` |
-| Constructive vs evaluated split | `@core/model/partition` |
+| Feature history: `execute` appends `FeatureStep { id: 'step-<n>' }` per mutating command | `execute.ts` |
+| History edits: `replay_history`, `edit_step_params`, `reorder_step`, `set_step_suppressed`, `insert_step`, `delete_step` (`metaHistory`) | `history/history.ts`, `history/carry.ts` |
+| Step-scoped ids `<prefix>-<n>.<k>` — replay re-mints identical ids (remap kept only for legacy, pre-step-scoped ids) | `@lib/id`, `history/regenerate.ts` |
+| Replay prefix cache (`ctx.replayCache`): unchanged prefixes reused; edit step k ⇒ re-run k..n | `history/replayCache.ts` |
+| Parameters + `=expr` step params (`set_parameter`, `delete_parameter`) | `parametric/parameters.ts`, `parametric/expression.ts` |
+| Parameter → step dependencies: regenerate only when a step reads a changed parameter | `history/dependents.ts` |
+| Configurations (design tables), recipes | `parametric/configurations.ts`, `parametric/recipes.ts` |
+| Constraints + pure solver (`add_constraint`, `solve_constraints`, …) | `parametric/constraints.ts`, `parametric/constraintSolver.ts` |
+| Constructive vs evaluated split | `derivedEntityIds` in `@core/plugins/host` |
 
 ## The core distinction (decide before coding)
 - **Constructive** = the editable definition: feature history, parameters, constraints, plugin

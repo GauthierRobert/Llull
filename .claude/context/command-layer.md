@@ -1,8 +1,10 @@
 # CONTEXT: command layer (exact signatures)
 
 Ground-truth reference for `packages/core/src/commands` (`@core/commands/*`). Mirror these
-signatures exactly. Source: `types.ts`, `schema.ts`, `context.ts`, `registry.ts`,
-`entityOps.ts`, `commitEntity.ts`; ids in `packages/core/src/lib/id.ts`; plugins in `packages/core/src/plugins/`.
+signatures exactly. Engine (root of `commands/`): `types.ts` (contracts), `schema.ts`
+(`defineCommand`, `commandCatalog`), `context.ts`, `execute.ts`, `commandTable.ts`, `registry.ts`,
+`guard.ts`; commands live in feature folders, each with a `catalog.ts`. Helpers:
+`entity/entityOps.ts`, `entity/commitEntity.ts`; ids in `packages/core/src/lib/id.ts`; plugins in `packages/core/src/plugins/`.
 
 ## Contracts (`types.ts`)
 
@@ -82,7 +84,7 @@ runInContext<T>(ctx, fn: () => T): T
 - `setGeometryKernel(k)` (`@core/geometry/kernel`) is called ONLY by composition roots
   (`src/main.tsx`, `server/src/geometryKernel.ts`) and tests.
 
-## Registry API (`registry.ts`)
+## Registry API (`registry.ts` — re-exports `execute.ts` + `commandTable.ts`)
 
 ```ts
 listCommands(): ReadonlyArray<CommandDefinition<unknown>>   // core + installed plugins
@@ -102,8 +104,9 @@ toToolSchemas(): Array<{ name; description; input_schema: ParamsSchema;
 7. Mutating (not `readOnly`/`metaHistory`, not nested in a step) and doc changed ⇒ append
    `FeatureStep { id: 'step-<n>', name, params, suppressed: false, affected }`, bump `nextStepNumber`.
 
-Registration: core — import the const into `registry.ts` and append to `rawDefinitions`.
-Domain — add it to the plugin's `commands` (`packages/domain-aec/src/index.ts` lists feed
+Registration: core — list the const in its feature folder's `catalog.ts`
+(`commandCatalog(...)`); `registry.ts` registers every catalog (a contract test fails on an
+exported command no catalog lists). Domain — add it to the plugin's `commands` (`packages/domain-aec/src/index.ts` lists feed
 `buildingPlugin` / `industrialPlugin` in `plugin.ts`); `installPlugin` appends them (name clash
 throws). `toToolSchemas()` length MUST equal `listCommands()` length (test-guarded), and its
 output is snapshotted (`tests/unit/contract/__snapshots__`).
@@ -123,7 +126,7 @@ pluginToolNames(toolset): string[]
 interface DerivationGuard { readonly domain: string; check(previous, next): string | null }
 ```
 
-## Purity helper pattern (`entityOps.ts`, `commitEntity.ts`)
+## Purity helper pattern (`entity/entityOps.ts`, `entity/commitEntity.ts`)
 
 ```ts
 function withEntity(doc: CadDocument, entity: Entity): CadDocument {
@@ -133,9 +136,9 @@ function withEntity(doc: CadDocument, entity: Entity): CadDocument {
 function commitEntity(doc: CadDocument, entity: Entity, summary: string): CommandResult;
 ```
 
-Commands to imitate: `add_box` (`geometryBasic.ts`), `set_units` (`units.ts`),
-`extrude_sketch` / `revolve_profile` (`profile.ts`), `boolean_subtract` (`boolean.ts`, kernel),
-`measure_distance` (`measureDistanceAngle.ts`, query), a building command in `packages/domain-aec/src`.
+Commands to imitate: `add_box` (`solids/basic.ts`), `set_units` (`document/units.ts`),
+`extrude_sketch` / `revolve_profile` (`solids/profile.ts`), `boolean_subtract` (`brep/boolean.ts`, kernel),
+`measure_distance` (`inspect/measureDistanceAngle.ts`, query), a building command in `packages/domain-aec/src`.
 
 - Create: build entity with `nextId(prefix)` from `@lib/id` (scoped to the step's id source),
   `layerId: DEFAULT_LAYER_ID`.
@@ -159,11 +162,11 @@ No id-counter reset exists; tests rely on step-scoped determinism.
 
 ## History & regeneration
 
-- `replayHistory(base, history, getCommand, warnings?, onStep?)` (`history.ts`): replays live steps
+- `replayHistory(base, history, getCommand, warnings?, onStep?)` (`history/replay.ts`): replays live steps
   from an empty doc keeping document-level state; reuses `ctx.replayCache` prefixes
-  (`replayCache.ts`); refuses when a live step `requiresKernel` and no kernel is installed.
+  (`history/replayCache.ts`); refuses when a live step `requiresKernel` and no kernel is installed.
 - `set_parameter` / `delete_parameter` (`metaHistory`) → `regenerateParameterDependents`
-  (`dependents.ts`): replays only when a step's `=expr` params read a changed parameter.
+  (`history/dependents.ts`): replays only when a step's `=expr` params read a changed parameter.
 
 ## How the surfaces consume this (do not bypass)
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { serializeDocument } from '@core/commands/persistence';
+import { serializeDocument } from '@core/commands/persistence/serialization';
 
 function envelope(mutate: (document: Record<string, unknown>) => void): string {
   const doc = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;

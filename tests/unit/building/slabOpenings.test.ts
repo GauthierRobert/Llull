@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { prismMesh } from '@aec/mesh';
-import { buildPlanDrawing } from '@aec/planDrawing';
-import type { TakeoffLine } from '@aec/takeoffBasics';
-import type { IfcExport } from '@aec/ifcBuild';
+import { prismMesh } from '@aec/shared/mesh';
+import { buildPlanDrawing } from '@aec/building/drawings/planDrawing';
+import type { TakeoffLine } from '@aec/building/quantities/takeoffBasics';
+import type { IfcExport } from '@aec/building/exchange/ifcBuild';
 import { segmentsIntersect, pointInPolygon } from '@lib/polygon';
 import { run } from './runFixtures';
 

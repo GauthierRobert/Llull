@@ -6,7 +6,7 @@
  * @layer core/model
  */
 
-import type { Vec2, Vec3 } from './types';
+import type { Vec2, Vec3 } from './vectors';
 
 export const CIVIL_CATEGORIES = [
   'pointGroup',

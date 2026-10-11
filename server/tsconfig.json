@@ -1,4 +1,5 @@
 {
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2022",
     "module": "CommonJS",
@@ -16,30 +17,6 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "baseUrl": ".",
-    "paths": {
-      "@core/*": [
-        "../packages/core/src/*"
-      ],
-      "@lib/*": [
-        "../packages/core/src/lib/*"
-      ],
-      "@mcp/*": [
-        "../packages/mcp/src/*"
-      ],
-      "@aec/*": [
-        "../packages/domain-aec/src/*"
-      ],
-      "@kernel-manifold/*": [
-        "../packages/kernel-manifold/src/*"
-      ],
-      "@kernel-occt/*": [
-        "../packages/kernel-occt/src/*"
-      ],
-      "@app/*": [
-        "../src/app/*"
-      ]
-    }
   },
   "include": [
     "src",

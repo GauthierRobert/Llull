@@ -7,9 +7,9 @@ import { describe, it, expect } from 'vitest';
 import type * as THREE from 'three';
 import { type Entity, type Vec3, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { rotatedEntityBounds } from '@core/commands/sceneRotatedBounds';
-import { entityBounds } from '@core/commands/sceneBounds';
-import { entityToTriangles } from '@core/commands/exportTriangulate';
+import { rotatedEntityBounds } from '@core/geometry/rotatedBounds';
+import { entityBounds } from '@core/geometry/bounds';
+import { entityToTriangles } from '@core/geometry/entityTriangles';
 import {
   buildConeGeometry,
   buildCylinderGeometry,
