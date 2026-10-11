@@ -12,6 +12,7 @@ import { defineCommand, z } from '../schema';
 import { currentContext } from '../context';
 import { kernelUnavailable } from '../kernelRefusal';
 import { operandRecipe } from './kernelShape';
+import { labelStep, type StepLabel } from './stepLabels';
 import { noop, report } from '../noop';
 
 const OCC_HINT = 'the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server)';
@@ -109,6 +110,19 @@ export interface ExportStepExactData {
   readonly skipped: readonly string[];
 }
 
+/** Product name (entity name, else id), group name as description, and color of each solid. */
+function stepLabels(doc: CadDocument, solids: readonly Entity[]): StepLabel[] {
+  const groups = Object.values(doc.groups);
+  return solids.map((entity) => {
+    const group = groups.find((candidate) => candidate.memberIds.includes(entity.id));
+    return {
+      name: entity.name ?? entity.id,
+      color: entity.color,
+      ...(group !== undefined ? { description: group.name } : {}),
+    };
+  });
+}
+
 /** Ids of the exportable solids in `entityIds` (or the whole document), plus the ids skipped and why. */
 function stepTargets(
   doc: CadDocument,
@@ -145,6 +159,8 @@ export const exportStepExact = defineCommand({
     'booleans, fillets, chamfers and shells are written as true analytic/NURBS faces, not triangles. ' +
     `No Python needed. Requires ${OCC_HINT}; the default Manifold kernel gracefully no-ops ` +
     '(use export_step via the Python bridge, or export_stl, instead). ' +
+    'Each solid becomes one STEP product named after its entity (set_entity_name, else the id; the group ' +
+    'name goes in the product description) and carries its entity color as a surface style. ' +
     'Returns data: { format, step (the file text), solidCount, entityIds, skipped }. Instances are skipped ' +
     '(explode_instance first). Does not modify the document.',
   params: z.object({
@@ -171,7 +187,8 @@ export const exportStepExact = defineCommand({
       }
       shapes.push(shape);
     }
-    const step = kernel.exportStep(shapes);
+    const exactStep = kernel.exportStep(shapes);
+    const step = exactStep === null ? null : labelStep(exactStep, stepLabels(doc, solids));
     if (step === null)
       return noop(doc, `export_step_exact: this kernel cannot write exact STEP; use ${OCC_HINT}.`);
     const exported = solids.map((entity) => entity.id);

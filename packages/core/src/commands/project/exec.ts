@@ -1,4 +1,5 @@
 import type { CadDocument } from '../../model/types';
+import type { ExecutionContext } from '../types';
 import { getCommand } from '../commandTable';
 import { executeRecorded } from '../history/record';
 import { type StepReport } from './types';
@@ -13,6 +14,10 @@ export interface PlanRun {
   executedSteps: number;
   /** Loop iterations expanded so far (capped by MAX_LOOP_ITERATIONS). */
   loopIterations: number;
+  /** Commands started so far / commands the plan expands to, for `ExecutionContext.onStep`. */
+  startedSteps: number;
+  readonly totalSteps: number;
+  readonly onStep: ExecutionContext['onStep'];
 }
 
 /** Records a failed control-flow step; true when the run must abort. */
@@ -54,6 +59,8 @@ export function execStep(
     return report(false, `Param error${label ? ` in ${label}` : ''}: ${resolved.error}`);
   }
   const recorded = recordableParams(params, resolved.value, run.current.parameters);
+  const event = { ordinal: ++run.startedSteps, total: run.totalSteps, command, index };
+  run.onStep?.({ phase: 'start', ...event });
   const result = executeRecorded(
     run.current,
     command,
@@ -63,6 +70,7 @@ export function execStep(
   // A graceful no-op (no change + nothing affected) is a soft failure for a plan step.
   const ok = result.affected.length > 0 || result.document !== run.current;
   report(ok, label ? `${label}: ${result.summary}` : result.summary, result.affected);
+  run.onStep?.({ phase: 'end', ...event, ok, stepPosition: run.steps.length - 1 });
   if (!ok) return { ok, affected: [] };
   run.current = result.document;
   run.allAffected.push(...result.affected);

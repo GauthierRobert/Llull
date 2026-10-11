@@ -9,13 +9,18 @@ import { report } from '../noop';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { uint8ArrayToBase64 } from '../../lib/base64';
-import { collectExportTriangles, exportSummary } from '../../geometry/entityTriangles';
+import { collectExportParts, exportSummary, type ExportPart } from '../../geometry/entityTriangles';
 import type { Triangle } from '../../geometry/triangles';
 import { facetNormal } from '../../geometry/tessellation';
 
 const formatVec3 = (v: Vec3): string => v.join(' ');
 
 function buildAsciiStl(tris: Triangle[], solidName: string): string {
+  return asciiSolidBlock(tris, solidName).join('\n');
+}
+
+/** One `solid <name>` … `endsolid <name>` block, as lines. */
+function asciiSolidBlock(tris: Triangle[], solidName: string): string[] {
   const lines = [`solid ${solidName}`];
   for (const [v0, v1, v2] of tris) {
     lines.push(
@@ -29,7 +34,15 @@ function buildAsciiStl(tris: Triangle[], solidName: string): string {
     );
   }
   lines.push(`endsolid ${solidName}`);
-  return lines.join('\n');
+  return lines;
+}
+
+/** ASCII STL with one named `solid` block per non-empty entity (name, else id). */
+function buildPerEntityAsciiStl(parts: readonly ExportPart[]): string {
+  const blocks = parts
+    .filter((part) => part.tris.length > 0)
+    .map((part) => asciiSolidBlock(part.tris, cleanSolidName(part.name ?? part.id)));
+  return blocks.length > 0 ? blocks.flat().join('\n') : buildAsciiStl([], 'llull');
 }
 
 /** Single-line solid name: control characters and line breaks would corrupt the ASCII records. */
@@ -95,7 +108,8 @@ export const exportStl = defineCommand({
     'Supported entity kinds: box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, mesh. ' +
     'entityIds: omit to export all 3D entities; provide an array to export a subset. ' +
     'format: "ascii" (default, human-readable) or "binary" (more compact, required by some importers). ' +
-    'name: optional solid name embedded in the STL header (default "llull"). ' +
+    'name: optional solid name embedded in the STL header (default: the entity name when exactly one named ' +
+    'entity is exported, else "llull"). perEntity: one named solid block per entity (ASCII). ' +
     'Does NOT modify the document.',
   params: z.object({
     format: z
@@ -115,6 +129,14 @@ export const exportStl = defineCommand({
           '3D solid entities in the document. 2D-only entities in the list are silently skipped. ' +
           'Unknown ids are also silently skipped with a note in summary.',
       ),
+    perEntity: z
+      .boolean()
+      .optional()
+      .describe(
+        'ASCII only: write one "solid <entity name or id>" … "endsolid" block per entity (names from ' +
+          'set_entity_name, else the entity id) instead of one merged solid; `name` is then ignored. ' +
+          'Default false. Binary STL has no per-solid names.',
+      ),
     name: z
       .string()
       .optional()
@@ -126,21 +148,30 @@ export const exportStl = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const fmt: 'ascii' | 'binary' = params.format === 'binary' ? 'binary' : 'ascii';
-    const solidName = cleanSolidName(params.name);
-    const collected = collectExportTriangles(doc, params.entityIds);
-    const triangleCount = collected.tris.length;
-    const summary = exportSummary('export_stl', fmt, collected);
+    const collected = collectExportParts(doc, params.entityIds);
+    const tris = collected.parts.flatMap((part) => part.tris);
+    const triangleCount = tris.length;
+    const nonEmpty = collected.parts.filter((part) => part.tris.length > 0);
+    // A lone named entity names its solid; several entities need `name` or `perEntity`.
+    const solidName = cleanSolidName(
+      params.name ?? (nonEmpty.length === 1 ? nonEmpty[0]?.name : undefined),
+    );
+    const summary = exportSummary('export_stl', fmt, { ...collected, tris });
     const data: ExportStlData =
       fmt === 'ascii'
-        ? { format: 'ascii', triangleCount, stl: buildAsciiStl(collected.tris, solidName) }
+        ? {
+            format: 'ascii',
+            triangleCount,
+            stl:
+              params.perEntity === true
+                ? buildPerEntityAsciiStl(collected.parts)
+                : buildAsciiStl(tris, solidName),
+          }
         : {
             format: 'binary',
             triangleCount,
             stlBase64: uint8ArrayToBase64(
-              buildBinaryStl(
-                collected.tris,
-                /^solid/i.test(solidName) ? `llull ${solidName}` : solidName,
-              ),
+              buildBinaryStl(tris, /^solid/i.test(solidName) ? `llull ${solidName}` : solidName),
             ),
           };
     return report(doc, summary, data);

@@ -8,10 +8,14 @@
 import { shapeToolCallContent } from '@mcp/index';
 import { isRecord } from '@lib/isRecord';
 import type { CliRunResult } from './backend';
+import { formatDuration } from './progress';
 import type { SavedFile } from './saveFiles';
 
 /** Affected ids printed per plan step in text mode. */
 const STEP_IDS_SHOWN = 4;
+
+/** Plan steps at least this slow show their duration in text mode (all do in `--json`). */
+const STEP_DURATION_SHOWN_MS = 1000;
 
 export interface PrintableResult extends CliRunResult {
   readonly saved?: readonly SavedFile[];
@@ -50,7 +54,11 @@ function stepLine(step: unknown): string | null {
   const shown = ids.slice(0, STEP_IDS_SHOWN).join(', ');
   const more = ids.length > STEP_IDS_SHOWN ? ` +${ids.length - STEP_IDS_SHOWN}` : '';
   const status = step['ok'] === true ? 'ok  ' : 'FAIL';
-  return `  #${String(step['index'])} ${status} ${String(step['command'])}: ${String(step['summary'])}${ids.length > 0 ? ` -> ${shown}${more}` : ''}`;
+  const took =
+    typeof step['durationMs'] === 'number' && step['durationMs'] >= STEP_DURATION_SHOWN_MS
+      ? ` [${formatDuration(step['durationMs'])}]`
+      : '';
+  return `  #${String(step['index'])} ${status} ${String(step['command'])}${took}: ${String(step['summary'])}${ids.length > 0 ? ` -> ${shown}${more}` : ''}`;
 }
 
 /**

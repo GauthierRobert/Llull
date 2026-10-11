@@ -6772,21 +6772,7 @@ describe('export_obj', () => {
 describe('export_gltf', () => {
   /** Decode base64 → Uint8Array. */
   function base64ToUint8Array(b64: string): Uint8Array {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-    const out: number[] = [];
-    let i = 0;
-    const raw = b64.replace(/=+$/, '');
-    while (i < raw.length) {
-      const c0 = chars.indexOf(raw[i++]!);
-      const c1 = chars.indexOf(raw[i++]!);
-      const c2 = i <= raw.length ? chars.indexOf(raw[i++]!) : 0;
-      const c3 = i <= raw.length ? chars.indexOf(raw[i++]!) : 0;
-      const n = (c0 << 18) | (c1 << 12) | (c2 << 6) | c3;
-      out.push((n >> 16) & 0xff);
-      if (raw[i - 2] !== undefined) out.push((n >> 8) & 0xff);
-      if (raw[i - 1] !== undefined) out.push(n & 0xff);
-    }
-    return new Uint8Array(out);
+    return new Uint8Array(Buffer.from(b64, 'base64'));
   }
 
   type GltfData = { format: string; triangleCount: number; text?: string; base64?: string };

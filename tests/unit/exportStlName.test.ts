@@ -33,3 +33,55 @@ describe('export_stl solid name', () => {
     expect(bytes.readUInt32LE(80)).toBe(data.triangleCount);
   });
 });
+
+describe('export_stl entity names', () => {
+  type Doc = ReturnType<typeof createEmptyDocument>;
+  const named = (): Doc => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    doc = execute(doc, 'add_box', { size: [2, 2, 2], position: [5, 0, 0] }).document;
+    const [first] = doc.order;
+    return execute(doc, 'set_entity_name', { id: first, name: 'Bearing 1' }).document;
+  };
+  const stlOf = (doc: Doc, p: Record<string, unknown>): string =>
+    (execute(doc, 'export_stl', p).data as ExportStlData).stl!;
+
+  it('names the solid after a lone exported named entity', () => {
+    const doc = named();
+    const stl = stlOf(doc, { entityIds: [doc.order[0]] });
+    expect(stl.startsWith('solid Bearing 1\n')).toBe(true);
+  });
+
+  it('keeps the llull default when several entities are merged', () => {
+    expect(stlOf(named(), {}).startsWith('solid llull\n')).toBe(true);
+  });
+
+  it('perEntity writes one named solid block per entity (name, else id)', () => {
+    const doc = named();
+    const lines = stlOf(doc, { perEntity: true }).split('\n');
+    expect(lines.filter((line) => line.startsWith('solid '))).toEqual([
+      'solid Bearing 1',
+      `solid ${doc.order[1]}`,
+    ]);
+    expect(lines.filter((line) => line.startsWith('endsolid ')).length).toBe(2);
+    expect(lines.filter((line) => line.includes('facet normal')).length).toBe(24);
+  });
+
+  it('perEntity on an empty selection is one valid empty solid', () => {
+    expect(stlOf(createEmptyDocument(), { perEntity: true })).toBe('solid llull\nendsolid llull');
+  });
+});
+
+describe('export_obj entity names', () => {
+  it('writes one named object per entity with offset face indices', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    doc = execute(doc, 'add_box', { size: [2, 2, 2], position: [5, 0, 0] }).document;
+    const [first, second] = doc.order;
+    doc = execute(doc, 'set_entity_name', { id: first, name: 'Shaft  A' }).document;
+    const text = (execute(doc, 'export_obj', {}).data as { text: string }).text;
+    const lines = text.split('\n');
+    expect(lines.filter((line) => line.startsWith('o '))).toEqual(['o Shaft_A', `o ${second}`]);
+    expect(lines.filter((line) => line.startsWith('f ')).at(12)).toBe('f 37//13 38//13 39//13');
+  });
+});

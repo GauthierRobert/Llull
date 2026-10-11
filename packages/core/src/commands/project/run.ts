@@ -142,6 +142,9 @@ export function runProject(
     onError,
     executedSteps: 0,
     loopIterations: 0,
+    startedSteps: 0,
+    totalSteps: estimatedSteps,
+    onStep: currentContext().onStep,
   };
   const { steps } = run;
   let failedAt: number | null = null;

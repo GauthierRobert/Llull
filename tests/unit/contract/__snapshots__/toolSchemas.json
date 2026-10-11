@@ -5372,7 +5372,7 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Export the document (or a subset of entities) to glTF 2.0 format. Produces a triangle tessellation in world space for every exportable 3D solid entity. 2D shape entities are silently skipped. Revolution and instance entities are fully expanded. Returns the UNCHANGED document, affected:[], and a data object with:   format (\"gltf\" or \"glb\"), triangleCount,   text (glTF 2.0 JSON string — when binary=false, default),   base64 (GLB binary blob base64-encoded — when binary=true). The glTF contains a single mesh with POSITION and NORMAL attributes, a default PBR material, and a minimal scene/node graph. The BIN buffer is inlined as a data: URI in JSON mode. In GLB mode the 12-byte header + JSON chunk + BIN chunk are packed per the glTF 2.0 spec. entityIds: omit to export all 3D entities; provide an array to export a subset. binary: false (default) → data.text contains JSON; true → data.base64 contains GLB. Does NOT modify the document.",
+    "description": "Export the document (or a subset of entities) to glTF 2.0 format. Produces a triangle tessellation in world space for every exportable 3D solid entity. 2D shape entities are silently skipped. Revolution and instance entities are fully expanded. Returns the UNCHANGED document, affected:[], and a data object with:   format (\"gltf\" or \"glb\"), triangleCount, nodeCount, materialCount,   text (glTF 2.0 JSON string — when binary=false, default),   base64 (GLB binary blob base64-encoded — when binary=true). Structure: one glTF node + mesh per entity (node.name = the entity name from set_entity_name, else its id), one PBR material per distinct entity color (baseColorFactor from the hex color), and entities that belong to a group (group_entities) are children of a node named after the group. Meshes carry POSITION and NORMAL attributes. The BIN buffer is inlined as a data: URI in JSON mode. In GLB mode the 12-byte header + JSON chunk + BIN chunk are packed per the glTF 2.0 spec. entityIds: omit to export all 3D entities; provide an array to export a subset. binary: false (default) → data.text contains JSON; true → data.base64 contains GLB. Does NOT modify the document.",
     "input_schema": {
       "properties": {
         "binary": {
@@ -5497,7 +5497,7 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Export the document (or a subset of entities) to Wavefront OBJ text format. Produces a triangle tessellation in world space for every exportable 3D solid entity. 2D shape entities are silently skipped. Revolution and instance entities are fully expanded. Returns the UNCHANGED document, affected:[], and a data object with:   format (\"obj\"), triangleCount, text (the full OBJ string with v/vn/f records). entityIds: omit to export all 3D entities; provide an array to export a subset. units: optional units label embedded in the OBJ comment (defaults to doc units). Does NOT modify the document.",
+    "description": "Export the document (or a subset of entities) to Wavefront OBJ text format. Produces a triangle tessellation in world space for every exportable 3D solid entity. 2D shape entities are silently skipped. Revolution and instance entities are fully expanded. Returns the UNCHANGED document, affected:[], and a data object with:   format (\"obj\"), triangleCount, text (the full OBJ string with v/vn/f records). Each entity is one OBJ object (`o <entity name or id>`). entityIds: omit to export all 3D entities; provide an array to export a subset. units: optional units label embedded in the OBJ comment (defaults to doc units). Does NOT modify the document.",
     "input_schema": {
       "properties": {
         "entityIds": {
@@ -5597,7 +5597,7 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Export 3D solids to STEP (AP214, ISO 10303-21) directly from the geometry kernel's exact B-rep: primitives, booleans, fillets, chamfers and shells are written as true analytic/NURBS faces, not triangles. No Python needed. Requires the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server); the default Manifold kernel gracefully no-ops (use export_step via the Python bridge, or export_stl, instead). Returns data: { format, step (the file text), solidCount, entityIds, skipped }. Instances are skipped (explode_instance first). Does not modify the document.",
+    "description": "Export 3D solids to STEP (AP214, ISO 10303-21) directly from the geometry kernel's exact B-rep: primitives, booleans, fillets, chamfers and shells are written as true analytic/NURBS faces, not triangles. No Python needed. Requires the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server); the default Manifold kernel gracefully no-ops (use export_step via the Python bridge, or export_stl, instead). Each solid becomes one STEP product named after its entity (set_entity_name, else the id; the group name goes in the product description) and carries its entity color as a surface style. Returns data: { format, step (the file text), solidCount, entityIds, skipped }. Instances are skipped (explode_instance first). Does not modify the document.",
     "input_schema": {
       "properties": {
         "entityIds": {
@@ -5617,7 +5617,7 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Export the document (or a subset of entities) to STL format — the standard triangle-mesh interchange format accepted by slicers, mesh editors, and 3D printers. Produces a triangle tessellation in world space for every exportable 3D solid entity. 2D shape entities (line, polyline, arc, circle, rectangle, text, dimension, etc.) are silently skipped — STL is a solid/mesh format. Returns the UNCHANGED document, affected:[], and a data object with:   format (\"ascii\"|\"binary\"), triangleCount (number of exported triangles),   stl (ASCII STL string — when format=\"ascii\"),   stlBase64 (base64-encoded binary STL bytes — when format=\"binary\"). Supported entity kinds: box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, mesh. entityIds: omit to export all 3D entities; provide an array to export a subset. format: \"ascii\" (default, human-readable) or \"binary\" (more compact, required by some importers). name: optional solid name embedded in the STL header (default \"llull\"). Does NOT modify the document.",
+    "description": "Export the document (or a subset of entities) to STL format — the standard triangle-mesh interchange format accepted by slicers, mesh editors, and 3D printers. Produces a triangle tessellation in world space for every exportable 3D solid entity. 2D shape entities (line, polyline, arc, circle, rectangle, text, dimension, etc.) are silently skipped — STL is a solid/mesh format. Returns the UNCHANGED document, affected:[], and a data object with:   format (\"ascii\"|\"binary\"), triangleCount (number of exported triangles),   stl (ASCII STL string — when format=\"ascii\"),   stlBase64 (base64-encoded binary STL bytes — when format=\"binary\"). Supported entity kinds: box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, mesh. entityIds: omit to export all 3D entities; provide an array to export a subset. format: \"ascii\" (default, human-readable) or \"binary\" (more compact, required by some importers). name: optional solid name embedded in the STL header (default: the entity name when exactly one named entity is exported, else \"llull\"). perEntity: one named solid block per entity (ASCII). Does NOT modify the document.",
     "input_schema": {
       "properties": {
         "entityIds": {
@@ -5638,6 +5638,10 @@
         "name": {
           "description": "Solid name to embed in the STL header (ASCII: \"solid <name>\"…\"endsolid <name>\"; binary: first bytes of the 80-byte header). Default: \"llull\". Use a meaningful name to help downstream tools identify the mesh.",
           "type": "string"
+        },
+        "perEntity": {
+          "description": "ASCII only: write one \"solid <entity name or id>\" … \"endsolid\" block per entity (names from set_entity_name, else the entity id) instead of one merged solid; `name` is then ignored. Default false. Binary STL has no per-solid names.",
+          "type": "boolean"
         }
       },
       "required": [],

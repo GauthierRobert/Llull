@@ -32,6 +32,12 @@ Flags
                               PATH.png rasterizes an svg (render_view)
   --json                      print one JSON object instead of text
   --quiet                     print nothing on success
+  --progress                  stream one stderr line per plan step ([12/189] boolean_subtract … 3.2s);
+                              automatic when stderr is a terminal. Steps over 10 s always warn, and
+                              every step's durationMs is in the --json report (local runs only)
+  --timeout SEC               stop a whole run after SEC seconds: exit 1 with a clear message, nothing
+                              saved. Local: checked between plan steps, a hard kill 5 s later for a
+                              step that never ends; --server: per-request limit (default 120 s)
   --kernel manifold|occt      geometry kernel for local runs (default manifold; $LLULL_KERNEL)
 
 Exit codes: 0 ok · 1 the command failed, a plan step failed, or a change command changed
