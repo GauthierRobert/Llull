@@ -118,9 +118,8 @@ function curves(profile: SteelProfile): { major: number; minor: number } {
       ? { major: 0.21, minor: 0.34 }
       : { major: 0.34, minor: 0.49 };
   }
-  if (profile.shape === 'SHS' || profile.shape === 'RHS' || profile.shape === 'CHS') {
+  if (profile.shape === 'SHS' || profile.shape === 'RHS' || profile.shape === 'CHS')
     return { major: 0.21, minor: 0.21 };
-  }
   return { major: 0.49, minor: 0.49 };
 }
 

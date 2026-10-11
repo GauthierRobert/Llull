@@ -10,6 +10,7 @@ import { noop } from '@core/commands/noop';
 import { isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
 import { getBuilding } from '../model';
 import { round } from '../numeric';
+import { metres as shown } from './steelMemberRows';
 import { toCsv } from '../csv';
 import { briefList } from './utilisation';
 import { collectSteelBars, modelUnits, type ModelUnits } from './steelMemberBars';
@@ -104,7 +105,6 @@ function rowOf(
   };
   const issues: string[] = [];
   const notes: string[] = [];
-  const shown = (value: number): string => (value / 1000).toFixed(2);
   if (arcs.length === 0 && carriers[0] === null && carriers[1] === null) {
     issues.push(`no support: ${shown(length)} m of pipe rest on nothing`);
   }
@@ -208,16 +208,13 @@ export const checkPipeSupports = defineCommand({
   }),
   run: (doc: CadDocument, params): CommandResult => {
     const { spanFactor = 1, overhangRatio = 0.5 } = params;
-    if (!isPositiveNumber(spanFactor)) {
+    if (!isPositiveNumber(spanFactor))
       return noop(doc, 'check_pipe_supports failed: spanFactor must be a number > 0.');
-    }
-    if (!isNonNegativeNumber(overhangRatio)) {
+    if (!isNonNegativeNumber(overhangRatio))
       return noop(doc, 'check_pipe_supports failed: overhangRatio must be a number >= 0.');
-    }
     const building = getBuilding(doc);
-    if (params.levelId !== undefined && !building.levels[params.levelId]) {
+    if (params.levelId !== undefined && !building.levels[params.levelId])
       return noop(doc, `check_pipe_supports failed: no level '${params.levelId}'.`);
-    }
     const units = modelUnits(doc);
     const runs = pipeRunsOf(units);
     const selected = runs.filter(

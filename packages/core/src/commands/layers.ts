@@ -6,12 +6,11 @@
  * @layer core/commands
  */
 
-import type { CadDocument, Layer } from '../model/types';
-import { DEFAULT_LAYER_ID } from '../model/types';
+import { type CadDocument, type Layer, DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 import { isHexColor } from '../lib/isHexColor';
 import { replaceEntitiesById, replaceEntity } from './entityOps';
 
@@ -30,11 +29,11 @@ function setLayerFlag(
 ): CommandResult {
   const layer = doc.layers[id];
   if (!layer) return noop(doc, `No layer ${id} — ${command} is a no-op.`);
-  return {
-    document: withLayer(doc, { ...layer, [flag]: value }),
-    summary: `Layer ${id} ("${layer.name}"): ${flag} = ${value}.`,
-    affected: [id],
-  };
+  return changed(
+    withLayer(doc, { ...layer, [flag]: value }),
+    `Layer ${id} ("${layer.name}"): ${flag} = ${value}.`,
+    [id],
+  );
 }
 
 /**
@@ -64,13 +63,10 @@ export const addLayer = defineCommand({
   }),
   run: (doc, { name, color }): CommandResult => {
     const trimmed = name.trim();
-    if (!trimmed) {
-      return noop(doc, 'add_layer requires a non-empty name.');
-    }
+    if (!trimmed) return noop(doc, 'add_layer requires a non-empty name.');
 
-    if (color !== undefined && !isHexColor(color)) {
+    if (color !== undefined && !isHexColor(color))
       return noop(doc, `add_layer: color must be a #rrggbb hex string (got "${color}").`);
-    }
 
     const id = nextId('layer');
     const layer: Layer = {
@@ -81,11 +77,11 @@ export const addLayer = defineCommand({
       ...(color !== undefined ? { color } : {}),
     };
 
-    return {
-      document: { ...withLayer(doc, layer), layerOrder: [...doc.layerOrder, id] },
-      summary: `Created layer ${id} ("${trimmed}").`,
-      affected: [id],
-    };
+    return changed(
+      { ...withLayer(doc, layer), layerOrder: [...doc.layerOrder, id] },
+      `Created layer ${id} ("${trimmed}").`,
+      [id],
+    );
   },
 });
 
@@ -109,21 +105,17 @@ export const renameLayer = defineCommand({
   }),
   run: (doc, { id, name }): CommandResult => {
     const layer = doc.layers[id];
-    if (!layer) {
-      return noop(doc, `No layer ${id} — rename_layer is a no-op.`);
-    }
+    if (!layer) return noop(doc, `No layer ${id} — rename_layer is a no-op.`);
 
     const trimmed = name.trim();
-    if (!trimmed) {
-      return noop(doc, 'rename_layer requires a non-empty name.');
-    }
+    if (!trimmed) return noop(doc, 'rename_layer requires a non-empty name.');
 
     const prevName = layer.name;
-    return {
-      document: withLayer(doc, { ...layer, name: trimmed }),
-      summary: `Layer ${id}: renamed "${prevName}" → "${trimmed}".`,
-      affected: [id],
-    };
+    return changed(
+      withLayer(doc, { ...layer, name: trimmed }),
+      `Layer ${id}: renamed "${prevName}" → "${trimmed}".`,
+      [id],
+    );
   },
 });
 
@@ -195,14 +187,10 @@ export const setEntityLayer = defineCommand({
   }),
   run: (doc, { entityId, layerId }): CommandResult => {
     const entity = doc.entities[entityId];
-    if (!entity) {
-      return noop(doc, `No entity ${entityId} — set_entity_layer is a no-op.`);
-    }
+    if (!entity) return noop(doc, `No entity ${entityId} — set_entity_layer is a no-op.`);
 
     const targetLayer = doc.layers[layerId];
-    if (!targetLayer) {
-      return noop(doc, `No layer ${layerId} — set_entity_layer is a no-op.`);
-    }
+    if (!targetLayer) return noop(doc, `No layer ${layerId} — set_entity_layer is a no-op.`);
 
     const sourceLayer = doc.layers[entity.layerId];
     if (sourceLayer?.locked) {
@@ -213,11 +201,11 @@ export const setEntityLayer = defineCommand({
       );
     }
 
-    return {
-      document: replaceEntity(doc, { ...entity, layerId }),
-      summary: `Entity ${entityId}: moved from layer ${entity.layerId} to ${layerId} ("${targetLayer.name}").`,
-      affected: [entityId],
-    };
+    return changed(
+      replaceEntity(doc, { ...entity, layerId }),
+      `Entity ${entityId}: moved from layer ${entity.layerId} to ${layerId} ("${targetLayer.name}").`,
+      [entityId],
+    );
   },
 });
 
@@ -247,14 +235,11 @@ export const deleteLayer = defineCommand({
       ),
   }),
   run: (doc, { id }): CommandResult => {
-    if (id === DEFAULT_LAYER_ID) {
+    if (id === DEFAULT_LAYER_ID)
       return noop(doc, `Cannot delete the default layer (${DEFAULT_LAYER_ID}).`);
-    }
 
     const layer = doc.layers[id];
-    if (!layer) {
-      return noop(doc, `No layer ${id} — delete_layer is a no-op.`);
-    }
+    if (!layer) return noop(doc, `No layer ${id} — delete_layer is a no-op.`);
 
     const orphans = Object.values(doc.entities).filter((entity) => entity.layerId === id);
     const nextLayers = Object.fromEntries(Object.entries(doc.layers).filter(([lid]) => lid !== id));

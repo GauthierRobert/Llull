@@ -22,9 +22,7 @@ type CameraProjection =
 
 /** @pure World units spanned by `pixels` screen pixels at the marker; 1 when degenerate. */
 export function worldUnitsForPixels(pixels: number, projection: CameraProjection): number {
-  if (projection.kind === 'orthographic') {
-    return projection.zoom > 0 ? pixels / projection.zoom : 1;
-  }
+  if (projection.kind === 'orthographic') return projection.zoom > 0 ? pixels / projection.zoom : 1;
   const { fovDegrees, distance, viewportHeight } = projection;
   if (viewportHeight <= 0 || distance <= 0) return 1;
   const worldHeight = 2 * distance * Math.tan((fovDegrees * Math.PI) / 360);

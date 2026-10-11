@@ -2,12 +2,8 @@ import { distance, polygonArea, polygonPerimeter } from '../lib/polygon';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { formatLength } from './units';
-import { noop } from './noop';
+import { noop, report } from './noop';
 import { elementAt } from '../lib/elementAt';
-interface MeasureAreaData {
-  area: number;
-  unit: string;
-}
 
 /**
  * @command measure_area
@@ -42,31 +38,22 @@ export const measureArea = defineCommand({
   }),
   run: (doc, { entityId, points }): CommandResult => {
     const areaUnit = `${doc.units}²`;
-    const measured = (area: number, subject: string): CommandResult => {
-      const data: MeasureAreaData = { area, unit: areaUnit };
-      return {
-        document: doc,
-        summary: `Area${subject} = ${area.toFixed(doc.displayPrecision)} ${areaUnit}.`,
-        affected: [],
-        data,
-      };
-    };
+    const measured = (area: number, subject: string): CommandResult =>
+      report(doc, `Area${subject} = ${area.toFixed(doc.displayPrecision)} ${areaUnit}.`, {
+        area,
+        unit: areaUnit,
+      });
 
     if (points) {
-      if (points.length < 3) {
+      if (points.length < 3)
         return noop(doc, `measure_area: points must have >= 3 vertices, got ${points.length}.`);
-      }
       return measured(polygonArea(points), '');
     }
 
-    if (!entityId) {
-      return noop(doc, 'measure_area: provide either entityId or points.');
-    }
+    if (!entityId) return noop(doc, 'measure_area: provide either entityId or points.');
 
     const e = doc.entities[entityId];
-    if (!e) {
-      return noop(doc, `measure_area: entity '${entityId}' not found.`);
-    }
+    if (!e) return noop(doc, `measure_area: entity '${entityId}' not found.`);
 
     switch (e.kind) {
       case 'circle':
@@ -80,9 +67,8 @@ export const measureArea = defineCommand({
             `measure_area: polyline '${entityId}' is not closed — cannot compute area.`,
           );
         }
-        if (e.points.length < 3) {
+        if (e.points.length < 3)
           return noop(doc, `measure_area: polyline '${entityId}' has fewer than 3 points.`);
-        }
         return measured(polygonArea(e.points), ` of ${entityId}`);
       default:
         return noop(
@@ -92,11 +78,6 @@ export const measureArea = defineCommand({
     }
   },
 });
-
-interface MeasurePerimeterData {
-  perimeter: number;
-  unit: string;
-}
 
 /**
  * @command measure_perimeter
@@ -123,9 +104,7 @@ export const measurePerimeter = defineCommand({
   }),
   run: (doc, { entityId }): CommandResult => {
     const e = doc.entities[entityId];
-    if (!e) {
-      return noop(doc, `measure_perimeter: entity '${entityId}' not found.`);
-    }
+    if (!e) return noop(doc, `measure_perimeter: entity '${entityId}' not found.`);
 
     let perimeter: number;
     switch (e.kind) {
@@ -161,12 +140,9 @@ export const measurePerimeter = defineCommand({
         );
     }
 
-    const data: MeasurePerimeterData = { perimeter, unit: doc.units };
-    return {
-      document: doc,
-      summary: `Perimeter of ${entityId} = ${formatLength(doc, perimeter)}.`,
-      affected: [],
-      data,
-    };
+    return report(doc, `Perimeter of ${entityId} = ${formatLength(doc, perimeter)}.`, {
+      perimeter,
+      unit: doc.units,
+    });
   },
 });

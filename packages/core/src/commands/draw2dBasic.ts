@@ -28,9 +28,8 @@ export const drawLine = defineCommand({
     color: colorField(DEFAULT_DRAW_COLOR),
   }),
   run: (doc, { start, end, position = ORIGIN, color = DEFAULT_DRAW_COLOR }): CommandResult => {
-    if (start.length < 2 || end.length < 2) {
+    if (start.length < 2 || end.length < 2)
       return noop(doc, 'draw_line: start and end must each be [x, y] arrays.');
-    }
     const id = nextId('line');
     const entity = newEntity(
       'line',
@@ -117,9 +116,7 @@ export const drawArc = defineCommand({
     doc,
     { center, radius, startAngle, endAngle, position = ORIGIN, color = DEFAULT_DRAW_COLOR },
   ): CommandResult => {
-    if (radius <= 0) {
-      return noop(doc, `draw_arc: radius must be > 0 (got ${radius}).`);
-    }
+    if (radius <= 0) return noop(doc, `draw_arc: radius must be > 0 (got ${radius}).`);
     const id = nextId('arc');
     const safeCenter: Vec2 = [center[0], center[1]];
     const entity = newEntity(
@@ -156,9 +153,7 @@ export const drawCircle = defineCommand({
     color: colorField(DEFAULT_DRAW_COLOR),
   }),
   run: (doc, { center, radius, position = ORIGIN, color = DEFAULT_DRAW_COLOR }): CommandResult => {
-    if (radius <= 0) {
-      return noop(doc, `draw_circle: radius must be > 0 (got ${radius}).`);
-    }
+    if (radius <= 0) return noop(doc, `draw_circle: radius must be > 0 (got ${radius}).`);
     const id = nextId('circ');
     const safeCenter: Vec2 = [center[0], center[1]];
     const entity = newEntity('circle', id, { center: safeCenter, radius }, position, color);

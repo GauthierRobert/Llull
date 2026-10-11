@@ -92,13 +92,11 @@ export const makeTubeBetween = defineCommand({
       ['p1', p1],
       ['p2', p2],
     ] as const) {
-      if (point.length < 3) {
+      if (point.length < 3)
         return noop(doc, `make_tube_between failed: ${label} must be a numeric [x, y, z] array.`);
-      }
     }
-    if (radius <= 0) {
+    if (radius <= 0)
       return noop(doc, `make_tube_between failed: radius must be > 0, got ${radius}.`);
-    }
 
     const delta = sub3(p2, p1);
     const length = len3(delta);

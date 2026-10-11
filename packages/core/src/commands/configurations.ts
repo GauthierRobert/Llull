@@ -13,7 +13,7 @@ import { defineCommand, z } from './schema';
 import { reEvaluateAll, withParameterExpression } from './parameters';
 import { replayHistory } from './replay';
 import { unresolvedExpressionsNote } from './replayStep';
-import { noop } from './noop';
+import { changed, noop, report } from './noop';
 
 /**
  * @command create_configuration
@@ -51,9 +51,8 @@ export const createConfiguration = defineCommand({
   }),
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, { name, parameterValues }): CommandResult => {
-    if (name.trim() === '') {
+    if (name.trim() === '')
       return noop(doc, 'create_configuration failed: name must be a non-empty string.');
-    }
 
     const expressions: Record<string, string> = {};
     for (const [k, v] of Object.entries(parameterValues)) {
@@ -75,11 +74,10 @@ export const createConfiguration = defineCommand({
     };
 
     const paramCount = Object.keys(parameterValues).length;
-    return {
-      document: newDoc,
-      summary: `create_configuration '${name}': stored with ${paramCount} parameter${paramCount === 1 ? '' : 's'} (${Object.keys(parameterValues).join(', ')}).`,
-      affected: [],
-    };
+    return report(
+      newDoc,
+      `create_configuration '${name}': stored with ${paramCount} parameter${paramCount === 1 ? '' : 's'} (${Object.keys(parameterValues).join(', ')}).`,
+    );
   },
 });
 
@@ -110,9 +108,8 @@ export const activateConfiguration = defineCommand({
   }),
   annotations: { idempotent: true, metaHistory: true },
   run: (doc, { name }, ctx): CommandResult => {
-    if (name.trim() === '') {
+    if (name.trim() === '')
       return noop(doc, 'activate_configuration failed: name must be a non-empty string.');
-    }
 
     const config = doc.configurations[name];
     if (!config) {
@@ -141,9 +138,7 @@ export const activateConfiguration = defineCommand({
     const context = ctx ?? currentContext();
     const warnings: string[] = [];
     const refused = kernelRefusal(baseDoc, doc.featureHistory, context);
-    if (refused !== null) {
-      return noop(doc, `activate_configuration: ${refused}`);
-    }
+    if (refused !== null) return noop(doc, `activate_configuration: ${refused}`);
     const regenerated = replayHistory(baseDoc, doc.featureHistory, context.registry, warnings);
 
     const entityCount = Object.keys(regenerated.entities).length;
@@ -153,14 +148,13 @@ export const activateConfiguration = defineCommand({
         ? ` Warning: created ${unknownParams.length} new parameter(s) not previously in the document: ${unknownParams.join(', ')}.`
         : '';
 
-    return {
-      document: regenerated,
-      summary:
-        `activate_configuration '${name}': applied ${changedParams.length} parameter${changedParams.length === 1 ? '' : 's'} (${changedParams.join(', ')}) ` +
+    return changed(
+      regenerated,
+      `activate_configuration '${name}': applied ${changedParams.length} parameter${changedParams.length === 1 ? '' : 's'} (${changedParams.join(', ')}) ` +
         `regenerated ${entityCount} ${entityCount === 1 ? 'entity' : 'entities'}.` +
         createdNote +
         unresolvedExpressionsNote(warnings),
-      affected: regenerated.order,
-    };
+      regenerated.order,
+    );
   },
 });

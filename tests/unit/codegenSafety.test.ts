@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CadDocument, Entity } from '@core/model/types';
-import { createEmptyDocument } from '@core/model/types';
+import { type CadDocument, type Entity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 
 const PAYLOAD = "__import__('os').system('echo pwned')";

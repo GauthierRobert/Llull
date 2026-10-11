@@ -5,15 +5,14 @@
  * @layer core/commands
  */
 
-import type { CadDocument, Entity, Vec3 } from '../model/types';
-import { is3D } from '../model/types';
+import { type CadDocument, type Entity, type Vec3, is3D } from '../model/types';
 import type { ShapeHandle, ShapeTopology } from '../geometry/kernel';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { currentContext } from './context';
 import { kernelUnavailable } from './kernelRefusal';
 import { operandRecipe } from './kernelShape';
-import { noop } from './noop';
+import { noop, report } from './noop';
 
 const OCC_HINT = 'the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server)';
 
@@ -95,12 +94,10 @@ export const inspectTopology = defineCommand({
         `inspect_topology: this kernel has no exact B-rep topology; use ${OCC_HINT}.`,
       );
     }
-    return {
-      document: doc,
-      summary: topologySummary(id, topology, doc.displayPrecision),
-      affected: [],
-      data: { entityId: id, ...topology },
-    };
+    return report(doc, topologySummary(id, topology, doc.displayPrecision), {
+      entityId: id,
+      ...topology,
+    });
   },
 });
 
@@ -175,9 +172,8 @@ export const exportStepExact = defineCommand({
       shapes.push(shape);
     }
     const step = kernel.exportStep(shapes);
-    if (step === null) {
+    if (step === null)
       return noop(doc, `export_step_exact: this kernel cannot write exact STEP; use ${OCC_HINT}.`);
-    }
     const exported = solids.map((entity) => entity.id);
     const data: ExportStepExactData = {
       format: 'step',
@@ -186,13 +182,11 @@ export const exportStepExact = defineCommand({
       entityIds: exported,
       skipped,
     };
-    return {
-      document: doc,
-      summary:
-        `export_step_exact: ${solids.length} exact solid(s) (${exported.join(', ')}) → STEP AP214, ${step.length} bytes` +
+    return report(
+      doc,
+      `export_step_exact: ${solids.length} exact solid(s) (${exported.join(', ')}) → STEP AP214, ${step.length} bytes` +
         (skipped.length > 0 ? `; skipped ${skipped.join(', ')}.` : '.'),
-      affected: [],
       data,
-    };
+    );
   },
 });

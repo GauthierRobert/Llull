@@ -94,6 +94,13 @@ interface Imported {
   bridgeMs: number;
 }
 
+/** Sum of `measure_volume` over every imported body (NaN when a body cannot be measured). */
+const totalVolume = (imported: Imported): number =>
+  imported.meshes.reduce((total, mesh) => {
+    const result = execute(imported.document, 'measure_volume', { entityId: mesh.id });
+    return total + ((result.data as { volume?: number } | undefined)?.volume ?? NaN);
+  }, 0);
+
 const manifest = JSON.parse(readFileSync(path.join(ROOT, 'quality', 'corpus.json'), 'utf8')) as {
   files: CorpusEntry[];
 };
@@ -222,10 +229,7 @@ describe.each(entries)('STEP $id — $description', (entry) => {
   check(entry, 'volume', load, async () => {
     const { ref: r, imported: i } = await load();
     if (r.solids === 0) return;
-    const volume = i.meshes.reduce((total, mesh) => {
-      const result = execute(i.document, 'measure_volume', { entityId: mesh.id });
-      return total + ((result.data as { volume?: number } | undefined)?.volume ?? NaN);
-    }, 0);
+    const volume = totalVolume(i);
     const error = Math.abs(volume - Math.abs(r.volume)) / Math.abs(r.volume);
     metrics['volumeError'] = error;
     expect(error).toBeLessThanOrEqual(MAX_VOLUME_ERROR);
@@ -316,10 +320,7 @@ describe.each(entries)('STEP $id — $description', (entry) => {
     const { imported: i } = await load();
     const design = expected();
     expect(i.meshes.length, 'bodies').toBe(design.solids);
-    const volume = i.meshes.reduce((total, mesh) => {
-      const result = execute(i.document, 'measure_volume', { entityId: mesh.id });
-      return total + ((result.data as { volume?: number } | undefined)?.volume ?? NaN);
-    }, 0);
+    const volume = totalVolume(i);
     const volumeError = Math.abs(volume - design.volume) / design.volume;
     const data = execute(i.document, 'measure_bounding_box', {}).data as {
       min: [number, number, number];

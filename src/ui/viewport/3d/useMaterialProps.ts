@@ -17,8 +17,7 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
 import type { Material } from '@core/model/types';
-import { useViewportStore } from '@ui/store';
-import type { DisplayMode } from '@ui/store';
+import { type DisplayMode, useViewportStore } from '@ui/store';
 
 /** Document-material fields that drive a mesh's PBR surface. */
 export type PbrMaterial = Pick<Material, 'color' | 'metalness' | 'roughness'>;

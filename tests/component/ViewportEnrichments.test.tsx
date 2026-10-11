@@ -16,31 +16,18 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useViewportStore } from '@ui/store';
 import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
 import { ViewportControls } from '@ui/viewport/3d/ViewportControls';
 import { PropertiesPanel } from '@ui/panels/PropertiesPanel';
 import { localDispatch } from '../helpers/storeTestHelpers';
+import { resetViewportStores } from '../helpers/componentEntities';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
-function resetStores(): void {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
-  useViewportStore.setState({
-    displayMode: 'shaded',
-    clipPlane: { enabled: false, axis: 'y', offset: 0, flipped: false },
-    hiddenEntityIds: new Set(),
-  });
-}
-
-// ---------------------------------------------------------------------------
 // Store unit tests — viewportStore actions
-// ---------------------------------------------------------------------------
 
 describe('viewportStore — displayMode', () => {
   beforeEach(() => {
-    resetStores();
+    resetViewportStores();
   });
 
   it('starts as "shaded"', () => {
@@ -66,7 +53,7 @@ describe('viewportStore — displayMode', () => {
 
 describe('viewportStore — clipPlane', () => {
   beforeEach(() => {
-    resetStores();
+    resetViewportStores();
   });
 
   it('starts with clip plane disabled', () => {
@@ -106,7 +93,7 @@ describe('viewportStore — clipPlane', () => {
 
 describe('viewportStore — hiddenEntityIds', () => {
   beforeEach(() => {
-    resetStores();
+    resetViewportStores();
   });
 
   it('starts with no hidden entities', () => {
@@ -141,13 +128,11 @@ describe('viewportStore — hiddenEntityIds', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // ViewportControls component tests
-// ---------------------------------------------------------------------------
 
 describe('ViewportControls — display mode buttons', () => {
   beforeEach(() => {
-    resetStores();
+    resetViewportStores();
   });
 
   it('renders Shaded, Wire, and X-Ray buttons', () => {
@@ -193,7 +178,7 @@ describe('ViewportControls — display mode buttons', () => {
 
 describe('ViewportControls — section plane toggle', () => {
   beforeEach(() => {
-    resetStores();
+    resetViewportStores();
   });
 
   it('renders a Section toggle button', () => {
@@ -256,20 +241,21 @@ describe('ViewportControls — section plane toggle', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // PropertiesPanel — Hide/Show visibility toggle
-// ---------------------------------------------------------------------------
+
+function selectNewBox(): string {
+  const entityId = localDispatch('add_box', { size: [2, 2, 2] }).affected[0]!;
+  useStore.getState().select([entityId]);
+  return entityId;
+}
 
 describe('PropertiesPanel — entity visibility toggle', () => {
   beforeEach(() => {
-    resetStores();
+    resetViewportStores();
   });
 
   it('shows a Hide button when a 3D entity is selected', () => {
-    // Create a box and select it
-    const result = localDispatch('add_box', { size: [2, 2, 2] });
-    const entityId = result.affected[0]!;
-    useStore.getState().select([entityId]);
+    selectNewBox();
 
     render(<PropertiesPanel />);
 
@@ -278,9 +264,7 @@ describe('PropertiesPanel — entity visibility toggle', () => {
   });
 
   it('clicking Hide sets the entity as hidden in viewportStore', () => {
-    const result = localDispatch('add_box', { size: [2, 2, 2] });
-    const entityId = result.affected[0]!;
-    useStore.getState().select([entityId]);
+    const entityId = selectNewBox();
 
     render(<PropertiesPanel />);
 
@@ -290,9 +274,7 @@ describe('PropertiesPanel — entity visibility toggle', () => {
   });
 
   it('shows Show button when the entity is already hidden', () => {
-    const result = localDispatch('add_box', { size: [2, 2, 2] });
-    const entityId = result.affected[0]!;
-    useStore.getState().select([entityId]);
+    const entityId = selectNewBox();
     useViewportStore.getState().toggleEntityVisibility(entityId);
 
     render(<PropertiesPanel />);
@@ -301,9 +283,7 @@ describe('PropertiesPanel — entity visibility toggle', () => {
   });
 
   it('clicking Show unhides the entity in viewportStore', () => {
-    const result = localDispatch('add_box', { size: [2, 2, 2] });
-    const entityId = result.affected[0]!;
-    useStore.getState().select([entityId]);
+    const entityId = selectNewBox();
     useViewportStore.getState().toggleEntityVisibility(entityId);
 
     render(<PropertiesPanel />);
@@ -314,9 +294,7 @@ describe('PropertiesPanel — entity visibility toggle', () => {
   });
 
   it('does NOT mutate the document when hiding an entity', () => {
-    const result = localDispatch('add_box', { size: [2, 2, 2] });
-    const entityId = result.affected[0]!;
-    useStore.getState().select([entityId]);
+    selectNewBox();
     const docBefore = useStore.getState().document;
 
     render(<PropertiesPanel />);

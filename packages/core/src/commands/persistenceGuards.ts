@@ -1,5 +1,10 @@
-import type { Layer, CameraState, Vec3 } from '../model/types';
-import { SHAPE2D_KINDS, SOLID_KINDS } from '../model/types';
+import {
+  type Layer,
+  type CameraState,
+  type Vec3,
+  SHAPE2D_KINDS,
+  SOLID_KINDS,
+} from '../model/types';
 import { isRecord } from '../lib/isRecord';
 import { isFiniteNumber, isPositiveNumber } from '../lib/isFiniteNumber';
 import { isHexColor } from '../lib/isHexColor';

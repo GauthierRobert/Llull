@@ -2,10 +2,10 @@
  * @layer domain-aec
  */
 
-import type { BuildingModel, SteelMemberElement } from '@core/model/building';
+import type { BuildingModel } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import type { FrameNode } from '@lib/frame2d';
-import { toMm } from '../model';
+import { elementsOf, toMm } from '../model';
 import { GRAVITY } from '../numeric';
 import { findProfile, sectionProperties } from '../steel/profiles';
 import { E_STEEL } from './steelDesign';
@@ -37,10 +37,7 @@ export function framesOf(
 ): { frames: FrameModel[]; skipped: string[] } {
   const mm = (value: number): number => toMm(doc, value);
   const tolerance = 10;
-  const members = Object.values(building.elements).filter(
-    (element): element is SteelMemberElement =>
-      element.category === 'member' && element.levelId === levelId,
-  );
+  const members = elementsOf(building, 'member').filter((member) => member.levelId === levelId);
   const rafters = members.filter(
     (member) =>
       member.role === 'rafter' && Math.abs(mm(member.start[1] - member.end[1])) < tolerance,

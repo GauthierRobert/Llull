@@ -6,6 +6,7 @@
 
 import type { Entity, MeshData, Vec2, Vec3 } from '@core/model/types';
 import type { ManholeObject, PipeObject } from '@core/model/civil';
+import { cross3 } from '@lib/vec3';
 import { toMm } from '../model';
 import { civilLine, civilMesh, civilPolyline, civilText } from './entities';
 import { labelHeight, type CivilContext } from './context';
@@ -14,23 +15,17 @@ import { civilObject } from './model';
 const MANHOLE_SIDES = 16;
 const PIPE_SIDES = 12;
 
-type Triple = [number, number, number];
-
-function normalized(v: Triple): Triple {
+function normalized(v: Vec3): Vec3 {
   const length = Math.hypot(v[0], v[1], v[2]) || 1;
   return [v[0] / length, v[1] / length, v[2] / length];
-}
-
-function cross(a: Triple, b: Triple): Triple {
-  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
 /** Closed prism of `sides` facets and `radius` about the axis `bottom` -> `top` (outward normals). */
 export function prismMesh(bottom: Vec3, top: Vec3, radius: number, sides: number): MeshData {
   const axis = normalized([top[0] - bottom[0], top[1] - bottom[1], top[2] - bottom[2]]);
-  const reference: Triple = Math.abs(axis[2]) > 0.9 ? [1, 0, 0] : [0, 0, 1];
-  const u = normalized(cross(axis, reference));
-  const v = cross(axis, u);
+  const reference: Vec3 = Math.abs(axis[2]) > 0.9 ? [1, 0, 0] : [0, 0, 1];
+  const u = normalized(cross3(axis, reference));
+  const v = cross3(axis, u);
   const positions: number[] = [];
   for (const centre of [bottom, top]) {
     for (let i = 0; i < sides; i += 1) {

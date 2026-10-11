@@ -11,9 +11,8 @@ export function resolvePolyline(
 ): PolylineEntity | CommandResult {
   const entity = doc.entities[id];
   if (!entity) return noop(doc, `${command}: entity ${id} not found.`);
-  if (entity.kind !== 'polyline') {
+  if (entity.kind !== 'polyline')
     return noop(doc, `${command}: entity ${id} is kind '${entity.kind}', expected 'polyline'.`);
-  }
   return entity;
 }
 

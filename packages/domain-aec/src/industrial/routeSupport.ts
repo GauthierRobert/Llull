@@ -9,12 +9,25 @@ import { add3, distance3, dot3, scale3, sub3 } from '@lib/vec3';
 import { toVec3 } from './memberSupport';
 
 /** Most points accepted for one pipe or cable tray run. */
-export const MAX_ROUTE_POINTS = 1000;
+const MAX_ROUTE_POINTS = 1000;
 
 /** Route as Vec3 points; null unless there are at least 2 well-formed [x, y, z] points. */
-export function parseRoute(points: ReadonlyArray<unknown>): Vec3[] | null {
+function parseRoute(points: ReadonlyArray<unknown>): Vec3[] | null {
   const route = points.map(toVec3);
   return route.length >= 2 && route.every((point) => point !== null) ? (route as Vec3[]) : null;
+}
+
+/** `parseRoute` plus the point cap, as a ready failure text (`tool` failed: …) for the command. */
+export function routeOrFailure(
+  tool: string,
+  points: ReadonlyArray<unknown>,
+  split: 'line' | 'run',
+): Vec3[] | string {
+  const route = parseRoute(points);
+  if (!route) return `${tool} failed: points must be ≥ 2 [x, y, z] points.`;
+  return route.length > MAX_ROUTE_POINTS
+    ? `${tool} failed: at most ${MAX_ROUTE_POINTS} points per run (got ${route.length}); split the ${split}.`
+    : route;
 }
 
 export const hasRepeatedPoint = (route: ReadonlyArray<Vec3>): boolean =>

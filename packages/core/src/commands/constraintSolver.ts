@@ -1,5 +1,5 @@
 import type { CadDocument, Constraint, EntityRef, Vec2, Vec3 } from '../model/types';
-import { len2 } from '../lib/vec2';
+import { cross2, dot2, len2 } from '../lib/vec2';
 import { resolveNumeric } from './expression';
 
 type Point = readonly [number, number];
@@ -17,14 +17,12 @@ function resolvePoint(doc: CadDocument, ref: EntityRef): Point | null {
     const { start, end } = entity;
     if (subKind === 'start') return [start[0] + px, start[1] + py];
     if (subKind === 'end') return [end[0] + px, end[1] + py];
-    if (subKind === 'center' || subKind === 'mid') {
+    if (subKind === 'center' || subKind === 'mid')
       return [(start[0] + end[0]) / 2 + px, (start[1] + end[1]) / 2 + py];
-    }
   }
 
-  if ((entity.kind === 'arc' || entity.kind === 'circle') && subKind === 'center') {
+  if ((entity.kind === 'arc' || entity.kind === 'circle') && subKind === 'center')
     return [entity.center[0] + px, entity.center[1] + py];
-  }
 
   return [px, py];
 }
@@ -108,6 +106,17 @@ function applyConstraintGradient(
     deltas.set(entityId, [existing[0] + dx, existing[1] + dy]);
   }
 
+  /** Turns line b toward the nearest multiple of PI from `offset` relative to a; returns err². */
+  function turnToLattice(pair: Constraint, offset: number): number {
+    if (!('a' in pair) || !('b' in pair)) return 0;
+    const da = resolveDirection(doc, pair.a);
+    const db = resolveDirection(doc, pair.b);
+    if (!da || !db) return 0;
+    const err = distanceToLattice(Math.atan2(cross2(da, db), dot2(da, db)), offset, Math.PI);
+    addTurn(pair.b.entityId, -TURN_RELAXATION * err);
+    return err * err;
+  }
+
   /** Gradient of (|pa - pb| - target)²; returns the squared error. */
   function pullToDistance(
     idA: string,
@@ -157,38 +166,17 @@ function applyConstraintGradient(
       if (!da || !db) return 0;
       const target = resolveNumeric(c.value, doc.parameters);
       if (target === null) return 0;
-      // Angle from da to db (z-component of cross product + dot product).
-      const cross = da[0] * db[1] - da[1] * db[0]; // da × db
-      const dot = da[0] * db[0] + da[1] * db[1]; // da · db
-      const err = wrapAngle(Math.atan2(cross, dot) - target);
+      const err = wrapAngle(Math.atan2(cross2(da, db), dot2(da, db)) - target);
       // Line b turns about its midpoint (translating a line never changes its direction).
       addTurn(c.b.entityId, -TURN_RELAXATION * err);
       return err * err;
     }
 
-    case 'parallel': {
-      const da = resolveDirection(doc, c.a);
-      const db = resolveDirection(doc, c.b);
-      if (!da || !db) return 0;
-      // Error: signed angle from b to the nearest parallel (or anti-parallel) direction of a.
-      const cross = da[0] * db[1] - da[1] * db[0];
-      const dot = da[0] * db[0] + da[1] * db[1];
-      const err = distanceToLattice(Math.atan2(cross, dot), 0, Math.PI);
-      addTurn(c.b.entityId, -TURN_RELAXATION * err);
-      return err * err;
-    }
+    case 'parallel':
+      return turnToLattice(c, 0);
 
-    case 'perpendicular': {
-      const da = resolveDirection(doc, c.a);
-      const db = resolveDirection(doc, c.b);
-      if (!da || !db) return 0;
-      // Error: signed angle from b to the nearest perpendicular direction of a.
-      const cross = da[0] * db[1] - da[1] * db[0];
-      const dot = da[0] * db[0] + da[1] * db[1];
-      const err = distanceToLattice(Math.atan2(cross, dot), Math.PI / 2, Math.PI);
-      addTurn(c.b.entityId, -TURN_RELAXATION * err);
-      return err * err;
-    }
+    case 'perpendicular':
+      return turnToLattice(c, Math.PI / 2);
 
     case 'tangent': {
       const rA = resolveRadius(doc, c.a);
@@ -252,9 +240,8 @@ export function runSolver(doc: CadDocument): {
   const BASE_STEP = 0.1;
 
   const constraints = Object.values(doc.constraints);
-  if (constraints.length === 0) {
+  if (constraints.length === 0)
     return { document: doc, residual: 0, iterations: 0, converged: true };
-  }
 
   // Working copy of positions keyed by entity id.
   const positions = new Map<string, Vec3>();

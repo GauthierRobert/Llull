@@ -201,9 +201,8 @@ export const addSpurGear = defineCommand({
       name,
     },
   ): CommandResult => {
-    if (mod <= 0) {
+    if (mod <= 0)
       return noop(doc, `add_spur_gear failed: module must be finite and > 0, got ${String(mod)}.`);
-    }
 
     const teethInt = teeth;
     if (teethInt < 3 || teethInt > MAX_GEAR_TEETH) {
@@ -228,9 +227,8 @@ export const addSpurGear = defineCommand({
     }
 
     const pitchRadius = (mod * teethInt) / 2;
-    if (bore < 0) {
+    if (bore < 0)
       return noop(doc, `add_spur_gear failed: bore must be finite and >= 0, got ${String(bore)}.`);
-    }
     if (bore >= pitchRadius) {
       return noop(
         doc,

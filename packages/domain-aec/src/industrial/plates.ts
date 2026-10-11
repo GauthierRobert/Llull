@@ -63,9 +63,8 @@ export const addBasePlates = defineCommand({
   run: (doc, params): CommandResult => {
     const { margin, thickness, boltDiameter } = params;
     const positive = (value: number | undefined): boolean => value === undefined || value > 0;
-    if (!positive(margin) || !positive(thickness) || !positive(boltDiameter)) {
+    if (!positive(margin) || !positive(thickness) || !positive(boltDiameter))
       return noop(doc, 'add_base_plates failed: margin, thickness and boltDiameter must be > 0.');
-    }
     const boltCount = params.boltCount ?? 4;
     if (
       !(Number.isInteger(boltCount) && boltCount % 2 === 0 && boltCount >= 2 && boltCount <= 12)
@@ -74,17 +73,15 @@ export const addBasePlates = defineCommand({
     }
     const building = getBuilding(doc);
     const levelId = existingLevelId(building, params.levelId) ?? null;
-    if (params.levelId !== undefined && !building.levels[params.levelId]) {
+    if (params.levelId !== undefined && !building.levels[params.levelId])
       return noop(doc, `add_base_plates failed: no level '${params.levelId}'.`);
-    }
     const columns = columnsWithoutPlates(
       building,
       levelId,
       params.memberIds ? new Set(params.memberIds) : null,
     );
-    if (columns.length === 0) {
+    if (columns.length === 0)
       return noop(doc, 'add_base_plates failed: no steel column without a base plate found.');
-    }
     const added = appendBasePlates(doc, building, columns, {
       margin,
       thickness,

@@ -15,9 +15,6 @@ export const CIVIL_SAMPLE_SURVEY_URL = `${import.meta.env.BASE_URL}samples/pilot
 /** Design storm of the starter network: i = a / (t + b)^c mm/h (10-year, temperate climate). */
 export const CIVIL_STARTER_IDF = { a: 1000, b: 10, c: 0.8 } as const;
 
-/** Design speed (km/h) the starter road is laid out for (R 60 m, Ls 40 m, e max 6 %). */
-export const CIVIL_STARTER_SPEED_KMH = 40;
-
 /** Local site grid origin of the sample survey (metres). */
 const ORIGIN_E = 1000;
 const ORIGIN_N = 5000;

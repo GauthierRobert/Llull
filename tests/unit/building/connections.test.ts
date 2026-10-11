@@ -5,6 +5,7 @@ import { buildingErrors } from '@aec/validate';
 import type { BuildingElement, MomentConnectionElement } from '@core/model/building';
 import type { TakeoffLine } from '@aec/takeoffBasics';
 import type { IfcExport } from '@aec/ifcBuild';
+import { rawBuilding } from './elementEdits';
 
 const HALL = { span: 18000, length: 12000, eaveHeight: 6000, roofPitch: 6 };
 
@@ -146,9 +147,7 @@ describe('add_moment_connections', () => {
     expect(ifc).toContain("'HAUNCH'");
     expect(ifc).toContain('.BOLT.)');
     expect(buildingErrors(doc.building)).toEqual([]);
-    const broken = JSON.parse(JSON.stringify(doc.building)) as {
-      elements: Record<string, Record<string, unknown>>;
-    };
+    const broken = rawBuilding(doc);
     const connection = broken.elements['connection-1'] as Record<string, unknown>;
     connection['otherId'] = 'nope';
     connection['kind'] = 'knee';

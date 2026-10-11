@@ -1,13 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
-import type { CadDocument } from '@core/model/types';
+import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence';
+import { expectDocumentEnvelope } from '../helpers/documentEnvelope';
 
-// ---------------------------------------------------------------------------
 // Helpers — build minimal valid envelopes without going through commands
 // (needed to inject edge-case entity shapes that commands would reject)
-// ---------------------------------------------------------------------------
 
 /** Minimum valid camera state accepted by validateCamera. */
 const VALID_CAMERA = {
@@ -89,9 +87,7 @@ describe('serializeDocument / deserializeDocument', () => {
     const doc = createEmptyDocument();
     const json = serializeDocument(doc);
     const parsed = JSON.parse(json) as Record<string, unknown>;
-    expect(parsed['format']).toBe('llull-document');
-    expect(parsed['version']).toBe(2);
-    expect(parsed['document']).toBeDefined();
+    expectDocumentEnvelope(parsed);
   });
 
   it('throws on invalid JSON', () => {
@@ -227,24 +223,16 @@ describe('load_document command', () => {
     expect(result.summary).toMatch(/invalid JSON/i);
   });
 
-  it('failure path: wrong format is a graceful no-op', () => {
+  it.each([
+    ['wrong format', { format: 'unknown', version: 1, document: {} }, /format/i],
+    ['wrong version', { format: 'llull-document', version: 99, document: {} }, /version/i],
+  ])('failure path: %s is a graceful no-op', (_label, envelope, summary) => {
     const doc = createEmptyDocument();
-    const bad = JSON.stringify({ format: 'unknown', version: 1, document: {} });
-    const result = execute(doc, 'load_document', { json: bad });
+    const result = execute(doc, 'load_document', { json: JSON.stringify(envelope) });
 
     expect(result.document).toBe(doc);
     expect(result.affected).toHaveLength(0);
-    expect(result.summary).toMatch(/format/i);
-  });
-
-  it('failure path: wrong version is a graceful no-op', () => {
-    const doc = createEmptyDocument();
-    const bad = JSON.stringify({ format: 'llull-document', version: 99, document: {} });
-    const result = execute(doc, 'load_document', { json: bad });
-
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-    expect(result.summary).toMatch(/version/i);
+    expect(result.summary).toMatch(summary);
   });
 
   it('is pure — the input document is never mutated', () => {
@@ -269,10 +257,8 @@ describe('load_document command', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Validation branches: entity kind-specific guards
 // These tests target the text and default switch/case branches in validateEntityValue.
-// ---------------------------------------------------------------------------
 
 describe('deserializeDocument — entity kind-specific validation', () => {
   // ── text — valid passes, invalid height fails ────────────────────────────
@@ -293,14 +279,11 @@ describe('deserializeDocument — entity kind-specific validation', () => {
     expect((restored.entities['t1'] as unknown as Record<string, unknown>)['kind']).toBe('text');
   });
 
-  it('throws on text entity with height <= 0', () => {
-    const entity = validEntityBase('t1', 'text', { content: 'hi', height: 0, points: [[0, 0]] });
-    const json = makeEnvelope({ entities: { t1: entity }, order: ['t1'] });
-    expect(() => deserializeDocument(json)).toThrow(/height/i);
-  });
-
-  it('throws on text entity with non-finite height (NaN)', () => {
-    const entity = validEntityBase('t1', 'text', { content: 'hi', height: NaN, points: [[0, 0]] });
+  it.each([
+    ['height <= 0', 0],
+    ['non-finite height (NaN)', NaN],
+  ])('throws on text entity with %s', (_label, height) => {
+    const entity = validEntityBase('t1', 'text', { content: 'hi', height, points: [[0, 0]] });
     const json = makeEnvelope({ entities: { t1: entity }, order: ['t1'] });
     expect(() => deserializeDocument(json)).toThrow(/height/i);
   });
@@ -648,9 +631,7 @@ describe('deserializeDocument — entity kind-specific validation', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Material validation branches
-// ---------------------------------------------------------------------------
 
 describe('deserializeDocument — material validation', () => {
   it('accepts a valid material and round-trips it', () => {
@@ -745,9 +726,7 @@ describe('deserializeDocument — material validation', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Parameter validation branches
-// ---------------------------------------------------------------------------
 
 describe('deserializeDocument — parameter validation', () => {
   it('throws when a parameter entry is not an object', () => {
@@ -797,9 +776,7 @@ describe('deserializeDocument — parameter validation', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Migration: older documents missing optional fields get correct defaults
-// ---------------------------------------------------------------------------
 
 describe('deserializeDocument — migration / back-compat defaults', () => {
   it('fills parameters: {} when the field is absent', () => {
@@ -892,9 +869,7 @@ describe('deserializeDocument — migration / back-compat defaults', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // add_box guard branches: NaN / Infinity / unresolved-expression-string
-// ---------------------------------------------------------------------------
 
 describe('add_box — dimension guard branches', () => {
   it('NaN width is a safe no-op', () => {
@@ -921,9 +896,7 @@ describe('add_box — dimension guard branches', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // delete_entity on doc where groups is undefined
-// ---------------------------------------------------------------------------
 
 describe('delete_entity — doc.groups null-safety', () => {
   it('deletes an entity safely when doc.groups is undefined', () => {

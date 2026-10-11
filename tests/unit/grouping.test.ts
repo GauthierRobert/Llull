@@ -18,9 +18,7 @@ import {
   entityIdFromInstanceId,
 } from '../../src/ui/viewport/3d/grouping';
 
-// ---------------------------------------------------------------------------
 // Test entity factories (only the fields used by grouping logic)
-// ---------------------------------------------------------------------------
 
 function makeBox(
   id: string,
@@ -89,9 +87,7 @@ function makeConeStub(id: string): Entity {
   } as Entity;
 }
 
-// ---------------------------------------------------------------------------
 // entityRenderKey
-// ---------------------------------------------------------------------------
 
 describe('entityRenderKey', () => {
   it('returns null for non-batchable kind (cone)', () => {
@@ -158,9 +154,7 @@ describe('entityRenderKey', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // isBatchable
-// ---------------------------------------------------------------------------
 
 describe('isBatchable', () => {
   it('returns true for box', () => {
@@ -180,9 +174,7 @@ describe('isBatchable', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // groupEntitiesForInstancing
-// ---------------------------------------------------------------------------
 
 describe('groupEntitiesForInstancing — empty input', () => {
   it('returns an empty map for an empty entity array', () => {
@@ -313,9 +305,7 @@ describe('groupEntitiesForInstancing — sort determinism', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // entityIdFromInstanceId
-// ---------------------------------------------------------------------------
 
 describe('entityIdFromInstanceId', () => {
   const batch = {
@@ -358,9 +348,7 @@ describe('entityIdFromInstanceId', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // 100 unique-color entities → 100 batches (1 instance each)
-// ---------------------------------------------------------------------------
 
 describe('groupEntitiesForInstancing — 100 unique-color boxes', () => {
   it('produces 100 batches each with exactly 1 entity', () => {

@@ -71,6 +71,13 @@ export function hasCase(reaction: BaseReaction, loadCase: LoadCase): boolean {
  */
 export const FOUNDATION_WIND_CASES = [...WIND_CASES, ...WIND_PRESSURE_CASES];
 
+const CRANE_CASES: ReadonlyArray<readonly [string, LoadCase]> = [
+  ['C(left)', 'CL'],
+  ['C(right)', 'CR'],
+  ['C5(left)', 'CL5'],
+  ['C5(right)', 'CR5'],
+];
+
 /** SLS characteristic combinations for soil bearing. */
 export function serviceCombinations(wind: boolean, crane: boolean): Combination[] {
   const list: Combination[] = [{ name: 'G+S', factors: { G: 1, S: 1 } }];
@@ -83,12 +90,8 @@ export function serviceCombinations(wind: boolean, crane: boolean): Combination[
     }
   }
   if (crane) {
-    list.push(
-      { name: 'G+C(left)', factors: { G: 1, CL: 1 } },
-      { name: 'G+C(right)', factors: { G: 1, CR: 1 } },
-      { name: 'G+C5(left)', factors: { G: 1, CL5: 1 } },
-      { name: 'G+C5(right)', factors: { G: 1, CR5: 1 } },
-    );
+    for (const [label, loadCase] of CRANE_CASES)
+      list.push({ name: `G+${label}`, factors: { G: 1, [loadCase]: 1 } });
   }
   return list;
 }
@@ -100,37 +103,20 @@ export function ultimateCombinations(
   favourable: boolean,
 ): Combination[] {
   const g = favourable ? 1 : 1.35;
-  const list: Combination[] = [];
-  if (favourable) {
-    list.push({ name: '1.0G+1.5S', factors: { G: g, S: 1.5 } });
-    if (wind) {
-      for (const { loadCase, label } of FOUNDATION_WIND_CASES) {
-        list.push({ name: `1.0G+1.5${label}`, factors: { G: g, [loadCase]: 1.5 } });
-      }
-    }
-    if (crane) {
-      list.push(
-        { name: '1.0G+1.35C(left)', factors: { G: g, CL: 1.35 } },
-        { name: '1.0G+1.35C(right)', factors: { G: g, CR: 1.35 } },
-        { name: '1.0G+1.35C5(left)', factors: { G: g, CL5: 1.35 } },
-        { name: '1.0G+1.35C5(right)', factors: { G: g, CR5: 1.35 } },
-      );
-    }
-    return list;
-  }
-  list.push({ name: '1.35G+1.5S', factors: { G: g, S: 1.5 } });
+  // Compression combinations carry the snow companion 0.75 S; the favourable ones do not.
+  const companion = favourable ? {} : { S: 0.75 };
+  const name = (variable: string, withSnow = !favourable): string =>
+    `${favourable ? '1.0' : '1.35'}G+${variable}${withSnow ? '+0.75S' : ''}`;
+  const list: Combination[] = [{ name: name('1.5S', false), factors: { G: g, S: 1.5 } }];
   if (wind) {
     for (const { loadCase, label } of FOUNDATION_WIND_CASES) {
-      list.push({ name: `1.35G+1.5${label}+0.75S`, factors: { G: g, [loadCase]: 1.5, S: 0.75 } });
+      list.push({ name: name(`1.5${label}`), factors: { G: g, [loadCase]: 1.5, ...companion } });
     }
   }
   if (crane) {
-    list.push(
-      { name: '1.35G+1.35C(left)+0.75S', factors: { G: g, CL: 1.35, S: 0.75 } },
-      { name: '1.35G+1.35C(right)+0.75S', factors: { G: g, CR: 1.35, S: 0.75 } },
-      { name: '1.35G+1.35C5(left)+0.75S', factors: { G: g, CL5: 1.35, S: 0.75 } },
-      { name: '1.35G+1.35C5(right)+0.75S', factors: { G: g, CR5: 1.35, S: 0.75 } },
-    );
+    for (const [label, loadCase] of CRANE_CASES) {
+      list.push({ name: name(`1.35${label}`), factors: { G: g, [loadCase]: 1.35, ...companion } });
+    }
   }
   return list;
 }

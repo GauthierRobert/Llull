@@ -11,17 +11,13 @@ import { useStore, useToolStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { useModifyTool } from '../../src/ui/viewport/2d/useModifyTool';
 
-// ---------------------------------------------------------------------------
 // Store reset helpers
-// ---------------------------------------------------------------------------
 
 function resetStore(): void {
   useStore.setState({ document: createEmptyDocument(), lastSummary: null });
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 describe('useModifyTool', () => {
   beforeEach(() => {
@@ -60,9 +56,7 @@ describe('useModifyTool', () => {
     expect(result.current.phase).toBe('idle');
   });
 
-  // -------------------------------------------------------------------------
   // Bug 1 regression: cancel() must return to pick-entity, not idle
-  // -------------------------------------------------------------------------
 
   it('cancel() with an active tool returns to pick-entity (not idle)', () => {
     const { result } = renderHook(() => useModifyTool());
@@ -111,9 +105,7 @@ describe('useModifyTool', () => {
     expect(result.current.activeTool).toBe('trim');
   });
 
-  // -------------------------------------------------------------------------
   // Keyboard shortcut activation
-  // -------------------------------------------------------------------------
 
   it('pressing O activates the offset tool', () => {
     const { result } = renderHook(() => useModifyTool());
@@ -151,9 +143,7 @@ describe('useModifyTool', () => {
     document.body.removeChild(input);
   });
 
-  // -------------------------------------------------------------------------
   // Phase transitions for the fillet/chamfer flow
-  // -------------------------------------------------------------------------
 
   it('fillet: pick-entity → pick-vertex → enter-value on handleEntityPick', () => {
     const { result } = renderHook(() => useModifyTool());

@@ -5,6 +5,7 @@
  */
 
 import type { Vec3 } from '../model/types';
+import { report } from './noop';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { uint8ArrayToBase64 } from '../lib/base64';
@@ -142,6 +143,6 @@ export const exportStl = defineCommand({
               ),
             ),
           };
-    return { document: doc, summary, affected: [], data };
+    return report(doc, summary, data);
   },
 });

@@ -11,13 +11,12 @@ import {
   commentText,
   featureLinesWithHeadings,
   formatNumber,
-  formatTerm,
   parameterLines,
   provenance,
   quote,
   sectionBanner,
 } from './format';
-import { placementKwargs, pythonTuple, roundArguments, shapeCallOpen } from './pythonCalls';
+import { placementKwargs, pythonTuple, modifierLine, shapeCallOpen } from './pythonCalls';
 
 const HELPERS = String.raw`
 import math
@@ -159,9 +158,8 @@ function featureLine(feature: Feature): string {
       return `${v} = ${feature.left}.${OPERATIONS[feature.kind]}(${feature.right}).removeSplitter()`;
     case 'fillet':
     case 'chamfer':
-      return `${v} = ${feature.op}(${v}, ${roundArguments(feature)})`;
     case 'shell':
-      return `${v} = shell(${v}, ${formatTerm(feature.thickness)})`;
+      return modifierLine(feature);
     case 'translate':
       return `${v} = ${v}.translated(_vec${pythonTuple(feature.delta)})`;
     case 'remove':

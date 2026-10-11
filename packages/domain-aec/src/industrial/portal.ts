@@ -194,16 +194,22 @@ export const addPortalFrameBuilding = defineCommand({
     let building = resolution.building;
     const used = new Set(gridLabels(building));
     const overrun = mm(1500);
-    for (const x of columnLines) {
-      const label = nextFreeLabel(used, false);
+    const lines: Array<{ numbered: boolean; from: Vec2; to: Vec2 }> = [
+      ...columnLines.map((x) => ({
+        numbered: false,
+        from: [x, y0 - overrun] as Vec2,
+        to: [x, yEnd + overrun] as Vec2,
+      })),
+      ...ys.map((y) => ({
+        numbered: true,
+        from: [x0 - overrun, y] as Vec2,
+        to: [x1 + overrun, y] as Vec2,
+      })),
+    ];
+    for (const { numbered, from, to } of lines) {
+      const label = nextFreeLabel(used, numbered);
       used.add(label);
-      building = addGrid(building, label, [x, y0 - overrun], [x, yEnd + overrun]);
-      ids.push(building.elementOrder[building.elementOrder.length - 1] as string);
-    }
-    for (const y of ys) {
-      const label = nextFreeLabel(used, true);
-      used.add(label);
-      building = addGrid(building, label, [x0 - overrun, y], [x1 + overrun, y]);
+      building = addGrid(building, label, from, to);
       ids.push(building.elementOrder[building.elementOrder.length - 1] as string);
     }
     const membersAdded = appendMembers(building, levelId, specs);
@@ -239,29 +245,29 @@ export const addPortalFrameBuilding = defineCommand({
       }
     }
     // Crane runway on both sides, inboard of the columns.
-    if (params.crane) {
-      const craneProfile = findProfile(params.crane.profile ?? 'HEB300');
+    const { crane } = params;
+    if (crane) {
+      const craneProfile = findProfile(crane.profile ?? 'HEB300');
       const bracket = findProfile('HEB200') as SteelProfile;
       if (!craneProfile)
         return noop(
           doc,
-          `add_portal_frame_building failed: unknown crane profile '${params.crane.profile ?? ''}'.`,
+          `add_portal_frame_building failed: unknown crane profile '${crane.profile ?? ''}'.`,
         );
       const inset = h(p.column) / 2 + mm(500);
-      const runway: MemberSpec[] = [];
-      for (const x of spanBounds.flatMap(([a, b]) => [a + inset, b - inset])) {
-        runway.push(
-          ...runwayMembers(doc, building, levelId, {
+      const runway = spanBounds
+        .flatMap(([a, b]) => [a + inset, b - inset])
+        .flatMap((x) =>
+          runwayMembers(doc, building, levelId, {
             start: [x, y0],
             end: [x, yEnd],
-            railHeight: params.crane.railHeight,
+            railHeight: crane.railHeight,
             profile: craneProfile,
             supports: ys.map((y) => y - y0),
             bracket,
-            note: `Crane ${params.crane.capacity ?? 10} t, rail top ${params.crane.railHeight}`,
+            note: `Crane ${crane.capacity ?? 10} t, rail top ${crane.railHeight}`,
           }),
         );
-      }
       const craneAdded = appendMembers(building, levelId, runway);
       if ('reason' in craneAdded)
         return noop(doc, `add_portal_frame_building failed: ${craneAdded.reason}.`);

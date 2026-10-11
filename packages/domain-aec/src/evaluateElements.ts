@@ -4,6 +4,7 @@
  */
 
 import type { CadDocument, Entity } from '@core/model/types';
+import type { CommandResult } from '@core/commands/types';
 import type {
   BuildingElement,
   BuildingModel,
@@ -23,7 +24,9 @@ import {
 import { evaluatePlate, evaluateConnection } from './industrial/evaluateConnections';
 import { evaluatePipeSupport } from './industrial/evaluateSupports';
 import { reconcilePipeSupports } from './industrial/pipeSupportAttach';
-import { ensureLayers } from './entities';
+import { BUILDING_LAYER_COLOR } from './entities';
+import { regenerateOwned } from './derived';
+import { elementAffected } from './model';
 import { openingsOf } from './wallGeometry';
 import {
   type EvaluationContext,
@@ -116,42 +119,30 @@ function evaluateElement(context: EvaluationContext, element: BuildingElement): 
  * @returns the new document; each element's `entityIds` lists the entities generated for it
  */
 export function regenerateBuilding(doc: CadDocument, edited: BuildingModel): CadDocument {
-  const previous = doc.building;
   // Pipe supports follow edits of their pipe and steel (re-attached, or unattached when no steel is left).
   const building = reconcilePipeSupports(doc, edited).building;
-  const staleIds = new Set<string>();
-  if (previous) {
-    for (const element of Object.values(previous.elements)) {
-      for (const id of element.entityIds) staleIds.add(id);
-    }
-  }
-  const entities: Record<string, Entity> = {};
-  for (const [id, entity] of Object.entries(doc.entities)) {
-    if (!staleIds.has(id)) entities[id] = entity;
-  }
-  const order = doc.order.filter((id) => !staleIds.has(id));
   const context: EvaluationContext = { doc, building };
-  const elements: BuildingModel['elements'] = {};
-  const usedLayers = new Set<string>();
-  for (const elementId of building.elementOrder) {
-    const element = building.elements[elementId];
-    if (!element) continue;
-    const generated = evaluateElement(context, element);
-    for (const entity of generated) {
-      entities[entity.id] = entity;
-      order.push(entity.id);
-    }
-    for (const entity of generated) usedLayers.add(entity.layerId);
-    elements[elementId] = { ...element, entityIds: generated.map((entity) => entity.id) };
-  }
-  const { layers, layerOrder } = ensureLayers(doc.layers, doc.layerOrder, usedLayers);
-  return {
-    ...doc,
-    entities,
-    order,
-    layers,
-    layerOrder,
-    selection: doc.selection.filter((id) => entities[id] !== undefined),
-    building: { ...building, elements },
-  };
+  const { parts, owners } = regenerateOwned(
+    doc,
+    Object.values(doc.building?.elements ?? {}),
+    building.elementOrder.flatMap((id) => building.elements[id] ?? []),
+    (element) => evaluateElement(context, element),
+    BUILDING_LAYER_COLOR,
+  );
+  return { ...doc, ...parts, building: { ...building, elements: owners } };
+}
+
+/** Regenerates `doc` from the edited model; `affected` = `elementIds` then the entities generated. */
+export function commitBuilding(
+  doc: CadDocument,
+  model: BuildingModel,
+  elementIds: ReadonlyArray<string>,
+  summary: string,
+  data?: Record<string, unknown>,
+): CommandResult {
+  const document = regenerateBuilding(doc, model);
+  const affected = elementAffected(document, elementIds);
+  return data === undefined
+    ? { document, summary, affected }
+    : { document, summary, affected, data };
 }

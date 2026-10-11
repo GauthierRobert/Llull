@@ -249,9 +249,8 @@ export async function exportStepFile(
   options: { name?: string; language?: unknown; save?: boolean },
 ): Promise<StepFile | { error: string }> {
   const language = pythonLanguage(options.language);
-  if (language === null) {
+  if (language === null)
     return { error: 'export_step: language must be "cadquery" or "build123d".' };
-  }
   const code = execute(getDoc(), 'export_code', { language, name: options.name ?? 'model' });
   const codeData = code.data as
     | { text: string; fileName: string; solidCount: number; source: string }
@@ -261,9 +260,8 @@ export async function exportStepFile(
     return { error: 'export_step: the model has no 3D solids to export.' };
 
   const run = await port.runProgram({ language, source: codeData.text, step: true });
-  if (run.stepBase64 === undefined) {
+  if (run.stepBase64 === undefined)
     return { error: 'export_step: the Python bridge returned no STEP data.' };
-  }
   // export_code already sanitised the base name; only the extension changes.
   const fileName = codeData.fileName.replace(/\.[^.]+$/, '.step');
   const savedTo =
@@ -344,9 +342,8 @@ async function importDwg(
   args: Record<string, unknown>,
 ): Promise<McpShapedResult> {
   const target = args.target ?? 'drawing';
-  if (target !== 'drawing' && target !== 'survey') {
+  if (target !== 'drawing' && target !== 'survey')
     return failure('import_dwg: target must be "drawing" or "survey"; nothing was changed.');
-  }
   let dwgBase64 = stringArg(args, 'dwgBase64');
   if (dwgBase64 === undefined) {
     const file = stringArg(args, 'path');

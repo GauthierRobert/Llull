@@ -1,22 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import { boxInstance } from '../helpers/boxInstance';
 
 /** A 2x2x2 component box instanced at x=100 (world bounds x 99..101) plus a 2x2x2 box at the origin. */
 function scene(): { doc: CadDocument; instanceId: string; boxId: string } {
-  const part = execute(createEmptyDocument(), 'add_box', { size: [2, 2, 2] });
-  const component = execute(part.document, 'create_component', {
-    name: 'Part',
-    entityIds: [part.affected[0]!],
-    componentId: 'comp-part',
-  });
-  const inserted = execute(component.document, 'insert_instance', {
-    componentId: 'comp-part',
-    position: [100, 0, 0],
-  });
-  const box = execute(inserted.document, 'add_box', { size: [2, 2, 2] });
-  return { doc: box.document, instanceId: inserted.affected[0]!, boxId: box.affected[0]! };
+  const { doc: withInstance, instanceId } = boxInstance([100, 0, 0]);
+  const box = execute(withInstance, 'add_box', { size: [2, 2, 2] });
+  return { doc: box.document, instanceId, boxId: box.affected[0]! };
 }
 
 const matchIds = (result: { data?: unknown }): string[] =>

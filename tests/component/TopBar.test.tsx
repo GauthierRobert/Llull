@@ -19,9 +19,7 @@ import { useLayoutStore, usePaletteStore, useStore, useThemeStore } from '@ui/st
 import { createEmptyDocument } from '@core/model/types';
 import { TopBar } from '@ui/components/TopBar';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function resetStore(): void {
   useStore.setState({
@@ -31,9 +29,7 @@ function resetStore(): void {
   });
 }
 
-// ---------------------------------------------------------------------------
 // TopBar — brand
-// ---------------------------------------------------------------------------
 
 describe('TopBar — brand', () => {
   beforeEach(() => {
@@ -46,9 +42,7 @@ describe('TopBar — brand', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // TopBar — agent pill
-// ---------------------------------------------------------------------------
 
 describe('TopBar — agent pill', () => {
   beforeEach(() => {
@@ -87,9 +81,7 @@ describe('TopBar — agent pill', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // TopBar — command palette trigger
-// ---------------------------------------------------------------------------
 
 describe('TopBar — search trigger', () => {
   beforeEach(() => {
@@ -106,9 +98,7 @@ describe('TopBar — search trigger', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // TopBar — theme toggle
-// ---------------------------------------------------------------------------
 
 describe('TopBar — theme toggle', () => {
   beforeEach(() => {
@@ -130,9 +120,7 @@ describe('TopBar — theme toggle', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // TopBar — dock toggles + actions
-// ---------------------------------------------------------------------------
 
 describe('TopBar — dock toggles and actions', () => {
   beforeEach(() => {

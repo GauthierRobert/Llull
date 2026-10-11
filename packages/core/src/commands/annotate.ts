@@ -5,8 +5,14 @@
  * @layer core/commands
  */
 
-import type { CadDocument, DimensionEntity, Entity, TextEntity, Vec3 } from '../model/types';
-import { DEFAULT_LAYER_ID } from '../model/types';
+import {
+  type CadDocument,
+  type DimensionEntity,
+  type Entity,
+  type TextEntity,
+  type Vec3,
+  DEFAULT_LAYER_ID,
+} from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
@@ -74,17 +80,14 @@ export const addText = defineCommand({
     doc,
     { content, position, height, rotation = [0, 0, 0], anchor = 'left', color = '#333333', layer },
   ): CommandResult => {
-    if (content.trim().length === 0) {
+    if (content.trim().length === 0)
       return noop(doc, 'add_text: content must be a non-empty string; entity not created.');
-    }
 
-    if (height <= 0) {
+    if (height <= 0)
       return noop(doc, `add_text: height must be > 0 (got ${height}); entity not created.`);
-    }
 
-    if (position.length < 3) {
+    if (position.length < 3)
       return noop(doc, 'add_text: position must be a [x, y, z] numeric array; entity not created.');
-    }
 
     const id = nextId('text');
     const entity = {
@@ -189,9 +192,8 @@ export const addDimension = defineCommand({
         `add_dimension: precision must be an integer in [0, ${MAX_DISPLAY_PRECISION}] (got ${precision}).`,
       );
     }
-    if (entityIds.length === 0) {
+    if (entityIds.length === 0)
       return noop(doc, `add_dimension: entityIds must be a non-empty array of entity ids.`);
-    }
     if (entityIds.length !== rule.ids) {
       return noop(
         doc,

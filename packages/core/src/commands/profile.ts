@@ -1,4 +1,4 @@
-import type { Vec3 } from '../model/types';
+import { type Vec3, DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3, tolerant, untypedArray, colorField } from './schema';
 import { axisVector, isValidAxis } from '../lib/axis';
@@ -16,7 +16,6 @@ import {
   rejectBadProfile,
   rejectZeroAreaProfile,
 } from './geometryShared';
-import { DEFAULT_LAYER_ID } from '../model/types';
 import { circlePoints } from './tessellation';
 
 /** Number of polygon segments used to approximate a circle. */
@@ -67,14 +66,11 @@ export const extrudeSketch = defineCommand({
       .optional(),
   }),
   run: (doc, { id, depth, rotation }): CommandResult => {
-    if (depth <= 0) {
+    if (depth <= 0)
       return noop(doc, `extrude_sketch: depth must be > 0 (got ${depth}); entity ${id} unchanged.`);
-    }
 
     const source = doc.entities[id];
-    if (!source) {
-      return noop(doc, `extrude_sketch: no entity with id "${id}".`);
-    }
+    if (!source) return noop(doc, `extrude_sketch: no entity with id "${id}".`);
 
     let profile: ReadonlyArray<readonly [number, number]> | null = null;
 

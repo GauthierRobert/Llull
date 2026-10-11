@@ -3,7 +3,15 @@ import { execute } from '@core/commands/registry';
 import type { CadDocument } from '@core/model/types';
 import type { FrameReport } from '@aec/industrial/steelFrameAnalysis';
 import { check as baseCheck, rowOf, step, twoLevels, type CheckData } from './steelFixtures';
-import { BEAM_Z, frameColumn, inertiaOf, jointBeam, portal, weightOf } from './steelFrameFixtures';
+import {
+  BEAM_Z,
+  frameColumn,
+  gratingFloor,
+  inertiaOf,
+  jointBeam,
+  portal,
+  weightOf,
+} from './steelFrameFixtures';
 
 interface FrameData extends CheckData {
   frames: FrameReport[];
@@ -157,17 +165,7 @@ describe('two-storey bent with pinned bases', () => {
       doc = frameColumn(doc, 0, y, { profile: 'HEA140' });
     }
     doc = jointBeam(doc, [0, 0], [0, 6000], { startJoint: 'rigid', endJoint: 'rigid' });
-    doc = step(doc, 'add_slab', {
-      levelId: 'level-2',
-      boundary: [
-        [-3000, 0],
-        [3000, 0],
-        [3000, 6000],
-        [-3000, 6000],
-      ],
-      thickness: 30,
-      material: 'grating',
-    });
+    doc = gratingFloor(doc);
     const heavy = check(doc);
     const alpha = heavy.frames[0]?.alphaCritical ?? Infinity;
     expect(alpha).toBeLessThan(10);

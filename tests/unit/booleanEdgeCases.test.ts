@@ -1,8 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { setGeometryKernel } from '@core/geometry/kernel';
-import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
+import { type GeometryKernel, type MeshData, setGeometryKernel } from '@core/geometry/kernel';
 import { fakeKernel } from '../helpers/fakeKernel';
 
 const kernelReturning = (mesh: MeshData | null): GeometryKernel => fakeKernel({ boolean: mesh });

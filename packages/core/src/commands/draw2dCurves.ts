@@ -179,9 +179,8 @@ export const drawInvolute = defineCommand({
       name,
     },
   ): CommandResult => {
-    if (baseRadius <= 0) {
+    if (baseRadius <= 0)
       return noop(doc, `draw_involute: baseRadius must be > 0, got ${baseRadius}.`);
-    }
     const samplesInt = Math.round(samples);
     if (samplesInt < 2 || samplesInt > MAX_CURVE_SAMPLES) {
       return noop(

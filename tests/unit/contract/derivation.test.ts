@@ -2,8 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import type { DerivationGuard } from '@core/commands/derivation';
-import { derivationViolation } from '@core/commands/derivation';
+import { type DerivationGuard, derivationViolation } from '@core/commands/derivation';
 
 const alwaysRejects: DerivationGuard = { domain: 'test', check: () => 'nope.' };
 const alwaysAllows: DerivationGuard = { domain: 'ok', check: () => null };

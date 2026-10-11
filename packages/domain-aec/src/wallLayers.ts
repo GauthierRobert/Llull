@@ -6,10 +6,10 @@
 import type { WallElement, WallLayer, WallLayerFunction } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { elementAffected, getBuilding, withElement } from './model';
+import { getBuilding, withElement } from './model';
+import { commitBuilding } from './evaluateElements';
 import { noop } from '@core/commands/noop';
 import { isPositiveNumber } from '@lib/isFiniteNumber';
-import { regenerateBuilding } from './evaluateElements';
 
 const WALL_LAYER_FUNCTIONS = [
   'structure',
@@ -21,9 +21,8 @@ const WALL_LAYER_FUNCTIONS = [
 
 /** @failure malformed layer list -> reason string */
 export function parseWallLayers(value: unknown): WallLayer[] | string {
-  if (!Array.isArray(value) || value.length < 1 || value.length > 10) {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 10)
     return 'layers must be a list of 1–10 { material, thickness, function }';
-  }
   const layers: WallLayer[] = [];
   for (const raw of value as unknown[]) {
     const layer = raw as Partial<Record<keyof WallLayer, unknown>>;
@@ -101,9 +100,8 @@ export const setWallLayers = defineCommand({
     const walls = [...new Set(wallIds)]
       .map((id) => building.elements[id])
       .filter((element): element is WallElement => element?.category === 'wall');
-    if (walls.length === 0 || walls.length !== new Set(wallIds).size) {
+    if (walls.length === 0 || walls.length !== new Set(wallIds).size)
       return noop(doc, 'set_wall_layers failed: wallIds must list existing walls.');
-    }
     const ids = walls.map((wall) => wall.id);
     const marks = walls.map((wall) => wall.mark).join(', ');
     if (layers === null) {
@@ -113,12 +111,7 @@ export const setWallLayers = defineCommand({
         delete bare.layers;
         next = withElement(next, bare);
       }
-      const document = regenerateBuilding(doc, next);
-      return {
-        document,
-        summary: `Removed the build-up of ${marks}.`,
-        affected: elementAffected(document, ids),
-      };
+      return commitBuilding(doc, next, ids, `Removed the build-up of ${marks}.`);
     }
     const parsed = parseWallLayers(layers);
     if (typeof parsed === 'string') return noop(doc, `set_wall_layers failed: ${parsed}.`);
@@ -127,13 +120,12 @@ export const setWallLayers = defineCommand({
     let next = building;
     for (const wall of walls)
       next = withElement(next, { ...wall, layers: parsed, thickness, material });
-    const document = regenerateBuilding(doc, next);
-    return {
-      document,
-      summary:
-        `Set a ${parsed.length}-layer build-up (${thickness} total: ` +
+    return commitBuilding(
+      doc,
+      next,
+      ids,
+      `Set a ${parsed.length}-layer build-up (${thickness} total: ` +
         `${parsed.map((layer) => `${layer.thickness} ${layer.material}`).join(' + ')}) on ${marks}.`,
-      affected: elementAffected(document, ids),
-    };
+    );
   },
 });

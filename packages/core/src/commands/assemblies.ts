@@ -6,10 +6,15 @@
  * @layer core/commands
  */
 
-import type { Component, Entity, InstanceEntity, Vec3 } from '../model/types';
+import {
+  type Component,
+  type Entity,
+  type InstanceEntity,
+  type Vec3,
+  DEFAULT_LAYER_ID,
+} from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, vec3, z } from './schema';
-import { DEFAULT_LAYER_ID } from '../model/types';
 import { UNIT_SCALE, expandInstance } from './instanceExpansion';
 import { nextId } from '../lib/id';
 import { commitEntity } from './commitEntity';
@@ -19,7 +24,7 @@ import {
   replaceEntities,
   withoutEntities,
 } from './entityOps';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 import { EXTRUSION_COLOR } from './geometryShared';
 import { ORIGIN } from '../lib/vec3';
 
@@ -114,9 +119,8 @@ export const createComponent = defineCommand({
       ),
   }),
   run: (doc, { name, entityIds, componentId, replace = false }): CommandResult => {
-    if (entityIds.length === 0) {
+    if (entityIds.length === 0)
       return noop(doc, 'create_component: entityIds must be a non-empty array.');
-    }
 
     const missing = entityIds.filter((id) => !(id in doc.entities));
     if (missing.length > 0) {
@@ -151,11 +155,11 @@ export const createComponent = defineCommand({
     const instance = instanceEntity(instanceId, compId, ORIGIN, ORIGIN);
     const replaced = replaceEntities(doc, entityIds, instance);
 
-    return {
-      document: { ...replaced, components: { ...doc.components, [compId]: component } },
-      summary: `Created component "${name}" (id: ${compId}) from ${entityIds.length} entit${entityIds.length === 1 ? 'y' : 'ies'} [${entityIds.join(', ')}]; placed instance ${instanceId}.${referenceLossSuffix(doc, replaced)}`,
-      affected: [instanceId],
-    };
+    return changed(
+      { ...replaced, components: { ...doc.components, [compId]: component } },
+      `Created component "${name}" (id: ${compId}) from ${entityIds.length} entit${entityIds.length === 1 ? 'y' : 'ies'} [${entityIds.join(', ')}]; placed instance ${instanceId}.${referenceLossSuffix(doc, replaced)}`,
+      [instanceId],
+    );
   },
 });
 
@@ -193,9 +197,8 @@ export const insertInstance = defineCommand({
     const position = rawPosition ?? ORIGIN;
     const rotation = rawRotation ?? ORIGIN;
     const component = doc.components[componentId];
-    if (!component) {
+    if (!component)
       return noop(doc, `insert_instance: component "${componentId}" not found in doc.components.`);
-    }
 
     const instanceId = nextId('instance');
     const instance = instanceEntity(
@@ -238,9 +241,8 @@ export const explodeInstance = defineCommand({
   }),
   run: (doc, { id }): CommandResult => {
     const entity = doc.entities[id];
-    if (!entity || entity.kind !== 'instance') {
+    if (!entity || entity.kind !== 'instance')
       return noop(doc, `explode_instance: entity "${id}" is not an instance or does not exist.`);
-    }
 
     const component = doc.components[entity.componentId];
     if (!component) {
@@ -260,10 +262,10 @@ export const explodeInstance = defineCommand({
       order: doc.order.flatMap((orderId) => (orderId === id ? bakedIds : [orderId])),
     };
 
-    return {
+    return changed(
       document,
-      summary: `Exploded instance "${id}" (component "${component.name}", ${entity.componentId}) into ${bakedEntities.length} concrete entit${bakedEntities.length === 1 ? 'y' : 'ies'}: [${bakedIds.join(', ')}].${referenceSuffix(prunedReferences)}`,
-      affected: bakedIds,
-    };
+      `Exploded instance "${id}" (component "${component.name}", ${entity.componentId}) into ${bakedEntities.length} concrete entit${bakedEntities.length === 1 ? 'y' : 'ies'}: [${bakedIds.join(', ')}].${referenceSuffix(prunedReferences)}`,
+      bakedIds,
+    );
   },
 });

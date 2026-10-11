@@ -114,3 +114,17 @@ export function memberOf(doc: CadDocument, mark: string): SteelMemberElement {
   if (!found) throw new Error(`no member ${mark}`);
   return found;
 }
+
+/** A 6 x 6 m grating floor on level 2 (its slab restrains the beams' top flange). */
+export const gratingFloor = (doc: CadDocument): CadDocument =>
+  step(doc, 'add_slab', {
+    levelId: 'level-2',
+    boundary: [
+      [-3000, 0],
+      [3000, 0],
+      [3000, 6000],
+      [-3000, 6000],
+    ],
+    thickness: 30,
+    material: 'grating',
+  });

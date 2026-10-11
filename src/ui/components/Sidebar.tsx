@@ -8,8 +8,7 @@
 
 import React from 'react';
 import type { CadDocument } from '@core/model/types';
-import { useLayoutStore, useStore } from '@ui/store';
-import type { SidebarTab } from '@ui/store';
+import { type SidebarTab, useLayoutStore, useStore } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
 import { LayersPanel } from '@ui/panels/LayersPanel';
 import { AssemblyPanel } from '@ui/panels/AssemblyPanel';
@@ -20,8 +19,7 @@ import { ConfigurationsPanel } from '@ui/panels/ConfigurationsPanel';
 import { MaterialsPanel } from '@ui/panels/MaterialsPanel';
 import { BuildingPanel } from '@ui/panels/building/BuildingPanel';
 import { CivilPanel } from '@ui/panels/civil/CivilPanel';
-import { SIDEBAR_TAB_SPECS } from './sidebarTabs';
-import type { SidebarTabSpec } from './sidebarTabs';
+import { type SidebarTabSpec, SIDEBAR_TAB_SPECS } from './sidebarTabs';
 
 const TAB_PANELS: Readonly<Record<SidebarTab, React.ComponentType<{ className?: string }>>> = {
   building: BuildingPanel,

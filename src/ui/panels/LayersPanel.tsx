@@ -10,8 +10,7 @@
 import React, { useState } from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore, useViewportStore } from '@ui/store';
-import { DEFAULT_LAYER_ID } from '@core/model/types';
-import type { Layer } from '@core/model/types';
+import { type Layer, DEFAULT_LAYER_ID } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
 import { ConfirmDialog } from '@ui/components/ConfirmDialog';
 import { IconButton, PanelHeader } from '@ui/panels/PanelParts';

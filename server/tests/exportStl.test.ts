@@ -17,19 +17,16 @@ import request from 'supertest';
 import { app } from '../src/index';
 import { _resetLiveDoc } from '../src/liveDocument';
 import { _resetHistory, applyCommand } from '../src/commandBus';
+import { parseBuffer } from './exchangeTestSupport';
 
-// ---------------------------------------------------------------------------
 // Reset shared state before each test.
-// ---------------------------------------------------------------------------
 
 beforeEach(() => {
   _resetLiveDoc();
   _resetHistory();
 });
 
-// ---------------------------------------------------------------------------
 // (a) ASCII download with a seeded box
-// ---------------------------------------------------------------------------
 
 describe('GET /export/stl — ascii (default)', () => {
   it('returns 200 with Content-Disposition attachment and ASCII STL body', async () => {
@@ -61,23 +58,21 @@ describe('GET /export/stl — ascii (default)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
+function getBinaryStl(): Promise<request.Response> {
+  return request(app)
+    .get('/export/stl')
+    .query({ format: 'binary' })
+    .buffer(true)
+    .parse(parseBuffer);
+}
+
 // (b) Binary download
-// ---------------------------------------------------------------------------
 
 describe('GET /export/stl — binary', () => {
   it('returns 200 with raw binary body of correct length', async () => {
     applyCommand('add_box', { size: [1, 1, 1], position: [0, 0, 0] });
 
-    const res = await request(app)
-      .get('/export/stl')
-      .query({ format: 'binary' })
-      .buffer(true)
-      .parse((res, callback) => {
-        const chunks: Buffer[] = [];
-        res.on('data', (chunk: Buffer) => chunks.push(chunk));
-        res.on('end', () => callback(null, Buffer.concat(chunks)));
-      });
+    const res = await getBinaryStl();
 
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toMatch(/model\/stl/);
@@ -96,9 +91,7 @@ describe('GET /export/stl — binary', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (c) Empty document — valid empty STL, not an error
-// ---------------------------------------------------------------------------
 
 describe('GET /export/stl — empty document', () => {
   it('returns 200 with a valid empty ASCII STL when the document has no 3D entities', async () => {
@@ -113,15 +106,7 @@ describe('GET /export/stl — empty document', () => {
   });
 
   it('returns 200 with a valid empty binary STL (84 bytes) for an empty document', async () => {
-    const res = await request(app)
-      .get('/export/stl')
-      .query({ format: 'binary' })
-      .buffer(true)
-      .parse((res, callback) => {
-        const chunks: Buffer[] = [];
-        res.on('data', (chunk: Buffer) => chunks.push(chunk));
-        res.on('end', () => callback(null, Buffer.concat(chunks)));
-      });
+    const res = await getBinaryStl();
 
     expect(res.status).toBe(200);
     const buf = res.body as Buffer;
@@ -132,9 +117,7 @@ describe('GET /export/stl — empty document', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (d) Custom name param
-// ---------------------------------------------------------------------------
 
 describe('GET /export/stl — custom name', () => {
   it('uses the name query param in Content-Disposition and inside the STL body (ascii)', async () => {
@@ -148,9 +131,7 @@ describe('GET /export/stl — custom name', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (e) Unrecognised format falls back to ascii (tolerance mirror)
-// ---------------------------------------------------------------------------
 
 describe('GET /export/stl — format fallback', () => {
   it('falls back to ascii for an unknown format value', async () => {

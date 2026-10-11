@@ -5,9 +5,9 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
-import type { Entity } from '@core/model/types';
+import { type CadDocument, type Entity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import { groupedBoxes } from '../helpers/groupedBoxes';
 import { computeSceneSnapshot } from '@core/commands/scene';
 import { rotatedEntityBounds } from '@core/commands/sceneRotatedBounds';
 import { entityBounds, instanceBoundsFromDoc } from '@core/commands/sceneBounds';
@@ -38,20 +38,13 @@ describe('describe_scene command', () => {
   });
 
   it('reports per-layer entity counts, selection, and groups', () => {
-    let doc = createEmptyDocument();
-    const a = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = a.document;
-    const b = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = b.document;
-    doc = execute(doc, 'group_entities', {
-      ids: [a.affected[0], b.affected[0]],
-      name: 'Pair',
-    }).document;
-    doc = { ...doc, selection: [a.affected[0]!] };
+    const grouped = groupedBoxes('Pair');
+    const [first] = grouped.ids;
+    const doc = { ...grouped.doc, selection: [first] };
 
     const snap = computeSceneSnapshot(doc);
     expect(snap.layers[0]!.entityCount).toBe(2);
-    expect(snap.selection).toEqual([a.affected[0]]);
+    expect(snap.selection).toEqual([first]);
     expect(snap.groups).toHaveLength(1);
     expect(snap.groups[0]!.name).toBe('Pair');
   });
@@ -223,9 +216,7 @@ describe('entityBounds — per kind', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // rotatedEntityBounds — OBB-aware world-space AABB
-// ---------------------------------------------------------------------------
 
 describe('rotatedEntityBounds — zero rotation is byte-for-byte identical to entityBounds', () => {
   it('box with zero rotation: no oriented flag, same values as entityBounds', () => {
@@ -254,6 +245,16 @@ describe('rotatedEntityBounds — zero rotation is byte-for-byte identical to en
 
 describe('rotatedEntityBounds — non-zero rotation produces oriented:true and correct extents', () => {
   const EPS = 1e-9;
+  function rotated(
+    addCommand: string,
+    params: Record<string, unknown>,
+    delta: [number, number, number],
+  ): { doc: CadDocument; e: Entity } {
+    const added = execute(createEmptyDocument(), addCommand, { ...params, position: [0, 0, 0] });
+    const id = added.document.order[0]!;
+    const doc = execute(added.document, 'rotate_entity', { id, delta }).document;
+    return { doc, e: doc.entities[id]! };
+  }
   function approxEq(a: number, b: number): boolean {
     return Math.abs(a - b) < EPS;
   }
@@ -261,11 +262,7 @@ describe('rotatedEntityBounds — non-zero rotation produces oriented:true and c
   it('box [2,2,10] rotated [π/2,0,0]: tall Z-axis box becomes tall Y-axis box', () => {
     // Unrotated: extends ±1 in X/Y, ±5 in Z.
     // After Rx(π/2): Z-axis maps to +Y, so extents become ±1 in X/Z, ±5 in Y.
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [2, 2, 10], position: [0, 0, 0] }).document;
-    const id = doc.order[0]!;
-    doc = execute(doc, 'rotate_entity', { id, delta: [Math.PI / 2, 0, 0] }).document;
-    const e = doc.entities[id]!;
+    const { e } = rotated('add_box', { size: [2, 2, 10] }, [Math.PI / 2, 0, 0]);
     const b = rotatedEntityBounds(e);
 
     expect(b.oriented).toBe(true);
@@ -285,11 +282,7 @@ describe('rotatedEntityBounds — non-zero rotation produces oriented:true and c
     //   OBB X extent = 4*cos45 + 2*sin45 = 3√2 ≈ 4.243  (> 4)
     //   OBB Y extent = 4*sin45 + 2*cos45 = 3√2 ≈ 4.243  (> 2)
     // Both axes grow — the OBB AABB is larger than the unrotated AABB on both X and Y.
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [4, 2, 2], position: [0, 0, 0] }).document;
-    const id = doc.order[0]!;
-    doc = execute(doc, 'rotate_entity', { id, delta: [0, 0, Math.PI / 4] }).document;
-    const e = doc.entities[id]!;
+    const { e } = rotated('add_box', { size: [4, 2, 2] }, [0, 0, Math.PI / 4]);
     const obb = rotatedEntityBounds(e);
     const plain = entityBounds({ ...e, rotation: [0, 0, 0] });
 
@@ -307,11 +300,7 @@ describe('rotatedEntityBounds — non-zero rotation produces oriented:true and c
 
   it('rotated box differs from naive unrotated AABB', () => {
     // This is the regression test: naive AABB (pre-fix) would ignore rotation.
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 10], position: [0, 0, 0] }).document;
-    const id = doc.order[0]!;
-    doc = execute(doc, 'rotate_entity', { id, delta: [Math.PI / 2, 0, 0] }).document;
-    const e = doc.entities[id]!;
+    const { e } = rotated('add_box', { size: [1, 1, 10] }, [Math.PI / 2, 0, 0]);
     const obb = rotatedEntityBounds(e);
     const naive = entityBounds(e); // entityBounds ignores rotation
 
@@ -320,10 +309,7 @@ describe('rotatedEntityBounds — non-zero rotation produces oriented:true and c
   });
 
   it('describe_scene data carries oriented:true for a rotated entity', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 4], position: [0, 0, 0] }).document;
-    const id = doc.order[0]!;
-    doc = execute(doc, 'rotate_entity', { id, delta: [Math.PI / 4, 0, 0] }).document;
+    const { doc } = rotated('add_box', { size: [1, 1, 4] }, [Math.PI / 4, 0, 0]);
 
     const result = execute(doc, 'describe_scene', {});
     const snap = result.data as ReturnType<typeof computeSceneSnapshot>;
@@ -343,11 +329,7 @@ describe('rotatedEntityBounds — non-zero rotation produces oriented:true and c
     // Unrotated cylinder (Z-up): extent ±radius in X/Y, ±height/2 in Z.
     // After Rx(π/2): Y-axis maps to +Z, Z-axis maps to -Y.
     // The tall Z extent (height/2=5) maps to Y; the radius (2) now spans Z.
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_cylinder', { radius: 2, height: 10, position: [0, 0, 0] }).document;
-    const id = doc.order[0]!;
-    doc = execute(doc, 'rotate_entity', { id, delta: [Math.PI / 2, 0, 0] }).document;
-    const e = doc.entities[id]!;
+    const { e } = rotated('add_cylinder', { radius: 2, height: 10 }, [Math.PI / 2, 0, 0]);
     const b = rotatedEntityBounds(e);
 
     expect(b.oriented).toBe(true);
@@ -388,9 +370,7 @@ describe('rotatedEntityBounds — non-zero rotation produces oriented:true and c
   });
 });
 
-// ---------------------------------------------------------------------------
 // instanceBoundsFromDoc — assembly bounds
-// ---------------------------------------------------------------------------
 
 describe('instanceBoundsFromDoc — instance world AABB', () => {
   it('happy path: instance bounds reflect the component child geometry', () => {

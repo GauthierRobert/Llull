@@ -12,7 +12,7 @@ import { referenceSuffix, withEntities, withoutEntities } from './entityOps';
 import { nextId } from '../lib/id';
 import { ORIGIN } from '../lib/vec3';
 import { translated } from './geometryShared';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 
 type BatchIds =
   | { readonly ok: true; readonly existing: string[]; readonly missing: string[] }
@@ -37,15 +37,13 @@ function resolveBatchIds(
     result: noop(doc, `${command}: ${summary}`),
   });
   if (ids.length === 0) return fail(emptyDetail);
-  if (ids.length > MAX_BATCH_IDS) {
+  if (ids.length > MAX_BATCH_IDS)
     return fail(`${ids.length} ids exceeds MAX_BATCH_IDS (${MAX_BATCH_IDS}).`);
-  }
   const unique = [...new Set(ids)];
   const existing = unique.filter((id) => Object.hasOwn(doc.entities, id));
   const missing = unique.filter((id) => !Object.hasOwn(doc.entities, id));
-  if (existing.length === 0) {
+  if (existing.length === 0)
     return fail(`no listed entity exists (missing: [${missing.join(', ')}]).`);
-  }
   return { ok: true, existing, missing };
 }
 
@@ -91,11 +89,11 @@ export const deleteEntities = defineCommand({
         : '';
     const missingSuffix = missing.length > 0 ? ` Skipped missing: [${missing.join(', ')}].` : '';
 
-    return {
+    return changed(
       document,
-      summary: `Deleted ${existing.length} entit${existing.length === 1 ? 'y' : 'ies'} [${existing.join(', ')}].${dissolveSuffix}${referenceSuffix(prunedReferences)}${missingSuffix}`,
-      affected: existing,
-    };
+      `Deleted ${existing.length} entit${existing.length === 1 ? 'y' : 'ies'} [${existing.join(', ')}].${dissolveSuffix}${referenceSuffix(prunedReferences)}${missingSuffix}`,
+      existing,
+    );
   },
 });
 
@@ -131,11 +129,11 @@ export const moveEntities = defineCommand({
       if (target) entities[id] = translated(target, delta);
     }
     const missingSuffix = missing.length > 0 ? ` Skipped missing: [${missing.join(', ')}].` : '';
-    return {
-      document: { ...doc, entities },
-      summary: `Moved ${existing.length} entit${existing.length === 1 ? 'y' : 'ies'} [${existing.join(', ')}] by [${delta.join(', ')}].${missingSuffix}`,
-      affected: existing,
-    };
+    return changed(
+      { ...doc, entities },
+      `Moved ${existing.length} entit${existing.length === 1 ? 'y' : 'ies'} [${existing.join(', ')}] by [${delta.join(', ')}].${missingSuffix}`,
+      existing,
+    );
   },
 });
 
@@ -174,10 +172,10 @@ export const duplicateEntities = defineCommand({
     });
     const newIds = copies.map((copy) => copy.id);
     const missingSuffix = missing.length > 0 ? ` Skipped missing: [${missing.join(', ')}].` : '';
-    return {
-      document: withEntities(doc, copies),
-      summary: `Duplicated ${existing.length} entit${existing.length === 1 ? 'y' : 'ies'} [${existing.join(', ')}] → [${newIds.join(', ')}] at offset [${offset.join(', ')}].${missingSuffix}`,
-      affected: newIds,
-    };
+    return changed(
+      withEntities(doc, copies),
+      `Duplicated ${existing.length} entit${existing.length === 1 ? 'y' : 'ies'} [${existing.join(', ')}] → [${newIds.join(', ')}] at offset [${offset.join(', ')}].${missingSuffix}`,
+      newIds,
+    );
   },
 });

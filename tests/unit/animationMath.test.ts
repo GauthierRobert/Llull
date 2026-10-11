@@ -27,9 +27,7 @@ function composeAnimatedPose(
   return { position: [p.x, p.y, p.z], quaternion: [q.x, q.y, q.z, q.w] };
 }
 
-// ---------------------------------------------------------------------------
 // evaluateAnimationScalar
-// ---------------------------------------------------------------------------
 
 describe('evaluateAnimationScalar', () => {
   const base = { speed: 2, amplitude: 3, frequency: 0.5 };
@@ -62,9 +60,22 @@ describe('evaluateAnimationScalar', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // composeAnimatedPose
-// ---------------------------------------------------------------------------
+
+const contribution = (
+  channel: 'rotation' | 'position',
+  axis: [number, number, number],
+  scalar: number,
+): AnimationContribution => ({
+  channel,
+  axis: new THREE.Vector3(...axis),
+  scalar,
+  pivot: new THREE.Vector3(0, 0, 0),
+});
+
+function expectPosition(position: ArrayLike<number>, expected: number[]): void {
+  expected.forEach((value, axis) => expect(position[axis]).toBeCloseTo(value));
+}
 
 describe('composeAnimatedPose', () => {
   it('no contributions → base pose unchanged', () => {
@@ -82,18 +93,9 @@ describe('composeAnimatedPose', () => {
     const { position, quaternion } = composeAnimatedPose(
       [1, 0, 0],
       [0, 0, 0],
-      [
-        {
-          channel: 'rotation',
-          axis: new THREE.Vector3(0, 1, 0),
-          scalar: Math.PI,
-          pivot: new THREE.Vector3(0, 0, 0),
-        },
-      ],
+      [contribution('rotation', [0, 1, 0], Math.PI)],
     );
-    expect(position[0]).toBeCloseTo(-1);
-    expect(position[1]).toBeCloseTo(0);
-    expect(position[2]).toBeCloseTo(0);
+    expectPosition(position, [-1, 0, 0]);
     // Quaternion encodes π rotation about Y: x=0, y=1, z=0 (normalised), w≈0
     expect(quaternion[1]).toBeCloseTo(1); // y component dominates
     expect(quaternion[3]).toBeCloseTo(0); // w ≈ 0
@@ -103,18 +105,9 @@ describe('composeAnimatedPose', () => {
     const { position } = composeAnimatedPose(
       [0, 0, 0],
       [0, 0, 0],
-      [
-        {
-          channel: 'position',
-          axis: new THREE.Vector3(1, 0, 0),
-          scalar: 5,
-          pivot: new THREE.Vector3(0, 0, 0),
-        },
-      ],
+      [contribution('position', [1, 0, 0], 5)],
     );
-    expect(position[0]).toBeCloseTo(5);
-    expect(position[1]).toBeCloseTo(0);
-    expect(position[2]).toBeCloseTo(0);
+    expectPosition(position, [5, 0, 0]);
   });
 
   it('two rotation contributions compose multiplicatively', () => {
@@ -124,22 +117,10 @@ describe('composeAnimatedPose', () => {
       [1, 0, 0],
       [0, 0, 0],
       [
-        {
-          channel: 'rotation',
-          axis: new THREE.Vector3(0, 0, 1),
-          scalar: Math.PI / 2,
-          pivot: new THREE.Vector3(0, 0, 0),
-        },
-        {
-          channel: 'rotation',
-          axis: new THREE.Vector3(0, 0, 1),
-          scalar: Math.PI / 2,
-          pivot: new THREE.Vector3(0, 0, 0),
-        },
+        contribution('rotation', [0, 0, 1], Math.PI / 2),
+        contribution('rotation', [0, 0, 1], Math.PI / 2),
       ],
     );
-    expect(position[0]).toBeCloseTo(-1);
-    expect(position[1]).toBeCloseTo(0);
-    expect(position[2]).toBeCloseTo(0);
+    expectPosition(position, [-1, 0, 0]);
   });
 });

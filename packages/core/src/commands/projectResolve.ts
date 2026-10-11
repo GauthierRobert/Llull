@@ -1,7 +1,12 @@
 import type { CadDocument } from '../model/types';
+import { report } from './noop';
 import type { CommandResult } from './types';
-import type { EvalResult } from './expression';
-import { evaluateExpression, extractReferences, parameterValues } from './expression';
+import {
+  type EvalResult,
+  evaluateExpression,
+  extractReferences,
+  parameterValues,
+} from './expression';
 import { MAX_PROJECT_STEPS } from './limits';
 import { mapStringLeaves } from './regenerate';
 import { isRecord } from '../lib/isRecord';
@@ -89,7 +94,7 @@ export function rejectPlan(
   data: BuildProjectData,
   summary: string,
 ): CommandResult {
-  return { document: doc, summary, affected: [], data };
+  return report(doc, summary, data);
 }
 
 /** Expression env: every parameter value plus the loop variables (`$i`, `$<as>`). */
@@ -107,9 +112,7 @@ export function resolveCount(
   raw: number | string,
   doc: CadDocument,
 ): { count: number; error: string | null } {
-  if (typeof raw === 'number') {
-    return { count: raw, error: null };
-  }
+  if (typeof raw === 'number') return { count: raw, error: null };
   const result = evaluateOverParameters(raw, doc);
   if (!result.ok) return { count: 0, error: `repeat count expression error: ${result.error}` };
   return { count: result.value, error: null };
@@ -182,9 +185,8 @@ export function recordableParams(
     const refs = extractReferences(raw.slice(1));
     return [...refs].every((name) => name in parameters) ? raw : resolved;
   }
-  if (Array.isArray(raw) && Array.isArray(resolved)) {
+  if (Array.isArray(raw) && Array.isArray(resolved))
     return raw.map((item, i) => recordableParams(item, resolved[i], parameters));
-  }
   if (isRecord(raw) && isRecord(resolved)) {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(resolved)) out[k] = recordableParams(raw[k], v, parameters);

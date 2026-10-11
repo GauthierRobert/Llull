@@ -52,20 +52,17 @@ export function criteriaFrom(params: CriteriaInput): DrainageCriteria | string {
     freeboardM: params.freeboardM ?? DEFAULT_CRITERIA.freeboardM,
     outfallLevel: params.outfallLevel ?? null,
   };
-  if (criteria.idf && params.rainfallIntensityMmH !== undefined) {
+  if (criteria.idf && params.rainfallIntensityMmH !== undefined)
     return 'give either rainfallIntensityMmH or idf, not both.';
-  }
   if (criteria.idf) {
     const problem = idfError(criteria.idf);
     if (problem !== null) return problem;
   }
   if (!(criteria.rainfallIntensityMmH > 0)) return 'rainfallIntensityMmH must be > 0.';
-  if (!(criteria.maxDepthRatio > 0 && criteria.maxDepthRatio <= 1)) {
+  if (!(criteria.maxDepthRatio > 0 && criteria.maxDepthRatio <= 1))
     return 'maxDepthRatio must be in (0, 1].';
-  }
-  if (criteria.minVelocity < 0 || criteria.maxVelocity < criteria.minVelocity) {
+  if (criteria.minVelocity < 0 || criteria.maxVelocity < criteria.minVelocity)
     return 'velocity limits must satisfy 0 <= minVelocity <= maxVelocity.';
-  }
   if (criteria.manholeLossK < 0) return 'manholeLossK must be >= 0.';
   if (criteria.freeboardM < 0) return 'freeboardM must be >= 0.';
   return criteria;
@@ -140,9 +137,8 @@ export const checkDrainageNetwork = defineCommand({
     if (typeof criteria === 'string')
       return noop(doc, `check_drainage_network failed: ${criteria}`);
     const civil = getCivil(doc);
-    if (civilObjectsOf(civil, 'pipe').length === 0) {
+    if (civilObjectsOf(civil, 'pipe').length === 0)
       return noop(doc, 'check_drainage_network: the document has no drainage pipes.');
-    }
     const { pipes, manholes, diverging } = analyseNetwork(doc, civil, criteria);
     const failures = [
       ...pipes
@@ -331,22 +327,19 @@ export const sizeDrainagePipes = defineCommand({
     });
     if (typeof criteria === 'string') return noop(doc, `size_drainage_pipes failed: ${criteria}`);
     const candidates = [...(params.diameters ?? COMMERCIAL_DIAMETERS_MM)].sort((a, b) => a - b);
-    if (candidates.length === 0 || candidates.some((d) => !(d > 0))) {
+    if (candidates.length === 0 || candidates.some((d) => !(d > 0)))
       return noop(doc, 'size_drainage_pipes failed: diameters must be positive millimetres.');
-    }
     const civil = getCivil(doc);
-    if (civilObjectsOf(civil, 'pipe').length === 0) {
+    if (civilObjectsOf(civil, 'pipe').length === 0)
       return noop(doc, 'size_drainage_pipes: the document has no pipes.');
-    }
     const sized = sizeNetwork(doc, civil, criteria, candidates);
     const note =
       sized.unsized.length > 0
         ? ` Cannot size ${sized.unsized.join(', ')} (adverse slope or flow exceeds the largest size); left unchanged.`
         : '';
     const passes = `${sized.iterations} pass(es)${sized.converged ? '' : ', NOT converged'}`;
-    if (sized.changed.length === 0) {
+    if (sized.changed.length === 0)
       return noop(doc, `size_drainage_pipes: no diameter change needed.${note}`);
-    }
     const document = regenerateCivil(doc, sized.civil);
     return {
       document,

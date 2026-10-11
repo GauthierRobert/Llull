@@ -9,13 +9,15 @@
 import React, { useMemo, useState } from 'react';
 import type { PlatformObject } from '@core/model/civil';
 import { useStore } from '@ui/store';
-import { PanelSection } from '@ui/panels/PanelParts';
+import { PanelSection, FormError } from '@ui/panels/PanelParts';
 import {
   chosenId,
   CivilObjectRow,
   CivilObjectSelect,
   CivilStatus,
   useCivilObjects,
+  NumberField,
+  TextField,
 } from './CivilParts';
 import {
   formatPoints,
@@ -39,12 +41,11 @@ function PlatformRow({ platform }: { platform: PlatformObject }): React.ReactEle
   );
   return (
     <CivilObjectRow object={platform} detail={volumes}>
-      <input
-        type="number"
+      <NumberField
         value={swell}
-        placeholder="Swell factor"
-        aria-label={`Swell factor of ${platform.name}`}
-        onChange={(event) => setSwell(event.target.value)}
+        set={setSwell}
+        hint="Swell factor"
+        label={`Swell factor of ${platform.name}`}
       />
       <button
         type="button"
@@ -167,53 +168,36 @@ export function EarthworksSection(): React.ReactElement {
             label="Platform surface"
             onChange={setSurface}
           />
-          <input
+          <TextField
             value={outline}
-            placeholder="x,y; x,y; x,y; …"
-            aria-label="Platform outline"
-            onChange={(event) => setOutline(event.target.value)}
+            set={setOutline}
+            hint="x,y; x,y; x,y; …"
+            label="Platform outline"
           />
           <button type="button" className="btn btn--ghost btn--sm" onClick={takeSelection}>
             From selection
           </button>
         </div>
         <div className="building-inline-form">
-          <input
-            type="number"
+          <NumberField
             value={elevation}
-            placeholder="Pad elevation"
-            aria-label="Platform elevation"
-            onChange={(event) => setElevation(event.target.value)}
+            set={setElevation}
+            hint="Pad elevation"
+            label="Platform elevation"
           />
-          <input
-            type="number"
-            value={cutSlope}
-            placeholder="Cut H:1V (1.5)"
-            aria-label="Cut slope"
-            onChange={(event) => setCutSlope(event.target.value)}
-          />
-          <input
-            type="number"
+          <NumberField value={cutSlope} set={setCutSlope} hint="Cut H:1V (1.5)" label="Cut slope" />
+          <NumberField
             value={fillSlope}
-            placeholder="Fill H:1V (2)"
-            aria-label="Fill slope"
-            onChange={(event) => setFillSlope(event.target.value)}
+            set={setFillSlope}
+            hint="Fill H:1V (2)"
+            label="Fill slope"
           />
-          <input
-            value={name}
-            placeholder="Name"
-            aria-label="Platform name"
-            onChange={(event) => setName(event.target.value)}
-          />
+          <TextField value={name} set={setName} hint="Name" label="Platform name" />
           <button type="submit" className="btn btn--primary btn--sm" disabled={surfaceId === ''}>
             Add platform
           </button>
         </div>
-        {error !== '' && (
-          <p className="panel__error" role="alert">
-            {error}
-          </p>
-        )}
+        <FormError text={error} />
       </form>
       {platforms.length > 0 && (
         <ul className="civil-list" aria-label="Platforms">

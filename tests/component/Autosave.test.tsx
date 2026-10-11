@@ -36,6 +36,12 @@ function fakeStorage(initial: Record<string, string> = {}): KeyValueStorage & {
   };
 }
 
+function renderWithAutosave(savedAt: number): void {
+  const storage = fakeStorage();
+  writeAutosave(storage, { savedAt, json: savedBoxJson() });
+  render(<Harness storage={storage} />);
+}
+
 describe('autosave storage adapter', () => {
   beforeEach(() => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
@@ -112,9 +118,7 @@ describe('useAutosave', () => {
   });
 
   it('restores an autosaved document through load_document and shows the banner', () => {
-    const storage = fakeStorage();
-    writeAutosave(storage, { savedAt: Date.now(), json: savedBoxJson() });
-    render(<Harness storage={storage} />);
+    renderWithAutosave(Date.now());
     expect(useStore.getState().document.order.length).toBe(1);
     expect(screen.getByText(/restored your unsaved work/i)).toBeDefined();
 
@@ -124,9 +128,7 @@ describe('useAutosave', () => {
   });
 
   it('hides the restore notice by itself after a while, keeping the work', () => {
-    const storage = fakeStorage();
-    writeAutosave(storage, { savedAt: Date.now(), json: savedBoxJson() });
-    render(<Harness storage={storage} />);
+    renderWithAutosave(Date.now());
     expect(screen.getByText(/restored your unsaved work/i)).toBeDefined();
     act(() => {
       vi.advanceTimersByTime(20_000);
@@ -137,17 +139,13 @@ describe('useAutosave', () => {
 
   it('does not restore when a live server is connected', () => {
     useStore.setState({ liveStatus: 'connected' });
-    const storage = fakeStorage();
-    writeAutosave(storage, { savedAt: 1, json: savedBoxJson() });
-    render(<Harness storage={storage} />);
+    renderWithAutosave(1);
     expect(useStore.getState().document.order.length).toBe(0);
   });
 
   it('waits for the connection attempt, then restores when it fails', () => {
     useStore.setState({ liveStatus: 'connecting' });
-    const storage = fakeStorage();
-    writeAutosave(storage, { savedAt: 1, json: savedBoxJson() });
-    render(<Harness storage={storage} />);
+    renderWithAutosave(1);
     expect(useStore.getState().document.order.length).toBe(0);
     act(() => useStore.getState().setLiveStatus('disconnected'));
     expect(useStore.getState().document.order.length).toBe(1);

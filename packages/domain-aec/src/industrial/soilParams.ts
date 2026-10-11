@@ -68,12 +68,10 @@ export function soilInputs(params: {
 }): { soilBearing: number; soilModulus: number } | { reason: string } {
   const soilBearing = params.soilBearing ?? DEFAULT_SOIL_BEARING;
   const soilModulus = params.soilModulus ?? DEFAULT_SOIL_MODULUS;
-  if (!isFiniteNumber(soilBearing) || soilBearing <= 0) {
+  if (!isFiniteNumber(soilBearing) || soilBearing <= 0)
     return { reason: 'soilBearing must be a number > 0 (kPa).' };
-  }
-  if (!isFiniteNumber(soilModulus) || soilModulus <= 0) {
+  if (!isFiniteNumber(soilModulus) || soilModulus <= 0)
     return { reason: 'soilModulus must be a number > 0 (MPa).' };
-  }
   const clayError = params.clayLayer === undefined ? null : clayLayerError(params.clayLayer);
   if (clayError) return { reason: `${clayError}.` };
   return { soilBearing, soilModulus };

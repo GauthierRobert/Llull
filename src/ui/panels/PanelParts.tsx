@@ -6,8 +6,7 @@
 
 import React, { useState } from 'react';
 import { classNames } from '@ui/classNames';
-import { Icon } from '@ui/components/Icon';
-import type { IconName } from '@ui/components/Icon';
+import { type IconName, Icon } from '@ui/components/Icon';
 
 interface PanelHeaderProps {
   title: string;
@@ -154,5 +153,15 @@ export function IconButton({
     >
       <Icon name={icon} size={size} />
     </button>
+  );
+}
+
+/** Inline form error; renders nothing while `text` is empty. */
+export function FormError({ text }: { text: string }): React.ReactElement | null {
+  if (text === '') return null;
+  return (
+    <p className="panel__error" role="alert">
+      {text}
+    </p>
   );
 }

@@ -5,7 +5,15 @@
  * @pure
  */
 
-import { niceStep, svgDocument, svgLine, svgPolyline, svgRect, svgText } from './roadSvg';
+import {
+  pushLevelGrid,
+  pushTableLabels,
+  svgDocument,
+  svgLine,
+  svgPolyline,
+  svgRect,
+  svgText,
+} from './roadSvg';
 
 type Pair = readonly [number, number];
 
@@ -72,11 +80,7 @@ export function drainageLongSectionSvg(
     ),
     svgRect(LEFT, TOP, plotWidth, plotHeight),
   ];
-  const zStep = niceStep(28 / vScale);
-  for (let z = Math.ceil((zTop - rangeM) / zStep) * zStep; z <= zTop; z += zStep) {
-    body.push(svgLine([LEFT, y(z)], [LEFT + plotWidth, y(z)], '#e2e2e2'));
-    body.push(svgText(LEFT - 6, y(z) + 3, z.toFixed(2), { anchor: 'end', size: 9 }));
-  }
+  pushLevelGrid(body, LEFT, plotWidth, y, zTop, rangeM, vScale);
   body.push(
     svgPolyline(
       stations.map((s) => [x(s.chainageM), y(s.rimM)] as Pair),
@@ -115,22 +119,7 @@ export function drainageLongSectionSvg(
   ]);
   if (hglPoints.length >= 2) body.push(svgPolyline(hglPoints, '#1060d0', 2));
   const bandTop = TOP + plotHeight + 12;
-  TABLE_LABELS.forEach((label, row) => {
-    body.push(
-      svgText(LEFT - 6, bandTop + row * ROW_HEIGHT + 12, label, {
-        anchor: 'end',
-        size: 9,
-        weight: 'bold',
-      }),
-    );
-    body.push(
-      svgLine(
-        [LEFT, bandTop + (row + 1) * ROW_HEIGHT],
-        [LEFT + plotWidth, bandTop + (row + 1) * ROW_HEIGHT],
-        '#ccc',
-      ),
-    );
-  });
+  pushTableLabels(body, TABLE_LABELS, LEFT, plotWidth, bandTop, ROW_HEIGHT);
   body.push(svgLine([LEFT, bandTop], [LEFT + plotWidth, bandTop], '#444'));
   const cell = (px: number, row: number, text: string): void => {
     body.push(svgText(px, bandTop + row * ROW_HEIGHT + 12, text, { anchor: 'middle', size: 8 }));

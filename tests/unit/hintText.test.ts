@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hintText } from '@ui/components/hintText';
-import type { HintContext } from '@ui/components/hintText';
+import { type HintContext, hintText } from '@ui/components/hintText';
 
 const base: HintContext = {
   viewMode: '3d',

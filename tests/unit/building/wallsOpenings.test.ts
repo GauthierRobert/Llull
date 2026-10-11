@@ -3,10 +3,7 @@ import { createEmptyDocument, type BoxEntity, type CadDocument } from '@core/mod
 import { execute } from '@core/commands/registry';
 import { endAdjustment, wallPieces } from '@aec/wallGeometry';
 import type { WallElement } from '@core/model/building';
-
-function run(doc: CadDocument, name: string, params: unknown): CadDocument {
-  return execute(doc, name, params).document;
-}
+import { run } from './runFixtures';
 
 function box(doc: CadDocument, id: string): BoxEntity {
   const entity = doc.entities[id];
@@ -250,23 +247,24 @@ describe('update_wall', () => {
   });
 });
 
+const PIECE_WALL: WallElement = {
+  id: 'w',
+  category: 'wall',
+  mark: 'W',
+  entityIds: [],
+  levelId: 'l',
+  start: [0, 0],
+  end: [10, 0],
+  thickness: 1,
+  height: 3,
+  baseOffset: 0,
+  material: 'concrete',
+};
+
 describe('wallPieces', () => {
   it('handles openings flush with the wall top and base', () => {
-    const base: WallElement = {
-      id: 'w',
-      category: 'wall',
-      mark: 'W',
-      entityIds: [],
-      levelId: 'l',
-      start: [0, 0],
-      end: [10, 0],
-      thickness: 1,
-      height: 3,
-      baseOffset: 0,
-      material: 'concrete',
-    };
     const pieces = wallPieces(
-      base,
+      PIECE_WALL,
       [
         {
           id: 'o',
@@ -355,19 +353,7 @@ describe('built wall extents', () => {
 
   it('clamps sill / head pieces to the built extent', () => {
     const pieces = wallPieces(
-      {
-        id: 'w',
-        category: 'wall',
-        mark: 'W',
-        entityIds: [],
-        levelId: 'l',
-        start: [0, 0],
-        end: [10, 0],
-        thickness: 1,
-        height: 3,
-        baseOffset: 0,
-        material: 'concrete',
-      },
+      PIECE_WALL,
       [
         {
           id: 'o',

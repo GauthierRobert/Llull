@@ -22,9 +22,7 @@ import type { BoxEntity } from '@core/model/types';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import type { ShapeRecipe } from '@core/geometry/shapeRecipe';
 
-// ---------------------------------------------------------------------------
 // Test entities — two 2×2×2 boxes (as in docs/decisions/KI4-occt-spike.md).
-// ---------------------------------------------------------------------------
 
 const BOX_A: BoxEntity = {
   id: 'box-a',
@@ -46,9 +44,7 @@ const BOX_B: BoxEntity = {
   color: '#888888',
 };
 
-// ---------------------------------------------------------------------------
 // Static entity contract tests — always run; no WASM required.
-// ---------------------------------------------------------------------------
 
 describe('OcctKernel — static contract tests (always run)', () => {
   it('BOX_A entity satisfies BoxEntity shape contract', () => {
@@ -72,10 +68,8 @@ describe('OcctKernel — static contract tests (always run)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // GeometryKernel interface conformance — compile-time check via `satisfies`.
 // A stub missing any of the four methods fails tsc; no WASM needed.
-// ---------------------------------------------------------------------------
 
 describe('GeometryKernel — interface conformance', () => {
   it('GeometryKernel type has evaluate, tessellate, topology, exportStep', () => {
@@ -121,9 +115,7 @@ describe('GeometryKernel — interface conformance', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // occtOps / createOcctKernel — static contract tests (no WASM required).
-// ---------------------------------------------------------------------------
 
 describe('occtOps — static / contract tests', () => {
   it('occtOps exposes every native operation of the recipe evaluator', async () => {
@@ -164,11 +156,9 @@ describe('occtOps — static / contract tests', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Live WASM tests — ALWAYS SKIPPED in this config (jsdom + 63 MB WASM).
 // To un-skip: run vitest with `--environment node` AND the WASM binary present.
 // Measurements from manual verification: union tris=28, fillet tris=628 (r=0.2).
-// ---------------------------------------------------------------------------
 
 describe.skip('OcctKernel live WASM (requires node env + 63 MB opencascade.js)', () => {
   const solid = (entity: BoxEntity): ShapeRecipe => ({ op: 'solid', entity });

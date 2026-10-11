@@ -7,11 +7,10 @@
  * @failure invalid unit or negative/non-integer/>20 precision -> no-op, affected:[]
  */
 
-import type { CadDocument } from '../model/types';
-import { DOCUMENT_UNITS } from '../model/types';
+import { type CadDocument, DOCUMENT_UNITS } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { noop } from './noop';
+import { noop, report } from './noop';
 import { MAX_DISPLAY_PRECISION } from './limits';
 
 export const setUnits = defineCommand({
@@ -49,18 +48,16 @@ export const setUnits = defineCommand({
       );
     }
 
-    if (units === undefined && displayPrecision === undefined) {
+    if (units === undefined && displayPrecision === undefined)
       return noop(doc, 'No changes: provide at least one of units or displayPrecision.');
-    }
 
     const nextUnits = units ?? doc.units;
     const nextPrecision = displayPrecision ?? doc.displayPrecision;
 
-    return {
-      document: { ...doc, units: nextUnits, displayPrecision: nextPrecision },
-      summary: `Units set to ${nextUnits}, precision ${nextPrecision}.`,
-      affected: [],
-    };
+    return report(
+      { ...doc, units: nextUnits, displayPrecision: nextPrecision },
+      `Units set to ${nextUnits}, precision ${nextPrecision}.`,
+    );
   },
 });
 

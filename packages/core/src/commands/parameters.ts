@@ -9,7 +9,7 @@ import type { CadDocument, Parameter } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { topologicalSort } from '../lib/topologicalSort';
-import { noop } from './noop';
+import { changed, noop, report } from './noop';
 import { evaluateExpression, expressionSyntaxError, extractReferences } from './expression';
 import { regenerateParameterDependents } from './dependents';
 
@@ -113,9 +113,8 @@ export const setParameter = defineCommand({
         `set_parameter failed: name '${name}' is invalid. Use letters, digits, and underscores; must not start with a digit.`,
       );
     }
-    if (expression.trim() === '') {
+    if (expression.trim() === '')
       return noop(doc, `set_parameter failed: expression must be a non-empty string.`);
-    }
 
     const syntaxError = expressionSyntaxError(expression);
     if (syntaxError !== null) {
@@ -136,29 +135,25 @@ export const setParameter = defineCommand({
     const newDoc: CadDocument = { ...doc, parameters: evaluated };
 
     if (param.error) {
-      return {
-        document: newDoc,
-        summary: `set_parameter '${name}': expression '${expression}' could not be evaluated — ${param.error}. Parameter stored with error.`,
-        affected: [],
-      };
+      return report(
+        newDoc,
+        `set_parameter '${name}': expression '${expression}' could not be evaluated — ${param.error}. Parameter stored with error.`,
+      );
     }
 
     const dependentCount = Object.values(evaluated).filter(
       (p) => p.name !== name && extractReferences(p.expression).has(name),
     ).length;
     const { document, dependentSteps, refusal } = regenerateParameterDependents(doc, newDoc, ctx);
-    if (refusal !== undefined) {
-      return noop(doc, `set_parameter '${name}': ${refusal}`);
-    }
+    if (refusal !== undefined) return noop(doc, `set_parameter '${name}': ${refusal}`);
 
-    return {
+    return changed(
       document,
-      summary:
-        `set_parameter '${name}' = ${param.value} (expression: '${expression}')` +
+      `set_parameter '${name}' = ${param.value} (expression: '${expression}')` +
         (dependentCount > 0 ? `; ${dependentCount} dependent(s) re-evaluated` : '') +
         (dependentSteps > 0 ? `; regenerated ${dependentSteps} dependent feature step(s).` : '.'),
-      affected: dependentSteps > 0 ? document.order : [],
-    };
+      dependentSteps > 0 ? document.order : [],
+    );
   },
 });
 
@@ -189,9 +184,8 @@ export const deleteParameter = defineCommand({
       ),
   }),
   run: (doc, { name }): CommandResult => {
-    if (!Object.hasOwn(doc.parameters, name)) {
+    if (!Object.hasOwn(doc.parameters, name))
       return noop(doc, `delete_parameter: parameter '${name}' does not exist — no change made.`);
-    }
 
     const evaluated = reEvaluateAll(
       Object.fromEntries(Object.entries(doc.parameters).filter(([key]) => key !== name)),
@@ -203,14 +197,12 @@ export const deleteParameter = defineCommand({
 
     const newDoc: CadDocument = { ...doc, parameters: evaluated };
 
-    return {
-      document: newDoc,
-      summary:
-        `delete_parameter '${name}': removed.` +
+    return report(
+      newDoc,
+      `delete_parameter '${name}': removed.` +
         (erroredDependents.length > 0
           ? ` ${erroredDependents.length} dependent(s) now have errors: ${erroredDependents.join(', ')}.`
           : ''),
-      affected: [],
-    };
+    );
   },
 });

@@ -9,7 +9,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
 import { ORIGIN } from '../lib/vec3';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 import { commitEntity } from './commitEntity';
 import { replaceEntity } from './entityOps';
 import { translated } from './geometryShared';
@@ -35,9 +35,7 @@ export const duplicateEntity = defineCommand({
   }),
   run: (doc, { id, offset = ORIGIN }): CommandResult => {
     const source = doc.entities[id];
-    if (!source) {
-      return noop(doc, `No entity ${id} to duplicate.`);
-    }
+    if (!source) return noop(doc, `No entity ${id} to duplicate.`);
 
     const newId = nextId(source.kind);
     return commitEntity(
@@ -117,18 +115,16 @@ export const ungroupEntities = defineCommand({
   run: (doc, { groupId }): CommandResult => {
     const group = doc.groups[groupId];
 
-    if (!group) {
-      return noop(doc, `No group ${groupId} to ungroup.`);
-    }
+    if (!group) return noop(doc, `No group ${groupId} to ungroup.`);
 
     const nextGroups = { ...doc.groups };
     delete nextGroups[groupId];
 
-    return {
-      document: { ...doc, groups: nextGroups },
-      summary: `Ungrouped ${groupId} ("${group.name}"), freeing ${group.memberIds.length} members: [${group.memberIds.join(', ')}].`,
-      affected: [...group.memberIds],
-    };
+    return changed(
+      { ...doc, groups: nextGroups },
+      `Ungrouped ${groupId} ("${group.name}"), freeing ${group.memberIds.length} members: [${group.memberIds.join(', ')}].`,
+      [...group.memberIds],
+    );
   },
 });
 
@@ -168,9 +164,7 @@ export const setEntityName = defineCommand({
   }),
   run: (doc, { id, name, tags }): CommandResult => {
     const entity = doc.entities[id];
-    if (!entity) {
-      return noop(doc, `No entity ${id} — set_entity_name is a no-op.`);
-    }
+    if (!entity) return noop(doc, `No entity ${id} — set_entity_name is a no-op.`);
 
     const { name: currentName, tags: currentTags, ...rest } = entity;
     const nextName = name === undefined ? currentName : name === '' ? undefined : name;
@@ -185,10 +179,6 @@ export const setEntityName = defineCommand({
     const tagsPart =
       patched.tags !== undefined ? `tags=[${patched.tags.join(', ')}]` : 'tags=<none>';
 
-    return {
-      document: replaceEntity(doc, patched),
-      summary: `Entity ${id}: ${namePart}, ${tagsPart}.`,
-      affected: [id],
-    };
+    return changed(replaceEntity(doc, patched), `Entity ${id}: ${namePart}, ${tagsPart}.`, [id]);
   },
 });

@@ -13,6 +13,7 @@ import type { ViewName } from './renderCamera';
 import { renderDocument } from './renderScene';
 import { composeOverlays } from './renderOverlays';
 import { buildTurntableSvg, buildIsolateSvg, buildSectionSvg } from './renderMultiPass';
+import { report } from './noop';
 
 const clampPixels = (value: number | undefined, fallback: number): number =>
   Math.max(64, Math.min(2000, Math.round(value ?? fallback)));
@@ -134,12 +135,11 @@ export const renderView = defineCommand({
     if (params.turntable) {
       const frames = Math.max(1, Math.min(12, params.turntable.frames));
       const strip = buildTurntableSvg(doc, frames, view, width, height);
-      return {
-        document: doc,
-        summary: `Rendered turntable strip: ${frames} frame(s), ${strip.width}×${height}.`,
-        affected: [],
-        data: { ...base, width: strip.width, svg: strip.svg },
-      };
+      return report(
+        doc,
+        `Rendered turntable strip: ${frames} frame(s), ${strip.width}×${height}.`,
+        { ...base, width: strip.width, svg: strip.svg },
+      );
     }
 
     let svg = base.svg;
@@ -161,6 +161,6 @@ export const renderView = defineCommand({
       showLabels: params.showLabels === true,
     });
 
-    return { document: doc, summary, affected: [], data: { ...base, svg } };
+    return report(doc, summary, { ...base, svg });
   },
 });

@@ -7,8 +7,11 @@
 
 import type { Vec3 } from '@core/model/types';
 import { useStore, useToolStore } from '@ui/store';
-import { nextPlacement, solidCommandParams } from '@ui/components/toolbar/solidPresets';
-import type { SolidPreset } from '@ui/components/toolbar/solidPresets';
+import {
+  type SolidPreset,
+  nextPlacement,
+  solidCommandParams,
+} from '@ui/components/toolbar/solidPresets';
 
 /** How long a drop point stays reserved while its entity travels through the server round trip. */
 const RESERVATION_MS = 3000;

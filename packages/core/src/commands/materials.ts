@@ -13,7 +13,7 @@ import type { CadDocument, Material } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { isHexColor } from '../lib/isHexColor';
-import { noop } from './noop';
+import { changed, noop, report } from './noop';
 
 /**
  * @command create_material
@@ -72,9 +72,8 @@ export const createMaterial = defineCommand({
   }),
   annotations: { idempotent: true },
   run: (doc, { name, density, color, metalness, roughness }): CommandResult => {
-    if (name.trim() === '') {
+    if (name.trim() === '')
       return noop(doc, 'create_material failed: name must be a non-empty string.');
-    }
 
     if (density <= 0) {
       return noop(
@@ -109,11 +108,10 @@ export const createMaterial = defineCommand({
     };
 
     const action = doc.materials[name] ? 'replaced' : 'created';
-    return {
-      document: newDoc,
-      summary: `create_material '${name}': ${action} (density=${density} g/${doc.units}³, color=${color}, metalness=${metalness}, roughness=${roughness}).`,
-      affected: [],
-    };
+    return report(
+      newDoc,
+      `create_material '${name}': ${action} (density=${density} g/${doc.units}³, color=${color}, metalness=${metalness}, roughness=${roughness}).`,
+    );
   },
 });
 
@@ -151,9 +149,8 @@ export const assignMaterial = defineCommand({
   }),
   annotations: { idempotent: true },
   run: (doc, { materialName, entityIds }): CommandResult => {
-    if (materialName.trim() === '') {
+    if (materialName.trim() === '')
       return noop(doc, 'assign_material failed: materialName must be a non-empty string.');
-    }
 
     if (!doc.materials[materialName]) {
       const available = Object.keys(doc.materials);
@@ -204,10 +201,6 @@ export const assignMaterial = defineCommand({
       parts.push(`Missing ids skipped: ${missing.join(', ')}.`);
     }
 
-    return {
-      document: newDoc,
-      summary: parts.join(' '),
-      affected: assigned,
-    };
+    return changed(newDoc, parts.join(' '), assigned);
   },
 });

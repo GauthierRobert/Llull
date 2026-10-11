@@ -14,9 +14,7 @@ import {
   scaleBarLength,
 } from '@ui/viewport/2d/gridHelpers';
 
-// ---------------------------------------------------------------------------
 // adaptiveGridStep
-// ---------------------------------------------------------------------------
 
 describe('adaptiveGridStep', () => {
   it('returns a positive step for typical zoom values', () => {
@@ -76,9 +74,7 @@ describe('adaptiveGridStep', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // majorGridStep
-// ---------------------------------------------------------------------------
 
 describe('majorGridStep', () => {
   it('is always 10× the minor step', () => {
@@ -88,9 +84,7 @@ describe('majorGridStep', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // pixelsToWorld
-// ---------------------------------------------------------------------------
 
 describe('pixelsToWorld', () => {
   it('converts pixels to world units as pixels / zoom', () => {
@@ -118,9 +112,7 @@ describe('pixelsToWorld', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // localGridPatch
-// ---------------------------------------------------------------------------
 
 describe('localGridPatch', () => {
   it('returns an even division count ≥ 2', () => {
@@ -177,9 +169,7 @@ describe('localGridPatch', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // scaleBarLength
-// ---------------------------------------------------------------------------
 
 describe('scaleBarLength', () => {
   it('returns positive worldLength and pixelLength', () => {

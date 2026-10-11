@@ -1,9 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
-import type { CadDocument } from '@core/model/types';
+import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { setGeometryKernel } from '@core/geometry/kernel';
-import type { GeometryKernel } from '@core/geometry/kernel';
+import { type GeometryKernel, setGeometryKernel } from '@core/geometry/kernel';
 import { fakeKernel } from '../helpers/fakeKernel';
 
 const MESH = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] };

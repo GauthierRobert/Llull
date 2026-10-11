@@ -7,12 +7,10 @@
 
 import { describe, it, expect } from 'vitest';
 import type { Entity, Vec3 } from '@core/model/types';
-import type { MeshData } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createNodeOcctKernel } from '../src/occtNode';
-import { booleanMesh } from './kernelTestSupport';
+import { common, booleanMesh, volume } from './kernelTestSupport';
 
-const common = { layerId: 'layer-default', color: '#888888' };
 const sphere = (rotation: Vec3): Entity =>
   ({ id: 's', kind: 'sphere', position: [1, 1, 0], rotation, radius: 3, ...common }) as Entity;
 // Top face at z = 3 touches the sphere (centre z = 0, r = 3) at a single point.
@@ -24,24 +22,6 @@ const tangentBox: Entity = {
   size: [5, 3, 4],
   ...common,
 } as Entity;
-
-function volume(mesh: MeshData): number {
-  const p = mesh.positions;
-  let sum = 0;
-  for (let i = 0; i < mesh.indices.length; i += 3) {
-    const [a, b, c] = [0, 1, 2].map((k) => (mesh.indices[i + k] ?? 0) * 3) as [
-      number,
-      number,
-      number,
-    ];
-    sum +=
-      ((p[a] ?? 0) * ((p[b + 1] ?? 0) * (p[c + 2] ?? 0) - (p[b + 2] ?? 0) * (p[c + 1] ?? 0)) -
-        (p[a + 1] ?? 0) * ((p[b] ?? 0) * (p[c + 2] ?? 0) - (p[b + 2] ?? 0) * (p[c] ?? 0)) +
-        (p[a + 2] ?? 0) * ((p[b] ?? 0) * (p[c + 1] ?? 0) - (p[b + 1] ?? 0) * (p[c] ?? 0))) /
-      6;
-  }
-  return sum;
-}
 
 describe.each([
   ['axis-aligned', [0, 0, 0]],

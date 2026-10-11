@@ -56,9 +56,8 @@ export function buildPlanProfileSheet(
   alignment: AlignmentObject,
   options: PlanProfileOptions,
 ): PlanProfileSheet | string {
-  if (validateProfile(alignment.profile) !== null) {
+  if (validateProfile(alignment.profile) !== null)
     return `${alignment.name} has no design profile (set_alignment_profile).`;
-  }
   if (options.scale !== undefined && !(options.scale > 0)) return 'scale must be > 0.';
   if (!(options.verticalExaggeration > 0)) return 'verticalExaggeration must be > 0.';
   const civil = getCivil(doc);

@@ -4,23 +4,15 @@
  * @layer domain-aec/civil
  */
 
-import type { Vec3 } from '@core/model/types';
-import { DOCUMENT_UNITS } from '@core/model/types';
+import { type Vec3, DOCUMENT_UNITS } from '@core/model/types';
 import type { PointGroupObject, SurveyPoint } from '@core/model/civil';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
 import { flattenDxf, parseDxf, type DxfPrimitive } from '@lib/dxfRead';
 import { insUnitsMillimetres } from '@lib/dxfUnits';
-import {
-  civilAffected,
-  civilObjectsOf,
-  fromUnit,
-  getCivil,
-  nextCivilId,
-  withObject,
-} from './model';
-import { regenerateCivil } from './evaluate';
+import { civilObjectsOf, fromUnit, getCivil, nextCivilId, withObject } from './model';
+import { commitCivil } from './evaluate';
 
 const SOURCES = ['points', 'vertices', 'faces', 'text'] as const;
 type Source = (typeof SOURCES)[number];
@@ -86,9 +78,8 @@ export const importSurveyDxf = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const drawing = parseDxf(params.text);
-    if (drawing === null) {
+    if (drawing === null)
       return noop(doc, 'import_survey_dxf failed: not an ASCII DXF with an ENTITIES section.');
-    }
     const headerMm = insUnitsMillimetres(drawing.insUnits);
     const unit =
       params.sourceUnit ??
@@ -139,14 +130,13 @@ export const importSurveyDxf = defineCommand({
       entityIds: [],
       points,
     };
-    const document = regenerateCivil(doc, withObject(civil, group));
-    return {
-      document,
-      summary:
-        `Imported ${points.length} survey points from DXF (${unit}) as ${group.name} (${id})` +
+    return commitCivil(
+      doc,
+      withObject(civil, group),
+      [id],
+      `Imported ${points.length} survey points from DXF (${unit}) as ${group.name} (${id})` +
         (zeros > 0 ? `; ${zeros} at elevation 0 ignored.` : '.'),
-      affected: civilAffected(document, [id]),
-      data: { pointGroupId: id, count: points.length },
-    };
+      { pointGroupId: id, count: points.length },
+    );
   },
 });

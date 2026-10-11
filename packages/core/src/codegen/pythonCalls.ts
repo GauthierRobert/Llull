@@ -52,13 +52,18 @@ export function shapeCallOpen(shape: ShapeSpec): string {
   }
 }
 
-/** Call arguments of a fillet / chamfer: `[edges], size[, near=[(x, y, z), …]]`. */
-export function roundArguments(feature: Extract<Feature, { op: 'fillet' | 'chamfer' }>): string {
+/** `v = fillet|chamfer(v, [edges], size[, near=[…]])` or `v = shell(v, thickness)`. */
+export function modifierLine(
+  feature: Extract<Feature, { op: 'fillet' | 'chamfer' | 'shell' }>,
+): string {
+  const v = feature.variable;
+  if (feature.op === 'shell') return `${v} = shell(${v}, ${formatTerm(feature.thickness)})`;
   const near =
     feature.near === undefined
       ? ''
       : `, near=[${feature.near.map((point) => `(${point.map(formatNumber).join(', ')})`).join(', ')}]`;
-  return `[${feature.edges.map(formatNumber).join(', ')}], ${formatTerm(feature.size)}${near}`;
+  const size = formatTerm(feature.size);
+  return `${v} = ${feature.op}(${v}, [${feature.edges.map(formatNumber).join(', ')}], ${size}${near})`;
 }
 
 /** `, position=(…), rotation=(…)` kwargs; omitted when zero. Meshes are already world-space. */

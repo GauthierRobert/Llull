@@ -129,9 +129,8 @@ export function appendEntityLabels(
     for (const point of keyPoints) {
       const screen = project(point);
       // Only draw markers reasonably within the viewport (with generous margin).
-      if (screen[0] < -20 || screen[0] > width + 20 || screen[1] < -20 || screen[1] > height + 20) {
+      if (screen[0] < -20 || screen[0] > width + 20 || screen[1] < -20 || screen[1] > height + 20)
         continue;
-      }
       lines.push(
         `    ${svgDot(screen, `fill="${color}" opacity="0.85" stroke="#0d0d1a" stroke-width="0.8"`)}`,
       );

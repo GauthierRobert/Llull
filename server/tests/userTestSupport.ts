@@ -6,7 +6,10 @@ import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { afterEach, beforeEach } from 'vitest';
 import type { Role } from '../src/users';
+import { _resetLiveDoc } from '../src/liveDocument';
+import { _resetHistory } from '../src/commandBus';
 
 export const sha256 = (value: string): string =>
   crypto.createHash('sha256').update(value).digest('hex');
@@ -61,4 +64,26 @@ export const ENV_KEYS = [
 
 export function clearEnv(): void {
   for (const key of ENV_KEYS) delete process.env[key];
+}
+
+export const bearer = (token: string): [string, string] => ['Authorization', `Bearer ${token}`];
+
+/**
+ * Per-file hooks: a temp dir with the standard users file, a fresh live document and history,
+ * env cleaned afterwards. `onDir` runs right after the dir exists; returns a getter for the dir.
+ */
+export function withUserFixture(onDir?: (dir: string) => void): () => string {
+  let dir = '';
+  beforeEach(() => {
+    dir = tempDir();
+    onDir?.(dir);
+    installUsersFile(dir, [ADMIN, EDITOR, VIEWER]);
+    _resetLiveDoc();
+    _resetHistory();
+  });
+  afterEach(() => {
+    clearEnv();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+  return () => dir;
 }

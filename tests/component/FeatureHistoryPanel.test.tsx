@@ -19,14 +19,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
+import { type FeatureStep, createEmptyDocument } from '@core/model/types';
 import { FeatureHistoryPanel } from '@ui/panels/FeatureHistoryPanel';
 import { localDispatch, liveSnapshot } from '../helpers/storeTestHelpers';
-import type { FeatureStep } from '@core/model/types';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 /** The store's real dispatch, captured before any test swaps in a spy via `patchDispatch`. */
 const realDispatch = useStore.getState().dispatch;
@@ -62,9 +59,12 @@ function patchDispatch(spy: ReturnType<typeof vi.fn>): void {
   useStore.setState({ dispatch: spy } as any);
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
+
+function expectBoxSize(size: number[]): void {
+  const box = Object.values(useStore.getState().document.entities).find((e) => e?.kind === 'box');
+  expect(box?.kind === 'box' ? box.size : null).toEqual(size);
+}
 
 describe('FeatureHistoryPanel — rendering', () => {
   beforeEach(() => {
@@ -158,30 +158,19 @@ describe('FeatureHistoryPanel — reorder', () => {
     resetStore();
   });
 
-  it('dispatches reorder_step with newIndex=0 when move-up clicked on index 1', () => {
+  it.each([
+    ['newIndex=0 when move-up clicked on index 1', 's1', /move step add_sphere up/i, 0],
+    ['newIndex=1 when move-down clicked on index 0', 's0', /move step add_box down/i, 1],
+  ])('dispatches reorder_step with %s', (_title, stepId, buttonName, newIndex) => {
     setHistory([makeStep('s0', 'add_box'), makeStep('s1', 'add_sphere')]);
     const dispatchSpy = vi.fn();
     patchDispatch(dispatchSpy);
 
     render(<FeatureHistoryPanel />);
-    const row = screen.getByTestId('history-step-s1');
-    const upBtn = within(row).getByRole('button', { name: /move step add_sphere up/i });
-    fireEvent.click(upBtn);
+    const row = screen.getByTestId(`history-step-${stepId}`);
+    fireEvent.click(within(row).getByRole('button', { name: buttonName }));
 
-    expect(dispatchSpy).toHaveBeenCalledWith('reorder_step', { stepId: 's1', newIndex: 0 });
-  });
-
-  it('dispatches reorder_step with newIndex=1 when move-down clicked on index 0', () => {
-    setHistory([makeStep('s0', 'add_box'), makeStep('s1', 'add_sphere')]);
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
-
-    render(<FeatureHistoryPanel />);
-    const row = screen.getByTestId('history-step-s0');
-    const downBtn = within(row).getByRole('button', { name: /move step add_box down/i });
-    fireEvent.click(downBtn);
-
-    expect(dispatchSpy).toHaveBeenCalledWith('reorder_step', { stepId: 's0', newIndex: 1 });
+    expect(dispatchSpy).toHaveBeenCalledWith('reorder_step', { stepId, newIndex });
   });
 
   it('disables move-up for the first step', () => {
@@ -299,8 +288,7 @@ describe('FeatureHistoryPanel — per-step params editor', () => {
     fireEvent.change(within(form).getByLabelText(/^Size/), { target: { value: '4, 5, 6' } });
     fireEvent.click(within(form).getByRole('button', { name: /^Apply/ }));
 
-    const box = Object.values(useStore.getState().document.entities).find((e) => e?.kind === 'box');
-    expect(box?.kind === 'box' ? box.size : null).toEqual([4, 5, 6]);
+    expectBoxSize([4, 5, 6]);
     expect(screen.queryByRole('form', { name: /add box parameters/i })).toBeNull();
   });
 
@@ -312,8 +300,7 @@ describe('FeatureHistoryPanel — per-step params editor', () => {
     expect(screen.getByRole('form', { name: /add box parameters/i })).toBeDefined();
     const alerts = screen.getAllByRole('alert').map((alert) => alert.textContent ?? '');
     expect(alerts.some((text) => /changed nothing when replayed/.test(text))).toBe(true);
-    const box = Object.values(useStore.getState().document.entities).find((e) => e?.kind === 'box');
-    expect(box?.kind === 'box' ? box.size : null).toEqual([2, 2, 2]);
+    expectBoxSize([2, 2, 2]);
   });
 
   it('dispatches a schema-invalid edit and shows the core refusal instead of pre-validating', () => {
@@ -322,8 +309,7 @@ describe('FeatureHistoryPanel — per-step params editor', () => {
     fireEvent.click(within(form).getByRole('button', { name: /^Apply/ }));
 
     expect(screen.getByRole('form', { name: /add box parameters/i })).toBeDefined();
-    const box = Object.values(useStore.getState().document.entities).find((e) => e?.kind === 'box');
-    expect(box?.kind === 'box' ? box.size : null).toEqual([2, 2, 2]);
+    expectBoxSize([2, 2, 2]);
   });
 
   it('Cancel closes the editor without dispatching', () => {

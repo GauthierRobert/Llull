@@ -12,24 +12,20 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { frameEntityIds } from './sseTestHelpers';
+import { frameEntityIds, makeFakeRes } from './sseTestHelpers';
 import request from 'supertest';
 import { app } from '../src/index';
 import { getLiveDoc, _resetLiveDoc, subscribeLive } from '../src/liveDocument';
 import { _resetHistory } from '../src/commandBus';
 
-// ---------------------------------------------------------------------------
 // Reset shared state before each test.
-// ---------------------------------------------------------------------------
 
 beforeEach(() => {
   _resetLiveDoc();
   _resetHistory();
 });
 
-// ---------------------------------------------------------------------------
 // (a) POST /command — mutation + SSE broadcast
-// ---------------------------------------------------------------------------
 
 describe('POST /command — mutation', () => {
   it('returns 200 with summary, affected, canUndo', async () => {
@@ -55,21 +51,8 @@ describe('POST /command — mutation', () => {
   });
 
   it('/live SSE subscriber receives the broadcast', async () => {
-    interface FakeResponse {
-      written: string[];
-      write(chunk: string): boolean;
-      end(): void;
-    }
-    const fakeRes: FakeResponse = {
-      written: [],
-      write(chunk: string): boolean {
-        this.written.push(chunk);
-        return true;
-      },
-      end(): void {},
-    };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const unsub = subscribeLive(fakeRes as any);
+    const fakeRes = makeFakeRes();
+    const unsub = subscribeLive(fakeRes);
     const writesBefore = fakeRes.written.length;
 
     await request(app)
@@ -85,9 +68,7 @@ describe('POST /command — mutation', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (b) POST /command — bad body → 400
-// ---------------------------------------------------------------------------
 
 describe('POST /command — validation', () => {
   it('returns 400 when body has no "name" field', async () => {
@@ -114,9 +95,7 @@ describe('POST /command — validation', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (c) POST /undo + POST /redo round-trip
-// ---------------------------------------------------------------------------
 
 describe('POST /undo + POST /redo', () => {
   it('undo reverts a prior mutation', async () => {
@@ -162,9 +141,7 @@ describe('POST /undo + POST /redo', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (d) Unknown command → isError: true, 200 (not 400)
-// ---------------------------------------------------------------------------
 
 describe('POST /command — unknown command', () => {
   it('returns 200 with isError: true', async () => {
@@ -175,9 +152,7 @@ describe('POST /command — unknown command', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (e) MCP tools/call shares history — POST /undo reverts an MCP mutation
-// ---------------------------------------------------------------------------
 
 describe('MCP tools/call + REST /undo interop', () => {
   it('POST /undo after an MCP add_box reverts the entity', async () => {

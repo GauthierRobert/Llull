@@ -13,47 +13,19 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { frameEntityIds, parseSseFrame } from './sseTestHelpers';
+import { frameEntityIds, makeFakeRes, parseSseFrame } from './sseTestHelpers';
+import { boxRowPlan } from '../../tests/helpers/boxRowPlan';
 import { applyCommand, undo, redo, canUndo, canRedo, _resetHistory } from '../src/commandBus';
 import { getLiveDoc, _resetLiveDoc, subscribeLive } from '../src/liveDocument';
 
-// ---------------------------------------------------------------------------
-// Minimal fake Express Response for broadcast-capture tests.
-// ---------------------------------------------------------------------------
-
-interface FakeResponse {
-  written: string[];
-  ended: boolean;
-  write(chunk: string): boolean;
-  end(): void;
-}
-
-function makeFakeRes(): FakeResponse {
-  return {
-    written: [],
-    ended: false,
-    write(chunk: string): boolean {
-      this.written.push(chunk);
-      return true;
-    },
-    end(): void {
-      this.ended = true;
-    },
-  };
-}
-
-// ---------------------------------------------------------------------------
 // Reset shared state before each test.
-// ---------------------------------------------------------------------------
 
 beforeEach(() => {
   _resetLiveDoc();
   _resetHistory();
 });
 
-// ---------------------------------------------------------------------------
 // (a) Mutating command updates live doc + pushes undo history
-// ---------------------------------------------------------------------------
 
 describe('applyCommand — mutating command', () => {
   it('adds an entity to the live document', () => {
@@ -80,8 +52,7 @@ describe('applyCommand — mutating command', () => {
 
   it('broadcasts to SSE subscribers after a mutation', () => {
     const fakeRes = makeFakeRes();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const unsub = subscribeLive(fakeRes as any);
+    const unsub = subscribeLive(fakeRes);
 
     // Initial snapshot write (1 total).
     expect(fakeRes.written).toHaveLength(1);
@@ -100,9 +71,7 @@ describe('applyCommand — mutating command', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (b) Query command — data returned, no history push, no doc change
-// ---------------------------------------------------------------------------
 
 describe('applyCommand — query command (measure_volume)', () => {
   it('returns data and leaves the live document unchanged', () => {
@@ -129,8 +98,7 @@ describe('applyCommand — query command (measure_volume)', () => {
     const entityId = Object.keys(getLiveDoc().entities)[0] ?? '';
 
     const fakeRes = makeFakeRes();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const unsub = subscribeLive(fakeRes as any);
+    const unsub = subscribeLive(fakeRes);
     const writeCountBefore = fakeRes.written.length;
 
     applyCommand('measure_volume', { entityId });
@@ -142,9 +110,7 @@ describe('applyCommand — query command (measure_volume)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (c) No-op — graceful bad params, no history push
-// ---------------------------------------------------------------------------
 
 describe('applyCommand — no-op (bad params)', () => {
   it('does not push history when the document is unchanged', () => {
@@ -158,9 +124,7 @@ describe('applyCommand — no-op (bad params)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (d) Unknown command → isError true
-// ---------------------------------------------------------------------------
 
 describe('applyCommand — unknown command', () => {
   it('returns isError true and leaves the doc unchanged', () => {
@@ -182,9 +146,7 @@ describe('applyCommand — unknown command', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (e) undo / redo
-// ---------------------------------------------------------------------------
 
 describe('undo / redo', () => {
   it('undo with empty stack returns "Nothing to undo." without error', () => {
@@ -259,8 +221,7 @@ describe('undo / redo', () => {
     applyCommand('add_box', { size: [1, 1, 1], position: [0, 0, 0] });
 
     const fakeRes = makeFakeRes();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const unsub = subscribeLive(fakeRes as any);
+    const unsub = subscribeLive(fakeRes);
     const writesBefore = fakeRes.written.length;
 
     undo();
@@ -277,9 +238,7 @@ describe('undo / redo', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // (f) canUndo / canRedo module-level helpers
-// ---------------------------------------------------------------------------
 
 describe('canUndo / canRedo', () => {
   it('start false on a clean state', () => {
@@ -304,21 +263,13 @@ describe('applyCommand — idempotent commandId', () => {
   });
 
   it('a replay keeps small result data but drops a huge payload and says so', () => {
-    const plan = (count: number): unknown => ({
-      actions: [
-        {
-          repeat: { count, as: 'row' },
-          step: { command: 'add_box', params: { size: [1, 1, 1], position: ['=$i', 0, 0] } },
-        },
-      ],
-    });
-    const small = applyCommand('build_project', plan(2), 'small');
+    const small = applyCommand('build_project', boxRowPlan(2), 'small');
     expect(small.data).toBeDefined();
-    expect(applyCommand('build_project', plan(2), 'small')).toEqual(small);
+    expect(applyCommand('build_project', boxRowPlan(2), 'small')).toEqual(small);
 
-    const big = applyCommand('build_project', plan(400), 'big');
+    const big = applyCommand('build_project', boxRowPlan(400), 'big');
     expect(JSON.stringify(big.data).length).toBeGreaterThan(64 * 1024);
-    const replay = applyCommand('build_project', plan(400), 'big');
+    const replay = applyCommand('build_project', boxRowPlan(400), 'big');
     expect(replay.data).toBeUndefined();
     expect(replay.affected).toEqual(big.affected);
     expect(replay.changed).toBe(true);

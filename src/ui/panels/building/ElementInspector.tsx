@@ -80,9 +80,8 @@ export function ElementInspector({ elementId }: ElementInspectorProps): React.Re
   const building = useStore((s) => s.document.building);
   const units = useStore((s) => s.document.units);
   const element = building?.elements[elementId];
-  if (building === undefined || element === undefined) {
+  if (building === undefined || element === undefined)
     return <p className="panel__empty-hint">Building element {elementId} not found.</p>;
-  }
   const label = CATEGORY_LABEL[element.category];
   const level = levelNameOf(building, element);
   const facts: ReadonlyArray<readonly [string, string]> =

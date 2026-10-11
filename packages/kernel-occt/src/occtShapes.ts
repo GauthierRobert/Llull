@@ -6,9 +6,8 @@
  */
 
 import type { MeshData } from '@core/geometry/kernel';
-import type { Entity, Vec3 } from '@core/model/types';
-import { createEmptyDocument } from '@core/model/types';
-import { entityToTriangles } from '@core/commands/exportTriangulate';
+import { type Entity, type Vec3, createEmptyDocument } from '@core/model/types';
+import { entityTrianglePositions } from '@core/commands/exportTriangulate';
 import { cross3, dot3, sub3 } from '@lib/vec3';
 import { isValidPolygon, toCounterClockwise } from '@lib/polygon';
 import {
@@ -187,18 +186,9 @@ function revolvedPrimitive(api: OccApi, entity: Entity): OccShape | null {
   return placed(api, shape, placementTransform(api, entity.rotation, entity.position, anchorShift));
 }
 
-/**
- * Prism of an XY polygon from z=0 to z=depth. The outline is made counter-clockwise first (a
- * clockwise face would extrude inside-out); degenerate or non-finite profiles -> null.
- */
-function extrudedProfile(api: OccApi, entity: Entity): OccShape | null {
-  if (entity.kind !== 'extrusion' || !isValidPolygon(entity.profile) || !(entity.depth > 0)) {
-    return null;
-  }
-  const outline = toCounterClockwise(entity.profile).map(([x, y]): Vec3 => [x, y, 0]);
-  const face = polygonFace(api, outline);
-  if (face === null) return null;
-  const direction: OccHandle = new api.gp_Vec_4(0, 0, entity.depth);
+/** Sweep `face` along `offset` into a prism, placed at the entity's rotation and position. */
+function prism(api: OccApi, face: OccShape, offset: Vec3, entity: Entity): OccShape {
+  const direction: OccHandle = new api.gp_Vec_4(...offset);
   const maker = new api.BRepPrimAPI_MakePrism_1(face, direction, false, true) as {
     Shape(): OccShape;
     delete(): void;
@@ -206,6 +196,19 @@ function extrudedProfile(api: OccApi, entity: Entity): OccShape | null {
   const shape = maker.Shape();
   [maker, direction, face].forEach(release);
   return placed(api, shape, placementTransform(api, entity.rotation, entity.position));
+}
+
+/**
+ * Prism of an XY polygon from z=0 to z=depth. The outline is made counter-clockwise first (a
+ * clockwise face would extrude inside-out); degenerate or non-finite profiles -> null.
+ */
+function extrudedProfile(api: OccApi, entity: Entity): OccShape | null {
+  if (entity.kind !== 'extrusion' || !isValidPolygon(entity.profile) || !(entity.depth > 0))
+    return null;
+  const outline = toCounterClockwise(entity.profile).map(([x, y]): Vec3 => [x, y, 0]);
+  const face = polygonFace(api, outline);
+  if (face === null) return null;
+  return prism(api, face, [0, 0, entity.depth], entity);
 }
 
 /** Right-triangle prism: the YZ triangle (0,0), (h,0), (0,d) extruded along +X by the width. */
@@ -218,14 +221,7 @@ function wedgeSolid(api: OccApi, entity: Entity): OccShape | null {
     [0, 0, depth],
   ]);
   if (face === null) return null;
-  const direction: OccHandle = new api.gp_Vec_4(width, 0, 0);
-  const maker = new api.BRepPrimAPI_MakePrism_1(face, direction, false, true) as {
-    Shape(): OccShape;
-    delete(): void;
-  };
-  const shape = maker.Shape();
-  [maker, direction, face].forEach(release);
-  return placed(api, shape, placementTransform(api, entity.rotation, entity.position));
+  return prism(api, face, [width, 0, 0], entity);
 }
 
 /**
@@ -298,10 +294,7 @@ function soupVolume(positions: readonly number[]): number {
 
 /** Sewn solid from the entity's own (already world-space, outward-wound) triangles. */
 function tessellatedSolid(api: OccApi, entity: Entity): OccShape | null {
-  const positions: number[] = [];
-  for (const triangle of entityToTriangles(entity, NO_COMPONENTS)) {
-    for (const [x, y, z] of triangle) positions.push(x, y, z);
-  }
+  const positions = entityTrianglePositions(entity, NO_COMPONENTS);
   if (positions.length === 0) return null;
   if (soupVolume(positions) < 0) {
     for (let i = 0; i + 8 < positions.length; i += 9) {

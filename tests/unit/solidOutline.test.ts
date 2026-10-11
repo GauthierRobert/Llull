@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
-import type { CadDocument, Entity, Vec2 } from '@core/model/types';
-import { execute } from '@core/commands/registry';
+import { type CadDocument, type Entity, type Vec2, createEmptyDocument } from '@core/model/types';
+import { add } from '../helpers/addEntity';
 import {
   convexHull,
   ringsDistSq,
@@ -10,11 +9,6 @@ import {
 } from '../../src/ui/viewport/2d/solidOutline';
 import { entitiesInBox } from '../../src/ui/viewport/2d/boxSelect';
 import { nearestEntityId } from '../../src/ui/viewport/2d/modifyHelpers';
-
-function add(doc: CadDocument, name: string, params: unknown): { doc: CadDocument; id: string } {
-  const result = execute(doc, name, params);
-  return { doc: result.document, id: result.affected[0] as string };
-}
 
 const extent = (ring: ReadonlyArray<Vec2>): [number, number, number, number] => [
   Math.min(...ring.map((p) => p[0])),

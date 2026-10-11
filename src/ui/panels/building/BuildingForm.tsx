@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import { FormError } from '@ui/panels/PanelParts';
 
 interface BuildingFormProps {
   ariaLabel: string;
@@ -35,11 +36,7 @@ export function BuildingForm({
       data-testid={testId}
     >
       {children}
-      {error !== '' && (
-        <p className="panel__error" role="alert">
-          {error}
-        </p>
-      )}
+      <FormError text={error} />
       <button type="submit" className="btn btn--primary btn--sm" data-testid={submitTestId}>
         {submitLabel}
       </button>

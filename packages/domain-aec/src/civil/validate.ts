@@ -5,9 +5,8 @@
  * @pure
  */
 
-import type { ProfilePvi } from '@core/model/civil';
+import { type ProfilePvi, CIVIL_CATEGORIES } from '@core/model/civil';
 import type { Vec2 } from '@core/model/types';
-import { CIVIL_CATEGORIES } from '@core/model/civil';
 import { isRecord } from '@lib/isRecord';
 import { isValidPolygon } from '@lib/polygon';
 import { validateHorizontal } from './alignmentGeometry';
@@ -232,9 +231,8 @@ export function civilErrors(raw: unknown): string[] {
   if (!isRecord(objects)) return ['civil.objects must be an object'];
   if (!isStringList(order)) return ['civil.order must be an array of ids'];
   const counters = raw['counters'];
-  if (!isRecord(counters) || !Object.values(counters).every(finite)) {
+  if (!isRecord(counters) || !Object.values(counters).every(finite))
     return ['civil.counters must map prefixes to numbers'];
-  }
   const errors: string[] = crsErrors(raw['crs']);
   const ids = order as string[];
   if (new Set(ids).size !== ids.length) errors.push('civil.order lists an id twice');

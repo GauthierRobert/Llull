@@ -9,7 +9,6 @@ import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
 import { fromMm } from '../model';
 import {
-  civilAffected,
   civilObject,
   civilObjectsOf,
   getCivil,
@@ -17,7 +16,7 @@ import {
   toMetresText,
   withObject,
 } from './model';
-import { regenerateCivil } from './evaluate';
+import { commitCivil } from './evaluate';
 import { flowsTo, pipePlanLength } from './drainageTopology';
 
 const pipeFields = {
@@ -117,19 +116,17 @@ export const addPipe = defineCommand({
       invertTo: params.invertTo ?? to.invertElevation,
     };
     const length = pipePlanLength(civil, pipe) ?? 0;
-    if (!(length > 0)) {
+    if (!(length > 0))
       return noop(doc, `add_pipe failed: ${from.id} and ${to.id} share the same plan position.`);
-    }
-    const document = regenerateCivil(doc, withObject(civil, pipe));
     const adverse = pipe.invertFrom <= pipe.invertTo ? ' Warning: adverse or zero slope.' : '';
-    return {
-      document,
-      summary:
-        `Added pipe ${pipe.name} (${id}) ${from.name} -> ${to.name}: length ${toMetresText(doc, length)} m, ` +
+    return commitCivil(
+      doc,
+      withObject(civil, pipe),
+      [id],
+      `Added pipe ${pipe.name} (${id}) ${from.name} -> ${to.name}: length ${toMetresText(doc, length)} m, ` +
         `slope ${slopeText(pipe, length)}, ${pipe.material}.${adverse}`,
-      affected: civilAffected(document, [id]),
-      data: { pipeId: id },
-    };
+      { pipeId: id },
+    );
   },
 });
 
@@ -163,20 +160,18 @@ export const updatePipe = defineCommand({
       invertFrom: params.invertFrom ?? pipe.invertFrom,
       invertTo: params.invertTo ?? pipe.invertTo,
     };
-    if (JSON.stringify(updated) === JSON.stringify(pipe)) {
+    if (JSON.stringify(updated) === JSON.stringify(pipe))
       return noop(doc, `update_pipe: nothing to change on ${pipe.id}.`);
-    }
-    const document = regenerateCivil(doc, withObject(civil, updated));
     const length = pipePlanLength(civil, updated) ?? 0;
     const adverse =
       updated.invertFrom <= updated.invertTo ? ' Warning: adverse or zero slope.' : '';
-    return {
-      document,
-      summary:
-        `Updated pipe ${updated.name} (${updated.id}): slope ${slopeText(updated, length)}, ` +
+    return commitCivil(
+      doc,
+      withObject(civil, updated),
+      [updated.id],
+      `Updated pipe ${updated.name} (${updated.id}): slope ${slopeText(updated, length)}, ` +
         `${updated.material}, n ${updated.manningN}.${adverse}`,
-      affected: civilAffected(document, [updated.id]),
-    };
+    );
   },
 });
 

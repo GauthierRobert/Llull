@@ -1,23 +1,14 @@
 /** Regression tests for the final migration review (S2, S3, S4, S7, N2, N5). */
 import { describe, it, expect, afterEach } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
-import type { BoxEntity, CadDocument } from '@core/model/types';
+import { type BoxEntity, type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { currentContext, defaultContext, runInContext } from '@core/commands/context';
 import { setGeometryKernel } from '@core/geometry/kernel';
-import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
 import { installPlugin } from '@core/plugins/host';
 import { defineCommand, z } from '@core/commands/schema';
 import type { CommandDefinition } from '@core/commands/types';
 import { nextId, withIdSource } from '@lib/id';
-import { fakeKernel } from '../../helpers/fakeKernel';
-
-const TRIANGLE: MeshData = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] };
-const triangleKernel: GeometryKernel = fakeKernel({
-  solid: TRIANGLE,
-  boolean: TRIANGLE,
-  fillet: TRIANGLE,
-});
+import { triangleKernel } from '../../helpers/fakeKernel';
 
 function boxOf(doc: CadDocument): BoxEntity {
   return Object.values(doc.entities).find((e) => e.kind === 'box') as BoxEntity;
@@ -61,7 +52,7 @@ describe('S3: set_parameter regenerates through recipes and constraints', () => 
 describe('S4/S7: history operations refuse without a kernel instead of reporting success', () => {
   function unionHistory(): CadDocument {
     let doc = createEmptyDocument();
-    const ctx = { ...defaultContext(), kernel: triangleKernel };
+    const ctx = { ...defaultContext(), kernel: triangleKernel() };
     const a = execute(doc, 'add_box', { size: [2, 2, 2] }, ctx);
     doc = a.document;
     const b = execute(doc, 'add_box', { size: [2, 2, 2], position: [1, 0, 0] }, ctx);

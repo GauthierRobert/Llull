@@ -217,9 +217,8 @@ export function instanceBoundsFromDoc(
 ): Bounds {
   const component = doc.components[instance.componentId];
   // Past MAX_NESTING a reference cycle is assumed: the instance counts as a point at its position.
-  if (!component || component.order.length === 0 || depth >= MAX_NESTING) {
+  if (!component || component.order.length === 0 || depth >= MAX_NESTING)
     return { min: instance.position, max: instance.position };
-  }
 
   const { scale = [1, 1, 1], rotation, position } = instance;
   const hasRotation = !isZeroRotation(rotation);

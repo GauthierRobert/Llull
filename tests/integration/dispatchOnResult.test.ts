@@ -6,10 +6,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
-
-async function flushPromises(): Promise<void> {
-  for (let i = 0; i < 10; i++) await new Promise<void>((resolve) => resolve());
-}
+import { flushPromises, resetOfflineStore } from '../helpers/storeTestHelpers';
 
 function serverResponse(body: Record<string, unknown>, ok = true): ReturnType<typeof vi.fn> {
   return vi.fn().mockResolvedValue({
@@ -22,14 +19,8 @@ function serverResponse(body: Record<string, unknown>, ok = true): ReturnType<ty
 }
 
 describe('dispatch onResult', () => {
-  beforeEach(() => {
-    useStore.getState().setDocument(createEmptyDocument());
-    useStore.setState({ liveStatus: 'disconnected', localUndoStack: [], localRedoStack: [] });
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
+  beforeEach(resetOfflineStore);
+  afterEach(() => vi.unstubAllGlobals());
 
   it('reports a local change, then a local no-op', () => {
     const onResult = vi.fn();

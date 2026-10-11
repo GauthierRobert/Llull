@@ -2,9 +2,9 @@
  * @layer server/tests
  * Parse one named SSE frame (`event: <type>\ndata: <json>\n\n`) written by liveDocument.
  */
-import { createEmptyDocument } from '@core/model/types';
-import type { CadDocument } from '@core/model/types';
+import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import type { Response } from 'express';
 
 interface ParsedSseFrame {
   event: string;
@@ -35,4 +35,22 @@ export function frameEntityIds(frame: string, base: CadDocument = createEmptyDoc
   }
   const after = execute(base, data['name'] as string, data['params']).document;
   return after.order.filter((id) => base.entities[id] === undefined);
+}
+
+export type FakeRes = Response & { written: string[]; ended: boolean };
+
+/** Minimal Express Response that records SSE writes (usable with `subscribeLive`). */
+export function makeFakeRes(): FakeRes {
+  const res = {
+    written: [] as string[],
+    ended: false,
+    write(chunk: string): boolean {
+      res.written.push(chunk);
+      return true;
+    },
+    end(): void {
+      res.ended = true;
+    },
+  };
+  return res as unknown as FakeRes;
 }

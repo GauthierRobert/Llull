@@ -39,9 +39,7 @@ vi.mock('@core/commands/registry', () => ({
 import { shapeToolCallContent } from '@mcp/dispatch';
 import { applyToolCall } from '../helpers/applyToolCall';
 
-// ---------------------------------------------------------------------------
 // shapeToolCallContent — the single shaping implementation
-// ---------------------------------------------------------------------------
 
 describe('shapeToolCallContent() — pure shaping', () => {
   it('always produces a summary text block', () => {
@@ -138,9 +136,7 @@ describe('shapeToolCallContent() — pure shaping', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // applyToolCall — delegates to shapeToolCallContent (registry mock active)
-// ---------------------------------------------------------------------------
 
 describe('CommandResult.data — MCP passthrough via applyToolCall', () => {
   it('surfaces `data` when the command produced it', () => {
@@ -174,9 +170,7 @@ describe('CommandResult.data — MCP passthrough via applyToolCall', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // ParamSpec — richer schemas (unchanged from original)
-// ---------------------------------------------------------------------------
 
 describe('ParamSpec — richer schemas', () => {
   it('accepts `enum` and preserves the allowed values', () => {

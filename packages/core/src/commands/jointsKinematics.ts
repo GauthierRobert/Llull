@@ -84,9 +84,7 @@ export function detectCycleOnAdd(
     return false;
   }
 
-  if (dfs(drivenJointId)) {
-    return path.join(' → ');
-  }
+  if (dfs(drivenJointId)) return path.join(' → ');
   return null;
 }
 

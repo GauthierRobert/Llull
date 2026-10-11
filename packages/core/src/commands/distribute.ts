@@ -14,7 +14,7 @@ import { nextId } from '../lib/id';
 import { rotatePoint2 } from '../lib/polygon';
 import { add2, len2, normalize2, scale2, sub2 } from '../lib/vec2';
 import { MAX_COPIES_PER_COMMAND } from './limits';
-import { noop } from './noop';
+import { changed, noop, report } from './noop';
 import { withEntities } from './entityOps';
 import { instanceEntity } from './assemblies';
 
@@ -128,9 +128,7 @@ export const distributeAlongPath = defineCommand({
     { pathId, componentId, count, tangentAlign = true, startOffset = 0, endOffset = 0, name },
   ): CommandResult => {
     const pathEntity = doc.entities[pathId];
-    if (!pathEntity) {
-      return noop(doc, `distribute_along_path: path entity "${pathId}" not found.`);
-    }
+    if (!pathEntity) return noop(doc, `distribute_along_path: path entity "${pathId}" not found.`);
     if (pathEntity.kind !== 'polyline' && pathEntity.kind !== 'spline') {
       return noop(
         doc,
@@ -179,9 +177,8 @@ export const distributeAlongPath = defineCommand({
     const cumulative = cumulativeLengths(pathPoints, pathClosed);
     const totalLength = cumulative[cumulative.length - 1] ?? 0;
 
-    if (!Number.isFinite(totalLength) || totalLength < 1e-12) {
+    if (!Number.isFinite(totalLength) || totalLength < 1e-12)
       return noop(doc, `distribute_along_path: path "${pathId}" has zero or degenerate length.`);
-    }
 
     const placements: number[] = [];
 
@@ -197,13 +194,11 @@ export const distributeAlongPath = defineCommand({
       // Open path: usable = totalLength - startOffset - endOffset
       const usable = totalLength - startOffset - endOffset;
       if (usable <= 1e-12) {
-        return {
-          document: doc,
-          summary:
-            `distribute_along_path: usable path length is <= 0 ` +
+        return report(
+          doc,
+          `distribute_along_path: usable path length is <= 0 ` +
             `(totalLength=${totalLength.toFixed(4)}, startOffset=${startOffset}, endOffset=${endOffset}).`,
-          affected: [],
-        };
+        );
       }
 
       if (count === 1) {
@@ -253,14 +248,13 @@ export const distributeAlongPath = defineCommand({
     const lastId = createdIds[createdIds.length - 1] ?? '';
     const rangeStr = createdIds.length > 1 ? `${firstId}..${lastId}` : firstId;
 
-    return {
-      document: withEntities(doc, created),
-      summary:
-        `Distributed ${createdIds.length} instance${createdIds.length === 1 ? '' : 's'} of "${component.name}" ` +
+    return changed(
+      withEntities(doc, created),
+      `Distributed ${createdIds.length} instance${createdIds.length === 1 ? '' : 's'} of "${component.name}" ` +
         `along ${pathEntity.kind} "${pathId}" ` +
         `(length=${totalLength.toFixed(2)}, spacing=${spacing.toFixed(4)}). ` +
         `Created: ${rangeStr}.`,
-      affected: createdIds,
-    };
+      createdIds,
+    );
   },
 });

@@ -11,9 +11,7 @@ import { ModifyTools } from '../../src/ui/viewport/2d/ModifyTools';
 import type { ModifyToolKind } from '@ui/store';
 import type { ModifyToolPhase } from '../../src/ui/viewport/2d/useModifyTool';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function renderModifyTools(
   overrides: Partial<{
@@ -37,9 +35,7 @@ function renderModifyTools(
   render(<ModifyTools {...props} />);
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 describe('ModifyTools', () => {
   it('renders a toolbar with aria-label "2D modify tools"', () => {

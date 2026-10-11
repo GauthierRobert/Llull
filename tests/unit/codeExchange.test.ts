@@ -1,13 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import type { BoxEntity, CadDocument } from '@core/model/types';
-import { createEmptyDocument } from '@core/model/types';
+import { describe, it, expect } from 'vitest';
+import { type BoxEntity, type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { stripOuterParens } from '@core/commands/code_trace';
 import { MAX_TRACE_FEATURES } from '@core/commands/limits';
 import { setGeometryKernel } from '@core/geometry/kernel';
-import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
-import { fakeKernel } from '../helpers/fakeKernel';
+import { TETRA, fakeKernel, installKernelPerTest } from '../helpers/fakeKernel';
 
 interface CodeData {
   format: string;
@@ -80,20 +78,7 @@ function buildRichDoc(): CadDocument {
   return result.document;
 }
 
-const cannedMesh: MeshData = {
-  positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
-  indices: [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3],
-};
-
-const cannedKernel: GeometryKernel = fakeKernel({ boolean: cannedMesh });
-
-beforeEach(() => {
-  setGeometryKernel(cannedKernel);
-});
-
-afterEach(() => {
-  setGeometryKernel(null);
-});
+installKernelPerTest(fakeKernel({ boolean: TETRA }));
 
 describe('export_code', () => {
   it('exports a CadQuery script with parameters, expressions and ordered features', () => {
@@ -315,11 +300,15 @@ describe('stripOuterParens', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // apply_code_trace
-// ---------------------------------------------------------------------------
 
 /** What the generated CadQuery runtime records for: width/thickness params, box, cylinder, cut, name. */
+/** Traced `position` and `rotation` at the origin, no rotation. */
+const ORIGIN_POSE = {
+  position: [{ value: 0 }, { value: 0 }, { value: 0 }],
+  rotation: [{ value: 0 }, { value: 0 }, { value: 0 }],
+};
+
 function plateTrace(): unknown {
   return {
     parameters: [
@@ -336,8 +325,7 @@ function plateTrace(): unknown {
             { value: 40 },
             { value: 8, expression: '(width / 10)' },
           ],
-          position: [{ value: 0 }, { value: 0 }, { value: 0 }],
-          rotation: [{ value: 0 }, { value: 0 }, { value: 0 }],
+          ...ORIGIN_POSE,
           color: '#112233',
         },
       },
@@ -652,8 +640,7 @@ describe('apply_code_trace', () => {
             ref: 'f1',
             params: {
               size: [{ value: 4 }, { value: 4 }, { value: 4 }],
-              position: [{ value: 0 }, { value: 0 }, { value: 0 }],
-              rotation: [{ value: 0 }, { value: 0 }, { value: 0 }],
+              ...ORIGIN_POSE,
             },
           },
           {
@@ -662,8 +649,7 @@ describe('apply_code_trace', () => {
             params: {
               radius: { value: 1 },
               height: { value: 10 },
-              position: [{ value: 0 }, { value: 0 }, { value: 0 }],
-              rotation: [{ value: 0 }, { value: 0 }, { value: 0 }],
+              ...ORIGIN_POSE,
             },
           },
           {

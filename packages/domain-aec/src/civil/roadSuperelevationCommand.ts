@@ -7,8 +7,8 @@ import type { AlignmentObject } from '@core/model/civil';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
-import { civilAffected, civilObject, getCivil, toMetresText, withObject } from './model';
-import { regenerateCivil } from './evaluate';
+import { civilObject, getCivil, toMetresText, withObject } from './model';
+import { commitCivil } from './evaluate';
 
 /** Largest accepted full superelevation rate (ratio). */
 export const MAX_SUPERELEVATION_RATE = 0.15;
@@ -52,9 +52,8 @@ export const setSuperelevation = defineCommand({
         `set_superelevation failed: maxRate must be between 0 and ${MAX_SUPERELEVATION_RATE}.`,
       );
     }
-    if (runoffLength !== undefined && !(runoffLength > 0 && Number.isFinite(runoffLength))) {
+    if (runoffLength !== undefined && !(runoffLength > 0 && Number.isFinite(runoffLength)))
       return noop(doc, 'set_superelevation failed: runoffLength must be > 0.');
-    }
     const { superelevation: previous, ...rest } = alignment;
     const updated: AlignmentObject =
       maxRate === 0
@@ -63,19 +62,18 @@ export const setSuperelevation = defineCommand({
             ...rest,
             superelevation: { maxRate, ...(runoffLength !== undefined ? { runoffLength } : {}) },
           };
-    if (JSON.stringify(updated) === JSON.stringify(alignment)) {
+    if (JSON.stringify(updated) === JSON.stringify(alignment))
       return noop(doc, `set_superelevation: nothing to change on ${alignment.id}.`);
-    }
-    const document = regenerateCivil(doc, withObject(getCivil(doc), updated));
     const text =
       maxRate === 0
         ? `Removed superelevation (was ${((previous?.maxRate ?? 0) * 100).toFixed(2)} %)`
         : `Set superelevation ${(maxRate * 100).toFixed(2)} %` +
           (runoffLength !== undefined ? `, runoff ${toMetresText(doc, runoffLength)} m` : '');
-    return {
-      document,
-      summary: `${text} on ${alignment.name} (${alignment.id}).`,
-      affected: civilAffected(document, [alignment.id]),
-    };
+    return commitCivil(
+      doc,
+      withObject(getCivil(doc), updated),
+      [alignment.id],
+      `${text} on ${alignment.name} (${alignment.id}).`,
+    );
   },
 });

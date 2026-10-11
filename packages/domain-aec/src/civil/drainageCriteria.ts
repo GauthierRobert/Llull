@@ -47,8 +47,6 @@ export function intensityAt(criteria: DrainageCriteria, tcMin: number): number {
 
 /** Error text when an IDF curve is unusable, else null. */
 export function idfError(idf: Idf): string | null {
-  if (!(idf.a > 0) || !(idf.b >= 0) || !(idf.c > 0)) {
-    return 'idf needs a > 0, b >= 0 and c > 0.';
-  }
+  if (!(idf.a > 0) || !(idf.b >= 0) || !(idf.c > 0)) return 'idf needs a > 0, b >= 0 and c > 0.';
   return null;
 }

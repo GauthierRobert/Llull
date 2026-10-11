@@ -7,6 +7,7 @@ import { layerBoundaries, parseWallLayers } from '@aec/wallLayers';
 import type { TakeoffLine } from '@aec/takeoffBasics';
 import type { IfcExport } from '@aec/ifcBuild';
 import type { WallElement } from '@core/model/building';
+import { rawBuilding } from './elementEdits';
 
 const BUILD_UP = [
   { material: 'brick', thickness: 100, function: 'finish' },
@@ -123,9 +124,7 @@ describe('set_wall_layers', () => {
       layers: BUILD_UP,
     }).document;
     expect(buildingErrors(doc.building)).toEqual([]);
-    const broken = JSON.parse(JSON.stringify(doc.building)) as {
-      elements: Record<string, Record<string, unknown>>;
-    };
+    const broken = rawBuilding(doc);
     broken.elements['wall-1']!['thickness'] = 400;
     expect(buildingErrors(broken)).toEqual([expect.stringMatching(/add up to the wall thickness/)]);
     broken.elements['wall-1']!['layers'] = 'x';

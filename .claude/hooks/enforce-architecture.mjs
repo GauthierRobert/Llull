@@ -11,6 +11,7 @@
  * Block: JSON permissionDecision deny + stderr + exit 2.
  */
 import { existsSync, readFileSync } from 'node:fs';
+import { readStdin } from './readStdin.mjs';
 
 async function main() {
   const data = await readStdin();
@@ -93,15 +94,5 @@ function collectOldText(input, filePath) {
 
 function ok() {
   process.exit(0);
-}
-async function readStdin() {
-  try {
-    const chunks = [];
-    for await (const c of process.stdin) chunks.push(c);
-    const raw = Buffer.concat(chunks).toString('utf8').trim();
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
 }
 main().catch(() => process.exit(0));

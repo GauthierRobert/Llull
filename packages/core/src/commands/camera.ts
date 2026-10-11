@@ -13,7 +13,7 @@ import { boundsCenter } from './sceneBounds';
 import type { CommandResult } from './types';
 import { defineCommand, vec3, z } from './schema';
 import { computeSceneSnapshot } from './scene';
-import { noop } from './noop';
+import { noop, report } from './noop';
 
 /** Half of the 3D viewport PerspectiveCamera's vertical field of view. */
 const HALF_FOV_RAD = (VIEWPORT_FOV_DEGREES / 2) * (Math.PI / 180);
@@ -79,9 +79,8 @@ export const setCamera = defineCommand({
       ),
   }),
   run: (doc, p): CommandResult => {
-    if (p.distance !== undefined && p.distance <= 0) {
+    if (p.distance !== undefined && p.distance <= 0)
       return noop(doc, `set_camera: distance must be > 0 (got ${p.distance}). Camera unchanged.`);
-    }
 
     const prev: CameraState = doc.camera;
     const next: CameraState = {
@@ -94,15 +93,13 @@ export const setCamera = defineCommand({
       (field) => p[field] !== undefined,
     );
 
-    if (changed.length === 0) {
+    if (changed.length === 0)
       return noop(doc, 'set_camera: no fields specified; camera unchanged.');
-    }
 
-    return {
-      document: { ...doc, camera: next },
-      summary: `set_camera: updated ${changed.join(', ')}. target=${JSON.stringify(next.target)}, azimuth=${next.azimuth.toFixed(3)}, polar=${next.polar.toFixed(3)}, distance=${next.distance.toFixed(3)}.`,
-      affected: [],
-    };
+    return report(
+      { ...doc, camera: next },
+      `set_camera: updated ${changed.join(', ')}. target=${JSON.stringify(next.target)}, azimuth=${next.azimuth.toFixed(3)}, polar=${next.polar.toFixed(3)}, distance=${next.distance.toFixed(3)}.`,
+    );
   },
 });
 
@@ -149,11 +146,10 @@ export const lookAt = defineCommand({
       distance: prev.distance,
     };
 
-    return {
-      document: { ...doc, camera: next },
-      summary: `look_at: target set to ${JSON.stringify(next.target)}, azimuth=${next.azimuth.toFixed(3)}, polar=${next.polar.toFixed(3)}, distance preserved at ${next.distance.toFixed(3)}.`,
-      affected: [],
-    };
+    return report(
+      { ...doc, camera: next },
+      `look_at: target set to ${JSON.stringify(next.target)}, azimuth=${next.azimuth.toFixed(3)}, polar=${next.polar.toFixed(3)}, distance preserved at ${next.distance.toFixed(3)}.`,
+    );
   },
 });
 
@@ -199,9 +195,8 @@ export const fitView = defineCommand({
     const direction: FitDirection = p.direction ?? 'iso';
     const padding: number = p.padding ?? 1.2;
 
-    if (padding <= 0) {
+    if (padding <= 0)
       return noop(doc, `fit_view: padding must be > 0 (got ${padding}). Camera unchanged.`);
-    }
 
     const { bounds } = computeSceneSnapshot(doc);
 
@@ -212,11 +207,10 @@ export const fitView = defineCommand({
     if (!bounds) {
       const distance = 10;
       const next: CameraState = { target: [0, 0, 0], azimuth, polar, distance };
-      return {
-        document: { ...doc, camera: next },
-        summary: `fit_view (${direction}): document is empty — applied default framing: target=[0,0,0], distance=${distance}. azimuth=${azimuth.toFixed(3)}, polar=${polar.toFixed(3)}.`,
-        affected: [],
-      };
+      return report(
+        { ...doc, camera: next },
+        `fit_view (${direction}): document is empty — applied default framing: target=[0,0,0], distance=${distance}. azimuth=${azimuth.toFixed(3)}, polar=${polar.toFixed(3)}.`,
+      );
     }
 
     const target = boundsCenter(bounds);
@@ -227,10 +221,9 @@ export const fitView = defineCommand({
     const distance = (safeRadius / Math.sin(HALF_FOV_RAD)) * padding;
 
     const next: CameraState = { target, azimuth, polar, distance };
-    return {
-      document: { ...doc, camera: next },
-      summary: `fit_view (${direction}): target=${JSON.stringify(target.map((v) => +v.toFixed(3)))}, distance=${distance.toFixed(3)}, azimuth=${azimuth.toFixed(3)}, polar=${polar.toFixed(3)}, padding=${padding}.`,
-      affected: [],
-    };
+    return report(
+      { ...doc, camera: next },
+      `fit_view (${direction}): target=${JSON.stringify(target.map((v) => +v.toFixed(3)))}, distance=${distance.toFixed(3)}, azimuth=${azimuth.toFixed(3)}, polar=${polar.toFixed(3)}, padding=${padding}.`,
+    );
   },
 });

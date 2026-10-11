@@ -14,17 +14,9 @@ import {
   polygonArea,
   segmentsIntersect,
 } from '@lib/polygon';
-import {
-  fromMm,
-  getBuilding,
-  isVec2List,
-  toMetres,
-  toVec2,
-  withElement,
-  elementAffected,
-} from './model';
+import { fromMm, getBuilding, isVec2List, toMetres, toVec2, withElement } from './model';
 import { noop } from '@core/commands/noop';
-import { regenerateBuilding } from './evaluateElements';
+import { commitBuilding } from './evaluateElements';
 import { stairPoint } from './stairGeometry';
 import { triangulatePolygon } from '@lib/triangulate';
 
@@ -79,9 +71,8 @@ export function slabOpeningError(slab: SlabElement, opening: ReadonlyArray<Vec2>
         ),
     ),
   );
-  if (tooClose) {
+  if (tooClose)
     return `the opening comes within ${gap.toFixed(1)} of the slab edge or another opening (keep a gap)`;
-  }
   const clash = (slab.openings ?? []).findIndex((existing) => polygonsTouch(existing, opening));
   if (clash >= 0) return `the opening overlaps opening #${clash} of slab ${slab.mark}`;
   return triangulatePolygon(slab.boundary, [...(slab.openings ?? []), opening]).complete
@@ -145,9 +136,7 @@ export const addSlabOpening = defineCommand({
       if (stair?.category !== 'stair')
         return noop(doc, `add_slab_opening failed: no stair '${stairId}'.`);
       const clearance = margin ?? fromMm(doc, 100);
-      if (clearance < 0) {
-        return noop(doc, 'add_slab_opening failed: margin must be >= 0.');
-      }
+      if (clearance < 0) return noop(doc, 'add_slab_opening failed: margin must be >= 0.');
       outline = stairFootprint(stair, clearance);
       slab = slabId === undefined ? slabAboveStair(building, stair, outline) : undefined;
     } else if (isVec2List(boundary, 3)) {
@@ -174,15 +163,15 @@ export const addSlabOpening = defineCommand({
     const error = slabOpeningError(slab, outline);
     if (error) return noop(doc, `add_slab_opening refused: ${error}.`);
     const updated: SlabElement = { ...slab, openings: [...(slab.openings ?? []), outline] };
-    const document = regenerateBuilding(doc, withElement(building, updated));
     const area = polygonArea(outline) * toMetres(doc, 1) ** 2;
     const openingIndex = (updated.openings?.length ?? 1) - 1;
-    return {
-      document,
-      summary: `Cut opening index ${openingIndex} (${area.toFixed(2)} m²) in slab ${slab.mark} (${slab.id}).`,
-      affected: elementAffected(document, [slab.id]),
-      data: { slabId: slab.id, openingIndex },
-    };
+    return commitBuilding(
+      doc,
+      withElement(building, updated),
+      [slab.id],
+      `Cut opening index ${openingIndex} (${area.toFixed(2)} m²) in slab ${slab.mark} (${slab.id}).`,
+      { slabId: slab.id, openingIndex },
+    );
   },
 });
 
@@ -213,11 +202,11 @@ export const deleteSlabOpening = defineCommand({
     }
     const remaining = openings.filter((_, position) => position !== index);
     const updated: SlabElement = { ...slab, openings: remaining };
-    const document = regenerateBuilding(doc, withElement(building, updated));
-    return {
-      document,
-      summary: `Removed opening #${index} from slab ${slab.mark}; ${remaining.length} left.`,
-      affected: elementAffected(document, [slabId]),
-    };
+    return commitBuilding(
+      doc,
+      withElement(building, updated),
+      [slabId],
+      `Removed opening #${index} from slab ${slab.mark}; ${remaining.length} left.`,
+    );
   },
 });

@@ -16,17 +16,14 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
 
-import { liveSnapshot } from '../helpers/storeTestHelpers';
+import { answerDispatch, liveSnapshot } from '../helpers/storeTestHelpers';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
+import { type Material, createEmptyDocument } from '@core/model/types';
 import { MaterialsPanel } from '@ui/panels/MaterialsPanel';
-import type { Material } from '@core/model/types';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function resetStore(): void {
   useStore.setState({
@@ -34,6 +31,11 @@ function resetStore(): void {
     lastSummary: null,
   });
 }
+
+const STEEL_AND_PLA: Record<string, Material> = {
+  steel: { name: 'steel', density: 0.00785, color: '#b0b0b0', metalness: 0.9, roughness: 0.2 },
+  pla: { name: 'pla', density: 0.00124, color: '#ff8800', metalness: 0, roughness: 0.7 },
+};
 
 /** Inject materials directly into the store document for fixture setup. */
 function setMaterials(mats: Record<string, Material>): void {
@@ -52,9 +54,21 @@ function patchDispatch(spy: ReturnType<typeof vi.fn>): void {
   useStore.setState({ dispatch: spy } as any);
 }
 
-// ---------------------------------------------------------------------------
 // Rendering tests
-// ---------------------------------------------------------------------------
+
+function renderCreateForm(): {
+  form: HTMLElement;
+  nameInput: HTMLElement;
+  densityInput: HTMLElement;
+} {
+  render(<MaterialsPanel />);
+  const form = screen.getByTestId('material-create-form');
+  return {
+    form,
+    nameInput: within(form).getByRole('textbox', { name: /new material name/i }),
+    densityInput: within(form).getByRole('spinbutton', { name: /material density/i }),
+  };
+}
 
 describe('MaterialsPanel — rendering', () => {
   beforeEach(() => {
@@ -67,10 +81,7 @@ describe('MaterialsPanel — rendering', () => {
   });
 
   it('renders a row for each material', () => {
-    setMaterials({
-      steel: { name: 'steel', density: 0.00785, color: '#b0b0b0', metalness: 0.9, roughness: 0.2 },
-      pla: { name: 'pla', density: 0.00124, color: '#ff8800', metalness: 0, roughness: 0.7 },
-    });
+    setMaterials(STEEL_AND_PLA);
 
     render(<MaterialsPanel />);
 
@@ -136,9 +147,7 @@ describe('MaterialsPanel — rendering', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Assign tests
-// ---------------------------------------------------------------------------
 
 describe('MaterialsPanel — assign', () => {
   beforeEach(() => {
@@ -188,10 +197,7 @@ describe('MaterialsPanel — assign', () => {
   });
 
   it('dispatches with the correct materialName when multiple materials exist', () => {
-    setMaterials({
-      steel: { name: 'steel', density: 0.00785, color: '#b0b0b0', metalness: 0.9, roughness: 0.2 },
-      pla: { name: 'pla', density: 0.00124, color: '#ff8800', metalness: 0, roughness: 0.7 },
-    });
+    setMaterials(STEEL_AND_PLA);
     setSelection(['e-001']);
     const dispatchSpy = vi.fn();
     patchDispatch(dispatchSpy);
@@ -212,9 +218,7 @@ describe('MaterialsPanel — assign', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Create form tests
-// ---------------------------------------------------------------------------
 
 describe('MaterialsPanel — create form', () => {
   beforeEach(() => {
@@ -243,10 +247,7 @@ describe('MaterialsPanel — create form', () => {
   });
 
   it('Create button is enabled when name and valid density are filled', () => {
-    render(<MaterialsPanel />);
-    const form = screen.getByTestId('material-create-form');
-    const nameInput = within(form).getByRole('textbox', { name: /new material name/i });
-    const densityInput = within(form).getByRole('spinbutton', { name: /material density/i });
+    const { nameInput, densityInput } = renderCreateForm();
 
     fireEvent.change(nameInput, { target: { value: 'steel' } });
     fireEvent.change(densityInput, { target: { value: '0.00785' } });
@@ -259,11 +260,7 @@ describe('MaterialsPanel — create form', () => {
     const dispatchSpy = vi.fn();
     patchDispatch(dispatchSpy);
 
-    render(<MaterialsPanel />);
-    const form = screen.getByTestId('material-create-form');
-
-    const nameInput = within(form).getByRole('textbox', { name: /new material name/i });
-    const densityInput = within(form).getByRole('spinbutton', { name: /material density/i });
+    const { form, nameInput, densityInput } = renderCreateForm();
 
     fireEvent.change(nameInput, { target: { value: 'aluminium' } });
     fireEvent.change(densityInput, { target: { value: '0.0027' } });
@@ -279,12 +276,11 @@ describe('MaterialsPanel — create form', () => {
     );
   });
 
-  it('keeps the typed values when the create is rejected', () => {
-    patchDispatch(
-      vi.fn((_name: string, _params: unknown, options?: { onResult?: (r: any) => void }) =>
-        options?.onResult?.({ summary: 'duplicate', changed: false }),
-      ),
-    );
+  it.each([
+    ['keeps the typed values when the create is rejected', 'duplicate', false, 'steel', '0.00785'],
+    ['clears name and density after successful submit', 'ok', true, '', ''],
+  ])('%s', (_title, summary, changed, expectedName, expectedDensity) => {
+    answerDispatch({ summary, changed });
 
     render(<MaterialsPanel />);
     const form = screen.getByTestId('material-create-form');
@@ -298,8 +294,8 @@ describe('MaterialsPanel — create form', () => {
     fireEvent.change(densityInput, { target: { value: '0.00785' } });
     fireEvent.submit(form);
 
-    expect(nameInput.value).toBe('steel');
-    expect(densityInput.value).toBe('0.00785');
+    expect(nameInput.value).toBe(expectedName);
+    expect(densityInput.value).toBe(expectedDensity);
   });
 
   it('shows large densities without exponent notation', () => {
@@ -309,36 +305,9 @@ describe('MaterialsPanel — create form', () => {
     render(<MaterialsPanel />);
     expect(within(screen.getByTestId('material-row-steel')).getByText('7850')).toBeDefined();
   });
-
-  it('clears name and density after successful submit', () => {
-    patchDispatch(
-      vi.fn((_name: string, _params: unknown, options?: { onResult?: (r: any) => void }) =>
-        options?.onResult?.({ summary: 'ok', changed: true }),
-      ),
-    );
-
-    render(<MaterialsPanel />);
-    const form = screen.getByTestId('material-create-form');
-
-    const nameInput = within(form).getByRole('textbox', {
-      name: /new material name/i,
-    }) as HTMLInputElement;
-    const densityInput = within(form).getByRole('spinbutton', {
-      name: /material density/i,
-    }) as HTMLInputElement;
-
-    fireEvent.change(nameInput, { target: { value: 'steel' } });
-    fireEvent.change(densityInput, { target: { value: '0.00785' } });
-    fireEvent.submit(form);
-
-    expect(nameInput.value).toBe('');
-    expect(densityInput.value).toBe('');
-  });
 });
 
-// ---------------------------------------------------------------------------
 // Per-entity PBR resolution test
-// ---------------------------------------------------------------------------
 
 describe('MaterialsPanel — per-entity PBR resolution', () => {
   beforeEach(() => {

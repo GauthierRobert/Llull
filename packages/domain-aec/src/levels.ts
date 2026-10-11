@@ -54,9 +54,8 @@ export const addLevel = defineCommand({
     const tops = Object.values(building.levels).map((level) => level.elevation + level.height);
     const resolvedElevation = elevation ?? (tops.length > 0 ? Math.max(...tops) : 0);
     const resolvedHeight = height ?? fromMm(doc, 3000);
-    if (resolvedHeight <= 0) {
+    if (resolvedHeight <= 0)
       return noop(doc, `add_level failed: height must be > 0 (got ${String(height)}).`);
-    }
     const id = nextLevelId(building);
     const level: BuildingLevel = {
       id,
@@ -99,9 +98,8 @@ export const updateLevel = defineCommand({
     const building = getBuilding(doc);
     const level = building.levels[levelId];
     if (!level) return noop(doc, `update_level failed: no level '${levelId}'.`);
-    if (height !== undefined && height <= 0) {
+    if (height !== undefined && height <= 0)
       return noop(doc, 'update_level failed: height must be > 0.');
-    }
     const updated: BuildingLevel = {
       ...level,
       name: name?.trim() || level.name,
@@ -204,9 +202,8 @@ export const setActiveLevel = defineCommand({
     const building = getBuilding(doc);
     const level = building.levels[levelId];
     if (!level) return noop(doc, `set_active_level failed: no level '${levelId}'.`);
-    if (building.activeLevelId === levelId) {
+    if (building.activeLevelId === levelId)
       return noop(doc, `Level ${levelId} "${level.name}" is already active.`);
-    }
     return {
       document: { ...doc, building: { ...building, activeLevelId: levelId } },
       summary: `Active level is now ${levelId} "${level.name}".`,

@@ -7,6 +7,7 @@
 import type { EntityKind, InstanceEntity } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
+import { report } from './noop';
 
 /** One row in the bill of materials output. */
 interface BomRow {
@@ -92,24 +93,16 @@ export const billOfMaterials = defineCommand({
     const totalInstances = [...byComponent.values()].reduce((sum, list) => sum + list.length, 0);
     const distinctComponents = rows.filter((r) => !r.orphan).length;
     const data = { rows, totalInstances, distinctComponents } satisfies BillOfMaterialsData;
-    if (totalInstances === 0) {
-      return {
-        document: doc,
-        summary: 'bill_of_materials: 0 instances found. BOM is empty.',
-        affected: [],
-        data,
-      };
-    }
+    if (totalInstances === 0)
+      return report(doc, 'bill_of_materials: 0 instances found. BOM is empty.', data);
     const rowSummary = rows
       .map((r) => `"${r.componentName}" ×${r.count}${r.orphan ? ' [ORPHAN]' : ''}`)
       .join(', ');
-    return {
-      document: doc,
-      summary:
-        `bill_of_materials: ${totalInstances} instance(s), ${distinctComponents} distinct component(s). ` +
+    return report(
+      doc,
+      `bill_of_materials: ${totalInstances} instance(s), ${distinctComponents} distinct component(s). ` +
         `Rows: ${rowSummary}.`,
-      affected: [],
       data,
-    };
+    );
   },
 });

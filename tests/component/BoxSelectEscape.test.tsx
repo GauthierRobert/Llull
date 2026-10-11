@@ -3,18 +3,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, act, fireEvent } from '@testing-library/react';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
-import type { Vec2 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 
 const captured = vi.hoisted(() => ({ handlers: {} as Record<string, (event: unknown) => void> }));
 
-vi.mock('@ui/viewport/2d/GroundPlane', () => ({
-  GroundPlane: (props: Record<string, (event: unknown) => void>) => {
-    captured.handlers = props;
-    return null;
-  },
-  toDocumentPoint: (hit: { x: number; y: number }): Vec2 => [hit.x, hit.y],
-}));
+vi.mock('@ui/viewport/2d/GroundPlane', async () =>
+  (await import('../helpers/groundPlaneMock')).groundPlaneMock(captured),
+);
 
 import { BoxSelectInteraction } from '@ui/viewport/2d/BoxSelectInteraction';
 

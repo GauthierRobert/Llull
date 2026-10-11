@@ -5,7 +5,6 @@
 import type {
   BasePlateElement,
   BuildingLevel,
-  FootingElement,
   GridElement,
   SteelMemberElement,
 } from '@core/model/building';
@@ -131,9 +130,8 @@ export function placePlates(
   mm: (value: number) => number,
 ): PlacedPlate[] {
   const building = getBuilding(doc);
-  const footings = Object.values(building.elements).filter(
-    (element): element is FootingElement =>
-      element.category === 'footing' && element.levelId === level.id,
+  const footings = elementsOf(building, 'footing').filter(
+    (footing) => footing.levelId === level.id,
   );
   const placed: PlacedPlate[] = [];
   for (const plate of elementsOf(building, 'plate')) {

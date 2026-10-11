@@ -74,3 +74,42 @@ export function niceStep(minimum: number): number {
     (NICE.map((n) => n * power).find((step) => step >= minimum - 1e-12) as number) ?? power * 10
   );
 }
+
+/** Horizontal level gridlines with right-aligned level labels, appended to `body`. */
+export function pushLevelGrid(
+  body: string[],
+  left: number,
+  plotWidth: number,
+  y: (z: number) => number,
+  zTop: number,
+  rangeM: number,
+  vScale: number,
+): void {
+  const zStep = niceStep(28 / vScale);
+  for (let z = Math.ceil((zTop - rangeM) / zStep) * zStep; z <= zTop; z += zStep) {
+    body.push(svgLine([left, y(z)], [left + plotWidth, y(z)], '#e2e2e2'));
+    body.push(svgText(left - 6, y(z) + 3, z.toFixed(2), { anchor: 'end', size: 9 }));
+  }
+}
+
+/** Table-band row labels (left of the plot) and row separators, appended to `body`. */
+export function pushTableLabels(
+  body: string[],
+  labels: readonly string[],
+  left: number,
+  plotWidth: number,
+  bandTop: number,
+  rowHeight: number,
+): void {
+  labels.forEach((label, row) => {
+    body.push(
+      svgText(left - 6, bandTop + row * rowHeight + 12, label, {
+        anchor: 'end',
+        size: 9,
+        weight: 'bold',
+      }),
+    );
+    const rule = bandTop + (row + 1) * rowHeight;
+    body.push(svgLine([left, rule], [left + plotWidth, rule], '#ccc'));
+  });
+}

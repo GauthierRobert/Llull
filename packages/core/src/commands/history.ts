@@ -12,7 +12,7 @@ import { defineCommand, z } from './schema';
 import { kernelRefusal } from './kernelRefusal';
 import { replayHistory } from './replay';
 import { unresolvedExpressionsNote } from './replayStep';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 
 /**
  * Refuse (kernel) or replay `newHistory`; `done` receives "<n> entity|entities".
@@ -59,11 +59,11 @@ function regenerateWith(
     brokenDependents.length > 0
       ? ` Warning: ${brokenDependents.length} step(s) no longer change the document (a referenced entity or input is gone): ${brokenDependents.map((step) => `${step.id} (${step.name})`).join(', ')}.`
       : '';
-  return {
-    document: regenerated,
-    summary: `${command}: ${done(`${count} ${count === 1 ? 'entity' : 'entities'}`)}${brokenNote}`,
-    affected: regenerated.order,
-  };
+  return changed(
+    regenerated,
+    `${command}: ${done(`${count} ${count === 1 ? 'entity' : 'entities'}`)}${brokenNote}`,
+    regenerated.order,
+  );
 }
 
 /** Locate `stepId`, let `edit` build the new history (or a no-op message), then regenerate. */
@@ -117,21 +117,18 @@ const replayHistoryCommand = defineCommand({
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, _params, ctx): CommandResult => {
     const context = ctx ?? currentContext();
-    if (doc.featureHistory.length === 0) {
+    if (doc.featureHistory.length === 0)
       return noop(doc, 'replay_history: featureHistory is empty — nothing to replay.');
-    }
     const warnings: string[] = [];
     const refused = kernelRefusal(doc, doc.featureHistory, context);
-    if (refused !== null) {
-      return noop(doc, `replay_history: ${refused}`);
-    }
+    if (refused !== null) return noop(doc, `replay_history: ${refused}`);
     const regenerated = replayHistory(doc, doc.featureHistory, context.registry, warnings);
     const count = Object.keys(regenerated.entities).length;
-    return {
-      document: regenerated,
-      summary: `replay_history: replayed ${doc.featureHistory.length} step(s); ${count} ${count === 1 ? 'entity' : 'entities'} in document.${unresolvedExpressionsNote(warnings)}`,
-      affected: regenerated.order,
-    };
+    return changed(
+      regenerated,
+      `replay_history: replayed ${doc.featureHistory.length} step(s); ${count} ${count === 1 ? 'entity' : 'entities'} in document.${unresolvedExpressionsNote(warnings)}`,
+      regenerated.order,
+    );
   },
 });
 
@@ -331,9 +328,8 @@ const insertStep = defineCommand({
       afterStepId === undefined
         ? doc.featureHistory.length - 1
         : doc.featureHistory.findIndex((s) => s.id === afterStepId);
-    if (afterStepId !== undefined && insertIdx === -1) {
+    if (afterStepId !== undefined && insertIdx === -1)
       return noop(doc, `insert_step: afterStepId '${afterStepId}' not found in featureHistory.`);
-    }
 
     const stepNumber = doc.nextStepNumber ?? 1;
     const newStep: FeatureStep = {

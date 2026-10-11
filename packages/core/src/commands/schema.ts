@@ -40,9 +40,8 @@ function unwrap(schema: z.ZodType): Unwrapped {
   let description = schema.description;
   for (;;) {
     const def = current.def as { type: string; innerType?: z.ZodType };
-    if (!WRAPPER_TYPES.has(def.type) || !def.innerType) {
+    if (!WRAPPER_TYPES.has(def.type) || !def.innerType)
       return { core: current, optional, description };
-    }
     optional = optional || def.type === 'optional' || def.type === 'default';
     current = def.innerType;
     description ??= current.description;

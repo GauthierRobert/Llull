@@ -2,7 +2,13 @@
  * Fake shape kernel for command tests: the real recipe evaluator (`kernelFromOps`) over canned
  * native ops, so commands exercise recipes, caching and handles without WASM.
  */
-import type { MeshData, ShapeTopology } from '@core/geometry/kernel';
+import { afterEach, beforeEach } from 'vitest';
+import {
+  setGeometryKernel,
+  type GeometryKernel,
+  type MeshData,
+  type ShapeTopology,
+} from '@core/geometry/kernel';
 import type { BooleanOp, ShapeRecipe } from '@core/geometry/shapeRecipe';
 import { kernelFromOps, type CachingKernel } from '@core/geometry/shapeKernel';
 import type { Entity } from '@core/model/types';
@@ -12,6 +18,9 @@ export const TETRA: MeshData = {
   positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
   indices: [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3],
 };
+
+/** One triangle: the smallest mesh a kernel can return. */
+export const TRIANGLE: MeshData = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] };
 
 /** Native fake shape: the mesh it tessellates to, and the entity of a leaf. */
 export interface FakeShape {
@@ -78,4 +87,15 @@ export function fakeKernel(spec: FakeKernelSpec = {}): FakeKernel {
     release: () => undefined,
   });
   return Object.assign(kernel, { calls });
+}
+
+/** Installs `kernel` as the geometry kernel before each test of the file and clears it after. */
+export function installKernelPerTest(kernel: GeometryKernel): void {
+  beforeEach(() => setGeometryKernel(kernel));
+  afterEach(() => setGeometryKernel(null));
+}
+
+/** A fake kernel whose solids, booleans, fillets and chamfers are all `TRIANGLE`. */
+export function triangleKernel(): FakeKernel {
+  return fakeKernel({ solid: TRIANGLE, boolean: TRIANGLE, fillet: TRIANGLE, chamfer: TRIANGLE });
 }

@@ -1,10 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
+import { type TextEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { textLocalBounds } from '@core/commands/sceneBounds';
 import { entityDistSq, textLocalBox } from '../../src/ui/viewport/2d/modifyHelpers';
 import { entitiesInBox } from '../../src/ui/viewport/2d/boxSelect';
-import type { TextEntity } from '@core/model/types';
 
 function text(content: string, anchor: 'left' | 'center' | 'right'): TextEntity {
   const result = execute(createEmptyDocument(), 'add_text', {

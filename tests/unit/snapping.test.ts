@@ -26,9 +26,7 @@ import {
 import { snap, applyOrthoPolar } from '../../src/ui/viewport/2d/snapping/resolveSnap';
 import { collectSnapCandidates } from '../../src/ui/viewport/2d/snapping/candidates';
 
-// ---------------------------------------------------------------------------
 // Test document builders
-// ---------------------------------------------------------------------------
 
 function docWithLine(start: [number, number], end: [number, number]): CadDocument {
   const doc = createEmptyDocument();
@@ -135,9 +133,7 @@ function docWithTwoLines(): CadDocument {
   };
 }
 
-// ---------------------------------------------------------------------------
 // collectSnapCandidates
-// ---------------------------------------------------------------------------
 
 describe('collectSnapCandidates', () => {
   it('returns endpoint and midpoint for a line', () => {
@@ -339,9 +335,7 @@ describe('collectSnapCandidates', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // snap
-// ---------------------------------------------------------------------------
 
 describe('snap', () => {
   const GRID = 1;
@@ -428,9 +422,7 @@ describe('snap', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // applyOrthoPolar
-// ---------------------------------------------------------------------------
 
 describe('applyOrthoPolar', () => {
   it('returns cursor unchanged when both ortho and polar are false', () => {
@@ -464,17 +456,21 @@ describe('applyOrthoPolar', () => {
     expect(result[1]).toBeCloseTo(3);
   });
 
-  it('snaps to the nearest polar angle increment (polar=true, increment=15°)', () => {
+  it.each([
+    [
+      'snaps to the nearest polar angle increment (polar=true, increment=15°)',
+      (15 * Math.PI) / 180,
+    ],
+    ['treats a 0 polarIncrement as the 15° default (never returns NaN)', 0],
+  ])('%s', (_name, polarIncrement) => {
     const origin: [number, number] = [0, 0];
     // angle ≈ 22.5°, nearest 15° increment → 30°
     const length = 5;
     const angle = (22.5 * Math.PI) / 180;
     const cursor: [number, number] = [length * Math.cos(angle), length * Math.sin(angle)];
-    const result = applyOrthoPolar(origin, cursor, {
-      ortho: false,
-      polar: true,
-      polarIncrement: (15 * Math.PI) / 180,
-    });
+    const result = applyOrthoPolar(origin, cursor, { ortho: false, polar: true, polarIncrement });
+    expect(Number.isNaN(result[0])).toBe(false);
+    expect(Number.isNaN(result[1])).toBe(false);
     const expectedAngle = (30 * Math.PI) / 180;
     expect(result[0]).toBeCloseTo(length * Math.cos(expectedAngle));
     expect(result[1]).toBeCloseTo(length * Math.sin(expectedAngle));
@@ -507,29 +503,9 @@ describe('applyOrthoPolar', () => {
     const result = applyOrthoPolar(origin, [3, 4], { ortho: true, polar: false });
     expect(result).toEqual([3, 4]);
   });
-
-  it('treats a 0 polarIncrement as the 15° default (never returns NaN)', () => {
-    const origin: [number, number] = [0, 0];
-    const length = 5;
-    const angle = (22.5 * Math.PI) / 180;
-    const cursor: [number, number] = [length * Math.cos(angle), length * Math.sin(angle)];
-    const result = applyOrthoPolar(origin, cursor, {
-      ortho: false,
-      polar: true,
-      polarIncrement: 0,
-    });
-    expect(Number.isNaN(result[0])).toBe(false);
-    expect(Number.isNaN(result[1])).toBe(false);
-    // Falls back to 15° increment → nearest is 30°.
-    const expected = (30 * Math.PI) / 180;
-    expect(result[0]).toBeCloseTo(length * Math.cos(expected));
-    expect(result[1]).toBeCloseTo(length * Math.sin(expected));
-  });
 });
 
-// ---------------------------------------------------------------------------
 // snapPerpendicular
-// ---------------------------------------------------------------------------
 
 describe('snapPerpendicular', () => {
   it('returns foot within segment (happy path)', () => {
@@ -562,9 +538,7 @@ describe('snapPerpendicular', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // tangentPointsToCircle
-// ---------------------------------------------------------------------------
 
 describe('tangentPointsToCircle', () => {
   it('returns 2 tangent points from an external point', () => {
@@ -603,9 +577,7 @@ describe('tangentPointsToCircle', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // snapTangentToCircle
-// ---------------------------------------------------------------------------
 
 describe('snapTangentToCircle', () => {
   it('returns 2 SnapPoints from an external point', () => {
@@ -624,9 +596,7 @@ describe('snapTangentToCircle', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // snapExtension
-// ---------------------------------------------------------------------------
 
 describe('snapExtension', () => {
   it('returns extension snap beyond the end of segment (t > 1)', () => {
@@ -666,9 +636,7 @@ describe('snapExtension', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // nearestOnSegment
-// ---------------------------------------------------------------------------
 
 describe('nearestOnSegment', () => {
   it('returns the projected foot when cursor is perpendicular to middle of segment', () => {
@@ -697,9 +665,7 @@ describe('nearestOnSegment', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // nearestOnArc
-// ---------------------------------------------------------------------------
 
 describe('nearestOnArc', () => {
   it('returns radial foot for a full circle', () => {
@@ -727,9 +693,7 @@ describe('nearestOnArc', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // collectSnapCandidates — advanced snaps wired in
-// ---------------------------------------------------------------------------
 
 describe('collectSnapCandidates — advanced snaps', () => {
   it('emits perpendicular snap for a line when fromPoint is provided', () => {
@@ -823,9 +787,7 @@ describe('collectSnapCandidates — advanced snaps', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // snap priority — new types lower priority than classic ones
-// ---------------------------------------------------------------------------
 
 describe('snap priority — advanced types', () => {
   it('prefers endpoint over perpendicular at equal distance', () => {

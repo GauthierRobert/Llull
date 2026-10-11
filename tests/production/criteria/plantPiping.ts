@@ -8,6 +8,7 @@ import {
   insideBox,
   polylineLength,
   round,
+  sameEnds,
 } from '../oracle/geometry';
 import { PIPE_OD } from '../oracle/steel';
 import { parseCsv } from '../oracle/csv';
@@ -34,16 +35,7 @@ function linesCheck(intent: PlantIntent, ctx: GradeContext): CheckOutcome {
   }));
   const problems: string[] = [];
   for (const line of intent.pipes) {
-    const first = line.route[0] ?? [0, 0, 0];
-    const last = line.route.at(-1) ?? [0, 0, 0];
-    const found = pipes.find(({ route }) => {
-      const a = route[0] ?? [0, 0, 0];
-      const b = route.at(-1) ?? [0, 0, 0];
-      return (
-        (distance(a, first) <= END_TOLERANCE && distance(b, last) <= END_TOLERANCE) ||
-        (distance(a, last) <= END_TOLERANCE && distance(b, first) <= END_TOLERANCE)
-      );
-    });
+    const found = pipes.find(({ route }) => sameEnds(route, line.route, END_TOLERANCE));
     if (!found) {
       problems.push(`${line.line} (${line.from} → ${line.to}) not found`);
       continue;

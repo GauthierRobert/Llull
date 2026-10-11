@@ -13,6 +13,7 @@ import {
 } from './steelFixtures';
 import {
   frameColumn,
+  gratingFloor,
   inertiaOf,
   jointBeam,
   memberOf,
@@ -340,17 +341,7 @@ describe('loads on a frame', () => {
 
   it('checks the hogging end with LTB over the hogging length when a floor restrains the top flange', () => {
     let doc = portal({ base: 'fixed' });
-    doc = step(doc, 'add_slab', {
-      levelId: 'level-2',
-      boundary: [
-        [-3000, 0],
-        [3000, 0],
-        [3000, 6000],
-        [-3000, 6000],
-      ],
-      thickness: 30,
-      material: 'grating',
-    });
+    doc = gratingFloor(doc);
     const beam = rowOf(check(doc), 'SB1');
     expect(beam.analysed).toBe(true);
     expect(beam.forces['jointMomentStart']).toBeLessThan(0);

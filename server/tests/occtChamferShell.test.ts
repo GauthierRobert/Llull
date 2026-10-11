@@ -10,7 +10,7 @@ import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
 import type { ShapeRecipe } from '@core/geometry/shapeRecipe';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createNodeOcctKernel } from '../src/occtNode';
-import { leaf, meshOf } from './kernelTestSupport';
+import { leaf, meshOf, volume } from './kernelTestSupport';
 
 const cubeEntity = (size: number): Entity =>
   ({
@@ -23,25 +23,18 @@ const cubeEntity = (size: number): Entity =>
     color: '#888888',
   }) as Entity;
 
-function volume(mesh: MeshData): number {
-  const p = mesh.positions;
-  let sum = 0;
-  for (let i = 0; i < mesh.indices.length; i += 3) {
-    const [a, b, c] = [0, 1, 2].map((k) => (mesh.indices[i + k] ?? 0) * 3) as [
-      number,
-      number,
-      number,
-    ];
-    sum +=
-      ((p[a] ?? 0) * ((p[b + 1] ?? 0) * (p[c + 2] ?? 0) - (p[b + 2] ?? 0) * (p[c + 1] ?? 0)) -
-        (p[a + 1] ?? 0) * ((p[b] ?? 0) * (p[c + 2] ?? 0) - (p[b + 2] ?? 0) * (p[c] ?? 0)) +
-        (p[a + 2] ?? 0) * ((p[b] ?? 0) * (p[c + 1] ?? 0) - (p[b + 1] ?? 0) * (p[c] ?? 0))) /
-      6;
-  }
-  return sum;
-}
-
 const cube = leaf(cubeEntity(4));
+const drill = (): Entity =>
+  ({
+    id: 'd',
+    kind: 'cylinder',
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+    radius: 1,
+    height: 10,
+    layerId: 'layer-default',
+    color: '#888888',
+  }) as unknown as Entity;
 const shell = (source: ShapeRecipe, thickness: number): ShapeRecipe => ({
   op: 'shell',
   source,
@@ -109,17 +102,7 @@ describe('occt chamfer / fillet on true B-rep edges', () => {
   });
 
   it('fillets a boolean result on its exact circular edge (a filleted hole lip)', () => {
-    const drill = {
-      id: 'd',
-      kind: 'cylinder',
-      position: [0, 0, 0],
-      rotation: [0, 0, 0],
-      radius: 1,
-      height: 10,
-      layerId: 'layer-default',
-      color: '#888888',
-    } as unknown as Entity;
-    const drilled: ShapeRecipe = { op: 'boolean', boolean: 'subtract', a: cube, b: leaf(drill) };
+    const drilled: ShapeRecipe = { op: 'boolean', boolean: 'subtract', a: cube, b: leaf(drill()) };
     const topology = occt.topology(occt.evaluate(drilled)!)!;
     const lip = topology.edges.find((edge) => edge.curve === 'circle');
     expect(lip).toBeDefined();
@@ -141,17 +124,12 @@ describe('occt chamfer / fillet on true B-rep edges', () => {
   });
 
   it('writes exact STEP: analytic planes and a cylinder, no triangulated faces', () => {
-    const drill = {
-      id: 'd',
-      kind: 'cylinder',
-      position: [0, 0, 0],
-      rotation: [0, 0, 0],
-      radius: 1,
-      height: 10,
-      layerId: 'layer-default',
-      color: '#888888',
-    } as unknown as Entity;
-    const drilled = occt.evaluate({ op: 'boolean', boolean: 'subtract', a: cube, b: leaf(drill) })!;
+    const drilled = occt.evaluate({
+      op: 'boolean',
+      boolean: 'subtract',
+      a: cube,
+      b: leaf(drill()),
+    })!;
     const step = occt.exportStep([drilled]);
     expect(step).toMatch(/^ISO-10303-21;/);
     expect(step).toMatch(/CYLINDRICAL_SURFACE/);

@@ -6,24 +6,14 @@
  * @layer core/commands
  */
 
-import type { CadDocument, Entity, Vec3 } from '../model/types';
+import { type CadDocument, type Entity, type Vec3, is3D } from '../model/types';
 import type { ShapeRecipe } from '../geometry/shapeRecipe';
-import { is3D } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, vec3, z } from './schema';
 import { selectEdges } from './edgeSelection';
-import type { ExecutionContext } from './context';
-import { currentContext } from './context';
-import { nextId } from '../lib/id';
-import { referenceLossSuffix, replaceEntities } from './entityOps';
+import { type ExecutionContext, currentContext } from './context';
 import { kernelUnavailable } from './kernelRefusal';
-import {
-  evaluateRecipe,
-  fallbackSuffix,
-  kernelResultEntity,
-  operandRecipe,
-  topologySuffix,
-} from './kernelShape';
+import { commitKernelResult, evaluateRecipe, operandRecipe } from './kernelShape';
 import { noop } from './noop';
 
 /** Surface-neutral pointer to the B-rep kernel (browser URL flag or server env var). */
@@ -36,9 +26,7 @@ function validateSolidTarget(
   id: string,
 ): { entity: Entity } | CommandResult {
   const entity = doc.entities[id];
-  if (!entity) {
-    return noop(doc, `${opName}: entity '${id}' not found.`);
-  }
+  if (!entity) return noop(doc, `${opName}: entity '${id}' not found.`);
   if (!is3D(entity)) {
     return noop(
       doc,
@@ -103,14 +91,15 @@ function modifyEdges(
     );
   }
 
-  const newId = nextId('mesh');
-  const meshEntity = kernelResultEntity(newId, result, entity);
-  const document = replaceEntities(doc, [id], meshEntity);
-  return {
-    document,
-    summary: `${command}: ${pastTense} '${id}' (kind '${entity.kind}', ${amountName} ${amount}) → mesh '${newId}' (${result.mesh.indices.length / 3} triangles). Source entity consumed.${near.length > 0 ? ` edgesNear selected edges ${selection.edges.join(', ')}.` : ''}${fallbackSuffix(kernel, [entity])}${topologySuffix(kernel, result.shape)}${referenceLossSuffix(doc, document)}`,
-    affected: [newId],
-  };
+  const picked = near.length > 0 ? ` edgesNear selected edges ${selection.edges.join(', ')}.` : '';
+  return commitKernelResult(
+    doc,
+    kernel,
+    result,
+    [entity],
+    (newId, triangles) =>
+      `${command}: ${pastTense} '${id}' (kind '${entity.kind}', ${amountName} ${amount}) → mesh '${newId}' (${triangles} triangles). Source entity consumed.${picked}`,
+  );
 }
 
 /**

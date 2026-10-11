@@ -206,9 +206,7 @@ export function parseToolsets(raw: string | undefined): ParsedToolsets {
     .map((part) => part.trim().toLowerCase())
     .filter((part) => part.length > 0);
   const unknown = requested.filter((name) => name !== 'all' && !isToolsetName(name));
-  if (requested.includes('all')) {
-    return { enabled: new Set(TOOLSET_NAMES), unknown };
-  }
+  if (requested.includes('all')) return { enabled: new Set(TOOLSET_NAMES), unknown };
   const enabled = new Set<ToolsetName>(['core', ...requested.filter(isToolsetName)]);
   return { enabled, unknown };
 }

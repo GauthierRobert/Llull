@@ -19,7 +19,16 @@ import { surfaceTinById } from './surfaceTin';
 import { elevationAt } from './tin';
 import type { ReportRow } from './roadReport';
 import { formatStation } from './model';
-import { niceStep, svgDocument, svgLine, svgPolyline, svgRect, svgText } from './roadSvg';
+import {
+  niceStep,
+  pushLevelGrid,
+  pushTableLabels,
+  svgDocument,
+  svgLine,
+  svgPolyline,
+  svgRect,
+  svgText,
+} from './roadSvg';
 import { toMetres } from '../model';
 
 export const LONG_SECTION_LEFT = 90;
@@ -97,11 +106,7 @@ export function longSectionSvg(
     ),
   );
   body.push(svgRect(LEFT, TOP, plotWidth, plotHeight));
-  const zStep = niceStep(28 / vScale);
-  for (let z = Math.ceil((zTop - rangeM) / zStep) * zStep; z <= zTop; z += zStep) {
-    body.push(svgLine([LEFT, y(z)], [LEFT + plotWidth, y(z)], '#e2e2e2'));
-    body.push(svgText(LEFT - 6, y(z) + 3, z.toFixed(2), { anchor: 'end', size: 9 }));
-  }
+  pushLevelGrid(body, LEFT, plotWidth, y, zTop, rangeM, vScale);
   const sStep = niceStep(70 / hScale);
   for (let s = Math.ceil(startM / sStep) * sStep; s <= startM + lengthM + 1e-9; s += sStep) {
     body.push(svgLine([x(s), TOP], [x(s), TOP + plotHeight], '#eee'));
@@ -166,23 +171,14 @@ export function longSectionSvg(
     );
   }
   const bandTop = TOP + plotHeight + 12;
-  const labels = ['Station', 'Ground', 'Design', 'Cut(-)/Fill(+)'];
-  labels.forEach((label, r) => {
-    body.push(
-      svgText(LEFT - 6, bandTop + r * ROW_HEIGHT + 12, label, {
-        anchor: 'end',
-        size: 9,
-        weight: 'bold',
-      }),
-    );
-    body.push(
-      svgLine(
-        [LEFT, bandTop + (r + 1) * ROW_HEIGHT],
-        [LEFT + plotWidth, bandTop + (r + 1) * ROW_HEIGHT],
-        '#ccc',
-      ),
-    );
-  });
+  pushTableLabels(
+    body,
+    ['Station', 'Ground', 'Design', 'Cut(-)/Fill(+)'],
+    LEFT,
+    plotWidth,
+    bandTop,
+    ROW_HEIGHT,
+  );
   body.push(svgLine([LEFT, bandTop], [LEFT + plotWidth, bandTop], '#444'));
   const stride = Math.max(1, Math.ceil(64 / Math.max(1, plotWidth / Math.max(1, rows.length - 1))));
   rows.forEach((row, index) => {

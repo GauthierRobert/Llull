@@ -3,7 +3,7 @@ import { kernelRefusal } from './kernelRefusal';
 import { currentContext, runInContext, type ExecutionContext } from './context';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { noop } from './noop';
+import { changed, noop, report } from './noop';
 import { MAX_PROJECT_DEPTH, MAX_PROJECT_STEPS } from './limits';
 import { resolveStepForReplay, runReplayStep, unresolvedExpressionsNote } from './replayStep';
 
@@ -79,9 +79,8 @@ export const saveRecipe = defineCommand({
   }),
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, { name, label }): CommandResult => {
-    if (name.trim() === '') {
+    if (name.trim() === '')
       return noop(doc, 'save_recipe failed: name must be a non-empty, non-whitespace-only string.');
-    }
 
     const steps: FeatureStep[] = doc.featureHistory.map((s) => ({ ...s }));
 
@@ -95,11 +94,10 @@ export const saveRecipe = defineCommand({
 
     const stepCount = steps.length;
     const emptySuffix = stepCount === 0 ? ' (empty recipe — no steps in featureHistory)' : '';
-    return {
-      document: newDoc,
-      summary: `save_recipe '${name}': saved ${stepCount} step${stepCount === 1 ? '' : 's'}${emptySuffix}.`,
-      affected: [],
-    };
+    return report(
+      newDoc,
+      `save_recipe '${name}': saved ${stepCount} step${stepCount === 1 ? '' : 's'}${emptySuffix}.`,
+    );
   },
 });
 
@@ -146,9 +144,8 @@ function instantiateRecipeOnce(
   name: string,
   ctx: ExecutionContext,
 ): CommandResult {
-  if (name.trim() === '') {
+  if (name.trim() === '')
     return noop(doc, 'instantiate_recipe failed: name must be a non-empty string.');
-  }
 
   const recipe = doc.recipes[name];
   if (!recipe) {
@@ -161,9 +158,7 @@ function instantiateRecipeOnce(
   }
 
   const refused = kernelRefusal(doc, recipe.steps, ctx);
-  if (refused !== null) {
-    return noop(doc, `instantiate_recipe: ${refused}`);
-  }
+  if (refused !== null) return noop(doc, `instantiate_recipe: ${refused}`);
 
   if (recipe.steps.length > MAX_PROJECT_STEPS) {
     return noop(
@@ -175,12 +170,11 @@ function instantiateRecipeOnce(
   const warnings: string[] = [];
   const { doc: newDoc, allAffected } = replayRecipeAdditive(doc, recipe.steps, ctx, warnings);
 
-  return {
-    document: newDoc,
-    summary:
-      `instantiate_recipe '${name}': replayed ${recipe.steps.length} step${recipe.steps.length === 1 ? '' : 's'}, ` +
+  return changed(
+    newDoc,
+    `instantiate_recipe '${name}': replayed ${recipe.steps.length} step${recipe.steps.length === 1 ? '' : 's'}, ` +
       `created ${allAffected.length} entit${allAffected.length === 1 ? 'y' : 'ies'} ` +
       `(ids: ${allAffected.join(', ')}).${unresolvedExpressionsNote(warnings)}`,
-    affected: allAffected,
-  };
+    allAffected,
+  );
 }

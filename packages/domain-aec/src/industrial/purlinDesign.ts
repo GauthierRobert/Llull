@@ -4,12 +4,12 @@
  * @layer domain-aec
  */
 
-import type { BuildingModel, SteelMemberElement } from '@core/model/building';
+import type { BuildingModel } from '@core/model/building';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { PURLIN_LOAD_SHAPE } from './purlinLoadParams';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { elementAffected, fromMm, getBuilding, withElement } from '../model';
+import { elementAffected, elementsOf, fromMm, getBuilding, withElement } from '../model';
 import { noop } from '@core/commands/noop';
 import { add3, scale3 } from '@lib/vec3';
 import { regenerateBuilding } from '../evaluateElements';
@@ -20,8 +20,8 @@ import { findProfile, lightestProfile, sectionProperties } from '../steel/profil
 import {
   addProfileGroup,
   isValidTargetUtilisation,
-  MAX_ITERATIONS,
   nextProfile,
+  iterateUpsizing,
   resizeProfileGroup,
   targetUtilisationParam,
   upsizeProfileGroups,
@@ -76,23 +76,16 @@ export const designPurlins = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const { targetUtilisation = 0.95, ...loadParams } = params;
-    if (!isValidTargetUtilisation(targetUtilisation)) {
+    if (!isValidTargetUtilisation(targetUtilisation))
       return noop(doc, 'design_purlins failed: targetUtilisation must be in [0.5, 1].');
-    }
     const analyse = (document: CadDocument): { rows: PurlinRow[]; summary: string } => {
       const result = checkPurlins.run(document, loadParams);
       const data = result.data as { rows: PurlinRow[] } | undefined;
       return { rows: data?.rows ?? [], summary: result.summary };
     };
     const first = analyse(doc);
-    if (first.rows.length === 0) {
-      return noop(doc, `design_purlins failed: ${first.summary}`);
-    }
-    let current = doc;
-    let limited = false;
-    const changes: string[] = [];
-    const changed = new Set<string>();
-    for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+    if (first.rows.length === 0) return noop(doc, `design_purlins failed: ${first.summary}`);
+    const { current, limited, changes, changed } = iterateUpsizing(doc, (current) => {
       const { rows } = analyse(current);
       const building = getBuilding(current);
       const levelId = levelOf(building, rows);
@@ -103,34 +96,22 @@ export const designPurlins = defineCommand({
         if (member?.category !== 'member') continue;
         addProfileGroup(groups, member);
       }
-      if (groups.size === 0) break;
-      const step = upsizeProfileGroups(
-        building,
-        groups,
-        nextSecondaryProfile,
-        (next, group, larger) => {
-          const { building: resizedBuilding, resizedIds } = resizeProfileGroup(
-            next,
-            group,
-            larger,
-            (element) => element.levelId === levelId,
-          );
-          return {
-            building: reseatResized(current, resizedBuilding, resizedIds, group.profile, larger),
-            changedIds: resizedIds,
-          };
-        },
-      );
-      changes.push(...step.changes);
-      for (const id of step.changedIds) changed.add(id);
-      if (step.limited) limited = true;
-      current = { ...current, building: step.building };
-      if (!step.progressed) break;
-      if (iteration === MAX_ITERATIONS - 1) limited = true;
-    }
-    if (changed.size === 0) {
+      if (groups.size === 0) return null;
+      return upsizeProfileGroups(building, groups, nextSecondaryProfile, (next, group, larger) => {
+        const { building: resizedBuilding, resizedIds } = resizeProfileGroup(
+          next,
+          group,
+          larger,
+          (element) => element.levelId === levelId,
+        );
+        return {
+          building: reseatResized(current, resizedBuilding, resizedIds, group.profile, larger),
+          changedIds: resizedIds,
+        };
+      });
+    });
+    if (changed.size === 0)
       return noChangeResult(doc, `${first.rows.length} purlin / rail row(s)`, first.rows, limited);
-    }
     const document = regenerateBuilding(doc, getBuilding(current));
     const final = analyse(document).rows;
     const stats = utilisationStats(final);
@@ -167,9 +148,7 @@ function reseatResized(
   if (!old || !larger) return building;
   const half = fromMm(doc, larger.h - old.h) / 2;
   const tolerance = fromMm(doc, 10);
-  const members = Object.values(building.elements).filter(
-    (element): element is SteelMemberElement => element.category === 'member',
-  );
+  const members = elementsOf(building, 'member');
   const rafters = members.filter((member) => member.role === 'rafter');
   const xs = members.flatMap((member) => [member.start[0], member.end[0]]);
   const centre = (Math.min(...xs) + Math.max(...xs)) / 2;

@@ -15,9 +15,7 @@ import { listMcpPrompts, getMcpPrompt } from '@mcp/index';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
 
-// ---------------------------------------------------------------------------
 // listMcpPrompts
-// ---------------------------------------------------------------------------
 
 describe('listMcpPrompts()', () => {
   it('returns at least one prompt template', () => {
@@ -62,9 +60,7 @@ describe('listMcpPrompts()', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // getMcpPrompt — unknown name
-// ---------------------------------------------------------------------------
 
 describe('getMcpPrompt() — unknown name', () => {
   it('returns null for an unregistered prompt name', () => {
@@ -76,9 +72,7 @@ describe('getMcpPrompt() — unknown name', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // getMcpPrompt — model_bracket
-// ---------------------------------------------------------------------------
 
 describe('getMcpPrompt("model_bracket")', () => {
   it('returns a non-null result', () => {
@@ -156,9 +150,7 @@ describe('getMcpPrompt("model_bracket")', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // getMcpPrompt — orthographic_setup
-// ---------------------------------------------------------------------------
 
 describe('getMcpPrompt("orthographic_setup")', () => {
   it('returns a non-null result for default view', () => {
@@ -203,9 +195,7 @@ describe('getMcpPrompt("orthographic_setup")', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // getMcpPrompt — parametric_part
-// ---------------------------------------------------------------------------
 
 describe('getMcpPrompt("parametric_part")', () => {
   it('returns a non-null result', () => {
@@ -261,9 +251,7 @@ describe('getMcpPrompt("parametric_part")', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Content type invariants
-// ---------------------------------------------------------------------------
 
 describe('getMcpPrompt() — content type invariants', () => {
   const templateNames = ['model_bracket', 'orthographic_setup', 'parametric_part'];
@@ -287,9 +275,7 @@ describe('getMcpPrompt() — content type invariants', () => {
   }
 });
 
-// ---------------------------------------------------------------------------
 // build_project validate regression — binds prompt templates to live registry
-// ---------------------------------------------------------------------------
 //
 // For each prompt that emits a ```json fenced build_project plan, we:
 //   1. Extract the JSON block from the assistant message text.
@@ -300,7 +286,6 @@ describe('getMcpPrompt() — content type invariants', () => {
 //
 // validate:true never mutates the document; it only checks names/params/aliases.
 // A param rename in any command will immediately fail this suite.
-// ---------------------------------------------------------------------------
 
 /** Extract the first ```json ... ``` block from a string and parse it. */
 function extractJsonBlock(text: string): unknown {
@@ -312,117 +297,42 @@ function extractJsonBlock(text: string): unknown {
   return JSON.parse(stripped) as unknown;
 }
 
-describe('build_project validate regression — model_bracket (default 2 holes)', () => {
-  it('emitted plan passes build_project validate:true', () => {
-    const result = getMcpPrompt('model_bracket', {
-      width: '80',
-      height: '40',
-      thickness: '6',
-      hole_count: '2',
+function expectPromptPlanValidates(promptName: string, args: Record<string, string>): void {
+  const result = getMcpPrompt(promptName, args);
+  expect(result).not.toBeNull();
+
+  const assistantText = result!.messages.find((m) => m.role === 'assistant')!.content.text;
+  const payload = extractJsonBlock(assistantText) as Record<string, unknown>;
+
+  const cmdResult = execute(createEmptyDocument(), 'build_project', { ...payload, validate: true });
+
+  // data.ok is the authoritative field (see BuildProjectData in project.ts)
+  const data = cmdResult.data as { ok: boolean; issues?: string[] } | undefined;
+  expect(data).toBeDefined();
+  if (data && !data.ok) {
+    throw new Error(`${promptName} plan validation failed: ${JSON.stringify(data.issues)}`);
+  }
+  expect(data!.ok).toBe(true);
+}
+
+describe('build_project validate regression — model_bracket', () => {
+  it.each([2, 1, 4])('emitted plan passes build_project validate:true for hole_count=%i', (n) => {
+    const dims = { 1: ['60', '30', '5'], 2: ['80', '40', '6'], 4: ['120', '50', '8'] }[n]!;
+    expectPromptPlanValidates('model_bracket', {
+      width: dims[0]!,
+      height: dims[1]!,
+      thickness: dims[2]!,
+      hole_count: String(n),
     });
-    expect(result).not.toBeNull();
-
-    const assistantText = result!.messages.find((m) => m.role === 'assistant')!.content.text;
-    const payload = extractJsonBlock(assistantText) as Record<string, unknown>;
-
-    const doc = createEmptyDocument();
-    const cmdResult = execute(doc, 'build_project', { ...payload, validate: true });
-
-    // data.ok is the authoritative field (see BuildProjectData in project.ts)
-    const data = cmdResult.data as { ok: boolean; issues?: string[] } | undefined;
-    expect(data).toBeDefined();
-    if (data && !data.ok) {
-      // Surface the issues list for a helpful failure message
-      throw new Error(`Plan validation failed: ${JSON.stringify(data.issues)}`);
-    }
-    expect(data!.ok).toBe(true);
-  });
-
-  it('emitted plan passes validate for hole_count=1', () => {
-    const result = getMcpPrompt('model_bracket', {
-      width: '60',
-      height: '30',
-      thickness: '5',
-      hole_count: '1',
-    });
-    expect(result).not.toBeNull();
-
-    const assistantText = result!.messages.find((m) => m.role === 'assistant')!.content.text;
-    const payload = extractJsonBlock(assistantText) as Record<string, unknown>;
-
-    const doc = createEmptyDocument();
-    const cmdResult = execute(doc, 'build_project', { ...payload, validate: true });
-
-    const data = cmdResult.data as { ok: boolean; issues?: string[] } | undefined;
-    expect(data).toBeDefined();
-    if (data && !data.ok) {
-      throw new Error(`Plan validation failed (hole_count=1): ${JSON.stringify(data.issues)}`);
-    }
-    expect(data!.ok).toBe(true);
-  });
-
-  it('emitted plan passes validate for hole_count=4', () => {
-    const result = getMcpPrompt('model_bracket', {
-      width: '120',
-      height: '50',
-      thickness: '8',
-      hole_count: '4',
-    });
-    expect(result).not.toBeNull();
-
-    const assistantText = result!.messages.find((m) => m.role === 'assistant')!.content.text;
-    const payload = extractJsonBlock(assistantText) as Record<string, unknown>;
-
-    const doc = createEmptyDocument();
-    const cmdResult = execute(doc, 'build_project', { ...payload, validate: true });
-
-    const data = cmdResult.data as { ok: boolean; issues?: string[] } | undefined;
-    expect(data).toBeDefined();
-    if (data && !data.ok) {
-      throw new Error(`Plan validation failed (hole_count=4): ${JSON.stringify(data.issues)}`);
-    }
-    expect(data!.ok).toBe(true);
   });
 });
 
 describe('build_project validate regression — parametric_part', () => {
-  it('emitted plan passes build_project validate:true (default part_name)', () => {
-    const result = getMcpPrompt('parametric_part', {});
-    expect(result).not.toBeNull();
-
-    const assistantText = result!.messages.find((m) => m.role === 'assistant')!.content.text;
-    const payload = extractJsonBlock(assistantText) as Record<string, unknown>;
-
-    const doc = createEmptyDocument();
-    // The skeleton already includes validate:true; pass it again (idempotent)
-    const cmdResult = execute(doc, 'build_project', { ...payload, validate: true });
-
-    const data = cmdResult.data as { ok: boolean; issues?: string[] } | undefined;
-    expect(data).toBeDefined();
-    if (data && !data.ok) {
-      throw new Error(`parametric_part plan validation failed: ${JSON.stringify(data.issues)}`);
-    }
-    expect(data!.ok).toBe(true);
-  });
-
-  it('emitted plan passes validate for a custom part_name', () => {
-    const result = getMcpPrompt('parametric_part', { part_name: 'flange_plate' });
-    expect(result).not.toBeNull();
-
-    const assistantText = result!.messages.find((m) => m.role === 'assistant')!.content.text;
-    const payload = extractJsonBlock(assistantText) as Record<string, unknown>;
-
-    const doc = createEmptyDocument();
-    const cmdResult = execute(doc, 'build_project', { ...payload, validate: true });
-
-    const data = cmdResult.data as { ok: boolean; issues?: string[] } | undefined;
-    expect(data).toBeDefined();
-    if (data && !data.ok) {
-      throw new Error(
-        `parametric_part (flange_plate) plan validation failed: ${JSON.stringify(data.issues)}`,
-      );
-    }
-    expect(data!.ok).toBe(true);
+  it.each([
+    ['default part_name', {}],
+    ['a custom part_name', { part_name: 'flange_plate' }],
+  ])('emitted plan passes build_project validate:true (%s)', (_label, args) => {
+    expectPromptPlanValidates('parametric_part', args);
   });
 });
 

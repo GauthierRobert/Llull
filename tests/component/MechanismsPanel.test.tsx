@@ -26,9 +26,7 @@ import { createEmptyDocument } from '@core/model/types';
 import { MechanismsPanel } from '@ui/panels/MechanismsPanel';
 import { localDispatch } from '../helpers/storeTestHelpers';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function resetStore(): void {
   useStore.setState({ document: createEmptyDocument(), lastSummary: null });
@@ -38,9 +36,7 @@ function patchDispatch(spy: ReturnType<typeof vi.fn>): void {
   useStore.setState({ dispatch: spy } as any);
 }
 
-// ---------------------------------------------------------------------------
 // Shared setup helpers
-// ---------------------------------------------------------------------------
 
 /** Add two boxes and a constraint between them. Returns ids. */
 function buildConstraint(): { constraintId: string; boxId: string; sphereId: string } {
@@ -131,9 +127,7 @@ function buildFullDoc(): {
   return { ...c, ...j, ...d };
 }
 
-// ---------------------------------------------------------------------------
 // Empty-state tests
-// ---------------------------------------------------------------------------
 
 describe('MechanismsPanel — empty state', () => {
   beforeEach(() => {
@@ -156,9 +150,7 @@ describe('MechanismsPanel — empty state', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Constraint section tests
-// ---------------------------------------------------------------------------
 
 describe('MechanismsPanel — constraints section', () => {
   beforeEach(() => {
@@ -195,9 +187,7 @@ describe('MechanismsPanel — constraints section', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Joint section tests
-// ---------------------------------------------------------------------------
 
 describe('MechanismsPanel — joints section', () => {
   beforeEach(() => {
@@ -286,9 +276,7 @@ describe('MechanismsPanel — joints section', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Drive-relation section tests
-// ---------------------------------------------------------------------------
 
 describe('MechanismsPanel — drive relations section', () => {
   beforeEach(() => {

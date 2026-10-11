@@ -19,8 +19,7 @@ import {
   PerspectiveCamera,
 } from '@react-three/drei';
 import * as THREE from 'three';
-import { useStore, useToolStore, useViewportStore } from '@ui/store';
-import type { GizmoMode } from '@ui/store';
+import { type GizmoMode, useStore, useToolStore, useViewportStore } from '@ui/store';
 import { Entities } from './Entities';
 import { TransformGizmo } from './TransformGizmo';
 import { RenderOriginSyncer } from '../RenderOriginSyncer';

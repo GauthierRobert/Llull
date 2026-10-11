@@ -11,7 +11,6 @@ import { defineCommand, z, vec2 } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
 import { isValidPolygon, segmentsIntersect, signedArea } from '@lib/polygon';
 import {
-  civilAffected,
   civilObject,
   civilObjectsOf,
   getCivil,
@@ -19,7 +18,7 @@ import {
   toMetresText,
   withObject,
 } from './model';
-import { regenerateCivil } from './evaluate';
+import { commitCivil } from './evaluate';
 import { surfaceTinById } from './surfaceTin';
 import { elevationAt, type Tin } from './tin';
 import {
@@ -65,18 +64,15 @@ function isSimple(polygon: ReadonlyArray<Vec2>): boolean {
 
 /** Why `platform` cannot be graded into `tin`, or null when it can. */
 function platformProblem(platform: PlatformObject, tin: Tin): string | null {
-  if (platform.boundary.length > MAX_BOUNDARY_VERTICES) {
+  if (platform.boundary.length > MAX_BOUNDARY_VERTICES)
     return `boundary has more than ${MAX_BOUNDARY_VERTICES} vertices.`;
-  }
-  if (!isValidPolygon(platform.boundary) || !isSimple(platform.boundary)) {
+  if (!isValidPolygon(platform.boundary) || !isSimple(platform.boundary))
     return 'boundary must be a simple (non self-intersecting) polygon of >= 3 [x, y] points.';
-  }
   const problem =
     slopeOf('cutSlope', platform.cutSlope) ?? slopeOf('fillSlope', platform.fillSlope);
   if (problem) return problem;
-  if (platform.boundary.some((vertex) => elevationAt(tin, vertex) === null)) {
+  if (platform.boundary.some((vertex) => elevationAt(tin, vertex) === null))
     return 'the boundary lies outside the surface (every vertex must be inside the TIN).';
-  }
   return null;
 }
 
@@ -166,16 +162,15 @@ export const addPlatform = defineCommand({
     };
     const problem = platformProblem(platform, tin);
     if (problem) return noop(doc, `add_platform failed: ${problem}`);
-    const document = regenerateCivil(doc, withObject(civil, platform));
     const data = report(doc, worksOf(platform, tin));
-    return {
-      document,
-      summary:
-        `Created platform ${platform.name} (${id}) at ${toMetresText(doc, platform.elevation)} m on ` +
+    return commitCivil(
+      doc,
+      withObject(civil, platform),
+      [id],
+      `Created platform ${platform.name} (${id}) at ${toMetresText(doc, platform.elevation)} m on ` +
         `${surface.name}: ${volumeText(data)}.`,
-      affected: civilAffected(document, [id]),
-      data: { platformId: id, ...data },
-    };
+      { platformId: id, ...data },
+    );
   },
 });
 
@@ -208,9 +203,8 @@ export const updatePlatform = defineCommand({
     const platform = civilObject(civil, params.platformId, 'platform');
     if (!platform) return noop(doc, `update_platform failed: no platform ${params.platformId}.`);
     const tin = surfaceTinById(civil, platform.surfaceId);
-    if (!tin) {
+    if (!tin)
       return noop(doc, `update_platform failed: surface ${platform.surfaceId} no longer exists.`);
-    }
     const updated: PlatformObject = {
       ...platform,
       name: params.name?.trim() || platform.name,
@@ -219,19 +213,18 @@ export const updatePlatform = defineCommand({
       cutSlope: params.cutSlope ?? platform.cutSlope,
       fillSlope: params.fillSlope ?? platform.fillSlope,
     };
-    if (JSON.stringify(updated) === JSON.stringify(platform)) {
+    if (JSON.stringify(updated) === JSON.stringify(platform))
       return noop(doc, `update_platform: nothing to change on ${platform.id}.`);
-    }
     const problem = platformProblem(updated, tin);
     if (problem) return noop(doc, `update_platform failed: ${problem}`);
-    const document = regenerateCivil(doc, withObject(civil, updated));
     const data = report(doc, worksOf(updated, tin));
-    return {
-      document,
-      summary: `Updated platform ${updated.name} (${updated.id}) at ${toMetresText(doc, updated.elevation)} m: ${volumeText(data)}.`,
-      affected: civilAffected(document, [updated.id]),
-      data: { platformId: updated.id, ...data },
-    };
+    return commitCivil(
+      doc,
+      withObject(civil, updated),
+      [updated.id],
+      `Updated platform ${updated.name} (${updated.id}) at ${toMetresText(doc, updated.elevation)} m: ${volumeText(data)}.`,
+      { platformId: updated.id, ...data },
+    );
   },
 });
 
@@ -268,9 +261,8 @@ export const platformEarthworks = defineCommand({
         `platform_earthworks failed: surface ${platform.surfaceId} no longer exists.`,
       );
     }
-    if (gridSpacing !== undefined && !(gridSpacing > 0)) {
+    if (gridSpacing !== undefined && !(gridSpacing > 0))
       return noop(doc, 'platform_earthworks failed: gridSpacing must be > 0.');
-    }
     const data = report(doc, worksOf(platform, tin, gridSpacing));
     const daylight = daylightPoints(
       tin,
@@ -346,12 +338,10 @@ export const balancePlatform = defineCommand({
     const platform = civilObject(civil, platformId, 'platform');
     if (!platform) return noop(doc, `balance_platform failed: no platform ${platformId}.`);
     const tin = surfaceTinById(civil, platform.surfaceId);
-    if (!tin) {
+    if (!tin)
       return noop(doc, `balance_platform failed: surface ${platform.surfaceId} no longer exists.`);
-    }
-    if (!(swellFactor > 0) || !Number.isFinite(swellFactor)) {
+    if (!(swellFactor > 0) || !Number.isFinite(swellFactor))
       return noop(doc, 'balance_platform failed: swellFactor must be > 0.');
-    }
     const [low, high] = surfaceRange(tin, platform.boundary);
     const reach = Math.max(
       daylightReach(tin, low, platform.cutSlope, platform.fillSlope),
@@ -400,22 +390,21 @@ export const balancePlatform = defineCommand({
     const residual = round(
       (works.cutVolume * swellFactor - works.fillVolume) * toMetres(doc, 1) ** 3,
     );
-    const document = regenerateCivil(doc, withObject(civil, updated));
-    return {
-      document,
-      summary:
-        `Balanced ${platform.name} (${platform.id}): elevation ${toMetresText(doc, platform.elevation)} m -> ` +
+    return commitCivil(
+      doc,
+      withObject(civil, updated),
+      [platform.id],
+      `Balanced ${platform.name} (${platform.id}): elevation ${toMetresText(doc, platform.elevation)} m -> ` +
         `${round(toMetres(doc, elevation), 3)} m; ${volumeText(data)}; residual ${residual} m³ ` +
         `(cut x ${swellFactor} - fill).`,
-      affected: civilAffected(document, [platform.id]),
-      data: {
+      {
         platformId: platform.id,
         elevationM: round(toMetres(doc, elevation), 4),
         cutM3: data['cutM3'],
         fillM3: data['fillM3'],
         residualM3: residual,
       },
-    };
+    );
   },
 });
 
@@ -448,13 +437,11 @@ export const compareSurfaces = defineCommand({
     if (!base) return noop(doc, `compare_surfaces failed: no surface ${baseSurfaceId}.`);
     if (!comparison)
       return noop(doc, `compare_surfaces failed: no surface ${comparisonSurfaceId}.`);
-    if (gridSpacing !== undefined && !(gridSpacing > 0)) {
+    if (gridSpacing !== undefined && !(gridSpacing > 0))
       return noop(doc, 'compare_surfaces failed: gridSpacing must be > 0.');
-    }
     const result = compareSurfaceVolumes(base, comparison, gridSpacing);
-    if (result.samples === 0) {
+    if (result.samples === 0)
       return noop(doc, 'compare_surfaces failed: the surfaces share no plan extent.');
-    }
     const k = toMetres(doc, 1);
     const data = {
       baseSurfaceId,

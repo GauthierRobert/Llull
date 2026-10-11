@@ -10,10 +10,15 @@ import type {
 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 
+function expectPure(name: string, params: unknown): void {
+  const doc = createEmptyDocument();
+  const snapshot = JSON.stringify(doc);
+  execute(doc, name, params);
+  expect(JSON.stringify(doc)).toBe(snapshot);
+}
+
 describe('2D draw commands', () => {
-  // -------------------------------------------------------------------------
   // draw_line
-  // -------------------------------------------------------------------------
 
   describe('draw_line', () => {
     it('creates a line entity with correct geometry', () => {
@@ -61,16 +66,11 @@ describe('2D draw commands', () => {
     });
 
     it('is pure — input document is not mutated', () => {
-      const doc = createEmptyDocument();
-      const snapshot = JSON.stringify(doc);
-      execute(doc, 'draw_line', { start: [0, 0], end: [1, 1] });
-      expect(JSON.stringify(doc)).toBe(snapshot);
+      expectPure('draw_line', { start: [0, 0], end: [1, 1] });
     });
   });
 
-  // -------------------------------------------------------------------------
   // draw_polyline
-  // -------------------------------------------------------------------------
 
   describe('draw_polyline', () => {
     it('creates a polyline entity with correct geometry', () => {
@@ -122,21 +122,16 @@ describe('2D draw commands', () => {
     });
 
     it('is pure — input document is not mutated', () => {
-      const doc = createEmptyDocument();
-      const snapshot = JSON.stringify(doc);
-      execute(doc, 'draw_polyline', {
+      expectPure('draw_polyline', {
         points: [
           [0, 0],
           [1, 1],
         ],
       });
-      expect(JSON.stringify(doc)).toBe(snapshot);
     });
   });
 
-  // -------------------------------------------------------------------------
   // draw_arc
-  // -------------------------------------------------------------------------
 
   describe('draw_arc', () => {
     it('creates an arc entity with correct geometry', () => {
@@ -184,16 +179,11 @@ describe('2D draw commands', () => {
     });
 
     it('is pure — input document is not mutated', () => {
-      const doc = createEmptyDocument();
-      const snapshot = JSON.stringify(doc);
-      execute(doc, 'draw_arc', { center: [0, 0], radius: 3, startAngle: 0, endAngle: 1 });
-      expect(JSON.stringify(doc)).toBe(snapshot);
+      expectPure('draw_arc', { center: [0, 0], radius: 3, startAngle: 0, endAngle: 1 });
     });
   });
 
-  // -------------------------------------------------------------------------
   // draw_circle
-  // -------------------------------------------------------------------------
 
   describe('draw_circle', () => {
     it('creates a circle entity with correct geometry', () => {
@@ -224,16 +214,11 @@ describe('2D draw commands', () => {
     });
 
     it('is pure — input document is not mutated', () => {
-      const doc = createEmptyDocument();
-      const snapshot = JSON.stringify(doc);
-      execute(doc, 'draw_circle', { center: [0, 0], radius: 5 });
-      expect(JSON.stringify(doc)).toBe(snapshot);
+      expectPure('draw_circle', { center: [0, 0], radius: 5 });
     });
   });
 
-  // -------------------------------------------------------------------------
   // draw_rectangle
-  // -------------------------------------------------------------------------
 
   describe('draw_rectangle', () => {
     it('creates a rectangle entity with correct geometry', () => {
@@ -265,16 +250,11 @@ describe('2D draw commands', () => {
     });
 
     it('is pure — input document is not mutated', () => {
-      const doc = createEmptyDocument();
-      const snapshot = JSON.stringify(doc);
-      execute(doc, 'draw_rectangle', { width: 4, height: 3 });
-      expect(JSON.stringify(doc)).toBe(snapshot);
+      expectPure('draw_rectangle', { width: 4, height: 3 });
     });
   });
 
-  // -------------------------------------------------------------------------
   // draw_point
-  // -------------------------------------------------------------------------
 
   describe('draw_point', () => {
     it('creates a point entity at the given position', () => {
@@ -298,16 +278,11 @@ describe('2D draw commands', () => {
     });
 
     it('is pure — input document is not mutated', () => {
-      const doc = createEmptyDocument();
-      const snapshot = JSON.stringify(doc);
-      execute(doc, 'draw_point', { position: [0, 0, 0] });
-      expect(JSON.stringify(doc)).toBe(snapshot);
+      expectPure('draw_point', { position: [0, 0, 0] });
     });
   });
 
-  // -------------------------------------------------------------------------
   // is2D / is3D helpers
-  // -------------------------------------------------------------------------
 
   describe('is2D / is3D', () => {
     it('is2D returns true for all 2D shape kinds', () => {
@@ -351,9 +326,7 @@ describe('2D draw commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // scale_entity — 2D branches
-  // -------------------------------------------------------------------------
 
   describe('scale_entity on 2D shapes', () => {
     it('scales a line start and end points', () => {

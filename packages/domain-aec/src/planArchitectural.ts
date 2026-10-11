@@ -275,9 +275,8 @@ export function curvedWallPrimitives(
   if (!outline) return [];
   const layer = layerName('wall');
   const localCut = cutHeight - wall.baseOffset;
-  if (!(localCut >= 0 && localCut < wall.height)) {
+  if (!(localCut >= 0 && localCut < wall.height))
     return [{ type: 'polygon', layer, style: 'hidden', points: outline }];
-  }
   const openings = openingsOf(building, wall.id);
   const primitives: PlanPrimitive[] = [];
   for (const piece of wallPieces(wall, openings, extent)) {

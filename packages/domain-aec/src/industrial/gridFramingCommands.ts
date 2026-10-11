@@ -51,18 +51,21 @@ interface FramingSetup {
 function setup(
   doc: CadDocument,
   tool: string,
-  profile: string,
-  levelId: string | undefined,
+  {
+    profile,
+    levelId,
+    axes,
+  }: { profile: string; levelId?: string | undefined; axes?: string[] | undefined },
 ): FramingSetup | string {
-  if (!findProfile(profile)) {
+  if (!findProfile(profile))
     return `${tool} failed: unknown steel profile '${profile}' (see list_steel_profiles).`;
-  }
   const resolution = resolveLevel(doc, getBuilding(doc), levelId);
   if (!resolution.ok) return `${tool} failed: ${resolution.reason}.`;
   const lines = gridLinesOf(resolution.building);
-  if (lines.length < 2) {
+  if (lines.length < 2)
     return `${tool} failed: needs at least 2 grid lines (add_grid_line); the building has ${lines.length}.`;
-  }
+  const bad = unknownLabels(lines, axes ?? []);
+  if (bad.length > 0) return `${tool} failed: unknown grid axis label(s) ${bad.join(', ')}.`;
   const { level } = resolution;
   return {
     building: resolution.building,
@@ -144,13 +147,9 @@ export const addGridColumns = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const tool = 'add_grid_columns';
-    const prepared = setup(doc, tool, params.profile, params.levelId);
+    const prepared = setup(doc, tool, params);
     if (typeof prepared === 'string') return noop(doc, prepared);
     const { building, lines, tolerance } = prepared;
-    const bad = unknownLabels(lines, params.axes ?? []);
-    if (bad.length > 0) {
-      return noop(doc, `${tool} failed: unknown grid axis label(s) ${bad.join(', ')}.`);
-    }
     const excluded: Array<[string, string]> = [];
     for (const name of params.exclude ?? []) {
       const pair = parseCrossingName(name);
@@ -286,13 +285,9 @@ export const addGridBeams = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const tool = 'add_grid_beams';
-    const prepared = setup(doc, tool, params.profile, params.levelId);
+    const prepared = setup(doc, tool, params);
     if (typeof prepared === 'string') return noop(doc, prepared);
     const { building, lines, tolerance } = prepared;
-    const bad = unknownLabels(lines, params.axes ?? []);
-    if (bad.length > 0) {
-      return noop(doc, `${tool} failed: unknown grid axis label(s) ${bad.join(', ')}.`);
-    }
     const section = findProfile(params.profile);
     const z = (params.topOffset ?? 0) - fromMm(doc, section?.h ?? 0) / 2;
     const existing = elementsOf(building, 'member').filter(
@@ -409,16 +404,14 @@ export const addGridBracing = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const tool = 'add_grid_bracing';
-    const prepared = setup(doc, tool, params.profile, params.levelId);
+    const prepared = setup(doc, tool, params);
     if (typeof prepared === 'string') return noop(doc, prepared);
     const { lines, tolerance } = prepared;
     const bad = unknownLabels(lines, [params.axis, params.from, params.to]);
-    if (bad.length > 0) {
+    if (bad.length > 0)
       return noop(doc, `${tool} failed: unknown grid label(s) ${bad.join(', ')}.`);
-    }
-    if (params.from === params.to) {
+    if (params.from === params.to)
       return noop(doc, `${tool} failed: from and to must be different grid lines.`);
-    }
     const find = (label: string): GridElement | undefined => lines.find((l) => l.mark === label);
     const axis = find(params.axis);
     const crossWith = (label: string): ReturnType<typeof crossGridLines> => {

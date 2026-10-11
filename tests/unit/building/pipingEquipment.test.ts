@@ -12,6 +12,7 @@ interface ScheduleTable {
   rows: unknown[][];
 }
 import type { PlanSheet } from '@aec/sheet';
+import { rawBuilding } from './elementEdits';
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {
   const result = execute(doc, name, params);
@@ -150,9 +151,7 @@ describe('add_pipe_run line-list data', () => {
       from: 'A',
       to: 'B',
     });
-    const copy = JSON.parse(JSON.stringify(doc.building)) as {
-      elements: Record<string, Record<string, unknown>>;
-    };
+    const copy = rawBuilding(doc);
     expect(buildingErrors(copy)).toEqual([]);
     const pipe = copy.elements['pipe-1'] as Record<string, unknown>;
     pipe['dn'] = 12.5;

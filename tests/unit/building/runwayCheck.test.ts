@@ -30,6 +30,14 @@ const find = (rows: RunwayCheckRow[], kind: string, check = ''): RunwayCheckRow 
   return match;
 };
 
+const expectFailed = (doc: CadDocument, params: Record<string, unknown>, summary: RegExp): void => {
+  const result = runwayCheck.run(doc, params);
+  expect(result.document).toBe(doc);
+  expect(result.affected).toEqual([]);
+  expect(result.data).toBeUndefined();
+  expect(result.summary).toMatch(summary);
+};
+
 describe('check_crane_runways', () => {
   it('checks the default 10 t runway with realistic utilisations', () => {
     const doc = hall();
@@ -168,11 +176,7 @@ describe('check_crane_runways', () => {
       { craneSelfWeight: 0 },
       { levelId: 'nope' },
     ]) {
-      const result = runwayCheck.run(doc, params);
-      expect(result.document).toBe(doc);
-      expect(result.affected).toEqual([]);
-      expect(result.data).toBeUndefined();
-      expect(result.summary).toMatch(/^check_crane_runways failed/);
+      expectFailed(doc, params, /^check_crane_runways failed/);
     }
   });
 
@@ -313,11 +317,7 @@ describe('check_crane_runways longitudinal actions (EN 1991-3 groups 7 and 8)', 
       { bufferStiffness: 0 },
       { bufferStiffness: Number.NaN },
     ]) {
-      const result = runwayCheck.run(doc, params);
-      expect(result.document).toBe(doc);
-      expect(result.affected).toEqual([]);
-      expect(result.data).toBeUndefined();
-      expect(result.summary).toMatch(/failed/);
+      expectFailed(doc, params, /failed/);
     }
   });
 });

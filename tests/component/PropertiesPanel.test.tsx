@@ -17,9 +17,7 @@ import { createEmptyDocument } from '@core/model/types';
 import { PropertiesPanel } from '@ui/panels/PropertiesPanel';
 import { localDispatch } from '../helpers/storeTestHelpers';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function resetStore(): void {
   useStore.setState({ document: createEmptyDocument(), lastSummary: null });
@@ -30,9 +28,7 @@ function createBox(size: [number, number, number] = [2, 2, 2]): string {
   return result.affected[0]!;
 }
 
-// ---------------------------------------------------------------------------
 // SelectionSection tests
-// ---------------------------------------------------------------------------
 
 describe('PropertiesPanel — selection inspector', () => {
   beforeEach(() => {
@@ -64,40 +60,22 @@ describe('PropertiesPanel — selection inspector', () => {
     expect(screen.getByText(/2 entities selected/i)).toBeDefined();
   });
 
-  it('shows Size field for a box entity', () => {
-    const id = createBox([1, 2, 3]);
+  it.each([
+    ['Size field for a box entity', 'Size', [1, 2, 3]],
+    ['Position field for any selected entity', 'Position', undefined],
+    ['Color field for a selected entity', 'Color', undefined],
+  ] as const)('shows %s', (_label, field, size) => {
+    const id = createBox(size && [...size]);
     useStore.getState().select([id]);
 
     render(<PropertiesPanel />);
 
     const selectionSection = screen.getByRole('region', { name: /selection/i });
-    expect(within(selectionSection).getByText('Size')).toBeDefined();
-  });
-
-  it('shows Position field for any selected entity', () => {
-    const id = createBox();
-    useStore.getState().select([id]);
-
-    render(<PropertiesPanel />);
-
-    const selectionSection = screen.getByRole('region', { name: /selection/i });
-    expect(within(selectionSection).getByText('Position')).toBeDefined();
-  });
-
-  it('shows Color field for a selected entity', () => {
-    const id = createBox();
-    useStore.getState().select([id]);
-
-    render(<PropertiesPanel />);
-
-    const selectionSection = screen.getByRole('region', { name: /selection/i });
-    expect(within(selectionSection).getByText('Color')).toBeDefined();
+    expect(within(selectionSection).getByText(field)).toBeDefined();
   });
 });
 
-// ---------------------------------------------------------------------------
 // Viewer mode — no mutation controls
-// ---------------------------------------------------------------------------
 
 describe('PropertiesPanel — no mutation controls in viewer mode', () => {
   beforeEach(() => {
@@ -120,9 +98,7 @@ describe('PropertiesPanel — no mutation controls in viewer mode', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Editing — every committed field dispatches a command
-// ---------------------------------------------------------------------------
 
 describe('PropertiesPanel — editing', () => {
   beforeEach(() => {

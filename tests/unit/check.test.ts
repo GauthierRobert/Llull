@@ -10,24 +10,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
-import type { CadDocument, Entity } from '@core/model/types';
+import { type CadDocument, type Entity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { runModelChecks } from '@core/commands/check';
-import type { CheckResult } from '@core/commands/check';
+import { withEntity } from '@core/commands/entityOps';
+import { groupedBoxes } from '../helpers/groupedBoxes';
+import { type CheckResult, runModelChecks } from '@core/commands/check';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
-
-/** Insert a raw entity directly (bypassing commands) for failure-path tests. */
-function injectEntity(doc: CadDocument, entity: Entity): CadDocument {
-  return {
-    ...doc,
-    entities: { ...doc.entities, [entity.id]: entity },
-    order: [...doc.order, entity.id],
-  };
-}
 
 const BASE = {
   position: [0, 0, 0] as const,
@@ -36,9 +25,7 @@ const BASE = {
   color: '#ffffff',
 };
 
-// ---------------------------------------------------------------------------
 // check_model — happy path
-// ---------------------------------------------------------------------------
 
 describe('check_model — clean document', () => {
   it('returns ok:true for an empty document (empty-layer info does not make ok=false)', () => {
@@ -62,9 +49,7 @@ describe('check_model — clean document', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Purity
-// ---------------------------------------------------------------------------
 
 describe('check_model — purity', () => {
   it('returns the SAME doc reference and affected:[]', () => {
@@ -77,14 +62,12 @@ describe('check_model — purity', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // degenerate_size
-// ---------------------------------------------------------------------------
 
 describe('check_model — degenerate_size', () => {
   it('flags a box with a zero size component', () => {
     const badBox: Entity = { ...BASE, id: 'b1', kind: 'box', size: [1, 0, 1] };
-    const doc = injectEntity(createEmptyDocument(), badBox);
+    const doc = withEntity(createEmptyDocument(), badBox);
     const { issues } = runModelChecks(doc, 1e6);
     const hit = issues.find((i) => i.code === 'degenerate_size' && i.entityId === 'b1');
     expect(hit).toBeDefined();
@@ -93,7 +76,7 @@ describe('check_model — degenerate_size', () => {
 
   it('flags a cylinder with radius ≤ 0', () => {
     const bad: Entity = { ...BASE, id: 'c1', kind: 'cylinder', radius: -1, height: 5 };
-    const doc = injectEntity(createEmptyDocument(), bad);
+    const doc = withEntity(createEmptyDocument(), bad);
     const { issues } = runModelChecks(doc, 1e6);
     const hit = issues.find((i) => i.code === 'degenerate_size' && i.entityId === 'c1');
     expect(hit).toBeDefined();
@@ -102,7 +85,7 @@ describe('check_model — degenerate_size', () => {
 
   it('flags a cylinder with height ≤ 0', () => {
     const bad: Entity = { ...BASE, id: 'c2', kind: 'cylinder', radius: 2, height: 0 };
-    const doc = injectEntity(createEmptyDocument(), bad);
+    const doc = withEntity(createEmptyDocument(), bad);
     const { issues } = runModelChecks(doc, 1e6);
     const hit = issues.find((i) => i.code === 'degenerate_size' && i.entityId === 'c2');
     expect(hit).toBeDefined();
@@ -111,7 +94,7 @@ describe('check_model — degenerate_size', () => {
 
   it('flags a sphere with radius ≤ 0', () => {
     const bad: Entity = { ...BASE, id: 's1', kind: 'sphere', radius: 0 };
-    const doc = injectEntity(createEmptyDocument(), bad);
+    const doc = withEntity(createEmptyDocument(), bad);
     const { issues } = runModelChecks(doc, 1e6);
     const hit = issues.find((i) => i.code === 'degenerate_size' && i.entityId === 's1');
     expect(hit).toBeDefined();
@@ -131,7 +114,7 @@ describe('check_model — degenerate_size', () => {
       ],
       depth: 0,
     };
-    const doc = injectEntity(createEmptyDocument(), bad);
+    const doc = withEntity(createEmptyDocument(), bad);
     const { issues } = runModelChecks(doc, 1e6);
     const hit = issues.find((i) => i.code === 'degenerate_size' && i.entityId === 'e1');
     expect(hit).toBeDefined();
@@ -140,7 +123,7 @@ describe('check_model — degenerate_size', () => {
 
   it('flags a circle with radius ≤ 0', () => {
     const bad: Entity = { ...BASE, id: 'ci1', kind: 'circle', center: [0, 0], radius: -2 };
-    const doc = injectEntity(createEmptyDocument(), bad);
+    const doc = withEntity(createEmptyDocument(), bad);
     const { issues } = runModelChecks(doc, 1e6);
     const hit = issues.find((i) => i.code === 'degenerate_size' && i.entityId === 'ci1');
     expect(hit).toBeDefined();
@@ -157,7 +140,7 @@ describe('check_model — degenerate_size', () => {
       startAngle: 0,
       endAngle: 1,
     };
-    const doc = injectEntity(createEmptyDocument(), bad);
+    const doc = withEntity(createEmptyDocument(), bad);
     const { issues } = runModelChecks(doc, 1e6);
     const hit = issues.find((i) => i.code === 'degenerate_size' && i.entityId === 'a1');
     expect(hit).toBeDefined();
@@ -173,7 +156,7 @@ describe('check_model — degenerate_size', () => {
       radiusX: 0,
       radiusY: 1,
     };
-    const doc = injectEntity(createEmptyDocument(), bad);
+    const doc = withEntity(createEmptyDocument(), bad);
     const { issues } = runModelChecks(doc, 1e6);
     const hit = issues.find((i) => i.code === 'degenerate_size' && i.entityId === 'el1');
     expect(hit).toBeDefined();
@@ -189,7 +172,7 @@ describe('check_model — degenerate_size', () => {
       radiusX: 1,
       radiusY: -1,
     };
-    const doc = injectEntity(createEmptyDocument(), bad);
+    const doc = withEntity(createEmptyDocument(), bad);
     const { issues } = runModelChecks(doc, 1e6);
     const hit = issues.find((i) => i.code === 'degenerate_size' && i.entityId === 'el2');
     expect(hit).toBeDefined();
@@ -204,9 +187,7 @@ describe('check_model — degenerate_size', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // open_profile
-// ---------------------------------------------------------------------------
 
 describe('check_model — open_profile', () => {
   it('flags an open polyline with a warning', () => {
@@ -240,14 +221,12 @@ describe('check_model — open_profile', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // insufficient_points
-// ---------------------------------------------------------------------------
 
 describe('check_model — insufficient_points', () => {
   it('flags a polyline with fewer than 2 points', () => {
     const bad: Entity = { ...BASE, id: 'pl1', kind: 'polyline', points: [[0, 0]], closed: false };
-    const doc = injectEntity(createEmptyDocument(), bad);
+    const doc = withEntity(createEmptyDocument(), bad);
     const { issues } = runModelChecks(doc, 1e6);
     const hit = issues.find((i) => i.code === 'insufficient_points' && i.entityId === 'pl1');
     expect(hit).toBeDefined();
@@ -256,7 +235,7 @@ describe('check_model — insufficient_points', () => {
 
   it('flags a polyline with zero points', () => {
     const bad: Entity = { ...BASE, id: 'pl2', kind: 'polyline', points: [], closed: false };
-    const doc = injectEntity(createEmptyDocument(), bad);
+    const doc = withEntity(createEmptyDocument(), bad);
     const { issues } = runModelChecks(doc, 1e6);
     const hit = issues.find((i) => i.code === 'insufficient_points' && i.entityId === 'pl2');
     expect(hit).toBeDefined();
@@ -265,7 +244,7 @@ describe('check_model — insufficient_points', () => {
 
   it('flags a spline with fewer than 2 points', () => {
     const bad: Entity = { ...BASE, id: 'sp1', kind: 'spline', points: [[0, 0]], closed: false };
-    const doc = injectEntity(createEmptyDocument(), bad);
+    const doc = withEntity(createEmptyDocument(), bad);
     const { issues } = runModelChecks(doc, 1e6);
     const hit = issues.find((i) => i.code === 'insufficient_points' && i.entityId === 'sp1');
     expect(hit).toBeDefined();
@@ -285,9 +264,7 @@ describe('check_model — insufficient_points', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // far_from_origin
-// ---------------------------------------------------------------------------
 
 describe('check_model — far_from_origin', () => {
   it('flags an entity whose bounding-box center exceeds the threshold', () => {
@@ -321,9 +298,7 @@ describe('check_model — far_from_origin', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // empty_layer
-// ---------------------------------------------------------------------------
 
 describe('check_model — empty_layer', () => {
   it('flags a layer with no entities as info', () => {
@@ -344,9 +319,7 @@ describe('check_model — empty_layer', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // orphaned_group_member
-// ---------------------------------------------------------------------------
 
 describe('check_model — orphaned_group_member', () => {
   it('flags a group that references a missing entity id', () => {
@@ -365,23 +338,13 @@ describe('check_model — orphaned_group_member', () => {
   });
 
   it('does NOT flag a group whose members all exist', () => {
-    let doc = createEmptyDocument();
-    const a = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = a.document;
-    const b = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = b.document;
-    doc = execute(doc, 'group_entities', {
-      ids: [a.affected[0]!, b.affected[0]!],
-      name: 'Good',
-    }).document;
+    const { doc } = groupedBoxes('Good');
     const { issues } = runModelChecks(doc, 1e6);
     expect(issues.filter((i) => i.code === 'orphaned_group_member')).toHaveLength(0);
   });
 });
 
-// ---------------------------------------------------------------------------
 // parameter_error
-// ---------------------------------------------------------------------------
 
 describe('check_model — parameter_error', () => {
   it('flags a parameter whose error field is set', () => {
@@ -412,14 +375,12 @@ describe('check_model — parameter_error', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // ok flag
-// ---------------------------------------------------------------------------
 
 describe('check_model — ok flag', () => {
   it('ok is false when there are error-severity issues', () => {
     const bad: Entity = { ...BASE, id: 'b1', kind: 'box', size: [0, 1, 1] };
-    const doc = injectEntity(createEmptyDocument(), bad);
+    const doc = withEntity(createEmptyDocument(), bad);
     const data = runModelChecks(doc, 1e6);
     expect(data.ok).toBe(false);
   });
@@ -442,14 +403,12 @@ describe('check_model — ok flag', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // summary string
-// ---------------------------------------------------------------------------
 
 describe('check_model — summary', () => {
   it('summary mentions counts when issues are present', () => {
     const bad: Entity = { ...BASE, id: 'b1', kind: 'box', size: [-1, 1, 1] };
-    const doc = injectEntity(createEmptyDocument(), bad);
+    const doc = withEntity(createEmptyDocument(), bad);
     const result = execute(doc, 'check_model', {});
     expect(result.summary).toContain('error');
     expect(result.summary).toContain('ok=');

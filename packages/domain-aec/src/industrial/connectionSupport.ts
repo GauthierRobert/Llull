@@ -10,7 +10,14 @@ import type {
   SteelMemberElement,
 } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
-import { fromMm, nextElementId, nextMark, withElement, withoutElements } from '../model';
+import {
+  elementsOf,
+  fromMm,
+  nextElementId,
+  nextMark,
+  withElement,
+  withoutElements,
+} from '../model';
 import { distance3 } from '@lib/vec3';
 import { findProfile } from '../steel/profiles';
 
@@ -23,13 +30,8 @@ export function findMomentJoints(
   rafterIds: ReadonlySet<string> | null,
   tolerance: number,
 ): MomentJoint[] {
-  const members = Object.values(building.elements).filter(
-    (element): element is SteelMemberElement =>
-      element.category === 'member' && element.levelId === levelId,
-  );
-  const existing = Object.values(building.elements).filter(
-    (element): element is MomentConnectionElement => element.category === 'connection',
-  );
+  const members = elementsOf(building, 'member').filter((member) => member.levelId === levelId);
+  const existing = elementsOf(building, 'connection');
   const connected = new Set(existing.map((element) => `${element.rafterId}:${element.end}`));
   const pairKey = (a: string, b: string): string => (a < b ? `${a}|${b}` : `${b}|${a}`);
   const apexPairs = new Set(

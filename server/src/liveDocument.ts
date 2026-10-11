@@ -10,13 +10,11 @@ import path from 'path';
 import { randomUUID } from 'crypto';
 import { createAutosaver } from './autosave';
 import type { Response } from 'express';
-import { createEmptyDocument } from '@core/model/types';
-import type { CadDocument } from '@core/model/types';
+import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence';
 import { errorMessage } from '@lib/errorMessage';
-import { documentHash } from '@mcp/liveSync';
+import { type LiveCommandEvent, type LiveSnapshotEvent, documentHash } from '@mcp/liveSync';
 import { setAuditDefaultDirectory } from './audit';
-import type { LiveCommandEvent, LiveSnapshotEvent } from '@mcp/liveSync';
 
 /**
  * Autosave path (override via `LLULL_AUTOSAVE_PATH`; default next to the server bundle). Disabled

@@ -11,7 +11,7 @@ import { DOCUMENT_UNITS, type DocumentUnit } from '@core/model/types';
 import { useStore } from '@ui/store';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { OptionSelect } from '@ui/panels/OptionSelect';
-import { CivilObjectRow, useCivilObjects } from './CivilParts';
+import { CivilObjectRow, useCivilObjects, TextField } from './CivilParts';
 import { DxfImports, readChosenFile } from './DxfImports';
 
 const FORMATS = ['PENZD', 'PNEZD', 'PENZ', 'PNEZ', 'ENZ', 'NEZ'] as const;
@@ -100,12 +100,7 @@ export function SurveySection(): React.ReactElement {
             label="Survey unit"
             onChange={setUnit}
           />
-          <input
-            value={name}
-            placeholder="Group name"
-            aria-label="Point group name"
-            onChange={(event) => setName(event.target.value)}
-          />
+          <TextField value={name} set={setName} hint="Group name" label="Point group name" />
           <button type="submit" className="btn btn--primary btn--sm" disabled={text.trim() === ''}>
             Import points
           </button>

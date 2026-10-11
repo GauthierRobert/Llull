@@ -6,10 +6,9 @@ import { referenceSuffix, replaceEntity, withoutEntities } from './entityOps';
 import {
   DEFAULT_SOLID_COLOR,
   EXTRUSION_COLOR,
-  anchorField,
   commitSolid,
   placeSolid,
-  positionField,
+  placedSolidFields,
   rejectBadProfile,
   rejectZeroAreaProfile,
   rejectBadSize,
@@ -17,7 +16,7 @@ import {
   translated,
 } from './geometryShared';
 import { ORIGIN, finiteVec3OrZero } from '../lib/vec3';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 import { MAX_PROFILE_POINTS } from './limits';
 
 /**
@@ -40,10 +39,7 @@ export const addBox = defineCommand({
     'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.',
   params: z.object({
     size: looseVec3('[width, height, depth] in document units. All three components must be > 0.'),
-    position: positionField(),
-    anchor: anchorField('box', 'center'),
-    rotation: rotationField(),
-    color: colorField(DEFAULT_SOLID_COLOR),
+    ...placedSolidFields('box', 'center'),
   }),
   run: (
     doc,
@@ -154,14 +150,12 @@ export const move = defineCommand({
   }),
   run: (doc, { id, delta }): CommandResult => {
     const target = doc.entities[id];
-    if (!target) {
-      return noop(doc, `No entity ${id} to move.`);
-    }
-    return {
-      document: replaceEntity(doc, translated(target, delta)),
-      summary: `Moved ${id} by ${delta.join(', ')}.`,
-      affected: [id],
-    };
+    if (!target) return noop(doc, `No entity ${id} to move.`);
+    return changed(
+      replaceEntity(doc, translated(target, delta)),
+      `Moved ${id} by ${delta.join(', ')}.`,
+      [id],
+    );
   },
 });
 
@@ -184,9 +178,7 @@ export const deleteEntity = defineCommand({
     id: z.string().describe('Target entity id to delete.'),
   }),
   run: (doc, { id }): CommandResult => {
-    if (!doc.entities[id]) {
-      return noop(doc, `No entity ${id} to delete.`);
-    }
+    if (!doc.entities[id]) return noop(doc, `No entity ${id} to delete.`);
 
     const { document, dissolvedGroups, prunedReferences } = withoutEntities(doc, new Set([id]));
 
@@ -195,10 +187,10 @@ export const deleteEntity = defineCommand({
         ? ` Dissolved group(s): [${dissolvedGroups.join(', ')}] (fell below 2 members).`
         : '';
 
-    return {
+    return changed(
       document,
-      summary: `Deleted ${id}.${dissolveSuffix}${referenceSuffix(prunedReferences)}`,
-      affected: [id],
-    };
+      `Deleted ${id}.${dissolveSuffix}${referenceSuffix(prunedReferences)}`,
+      [id],
+    );
   },
 });

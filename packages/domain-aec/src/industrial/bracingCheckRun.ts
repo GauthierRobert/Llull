@@ -107,14 +107,12 @@ export const checkBracing = defineCommand({
       ['travelSpeed', travelSpeed],
       ['bufferStiffness', bufferStiffness],
     ] as const) {
-      if (value !== undefined && !isPositiveNumber(value)) {
+      if (value !== undefined && !isPositiveNumber(value))
         return noop(doc, `check_bracing failed: ${name} must be a number > 0.`);
-      }
     }
     const levelId = existingLevelId(getBuilding(doc), params.levelId);
-    if (levelId === undefined) {
+    if (levelId === undefined)
       return noop(doc, `check_bracing failed: no level '${params.levelId ?? ''}'.`);
-    }
     const analysis = analyseBracing(locateMembers(doc, levelId), levelId, {
       windPressure,
       deadLoad,

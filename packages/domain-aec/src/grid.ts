@@ -7,11 +7,11 @@ import type { Vec2 } from '@core/model/types';
 import type { BuildingModel, GridElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
-import { fromMm, getBuilding, nextElementId, withElement, elementAffected } from './model';
+import { fromMm, getBuilding, nextElementId, withElement } from './model';
 import { distance } from '@lib/polygon';
 import { sameSegment } from './duplicates';
 import { noop } from '@core/commands/noop';
-import { regenerateBuilding } from './evaluateElements';
+import { commitBuilding } from './evaluateElements';
 import { wallFrame } from './wallGeometry';
 
 export function gridLabels(building: BuildingModel): Set<string> {
@@ -83,15 +83,13 @@ export const addGridLine = defineCommand({
     label: z.string().optional().describe('Bubble label, e.g. "A" or "3". Must be unique.'),
   }),
   run: (doc, { start, end, label }): CommandResult => {
-    if (distance(start, end) <= 0) {
+    if (distance(start, end) <= 0)
       return noop(doc, 'add_grid_line failed: start and end must be distinct [x, y] points.');
-    }
     const building = getBuilding(doc);
     const used = gridLabels(building);
     const resolvedLabel = label?.trim() || nextFreeLabel(used, true);
-    if (used.has(resolvedLabel)) {
+    if (used.has(resolvedLabel))
       return noop(doc, `add_grid_line failed: grid label "${resolvedLabel}" already exists.`);
-    }
     const twin = gridTwin(building, start, end);
     if (twin) {
       return noop(
@@ -101,13 +99,9 @@ export const addGridLine = defineCommand({
     }
     const next = addGrid(building, resolvedLabel, start, end);
     const id = next.elementOrder[next.elementOrder.length - 1] as string;
-    const document = regenerateBuilding(doc, next);
-    return {
-      document,
-      summary: `Added grid axis ${resolvedLabel} (${id}).`,
-      affected: elementAffected(document, [id]),
-      data: { elementId: id },
-    };
+    return commitBuilding(doc, next, [id], `Added grid axis ${resolvedLabel} (${id}).`, {
+      elementId: id,
+    });
   },
 });
 
@@ -159,9 +153,7 @@ export const addGridSystem = defineCommand({
       );
     }
     const overrun = extension ?? fromMm(doc, 1500);
-    if (overrun < 0) {
-      return noop(doc, 'add_grid_system failed: extension must be >= 0.');
-    }
+    if (overrun < 0) return noop(doc, 'add_grid_system failed: extension must be >= 0.');
     const origin: Vec2 = originInput ?? [0, 0];
     const xs = [origin[0]];
     for (const spacing of xSpacings) xs.push((xs[xs.length - 1] as number) + spacing);
@@ -206,14 +198,14 @@ export const addGridSystem = defineCommand({
       building = addGrid(building, label, [minX - overrun, y], [maxX + overrun, y]);
       created.push(label);
     }
-    const document = regenerateBuilding(doc, building);
     const createdIds = building.elementOrder.slice(-created.length);
-    return {
-      document,
-      summary: `Added grid system: axes ${created.join(', ')} spanning ${maxX - minX} × ${maxY - minY} ${doc.units}.`,
-      affected: elementAffected(document, createdIds),
-      data: { elementIds: createdIds, labels: created },
-    };
+    return commitBuilding(
+      doc,
+      building,
+      createdIds,
+      `Added grid system: axes ${created.join(', ')} spanning ${maxX - minX} × ${maxY - minY} ${doc.units}.`,
+      { elementIds: createdIds, labels: created },
+    );
   },
 });
 

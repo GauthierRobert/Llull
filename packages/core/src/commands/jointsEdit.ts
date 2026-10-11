@@ -5,7 +5,7 @@ import { nextId } from '../lib/id';
 import { resolveNumeric } from './expression';
 import { instanceFrameRef, instanceRefsProblem } from './instanceFrameRef';
 import { isValidAxis } from '../lib/axis';
-import { noop } from './noop';
+import { changed, noop, report } from './noop';
 /**
  * @command add_joint
  * @pure
@@ -70,9 +70,8 @@ export const addJoint = defineCommand({
     if (refProblem !== null) return noop(doc, refProblem);
 
     const jointId = id !== undefined && id.length > 0 ? id : nextId('joint');
-    if (jointId in doc.joints) {
+    if (jointId in doc.joints)
       return noop(doc, `add_joint: joint id '${jointId}' already exists — no change made.`);
-    }
 
     const mateRef = ({ instanceId, frame }: typeof a): JointMateRef =>
       frame !== undefined ? { instanceId, frame } : { instanceId };
@@ -87,13 +86,12 @@ export const addJoint = defineCommand({
       jointOrder: [...doc.jointOrder, jointId],
     };
 
-    return {
-      document: newDoc,
-      summary:
-        `add_joint: added '${kind}' joint '${jointId}' between instance '${a.instanceId}' (a) ` +
+    return changed(
+      newDoc,
+      `add_joint: added '${kind}' joint '${jointId}' between instance '${a.instanceId}' (a) ` +
         `and instance '${b.instanceId}' (b), axis=${JSON.stringify(axis)}.`,
-      affected: [jointId],
-    };
+      [jointId],
+    );
   },
 });
 
@@ -122,9 +120,8 @@ export const deleteJoint = defineCommand({
   }),
   run: (doc, { id }): CommandResult => {
     const joint = Object.hasOwn(doc.joints, id) ? doc.joints[id] : undefined;
-    if (!joint) {
+    if (!joint)
       return noop(doc, `delete_joint: joint '${String(id)}' does not exist — no change made.`);
-    }
 
     const removedDrIds = Object.entries(doc.driveRelations)
       .filter(([, dr]) => dr.driver === id || dr.driven === id)
@@ -145,11 +142,7 @@ export const deleteJoint = defineCommand({
         ? ` Also removed ${removedDrIds.length} drive relation(s): ${removedDrIds.join(', ')}.`
         : '';
 
-    return {
-      document: newDoc,
-      summary: `delete_joint: removed '${joint.kind}' joint '${id}'.${cascadeSummary}`,
-      affected: [],
-    };
+    return report(newDoc, `delete_joint: removed '${joint.kind}' joint '${id}'.${cascadeSummary}`);
   },
 });
 
@@ -182,9 +175,8 @@ export const setJointValue = defineCommand({
   }),
   run: (doc, { id, value }): CommandResult => {
     const existing = Object.hasOwn(doc.joints, id) ? doc.joints[id] : undefined;
-    if (!existing) {
+    if (!existing)
       return noop(doc, `set_joint_value: joint '${String(id)}' does not exist — no change made.`);
-    }
 
     const resolved = resolveNumeric(value, doc.parameters);
     const fieldName = existing.kind === 'revolute' ? 'angle' : 'displacement';
@@ -195,12 +187,11 @@ export const setJointValue = defineCommand({
       joints: { ...doc.joints, [id]: { ...existing, [fieldName]: storedValue } as Joint },
     };
 
-    return {
-      document: newDoc,
-      summary:
-        `set_joint_value: joint '${id}' (${existing.kind}) ${fieldName} set to ${storedValue}` +
+    return changed(
+      newDoc,
+      `set_joint_value: joint '${id}' (${existing.kind}) ${fieldName} set to ${storedValue}` +
         (typeof value === 'string' ? ` (expression: "${value}").` : '.'),
-      affected: [id],
-    };
+      [id],
+    );
   },
 });

@@ -215,9 +215,8 @@ export const checkClashes = defineCommand({
     if (levelId !== undefined && !building.levels[levelId])
       return noop(doc, `check_clashes failed: no level '${levelId}'.`);
     const resolvedTolerance = tolerance ?? fromMm(doc, 5);
-    if (!(resolvedTolerance >= 0)) {
+    if (!(resolvedTolerance >= 0))
       return noop(doc, 'check_clashes failed: tolerance must be >= 0.');
-    }
     const clashes = findClashes(
       doc,
       levelId !== undefined ? new Set([levelId]) : null,

@@ -55,9 +55,7 @@ export function segmentIntersection(
   const t = ((cx - ax) * s_y - (cy - ay) * s_x) / denom;
   const u = ((cx - ax) * r_y - (cy - ay) * r_x) / denom;
 
-  if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
-    return [ax + t * r_x, ay + t * r_y];
-  }
+  if (t >= 0 && t <= 1 && u >= 0 && u <= 1) return [ax + t * r_x, ay + t * r_y];
   return null;
 }
 

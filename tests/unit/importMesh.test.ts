@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
-import type { CadDocument, MeshSolidEntity } from '@core/model/types';
+import { type CadDocument, type MeshSolidEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { MAX_IMPORT_BODIES, MAX_IMPORT_TRIANGLES } from '@core/commands/limits';
 

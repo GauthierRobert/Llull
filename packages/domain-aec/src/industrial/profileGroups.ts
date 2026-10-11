@@ -6,12 +6,13 @@
 
 import { z } from '@core/commands/schema';
 import type { BuildingModel, SteelMemberElement } from '@core/model/building';
+import type { CadDocument } from '@core/model/types';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { withElement } from '../model';
 import { findProfile, lightestProfile, sectionProperties } from '../steel/profiles';
 
 /** Iteration cap of the design loops of design_portal_frames and design_purlins. */
-export const MAX_ITERATIONS = 15;
+const MAX_ITERATIONS = 15;
 
 /** Shared `targetUtilisation` parameter of the design commands. */
 export const targetUtilisationParam = z
@@ -104,6 +105,34 @@ export function upsizeProfileGroups(
     changedIds.push(...resized.changedIds);
   }
   return { building: next, progressed, limited, changes, changedIds };
+}
+
+type UpsizeStep = ReturnType<typeof upsizeProfileGroups>;
+
+/**
+ * Iterate `step` (one upsize pass on the current document; `null` = nothing left to upsize) up
+ * to MAX_ITERATIONS, accumulating the change texts and ids. `limited` when a group had no larger
+ * size or the iteration cap was hit.
+ */
+export function iterateUpsizing(
+  doc: CadDocument,
+  step: (current: CadDocument) => UpsizeStep | null,
+): { current: CadDocument; limited: boolean; changes: string[]; changed: Set<string> } {
+  let current = doc;
+  let limited = false;
+  const changes: string[] = [];
+  const changed = new Set<string>();
+  for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+    const result = step(current);
+    if (!result) break;
+    changes.push(...result.changes);
+    for (const id of result.changedIds) changed.add(id);
+    current = { ...current, building: result.building };
+    if (result.limited) limited = true;
+    if (!result.progressed) break;
+    if (iteration === MAX_ITERATIONS - 1) limited = true;
+  }
+  return { current, limited, changes, changed };
 }
 
 /**

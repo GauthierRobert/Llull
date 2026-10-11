@@ -9,8 +9,7 @@ import React from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore, useViewportStore } from '@ui/store';
 import { deleteSelection, duplicateSelection } from '@ui/actions/selectionActions';
-import { is2D } from '@core/model/types';
-import type { Entity } from '@core/model/types';
+import { type Entity, is2D } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
 import { PanelEmpty, PanelHeader, PanelSection } from '@ui/panels/PanelParts';
 import { AxisFields, CommitInput, PropRow } from './propertyFields';
@@ -166,9 +165,8 @@ function PropertiesBody(): React.ReactElement {
       />
     );
   }
-  if (elementIds.size === 1 && everyEntityBelongs && soleElementId !== undefined) {
+  if (elementIds.size === 1 && everyEntityBelongs && soleElementId !== undefined)
     return <ElementInspector elementId={soleElementId} />;
-  }
   if (selection.length > 1) {
     return (
       <>

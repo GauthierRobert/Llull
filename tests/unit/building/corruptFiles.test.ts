@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
+import { applySteps } from './applySteps';
 
 type Json = Record<string, unknown>;
 
@@ -9,7 +10,7 @@ const BAD: unknown[] = [null, 'x', -1, 0, [], {}, true, undefined];
 
 /** Industrial model: hall with crane + connections + plates + footings + panels, then pipes, supports, tray, equipment. */
 function industrialModel(): CadDocument {
-  let doc = execute(createEmptyDocument(), 'add_portal_frame_building', {
+  const hall = execute(createEmptyDocument(), 'add_portal_frame_building', {
     span: 12000,
     length: 12000,
     baySpacing: 6000,
@@ -45,12 +46,7 @@ function industrialModel(): CadDocument {
     ],
     ['add_curved_wall', { start: [14000, 0], through: [15000, 1000], end: [16000, 0] }],
   ];
-  for (const [name, params] of steps) {
-    const result = execute(doc, name, params);
-    expect(result.affected.length, `${name}: ${result.summary}`).toBeGreaterThan(0);
-    doc = result.document;
-  }
-  return doc;
+  return applySteps(hall, steps);
 }
 
 /** Every path (up to `depth` keys deep) inside `root`, as key lists. */

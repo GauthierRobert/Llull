@@ -123,9 +123,8 @@ export function analyseBracing(
   const rafters = members.filter(({ member }) => member.role === 'rafter');
   if (braces.length === 0)
     return { reason: `check_bracing: no bracing (role brace) on level '${levelId}'.` };
-  if (rafters.length === 0) {
+  if (rafters.length === 0)
     return { reason: `check_bracing failed: no rafters on level '${levelId}' (no gable).` };
-  }
   const rafterEnds = rafters.flatMap(({ start, end }) => [start, end]);
   const ys = rafterEnds.map((point) => point[1]);
   const y0 = Math.min(...ys);
@@ -251,35 +250,34 @@ export function analyseBracing(
     const fy = yieldStrength(member.material);
     const npl = sectionResistance(profile, fy).axial / 1000;
     const ids = panel.braces.map(({ member: brace }) => brace.id);
-    rows.push({
+    const diagonalRow = (force: number, check: string): BracingRow => ({
       group: panel.group,
       elementId: member.id,
       elementIds: ids,
       mark: member.mark,
       kind: 'diagonal',
-      force: tension,
+      force,
       resistance: npl,
       moment: 0,
       momentResistance: 0,
-      utilisation: tension / npl,
-      check: `tension-only ${member.profile}: V ${shear.toFixed(1)} kN / cos θ ${(dy / length).toFixed(2)} = ${tension.toFixed(1)} kN ≤ Npl,Rd ${npl.toFixed(1)} kN (bay ${panel.bay} mm)`,
+      utilisation: force / npl,
+      check,
     });
+    rows.push(
+      diagonalRow(
+        tension,
+        `tension-only ${member.profile}: V ${shear.toFixed(1)} kN / cos θ ${(dy / length).toFixed(2)} = ${tension.toFixed(1)} kN ≤ Npl,Rd ${npl.toFixed(1)} kN (bay ${panel.bay} mm)`,
+      ),
+    );
     if (craneForce !== null && craneShare > 0) {
       const craneTension = (craneShare * length) / dy;
       const side = panel.group.endsWith('west') ? 'west' : 'east';
-      rows.push({
-        group: panel.group,
-        elementId: member.id,
-        elementIds: ids,
-        mark: member.mark,
-        kind: 'diagonal',
-        force: craneTension,
-        resistance: npl,
-        moment: 0,
-        momentResistance: 0,
-        utilisation: craneTension / npl,
-        check: `crane longitudinal (group 1 / group 7): ${craneForce.governing} governs, 1.35 HL ${craneForce.driveGroup1.toFixed(1)} kN vs HB (γ 1.0) ${craneForce.bufferGroup7.toFixed(1)} kN per runway, share ${craneShare.toFixed(1)} kN on bay ${panel.bay} mm, tension ${craneTension.toFixed(1)} kN ≤ Npl,Rd ${npl.toFixed(1)} kN (included in the wall bracing row above)`,
-      });
+      rows.push(
+        diagonalRow(
+          craneTension,
+          `crane longitudinal (group 1 / group 7): ${craneForce.governing} governs, 1.35 HL ${craneForce.driveGroup1.toFixed(1)} kN vs HB (γ 1.0) ${craneForce.bufferGroup7.toFixed(1)} kN per runway, share ${craneShare.toFixed(1)} kN on bay ${panel.bay} mm, tension ${craneTension.toFixed(1)} kN ≤ Npl,Rd ${npl.toFixed(1)} kN (included in the wall bracing row above)`,
+        ),
+      );
       craneFoundation.push({
         side,
         braced: wallPanelsOnSide(side),

@@ -4,7 +4,7 @@ import { execute, getCommand } from '@core/commands/registry';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence';
 import { addPipeSupport } from '@aec/industrial/pipeSupports';
 import { buildingErrors } from '@aec/validate';
-import { beam, column, step, twoLevels } from './steelFixtures';
+import { beamOnColumns, column, step, twoLevels } from './steelFixtures';
 import { hangerDoc, shoeDoc, supportsOf } from './pipeSupportFixtures';
 
 const SHOE_AT = { pipeId: 'pipe-1', at: [[3000, 2000, 3027.15]] };
@@ -65,11 +65,7 @@ describe('shoe on a beam below the pipe', () => {
   });
 
   it('uses the pedestal height when the steel is lower than the pipe underside', () => {
-    let doc = twoLevels();
-    doc = column(doc, 3000, 0);
-    doc = column(doc, 3000, 4000);
-    doc = beam(doc, [3000, 0], [3000, 4000]);
-    doc = step(doc, 'add_pipe_run', {
+    const doc = step(beamOnColumns(), 'add_pipe_run', {
       levelId: 'level-1',
       dn: 100,
       points: [

@@ -2,7 +2,6 @@
  * @layer domain-aec
  */
 
-import type { GridElement } from '@core/model/building';
 import type { Vec2 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
@@ -102,12 +101,10 @@ export const exportAnchorPlan = defineCommand({
       ),
   }),
   run: (doc, { levelId, scale, paper, embedment }): CommandResult => {
-    if (scale !== undefined && !(scale > 0)) {
+    if (scale !== undefined && !(scale > 0))
       return noop(doc, 'export_anchor_plan failed: scale must be a number > 0.');
-    }
-    if (embedment !== undefined && !(embedment > 0)) {
+    if (embedment !== undefined && !(embedment > 0))
       return noop(doc, 'export_anchor_plan failed: embedment must be a number > 0.');
-    }
     const building = getBuilding(doc);
     const resolvedId = existingLevelId(building, levelId);
     const level = resolvedId !== undefined ? building.levels[resolvedId] : undefined;
@@ -125,10 +122,7 @@ export const exportAnchorPlan = defineCommand({
         `export_anchor_plan failed: no base plates on level ${level.id} (add_base_plates first).`,
       );
     }
-    const grids = Object.values(building.elements).filter(
-      (element): element is GridElement => element.category === 'grid',
-    );
-    const { vertical, horizontal } = gridAxes(grids, mm);
+    const { vertical, horizontal } = gridAxes(elementsOf(building, 'grid'), mm);
     const embedmentMm = embedment !== undefined ? mm(embedment) : DEFAULT_EMBEDMENT_MM;
 
     const sheetPaper: PaperSize = paper ?? 'A3';

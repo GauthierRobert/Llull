@@ -28,9 +28,8 @@ export function allSegmentIntersections(segments: ReadonlyArray<Segment>): Array
     for (let next = order + 1; next < byMinX.length; next++) {
       const j = byMinX[next] as number;
       if ((minX[j] as number) > (maxX[i] as number)) break;
-      if ((minY[j] as number) > (maxY[i] as number) || (maxY[j] as number) < (minY[i] as number)) {
+      if ((minY[j] as number) > (maxY[i] as number) || (maxY[j] as number) < (minY[i] as number))
         continue;
-      }
       const point = segmentIntersection(...first, ...(segments[j] as Segment));
       if (point) points.push(point);
     }

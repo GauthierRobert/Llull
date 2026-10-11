@@ -125,9 +125,7 @@ export function guardCommand(def: CommandDefinition<unknown>): CommandDefinition
         return rejection(doc, `${def.name} failed: ${reason}; document unchanged.`);
       }
       const violation = derivationViolation(pluginGuards(), def.name, doc, result.document);
-      if (violation !== null) {
-        return rejection(doc, violation);
-      }
+      if (violation !== null) return rejection(doc, violation);
       if (result.document !== doc) {
         for (const id of result.affected) {
           const reason = corruptionReason(result.document.entities[id]);

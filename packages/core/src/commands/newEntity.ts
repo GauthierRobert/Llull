@@ -1,5 +1,4 @@
-import type { BaseEntity, Entity, Vec3 } from '../model/types';
-import { DEFAULT_LAYER_ID } from '../model/types';
+import { type BaseEntity, type Entity, type Vec3, DEFAULT_LAYER_ID } from '../model/types';
 
 /**
  * A fresh entity (default layer unless `layerId`): `geometry` is the kind-specific part, the shared base

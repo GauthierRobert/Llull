@@ -280,9 +280,8 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
       const reader = new FieldReader(values);
       const dn = reader.text('dn');
       const diameter = reader.optionalNumber('diameter');
-      if (dn === '' && diameter === undefined) {
+      if (dn === '' && diameter === undefined)
         return { ok: false, reason: 'Pick a nominal size or give the outside Ø.' };
-      }
       return result(reader, 'add_pipe_run', {
         points: reader.pointList('points', 2),
         line: reader.text('line') || undefined,

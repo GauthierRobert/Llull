@@ -100,18 +100,19 @@ async function makeFakeKernel(): Promise<Fake> {
   return { kernel, leaked: () => created.filter((object) => !deleted.has(object)).length };
 }
 
+const box = {
+  id: 'b',
+  kind: 'box',
+  position: [0, 0, 0],
+  rotation: [0, 0, 0],
+  size: [1, 1, 1],
+  layerId: 'layer-default',
+  color: '#888888',
+} as unknown as Entity;
+
 describe('occt kernel releases WASM handles', () => {
   it('deletes the nodes, triangles, faces and triangulations read while meshing', async () => {
     const fake = await makeFakeKernel();
-    const box = {
-      id: 'b',
-      kind: 'box',
-      position: [0, 0, 0],
-      rotation: [0, 0, 0],
-      size: [1, 1, 1],
-      layerId: 'layer-default',
-      color: '#888888',
-    } as unknown as Entity;
 
     const shape = fake.kernel.evaluate({ op: 'solid', entity: box });
     const mesh = shape === null ? null : fake.kernel.tessellate(shape);
@@ -127,15 +128,6 @@ describe('occt kernel releases WASM handles', () => {
 
   it('deletes the explorers, edges, builders and intermediate shapes of a fillet', async () => {
     const fake = await makeFakeKernel();
-    const box = {
-      id: 'b',
-      kind: 'box',
-      position: [0, 0, 0],
-      rotation: [0, 0, 0],
-      size: [1, 1, 1],
-      layerId: 'layer-default',
-      color: '#888888',
-    } as unknown as Entity;
 
     const shape = fake.kernel.evaluate({
       op: 'fillet',

@@ -6,7 +6,7 @@ import { offsetSegment, miterJoin, resolvePolyline } from './modify2dGeometry';
 import { commitEntity } from './commitEntity';
 import { referenceSuffix, withEntities, withoutEntities } from './entityOps';
 import { newEntity } from './newEntity';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 import { elementAt } from '../lib/elementAt';
 
 /**
@@ -56,11 +56,11 @@ export const explodePolyline = defineCommand({
     }
     const newDoc = withEntities(baseDoc, lines);
 
-    return {
-      document: newDoc,
-      summary: `Exploded polyline ${id} into ${createdIds.length} line(s): [${createdIds.join(', ')}].${referenceSuffix(prunedReferences)}`,
-      affected: createdIds,
-    };
+    return changed(
+      newDoc,
+      `Exploded polyline ${id} into ${createdIds.length} line(s): [${createdIds.join(', ')}].${referenceSuffix(prunedReferences)}`,
+      createdIds,
+    );
   },
 });
 
@@ -98,12 +98,8 @@ export const offset2D = defineCommand({
   }),
   run: (doc, { id, distance }): CommandResult => {
     const entity = doc.entities[id];
-    if (!entity) {
-      return noop(doc, `offset_2d: entity ${id} not found.`);
-    }
-    if (distance === 0) {
-      return noop(doc, `offset_2d: distance is 0 — no-op.`);
-    }
+    if (!entity) return noop(doc, `offset_2d: entity ${id} not found.`);
+    if (distance === 0) return noop(doc, `offset_2d: distance is 0 — no-op.`);
 
     const newId = nextId('offset');
     const base = {
@@ -124,9 +120,8 @@ export const offset2D = defineCommand({
       }
       case 'polyline': {
         const pts = entity.points;
-        if (pts.length < 2) {
+        if (pts.length < 2)
           return noop(doc, `offset_2d: polyline ${id} has fewer than 2 points — no-op.`);
-        }
         const segs = pts
           .slice(0, -1)
           .map((p, i) => offsetSegment(p, elementAt(pts, i + 1), distance));
@@ -145,9 +140,8 @@ export const offset2D = defineCommand({
       }
       case 'circle': {
         const radius = entity.radius + distance;
-        if (radius <= 0) {
+        if (radius <= 0)
           return noop(doc, `offset_2d: resulting circle radius ${radius} <= 0 — no-op.`);
-        }
         offsetEntity = { ...base, id: newId, kind: 'circle', center: entity.center, radius };
         summary = `Offset circle ${id} by ${distance} → new circle ${newId} radius ${radius}.`;
         break;

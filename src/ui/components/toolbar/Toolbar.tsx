@@ -8,10 +8,8 @@
  */
 
 import React from 'react';
-import { useStore, useToolStore } from '@ui/store';
-import type { GizmoMode } from '@ui/store';
-import { Icon } from '@ui/components/Icon';
-import type { IconName } from '@ui/components/Icon';
+import { type GizmoMode, useStore, useToolStore } from '@ui/store';
+import { type IconName, Icon } from '@ui/components/Icon';
 import { deleteSelection, duplicateSelection } from '@ui/actions/selectionActions';
 import { DRAW_TOOL_KEYS, GIZMO_KEYS } from '@ui/hooks/shortcuts';
 import { SOLID_PRESETS } from './solidPresets';

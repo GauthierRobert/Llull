@@ -70,9 +70,8 @@ export const alignmentReport = defineCommand({
     const checked = checkedAlignment(doc, params.alignmentId, params.interval, 'alignment_report');
     if (typeof checked === 'string') return noop(doc, checked);
     const { alignment, interval } = checked;
-    if (params.designSpeedKmh !== undefined && !(params.designSpeedKmh > 0)) {
+    if (params.designSpeedKmh !== undefined && !(params.designSpeedKmh > 0))
       return noop(doc, 'alignment_report failed: designSpeedKmh must be > 0.');
-    }
     const stations = reportStations(alignment, interval);
     const rows = reportRows(
       doc,

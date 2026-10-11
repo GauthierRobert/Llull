@@ -8,8 +8,9 @@
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
-import { chosenId, CivilObjectSelect, useCivilObjects } from './CivilParts';
+import { chosenId, CivilObjectSelect, useCivilObjects, NumberField, TextField } from './CivilParts';
 import { optionalNumber, parseNumber, parsePoints } from './civilInput';
+import { FormError } from '@ui/panels/PanelParts';
 
 const MANHOLE_FIELDS = [
   ['rimElevation', 'Rim elevation'],
@@ -68,18 +69,12 @@ export function ManholeForm(): React.ReactElement {
   return (
     <form className="civil-form" onSubmit={handleSubmit} aria-label="Add manhole">
       <div className="building-inline-form">
-        <input
-          value={position}
-          placeholder="x,y"
-          aria-label="Manhole position"
-          onChange={(event) => setPosition(event.target.value)}
-        />
-        <input
-          type="number"
+        <TextField value={position} set={setPosition} hint="x,y" label="Manhole position" />
+        <NumberField
           value={invert}
-          placeholder="Invert elevation"
-          aria-label="Manhole invert"
-          onChange={(event) => setInvert(event.target.value)}
+          set={setInvert}
+          hint="Invert elevation"
+          label="Manhole invert"
         />
         <CivilObjectSelect
           objects={surfaces}
@@ -100,21 +95,12 @@ export function ManholeForm(): React.ReactElement {
             onChange={(event) => setFields((prev) => ({ ...prev, [key]: event.target.value }))}
           />
         ))}
-        <input
-          value={name}
-          placeholder="Name"
-          aria-label="Manhole name"
-          onChange={(event) => setName(event.target.value)}
-        />
+        <TextField value={name} set={setName} hint="Name" label="Manhole name" />
         <button type="submit" className="btn btn--primary btn--sm">
           Add manhole
         </button>
       </div>
-      {error !== '' && (
-        <p className="panel__error" role="alert">
-          {error}
-        </p>
-      )}
+      <FormError text={error} />
     </form>
   );
 }
@@ -146,26 +132,9 @@ export function PipeForm(): React.ReactElement {
     <form className="building-inline-form" onSubmit={handleSubmit} aria-label="Add pipe">
       <CivilObjectSelect objects={manholes} value={fromId} label="Pipe from" onChange={setFrom} />
       <CivilObjectSelect objects={manholes} value={toId} label="Pipe to" onChange={setTo} />
-      <input
-        type="number"
-        value={diameter}
-        placeholder="Diameter"
-        aria-label="Pipe diameter"
-        onChange={(event) => setDiameter(event.target.value)}
-      />
-      <input
-        value={material}
-        placeholder="Material"
-        aria-label="Pipe material"
-        onChange={(event) => setMaterial(event.target.value)}
-      />
-      <input
-        type="number"
-        value={manningN}
-        placeholder="Manning n"
-        aria-label="Pipe Manning n"
-        onChange={(event) => setManningN(event.target.value)}
-      />
+      <NumberField value={diameter} set={setDiameter} hint="Diameter" label="Pipe diameter" />
+      <TextField value={material} set={setMaterial} hint="Material" label="Pipe material" />
+      <NumberField value={manningN} set={setManningN} hint="Manning n" label="Pipe Manning n" />
       <button
         type="submit"
         className="btn btn--primary btn--sm"

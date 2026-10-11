@@ -10,9 +10,8 @@ import type { Entity, Vec3 } from '@core/model/types';
 import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createNodeOcctKernel } from '../src/occtNode';
-import { booleanMesh, meshOf } from './kernelTestSupport';
+import { common, booleanMesh, box, meshOf, volume } from './kernelTestSupport';
 
-const common = { layerId: 'layer-default', color: '#888888' };
 const at = (
   position: Vec3,
   rotation: Vec3,
@@ -48,27 +47,6 @@ const shapes: Array<[string, (position: Vec3, rotation: Vec3) => Entity]> = [
       }) as Entity,
   ],
 ];
-
-const box = (position: Vec3, size: Vec3): Entity =>
-  ({ id: 'b', kind: 'box', rotation: [0, 0, 0], position, size, ...common }) as Entity;
-
-function volume(mesh: MeshData): number {
-  const p = mesh.positions;
-  let sum = 0;
-  for (let i = 0; i < mesh.indices.length; i += 3) {
-    const [a, b, c] = [0, 1, 2].map((k) => (mesh.indices[i + k] ?? 0) * 3) as [
-      number,
-      number,
-      number,
-    ];
-    sum +=
-      ((p[a] ?? 0) * ((p[b + 1] ?? 0) * (p[c + 2] ?? 0) - (p[b + 2] ?? 0) * (p[c + 1] ?? 0)) -
-        (p[a + 1] ?? 0) * ((p[b] ?? 0) * (p[c + 2] ?? 0) - (p[b + 2] ?? 0) * (p[c] ?? 0)) +
-        (p[a + 2] ?? 0) * ((p[b] ?? 0) * (p[c + 1] ?? 0) - (p[b + 1] ?? 0) * (p[c] ?? 0))) /
-      6;
-  }
-  return sum;
-}
 
 let occt: GeometryKernel;
 let manifold: GeometryKernel;

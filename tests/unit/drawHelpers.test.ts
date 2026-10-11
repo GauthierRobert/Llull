@@ -10,41 +10,34 @@ import {
   circleRadiusFromPoints,
 } from '../../src/ui/viewport/2d/drawHelpers';
 
-// ---------------------------------------------------------------------------
 // rectParamsFromCorners
-// ---------------------------------------------------------------------------
 
 describe('rectParamsFromCorners', () => {
-  it('computes width, height and lower-left origin for bottom-left → top-right', () => {
-    const result = rectParamsFromCorners([1, 2], [5, 6]);
+  it.each([
+    [
+      'computes width, height and lower-left origin for bottom-left → top-right',
+      [1, 2],
+      [5, 6],
+      4,
+      4,
+      [1, 2, 0],
+    ],
+    [
+      'computes correct lower-left origin when corners are reversed (top-right → bottom-left)',
+      [5, 6],
+      [1, 2],
+      4,
+      4,
+      [1, 2, 0],
+    ],
+    ['handles negative coordinate corners', [-3, -3], [3, 3], 6, 6, [-3, -3, 0]],
+    ['handles mixed quadrant corners (top-left to bottom-right)', [1, 5], [4, 2], 3, 3, [1, 2, 0]],
+  ] as const)('%s', (_label, first, second, width, height, position) => {
+    const result = rectParamsFromCorners([...first], [...second]);
     expect(result).not.toBeNull();
-    expect(result!.width).toBeCloseTo(4);
-    expect(result!.height).toBeCloseTo(4);
-    expect(result!.position).toEqual([1, 2, 0]);
-  });
-
-  it('computes correct lower-left origin when corners are reversed (top-right → bottom-left)', () => {
-    const result = rectParamsFromCorners([5, 6], [1, 2]);
-    expect(result).not.toBeNull();
-    expect(result!.width).toBeCloseTo(4);
-    expect(result!.height).toBeCloseTo(4);
-    expect(result!.position).toEqual([1, 2, 0]);
-  });
-
-  it('handles negative coordinate corners', () => {
-    const result = rectParamsFromCorners([-3, -3], [3, 3]);
-    expect(result).not.toBeNull();
-    expect(result!.width).toBeCloseTo(6);
-    expect(result!.height).toBeCloseTo(6);
-    expect(result!.position).toEqual([-3, -3, 0]);
-  });
-
-  it('handles mixed quadrant corners (top-left to bottom-right)', () => {
-    const result = rectParamsFromCorners([1, 5], [4, 2]);
-    expect(result).not.toBeNull();
-    expect(result!.width).toBeCloseTo(3);
-    expect(result!.height).toBeCloseTo(3);
-    expect(result!.position).toEqual([1, 2, 0]);
+    expect(result!.width).toBeCloseTo(width);
+    expect(result!.height).toBeCloseTo(height);
+    expect(result!.position).toEqual(position);
   });
 
   it('returns null when corners share the same x (zero width)', () => {
@@ -65,9 +58,7 @@ describe('rectParamsFromCorners', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // circleRadiusFromPoints
-// ---------------------------------------------------------------------------
 
 describe('circleRadiusFromPoints', () => {
   it('computes the Euclidean distance between center and rim', () => {

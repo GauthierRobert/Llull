@@ -95,9 +95,8 @@ export function endAdjustment(
     const atOtherStart = distance(point, other.start) <= tolerance;
     if (atOtherStart || distance(point, other.end) <= tolerance) {
       // A curved wall keeps its square end: the straight wall always closes the corner.
-      if (!curvedIds.has(other.id) && building.elementOrder.indexOf(other.id) < ownIndex) {
+      if (!curvedIds.has(other.id) && building.elementOrder.indexOf(other.id) < ownIndex)
         return retraction;
-      }
       const otherAway: Vec2 = atOtherStart
         ? otherFrame.direction
         : [-otherFrame.direction[0], -otherFrame.direction[1]];
@@ -105,9 +104,7 @@ export function endAdjustment(
       return (other.thickness / 2 + (wall.thickness / 2) * cosine) / sine;
     }
     const projection = projectOntoSegment(point, other.start, other.end);
-    if (projection.distance <= tolerance && projection.t > 0 && projection.t < 1) {
-      return retraction;
-    }
+    if (projection.distance <= tolerance && projection.t > 0 && projection.t < 1) return retraction;
   }
   return 0;
 }

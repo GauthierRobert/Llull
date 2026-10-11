@@ -6,6 +6,7 @@
  */
 
 import type { CommandResult } from './types';
+import { report } from './noop';
 import { defineCommand, z } from './schema';
 import { uint8ArrayToBase64 } from '../lib/base64';
 import { collectExportTriangles, exportSummary } from './exportTriangulate';
@@ -81,7 +82,7 @@ export const exportObj = defineCommand({
     );
     const summary = exportSummary('export_obj', 'obj', collected);
 
-    return { document: doc, summary, affected: [], data: { format: 'obj', text, triangleCount } };
+    return report(doc, summary, { format: 'obj', text, triangleCount });
   },
 });
 
@@ -284,6 +285,6 @@ export const exportGltf = defineCommand({
         ? `data:application/octet-stream;base64,${uint8ArrayToBase64(binPayload)}`
         : undefined;
     const text = JSON.stringify(buildGltfJson(positions, binPayload, bufferUri), null, 2);
-    return { document: doc, summary, affected: [], data: { format: 'gltf', triangleCount, text } };
+    return report(doc, summary, { format: 'gltf', triangleCount, text });
   },
 });

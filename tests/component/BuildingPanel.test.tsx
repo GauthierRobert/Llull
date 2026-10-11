@@ -3,22 +3,24 @@
  * Geometry/quantity math is unit-tested in tests/unit/building.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, type MockInstance } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useStore, useViewportStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { BuildingPanel } from '@ui/panels/building/BuildingPanel';
-import { localDispatch } from '../helpers/storeTestHelpers';
-
-function spyDispatch(): ReturnType<typeof vi.fn> {
-  const spy = vi.fn();
-  useStore.setState({ dispatch: spy } as unknown as Parameters<typeof useStore.setState>[0]);
-  return spy;
-}
+import { localDispatch, spyDispatch } from '../helpers/storeTestHelpers';
 
 beforeEach(() => {
   useStore.setState({ document: createEmptyDocument(), lastSummary: null });
 });
+
+/** Stubs object URLs and anchor clicks so exports run without a browser download. */
+function stubDownloads(): { createObjectURL: ReturnType<typeof vi.fn>; click: MockInstance } {
+  const createObjectURL = vi.fn(() => 'blob:x');
+  Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+  return { createObjectURL, click };
+}
 
 describe('BuildingPanel', () => {
   it('shows the empty state and dispatches starter templates', () => {
@@ -156,11 +158,7 @@ describe('BuildingPanel', () => {
 
   it('export buttons report the exporter summary', () => {
     localDispatch('add_wall', { start: [0, 0], end: [5000, 0] });
-    const createObjectURL = vi.fn(() => 'blob:x');
-    Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
-    const click = vi
-      .spyOn(HTMLAnchorElement.prototype, 'click')
-      .mockImplementation(() => undefined);
+    const { createObjectURL, click } = stubDownloads();
     render(<BuildingPanel />);
     fireEvent.click(screen.getByRole('button', { name: 'DXF (AutoCAD)' }));
     expect(screen.getByTestId('building-export-status')).toHaveTextContent(/^DXF /);
@@ -210,11 +208,7 @@ describe('BuildingPanel', () => {
 
   it('reports a clean model and exports an elevation and a section', () => {
     localDispatch('add_box', { position: [0, 0, 500], size: [2000, 1000, 1000] });
-    const createObjectURL = vi.fn(() => 'blob:x');
-    Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
-    const click = vi
-      .spyOn(HTMLAnchorElement.prototype, 'click')
-      .mockImplementation(() => undefined);
+    const { click } = stubDownloads();
     render(<BuildingPanel />);
     fireEvent.click(screen.getByTestId('clash-check'));
     expect(screen.getByTestId('clash-summary')).toHaveTextContent('No clashes found.');
@@ -305,11 +299,7 @@ describe('BuildingPanel', () => {
 
   it('exports the anchor bolt plan and the DSTV NC files of a hall', () => {
     localDispatch('add_portal_frame_building', { span: 12000, length: 12000, cladding: false });
-    const createObjectURL = vi.fn(() => 'blob:x');
-    Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
-    const click = vi
-      .spyOn(HTMLAnchorElement.prototype, 'click')
-      .mockImplementation(() => undefined);
+    const { click } = stubDownloads();
     render(<BuildingPanel />);
     fireEvent.click(screen.getByRole('button', { name: 'Anchor plan' }));
     expect(screen.getByTestId('building-export-status')).toHaveTextContent(

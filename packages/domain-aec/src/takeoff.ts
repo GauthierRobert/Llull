@@ -162,9 +162,8 @@ export const estimateCost = defineCommand({
       .describe('Currency label. Default: the stored currency or EUR.'),
   }),
   run: (doc, { rates, currency }): CommandResult => {
-    if (rates !== undefined && !validRates(rates)) {
+    if (rates !== undefined && !validRates(rates))
       return noop(doc, 'estimate_cost failed: rates must be a map of key → number >= 0.');
-    }
     const building = getBuilding(doc);
     const resolvedCurrency = currency?.trim() || building.currency || 'EUR';
     const priced = priceTakeoff(computeTakeoff(doc), {

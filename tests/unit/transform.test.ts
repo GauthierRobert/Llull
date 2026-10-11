@@ -3,9 +3,7 @@ import { createEmptyDocument, DEFAULT_LAYER_ID } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 
 describe('transform commands', () => {
-  // -------------------------------------------------------------------------
   // Helpers
-  // -------------------------------------------------------------------------
 
   function docWithBox(
     position = [0, 0, 0] as [number, number, number],
@@ -14,19 +12,49 @@ describe('transform commands', () => {
     return execute(doc, 'add_box', { size: [2, 4, 6], position });
   }
 
-  // -------------------------------------------------------------------------
+  type Pos = [number, number, number];
+
+  /** Every command here is a no-op on a missing id: unchanged doc, summary names the id. */
+  function expectMissingIdNoOp(cmd: string, id: string, extra: Record<string, unknown>): void {
+    const doc = createEmptyDocument();
+    const result = execute(doc, cmd, { id, ...extra });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain(id);
+  }
+
+  function expectPure(cmd: string, extra: Record<string, unknown>, position?: Pos): void {
+    const created = docWithBox(position);
+    const doc = created.document;
+    const snapshot = JSON.stringify(doc);
+    execute(doc, cmd, { id: created.affected[0]!, ...extra });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  }
+
+  function expectInOrder(id: string, result: ReturnType<typeof execute>): void {
+    const order = result.document.order;
+    expect(order).toContain(id);
+    for (const copyId of result.affected) {
+      expect(order).toContain(copyId);
+    }
+  }
+
+  /** Box at `position`, then `cmd` on it; for rotation/placement assertions. */
+  function runOnBox(
+    cmd: string,
+    extra: Record<string, unknown>,
+    position?: Pos,
+  ): { created: ReturnType<typeof execute>; id: string; result: ReturnType<typeof execute> } {
+    const created = docWithBox(position);
+    const id = created.affected[0]!;
+    return { created, id, result: execute(created.document, cmd, { id, ...extra }) };
+  }
+
   // rotate_entity
-  // -------------------------------------------------------------------------
 
   describe('rotate_entity', () => {
     it('adds the delta to the existing rotation', () => {
-      const created = docWithBox();
-      const id = created.affected[0]!;
-
-      const result = execute(created.document, 'rotate_entity', {
-        id,
-        delta: [0.1, 0.2, 0.3],
-      });
+      const { id, result } = runOnBox('rotate_entity', { delta: [0.1, 0.2, 0.3] });
 
       expect(result.affected).toEqual([id]);
       const entity = result.document.entities[id]!;
@@ -63,25 +91,15 @@ describe('transform commands', () => {
     });
 
     it('is a no-op for a missing id', () => {
-      const doc = createEmptyDocument();
-      const result = execute(doc, 'rotate_entity', { id: 'ghost', delta: [1, 0, 0] });
-      expect(result.affected).toHaveLength(0);
-      expect(result.document).toBe(doc);
-      expect(result.summary).toContain('ghost');
+      expectMissingIdNoOp('rotate_entity', 'ghost', { delta: [1, 0, 0] });
     });
 
     it('is pure — input document is not mutated', () => {
-      const created = docWithBox();
-      const doc = created.document;
-      const snapshot = JSON.stringify(doc);
-      execute(doc, 'rotate_entity', { id: created.affected[0]!, delta: [1, 2, 3] });
-      expect(JSON.stringify(doc)).toBe(snapshot);
+      expectPure('rotate_entity', { delta: [1, 2, 3] });
     });
   });
 
-  // -------------------------------------------------------------------------
   // scale_entity
-  // -------------------------------------------------------------------------
 
   describe('scale_entity', () => {
     it('scales a box size by the factor', () => {
@@ -201,17 +219,11 @@ describe('transform commands', () => {
     });
 
     it('is pure — input document is not mutated', () => {
-      const created = docWithBox();
-      const doc = created.document;
-      const snapshot = JSON.stringify(doc);
-      execute(doc, 'scale_entity', { id: created.affected[0]!, factor: 3 });
-      expect(JSON.stringify(doc)).toBe(snapshot);
+      expectPure('scale_entity', { factor: 3 });
     });
   });
 
-  // -------------------------------------------------------------------------
   // mirror_entity
-  // -------------------------------------------------------------------------
 
   describe('mirror_entity', () => {
     it('mirrors across x-axis by negating position.x', () => {
@@ -255,11 +267,7 @@ describe('transform commands', () => {
     });
 
     it('is a no-op for a missing id', () => {
-      const doc = createEmptyDocument();
-      const result = execute(doc, 'mirror_entity', { id: 'missing', axis: 'x' });
-      expect(result.affected).toHaveLength(0);
-      expect(result.document).toBe(doc);
-      expect(result.summary).toContain('missing');
+      expectMissingIdNoOp('mirror_entity', 'missing', { axis: 'x' });
     });
 
     it('is a no-op for an invalid axis', () => {
@@ -273,28 +281,15 @@ describe('transform commands', () => {
     });
 
     it('is pure — input document is not mutated', () => {
-      const created = docWithBox([1, 2, 3]);
-      const doc = created.document;
-      const snapshot = JSON.stringify(doc);
-      execute(doc, 'mirror_entity', { id: created.affected[0]!, axis: 'y' });
-      expect(JSON.stringify(doc)).toBe(snapshot);
+      expectPure('mirror_entity', { axis: 'y' }, [1, 2, 3]);
     });
   });
 
-  // -------------------------------------------------------------------------
   // array_linear
-  // -------------------------------------------------------------------------
 
   describe('array_linear', () => {
     it('creates count-1 copies with correct positions', () => {
-      const created = docWithBox([0, 0, 0]);
-      const id = created.affected[0]!;
-
-      const result = execute(created.document, 'array_linear', {
-        id,
-        count: 4,
-        offset: [2, 0, 0],
-      });
+      const { result } = runOnBox('array_linear', { count: 4, offset: [2, 0, 0] }, [0, 0, 0]);
 
       expect(result.affected).toHaveLength(3);
       const doc = result.document;
@@ -308,34 +303,15 @@ describe('transform commands', () => {
     });
 
     it('preserves the original entity at its position', () => {
-      const created = docWithBox([1, 2, 3]);
-      const id = created.affected[0]!;
-
-      const result = execute(created.document, 'array_linear', {
-        id,
-        count: 3,
-        offset: [5, 0, 0],
-      });
+      const { id, result } = runOnBox('array_linear', { count: 3, offset: [5, 0, 0] }, [1, 2, 3]);
 
       // Original must still be at [1,2,3]
       expect(result.document.entities[id]!.position).toEqual([1, 2, 3]);
     });
 
     it('appends all copy ids to document.order', () => {
-      const created = docWithBox([0, 0, 0]);
-      const id = created.affected[0]!;
-
-      const result = execute(created.document, 'array_linear', {
-        id,
-        count: 3,
-        offset: [1, 0, 0],
-      });
-
-      const order = result.document.order;
-      expect(order).toContain(id);
-      for (const copyId of result.affected) {
-        expect(order).toContain(copyId);
-      }
+      const { id, result } = runOnBox('array_linear', { count: 3, offset: [1, 0, 0] }, [0, 0, 0]);
+      expectInOrder(id, result);
     });
 
     it('copies preserve geometry, rotation, color, and layer from the original', () => {
@@ -360,62 +336,31 @@ describe('transform commands', () => {
     });
 
     it('is a no-op for a missing id', () => {
-      const doc = createEmptyDocument();
-      const result = execute(doc, 'array_linear', { id: 'ghost', count: 3, offset: [1, 0, 0] });
-      expect(result.affected).toHaveLength(0);
-      expect(result.document).toBe(doc);
-      expect(result.summary).toContain('ghost');
+      expectMissingIdNoOp('array_linear', 'ghost', { count: 3, offset: [1, 0, 0] });
     });
 
     it('is a no-op when count < 2', () => {
-      const created = docWithBox();
-      const id = created.affected[0]!;
-
-      const result = execute(created.document, 'array_linear', {
-        id,
-        count: 1,
-        offset: [1, 0, 0],
-      });
+      const { created, result } = runOnBox('array_linear', { count: 1, offset: [1, 0, 0] });
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(created.document);
     });
 
     it('is a no-op when offset contains non-finite values', () => {
-      const created = docWithBox();
-      const id = created.affected[0]!;
-
-      const result = execute(created.document, 'array_linear', {
-        id,
-        count: 3,
-        offset: [Infinity, 0, 0],
-      });
+      const { created, result } = runOnBox('array_linear', { count: 3, offset: [Infinity, 0, 0] });
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(created.document);
     });
 
     it('is pure — input document is not mutated', () => {
-      const created = docWithBox([0, 0, 0]);
-      const doc = created.document;
-      const snapshot = JSON.stringify(doc);
-      execute(doc, 'array_linear', { id: created.affected[0]!, count: 3, offset: [2, 0, 0] });
-      expect(JSON.stringify(doc)).toBe(snapshot);
+      expectPure('array_linear', { count: 3, offset: [2, 0, 0] }, [0, 0, 0]);
     });
   });
 
-  // -------------------------------------------------------------------------
   // array_polar
-  // -------------------------------------------------------------------------
 
   describe('array_polar', () => {
     it('creates count-1 copies for a full-circle array', () => {
-      const created = docWithBox([2, 0, 0]);
-      const id = created.affected[0]!;
-
-      const result = execute(created.document, 'array_polar', {
-        id,
-        count: 4,
-        center: [0, 0, 0],
-      });
+      const { result } = runOnBox('array_polar', { count: 4, center: [0, 0, 0] }, [2, 0, 0]);
 
       // Original + 3 copies = 4 total
       expect(result.affected).toHaveLength(3);
@@ -423,14 +368,7 @@ describe('transform commands', () => {
 
     it('places copies at correct positions for a full-circle 4-count array', () => {
       // Box at [2,0,0], center [0,0,0], 4 instances = step 90° each
-      const created = docWithBox([2, 0, 0]);
-      const id = created.affected[0]!;
-
-      const result = execute(created.document, 'array_polar', {
-        id,
-        count: 4,
-        center: [0, 0, 0],
-      });
+      const { result } = runOnBox('array_polar', { count: 4, center: [0, 0, 0] }, [2, 0, 0]);
 
       const doc = result.document;
       const copy1 = doc.entities[result.affected[0]!]!; // 90°  → [0,  2, 0]
@@ -461,14 +399,7 @@ describe('transform commands', () => {
     });
 
     it('preserves the original entity', () => {
-      const created = docWithBox([5, 0, 0]);
-      const id = created.affected[0]!;
-
-      const result = execute(created.document, 'array_polar', {
-        id,
-        count: 3,
-        center: [0, 0, 0],
-      });
+      const { id, result } = runOnBox('array_polar', { count: 3, center: [0, 0, 0] }, [5, 0, 0]);
 
       expect(result.document.entities[id]!.position).toEqual([5, 0, 0]);
     });
@@ -477,15 +408,11 @@ describe('transform commands', () => {
       // Box at [1,0,0], center [0,0,0], count=3, angle=PI (180°)
       // step = PI/3 = 60°
       // copy1 at 60°, copy2 at 120°
-      const created = docWithBox([1, 0, 0]);
-      const id = created.affected[0]!;
-
-      const result = execute(created.document, 'array_polar', {
-        id,
-        count: 3,
-        center: [0, 0, 0],
-        angle: Math.PI,
-      });
+      const { result } = runOnBox(
+        'array_polar',
+        { count: 3, center: [0, 0, 0], angle: Math.PI },
+        [1, 0, 0],
+      );
 
       expect(result.affected).toHaveLength(2);
       const copy1 = result.document.entities[result.affected[0]!]!;
@@ -494,49 +421,26 @@ describe('transform commands', () => {
     });
 
     it('appends copy ids to document.order', () => {
-      const created = docWithBox([2, 0, 0]);
-      const id = created.affected[0]!;
-
-      const result = execute(created.document, 'array_polar', {
-        id,
-        count: 3,
-        center: [0, 0, 0],
-      });
-
-      const order = result.document.order;
-      expect(order).toContain(id);
-      for (const copyId of result.affected) {
-        expect(order).toContain(copyId);
-      }
+      const { id, result } = runOnBox('array_polar', { count: 3, center: [0, 0, 0] }, [2, 0, 0]);
+      expectInOrder(id, result);
     });
 
     it('is a no-op for a missing id', () => {
-      const doc = createEmptyDocument();
-      const result = execute(doc, 'array_polar', { id: 'nope', count: 4, center: [0, 0, 0] });
-      expect(result.affected).toHaveLength(0);
-      expect(result.document).toBe(doc);
-      expect(result.summary).toContain('nope');
+      expectMissingIdNoOp('array_polar', 'nope', { count: 4, center: [0, 0, 0] });
     });
 
     it('is a no-op when count < 2', () => {
-      const created = docWithBox([2, 0, 0]);
-      const id = created.affected[0]!;
-
-      const result = execute(created.document, 'array_polar', {
-        id,
-        count: 1,
-        center: [0, 0, 0],
-      });
+      const { created, result } = runOnBox(
+        'array_polar',
+        { count: 1, center: [0, 0, 0] },
+        [2, 0, 0],
+      );
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(created.document);
     });
 
     it('is pure — input document is not mutated', () => {
-      const created = docWithBox([2, 0, 0]);
-      const doc = created.document;
-      const snapshot = JSON.stringify(doc);
-      execute(doc, 'array_polar', { id: created.affected[0]!, count: 4, center: [0, 0, 0] });
-      expect(JSON.stringify(doc)).toBe(snapshot);
+      expectPure('array_polar', { count: 4, center: [0, 0, 0] }, [2, 0, 0]);
     });
   });
 

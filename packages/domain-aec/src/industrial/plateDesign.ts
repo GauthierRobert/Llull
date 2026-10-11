@@ -5,7 +5,7 @@
 
 import type { BasePlateElement, BuildingModel } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
-import { fromMm, withElement } from '../model';
+import { elementsOf, fromMm, withElement } from '../model';
 import { findProfile } from '../steel/profiles';
 import { sizeBasePlate, type PlateDemand } from './basePlateMN';
 import { plateDemands } from './foundationCombinations';
@@ -29,11 +29,8 @@ export function designFixedPlates(
   const wind = loads.windPressure > 0;
   const groups = new Map<string, { plates: BasePlateElement[]; demands: PlateDemand[] }>();
   for (const reaction of reactions) {
-    const plate = Object.values(building.elements).find(
-      (element): element is BasePlateElement =>
-        element.category === 'plate' &&
-        element.memberId === reaction.columnId &&
-        element.fixity === 'fixed',
+    const plate = elementsOf(building, 'plate').find(
+      (candidate) => candidate.memberId === reaction.columnId && candidate.fixity === 'fixed',
     );
     const column = building.elements[reaction.columnId];
     if (!plate || column?.category !== 'member') continue;

@@ -4,24 +4,12 @@ import { execute } from '@core/commands/registry';
 import { type TakeoffLine } from '@aec/takeoffBasics';
 import { toCsv } from '@aec/csv';
 import { rateFor, type CostLine } from '@aec/costing';
-
-function run(doc: CadDocument, name: string, params: unknown): CadDocument {
-  return execute(doc, name, params).document;
-}
+import { drawHouseWalls, run } from './runFixtures';
 
 /** A 10 m × 8 m single-storey house shell. */
 function house(): CadDocument {
   let doc = run(createEmptyDocument(), 'add_level', { name: 'Ground floor' });
-  doc = run(doc, 'draw_walls', {
-    points: [
-      [0, 0],
-      [10000, 0],
-      [10000, 8000],
-      [0, 8000],
-    ],
-    closed: true,
-    thickness: 300,
-  });
+  doc = drawHouseWalls(doc);
   doc = run(doc, 'add_door', { wallId: 'wall-1', offset: 2000 });
   doc = run(doc, 'add_window', { wallId: 'wall-1', offset: 6000 });
   doc = run(doc, 'add_window', { wallId: 'wall-3', offset: 5000, material: 'glass' });

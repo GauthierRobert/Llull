@@ -19,6 +19,27 @@ import {
   withMember,
 } from './steelFixtures';
 
+const pointLoaded = (
+  loads: ReturnType<typeof createBeamLoads>,
+  at: number,
+  permanent: number,
+): {
+  result: Parameters<typeof checkBeam>[1];
+  heavy: ReturnType<typeof analyseSimpleBeam>;
+} => {
+  const heavy = analyseSimpleBeam(loads.lengthM, [], [{ at, permanent, imposed: 0 }], {
+    permanent: 1,
+    imposed: 0,
+  });
+  const result = {
+    loads,
+    uls: heavy,
+    sls: heavy,
+    ends: [{ type: 'none' }, { type: 'none' }] as const,
+  };
+  return { result, heavy };
+};
+
 describe('check_steel_members failure paths', () => {
   const rejected = (params: Record<string, unknown>, doc = squareBay()): string => {
     const result = execute(doc, 'check_steel_members', params);
@@ -203,17 +224,7 @@ describe('beam check internals', () => {
     if (!bar) throw new Error('beam');
     const loads = createBeamLoads(bar);
     loads.floorSupport = true;
-    const span = loads.lengthM;
-    const heavy = analyseSimpleBeam(span, [], [{ at: span / 2, permanent: 400, imposed: 0 }], {
-      permanent: 1,
-      imposed: 0,
-    });
-    const result = {
-      loads,
-      uls: heavy,
-      sls: heavy,
-      ends: [{ type: 'none' }, { type: 'none' }] as const,
-    };
+    const { result, heavy } = pointLoaded(loads, loads.lengthM / 2, 400);
     const row = checkBeam(bar, result, 250, undefined);
     const bending = row.checks.find((entry) => entry.name.startsWith('bending'));
     const unreduced = checkBeam(
@@ -231,16 +242,7 @@ describe('beam check internals', () => {
     const bar = collectSteelBars(doc).find((entry) => entry.role === 'beam');
     if (!bar) throw new Error('beam');
     const loads = createBeamLoads(bar);
-    const heavy = analyseSimpleBeam(loads.lengthM, [], [{ at: 1, permanent: 500, imposed: 0 }], {
-      permanent: 1,
-      imposed: 0,
-    });
-    const result = {
-      loads,
-      uls: heavy,
-      sls: heavy,
-      ends: [{ type: 'none' }, { type: 'none' }] as const,
-    };
+    const { result } = pointLoaded(loads, 1, 500);
     const row = checkBeam(bar, result, 250, { force: 5, note: 'test strut' });
     expect(row.detail).toContain('reduced for V');
     expect(row.checks.map((entry) => entry.name)).toContain('strut compression + bending (§6.3.3)');

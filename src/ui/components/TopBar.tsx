@@ -8,8 +8,7 @@
 
 import React from 'react';
 import { classNames } from '@ui/classNames';
-import { useLayoutStore, usePaletteStore, useStore } from '@ui/store';
-import type { LiveStatus } from '@ui/store';
+import { type LiveStatus, useLayoutStore, usePaletteStore, useStore } from '@ui/store';
 import { useSessionStore } from '@ui/store/sessionStore';
 import { projectNameOf } from '@ui/components/projectName';
 import { Icon } from '@ui/components/Icon';

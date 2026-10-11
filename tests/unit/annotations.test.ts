@@ -14,9 +14,7 @@ import { createEmptyDocument } from '@core/model/types';
 import { listCommands, toToolSchemas, execute } from '@core/commands/registry';
 import { buildMcpTools } from '@mcp/tools';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function findSchema(name: string): ReturnType<typeof toToolSchemas>[number] {
   const schema = toToolSchemas().find((s) => s.name === name);
@@ -36,9 +34,7 @@ function findCommand(name: string): ReturnType<typeof listCommands>[number] {
   return cmd;
 }
 
-// ---------------------------------------------------------------------------
 // 1. CommandDefinition.annotations — presence and correctness
-// ---------------------------------------------------------------------------
 
 describe('CommandDefinition.annotations — readOnly commands', () => {
   const READ_ONLY_NAMES = [
@@ -116,9 +112,7 @@ describe('CommandDefinition.annotations — unannotated command', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // 2. toToolSchemas() — annotations surfaced as MCP hint names
-// ---------------------------------------------------------------------------
 
 describe('toToolSchemas() — annotations on readOnly command', () => {
   it('measure_distance schema has annotations.readOnlyHint === true', () => {
@@ -173,9 +167,7 @@ describe('toToolSchemas() — no annotations on plain command', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // 3. buildMcpTools() — mirrors toToolSchemas() annotations
-// ---------------------------------------------------------------------------
 
 describe('buildMcpTools() — annotations on readOnly command', () => {
   it('measure_distance tool has annotations.readOnlyHint === true', () => {
@@ -213,9 +205,7 @@ describe('buildMcpTools() — no annotations on plain command', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // 4. readOnly commands return the SAME document reference (smoke, table-driven)
-// ---------------------------------------------------------------------------
 
 describe('readOnly commands — document reference unchanged', () => {
   const READ_ONLY_CASES: Array<[string, Record<string, unknown>]> = [
@@ -251,9 +241,7 @@ describe('readOnly commands — document reference unchanged', () => {
   }
 });
 
-// ---------------------------------------------------------------------------
 // 5. Annotation count invariant — every annotated command has at least one hint
-// ---------------------------------------------------------------------------
 
 describe('annotations invariant', () => {
   it('every command with annotations has at least one flag set to true', () => {

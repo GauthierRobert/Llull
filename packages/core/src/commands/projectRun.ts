@@ -1,5 +1,6 @@
 import type { CadDocument } from '../model/types';
 import type { CommandResult } from './types';
+import { report } from './noop';
 import { getCommand } from './registry';
 import { executeRecorded } from './record';
 import { computeSceneSnapshot } from './scene';
@@ -53,13 +54,11 @@ function execStep(
     run.steps.push({ index, command, ok, summary, affected });
     return { ok, affected };
   };
-  if (!getCommand(command)) {
+  if (!getCommand(command))
     return report(false, `Unknown command: ${command}${label ? ` (${label})` : ''}`);
-  }
   const resolved = resolveExprInParam(params, bindings, env);
-  if (resolved.error) {
+  if (resolved.error)
     return report(false, `Param error${label ? ` in ${label}` : ''}: ${resolved.error}`);
-  }
   const recorded = recordableParams(params, resolved.value, run.current.parameters);
   const result = executeRecorded(
     run.current,
@@ -119,9 +118,8 @@ function runAction(run: PlanRun, raw: ActionItem, index: number): boolean {
     const countResult = resolveCount(raw.repeat.count, run.current);
     if (countResult.error !== null) return failStep(run, index, 'repeat', countResult.error);
     const count = Math.round(countResult.count);
-    if (count < 0) {
+    if (count < 0)
       return failStep(run, index, 'repeat', `repeat: count must be >= 0 (got ${count}).`);
-    }
     return runLoop(run, index, raw.step, count, 'repeat', raw.repeat.as, () => ({
       extras: {},
       bindings: run.bindings,
@@ -179,14 +177,13 @@ function validatePlan(doc: CadDocument, actions: ActionItem[]): CommandResult {
     if (raw.as) defined.add(raw.as);
   });
   const ok = issues.length === 0;
-  return {
-    document: doc,
-    summary: ok
+  return report(
+    doc,
+    ok
       ? `Plan valid: ${actions.length} step(s) ready.`
       : `Plan invalid: ${issues.length} issue(s) — ${issues.join('; ')}.`,
-    affected: [],
-    data: { ok, validated: true, stepCount: actions.length, steps: [], failedAt: null, issues },
-  };
+    { ok, validated: true, stepCount: actions.length, steps: [], failedAt: null, issues },
+  );
 }
 
 /** Upper-bound count of executed commands a plan expands to (repeat/for_each multiply). */

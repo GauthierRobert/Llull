@@ -6,7 +6,7 @@
  */
 
 import type {
-  Layer,
+  BaseEntity,
   LineEntity,
   MeshData,
   MeshSolidEntity,
@@ -36,19 +36,11 @@ export const CIVIL_LAYERS = {
 
 export type CivilLayerKey = keyof typeof CIVIL_LAYERS;
 
-const LAYER_COLOR: ReadonlyMap<string, string> = new Map(
+export const CIVIL_LAYER_COLOR: ReadonlyMap<string, string> = new Map(
   Object.values(CIVIL_LAYERS).map(({ name, color }) => [`layer-${name}`, color]),
 );
 
-interface Common {
-  id: string;
-  position: Vec3;
-  rotation: Vec3;
-  layerId: string;
-  color: string;
-  name: string;
-  tags: string[];
-}
+type Common = Omit<BaseEntity, 'kind'>;
 
 function common(
   object: CivilObject,
@@ -133,22 +125,4 @@ export function civilText(
 ): TextEntity {
   const base = common(object, part, content, layer, position);
   return { ...base, rotation: [0, 0, rotation], kind: 'text', content, height, anchor: 'center' };
-}
-
-/** Adds every civil layer referenced by `layerIds` that the document lacks. */
-export function ensureCivilLayers(
-  layers: Record<string, Layer>,
-  layerOrder: string[],
-  layerIds: Iterable<string>,
-): { layers: Record<string, Layer>; layerOrder: string[] } {
-  let nextLayers = layers;
-  let nextOrder = layerOrder;
-  for (const id of layerIds) {
-    if (nextLayers[id]) continue;
-    const color = LAYER_COLOR.get(id) ?? '#8a8a8a';
-    const name = id.replace(/^layer-/, '');
-    nextLayers = { ...nextLayers, [id]: { id, name, visible: true, locked: false, color } };
-    nextOrder = [...nextOrder, id];
-  }
-  return { layers: nextLayers, layerOrder: nextOrder };
 }

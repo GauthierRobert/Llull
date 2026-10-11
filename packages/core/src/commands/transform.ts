@@ -8,7 +8,7 @@
 import type { CadDocument, Entity, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 } from './schema';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 import { nextId } from '../lib/id';
 import { MAX_COPIES_PER_COMMAND } from './limits';
 import { add3, scale3 } from '../lib/vec3';
@@ -16,6 +16,11 @@ import { scale2 } from '../lib/vec2';
 import { rotatePoint2 } from '../lib/polygon';
 import { replaceEntity } from './entityOps';
 import { rotateEulerAboutWorldZ } from '../lib/eulerRotation';
+
+const arrayCountField = z
+  .number()
+  .int()
+  .describe('Total number of instances including the original. Must be an integer >= 2.');
 
 /** True for exactly three finite numbers (looseVec3 params are unchecked at the schema level). */
 function isFiniteVec3(v: readonly number[]): boolean {
@@ -41,9 +46,7 @@ export const rotateEntity = defineCommand({
   }),
   run: (doc, { id, delta }): CommandResult => {
     const target = doc.entities[id];
-    if (!target) {
-      return noop(doc, `No entity ${id} to rotate.`);
-    }
+    if (!target) return noop(doc, `No entity ${id} to rotate.`);
     if (!isFiniteVec3(delta)) {
       return noop(
         doc,
@@ -51,11 +54,11 @@ export const rotateEntity = defineCommand({
       );
     }
     const rotated: Entity = { ...target, rotation: add3(target.rotation, delta) };
-    return {
-      document: replaceEntity(doc, rotated),
-      summary: `Rotated ${id} by [${delta.join(', ')}] rad; new rotation [${rotated.rotation.join(', ')}].`,
-      affected: [id],
-    };
+    return changed(
+      replaceEntity(doc, rotated),
+      `Rotated ${id} by [${delta.join(', ')}] rad; new rotation [${rotated.rotation.join(', ')}].`,
+      [id],
+    );
   },
 });
 
@@ -191,19 +194,12 @@ export const scaleEntity = defineCommand({
   }),
   run: (doc, { id, factor }): CommandResult => {
     const target = doc.entities[id];
-    if (!target) {
-      return noop(doc, `No entity ${id} to scale.`);
-    }
-    if (factor <= 0) {
+    if (!target) return noop(doc, `No entity ${id} to scale.`);
+    if (factor <= 0)
       return noop(doc, `scale_entity: factor must be > 0 (got ${factor}); entity ${id} unchanged.`);
-    }
 
     const { scaled, dims } = scaleGeometry(target, factor);
-    return {
-      document: replaceEntity(doc, scaled),
-      summary: `Scaled ${id} by factor ${factor}; ${dims}.`,
-      affected: [id],
-    };
+    return changed(replaceEntity(doc, scaled), `Scaled ${id} by factor ${factor}; ${dims}.`, [id]);
   },
 });
 
@@ -232,9 +228,7 @@ export const mirrorEntity = defineCommand({
   }),
   run: (doc, { id, axis }): CommandResult => {
     const target = doc.entities[id];
-    if (!target) {
-      return noop(doc, `No entity ${id} to mirror.`);
-    }
+    if (!target) return noop(doc, `No entity ${id} to mirror.`);
     if (!VALID_AXES.has(axis)) {
       return noop(
         doc,
@@ -247,11 +241,11 @@ export const mirrorEntity = defineCommand({
       axis === 'x' ? [-px, py, pz] : axis === 'y' ? [px, -py, pz] : [px, py, -pz];
 
     const mirrored: Entity = { ...target, position: newPosition };
-    return {
-      document: replaceEntity(doc, mirrored),
-      summary: `Mirrored ${id} across ${axis}-axis; new position [${newPosition.join(', ')}].`,
-      affected: [id],
-    };
+    return changed(
+      replaceEntity(doc, mirrored),
+      `Mirrored ${id} across ${axis}-axis; new position [${newPosition.join(', ')}].`,
+      [id],
+    );
   },
 });
 
@@ -290,10 +284,7 @@ export const arrayLinear = defineCommand({
     'original.position + k*offset (k = 1..count-1). count must be an integer >= 2.',
   params: z.object({
     id: z.string().describe('Id of the entity to array.'),
-    count: z
-      .number()
-      .int()
-      .describe('Total number of instances including the original. Must be an integer >= 2.'),
+    count: arrayCountField,
     offset: looseVec3(
       'World-space translation vector [dx, dy, dz] between consecutive instances. ' +
         'All components must be finite numbers.',
@@ -301,9 +292,7 @@ export const arrayLinear = defineCommand({
   }),
   run: (doc, { id, count, offset }): CommandResult => {
     const target = doc.entities[id];
-    if (!target) {
-      return noop(doc, `array_linear: No entity ${id}.`);
-    }
+    if (!target) return noop(doc, `array_linear: No entity ${id}.`);
     if (count < 2 || count > MAX_COPIES_PER_COMMAND) {
       return noop(
         doc,
@@ -323,13 +312,12 @@ export const arrayLinear = defineCommand({
         position: add3(target.position, scale3(offset, i + 1)),
       })),
     );
-    return {
+    return changed(
       document,
-      summary:
-        `Linear array of ${target.kind} ${id}: created ${newIds.length} copies ` +
+      `Linear array of ${target.kind} ${id}: created ${newIds.length} copies ` +
         `along [${offset.join(', ')}]. New ids: ${newIds.join(', ')}.`,
-      affected: newIds,
-    };
+      newIds,
+    );
   },
 });
 
@@ -351,10 +339,7 @@ export const arrayPolar = defineCommand({
     'count must be >= 2.',
   params: z.object({
     id: z.string().describe('Id of the entity to array.'),
-    count: z
-      .number()
-      .int()
-      .describe('Total number of instances including the original. Must be an integer >= 2.'),
+    count: arrayCountField,
     center: looseVec3(
       'World-space center point [cx, cy, cz] for the polar rotation axis (Z axis through this point). ' +
         'Only cx and cy are used for the rotation; cz is ignored.',
@@ -369,9 +354,7 @@ export const arrayPolar = defineCommand({
   }),
   run: (doc, { id, count, center, angle = 2 * Math.PI }): CommandResult => {
     const target = doc.entities[id];
-    if (!target) {
-      return noop(doc, `array_polar: No entity ${id}.`);
-    }
+    if (!target) return noop(doc, `array_polar: No entity ${id}.`);
     if (count < 2 || count > MAX_COPIES_PER_COMMAND) {
       return noop(
         doc,
@@ -400,12 +383,11 @@ export const arrayPolar = defineCommand({
       }),
     );
     const angleDeg = ((angle * 180) / Math.PI).toFixed(1);
-    return {
+    return changed(
       document,
-      summary:
-        `Polar array of ${target.kind} ${id}: created ${newIds.length} copies ` +
+      `Polar array of ${target.kind} ${id}: created ${newIds.length} copies ` +
         `over ${angleDeg}° around center [${center[0]}, ${center[1]}]. New ids: ${newIds.join(', ')}.`,
-      affected: newIds,
-    };
+      newIds,
+    );
   },
 });

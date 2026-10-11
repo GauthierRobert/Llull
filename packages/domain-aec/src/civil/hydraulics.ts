@@ -59,9 +59,8 @@ export function solvePartialFlow(
   flow: number,
 ): PartialFlow {
   if (!(flow > 0)) return { depthRatio: 0, velocity: 0, surcharged: false };
-  if (!(slope > 0) || !(diameter > 0) || !(manningN > 0)) {
+  if (!(slope > 0) || !(diameter > 0) || !(manningN > 0))
     return { depthRatio: 1, velocity: 0, surcharged: true };
-  }
   const maximum = partialFlowDischarge(diameter, slope, manningN, MAX_DISCHARGE_DEPTH_RATIO);
   if (flow > maximum)
     return { depthRatio: 1, velocity: flow / fullArea(diameter), surcharged: true };

@@ -17,18 +17,24 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { useStore } from '@ui/store';
 import { useViewportStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
+import { type Constraint, type Joint, createEmptyDocument } from '@core/model/types';
 import { localDispatch } from '../helpers/storeTestHelpers';
-import type { Constraint, Joint } from '@core/model/types';
 
 function resetStore(): void {
   useStore.setState({ document: createEmptyDocument(), lastSummary: null });
   useViewportStore.setState({ mechanismSelection: null });
 }
 
-// ---------------------------------------------------------------------------
 // Constraint geometry test — line between two entity positions
-// ---------------------------------------------------------------------------
+
+/** Create a box and a sphere joined by a constraint of `kind`; returns the constraint id. */
+function addConstraint(kind: 'coincident' | 'parallel'): string {
+  const boxId = localDispatch('add_box', { size: [1, 1, 1] }).affected[0]!;
+  const sphereId = localDispatch('add_sphere', { radius: 1 }).affected[0]!;
+  return localDispatch('add_constraint', {
+    constraint: { kind, a: { entityId: boxId }, b: { entityId: sphereId } },
+  }).affected[0]!;
+}
 
 describe('MechanismOverlay — constraint line geometry', () => {
   beforeEach(() => {
@@ -36,19 +42,7 @@ describe('MechanismOverlay — constraint line geometry', () => {
   });
 
   it('a BufferGeometry for a constraint line has vertex count > 0 (2 positions)', () => {
-    const r1 = localDispatch('add_box', { size: [1, 1, 1] });
-    const r2 = localDispatch('add_sphere', { radius: 1 });
-    const boxId = r1.affected[0]!;
-    const sphereId = r2.affected[0]!;
-
-    const rc = localDispatch('add_constraint', {
-      constraint: {
-        kind: 'coincident',
-        a: { entityId: boxId },
-        b: { entityId: sphereId },
-      },
-    });
-    const constraintId = rc.affected[0]!;
+    const constraintId = addConstraint('coincident');
 
     const doc = useStore.getState().document;
     const constraint = doc.constraints[constraintId] as Constraint | undefined;
@@ -82,16 +76,7 @@ describe('MechanismOverlay — constraint line geometry', () => {
   });
 
   it('overlay reads mechanismSelection for a constraint — selection kind is "constraint"', () => {
-    const r1 = localDispatch('add_box', { size: [1, 1, 1] });
-    const r2 = localDispatch('add_sphere', { radius: 1 });
-    const rc = localDispatch('add_constraint', {
-      constraint: {
-        kind: 'parallel',
-        a: { entityId: r1.affected[0]! },
-        b: { entityId: r2.affected[0]! },
-      },
-    });
-    const constraintId = rc.affected[0]!;
+    const constraintId = addConstraint('parallel');
 
     useViewportStore.getState().setMechanismSelection({ kind: 'constraint', id: constraintId });
     const sel = useViewportStore.getState().mechanismSelection;
@@ -100,9 +85,7 @@ describe('MechanismOverlay — constraint line geometry', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Joint arrow geometry test — ArrowHelper with correct color
-// ---------------------------------------------------------------------------
 
 describe('MechanismOverlay — joint arrow', () => {
   beforeEach(() => {
@@ -129,12 +112,15 @@ describe('MechanismOverlay — joint arrow', () => {
     return { jointId: rj.affected[0]!, instanceId: ri1.affected[0]! };
   }
 
-  it('revolute joint produces a non-null ArrowHelper with cyan color', () => {
-    const { jointId } = buildJoint('revolute');
+  it.each([
+    ['revolute', 'cyan', '#00e5ff', '00e5ff'],
+    ['prismatic', 'magenta', '#e040fb', 'e040fb'],
+  ] as const)('%s joint produces an ArrowHelper with %s color', (kind, _name, color, hex) => {
+    const { jointId } = buildJoint(kind);
     const doc = useStore.getState().document;
     const joint = doc.joints[jointId] as Joint | undefined;
     expect(joint).toBeDefined();
-    expect(joint!.kind).toBe('revolute');
+    expect(joint!.kind).toBe(kind);
 
     const entity = doc.entities[joint!.a.instanceId];
     const origin = new THREE.Vector3(
@@ -143,44 +129,13 @@ describe('MechanismOverlay — joint arrow', () => {
       entity?.position[2] ?? 0,
     );
     const axis = new THREE.Vector3(0, 0, 1); // 'z'
-    const color = '#00e5ff';
-
-    const arrow = new THREE.ArrowHelper(axis, origin, 1.5, color, 0.35, 0.18);
-    expect(arrow).toBeDefined();
-    expect(arrow).toBeInstanceOf(THREE.ArrowHelper);
-
-    // Verify arrow line color matches revolute color.
-    const mat = arrow.line.material as THREE.LineBasicMaterial;
-    expect(mat.color.getHexString()).toBe('00e5ff');
-
-    arrow.line.geometry.dispose();
-    arrow.cone.geometry.dispose();
-    if (arrow.line.material instanceof THREE.Material) arrow.line.material.dispose();
-    if (arrow.cone.material instanceof THREE.Material) arrow.cone.material.dispose();
-  });
-
-  it('prismatic joint produces an ArrowHelper with magenta color', () => {
-    const { jointId } = buildJoint('prismatic');
-    const doc = useStore.getState().document;
-    const joint = doc.joints[jointId] as Joint | undefined;
-    expect(joint).toBeDefined();
-    expect(joint!.kind).toBe('prismatic');
-
-    const entity = doc.entities[joint!.a.instanceId];
-    const origin = new THREE.Vector3(
-      entity?.position[0] ?? 0,
-      entity?.position[1] ?? 0,
-      entity?.position[2] ?? 0,
-    );
-    const axis = new THREE.Vector3(0, 0, 1);
-    const color = '#e040fb';
 
     const arrow = new THREE.ArrowHelper(axis, origin, 1.5, color, 0.35, 0.18);
     expect(arrow).toBeDefined();
     expect(arrow).toBeInstanceOf(THREE.ArrowHelper);
 
     const mat = arrow.line.material as THREE.LineBasicMaterial;
-    expect(mat.color.getHexString()).toBe('e040fb');
+    expect(mat.color.getHexString()).toBe(hex);
 
     arrow.line.geometry.dispose();
     arrow.cone.geometry.dispose();

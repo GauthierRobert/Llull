@@ -39,9 +39,8 @@ function footingNetPressure(
 
 /** Strict validation of a clay layer; returns an error message or null. */
 export function clayLayerError(layer: unknown): string | null {
-  if (typeof layer !== 'object' || layer === null || Array.isArray(layer)) {
+  if (typeof layer !== 'object' || layer === null || Array.isArray(layer))
     return 'clayLayer must be an object { topDepth, thickness, compressionIndex, voidRatio, ... }';
-  }
   const fields = layer as Record<string, unknown>;
   const positive = (name: string, allowZero = false): string | null => {
     const value = fields[name];
@@ -61,13 +60,11 @@ export function clayLayerError(layer: unknown): string | null {
     optional('preconsolidationPressure');
   if (error) return error;
   const unitWeight = (fields.unitWeight as number | undefined) ?? DEFAULT_CLAY_UNIT_WEIGHT;
-  if (unitWeight <= WATER_UNIT_WEIGHT) {
+  if (unitWeight <= WATER_UNIT_WEIGHT)
     return `clayLayer.unitWeight must be > ${WATER_UNIT_WEIGHT} kN/m³ (water)`;
-  }
   const cr = fields.recompressionIndex as number | undefined;
-  if (cr !== undefined && cr > (fields.compressionIndex as number)) {
+  if (cr !== undefined && cr > (fields.compressionIndex as number))
     return 'clayLayer.recompressionIndex must be <= compressionIndex';
-  }
   return null;
 }
 

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
-import type { Entity } from '@core/model/types';
+import { type Entity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { flattenDxf, parseDxf, codeNumber } from '@core/lib/dxfRead';
 import { aciToHex, insUnitsMillimetres } from '@core/lib/dxfUnits';

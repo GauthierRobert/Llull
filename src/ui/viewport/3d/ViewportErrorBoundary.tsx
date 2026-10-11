@@ -6,10 +6,9 @@
  * so the rest of the app keeps running.
  */
 
-import { Component } from 'react';
+import { type ErrorInfo, type ReactNode, Component } from 'react';
 import { Icon } from '@ui/components/Icon';
 import { errorMessage } from '@lib/errorMessage';
-import type { ErrorInfo, ReactNode } from 'react';
 
 interface Props {
   children: ReactNode;

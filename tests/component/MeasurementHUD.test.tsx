@@ -21,9 +21,7 @@ import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { MeasurementHUD } from '@ui/components/MeasurementHUD';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function resetStore(): void {
   useStore.setState({ document: createEmptyDocument(), lastSummary: null, lastMeasure: null });
@@ -33,9 +31,7 @@ function setMeasure(command: string, data: unknown): void {
   useStore.setState({ lastMeasure: { command, data } });
 }
 
-// ---------------------------------------------------------------------------
 // No measure — HUD is hidden
-// ---------------------------------------------------------------------------
 
 describe('MeasurementHUD — no measure', () => {
   beforeEach(() => {
@@ -48,9 +44,7 @@ describe('MeasurementHUD — no measure', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // measure_distance
-// ---------------------------------------------------------------------------
 
 describe('MeasurementHUD — measure_distance', () => {
   beforeEach(() => {
@@ -80,9 +74,7 @@ describe('MeasurementHUD — measure_distance', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // measure_angle
-// ---------------------------------------------------------------------------
 
 describe('MeasurementHUD — measure_angle', () => {
   beforeEach(() => {
@@ -103,9 +95,7 @@ describe('MeasurementHUD — measure_angle', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // measure_area
-// ---------------------------------------------------------------------------
 
 describe('MeasurementHUD — measure_area', () => {
   beforeEach(() => {
@@ -128,9 +118,7 @@ describe('MeasurementHUD — measure_area', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // measure_perimeter
-// ---------------------------------------------------------------------------
 
 describe('MeasurementHUD — measure_perimeter', () => {
   beforeEach(() => {
@@ -152,9 +140,7 @@ describe('MeasurementHUD — measure_perimeter', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // measure_bounding_box
-// ---------------------------------------------------------------------------
 
 describe('MeasurementHUD — measure_bounding_box', () => {
   beforeEach(() => {
@@ -193,9 +179,7 @@ describe('MeasurementHUD — measure_bounding_box', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // measure_volume
-// ---------------------------------------------------------------------------
 
 describe('MeasurementHUD — measure_volume', () => {
   beforeEach(() => {
@@ -210,9 +194,7 @@ describe('MeasurementHUD — measure_volume', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // mass_properties
-// ---------------------------------------------------------------------------
 
 describe('MeasurementHUD — mass_properties', () => {
   beforeEach(() => {
@@ -236,9 +218,7 @@ describe('MeasurementHUD — mass_properties', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Dismiss button
-// ---------------------------------------------------------------------------
 
 describe('MeasurementHUD — dismiss', () => {
   beforeEach(() => {
@@ -267,9 +247,7 @@ describe('MeasurementHUD — dismiss', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Store integration — lastMeasure lifecycle
-// ---------------------------------------------------------------------------
 
 describe('MeasurementHUD — store lastMeasure integration', () => {
   beforeEach(() => {

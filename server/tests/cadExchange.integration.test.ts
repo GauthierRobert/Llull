@@ -36,9 +36,7 @@ const port = createPythonExchangePort({
   exchangeDir: null,
 });
 
-// ---------------------------------------------------------------------------
 // Fixture model
-// ---------------------------------------------------------------------------
 
 type Vec3 = readonly [number, number, number];
 interface Box3 {
@@ -217,9 +215,7 @@ const deviationTable: Array<{
   tolerance: number;
 }> = [];
 
-// ---------------------------------------------------------------------------
 // Suites
-// ---------------------------------------------------------------------------
 
 function describeLanguage(language: PythonLanguage, enabled: boolean): void {
   describe.skipIf(!enabled)(`${language} exchange against the real bridge`, () => {
@@ -322,13 +318,17 @@ describe.skipIf(!hasCadQuery)('parametric round trip (cadquery)', () => {
     expect(history).toContain('thickness');
   });
 
-  it('set_parameter width=120 + replay_history makes the plate 120 wide', () => {
+  const widenedPlate = (): { document: CadDocument } => {
     const applied = execute(createEmptyDocument(), 'apply_code_trace', { trace: traced });
     const changed = execute(applied.document, 'set_parameter', {
       name: 'width',
       expression: '120',
     });
-    const replayed = execute(changed.document, 'replay_history', {});
+    return execute(changed.document, 'replay_history', {});
+  };
+
+  it('set_parameter width=120 + replay_history makes the plate 120 wide', () => {
+    const replayed = widenedPlate();
     expect(replayed.document.parameters['width']?.value).toBe(120);
     expect(replayed.document.parameters['thickness']?.value).toBe(12);
     const plate = Object.values(replayed.document.entities).find((e) => e.name === 'Base plate');
@@ -340,12 +340,7 @@ describe.skipIf(!hasCadQuery)('parametric round trip (cadquery)', () => {
   });
 
   it('export_code of the rebuilt model reproduces the parameter declaration', () => {
-    const applied = execute(createEmptyDocument(), 'apply_code_trace', { trace: traced });
-    const changed = execute(applied.document, 'set_parameter', {
-      name: 'width',
-      expression: '120',
-    });
-    const replayed = execute(changed.document, 'replay_history', {});
+    const replayed = widenedPlate();
     const again = exportedCode(replayed.document, 'cadquery');
     expect(again).toContain('width = param("width", 120)');
     expect(again).toContain('thickness = param("thickness", width / 10)');

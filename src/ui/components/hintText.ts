@@ -47,22 +47,18 @@ export function hintText(context: HintContext): string {
       ? 'Move: select something first (V, then click it) · Esc to cancel.'
       : `Move ${selectionCount} selected: click a base point, then the destination · Esc to cancel.`;
   }
-  if (viewMode === '2d' && drawTool !== 'none' && drawTool !== 'move') {
+  if (viewMode === '2d' && drawTool !== 'none' && drawTool !== 'move')
     return `${DRAW_TOOL_HINTS[drawTool]} Esc cancels · Esc again returns to Select.`;
-  }
-  if (entityCount === 0) {
+  if (entityCount === 0)
     return 'Empty model: pick a solid (Box, Cylinder…) or a 2D tool (Line, Rectangle…) in the toolbar above.';
-  }
   if (selectionCount === 0) {
     return viewMode === '3d'
       ? 'Click an object to select it · drag to orbit, right-drag to pan, scroll to zoom · ? shortcuts.'
       : 'Click a shape to select it · Shift+drag to box-select · drag to pan, scroll to zoom · ? shortcuts.';
   }
-  if (viewMode === '2d') {
+  if (viewMode === '2d')
     return `${selectionCount} selected · M to move · arrows nudge · Ctrl D duplicate · Del delete · Esc deselect.`;
-  }
-  if (selectionCount === 1) {
+  if (selectionCount === 1)
     return `${GIZMO_HINTS[gizmoMode]} · M / R / S: move, rotate, scale · arrows nudge · Del delete.`;
-  }
   return `${selectionCount} selected · arrows nudge · Ctrl D duplicate · Del delete · select one to get the gizmo.`;
 }

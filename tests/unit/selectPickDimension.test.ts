@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
-import type { DimensionEntity } from '@core/model/types';
+import { type DimensionEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { dimensionLabelDistSq, nearestEntityId } from '@ui/viewport/2d/modifyHelpers';
 

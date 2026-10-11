@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { CadDocument, MeshSolidEntity } from '@core/model/types';
 import type { AlignmentObject } from '@core/model/civil';
 import { execute } from '@core/commands/registry';
-import { deserializeDocument, serializeDocument } from '@core/commands/persistence';
 import {
   horizontalElements,
   pointAtStation,
@@ -21,7 +20,7 @@ import {
 } from '@aec/civil/superelevation';
 import { crossSectionAt } from '@aec/civil/roadSection';
 import { civilErrors } from '@aec/civil/validate';
-import { surveyedDocument } from './fixtures';
+import { alignmentOf, expectSaveLoadRoundTrip, surveyedDocument } from './fixtures';
 
 const R = 100;
 const LS = 60;
@@ -45,9 +44,6 @@ function spiralDoc(extra: Record<string, unknown> = {}): { doc: CadDocument; id:
   expect(result.affected.length, result.summary).toBeGreaterThan(0);
   return { doc: result.document, id: (result.data as { alignmentId: string }).alignmentId };
 }
-
-const alignmentOf = (doc: CadDocument, id: string): AlignmentObject =>
-  doc.civil?.objects[id] as AlignmentObject;
 
 function designedSpiral(maxRate = 0.07): { doc: CadDocument; id: string } {
   const { doc, id } = spiralDoc();
@@ -395,12 +391,7 @@ describe('superelevation', () => {
 
   it('survives save / load and rejects corrupt spirals or superelevation', () => {
     const { doc, id } = designedSpiral();
-    const loaded = deserializeDocument(serializeDocument(doc));
-    expect(alignmentOf(loaded, id)).toEqual(alignmentOf(doc, id));
-    expect(Object.keys(loaded.entities).sort()).toEqual(Object.keys(doc.entities).sort());
-    const report = (d: CadDocument): unknown =>
-      execute(d, 'alignment_report', { alignmentId: id }).data;
-    expect(report(loaded)).toEqual(report(doc));
+    expectSaveLoadRoundTrip(doc, id);
     const withObject = (patch: Record<string, unknown>): NonNullable<CadDocument['civil']> => {
       const civil = doc.civil as NonNullable<typeof doc.civil>;
       return {

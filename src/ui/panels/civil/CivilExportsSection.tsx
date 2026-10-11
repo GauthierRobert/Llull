@@ -9,7 +9,7 @@ import React, { useState } from 'react';
 import { PAPER_SIZES, type PaperSize } from '@aec/sheet';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { OptionSelect } from '@ui/panels/OptionSelect';
-import { CivilStatus } from './CivilParts';
+import { CivilStatus, NumberField } from './CivilParts';
 import { downloadQuery } from './civilQuery';
 import { optionalNumber } from './civilInput';
 
@@ -49,13 +49,7 @@ export function CivilExportsSection(): React.ReactElement {
       </div>
       <div className="building-inline-form">
         <OptionSelect value={paper} options={PAPER_SIZES} label="Sheet paper" onChange={setPaper} />
-        <input
-          type="number"
-          value={scale}
-          placeholder="Scale 1:N (auto)"
-          aria-label="Sheet scale"
-          onChange={(event) => setScale(event.target.value)}
-        />
+        <NumberField value={scale} set={setScale} hint="Scale 1:N (auto)" label="Sheet scale" />
         <button
           type="button"
           className="btn btn--ghost btn--sm"

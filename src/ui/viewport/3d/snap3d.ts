@@ -4,8 +4,7 @@
  * solids (cylinder and sphere use disc/pole points), then grid fallback.
  */
 
-import type { Entity, CadDocument } from '@core/model/types';
-import { is3D } from '@core/model/types';
+import { type Entity, type CadDocument, is3D } from '@core/model/types';
 import { rotatedEntityBounds } from '@core/commands/sceneRotatedBounds';
 import { applyEulerXYZ } from '@lib/eulerRotation';
 import { nearestSnap } from '../nearestSnap';
@@ -198,9 +197,7 @@ export function snap3d(
     SNAP3D_PRIORITY,
   );
 
-  if (best !== null) {
-    return { x: best.x, y: best.y, z: best.z, type: best.type, snapped: true };
-  }
+  if (best !== null) return { x: best.x, y: best.y, z: best.z, type: best.type, snapped: true };
 
   // Grid fallback.
   if (gridStep > 0) {

@@ -119,9 +119,8 @@ export function moveLastOutboxEntry(
   direction: 'undo' | 'redo',
 ): Pick<CadStoreState, 'localOutbox' | 'localRedoOutbox'> {
   const from = direction === 'undo' ? state.localOutbox : state.localRedoOutbox;
-  if (from.length === 0) {
+  if (from.length === 0)
     return { localOutbox: state.localOutbox, localRedoOutbox: state.localRedoOutbox };
-  }
   // One undo step = its entry plus the coalesced entries that follow it.
   let start = from.length - 1;
   while (start > 0 && from[start]?.coalesced === true) start -= 1;

@@ -20,20 +20,9 @@ vi.mock('@core/commands/persistence', async (importOriginal) => {
 
 import { subscribeLive, getLiveSnapshot, _resetLiveDoc } from '../src/liveDocument';
 import { applyCommand } from '../src/commandBus';
-import { parseSseFrame } from './sseTestHelpers';
+import { makeFakeRes, parseSseFrame } from './sseTestHelpers';
 import { applyLiveCommand, documentHash } from '@mcp/liveSync';
 import type { CadDocument } from '@core/model/types';
-
-function makeFakeRes(): { written: string[]; write(chunk: string): boolean; end(): void } {
-  return {
-    written: [],
-    write(chunk: string): boolean {
-      this.written.push(chunk);
-      return true;
-    },
-    end(): void {},
-  };
-}
 
 describe('live command hash', () => {
   beforeEach(() => {

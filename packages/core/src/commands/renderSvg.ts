@@ -66,9 +66,8 @@ function polygonSvg(poly: Polygon3D, project: Projector): string {
       return `${r2(sx)},${r2(sy)}`;
     })
     .join(' ');
-  if (poly.stroke) {
+  if (poly.stroke)
     return `  <polyline points="${points}" fill="none" stroke="${poly.color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`;
-  }
   return `  <polygon points="${points}" fill="${shade(poly.normal, poly.color)}" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>`;
 }
 

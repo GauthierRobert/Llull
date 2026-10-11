@@ -51,9 +51,8 @@ export const addFooting = defineCommand({
   run: (doc, params): CommandResult => {
     const { width, length, thickness, topOffset, material } = params;
     const positive = (value: number | undefined): boolean => value === undefined || value > 0;
-    if (!positive(width) || !positive(length) || !positive(thickness)) {
+    if (!positive(width) || !positive(length) || !positive(thickness))
       return noop(doc, 'add_footing failed: width, length and thickness must be > 0.');
-    }
     const resolution = resolveLevel(doc, getBuilding(doc), params.levelId);
     if (!resolution.ok) return noop(doc, `add_footing failed: ${resolution.reason}.`);
     const tolerance = fromMm(doc, 10);
@@ -119,12 +118,10 @@ export const addPanel = defineCommand({
       );
     }
     const points = corners.map(toVec3);
-    if (points.length < 3 || points.some((point) => point === null)) {
+    if (points.length < 3 || points.some((point) => point === null))
       return noop(doc, 'add_panel failed: corners must be ≥ 3 [x, y, z] points.');
-    }
-    if (thickness !== undefined && !(thickness > 0)) {
+    if (thickness !== undefined && !(thickness > 0))
       return noop(doc, 'add_panel failed: thickness must be > 0.');
-    }
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_panel failed: ${resolution.reason}.`);
     const added = appendPanel(doc, resolution.building, resolution.level.id, {

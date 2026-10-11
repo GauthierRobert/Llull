@@ -37,9 +37,8 @@ function selectionProblem(topology: ShapeTopology | null, edges: readonly number
   if (topology === null) return null;
   const count = topology.edges.length;
   const outOfRange = edges.filter((index) => index >= count);
-  if (outOfRange.length > 0) {
+  if (outOfRange.length > 0)
     return `edge index ${outOfRange.join(', ')} out of range (the solid has ${count} edges, 0..${count - 1}; inspect_topology lists them)`;
-  }
   const repeated = edges.filter((index, at) => edges.indexOf(index) !== at);
   if (repeated.length > 0) return `edge index ${[...new Set(repeated)].join(', ')} selected twice`;
   const unroundable = edges.filter((index) => {
@@ -63,13 +62,11 @@ export function selectEdges(
   indices: readonly number[],
   near: readonly Vec3[],
 ): EdgeSelection {
-  if (near.length > 0 && topology === null) {
+  if (near.length > 0 && topology === null)
     return { problem: 'edgesNear needs the exact B-rep topology of the OCC kernel' };
-  }
   const picked = topology === null ? [] : near.map((point) => nearestEdge(topology, point));
-  if (picked.some((index) => index === undefined)) {
+  if (picked.some((index) => index === undefined))
     return { problem: 'edgesNear found no roundable edge (the solid has only seams)' };
-  }
   const fromPoints = (picked as number[]).filter((index) => !indices.includes(index));
   const edges = [...indices, ...new Set(fromPoints)];
   const problem = selectionProblem(topology, edges);

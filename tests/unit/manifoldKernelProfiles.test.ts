@@ -1,28 +1,8 @@
 import { describe, expect, it, beforeAll } from 'vitest';
 import type { Entity } from '@core/model/types';
 import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
-import type { BooleanOp } from '@core/geometry/shapeRecipe';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
-
-function meshOf(kernel: GeometryKernel, entity: Entity): MeshData | null {
-  const shape = kernel.evaluate({ op: 'solid', entity });
-  return shape === null ? null : kernel.tessellate(shape);
-}
-
-function booleanMesh(
-  kernel: GeometryKernel,
-  boolean: BooleanOp,
-  a: Entity,
-  b: Entity,
-): MeshData | null {
-  const shape = kernel.evaluate({
-    op: 'boolean',
-    boolean,
-    a: { op: 'solid', entity: a },
-    b: { op: 'solid', entity: b },
-  });
-  return shape === null ? null : kernel.tessellate(shape);
-}
+import { meshOf, booleanMesh } from '../helpers/manifoldMesh';
 
 const base = { layerId: 'layer-default', color: '#888888', rotation: [0, 0, 0] };
 const extrusion = (profile: number[][], depth: number): Entity =>

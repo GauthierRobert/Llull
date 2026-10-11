@@ -4,8 +4,7 @@
  * Derive snap candidate points from the 2D entities of a document.
  */
 
-import type { CadDocument, Vec2 } from '@core/model/types';
-import { is3D } from '@core/model/types';
+import { type CadDocument, type Vec2, is3D } from '@core/model/types';
 import { solidSnapPoints } from '../solidOutline';
 import type { CollectOpts, SnapPoint, SnapType } from './types';
 import {

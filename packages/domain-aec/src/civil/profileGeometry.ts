@@ -31,17 +31,14 @@ export interface VerticalCurve {
 export function validateProfile(profile: ReadonlyArray<ProfilePvi>): string | null {
   if (profile.length < 2) return 'a profile needs at least 2 PVIs.';
   for (const pvi of profile) {
-    if (!Number.isFinite(pvi.station) || !Number.isFinite(pvi.elevation)) {
+    if (!Number.isFinite(pvi.station) || !Number.isFinite(pvi.elevation))
       return 'PVI stations and elevations must be finite numbers.';
-    }
-    if (!(pvi.curveLength >= 0) || !Number.isFinite(pvi.curveLength)) {
+    if (!(pvi.curveLength >= 0) || !Number.isFinite(pvi.curveLength))
       return `PVI at station ${pvi.station}: curveLength must be >= 0.`;
-    }
   }
   for (let i = 1; i < profile.length; i++) {
-    if (!((profile[i] as ProfilePvi).station > (profile[i - 1] as ProfilePvi).station)) {
+    if (!((profile[i] as ProfilePvi).station > (profile[i - 1] as ProfilePvi).station))
       return `PVI stations must increase strictly (PVI ${i} at ${(profile[i] as ProfilePvi).station}).`;
-    }
   }
   if (
     (profile[0] as ProfilePvi).curveLength > 0 ||
@@ -52,9 +49,8 @@ export function validateProfile(profile: ReadonlyArray<ProfilePvi>): string | nu
   for (let i = 1; i + 1 < profile.length; i++) {
     const here = profile[i] as ProfilePvi;
     const next = profile[i + 1] as ProfilePvi;
-    if (here.curveLength / 2 + next.curveLength / 2 > next.station - here.station + 1e-9) {
+    if (here.curveLength / 2 + next.curveLength / 2 > next.station - here.station + 1e-9)
       return `vertical curves at PVI ${i} and PVI ${i + 1} overlap; shorten them.`;
-    }
   }
   return null;
 }

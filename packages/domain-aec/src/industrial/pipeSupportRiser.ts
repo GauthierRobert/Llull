@@ -12,6 +12,7 @@
  */
 
 import { round } from '../numeric';
+import { metres as shown } from './steelMemberRows';
 import { pipeWeightPerMetre } from './pipeWeight';
 import { riserRuns } from './routeSupport';
 import type { EndCarrier, PipeRun, SupportStation } from './pipeSupportLayout';
@@ -78,7 +79,6 @@ export function riserRows(
       carried[1] ? null : length - (lateral.at(-1) ?? 0),
     ];
     const issues: string[] = [];
-    const shown = (millimetres: number): string => (millimetres / 1000).toFixed(2);
     const label = `riser z ${shown(riser.from[2])} → ${shown(riser.to[2])} m (${shown(length)} m)`;
     if (largest > allowedMm + EPSILON) {
       issues.push(

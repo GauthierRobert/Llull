@@ -9,8 +9,7 @@
  *   layer, tags, material) never reach it, so a recolored operand reuses the cached shape
  */
 
-import type { Entity, MeshSolidEntity, Vec3 } from '../model/types';
-import { SOLID_KINDS } from '../model/types';
+import { type Entity, type MeshSolidEntity, type Vec3, SOLID_KINDS } from '../model/types';
 import { hashText } from '../lib/hash';
 import { isRecord } from '../lib/isRecord';
 

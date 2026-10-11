@@ -9,8 +9,7 @@
 
 import { pointInPolygon, polygonArea, projectOntoSegment, type Point2 } from '@lib/polygon';
 import { elementsOf } from '../model';
-import { round } from '../numeric';
-import { GRAVITY } from '../numeric';
+import { GRAVITY, round } from '../numeric';
 import type { ModelUnits } from './steelMemberBars';
 import { depositArea, type BeamLoads } from './steelBeamLoads';
 

@@ -3,8 +3,7 @@
  * carrying their brep recipe, the triangle fallback, scale on a brep, and brep validation on load.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import type { CadDocument, MeshSolidEntity } from '@core/model/types';
-import { createEmptyDocument } from '@core/model/types';
+import { type CadDocument, type MeshSolidEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import { serializeDocument } from '@core/commands/persistence';

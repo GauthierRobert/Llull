@@ -105,12 +105,10 @@ export function fixityProblem(
   role: MemberRole,
   fixity: Pick<MemberSpec, 'startJoint' | 'endJoint' | 'baseFixity'>,
 ): string | null {
-  if ((fixity.startJoint !== undefined || fixity.endJoint !== undefined) && role !== 'beam') {
+  if ((fixity.startJoint !== undefined || fixity.endJoint !== undefined) && role !== 'beam')
     return `startJoint / endJoint apply to beams (role is '${role}')`;
-  }
-  if (fixity.baseFixity !== undefined && role !== 'column') {
+  if (fixity.baseFixity !== undefined && role !== 'column')
     return `baseFixity applies to columns (role is '${role}')`;
-  }
   return null;
 }
 

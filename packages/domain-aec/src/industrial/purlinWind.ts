@@ -5,8 +5,14 @@
 
 import { FLAT_ROOF_LIMIT, roofCoefficients, type ZoneCpe } from './windCoefficients';
 import { DOWNWIND_ROOF_FACTOR } from './frameModelTypes';
-import { pressureOf, suctionOf, TOLERANCE, zoneOf } from './purlinModel';
-import type { Located, WindOption } from './purlinModel';
+import {
+  type Located,
+  type WindOption,
+  pressureOf,
+  suctionOf,
+  TOLERANCE,
+  zoneOf,
+} from './purlinModel';
 import { round } from '../numeric';
 
 interface HallEnvelope {

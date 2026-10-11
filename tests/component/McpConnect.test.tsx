@@ -20,9 +20,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { listCommands } from '@core/commands/registry';
 import { McpConnect, McpConnectButton } from '@ui/components/McpConnect';
 
-// ---------------------------------------------------------------------------
 // Mock clipboard
-// ---------------------------------------------------------------------------
 
 const writeTextMock: Mock<(text: string) => Promise<void>> = vi.fn((_text: string) =>
   Promise.resolve(),
@@ -37,9 +35,7 @@ beforeEach(() => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // McpConnect modal — structure
-// ---------------------------------------------------------------------------
 
 describe('McpConnect — structure', () => {
   it('renders with role=dialog and aria-modal=true', () => {
@@ -59,41 +55,23 @@ describe('McpConnect — structure', () => {
     expect(titleEl?.textContent).toMatch(/connect an mcp agent/i);
   });
 
-  it('shows the title "Connect an MCP agent"', () => {
+  it.each<[string, () => string | RegExp]>([
+    ['the title "Connect an MCP agent"', () => /connect an mcp agent/i],
+    [
+      'the server install and start command in a code block',
+      () => 'npm --prefix server install && npm --prefix server run dev',
+    ],
+    ['the endpoint URL in a code block', () => 'http://localhost:3001/mcp'],
+    [
+      'the live registry command count as a capability badge',
+      () => `${listCommands().length} commands`,
+    ],
+    ['the "structuredContent" capability badge', () => 'structuredContent'],
+    ['the "prompts (EN2)" capability badge', () => 'prompts (EN2)'],
+    ['the "session isolation" capability badge', () => 'session isolation'],
+  ])('shows %s', (_label, text) => {
     render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText(/connect an mcp agent/i)).toBeDefined();
-  });
-
-  it('shows the server install and start command in a code block', () => {
-    render(<McpConnect onClose={() => undefined} />);
-    expect(
-      screen.getByText('npm --prefix server install && npm --prefix server run dev'),
-    ).toBeDefined();
-  });
-
-  it('shows the endpoint URL in a code block', () => {
-    render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText('http://localhost:3001/mcp')).toBeDefined();
-  });
-
-  it('shows the live registry command count as a capability badge', () => {
-    render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText(`${listCommands().length} commands`)).toBeDefined();
-  });
-
-  it('shows the "structuredContent" capability badge', () => {
-    render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText('structuredContent')).toBeDefined();
-  });
-
-  it('shows the "prompts (EN2)" capability badge', () => {
-    render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText('prompts (EN2)')).toBeDefined();
-  });
-
-  it('shows the "session isolation" capability badge', () => {
-    render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText('session isolation')).toBeDefined();
+    expect(screen.getByText(text())).toBeDefined();
   });
 
   it('has a close button', () => {
@@ -109,9 +87,7 @@ describe('McpConnect — structure', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // McpConnect modal — close behavior
-// ---------------------------------------------------------------------------
 
 describe('McpConnect — close behavior', () => {
   it('calls onClose when the close button is clicked', () => {
@@ -148,16 +124,18 @@ describe('McpConnect — close behavior', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // McpConnect modal — focus management
-// ---------------------------------------------------------------------------
+
+const openDialog = async (): Promise<HTMLElement> => {
+  await act(async () => {
+    render(<McpConnect onClose={() => undefined} />);
+  });
+  return screen.getByRole('dialog');
+};
 
 describe('McpConnect — focus management', () => {
   it('focuses the first focusable element on open', async () => {
-    await act(async () => {
-      render(<McpConnect onClose={() => undefined} />);
-    });
-    const dialog = screen.getByRole('dialog');
+    const dialog = await openDialog();
     const firstBtn = dialog.querySelector('button');
     await waitFor(() => {
       expect(document.activeElement).toBe(firstBtn);
@@ -165,10 +143,7 @@ describe('McpConnect — focus management', () => {
   });
 
   it('wraps Tab from the last focusable element back to the first', async () => {
-    await act(async () => {
-      render(<McpConnect onClose={() => undefined} />);
-    });
-    const dialog = screen.getByRole('dialog');
+    const dialog = await openDialog();
     const buttons = Array.from(dialog.querySelectorAll<HTMLElement>('button'));
     const last = buttons[buttons.length - 1];
     expect(last).toBeTruthy();
@@ -182,10 +157,7 @@ describe('McpConnect — focus management', () => {
   });
 
   it('wraps Shift+Tab from the first focusable element back to the last', async () => {
-    await act(async () => {
-      render(<McpConnect onClose={() => undefined} />);
-    });
-    const dialog = screen.getByRole('dialog');
+    const dialog = await openDialog();
     const buttons = Array.from(dialog.querySelectorAll<HTMLElement>('button'));
     const first = buttons[0];
     const last = buttons[buttons.length - 1];
@@ -202,9 +174,7 @@ describe('McpConnect — focus management', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // McpConnect modal — quickstart content
-// ---------------------------------------------------------------------------
 
 describe('McpConnect — quickstart content', () => {
   it('shows the install+start server section label', () => {
@@ -212,52 +182,24 @@ describe('McpConnect — quickstart content', () => {
     expect(screen.getByText(/install.*start the mcp server/i)).toBeDefined();
   });
 
-  it('shows the install+start command text', () => {
-    render(<McpConnect onClose={() => undefined} />);
-    expect(
-      screen.getByText('npm --prefix server install && npm --prefix server run dev'),
-    ).toBeDefined();
-  });
-
-  it('shows the correct endpoint URL with port 3001', () => {
-    render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText('http://localhost:3001/mcp')).toBeDefined();
-  });
-
   it('shows the recommended agent loop section', () => {
     render(<McpConnect onClose={() => undefined} />);
     expect(screen.getByRole('region', { name: /recommended agent loop/i })).toBeDefined();
   });
 
-  it('shows the cad://conventions step', () => {
+  it.each<[string, string | RegExp]>([
+    ['the cad://conventions step', 'read cad://conventions'],
+    ['the describe_scene step', /describe_scene/],
+    ['the render_view step', /render_view/],
+    ['the check_model step', /check_model/],
+    ['MCP_AUTH_TOKEN in the endpoint section', /MCP_AUTH_TOKEN/],
+  ])('shows %s', (_label, text) => {
     render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText('read cad://conventions')).toBeDefined();
-  });
-
-  it('shows the describe_scene step', () => {
-    render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText(/describe_scene/)).toBeDefined();
-  });
-
-  it('shows the render_view step', () => {
-    render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText(/render_view/)).toBeDefined();
-  });
-
-  it('shows the check_model step', () => {
-    render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText(/check_model/)).toBeDefined();
-  });
-
-  it('mentions MCP_AUTH_TOKEN in the endpoint section', () => {
-    render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText(/MCP_AUTH_TOKEN/)).toBeDefined();
+    expect(screen.getByText(text)).toBeDefined();
   });
 });
 
-// ---------------------------------------------------------------------------
 // McpConnectButton — launcher
-// ---------------------------------------------------------------------------
 
 describe('McpConnectButton', () => {
   it('renders a "Connect agent" trigger button', () => {
@@ -300,33 +242,27 @@ describe('McpConnectButton', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Copy buttons
-// ---------------------------------------------------------------------------
 
 describe('McpConnect — copy buttons', () => {
-  it('Copy button for install+start command calls clipboard.writeText with the full command', async () => {
+  it.each<[string, RegExp, string]>([
+    [
+      'install+start command (the full command)',
+      /copy install and start command/i,
+      'npm --prefix server install && npm --prefix server run dev',
+    ],
+    ['endpoint URL (the correct port-3001 URL)', /copy endpoint url/i, 'http://localhost:3001/mcp'],
+    [
+      'read cad://conventions (the tool name)',
+      /copy read cad:\/\/conventions tool name/i,
+      'read cad://conventions',
+    ],
+  ])('Copy button for %s calls clipboard.writeText', async (_label, name, expected) => {
     render(<McpConnect onClose={() => undefined} />);
-    const copyBtns = screen.getAllByRole('button', { name: /copy install and start command/i });
+    const copyBtns = screen.getAllByRole('button', { name });
     expect(copyBtns.length).toBeGreaterThanOrEqual(1);
     fireEvent.click(copyBtns[0]!);
-
-    await waitFor(() => {
-      expect(writeTextMock).toHaveBeenCalledWith(
-        'npm --prefix server install && npm --prefix server run dev',
-      );
-    });
-  });
-
-  it('Copy button for endpoint URL calls clipboard.writeText with the correct port-3001 URL', async () => {
-    render(<McpConnect onClose={() => undefined} />);
-    const copyBtns = screen.getAllByRole('button', { name: /copy endpoint url/i });
-    expect(copyBtns.length).toBeGreaterThanOrEqual(1);
-    fireEvent.click(copyBtns[0]!);
-
-    await waitFor(() => {
-      expect(writeTextMock).toHaveBeenCalledWith('http://localhost:3001/mcp');
-    });
+    await waitFor(() => expect(writeTextMock).toHaveBeenCalledWith(expected));
   });
 
   it('Copy button shows "Copied!" label after click', async () => {
@@ -338,19 +274,6 @@ describe('McpConnect — copy buttons', () => {
       expect(
         screen.getByRole('button', { name: /install and start command copied/i }),
       ).toBeDefined();
-    });
-  });
-
-  it('Copy button for read cad://conventions calls clipboard.writeText with the tool name', async () => {
-    render(<McpConnect onClose={() => undefined} />);
-    const copyBtns = screen.getAllByRole('button', {
-      name: /copy read cad:\/\/conventions tool name/i,
-    });
-    expect(copyBtns.length).toBeGreaterThanOrEqual(1);
-    fireEvent.click(copyBtns[0]!);
-
-    await waitFor(() => {
-      expect(writeTextMock).toHaveBeenCalledWith('read cad://conventions');
     });
   });
 });

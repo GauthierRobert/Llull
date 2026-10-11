@@ -6,13 +6,12 @@
  * @pure
  */
 
-import type { CadDocument, Entity, FeatureStep, Vec3 } from '../model/types';
-import { is3D } from '../model/types';
+import { type CadDocument, type Entity, type FeatureStep, type Vec3, is3D } from '../model/types';
 import type { CommandDefinition } from '../commands/types';
 import { replayHistory, type ReplayStepEvent } from '../commands/replay';
 import { buildParamEnv } from '../commands/regenerate';
 import { evaluateExpression, extractReferences } from '../commands/expression';
-import { entityToTriangles } from '../commands/exportTriangulate';
+import { entityTrianglePositions } from '../commands/exportTriangulate';
 import { Namer, translateExpression } from './identifiers';
 import type { GeometryKernel } from '../geometry/kernel';
 import { recipeOf } from '../geometry/shapeRecipe';
@@ -129,11 +128,7 @@ function lowerShape(entity: Entity, doc: CadDocument, raw: unknown, ctx: LowerCo
         segments: safeSegments(entity.segments),
       };
     default: {
-      const positions: number[] = [];
-      for (const triangle of entityToTriangles(entity, doc)) {
-        for (const vertex of triangle) positions.push(vertex[0], vertex[1], vertex[2]);
-      }
-      return { kind: 'mesh', positions };
+      return { kind: 'mesh', positions: entityTrianglePositions(entity, doc) };
     }
   }
 }
@@ -205,12 +200,10 @@ const METADATA_FIELDS = new Set(['name', 'tags', 'layerId', 'materialId', 'color
 
 /** Deep equality with a numeric tolerance (replayed floats may differ in the last bits). */
 function nearlyEqual(left: unknown, right: unknown): boolean {
-  if (typeof left === 'number' && typeof right === 'number') {
+  if (typeof left === 'number' && typeof right === 'number')
     return Math.abs(left - right) <= EPSILON * Math.max(1, Math.abs(left), Math.abs(right));
-  }
-  if (Array.isArray(left) && Array.isArray(right)) {
+  if (Array.isArray(left) && Array.isArray(right))
     return left.length === right.length && left.every((item, i) => nearlyEqual(item, right[i]));
-  }
   if (left !== null && right !== null && typeof left === 'object' && typeof right === 'object') {
     const a = left as Record<string, unknown>;
     const b = right as Record<string, unknown>;
@@ -280,9 +273,8 @@ function lowerParameters(
     const identifier = identifiers.get(name);
     if (parameter === undefined || identifier === undefined) return [];
     const literal = Number(parameter.expression);
-    if (parameter.error !== undefined || Number.isFinite(literal)) {
+    if (parameter.error !== undefined || Number.isFinite(literal))
       return [{ name, identifier, value: parameter.value }];
-    }
     const expression = translateExpression(parameter.expression, identifiers);
     return [
       expression === null
@@ -478,9 +470,8 @@ function lowerStep(
 function historyMismatch(doc: CadDocument, replayed: CadDocument): string | null {
   const expected = solids(doc);
   const actual = solids(replayed);
-  if (expected.length !== actual.length) {
+  if (expected.length !== actual.length)
     return `featureHistory replays to ${actual.length} solid(s) but the document has ${expected.length}`;
-  }
   const differing = expected.find((original, i) => {
     const regenerated = actual[i];
     return regenerated === undefined || !geometryEqual(original, regenerated);

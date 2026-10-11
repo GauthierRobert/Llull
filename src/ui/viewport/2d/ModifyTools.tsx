@@ -12,9 +12,8 @@
  */
 
 import React, { useRef, useEffect } from 'react';
-import { Icon } from '@ui/components/Icon';
+import { type IconName, Icon } from '@ui/components/Icon';
 import { NumberField } from '@ui/components/NumberField';
-import type { IconName } from '@ui/components/Icon';
 import type { ModifyToolKind } from '@ui/store';
 import type { ModifyToolPhase } from './useModifyTool';
 

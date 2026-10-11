@@ -1,5 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
-import { applyTool, downloadText, elementRows, openBuilding, status } from './buildingHelpers';
+import {
+  applyTool,
+  downloadText,
+  elementRows,
+  openBuilding,
+  scheduleCsv,
+  status,
+} from './buildingHelpers';
 
 /**
  * End-to-end: an industrial (factory builder) workflow in the real app, covering
@@ -10,6 +17,18 @@ import { applyTool, downloadText, elementRows, openBuilding, status } from './bu
 async function hall(page: Page): Promise<void> {
   await applyTool(page, 'hall', { span: '24000', length: '36000', craneRailHeight: '5000' });
   await expect(status(page)).toContainText('Added portal-frame hall 24.0 × 36.0 m');
+}
+
+/** A 24 × 30 m hall without cladding, with a crane rail, under a 0.7 kN/m² wind pressure. */
+async function windyCraneHall(page: Page): Promise<void> {
+  await openBuilding(page);
+  await applyTool(page, 'hall', {
+    span: '24000',
+    length: '30000',
+    cladding: 'false',
+    craneRailHeight: '6000',
+  });
+  await page.getByLabel('Wind pressure qp (kN/m²)').fill('0.7');
 }
 
 test.describe('industrial workflow', () => {
@@ -76,10 +95,7 @@ test.describe('industrial workflow', () => {
     await expect(page.getByTestId('takeoff-member.paint.m2')).toContainText('m²');
     await expect(page.getByTestId('takeoff-footing.concrete.m3')).toBeVisible();
 
-    await page.getByLabel('Schedule').selectOption('member');
-    const schedule = await downloadText(page, () =>
-      page.getByRole('button', { name: 'Schedule CSV' }).click(),
-    );
+    const schedule = await scheduleCsv(page, 'member');
     expect(schedule.name).toBe('member-schedule.csv');
     expect(schedule.text.split('\n')[0]).toBe(
       'Mark,Role,Profile,Length (mm),Mass (kg),Grade,Level,Note',
@@ -127,10 +143,7 @@ test.describe('industrial workflow', () => {
 
     await applyTool(page, 'tray', { points: '2000,6000,5000; 30000,6000,5000', system: 'data' });
     await expect(status(page)).toContainText('Added data cable tray CT1');
-    await page.getByLabel('Schedule').selectOption('tray');
-    const trays = await downloadText(page, () =>
-      page.getByRole('button', { name: 'Schedule CSV' }).click(),
-    );
+    const trays = await scheduleCsv(page, 'tray');
     expect(trays.text).toContain('CT1,data,300,60,28');
 
     await applyTool(page, 'curvedWall', { x1: '40000', xm: '43000', ym: '3000', x2: '46000' });
@@ -163,10 +176,7 @@ test.describe('industrial workflow', () => {
     await openBuilding(page);
     await applyTool(page, 'hall', { span: '18000', length: '12000', cladding: 'false' });
     await expect(elementRows(page, 'connection')).toHaveCount(9);
-    await page.getByLabel('Schedule').selectOption('connection');
-    const schedule = await downloadText(page, () =>
-      page.getByRole('button', { name: 'Schedule CSV' }).click(),
-    );
+    const schedule = await scheduleCsv(page, 'connection');
     expect(schedule.text.split('\n')[1]).toMatch(/^MC1,eaves,RF1,SC1,25,8×M20,/);
 
     await applyTool(page, 'wall', { x1: '30000', y1: '0', x2: '36000', y2: '0' });
@@ -201,24 +211,14 @@ test.describe('industrial workflow', () => {
     await expect(status(page)).toContainText('Designed 6 frame(s)');
     await page.getByTestId('frame-check').click();
     await expect(page.getByTestId('frame-check-summary')).toContainText('all OK');
-    await page.getByLabel('Schedule').selectOption('connection');
-    const schedule = await downloadText(page, () =>
-      page.getByRole('button', { name: 'Schedule CSV' }).click(),
-    );
+    const schedule = await scheduleCsv(page, 'connection');
     expect(schedule.text.split('\n')[1]).toMatch(/,a9 flanges \/ a6 web · \d+\.\d m$/);
   });
 
   test('I20–I23 — wind and crane combinations, buckling, sway stability, deflections', async ({
     page,
   }) => {
-    await openBuilding(page);
-    await applyTool(page, 'hall', {
-      span: '24000',
-      length: '30000',
-      cladding: 'false',
-      craneRailHeight: '6000',
-    });
-    await page.getByLabel('Wind pressure qp (kN/m²)').fill('0.7');
+    await windyCraneHall(page);
     await page.getByTestId('frame-check').click();
     const summary = page.getByTestId('frame-check-summary');
     await expect(summary).toContainText('66 ULS combination(s)');
@@ -234,14 +234,7 @@ test.describe('industrial workflow', () => {
   });
 
   test('I24–I27 — bracing, foundations and crane runway checks', async ({ page }) => {
-    await openBuilding(page);
-    await applyTool(page, 'hall', {
-      span: '24000',
-      length: '30000',
-      cladding: 'false',
-      craneRailHeight: '6000',
-    });
-    await page.getByLabel('Wind pressure qp (kN/m²)').fill('0.7');
+    await windyCraneHall(page);
     const summary = page.getByTestId('frame-check-summary');
     await page.getByTestId('bracing-check').click();
     await expect(summary).toContainText('Bracing check (qp 0.7 kN/m²');
@@ -264,10 +257,7 @@ test.describe('industrial workflow', () => {
     await page.getByLabel('Wind pressure qp (kN/m²)').fill('0.7');
     await page.getByTestId('footing-design').click();
     await expect(status(page)).toContainText('Designed 12 of 12 footing(s)');
-    await page.getByLabel('Schedule').selectOption('footing');
-    const schedule = await downloadText(page, () =>
-      page.getByRole('button', { name: 'Schedule CSV' }).click(),
-    );
+    const schedule = await scheduleCsv(page, 'footing');
     expect(schedule.text).toMatch(/H\d+ @ \d+ B1\/B2/);
     const plan = await downloadText(page, () =>
       page.getByRole('button', { name: 'Anchor plan' }).click(),

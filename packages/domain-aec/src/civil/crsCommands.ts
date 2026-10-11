@@ -39,9 +39,8 @@ export const setCoordinateSystem = defineCommand({
   }),
   run: (doc, { name, epsg, verticalDatum }): CommandResult => {
     if (name.trim() === '') return noop(doc, 'set_coordinate_system failed: name is empty.');
-    if (epsg !== undefined && !(Number.isInteger(epsg) && epsg > 0)) {
+    if (epsg !== undefined && !(Number.isInteger(epsg) && epsg > 0))
       return noop(doc, 'set_coordinate_system failed: epsg must be a positive integer.');
-    }
     const calibration = getCivil(doc).crs?.calibration;
     const crs: CivilCrs = {
       name: name.trim(),
@@ -88,9 +87,8 @@ export const setSiteCalibration = defineCommand({
   }),
   run: (doc, { localOrigin, gridOrigin, rotationDeg = 0, scaleFactor = 1 }): CommandResult => {
     const values = [...localOrigin, ...gridOrigin, rotationDeg, scaleFactor];
-    if (!values.every(Number.isFinite)) {
+    if (!values.every(Number.isFinite))
       return noop(doc, 'set_site_calibration failed: all values must be finite numbers.');
-    }
     if (!(scaleFactor > 0))
       return noop(doc, 'set_site_calibration failed: scaleFactor must be > 0.');
     const previous = getCivil(doc).crs ?? { name: 'Unnamed' };
@@ -129,9 +127,8 @@ export const transformCoordinates = defineCommand({
   }),
   run: (doc, { points, direction }): CommandResult => {
     const calibration = getCivil(doc).crs?.calibration;
-    if (!calibration) {
+    if (!calibration)
       return noop(doc, 'transform_coordinates failed: no site calibration (set_site_calibration).');
-    }
     if (points.length === 0) return noop(doc, 'transform_coordinates failed: no points.');
     const convert = direction === 'localToGrid' ? localToGrid : gridToLocal;
     return {

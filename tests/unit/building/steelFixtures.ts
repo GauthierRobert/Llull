@@ -70,6 +70,17 @@ export const brace = (
     levelId: 'level-1',
   });
 
+/** Two levels; at each x a pair of HEB200 columns (y = 0, 4000) carrying an IPE300 beam along Y. */
+export function beamOnColumns(xs: readonly number[] = [3000]): CadDocument {
+  let doc = twoLevels();
+  for (const x of xs) {
+    doc = column(doc, x, 0);
+    doc = column(doc, x, 4000);
+    doc = beam(doc, [x, 0], [x, 4000]);
+  }
+  return doc;
+}
+
 /** Square bay 6 m × 6 m: four HEB200 columns, four IPE300 beams, optional grating slab. */
 export function squareBay(options: { slab?: boolean; equipmentKg?: number } = {}): CadDocument {
   const corners: Array<[number, number]> = [

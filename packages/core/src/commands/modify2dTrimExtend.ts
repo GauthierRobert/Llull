@@ -3,7 +3,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { len2, sub2 } from '../lib/vec2';
 import { segIntersect, evalLine } from './modify2dGeometry';
-import { noop } from './noop';
+import { changed, noop } from './noop';
 import { replaceEntity } from './entityOps';
 
 /** `line` with its endpoint nearer to `point` moved onto `point` (a tie moves the start). */
@@ -26,9 +26,8 @@ function resolveLinePair(
   const boundary = doc.entities[boundaryId];
   if (!line) return noop(doc, `${command}: entity ${id} not found.`);
   if (!boundary) return noop(doc, `${command}: boundary entity ${boundaryId} not found.`);
-  if (line.kind !== 'line') {
+  if (line.kind !== 'line')
     return noop(doc, `${command}: entity ${id} is kind '${line.kind}', expected 'line'.`);
-  }
   if (boundary.kind !== 'line') {
     return noop(
       doc,
@@ -52,9 +51,8 @@ function moveEndpointToBoundary(
   if ('summary' in pair) return pair;
   const { line, boundary } = pair;
   const hit = segIntersect(line.start, line.end, boundary.start, boundary.end);
-  if (hit === null) {
+  if (hit === null)
     return noop(doc, `${command}: lines ${id} and ${boundaryId} are parallel — no intersection.`);
-  }
   if (
     command === 'trim' &&
     (hit.t < -1e-9 || hit.t > 1 + 1e-9 || hit.u < -1e-9 || hit.u > 1 + 1e-9)
@@ -69,11 +67,11 @@ function moveEndpointToBoundary(
     command === 'trim'
       ? `Trimmed line ${id} to intersection with ${boundaryId}`
       : `Extended line ${id} to meet ${boundaryId}`;
-  return {
-    document: replaceEntity(doc, withNearerEndpointAt(line, point)),
-    summary: `${done} at [${point[0].toFixed(3)}, ${point[1].toFixed(3)}].`,
-    affected: [id],
-  };
+  return changed(
+    replaceEntity(doc, withNearerEndpointAt(line, point)),
+    `${done} at [${point[0].toFixed(3)}, ${point[1].toFixed(3)}].`,
+    [id],
+  );
 }
 
 /**

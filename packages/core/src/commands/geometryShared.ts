@@ -1,6 +1,6 @@
 import type { BaseEntity, CadDocument, Entity, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
-import { z, looseVec3, tolerant } from './schema';
+import { z, colorField, looseVec3, tolerant } from './schema';
 import { rotatedEntityBounds } from './sceneRotatedBounds';
 import { add3, finiteVec3OrZero } from '../lib/vec3';
 import { nextId } from '../lib/id';
@@ -142,6 +142,22 @@ export function rotationField(
   ).optional();
 }
 
+/** position / anchor / rotation / color params of a placed solid (`anchorField` arguments). */
+export function placedSolidFields(
+  shape: string,
+  defaultAnchor: AnchorName,
+  details: Partial<Record<AnchorName, string>> = {},
+  rotation = rotationField(),
+): {
+  position: ReturnType<typeof positionField>;
+  anchor: ReturnType<typeof anchorField>;
+  rotation: ReturnType<typeof rotationField>;
+  color: ReturnType<typeof colorField>;
+} {
+  const anchor = anchorField(shape, defaultAnchor, details);
+  return { position: positionField(), anchor, rotation, color: colorField(DEFAULT_SOLID_COLOR) };
+}
+
 /**
  * Reject non-finite or non-positive named dimensions: returns the failing no-op result, or `null`
  * when every value is finite and > 0. Checked in order.
@@ -152,9 +168,8 @@ export function rejectNonPositive(
   dimensions: ReadonlyArray<readonly [name: string, value: number]>,
 ): CommandResult | null {
   for (const [name, value] of dimensions) {
-    if (!Number.isFinite(value) || value <= 0) {
+    if (!Number.isFinite(value) || value <= 0)
       return noop(doc, `${command} failed: ${name} must be finite and > 0, got ${value}.`);
-    }
   }
   return null;
 }

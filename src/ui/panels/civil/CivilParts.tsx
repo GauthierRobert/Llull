@@ -116,3 +116,33 @@ export function CivilStatus({
     </p>
   );
 }
+
+interface CivilFieldProps {
+  value: string;
+  set: (text: string) => void;
+  hint: string;
+  label: string;
+}
+
+export function TextField({ value, set, hint, label }: CivilFieldProps): React.ReactElement {
+  return (
+    <input
+      value={value}
+      placeholder={hint}
+      aria-label={label}
+      onChange={(event) => set(event.target.value)}
+    />
+  );
+}
+
+export function NumberField({ value, set, hint, label }: CivilFieldProps): React.ReactElement {
+  return (
+    <input
+      type="number"
+      value={value}
+      placeholder={hint}
+      aria-label={label}
+      onChange={(event) => set(event.target.value)}
+    />
+  );
+}

@@ -3,9 +3,7 @@ import { createEmptyDocument, DEFAULT_LAYER_ID } from '@core/model/types';
 import { execute, listCommands, toToolSchemas } from '@core/commands/registry';
 
 describe('layer commands', () => {
-  // -------------------------------------------------------------------------
   // Purity guard
-  // -------------------------------------------------------------------------
 
   it('is pure — no layer command mutates the input document', () => {
     const doc = createEmptyDocument();
@@ -14,9 +12,7 @@ describe('layer commands', () => {
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 
-  // -------------------------------------------------------------------------
   // add_layer
-  // -------------------------------------------------------------------------
 
   describe('add_layer', () => {
     it('creates a new layer and appends it to layerOrder', () => {
@@ -63,9 +59,7 @@ describe('layer commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // rename_layer
-  // -------------------------------------------------------------------------
 
   describe('rename_layer', () => {
     it('updates the layer name', () => {
@@ -109,9 +103,7 @@ describe('layer commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // set_layer_visibility
-  // -------------------------------------------------------------------------
 
   describe('set_layer_visibility', () => {
     it('hides a visible layer', () => {
@@ -144,9 +136,7 @@ describe('layer commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // set_layer_lock
-  // -------------------------------------------------------------------------
 
   describe('set_layer_lock', () => {
     it('locks an unlocked layer', () => {
@@ -178,9 +168,7 @@ describe('layer commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // set_entity_layer
-  // -------------------------------------------------------------------------
 
   describe('set_entity_layer', () => {
     it('reassigns an entity to a different layer', () => {
@@ -263,9 +251,7 @@ describe('layer commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // delete_layer
-  // -------------------------------------------------------------------------
 
   describe('delete_layer', () => {
     it('deletes a non-default layer and removes it from layerOrder', () => {
@@ -351,9 +337,7 @@ describe('layer commands', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // Cross-cutting: toToolSchemas 1:1 with listCommands (layer entries)
-  // -------------------------------------------------------------------------
 
   it('all 6 layer commands are registered and appear in toToolSchemas', () => {
     const names = listCommands().map((c) => c.name);

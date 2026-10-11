@@ -5,12 +5,13 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
-import request from 'supertest';
+import type request from 'supertest';
 import { buildMcpRouter, toolsetsFromEnv } from '../src/mcp';
 import { getLiveDoc, _resetLiveDoc } from '../src/liveDocument';
 import { _resetHistory } from '../src/commandBus';
 import { TOOLSET_NAMES, TOOLSETS } from '@mcp/index';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { mcpRequest } from './mcpTestSupport';
 
 const app = express();
 app.use(express.json());
@@ -32,18 +33,23 @@ beforeEach(() => {
   _resetHistory();
 });
 
-async function rpc(sessionId: string | null, method: string, params: object): Promise<unknown> {
+type RpcApp = Parameters<typeof request>[0];
+
+async function rpcOn(
+  target: RpcApp,
+  sessionId: string | null,
+  method: string,
+  params: object,
+): Promise<unknown> {
   const id = rpcId++;
-  let req = request(app)
-    .post('/mcp')
-    .set('Content-Type', 'application/json')
-    .set('Accept', 'application/json, text/event-stream');
-  if (sessionId !== null) req = req.set('mcp-session-id', sessionId);
-  const res = await req.send({ jsonrpc: '2.0', id, method, params });
+  const res = await mcpRequest(target, sessionId).send({ jsonrpc: '2.0', id, method, params });
   expect(res.status).toBe(200);
   if (sessionId === null) return res.headers['mcp-session-id'];
   return parseSseResult(res.text, id);
 }
+
+const rpc = (sessionId: string | null, method: string, params: object): Promise<unknown> =>
+  rpcOn(app, sessionId, method, params);
 
 async function openSession(): Promise<string> {
   return (await rpc(null, 'initialize', {
@@ -57,18 +63,8 @@ const coreApp = express();
 coreApp.use(express.json());
 coreApp.use('/mcp', buildMcpRouter({ port: null, allowCodeExecution: false }, toolsetsFromEnv('')));
 
-async function coreRpc(sessionId: string | null, method: string, params: object): Promise<unknown> {
-  const id = rpcId++;
-  let req = request(coreApp)
-    .post('/mcp')
-    .set('Content-Type', 'application/json')
-    .set('Accept', 'application/json, text/event-stream');
-  if (sessionId !== null) req = req.set('mcp-session-id', sessionId);
-  const res = await req.send({ jsonrpc: '2.0', id, method, params });
-  expect(res.status).toBe(200);
-  if (sessionId === null) return res.headers['mcp-session-id'];
-  return parseSseResult(res.text, id);
-}
+const coreRpc = (sessionId: string | null, method: string, params: object): Promise<unknown> =>
+  rpcOn(coreApp, sessionId, method, params);
 
 async function openCoreSession(): Promise<string> {
   return (await coreRpc(null, 'initialize', {

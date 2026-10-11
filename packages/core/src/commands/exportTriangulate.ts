@@ -1,5 +1,4 @@
-import type { CadDocument, Entity } from '../model/types';
-import { is3D } from '../model/types';
+import { type CadDocument, type Entity, is3D } from '../model/types';
 import { expandInstance } from './instanceExpansion';
 import { solidTriangles } from './solidTriangulation';
 import type { Triangle } from './exportMath';
@@ -15,6 +14,11 @@ export function entityToTriangles(e: Entity, doc: CadDocument): Triangle[] {
     return expandInstance(e, component).flatMap((child) => entityToTriangles(child, doc));
   }
   return solidTriangles(e);
+}
+
+/** Flat xyz triple list of `entityToTriangles` (the input of mesh welding / sewing). */
+export function entityTrianglePositions(e: Entity, doc: CadDocument): number[] {
+  return entityToTriangles(e, doc).flatMap((triangle) => triangle.flat());
 }
 
 /**

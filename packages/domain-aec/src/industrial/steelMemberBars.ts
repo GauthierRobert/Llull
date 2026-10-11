@@ -68,8 +68,8 @@ const POINTER: Readonly<Partial<Record<MemberRole, string>>> = {
 };
 
 /** Slope limits of the classification: |dz| / length. */
-const VERTICAL_RATIO = 0.95;
-const HORIZONTAL_RATIO = 0.1;
+export const VERTICAL_RATIO = 0.95;
+export const HORIZONTAL_RATIO = 0.1;
 
 function classify(
   role: MemberRole,
@@ -79,9 +79,8 @@ function classify(
   dz: number,
 ): { kind: BarKind; reason: string | undefined } {
   const skip = (reason: string): { kind: BarKind; reason: string } => ({ kind: 'skipped', reason });
-  if (profile === null) {
+  if (profile === null)
     return skip(`profile '${profileName}' is not in the steel catalogue (list_steel_profiles)`);
-  }
   if (!(length > 1)) return skip('member length is zero');
   const pointer = POINTER[role];
   if (pointer !== undefined) {

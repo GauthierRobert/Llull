@@ -15,9 +15,9 @@
  * `core/commands/execute`, never inline.
  */
 
-import type { CadDocument } from '@core/model/types';
-import { documentHash } from '@mcp/liveSync';
-import type { LiveSnapshotEvent } from '@mcp/liveSync';
+import { expect, vi } from 'vitest';
+import { createEmptyDocument, type CadDocument } from '@core/model/types';
+import { type LiveSnapshotEvent, documentHash } from '@mcp/liveSync';
 import { execute } from '@core/commands/registry';
 import type { CommandResult } from '@core/commands/types';
 import { useStore } from '@ui/store';
@@ -46,4 +46,46 @@ export function liveSnapshot(
   epoch = TEST_EPOCH,
 ): LiveSnapshotEvent {
   return { epoch, seq, stateHash: documentHash(document), document };
+}
+
+/** Flush all pending microtasks (multiple promise chain hops). */
+export async function flushPromises(): Promise<void> {
+  for (let i = 0; i < 10; i++) await new Promise<void>((resolve) => resolve());
+}
+
+/** Dispatches `add_box` and checks the undo/redo flags the (mocked) server response set. */
+export async function expectUndoRedoFlagsAfterDispatch(
+  canUndo: boolean,
+  canRedo: boolean,
+): Promise<void> {
+  useStore.getState().dispatch('add_box', { size: [1, 1, 1] });
+  await flushPromises();
+  expect(useStore.getState().canUndo).toBe(canUndo);
+  expect(useStore.getState().canRedo).toBe(canRedo);
+}
+
+export function getState(): ReturnType<typeof useStore.getState> {
+  return useStore.getState();
+}
+
+/** Replace the store's `dispatch` with a spy so param-gathering UI can be asserted. */
+export function spyDispatch(): ReturnType<typeof vi.fn> {
+  const spy = vi.fn();
+  useStore.setState({ dispatch: spy } as unknown as Parameters<typeof useStore.setState>[0]);
+  return spy;
+}
+
+/** Offline store with an empty document and no local undo history. */
+export function resetOfflineStore(): void {
+  useStore.getState().setDocument(createEmptyDocument());
+  useStore.setState({ liveStatus: 'disconnected', localUndoStack: [], localRedoStack: [] });
+}
+
+/** Replaces `dispatch` with a spy that answers every call's `onResult` with `result`. */
+export function answerDispatch(result: { summary: string; changed: boolean }): void {
+  const answer = (_n: string, _p: unknown, options?: { onResult?: (r: unknown) => void }): void =>
+    options?.onResult?.(result);
+  useStore.setState({ dispatch: vi.fn(answer) } as unknown as Parameters<
+    typeof useStore.setState
+  >[0]);
 }

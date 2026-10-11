@@ -40,9 +40,8 @@ function sseIsDown(state: CadStoreState): boolean {
 }
 
 function postFailureMessage(err: unknown, what: string): string {
-  if (err instanceof ServerCommandError) {
+  if (err instanceof ServerCommandError)
     return err.kind === 'http' ? err.message : `${what} not applied — network error, retry.`;
-  }
   return `${what} failed: ${String(err)}`;
 }
 

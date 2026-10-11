@@ -21,8 +21,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
-import { useNamedViewStore, useStore } from '@ui/store';
-import type { NamedViewCamera } from '@ui/store';
+import { type NamedViewCamera, useNamedViewStore, useStore } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
 import { toRenderPosition } from './floatingOrigin';
 

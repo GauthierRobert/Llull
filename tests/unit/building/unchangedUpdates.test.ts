@@ -2,11 +2,41 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 
+/** Executes each command, then re-runs it with its twin params and expects the refusal. */
+const twinChecker = (): {
+  twinOf: (
+    name: string,
+    params: Record<string, unknown>,
+    twinParams?: Record<string, unknown>,
+  ) => void;
+  current: () => CadDocument;
+} => {
+  let doc = createEmptyDocument();
+  return {
+    twinOf: (name, params, twinParams = params) => {
+      doc = execute(doc, name, params).document;
+      expectTwinRefused(doc, name, twinParams);
+    },
+    current: () => doc,
+  };
+};
+
 const expectNoOp = (doc: CadDocument, name: string, params: Record<string, unknown>): void => {
   const result = execute(doc, name, params);
   expect(result.document).toBe(doc);
   expect(result.affected).toEqual([]);
   expect(result.summary).toMatch(/already|nothing/);
+};
+
+const expectTwinRefused = (
+  doc: CadDocument,
+  name: string,
+  params: Record<string, unknown>,
+): void => {
+  const again = execute(doc, name, params);
+  expect(again.document, name).toBe(doc);
+  expect(again.affected).toEqual([]);
+  expect(again.summary).toMatch(/already exists as .* nothing added/);
 };
 
 describe('update_* / set_* commands with unchanged values are no-ops', () => {
@@ -200,31 +230,18 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
     ];
     const rotated = [square[2], square[3], square[0], square[1]];
     const reversed = [...square].reverse();
-    let doc = createEmptyDocument();
-    const twinOf = (name: string, params: Record<string, unknown>, twinParams = params): void => {
-      doc = execute(doc, name, params).document;
-      const again = execute(doc, name, twinParams);
-      expect(again.document, name).toBe(doc);
-      expect(again.affected).toEqual([]);
-      expect(again.summary).toMatch(/already exists as .* nothing added/);
-    };
+    const { twinOf, current } = twinChecker();
     twinOf('add_slab', { boundary: square }, { boundary: rotated });
     twinOf('add_room', { name: 'Hall', boundary: square }, { name: 'Hall 2', boundary: reversed });
     twinOf('add_stair', { start: [0, 0], angle: 0 });
     const arc = { start: [-5000, 0], through: [0, 5000], end: [5000, 0], thickness: 300 };
     twinOf('add_curved_wall', arc, { ...arc, start: [5000, 0], end: [-5000, 0] });
-    const other = execute(doc, 'add_slab', { boundary: square, role: 'roof' });
+    const other = execute(current(), 'add_slab', { boundary: square, role: 'roof' });
     expect(other.affected.length).toBeGreaterThan(0);
   });
 
   it('add_steel_member / add_pipe_run / add_cable_tray refuse an exact twin', () => {
-    let doc = createEmptyDocument();
-    const twinOf = (name: string, params: Record<string, unknown>, twinParams = params): void => {
-      doc = execute(doc, name, params).document;
-      const again = execute(doc, name, twinParams);
-      expect(again.document, name).toBe(doc);
-      expect(again.summary).toMatch(/already exists as .* nothing added/);
-    };
+    const { twinOf, current } = twinChecker();
     const route = [
       [0, 0, 3000],
       [6000, 0, 3000],
@@ -236,7 +253,7 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
     );
     twinOf('add_pipe_run', { points: route }, { points: [...route].reverse() });
     twinOf('add_cable_tray', { points: route });
-    const other = execute(doc, 'add_steel_member', {
+    const other = execute(current(), 'add_steel_member', {
       profile: 'IPE400',
       role: 'beam',
       start: [0, 0, 3000],

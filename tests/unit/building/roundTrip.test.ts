@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
+import { applySteps } from './applySteps';
 
 const SQUARE = [
   [0, 0],
@@ -72,15 +73,7 @@ const STEPS: Step[] = [
   ],
 ];
 
-function build(): CadDocument {
-  let doc = createEmptyDocument();
-  for (const [name, params] of STEPS) {
-    const result = execute(doc, name, params);
-    expect(result.affected.length, `${name}: ${result.summary}`).toBeGreaterThan(0);
-    doc = result.document;
-  }
-  return doc;
-}
+const build = (): CadDocument => applySteps(createEmptyDocument(), STEPS);
 
 const roundTrip = (doc: CadDocument): CadDocument => deserializeDocument(serializeDocument(doc));
 
