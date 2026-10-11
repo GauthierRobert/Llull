@@ -13,6 +13,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { lintClaude } from './claude-lint.mjs';
+import { readStdin } from './readStdin.mjs';
 
 async function main() {
   const data = await readStdin();
@@ -60,16 +61,6 @@ async function main() {
   process.stdout.write(JSON.stringify({ decision: 'block', reason: 'llull done-gate:\n- ' + findings.join('\n- ') }));
 }
 
-async function readStdin() {
-  try {
-    const chunks = [];
-    for await (const c of process.stdin) chunks.push(c);
-    const raw = Buffer.concat(chunks).toString('utf8').trim();
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
 main()
   .catch(() => {})
   .finally(() => process.exit(0));
