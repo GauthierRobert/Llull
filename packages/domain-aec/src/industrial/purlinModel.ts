@@ -2,8 +2,7 @@
  * @layer domain-aec
  */
 
-import type { SteelMemberElement } from '@core/model/building';
-import type { SteelProfile } from '../steel/profiles';
+import type { Located as BracingLocated } from './bracingModel';
 import type { RoofCoefficients, RoofZone, ZoneCpe } from './windCoefficients';
 
 /** Internal pressure coefficient: +0.2 maximises uplift / suction, -0.3 maximises wall pressure. */
@@ -83,13 +82,7 @@ export interface ZoneSummary {
   readonly maxUtilisation: number;
 }
 
-export type Point = readonly [number, number, number];
-
-export interface Located {
-  readonly member: SteelMemberElement;
-  readonly profile: SteelProfile;
-  readonly start: Point;
-  readonly end: Point;
+export interface Located extends BracingLocated {
   /** Span, mm. */
   readonly length: number;
   readonly yMin: number;

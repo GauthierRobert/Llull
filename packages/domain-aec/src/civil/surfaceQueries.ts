@@ -8,7 +8,7 @@ import { defineCommand, z, vec2 } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
 import { civilObject, getCivil } from './model';
 import { surfaceTin } from './surfaceTin';
-import { elevationAt, slopeAt, tinBounds, tinPlanArea, triangleCount } from './tin';
+import { corners, elevationAt, slopeAt, tinBounds, tinPlanArea, triangleCount } from './tin';
 import { toMetres } from '../model';
 
 const round = (value: number, digits = 3): number => Number(value.toFixed(digits));
@@ -86,11 +86,7 @@ export const surfaceReport = defineCommand({
     let slopeSum = 0;
     let areaSum = 0;
     for (let t = 0; t < triangleCount(tin); t++) {
-      const [a, b, c] = [0, 1, 2].map((k) => tin.points[tin.triangles[t * 3 + k] as number]) as [
-        readonly [number, number, number],
-        readonly [number, number, number],
-        readonly [number, number, number],
-      ];
+      const [a, b, c] = corners(tin, t);
       const ux = b[0] - a[0];
       const uy = b[1] - a[1];
       const uz = b[2] - a[2];

@@ -6,7 +6,7 @@
  */
 
 import type { Vec2 } from '@core/model/types';
-import { pointInPolygon, polygonArea } from '@lib/polygon';
+import { pointInPolygon, polygonArea, projectOntoSegment } from '@lib/polygon';
 import { elevationAt, tinBounds, type Tin } from './tin';
 
 /** Default grid: the pad gets about this many cells. */
@@ -39,24 +39,13 @@ export interface Earthworks {
   readonly outsideTin: number;
 }
 
-function segmentDistance(p: Vec2, a: Vec2, b: Vec2): number {
-  const dx = b[0] - a[0];
-  const dy = b[1] - a[1];
-  const lengthSquared = dx * dx + dy * dy;
-  const t =
-    lengthSquared === 0
-      ? 0
-      : Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / lengthSquared));
-  return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy));
-}
-
 /** Plan distance from `p` to the outline of `polygon`. */
 export function distanceToOutline(p: Vec2, polygon: ReadonlyArray<Vec2>): number {
   let best = Infinity;
   for (let i = 0; i < polygon.length; i++) {
     best = Math.min(
       best,
-      segmentDistance(p, polygon[i] as Vec2, polygon[(i + 1) % polygon.length] as Vec2),
+      projectOntoSegment(p, polygon[i] as Vec2, polygon[(i + 1) % polygon.length] as Vec2).distance,
     );
   }
   return best;

@@ -6,6 +6,7 @@
  */
 
 import type {
+  BaseEntity,
   LineEntity,
   MeshData,
   MeshSolidEntity,
@@ -39,15 +40,7 @@ export const CIVIL_LAYER_COLOR: ReadonlyMap<string, string> = new Map(
   Object.values(CIVIL_LAYERS).map(({ name, color }) => [`layer-${name}`, color]),
 );
 
-interface Common {
-  id: string;
-  position: Vec3;
-  rotation: Vec3;
-  layerId: string;
-  color: string;
-  name: string;
-  tags: string[];
-}
+type Common = Omit<BaseEntity, 'kind'>;
 
 function common(
   object: CivilObject,

@@ -65,7 +65,8 @@ export function triangleCount(tin: Tin): number {
   return tin.triangles.length / 3;
 }
 
-function corners(tin: Tin, triangle: number): [Vec3, Vec3, Vec3] {
+/** The three corner points of triangle `triangle`. */
+export function corners(tin: Tin, triangle: number): [Vec3, Vec3, Vec3] {
   return [
     tin.points[tin.triangles[triangle * 3] as number] as Vec3,
     tin.points[tin.triangles[triangle * 3 + 1] as number] as Vec3,

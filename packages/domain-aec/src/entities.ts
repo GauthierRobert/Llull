@@ -5,7 +5,7 @@
  * @pure
  */
 
-import type { BoxEntity, MeshData, MeshSolidEntity, Vec3 } from '@core/model/types';
+import type { BaseEntity, BoxEntity, MeshData, MeshSolidEntity, Vec3 } from '@core/model/types';
 import type { BimCategory, BuildingElement, MemberRole } from '@core/model/building';
 
 /** AIA / US National CAD Standard layer per category. */
@@ -90,15 +90,7 @@ export function base(
   position: Vec3,
   rotation: Vec3,
   color: string,
-): {
-  id: string;
-  position: Vec3;
-  rotation: Vec3;
-  layerId: string;
-  color: string;
-  name: string;
-  tags: string[];
-} {
+): Omit<BaseEntity, 'kind'> {
   return {
     id: `${element.id}:${stub.part}`,
     position,
