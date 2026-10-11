@@ -67,5 +67,10 @@ scale:
   different folders do not collide.
 - Paths changed (`@core/commands/geometryBasic` → `@core/commands/solids/basic`, …). File names
   inside `domain-aec` were kept; only folders were added.
-- Selection still lives in `CadDocument` (shared with MCP resources and `measure_*` on the
-  selection). Moving it to per-client UI state is a product decision, not taken here.
+- Selection stays in `CadDocument` on purpose: commands read it as input (select-then-act,
+  `measure_*` on the selection, the MCP selection resource), while it is treated as per-client
+  view state everywhere it could leak — excluded from the live-sync state hash
+  (`@mcp/liveSync`), kept per client by the store (`withLocalSelection`), and pruned when
+  entities are removed. Moving it out would hide the user's selection from agents.
+- `.github/workflows/check.yml` runs typecheck, `npm run arch`, lint, format, the coverage gate
+  and the server suite on every push and pull request.
