@@ -8,7 +8,7 @@
 import type { CadDocument, FeatureStep } from '../../model/types';
 import { currentContext } from '../context';
 import type { ExecutionContext } from '../types';
-import type { CommandDefinition, CommandResult } from '../types';
+import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { kernelRefusal } from '../kernelRefusal';
 import { replayHistory } from './replay';
@@ -108,7 +108,7 @@ function editStep(
  * @invariant featureHistory is preserved unchanged; entities are re-evaluated
  * @failure empty history -> returns doc unchanged, affected:[]
  */
-const replayHistoryCommand = defineCommand({
+export const replayHistoryCommand = defineCommand({
   name: 'replay_history',
   description:
     'Recompute the document from scratch by replaying all non-suppressed steps in ' +
@@ -141,7 +141,7 @@ const replayHistoryCommand = defineCommand({
  * @invariant featureHistory length is unchanged
  * @failure unknown stepId -> no-op, affected:[]
  */
-const setStepSuppressed = defineCommand({
+export const setStepSuppressed = defineCommand({
   name: 'set_step_suppressed',
   description:
     'Toggle the suppressed flag of a feature history step by its stepId. ' +
@@ -177,7 +177,7 @@ const setStepSuppressed = defineCommand({
  * @invariant featureHistory length is unchanged; step name is unchanged
  * @failure unknown stepId -> no-op, affected:[]
  */
-const editStepParams = defineCommand({
+export const editStepParams = defineCommand({
   name: 'edit_step_params',
   description:
     'Replace the params of a feature history step by its stepId, then regenerate ' +
@@ -219,7 +219,7 @@ const editStepParams = defineCommand({
  * @invariant featureHistory length is unchanged
  * @failure unknown stepId -> no-op, affected:[]
  */
-const reorderStep = defineCommand({
+export const reorderStep = defineCommand({
   name: 'reorder_step',
   description:
     'Move a feature history step to a new position (0-based index) in the featureHistory ' +
@@ -262,7 +262,7 @@ const reorderStep = defineCommand({
  * @invariant featureHistory length decreases by 1
  * @failure unknown stepId -> no-op, affected:[]
  */
-const deleteStep = defineCommand({
+export const deleteStep = defineCommand({
   name: 'delete_step',
   description:
     'Permanently remove a feature history step by its stepId from featureHistory, ' +
@@ -293,7 +293,7 @@ const deleteStep = defineCommand({
  * @invariant featureHistory length increases by 1
  * @failure afterStepId provided but not found -> no-op, affected:[]
  */
-const insertStep = defineCommand({
+export const insertStep = defineCommand({
   name: 'insert_step',
   description:
     'Splice a new feature history step into featureHistory immediately after the step ' +
@@ -356,12 +356,3 @@ const insertStep = defineCommand({
     );
   },
 });
-
-export const historyCommands: ReadonlyArray<CommandDefinition<unknown>> = [
-  replayHistoryCommand,
-  setStepSuppressed,
-  editStepParams,
-  reorderStep,
-  deleteStep,
-  insertStep,
-] as ReadonlyArray<CommandDefinition<unknown>>;

@@ -5,9 +5,8 @@
 
 import type { Vec2 } from '@core/model/types';
 import type { ManholeObject } from '@core/model/civil';
-import type { CommandDefinition } from '@core/commands/types';
 import type { CommandResult } from '@core/commands/types';
-import { defineCommand, z, vec2 } from '@core/commands/schema';
+import { commandCatalog, defineCommand, z, vec2 } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
 import { fromMm } from '../../building/model';
 import {
@@ -247,10 +246,10 @@ export const updateManhole = defineCommand({
   },
 });
 
-export const drainageCommands = [
+export const drainageCommands = commandCatalog(
   addManhole,
   updateManhole,
   ...drainagePipeCommands,
   ...drainageAnalysisCommands,
   exportDrainageLongSection,
-] as ReadonlyArray<CommandDefinition<unknown>>;
+);

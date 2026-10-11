@@ -202,6 +202,16 @@ export function defineCommand<S extends ParamsObject>(
   return spec.annotations ? { ...definition, annotations: spec.annotations } : definition;
 }
 
+/**
+ * A feature's (or plugin's) command list, params erased to `unknown`. This is the one sanctioned
+ * erasure: `execute` validates params against each command's own schema before `run` sees them.
+ */
+export function commandCatalog(
+  ...commands: ReadonlyArray<CommandDefinition<never>>
+): ReadonlyArray<CommandDefinition<unknown>> {
+  return commands as ReadonlyArray<CommandDefinition<unknown>>;
+}
+
 /** 2-number vector `[x, y]` (local work-plane coordinates). */
 export function vec2(description: string): z.ZodTuple<[z.ZodNumber, z.ZodNumber], null> {
   return z.tuple([z.number(), z.number()]).describe(description);

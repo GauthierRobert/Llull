@@ -40,17 +40,21 @@ read-only queries declare `annotations: { readOnly: true }` and return their val
 
 ## 2. Register it
 
-Core command — import it in `packages/core/src/commands/registry.ts` and append it to the
-definitions list, then add its name to one MCP toolset in `packages/mcp/src/toolsets.ts`:
+Core command — put it in the feature folder it belongs to (`packages/core/src/commands/<feature>/`,
+e.g. `edit/` for transforms) and list it in that folder's `catalog.ts`, then add its name to one
+MCP toolset in `packages/mcp/src/toolsets.ts`:
 
 ```ts
+// packages/core/src/commands/edit/catalog.ts
 import { scaleUniform } from './transform';
 
-const rawDefinitions = [
+export const editCommands = commandCatalog(
   // ...
   scaleUniform,
-] as ReadonlyArray<CommandDefinition<unknown>>;
+);
 ```
+
+`registry.ts` registers every feature catalog; you never edit it for a new command.
 
 Plugin command — add it to the plugin's command list (for the AEC plugins,
 `packages/domain-aec/src/index.ts`); installing the plugin registers it and places it in the

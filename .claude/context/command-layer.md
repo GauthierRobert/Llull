@@ -1,7 +1,9 @@
 # CONTEXT: command layer (exact signatures)
 
 Ground-truth reference for `packages/core/src/commands` (`@core/commands/*`). Mirror these
-signatures exactly. Source: `types.ts`, `schema.ts`, `context.ts`, `registry.ts`,
+signatures exactly. Engine (root of `commands/`): `types.ts` (contracts), `schema.ts`
+(`defineCommand`, `commandCatalog`), `context.ts`, `execute.ts`, `commandTable.ts`, `registry.ts`,
+`guard.ts`; commands live in feature folders, each with a `catalog.ts`. Helpers:
 `entity/entityOps.ts`, `entity/commitEntity.ts`; ids in `packages/core/src/lib/id.ts`; plugins in `packages/core/src/plugins/`.
 
 ## Contracts (`types.ts`)
@@ -82,7 +84,7 @@ runInContext<T>(ctx, fn: () => T): T
 - `setGeometryKernel(k)` (`@core/geometry/kernel`) is called ONLY by composition roots
   (`src/main.tsx`, `server/src/geometryKernel.ts`) and tests.
 
-## Registry API (`registry.ts`)
+## Registry API (`registry.ts` — re-exports `execute.ts` + `commandTable.ts`)
 
 ```ts
 listCommands(): ReadonlyArray<CommandDefinition<unknown>>   // core + installed plugins
@@ -102,8 +104,9 @@ toToolSchemas(): Array<{ name; description; input_schema: ParamsSchema;
 7. Mutating (not `readOnly`/`metaHistory`, not nested in a step) and doc changed ⇒ append
    `FeatureStep { id: 'step-<n>', name, params, suppressed: false, affected }`, bump `nextStepNumber`.
 
-Registration: core — import the const into `registry.ts` and append to `rawDefinitions`.
-Domain — add it to the plugin's `commands` (`packages/domain-aec/src/index.ts` lists feed
+Registration: core — list the const in its feature folder's `catalog.ts`
+(`commandCatalog(...)`); `registry.ts` registers every catalog (a contract test fails on an
+exported command no catalog lists). Domain — add it to the plugin's `commands` (`packages/domain-aec/src/index.ts` lists feed
 `buildingPlugin` / `industrialPlugin` in `plugin.ts`); `installPlugin` appends them (name clash
 throws). `toToolSchemas()` length MUST equal `listCommands()` length (test-guarded), and its
 output is snapshotted (`tests/unit/contract/__snapshots__`).

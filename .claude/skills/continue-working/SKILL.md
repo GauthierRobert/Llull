@@ -26,9 +26,9 @@ The board can be stale (a prior agent finished, a session ended mid-task). Verif
 - A task is **eligible** if status is `[TODO]` and every dep is `[DONE]`.
 - Pick **one eligible task per free lane**, up to **4 lanes in parallel** (Lane 5 review is
   separate and runs after, not as one of the 4). Prefer the lowest-ID eligible task per lane.
-- Lanes own disjoint files (see board table) so parallel writes never collide. Never run two
-  tasks that both edit `packages/core/src/commands/registry.ts` — only Lane 1 touches it
-  (lane write scopes: `.claude/rules/workflow.md` W5).
+- Lanes own disjoint files (see board table) so parallel writes never collide. Core command
+  catalogs (`packages/core/src/commands/<feature>/catalog.ts`) are Lane-1 files; two core tasks
+  in different feature folders no longer collide (lane write scopes: `.claude/rules/workflow.md` W5).
 - Skip `[BLOCKED]` tasks. If the *only* remaining work is blocked, surface the Decision-log
   item to the user and stop.
 
@@ -39,7 +39,7 @@ The board can be stale (a prior agent finished, a session ended mid-task). Verif
   turn). Map lane → `subagent_type` via the board's Lane table. Each spawn prompt MUST carry:
   - the task ID + acceptance criteria;
   - its **writable file scope** (the lane's owned paths) and an explicit **off-limits** note:
-    "write ONLY within your scope; do not edit other lanes' files or `registry.ts` unless you
+    "write ONLY within your scope; do not edit other lanes' files or core command catalogs unless you
     are Lane 1";
   - the **already-DONE dependency outputs** it may read (resolved deps live in committed files —
     that is how you receive sibling work; there is no live channel between agents);
@@ -71,8 +71,8 @@ Coordination is structural, enforced by you (the orchestrator), not by agent-to-
 1. **Single writer of state** — only you read/write the board. Flip a task to `[WIP]` BEFORE
    launching it; the board is the live "who's on what" ledger. Agents never write it.
 2. **Disjoint file ownership** — lanes own non-overlapping paths, so two agents physically
-   cannot write the same file. The lone shared file `registry.ts` is Lane-1-only, and a lane
-   runs ≤1 task at a time → never double-written.
+   cannot write the same file. Each feature folder owns its `catalog.ts`
+   (Lane 1), and a lane runs ≤1 task at a time → never double-written.
 3. **A `[WIP]` lane is NOT free** — selection (step 3) skips it, so re-invoking the skill mid-run
    never double-assigns or collides with in-flight work.
 4. **Deps resolve by ordering, not chat** — a task waits until its deps are `[DONE]` and merged,

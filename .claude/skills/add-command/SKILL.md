@@ -49,8 +49,8 @@ add the `*Entity` interface to `packages/core/src/model/types.ts`, add it to the
 union, and note that the viewport needs a matching render branch (hand to `viewport-engineer`).
 
 ### 3. Register
-- Core: import the const into `packages/core/src/commands/registry.ts` and append to
-  `rawDefinitions`, then list its name in exactly one toolset in `packages/mcp/src/toolsets.ts`
+- Core: define it in its feature folder (`packages/core/src/commands/<feature>/`) and list the
+  const in that folder's `catalog.ts` (never `registry.ts`), then list its name in exactly one toolset in `packages/mcp/src/toolsets.ts`
   (`core` only if every agent needs it up front; a test asserts one toolset per tool).
 - Plugin: add it to the plugin's command list (`buildingCommands` / `industrialCommands` in
   `packages/domain-aec/src/index.ts`, consumed by `plugin.ts`); it joins the plugin's `toolset`

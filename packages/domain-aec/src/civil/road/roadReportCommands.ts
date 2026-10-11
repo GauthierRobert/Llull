@@ -6,8 +6,8 @@
 
 import type { CadDocument } from '@core/model/types';
 import type { AlignmentObject } from '@core/model/civil';
-import type { CommandDefinition, CommandResult } from '@core/commands/types';
-import { defineCommand, z } from '@core/commands/schema';
+import type { CommandResult } from '@core/commands/types';
+import { commandCatalog, defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
 import { safeFileName } from '@lib/safeFileName';
 import { alignmentLength } from '../alignment/alignmentGeometry';
@@ -223,8 +223,8 @@ export const exportCrossSections = defineCommand({
   },
 });
 
-export const roadReportCommands = [
+export const roadReportCommands = commandCatalog(
   alignmentReport,
   exportLongSection,
   exportCrossSections,
-] as ReadonlyArray<CommandDefinition<unknown>>;
+);

@@ -5,10 +5,10 @@
  * @layer domain-aec/civil
  */
 
+import { commandCatalog } from '@core/commands/schema';
 import type { CadDocument } from '@core/model/types';
 import type { CivilModel } from '@core/model/civil';
 import type { CadPlugin, DocumentExtension } from '@core/plugins/plugin';
-import type { CommandDefinition } from '@core/commands/types';
 import { civilDerivationGuard } from './integrity';
 import { mergeRestored } from '../shared/derived';
 import { civilErrors } from './validate';
@@ -75,7 +75,7 @@ const civilDocument: DocumentExtension = {
 };
 
 /** Civil / site-engineering commands. */
-export const civilCommands = [
+export const civilCommands = commandCatalog(
   importSurveyPoints,
   importSurveyDxf,
   createSurface,
@@ -90,7 +90,7 @@ export const civilCommands = [
   ...civilExchangeCommands,
   ...crsCommands,
   ...civilSheetCommands,
-] as ReadonlyArray<CommandDefinition<unknown>>;
+);
 
 export const civilPlugin: CadPlugin = {
   name: 'civil',

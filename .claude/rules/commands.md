@@ -46,7 +46,8 @@ export const fooThing = defineCommand({
 - `run`: still validate semantics (ids exist, sizes > 0); on bad input return the **unchanged doc**,
   an explanatory `summary`, `affected: []`. Never throw for user error.
 - `summary` is the AI's feedback signal: specific and factual (ids, sizes, counts).
-- Register: core → `definitions` in `registry.ts`; domain → its plugin's `commands`.
+- Register: core → its feature folder's `catalog.ts` (`commandCatalog(...)`); domain → its plugin's
+  `commands`. Never edit `registry.ts` for a new command.
 - Tests (`tests/unit/**`): happy path + failure path + `is pure`. Assert `affected`, `summary`,
   observable entities — not internals. Coverage gate 90/85/90/90 on
   `packages/core/src/commands/**` + `packages/domain-aec/src/**`.

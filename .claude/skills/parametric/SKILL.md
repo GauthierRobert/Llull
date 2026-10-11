@@ -17,7 +17,7 @@ A full CAD stores HOW a model was built, not just final geometry. Commands are p
 ## What exists (extend, don't rebuild)
 | Piece | Where (`packages/core/src/commands/`) |
 | ----- | ----- |
-| Feature history: `execute` appends `FeatureStep { id: 'step-<n>' }` per mutating command | `registry.ts` |
+| Feature history: `execute` appends `FeatureStep { id: 'step-<n>' }` per mutating command | `execute.ts` |
 | History edits: `replay_history`, `edit_step_params`, `reorder_step`, `set_step_suppressed`, `insert_step`, `delete_step` (`metaHistory`) | `history/history.ts`, `history/carry.ts` |
 | Step-scoped ids `<prefix>-<n>.<k>` — replay re-mints identical ids (remap kept only for legacy, pre-step-scoped ids) | `@lib/id`, `history/regenerate.ts` |
 | Replay prefix cache (`ctx.replayCache`): unchanged prefixes reused; edit step k ⇒ re-run k..n | `history/replayCache.ts` |

@@ -6,8 +6,8 @@
 
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { PlatformObject } from '@core/model/civil';
-import type { CommandDefinition, CommandResult } from '@core/commands/types';
-import { defineCommand, z, vec2 } from '@core/commands/schema';
+import type { CommandResult } from '@core/commands/types';
+import { commandCatalog, defineCommand, z, vec2 } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
 import { isValidPolygon, segmentsIntersect, signedArea } from '@lib/polygon';
 import {
@@ -470,10 +470,10 @@ export const compareSurfaces = defineCommand({
   },
 });
 
-export const earthworksCommands = [
+export const earthworksCommands = commandCatalog(
   addPlatform,
   updatePlatform,
   platformEarthworks,
   balancePlatform,
   compareSurfaces,
-] as ReadonlyArray<CommandDefinition<unknown>>;
+);

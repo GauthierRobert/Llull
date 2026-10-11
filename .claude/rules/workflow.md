@@ -57,7 +57,7 @@ Lanes own disjoint write scopes (`.claude/work/BOARD.md` is the ledger):
 | 4 MCP | `mcp-engineer` | `packages/mcp/src/**`, `server/**` |
 | 5 Review | `test-verifier` + `cad-reviewer` | `tests/**`; reviews diffs |
 
-`registry.ts` is Lane-1-only. Run `cad-reviewer` when the diff touches `packages/core`, the
+Core feature catalogs (`commands/<feature>/catalog.ts`) are Lane-1-only. Run `cad-reviewer` when the diff touches `packages/core`, the
 registry, a plugin's commands, or `packages/mcp`/`server` — not for docs, tests-only or small UI tweaks.
 
 ## W6 — When unsure

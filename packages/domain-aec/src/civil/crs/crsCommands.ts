@@ -6,8 +6,8 @@
 
 import type { CadDocument } from '@core/model/types';
 import type { CivilCrs } from '@core/model/civil';
-import type { CommandDefinition, CommandResult } from '@core/commands/types';
-import { defineCommand, z, vec2 } from '@core/commands/schema';
+import type { CommandResult } from '@core/commands/types';
+import { commandCatalog, defineCommand, z, vec2 } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
 import { getCivil } from '../model';
 import { gridToLocal, localToGrid } from './crs';
@@ -140,8 +140,8 @@ export const transformCoordinates = defineCommand({
   },
 });
 
-export const crsCommands = [
+export const crsCommands = commandCatalog(
   setCoordinateSystem,
   setSiteCalibration,
   transformCoordinates,
-] as ReadonlyArray<CommandDefinition<unknown>>;
+);

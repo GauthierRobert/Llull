@@ -37,7 +37,7 @@ Rules are already in context (`rules/commands.md` loads when you touch `packages
    and flag that the
    viewport needs a render branch (hand that to viewport-engineer). For 2D drafting
    specifics, follow the `draw-2d` skill.
-3. Register: core — import into `registry.ts`, append to `rawDefinitions`, add the name to
+3. Register: core — list it in its feature folder's `catalog.ts`, add the name to
    one toolset in `packages/mcp/src/toolsets.ts`; plugin — add to its command list
    (`packages/domain-aec/src/index.ts`).
 4. Write tests in `tests/unit/<domain>.test.ts` (plugins: `tests/unit/building/`): happy path (asserts `affected`,

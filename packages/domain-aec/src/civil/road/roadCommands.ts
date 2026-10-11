@@ -6,8 +6,8 @@
 
 import type { CadDocument } from '@core/model/types';
 import type { AlignmentObject, ProfilePvi, RoadSection } from '@core/model/civil';
-import type { CommandDefinition, CommandResult } from '@core/commands/types';
-import { defineCommand, z, vec2 } from '@core/commands/schema';
+import type { CommandResult } from '@core/commands/types';
+import { commandCatalog, defineCommand, z, vec2 } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
 import { alignmentLength, endStation, validateHorizontal } from '../alignment/alignmentGeometry';
 import { grades, validateProfile, verticalCurves } from '../alignment/profileGeometry';
@@ -346,11 +346,11 @@ export const setRoadSection = defineCommand({
   },
 });
 
-export const roadCommands = [
+export const roadCommands = commandCatalog(
   addAlignment,
   updateAlignment,
   setAlignmentProfile,
   setRoadSection,
   setSuperelevation,
   ...roadReportCommands,
-] as ReadonlyArray<CommandDefinition<unknown>>;
+);

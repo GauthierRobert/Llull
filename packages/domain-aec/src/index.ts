@@ -3,7 +3,7 @@
  * @layer domain-aec
  */
 
-import type { CommandDefinition } from '@core/commands/types';
+import { commandCatalog } from '@core/commands/schema';
 import {
   addLevel,
   updateLevel,
@@ -67,7 +67,7 @@ import {
 } from './building/quantities/takeoff';
 
 /** AEC / BIM commands (levels, walls, openings, slabs, sheets, IFC, takeoff). */
-export const buildingCommands = [
+export const buildingCommands = commandCatalog(
   addLevel,
   updateLevel,
   deleteLevel,
@@ -103,10 +103,10 @@ export const buildingCommands = [
   addBuildingTemplate,
   addCurvedWall,
   setWallLayers,
-] as ReadonlyArray<CommandDefinition<unknown>>;
+);
 
 /** Industrial-steel commands (portal frames, members, checks, fabrication). */
-export const industrialCommands = [
+export const industrialCommands = commandCatalog(
   listSteelProfiles,
   addSteelMember,
   updateSteelMember,
@@ -138,7 +138,7 @@ export const industrialCommands = [
   addCraneRunway,
   addPortalFrameBuilding,
   checkClashes,
-] as ReadonlyArray<CommandDefinition<unknown>>;
+);
 export { type PlanPrimitive } from './building/drawings/planModel';
 export { buildPlanDrawing } from './building/drawings/planDrawing';
 export { CATEGORY_LAYER } from './building/evaluate/entities';

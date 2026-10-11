@@ -35,15 +35,21 @@ npm workspaces (`packages/*`); the web app and `server/` stay at the repo root.
 
 ```
 packages/core/src/          @core  Framework-agnostic brain. NO react / DOM / window / fetch.
-  model/                           types.ts (CadDocument, Entity) · building.ts · civil.ts (types)
-  commands/                        THE command layer — schema.ts (defineCommand), context.ts,
-                                   registry.ts, types.ts, one file per domain
-  geometry/                        kernel.ts (GeometryKernel) · shapeRecipe.ts · shapeKernel.ts · kernelChoice.ts
-  plugins/                         plugin.ts (CadPlugin) · host.ts (installPlugin)
+  lib/                      @lib   Tiny pure helpers (id, hash, polygon, triangulate, lruCache) — a leaf
+  model/                           types.ts (CadDocument, Entity) · units.ts · building.ts · civil.ts
+  geometry/                        kernel.ts (GeometryKernel) · shapeRecipe.ts · shapeKernel.ts ·
+                                   pure geometry: tessellation, triangles, bounds, instanceExpansion
+  commands/                        THE command layer. Engine at the root: types.ts · schema.ts
+                                   (defineCommand, commandCatalog) · context.ts · commandTable.ts ·
+                                   execute.ts · guard.ts · registry.ts (composes catalogs + plugins)
+    <feature>/                     solids · draw2d · modify2d · edit · brep · inspect · render ·
+                                   exchange · persistence · history · parametric · project ·
+                                   assembly · motion · document · entity — each with catalog.ts
+  plugins/                         plugin.ts (CadPlugin) · host.ts (installPlugin, derivedEntityIds)
   codegen/                         CadQuery / build123d / OpenSCAD / FreeCAD emitters
-  lib/                      @lib   Tiny pure helpers (id, hash, polygon, triangulate, lruCache)
 packages/mcp/src/           @mcp   MCP tools/resources/prompts/toolsets/discovery/liveSync over the registry
-packages/domain-aec/src/    @aec   building + industrial plugins (commands, guard, document extension)
+packages/domain-aec/src/    @aec   plugins: building/ (elements, geometry, evaluate, drawings, exchange,
+                                   quantities) · industrial/<discipline>/ · civil/<topic>/ · shared/
 packages/kernel-manifold/src/ @kernel-manifold   Manifold GeometryKernel
 packages/kernel-occt/src/   @kernel-occt       OpenCascade GeometryKernel
 src/app/                    @app   Composition root: installDefaultPlugins()
@@ -53,9 +59,12 @@ server/                            Express MCP host (optional; own package.json,
 ```
 
 **Dependency direction is one-way: `src/ui`, `server` → `src/app`, plugins, kernels, `@mcp` → `packages/core`.**
-`packages/core` imports no other package; no package imports `src/ui`. Enforced by a PreToolUse
-hook (`.claude/hooks/enforce-architecture.mjs`): react/DOM/fetch in any `packages/<name>/src/`
-is blocked, and so is `packages/core` importing `@aec` / `@mcp` / `@kernel-*`.
+Inside core: `commands`, `codegen`, `plugins` → `geometry` → `model` → `lib`. Enforced for every
+change by `npm run arch` (dependency-cruiser, `.dependency-cruiser.cjs`, part of `npm run check`):
+no runtime import cycles; core imports no package; packages are headless; plugins and kernels
+import only core's public API (`model`, `lib`, `geometry`, `plugins/plugin`, `commands/{schema,
+types,noop,derivation,registry}`). A PreToolUse hook (`.claude/hooks/enforce-architecture.mjs`)
+gives agents the same feedback at edit time.
 
 ## RULES (authoritative — read before editing)
 
@@ -106,7 +115,8 @@ Main thread by default; delegate for ≥ 2 independent lanes or > ~4 files in on
 ```bash
 npm install          # root + every packages/* workspace
 npm run dev          # app at http://localhost:5173
-npm run check        # typecheck + lint + format:check + test — MUST pass before commit
+npm run check        # typecheck + arch + lint + format:check + test — MUST pass before commit
+npm run arch         # dependency rules (layering, public API, no cycles) — .dependency-cruiser.cjs
 npm run claude:lint  # .claude/ references (skills, agents, paths) resolve — run after editing .claude/
 npm run test:coverage
 npm run quality       # import + display quality gates on real CAD files (docs/QUALITY_GATES.md)
@@ -119,7 +129,8 @@ npm --prefix server install && npm --prefix server run dev   # optional backend 
 1. Commands are **pure**: return a new document, never mutate the argument. A test
    enforces this (`is pure`).
 2. New command ⇒ `defineCommand({ name, description, params: z.object(…), run })` ⇒ registered
-   (core: `registry.ts`; domain: its plugin's `commands`) ⇒ unit test (happy + failure path).
+   (core: its feature folder's `catalog.ts`; domain: its plugin's `commands`) ⇒ unit test (happy +
+   failure path).
 3. `packages/core/src/commands/**` and `packages/domain-aec/src/**` hold **90% statements /
    85% branches / 90% functions / 90% lines**.
 4. Tool/command `name` is `snake_case` (it is the MCP tool name that agents call).

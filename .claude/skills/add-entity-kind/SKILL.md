@@ -20,7 +20,7 @@ Delegate in parallel when large: Lane 1 (`command-author`) model→codegen, Lane
 ## 2. Commands (mandatory)
 - Creating command next to its family: `solids/round.ts` (round solids), `solids/prismatic.ts`
   (wedge/pyramid-like), `draw2d/curves.ts` (2D curves; point series share `draw2d/shared.ts`).
-  Register in `registry.ts`. Follow `rules/commands.md` (pure, `.describe()`, graceful failure).
+  Register in the folder's `catalog.ts`. Follow `rules/commands.md` (pure, `.describe()`, graceful failure).
 - ⚠ `commands/render/polygons.ts` (`const exhaustive: never`), ⚠ `geometry/bounds.ts` `localBounds`,
   ⚠ `geometry/scaleGeometry.ts`.
 - `persistence/guards.ts` `POSITIVE_FIELDS` (saved-doc validation); `inspect/checkModel.ts`
