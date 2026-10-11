@@ -8,6 +8,7 @@ import type {
 } from '../model/types';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { ORIGIN, add3, sub3 } from '../lib/vec3';
+import { sweepTriangles } from './sweep';
 
 /** World-space axis-aligned bounding box. */
 export interface Bounds {
@@ -98,6 +99,14 @@ function meshLocalBounds(e: Extract<Entity, { kind: 'mesh' }>): Bounds {
   return bounds(sub3(min, e.position), sub3(max, e.position));
 }
 
+/** Local-space AABB of a sweep: its tessellated surface around the local origin. */
+function sweepLocalBounds(e: Extract<Entity, { kind: 'sweep' }>): Bounds {
+  const corners = sweepTriangles(e.path, e.section).flat();
+  if (corners.length === 0) return bounds(ORIGIN, ORIGIN);
+  const { min, max } = positionsExtent(corners.flat());
+  return bounds(min, max);
+}
+
 /**
  * AABB of one entity in its own frame (before `rotation` / `position`), matching how the
  * viewport places each kind. Mesh positions are world-space, so their local bounds are
@@ -135,6 +144,8 @@ export function localBounds(e: Entity): Bounds {
         [-e.baseWidth / 2, -e.baseDepth / 2, 0],
         [e.baseWidth / 2, e.baseDepth / 2, e.height],
       );
+    case 'sweep':
+      return sweepLocalBounds(e);
     case 'revolution': {
       // Conservative: radial extent around the world axis closest to `axis`, axial extent from the profile.
       const maxR = e.profile.reduce((m, [x]) => Math.max(m, Math.abs(x)), 0);

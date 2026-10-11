@@ -6,7 +6,7 @@
  * @layer kernel (concrete adapter injected by the app / server; commands see only GeometryKernel)
  * @invariant primitives are centred like three.js (box, cylinder along +Z, sphere) or extruded
  *   along +Z from z=0; entity transform = rotate Z, then Y, then X (M = Rx·Ry·Rz), then translate
- * @invariant cone, torus, wedge, pyramid, revolution, mesh: welded `entityToTriangles` geometry
+ * @invariant cone, torus, wedge, pyramid, revolution, sweep, mesh: welded `entityToTriangles` geometry
  * @failure unsupported kind / degenerate size / non-closed mesh / Manifold error -> null
  */
 
@@ -216,6 +216,7 @@ function entityToManifold(m: ManifoldModule, entity: Entity): ManifoldShape | nu
     case 'wedge':
     case 'pyramid':
     case 'revolution':
+    case 'sweep':
       return weldedManifold(m, entityTrianglePositions(entity, NO_COMPONENTS), undefined, entity);
     case 'box':
     case 'cylinder':

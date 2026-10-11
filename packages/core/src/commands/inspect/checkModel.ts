@@ -93,6 +93,10 @@ function checkDegenerateGeometry(e: Entity): Issue[] {
         ...nonPositive('baseDepth', e.baseDepth, 'baseDepth must be > 0.'),
         ...nonPositive('height', e.height, 'Height must be > 0.'),
       ];
+    case 'sweep':
+      return e.section.shape === 'circle'
+        ? nonPositive('section radius', e.section.radius, 'Radius must be > 0.')
+        : [];
     case 'text':
       return [
         ...nonPositive('height', e.height, 'Height must be > 0.'),

@@ -5,9 +5,37 @@
  * instance expansion).
  */
 
-import type { Entity } from '../model/types';
+import type { Entity, SweepSection, Vec2, Vec3 } from '../model/types';
+import type { CurveSegment } from '../model/curve';
+import { mapSegment } from './curveSegments';
 import { scale3 } from '../lib/vec3';
 import { scale2 } from '../lib/vec2';
+
+/** `{ curves }` scaled by `f` when the entity carries exact curves. */
+function scaledCurves(
+  e: { curves?: ReadonlyArray<CurveSegment<Vec2>> },
+  f: number,
+): { curves?: ReadonlyArray<CurveSegment<Vec2>> } {
+  return e.curves === undefined
+    ? {}
+    : { curves: e.curves.map((segment) => mapSegment(segment, (p: Vec2) => scale2(p, f))) };
+}
+
+function scaledSection(section: SweepSection, f: number): SweepSection {
+  if (section.shape === 'circle') {
+    const { radius, innerRadius } = section;
+    return {
+      shape: 'circle',
+      radius: radius * f,
+      ...(innerRadius !== undefined ? { innerRadius: innerRadius * f } : {}),
+    };
+  }
+  return {
+    shape: 'profile',
+    profile: section.profile.map((p) => scale2(p, f)),
+    ...scaledCurves(section, f),
+  };
+}
 
 /** Scaled copy of `e` about its local origin plus the summary fragment describing the result. */
 export function scaleGeometry(e: Entity, f: number): { scaled: Entity; dims: string } {
@@ -30,7 +58,7 @@ export function scaleGeometry(e: Entity, f: number): { scaled: Entity; dims: str
     case 'extrusion': {
       const depth = e.depth * f;
       return {
-        scaled: { ...e, profile: e.profile.map((p) => scale2(p, f)), depth },
+        scaled: { ...e, profile: e.profile.map((p) => scale2(p, f)), depth, ...scaledCurves(e, f) },
         dims: `new depth ${depth}`,
       };
     }
@@ -110,8 +138,17 @@ export function scaleGeometry(e: Entity, f: number): { scaled: Entity; dims: str
     case 'revolution':
       // Radial and axial profile offsets scale; axis direction is unchanged.
       return {
-        scaled: { ...e, profile: e.profile.map((p) => scale2(p, f)) },
+        scaled: { ...e, profile: e.profile.map((p) => scale2(p, f)), ...scaledCurves(e, f) },
         dims: `scaled ${e.profile.length}-point profile`,
+      };
+    case 'sweep':
+      return {
+        scaled: {
+          ...e,
+          path: e.path.map((segment) => mapSegment(segment, (p: Vec3) => scale3(p, f))),
+          section: scaledSection(e.section, f),
+        },
+        dims: `scaled ${e.path.length}-segment path and section`,
       };
     case 'instance': {
       const scale = scale3(e.scale ?? [1, 1, 1], f);

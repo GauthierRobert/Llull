@@ -3,6 +3,7 @@
 import type { Vec2, Vec3 } from './vectors';
 import type { BuildingModel } from './building';
 import type { CivilModel } from './civil';
+import type { CurveSegment } from './curve';
 
 /** Re-exported: every model consumer reads its vectors from here. */
 export type { Vec2, Vec3 };
@@ -24,6 +25,7 @@ export const SOLID_KINDS = [
   'wedge',
   'pyramid',
   'revolution',
+  'sweep',
 ] as const;
 
 export type SolidKind = (typeof SOLID_KINDS)[number];
@@ -86,6 +88,11 @@ export interface ExtrusionEntity extends BaseEntity {
   readonly kind: 'extrusion';
   profile: ReadonlyArray<readonly [number, number]>;
   depth: number;
+  /**
+   * Exact closed boundary (arcs, Béziers) the exact kernel uses instead of the polygon.
+   * @invariant when present `profile` is its tessellation; a command rewriting one rewrites both
+   */
+  curves?: ReadonlyArray<CurveSegment<Vec2>>;
 }
 
 /**
@@ -147,6 +154,35 @@ export interface RevolutionEntity extends BaseEntity {
   angle: number;
   /** Radial tessellation subdivisions. */
   segments: number;
+  /** Exact closed profile boundary; same invariant as `ExtrusionEntity.curves`. */
+  curves?: ReadonlyArray<CurveSegment<Vec2>>;
+}
+
+/** Cross-section of a sweep, in the path's start normal plane (x: frame normal, y: binormal). */
+export type SweepSection =
+  | {
+      readonly shape: 'circle';
+      readonly radius: number;
+      /** Bore radius of a hollow tube; 0 < innerRadius < radius. */
+      readonly innerRadius?: number;
+    }
+  | {
+      readonly shape: 'profile';
+      /** Closed polygon (tessellation of `curves` when present), >= 3 points. */
+      readonly profile: ReadonlyArray<Vec2>;
+      readonly curves?: ReadonlyArray<CurveSegment<Vec2>>;
+    };
+
+/**
+ * A cross-section swept along a tangent-continuous 3D path (pipes, rails, ducts, coils) with a
+ * rotation-minimizing frame. Path points are local (relative to `position`, then `rotation`).
+ * @invariant path is a connected chain of >= 1 segment, G1 at every joint, open (end != start)
+ * @see sweep_profile
+ */
+export interface SweepEntity extends BaseEntity {
+  readonly kind: 'sweep';
+  path: ReadonlyArray<CurveSegment<Vec3>>;
+  section: SweepSection;
 }
 
 export interface LineEntity extends BaseEntity {
@@ -256,6 +292,7 @@ export type Entity =
   | WedgeEntity
   | PyramidEntity
   | RevolutionEntity
+  | SweepEntity
   | LineEntity
   | PolylineEntity
   | ArcEntity

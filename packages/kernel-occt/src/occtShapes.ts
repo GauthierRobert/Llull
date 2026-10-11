@@ -1,7 +1,7 @@
 /**
  * @layer kernel
- * Entity -> OCC solid: exact makers for box, cylinder, sphere, cone, torus, wedge, extrusion and
- * revolution, sewn triangles for pyramid and mesh entities. Every returned solid sits at the
+ * Entity -> OCC solid: exact makers for box, cylinder, sphere, cone, torus, wedge, extrusion,
+ * revolution (exact arcs / Béziers when the entity carries `curves`) and sweep, sewn triangles for pyramid and mesh entities. Every returned solid sits at the
  * entity's rotation and position; the caller owns (releases) it.
  */
 
@@ -22,6 +22,7 @@ import {
   type OccSewing,
   type OccTopoDS,
 } from './occtTypes';
+import { chainFace, sweptSolid } from './occtCurves';
 
 /** Planar OCC face of a closed polygon wire through `corners`, or null when OCC rejects it. */
 function polygonFace(api: OccApi, corners: readonly Vec3[]): OccShape | null {
@@ -205,8 +206,13 @@ function prism(api: OccApi, face: OccShape, offset: Vec3, entity: Entity): OccSh
 function extrudedProfile(api: OccApi, entity: Entity): OccShape | null {
   if (entity.kind !== 'extrusion' || !isValidPolygon(entity.profile) || !(entity.depth > 0))
     return null;
-  const outline = toCounterClockwise(entity.profile).map(([x, y]): Vec3 => [x, y, 0]);
-  const face = polygonFace(api, outline);
+  const face =
+    entity.curves !== undefined
+      ? chainFace(api, entity.curves, ([x, y]) => [x, y, 0], true)
+      : polygonFace(
+          api,
+          toCounterClockwise(entity.profile).map(([x, y]): Vec3 => [x, y, 0]),
+        );
   if (face === null) return null;
   return prism(api, face, [0, 0, entity.depth], entity);
 }
@@ -243,11 +249,12 @@ function revolvedProfile(api: OccApi, entity: Entity): OccShape | null {
     frame === 'Y'
       ? toCounterClockwise(entity.profile)
       : [...toCounterClockwise(entity.profile)].reverse();
-  const corners = ordered.map(
-    ([radial, axial]): Vec3 =>
-      frame === 'Z' ? [radial, 0, axial] : frame === 'Y' ? [radial, axial, 0] : [axial, radial, 0],
-  );
-  const face = polygonFace(api, corners);
+  const place = ([radial, axial]: readonly [number, number]): Vec3 =>
+    frame === 'Z' ? [radial, 0, axial] : frame === 'Y' ? [radial, axial, 0] : [axial, radial, 0];
+  const face =
+    entity.curves !== undefined
+      ? chainFace(api, entity.curves, place, frame === 'Y')
+      : polygonFace(api, ordered.map(place));
   if (face === null) return null;
   const sweepAxis: Vec3 = frame === 'Z' ? [0, 0, 1] : frame === 'Y' ? [0, -1, 0] : [1, 0, 0];
   const origin: OccHandle = new api.gp_Pnt_3(0, 0, 0);
@@ -317,6 +324,12 @@ export function entityToOccShape(api: OccApi, entity: Entity): OccShape | null {
   if (entity.kind === 'wedge') return wedgeSolid(api, entity);
   if (entity.kind === 'revolution') return revolvedProfile(api, entity);
   if (entity.kind === 'mesh') return meshSolid(api, entity);
+  if (entity.kind === 'sweep') {
+    const shape = sweptSolid(api, entity);
+    return shape === null
+      ? null
+      : placed(api, shape, placementTransform(api, entity.rotation, entity.position));
+  }
   if (entity.kind !== 'box') return revolvedPrimitive(api, entity);
   const [sx, sy, sz] = entity.size;
   if (sx <= 0 || sy <= 0 || sz <= 0) return null;

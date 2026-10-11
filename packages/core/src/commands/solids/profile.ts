@@ -1,4 +1,5 @@
-import { type Vec3, DEFAULT_LAYER_ID } from '../../model/types';
+import { type CadDocument, type Vec2, type Vec3, DEFAULT_LAYER_ID } from '../../model/types';
+import type { CurveSegment } from '../../model/curve';
 import type { CommandResult } from '../types';
 import { defineCommand, z, looseVec3, tolerant, untypedArray, colorField } from '../schema';
 import { axisVector, isValidAxis } from '../../lib/axis';
@@ -16,41 +17,41 @@ import {
   rejectBadProfile,
   rejectZeroAreaProfile,
 } from './shared';
-import { circlePoints } from '../../geometry/tessellation';
-
-/** Number of polygon segments used to approximate a circle. */
-const CIRCLE_SEGMENTS = 32;
+import { sketchLoop } from './sketchCurves';
+import { mapSegment } from '../../geometry/curveSegments';
 
 /**
  * @command extrude_sketch
  * @pure
  * @layer core/commands
- * @affects creates 1 extrusion entity at the source position; source entity kept
+ * @affects creates 1 extrusion entity at the (first) source position; sources kept
  * @invariant depth > 0; resulting rotation = `rotation` param only (source rotation not inherited)
- * @failure missing id / unsupported or open source / depth <= 0 -> no-op, affected:[]
- *
- * Derives a polygon profile from the given closed 2D shape entity and builds a
- * new extrusion solid. The source entity is kept in the document (non-destructive).
- *
- * Profile derivation per kind:
- *   circle      → 32-segment regular polygon centred at entity.center
- *   rectangle   → 4 corners from the lower-left origin (RectangleEntity convention)
- *   polyline    → its points when closed === true; no-op when open
- *   line / arc / open polyline / point / 3D solid → graceful no-op
+ * @invariant curved sources (arc, circle, ellipse, spline) store their exact `curves`
+ * @failure missing id / unsupported or open source / pieces that do not close / depth <= 0 -> no-op
  */
 export const extrudeSketch = defineCommand({
   name: 'extrude_sketch',
   description:
-    'Extrude a closed 2D shape entity (circle, rectangle, or closed polyline) into a 3D extrusion solid. ' +
-    'Right-handed world frame, +Z up. The solid is placed at the source entity position and extends depth ' +
-    'units along +Z (before the optional rotation); the source entity rotation is not inherited. ' +
-    'Keeps the source entity in the document. depth must be > 0.',
+    'Extrude a closed 2D sketch into a 3D extrusion solid. Right-handed world frame, +Z up. ' +
+    'Give `id` of one closed shape (circle, rectangle, ellipse, closed polyline, closed spline), or `ids` ' +
+    'of several coplanar open pieces (line, arc, open polyline, open spline) that join end to end into ' +
+    'one closed loop, in any order and direction. Curved boundaries are kept exact (true arcs and ' +
+    'Bézier splines for the exact kernel and STEP export; the polygon is only the display tessellation). ' +
+    'The solid is placed at the (first) source entity position and extends depth units along +Z ' +
+    '(before the optional rotation); the source rotation is not inherited. Sources stay in the document.',
   params: z.object({
     id: z
       .string()
       .describe(
-        'Id of the closed 2D shape entity to extrude. Must be a circle, rectangle, or polyline with closed=true.',
-      ),
+        'Id of one closed 2D shape: circle, rectangle, ellipse, closed polyline or closed spline. Use ids instead for a loop made of several pieces.',
+      )
+      .optional(),
+    ids: z
+      .array(z.string())
+      .describe(
+        'Ids of coplanar 2D pieces (line, arc, polyline, spline) that join end to end into one closed loop; order and direction do not matter. Alternative to id.',
+      )
+      .optional(),
     depth: z
       .number()
       .describe(
@@ -65,51 +66,25 @@ export const extrudeSketch = defineCommand({
       )
       .optional(),
   }),
-  run: (doc, { id, depth, rotation }): CommandResult => {
+  run: (doc, { id, ids, depth, rotation }): CommandResult => {
+    const label = id ?? (ids ?? []).join(', ');
     if (depth <= 0)
-      return noop(doc, `extrude_sketch: depth must be > 0 (got ${depth}); entity ${id} unchanged.`);
-
-    const source = doc.entities[id];
-    if (!source) return noop(doc, `extrude_sketch: no entity with id "${id}".`);
-
-    let profile: ReadonlyArray<readonly [number, number]> | null = null;
-
-    if (source.kind === 'circle') {
-      const { center, radius } = source;
-      profile = circlePoints(center[0], center[1], 0, radius, CIRCLE_SEGMENTS).map(
-        ([x, y]): readonly [number, number] => [x, y],
-      );
-    } else if (source.kind === 'rectangle') {
-      const { width, height } = source;
-      // lower-left origin (RectangleEntity convention); corners in CCW order
-      profile = [
-        [0, 0],
-        [width, 0],
-        [width, height],
-        [0, height],
-      ];
-    } else if (source.kind === 'polyline') {
-      if (!source.closed) {
-        return noop(
-          doc,
-          `extrude_sketch: polyline "${id}" is not closed; cannot extrude an open profile.`,
-        );
-      }
-      if (source.points.length < 3) {
-        return noop(
-          doc,
-          `extrude_sketch: polyline "${id}" has fewer than 3 points; not a valid closed profile.`,
-        );
-      }
-      profile = source.points as ReadonlyArray<readonly [number, number]>;
-    } else {
-      // line, arc, point, 3D solids — not a closed 2D profile
       return noop(
         doc,
-        `extrude_sketch: entity "${id}" (kind="${source.kind}") is not a closed 2D profile. Use a circle, rectangle, or closed polyline.`,
+        `extrude_sketch: depth must be > 0 (got ${depth}); entity ${label} unchanged.`,
       );
+    if (id !== undefined && ids !== undefined)
+      return noop(doc, 'extrude_sketch: pass either id or ids, not both; no-op.');
+    const sourceIds = ids ?? (id !== undefined ? [id] : []);
+    if (sourceIds.length === 0)
+      return noop(doc, 'extrude_sketch: give id (one closed shape) or ids (pieces of a loop).');
+    if (sourceIds.length === 1) {
+      const single = singleSourceIssue(doc, sourceIds[0] as string);
+      if (single !== null) return noop(doc, `extrude_sketch: ${single}`);
     }
-
+    const loop = sketchLoop(doc, sourceIds);
+    if (typeof loop === 'string') return noop(doc, `extrude_sketch: ${loop}; no-op.`);
+    const { profile } = loop;
     const flatProfile = rejectZeroAreaProfile(doc, 'extrude_sketch', profile);
     if (flatProfile) return flatProfile;
 
@@ -117,21 +92,53 @@ export const extrudeSketch = defineCommand({
     const extrusion = newEntity(
       'extrusion',
       extId,
-      { profile, depth },
-      source.position,
+      { profile, depth, ...exactCurves(loop.curves) },
+      loop.origin,
       EXTRUSION_COLOR,
-      {
-        rotation: finiteVec3OrZero(rotation),
-      },
+      { rotation: finiteVec3OrZero(rotation) },
     );
-
+    const source =
+      sourceIds.length === 1 ? `${doc.entities[label]?.kind} "${label}"` : `[${label}]`;
     return commitSolid(
       doc,
       extrusion,
-      `extrude_sketch: created extrusion "${extId}" from ${source.kind} "${id}" (${profile.length}-point profile, depth=${depth})`,
+      `extrude_sketch: created extrusion "${extId}" from ${source} (${profile.length}-point profile${curveNote(loop.curves)}, depth=${depth})`,
     );
   },
 });
+
+/** Legacy single-shape messages: missing, open, too short or a non-closable kind. */
+function singleSourceIssue(doc: CadDocument, id: string): string | null {
+  const source = doc.entities[id];
+  if (!source) return `no entity with id "${id}".`;
+  if ((source.kind === 'polyline' || source.kind === 'spline') && !source.closed)
+    return `${source.kind} "${id}" is not closed; cannot extrude an open profile (pass several pieces in ids to close a loop).`;
+  if (source.kind === 'polyline' && source.points.length < 3)
+    return `polyline "${id}" has fewer than 3 points; not a valid closed profile.`;
+  if (!CLOSED_SHAPE_KINDS.has(source.kind))
+    return `entity "${id}" (kind="${source.kind}") is not a closed 2D profile. Use a circle, rectangle, ellipse, closed polyline or closed spline, or several pieces in ids.`;
+  return null;
+}
+
+const CLOSED_SHAPE_KINDS: ReadonlySet<string> = new Set([
+  'circle',
+  'rectangle',
+  'ellipse',
+  'polyline',
+  'spline',
+]);
+
+/** `{ curves }` when the loop has an arc or Bézier (a pure polygon needs no exact copy). */
+function exactCurves(curves: ReadonlyArray<CurveSegment<Vec2>>): {
+  curves?: ReadonlyArray<CurveSegment<Vec2>>;
+} {
+  return curves.some((segment) => segment.type !== 'line') ? { curves } : {};
+}
+
+function curveNote(curves: ReadonlyArray<CurveSegment<Vec2>>): string {
+  const curved = curves.filter((segment) => segment.type !== 'line').length;
+  return curved > 0 ? `, ${curved} exact curve segment(s)` : '';
+}
 
 /**
  * Unit Vec3 of a raw axis param ('x'|'y'|'z' or a finite 3-array), +Z when omitted (+Z-up document);
@@ -161,10 +168,12 @@ function resolveAxis(raw: unknown): Vec3 | null {
 export const revolveProfile = defineCommand({
   name: 'revolve_profile',
   description:
-    'Create a surface of revolution by rotating a closed 2D polygon profile around an axis. ' +
+    'Create a surface of revolution by rotating a closed 2D profile around an axis. ' +
     'Right-handed world frame, +Z up. ' +
-    'profile is an array of [x, y] points where x is the radial offset from the axis and y is the axial offset. ' +
-    'At least 3 points required. The polygon is treated as implicitly closed. ' +
+    'Either pass profile, an array of [x, y] points where x is the radial offset from the axis and y is the axial offset ' +
+    '(at least 3 points, implicitly closed), or profileIds: drawn 2D sketch entities (spline, arc, line, polyline, circle, ellipse) ' +
+    'that form one closed loop, read in their sketch-plane coordinates (x = radial, y = axial). ' +
+    'A sketched profile keeps its exact curves (smooth bell nozzles, domes, fillets) for the exact kernel and STEP export. ' +
     'axis controls the revolution axis: "x", "y", or "z" (shorthand), or a [dx,dy,dz] direction vector. ' +
     'Default axis is "z" (+Z up, the natural axis for a Z-up document). ' +
     'angle is the sweep in radians (default 2π for a full revolution; must be > 0). ' +
@@ -174,8 +183,16 @@ export const revolveProfile = defineCommand({
     profile: untypedArray(
       'Closed polygon cross-section: array of [x, y] points. x = radial offset from the axis (≥ 0 for outward), ' +
         'y = axial offset along the axis. Minimum 3 points. The polygon is implicitly closed — ' +
-        'do NOT repeat the first point at the end.',
-    ),
+        'do NOT repeat the first point at the end. Omit when profileIds is given.',
+    ).optional(),
+    profileIds: z
+      .array(z.string())
+      .describe(
+        'Ids of coplanar 2D sketch entities forming one closed loop (one closed shape, or open pieces such as a spline ' +
+          'plus lines that join end to end in any order). Their sketch-plane x is the radial offset, y the axial offset; ' +
+          'curves are kept exact. Alternative to profile.',
+      )
+      .optional(),
     axis: z
       .union([z.string(), z.array(z.number())])
       .describe(
@@ -219,7 +236,8 @@ export const revolveProfile = defineCommand({
   run: (
     doc,
     {
-      profile,
+      profile: rawProfile,
+      profileIds,
       axis: rawAxis,
       angle: rawAngle,
       segments: rawSegments,
@@ -230,6 +248,18 @@ export const revolveProfile = defineCommand({
       id: explicitId,
     },
   ): CommandResult => {
+    if (rawProfile !== undefined && profileIds !== undefined)
+      return noop(doc, 'revolve_profile: pass either profile or profileIds, not both; no-op.');
+    let profile: ReadonlyArray<readonly [number, number]> = rawProfile ?? [];
+    let curves: ReadonlyArray<CurveSegment<Vec2>> = [];
+    if (profileIds !== undefined) {
+      const loop = sketchLoop(doc, profileIds);
+      if (typeof loop === 'string') return noop(doc, `revolve_profile: ${loop}; no-op.`);
+      const [dx, dy] = loop.planeOffset;
+      const shift = ([x, y]: Vec2): Vec2 => [x + dx, y + dy];
+      profile = loop.profile.map(shift);
+      curves = loop.curves.map((segment) => mapSegment(segment, shift));
+    }
     if (profile.length < 3) {
       return noop(
         doc,
@@ -286,7 +316,7 @@ export const revolveProfile = defineCommand({
     const entity = newEntity(
       'revolution',
       id,
-      { profile, axis, angle: Math.min(angle, TWO_PI), segments },
+      { profile, axis, angle: Math.min(angle, TWO_PI), segments, ...exactCurves(curves) },
       position,
       color,
       {
@@ -303,7 +333,7 @@ export const revolveProfile = defineCommand({
     return commitSolid(
       doc,
       entity,
-      `revolve_profile: created revolution "${id}" — ${profile.length}-point profile, axis=${axisLabel}, angle=${compactNumber(angle)} rad, segments=${segments}`,
+      `revolve_profile: created revolution "${id}" — ${profile.length}-point profile${curveNote(curves)}, axis=${axisLabel}, angle=${compactNumber(angle)} rad, segments=${segments}`,
     );
   },
 });

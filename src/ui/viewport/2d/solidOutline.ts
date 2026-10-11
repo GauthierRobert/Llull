@@ -6,11 +6,13 @@
  * placed with the entity's full Euler rotation + position, so a tilted solid gets the hull of
  * its projected vertices. Upright solids are exact: circle (cylinder, sphere, cone), outer + inner
  * ring (torus), the rotated profile polygon (extrusion); everything else falls back to the convex
- * hull of its projected bounding box / vertices (mesh, revolution, wedge, pyramid, box, instance).
+ * hull of its projected bounding box / vertices (mesh, revolution, wedge, pyramid, box, instance),
+ * per-segment hulls for a sweep.
  */
 
 import { boundsCorners, localBounds } from '@core/geometry/bounds';
 import { applyEulerXYZ } from '@core/lib/eulerRotation';
+import { sweepSegmentRings } from '@core/geometry/sweep';
 import {
   type CadDocument,
   type Entity,
@@ -175,6 +177,9 @@ function outlineRings(document: ComponentsDoc, e: Entity, depth: number): Outlin
         ? [circleAround(center, outer), circleAround(center, inner)]
         : [circleAround(center, outer)];
     }
+    case 'sweep':
+      // One hull per path segment so an elbowed pipe reads as its run, not one convex blob.
+      return sweepSegmentRings(e.path, e.section).map((ring) => convexHull(toWorldXY(e, ring)));
     default:
       // box, wedge, pyramid: hull of the projected local bounding box.
       return hullRing(e, boundsCorners(localBounds(e)));
