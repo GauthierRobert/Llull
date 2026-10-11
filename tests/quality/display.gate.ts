@@ -24,8 +24,8 @@ import {
  * Display quality gate: every corpus document is opened in the real app (offline mode) and must
  * render without console / page / WebGL errors, unstretched, visible, framed, with the on-screen
  * aspect ratio of its bounding box (no deformation). The silhouette is the pixel diff between a
- * shot and the same camera with every layer hidden. 3D documents are framed by the `fit_view`
- * command (top view), then the UI "Fit all" and "Top" buttons are checked; 2D uses zoom-extents.
+ * shot and the same camera with every layer hidden. 3D documents are viewed with the UI "Top" button
+ * (opening re-frames to iso), then "Fit all" and "Top" are checked again; 2D uses zoom-extents.
  * Corpus: STEP files imported by `npm run quality:step`, native documents from golden plans, and
  * complex documents (tests/quality/complexPlans.ts: scale extremes, far from origin, dense scenes).
  *
@@ -85,13 +85,6 @@ const NATIVE: Record<View, string[]> = {
 /** Native-document checks expected to fail today (same ratchet as quality/corpus.json). */
 const NATIVE_KNOWN_ISSUES: Record<string, CheckId[]> = {
   '2d_arcs_circles': ['aspect'],
-  '2d_text_dimensions': ['aspect'],
-  '3d_box_cylinder_sphere': ['top-view-button'],
-  '3d_cone_torus_wedge_pyramid': ['fit-all-button', 'top-view-button'],
-  extrude_sketch_and_profile: ['fit-all-button', 'top-view-button'],
-  revolve_profile: ['fit-all-button'],
-  gears_spur_and_belt: ['fit-all-button', 'top-view-button'],
-  building_house_template: ['fit-all-button', 'top-view-button'],
 };
 
 interface StepEntry {
@@ -150,11 +143,7 @@ function nativeCases(): DisplayCase[] {
 
 /** Complex-document checks expected to fail today (same ratchet). */
 const COMPLEX_KNOWN_ISSUES: Record<string, CheckId[]> = {
-  '3d_far_from_origin': ['fit-all-button', 'top-view-button'],
-  '3d_many_instances': ['fit-all-button', 'top-view-button'],
-  '3d_micro_part': ['fit-all-button', 'top-view-button'],
-  '3d_site_scale': ['fit-all-button', 'top-view-button'],
-  '3d_rotated_beam': ['aspect', 'fit-all-button', 'top-view-button'],
+  '3d_rotated_beam': ['aspect'],
 };
 
 /** A complex plan must build completely: a failed step would hide what the case is about. */
@@ -175,19 +164,6 @@ function complexCases(): DisplayCase[] {
       knownIssues: COMPLEX_KNOWN_ISSUES[`${view.toLowerCase()}_${name}`] ?? [],
     }));
   return [...cases('2D', COMPLEX_2D), ...cases('3D', COMPLEX_3D)];
-}
-
-/** Run a fixture-preparation command; a rejected command would silently void the measurement. */
-function apply(doc: CadDocument, name: string, params: Record<string, unknown>): CadDocument {
-  const result = execute(doc, name, params);
-  if (result.document === doc) throw new Error(`fixture: ${result.summary}`);
-  return result.document;
-}
-
-/** 3D documents are framed from the top by the `fit_view` command (what an MCP agent calls). */
-function prepared(displayCase: DisplayCase): string {
-  if (displayCase.view === '2D') return serializeDocument(displayCase.document);
-  return serializeDocument(apply(displayCase.document, 'fit_view', { direction: 'top' }));
 }
 
 /** World-space X / Y extent ratio — what a top-down view must show. */
@@ -281,7 +257,7 @@ test.describe('display quality gate', () => {
         `${displayCase.id.replace('/', '-')}.json`,
       );
       mkdirSync(path.dirname(upload), { recursive: true });
-      writeFileSync(upload, prepared(displayCase));
+      writeFileSync(upload, serializeDocument(displayCase.document));
       await page.locator('[aria-label="Project file"] input[type="file"]').setInputFiles(upload);
       await expect(page.getByLabel(/^Last command: Loaded document/)).toBeVisible({
         timeout: 120_000,
@@ -293,6 +269,8 @@ test.describe('display quality gate', () => {
         displayCase.view === '3D' ? '.viewport-3d-wrapper canvas' : '.viewport-2d-wrapper canvas',
       );
       await expect(canvas).toBeVisible();
+      // Opening a project re-frames it (iso); view it from the top, framed, like a user would.
+      if (displayCase.view === '3D') await page.getByRole('button', { name: 'Top view' }).click();
       const buffer = await canvas.evaluate((element) => {
         const node = element as HTMLCanvasElement;
         const box = node.getBoundingClientRect();

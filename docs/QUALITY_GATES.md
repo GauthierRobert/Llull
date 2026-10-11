@@ -109,7 +109,7 @@ grid, lighting and DOM overlays cancel out.
 | `errors` | no console error, page error or `webglcontextlost` (the refused probe of the optional server at `localhost:3001` is expected offline) |
 | `stretch` | canvas drawing-buffer aspect equals its CSS box aspect |
 | `visible` | the model covers ≥ 0.05 % of the canvas |
-| `framed` | after `fit_view` (3D, top) / zoom-extents (2D) the model is whole (not touching the border) and spans ≥ 30 % of the canvas along its major axis |
+| `framed` | after the UI "Top" view (3D; opening a project re-frames it to iso) / zoom-extents (2D) the model is whole (not touching the border) and spans ≥ 30 % of the canvas along its major axis |
 | `aspect` | on-screen width/height equals the world X/Y bounding-box ratio. 2D (orthographic): within 3 %; 3D (perspective): within 15 %; plus ±2 px of edge on the shorter side. **This is the deformation check.** |
 | `fit-all-button` / `top-view-button` | the UI buttons leave the model whole and visible |
 
@@ -137,11 +137,11 @@ match the bounding box (2D within 0.2 %, most 3D within 0.5 %). The open defects
 | 1 | **Manifold kernel never loaded in the dev app**: pre-bundling moved `manifold-3d` away from its `.wasm`, which 404'd into `index.html`. Booleans and other kernel commands were unavailable in the browser. **Fixed** (`optimizeDeps.exclude`) | display `errors` | `vite.config.ts` |
 | 2 | **Large STEP files cannot be imported**: the bridge's JSON reply exceeds the 128 MB cap at ~0.8M triangles (full-precision floats, triangle soup, fixed 0.05 mm chord tolerance whatever the model size) | `kuka-kr600`, `rc-buggy-suspension`: `imports` | `server/python/llull_bridge.py`, `server/src/pythonExchange.ts` |
 | 3 | **STEP colours and part names are dropped**: `as1-oc-214` defines 5 colours and parts `bolt` / `nut` / `plate` / `rod`, and imports as grey `solid_1..18` (the tool description promises both) | `colors`, `part-names` | `llull_bridge.py` `_assembly_bodies` |
-| 4 | **"Fit all" frames entity positions, not geometry** (+ a fixed 3-unit guess) and always switches to iso. Imported parts (all at the origin) are not framed | display `fit-all-button` | `src/ui/viewport/3d/ViewPresets.tsx` |
-| 5 | **Front / Top / Right presets ignore the model**: they always target the origin at distance 10 | display `top-view-button` | `ViewPresets.tsx` `handlePreset` |
+| 4 | **"Fit all" frames entity positions, not geometry** (+ a fixed 3-unit guess) and always switches to iso. Imported parts (all at the origin) are not framed. **Fixed** — passes on the smoke tier | display `fit-all-button` | `src/ui/viewport/3d/ViewPresets.tsx` |
+| 5 | **Front / Top / Right presets ignore the model**: they always target the origin at distance 10. **Fixed** — passes on the smoke tier | display `top-view-button` | `ViewPresets.tsx` `handlePreset` |
 | 6 | **Open surfaces render single-sided**: faces of a surface-only import seen from behind disappear | `splinecage`: `aspect` | `MeshSolidMesh` / `SolidMeshShell` |
 | 7 | **Arc bounds are the full circle**: `measure_bounding_box` (and so 2D zoom-extents and agents) over-reports a semicircle's height ×2 | `2d_arcs_circles`: `aspect` | `packages/core/src/commands/sceneBounds.ts` |
-| 8 | **Text / dimension bounds disagree with what is drawn**, so zoom-extents is off-centre | `2d_text_dimensions`: `aspect` | `sceneBounds.ts` |
+| 8 | **Text / dimension bounds disagree with what is drawn**, so zoom-extents is off-centre. **Fixed** — within tolerance on the smoke tier | `2d_text_dimensions`: `aspect` | `sceneBounds.ts` |
 | 9 | A dark-grey half-plane / "wings" (shadow-frustum edge) is visible on some 3D scenes, and inflates `fc-gearmotor-l`'s silhouette | screenshots `native/3d_cone_torus_wedge_pyramid.png`, `step/fc-gearmotor-l.png` | lighting / shadows |
 | 10 | **Surface geometry is dropped when an assembly also has solids**: the bridge keeps only solids per node, so 1 978 surface patches (13 % of the area) vanish from the Raspberry Pi | `fc-raspberry-pi-4b`: `imports`, `surface-area` | `llull_bridge.py` `_solids` |
 | 11 | **`measure_bounding_box` ignores rotation**: a 40 × 4 beam rotated 45° reports 40 × 4 (it covers ≈ 31 × 31), and `fit_view` / zoom-extents / agents inherit it | `complex/3d_rotated_beam`: `aspect` | `packages/core/src/commands/sceneBounds.ts` |
