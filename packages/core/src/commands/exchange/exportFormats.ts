@@ -1,6 +1,6 @@
 /**
  * export_obj and export_gltf: read-only exports of the world-space triangles shared with
- * `exportTriangulate.ts` (document returned unchanged, affected: []).
+ * `exportTriangulate.ts` (glTF scene layout: ./gltfScene.ts) (document returned unchanged, affected: []).
  *
  * @layer core/commands
  */
@@ -12,6 +12,7 @@ import { uint8ArrayToBase64 } from '../../lib/base64';
 import { collectExportTriangles, exportSummary } from '../../geometry/entityTriangles';
 import type { Triangle } from '../../geometry/triangles';
 import { facetNormal } from '../../geometry/tessellation';
+import { buildGltfScene, collectExportParts } from './gltfScene';
 
 const entityIdsField = z
   .array(z.string())
@@ -86,100 +87,9 @@ export const exportObj = defineCommand({
   },
 });
 
-/** Per-vertex (triangle-soup) positions and facet normals as flat Float32Arrays. */
-function buildGltfBuffers(tris: Triangle[]): { positions: Float32Array; normals: Float32Array } {
-  const positions = new Float32Array(tris.length * 9);
-  const normals = new Float32Array(tris.length * 9);
-  tris.forEach((tri, t) => {
-    const n = facetNormal(...tri);
-    tri.forEach((v, k) => {
-      positions.set(v, t * 9 + k * 3);
-      normals.set(n, t * 9 + k * 3);
-    });
-  });
-  return { positions, normals };
-}
-
-/** Component-wise min/max of a flat xyz array; NaN values are skipped, all-zero when no finite x. */
-function computeAabb(positions: Float32Array): { min: number[]; max: number[] } {
-  const min = [Infinity, Infinity, Infinity];
-  const max = [-Infinity, -Infinity, -Infinity];
-  positions.forEach((value, i) => {
-    const axis = i % 3;
-    if (value < (min[axis] as number)) min[axis] = value;
-    if (value > (max[axis] as number)) max[axis] = value;
-  });
-  return Number.isFinite(min[0]) ? { min, max } : { min: [0, 0, 0], max: [0, 0, 0] };
-}
-
 /** Align a byte length to a 4-byte boundary (glTF chunk requirement). */
 function align4(n: number): number {
   return (n + 3) & ~3;
-}
-
-/**
- * Minimal valid glTF 2.0 JSON for `positions` (+ equally sized normals): one mesh, one material,
- * separate bufferView/accessor pairs. `bufferUri` inlines the BIN payload (JSON mode); GLB omits it.
- */
-function buildGltfJson(
-  positions: Float32Array,
-  binBuffer: Uint8Array,
-  bufferUri?: string,
-): Record<string, unknown> {
-  const vertexCount = positions.length / 3;
-  const posByteLength = positions.byteLength;
-  const normByteLength = positions.byteLength;
-  const aabb = computeAabb(positions);
-
-  return {
-    asset: { version: '2.0', generator: 'llull' },
-    scene: 0,
-    scenes: [{ nodes: [0] }],
-    nodes: [{ mesh: 0 }],
-    meshes: [
-      {
-        primitives: [
-          {
-            attributes: { POSITION: 0, NORMAL: 1 },
-            mode: 4, // TRIANGLES
-            material: 0,
-          },
-        ],
-      },
-    ],
-    materials: [
-      {
-        pbrMetallicRoughness: {
-          baseColorFactor: [0.784, 0.333, 0.239, 1.0], // #c8553d
-          metallicFactor: 0,
-          roughnessFactor: 0.8,
-        },
-      },
-    ],
-    accessors: [
-      {
-        bufferView: 0,
-        componentType: 5126, // FLOAT
-        count: vertexCount,
-        type: 'VEC3',
-        min: aabb.min,
-        max: aabb.max,
-      },
-      {
-        bufferView: 1,
-        componentType: 5126, // FLOAT
-        count: vertexCount,
-        type: 'VEC3',
-      },
-    ],
-    bufferViews: [
-      { buffer: 0, byteOffset: 0, byteLength: posByteLength, target: 34962 }, // ARRAY_BUFFER
-      { buffer: 0, byteOffset: posByteLength, byteLength: normByteLength, target: 34962 },
-    ],
-    buffers: [
-      { byteLength: binBuffer.byteLength, ...(bufferUri !== undefined && { uri: bufferUri }) },
-    ],
-  };
 }
 
 /** One GLB chunk: u32 length + u32 type + payload padded to 4 bytes with `pad`. */
@@ -211,17 +121,6 @@ function buildGlb(jsonObj: Record<string, unknown>, binPayload: Uint8Array): Uin
   return glb;
 }
 
-/** Combined BIN payload: positions then normals as raw bytes. */
-function buildBinPayload(positions: Float32Array, normals: Float32Array): Uint8Array {
-  const combined = new Uint8Array(positions.byteLength + normals.byteLength);
-  combined.set(new Uint8Array(positions.buffer, positions.byteOffset, positions.byteLength), 0);
-  combined.set(
-    new Uint8Array(normals.buffer, normals.byteOffset, normals.byteLength),
-    positions.byteLength,
-  );
-  return combined;
-}
-
 /**
  * @command export_gltf
  * @pure
@@ -243,8 +142,11 @@ export const exportGltf = defineCommand({
     '  format ("gltf" or "glb"), triangleCount, ' +
     '  text (glTF 2.0 JSON string — when binary=false, default), ' +
     '  base64 (GLB binary blob base64-encoded — when binary=true). ' +
-    'The glTF contains a single mesh with POSITION and NORMAL attributes, a default PBR material, ' +
-    'and a minimal scene/node graph. The BIN buffer is inlined as a data: URI in JSON mode. ' +
+    'Each part (entity, or each child of an instance) becomes its own named node + mesh (POSITION and ' +
+    'creased smooth NORMAL attributes) with a PBR material: the assigned document material ' +
+    '(color, metalness, roughness) or else the entity color, converted to linear glTF factors and ' +
+    'shared between parts with the same appearance — ready for Blender / Cycles, three.js or any viewer. ' +
+    'Node extras carry the llull entity id and kind. The BIN buffer is inlined as a data: URI in JSON mode. ' +
     'In GLB mode the 12-byte header + JSON chunk + BIN chunk are packed per the glTF 2.0 spec. ' +
     'entityIds: omit to export all 3D entities; provide an array to export a subset. ' +
     'binary: false (default) → data.text contains JSON; true → data.base64 contains GLB. ' +
@@ -267,24 +169,43 @@ export const exportGltf = defineCommand({
 
     const collected = collectExportTriangles(doc, entityIds);
     const triangleCount = collected.tris.length;
-    const { positions, normals } = buildGltfBuffers(collected.tris);
-    const binPayload = buildBinPayload(positions, normals);
-    const summary = exportSummary('export_gltf', binary ? 'glb' : 'gltf', collected);
+    const ids =
+      entityIds && entityIds.length > 0
+        ? entityIds.filter((id) => doc.entities[id] !== undefined)
+        : doc.order;
+    const parts = collectExportParts(doc, ids);
+    const { json, bin } = buildGltfScene(parts);
+    const materialCount = (json['materials'] as unknown[]).length;
+    const summary = `${exportSummary('export_gltf', binary ? 'glb' : 'gltf', collected)} ${parts.length} part(s), ${materialCount} material(s).`;
 
     if (binary) {
-      const base64 = uint8ArrayToBase64(buildGlb(buildGltfJson(positions, binPayload), binPayload));
+      const base64 = uint8ArrayToBase64(buildGlb(json, bin));
       return {
         document: doc,
         summary,
         affected: [],
-        data: { format: 'glb', triangleCount, base64 },
+        data: { format: 'glb', triangleCount, partCount: parts.length, materialCount, base64 },
       };
     }
-    const bufferUri =
-      binPayload.length > 0
-        ? `data:application/octet-stream;base64,${uint8ArrayToBase64(binPayload)}`
-        : undefined;
-    const text = JSON.stringify(buildGltfJson(positions, binPayload, bufferUri), null, 2);
-    return report(doc, summary, { format: 'gltf', triangleCount, text });
+    const withUri =
+      bin.length > 0
+        ? {
+            ...json,
+            buffers: [
+              {
+                byteLength: bin.byteLength,
+                uri: `data:application/octet-stream;base64,${uint8ArrayToBase64(bin)}`,
+              },
+            ],
+          }
+        : json;
+    const text = JSON.stringify(withUri, null, 2);
+    return report(doc, summary, {
+      format: 'gltf',
+      triangleCount,
+      partCount: parts.length,
+      materialCount,
+      text,
+    });
   },
 });
