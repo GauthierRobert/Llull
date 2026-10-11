@@ -304,7 +304,17 @@ describe('sweep_profile — failures are no-ops', () => {
       'path point 1',
     ],
     ['one point', { path: [[0, 0, 0]], radius: 0.1 }, 'path needs'],
-    ['closed pathId', { pathId: 'ring', radius: 0.1 }, 'closed'],
+    [
+      'stations on a loop',
+      {
+        pathId: 'ring',
+        stations: [
+          { at: 0, radius: 0.1 },
+          { at: 1, radius: 0.2 },
+        ],
+      },
+      'stations need an open path',
+    ],
     ['non-curve pathId', { pathId: 'label', radius: 0.1 }, 'not a 2D curve'],
     ['missing pathId', { pathId: 'nope', radius: 0.1 }, 'no entity'],
     [
@@ -323,7 +333,7 @@ describe('sweep_profile — failures are no-ops', () => {
     ['bend too tight', { path: L_PATH, radius: 1, bendRadius: 0.5 }, 'not wider than the section'],
     ['bendRadius <= 0', { path: L_PATH, radius: 1, bendRadius: -1 }, 'bendRadius must be > 0'],
     [
-      'closed loop',
+      'pinched loop',
       {
         path: [
           [0, 0, 0],
@@ -333,7 +343,7 @@ describe('sweep_profile — failures are no-ops', () => {
         smooth: true,
         radius: 0.1,
       },
-      'path invalid',
+      'sharp corner',
     ],
   ])('%s', (_label, params, text) => {
     expectNoOp(execute(rect, 'sweep_profile', params), rect, text);
@@ -546,5 +556,83 @@ describe('sweep review fixes', () => {
     const rings = sweepSegmentRings(pipe);
     expect(rings).toHaveLength(3);
     expect(rings.every((ring) => ring.length > 0)).toBe(true);
+  });
+});
+
+describe('closed-path sweeps', () => {
+  it('a circle pathId makes a torus-like ring with no caps and the exact volume', () => {
+    const doc = docWith({ id: 'ring', kind: 'circle', center: [0, 0], radius: 10 });
+    const ring = sweepOf(doc, { pathId: 'ring', radius: 2 });
+    const triangles = solidTriangles(ring);
+    expect(isWatertight(triangles)).toBe(true);
+    expect(volumeOf(ring)).toBeCloseTo(2 * Math.PI * Math.PI * 10 * 4, 6);
+  });
+
+  it('closed: true bends the closing corner of a point loop (and smooth closes a spline)', () => {
+    const square = [
+      [0, 0, 0],
+      [20, 0, 0],
+      [20, 20, 0],
+      [0, 20, 0],
+    ];
+    const frame = sweepOf(empty, { path: square, closed: true, radius: 1, bendRadius: 4 });
+    expect(frame.path.filter((s) => s.type === 'arc')).toHaveLength(4);
+    expect(isWatertight(solidTriangles(frame))).toBe(true);
+    const hose = sweepOf(empty, {
+      path: square,
+      closed: true,
+      smooth: true,
+      radius: 0.5,
+      innerRadius: 0.3,
+    });
+    expect(hose.path.every((s) => s.type === 'bezier')).toBe(true);
+    expect(isWatertight(solidTriangles(hose))).toBe(true);
+  });
+
+  it('a rectangular profile section closes without a twist seam on a 3D loop', () => {
+    const loop = sweepOf(empty, {
+      path: [
+        [0, 0, 0],
+        [20, 0, 5],
+        [20, 20, 0],
+        [0, 20, 5],
+      ],
+      closed: true,
+      smooth: true,
+      section: [
+        [-1, -0.3],
+        [1, -0.3],
+        [1, 0.3],
+        [-1, 0.3],
+      ],
+    });
+    expect(isWatertight(solidTriangles(loop))).toBe(true);
+  });
+
+  it('closed rectangle and polyline sketches get bends at every corner', () => {
+    const doc = docWith(
+      { id: 'r', kind: 'rectangle', width: 30, height: 20 },
+      {
+        id: 'p',
+        kind: 'polyline',
+        closed: true,
+        points: [
+          [0, 0],
+          [30, 0],
+          [15, 25],
+        ],
+      },
+    );
+    expect(
+      sweepOf(doc, { pathId: 'r', radius: 1 }).path.filter((s) => s.type === 'arc'),
+    ).toHaveLength(4);
+    expect(
+      sweepOf(doc, { pathId: 'p', radius: 1 }).path.filter((s) => s.type === 'arc'),
+    ).toHaveLength(3);
+    expectNoOp(
+      execute(doc, 'sweep_profile', { pathId: 'p', radius: 1, bendRadius: 40 }),
+      doc,
+      'too large',
+    );
   });
 });

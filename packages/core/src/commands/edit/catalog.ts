@@ -6,6 +6,7 @@ import { rotateEntity, scaleEntity, mirrorEntity, arrayLinear, arrayPolar } from
 import { duplicateEntity, groupEntities, ungroupEntities, setEntityName } from './basic';
 import { align, distribute, stackOn } from './place';
 import { arrayAlongPath, distributeOnArc } from './arrayAlongPath';
+import { patternAlongPath } from './patternAlongPath';
 import { distributeAlongPath } from './distribute';
 import { deleteEntities, moveEntities, duplicateEntities } from './batch';
 
@@ -25,6 +26,7 @@ export const editCommands = commandCatalog(
   distribute,
   stackOn,
   arrayAlongPath,
+  patternAlongPath,
   distributeOnArc,
   distributeAlongPath,
   deleteEntities,

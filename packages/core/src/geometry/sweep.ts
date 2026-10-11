@@ -12,7 +12,7 @@ import type { SweepEntity, SweepSection, SweepStation, Vec2, Vec3 } from '../mod
 import { add3, cross3, dot3, normalize3, scale3, sub3 } from '../lib/vec3';
 import { signedArea } from '../lib/polygon';
 import { triangulatePolygon } from '../lib/triangulate';
-import { segmentPoint, segmentSteps, segmentTangent } from './curveSegments';
+import { isClosedChain, segmentPoint, segmentSteps, segmentTangent } from './curveSegments';
 import { sampleRing } from './sectionRing';
 import { skinTriangles } from './skin';
 
@@ -73,7 +73,31 @@ export function sweepFrames(path: ReadonlyArray<CurveSegment<Vec3>>): SweepFrame
     normal = normalize3(sub3(normal, scale3(tangent, dot3(normal, tangent))));
     frames.push({ point, tangent, normal, binormal: cross3(tangent, normal), segment });
   }
-  return frames;
+  return isClosedChain(path) && frames.length > 2 ? closeFrames(frames) : frames;
+}
+
+/**
+ * Frames of a closed path: the duplicated end sample is dropped and the rotation-minimizing
+ * frame's holonomy (the twist it gains going once round) is spread linearly along the arc length,
+ * so the last frame meets the first without a jump.
+ */
+function closeFrames(frames: SweepFrame[]): SweepFrame[] {
+  const open = frames.slice(0, -1);
+  const first = open[0] as SweepFrame;
+  const last = frames[frames.length - 1] as SweepFrame;
+  const twist = Math.atan2(
+    dot3(cross3(first.normal, last.normal), first.tangent),
+    dot3(first.normal, last.normal),
+  );
+  const fractions = frameFractions(frames);
+  return open.map((frame, i) => {
+    const angle = -twist * (fractions[i] as number);
+    const normal = add3(
+      scale3(frame.normal, Math.cos(angle)),
+      scale3(cross3(frame.tangent, frame.normal), Math.sin(angle)),
+    );
+    return { ...frame, normal, binormal: cross3(frame.tangent, normal) };
+  });
 }
 
 /** Section loops in section coordinates: CCW outer boundary and optional CCW bore (same count). */
@@ -154,7 +178,9 @@ export function frameAtFraction(
   path: ReadonlyArray<CurveSegment<Vec3>>,
   t: number,
 ): Pick<SweepFrame, 'point' | 'normal' | 'binormal'> {
-  const frames = sweepFrames(path);
+  const open = sweepFrames(path);
+  // A loop's last span runs back to the first frame (the twist correction makes them meet).
+  const frames = isClosedChain(path) && open[0] !== undefined ? [...open, open[0]] : open;
   const fractions = frameFractions(frames);
   let i = 0;
   while (i < frames.length - 2 && t > (fractions[i + 1] as number)) i++;
@@ -190,6 +216,18 @@ export function stationLoopAt(stations: ReadonlyArray<SweepStation>, t: number):
   return sampleRing(stationRingAt(stations, t)).map(([x, y]): Vec2 => [x, y]);
 }
 
+/** Walls of a sweep round a closed path: consecutive rings joined, the last back to the first. */
+function closedWalls(outerRings: Vec3[][], innerRings: Vec3[][] | null): Triangle[] {
+  const triangles: Triangle[] = [];
+  for (let i = 0; i < outerRings.length; i++) {
+    const next = (i + 1) % outerRings.length;
+    triangles.push(...walls(outerRings[i] as Vec3[], outerRings[next] as Vec3[], false));
+    if (innerRings !== null)
+      triangles.push(...walls(innerRings[i] as Vec3[], innerRings[next] as Vec3[], true));
+  }
+  return triangles;
+}
+
 /**
  * Closed, outward-wound triangles of a sweep; `origin` is added to every vertex.
  * @invariant shared ring vertices are the same Vec3 values, so the soup welds watertight
@@ -216,6 +254,7 @@ export function sweepTriangles(sweep: SweepShape, origin: Vec3 = [0, 0, 0]): Tri
     );
   const outerRings = frames.map((frame) => ringAt(frame, outer));
   const innerRings = inner === null ? null : frames.map((frame) => ringAt(frame, inner));
+  if (isClosedChain(path)) return closedWalls(outerRings, innerRings);
   const triangles: Triangle[] = [];
   for (let i = 0; i + 1 < frames.length; i++) {
     triangles.push(...walls(outerRings[i] as Vec3[], outerRings[i + 1] as Vec3[], false));

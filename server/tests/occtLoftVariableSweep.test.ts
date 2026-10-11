@@ -103,3 +103,40 @@ describe('variable-section sweep on the live kernels', () => {
     expect(cut).not.toBeNull();
   });
 });
+
+describe('closed-path sweeps on the live kernels', () => {
+  it('a hollow ring along a circle sketch is one exact solid with the Pappus volume', () => {
+    const doc = execute(empty, 'draw_circle', { center: [0, 0], radius: 30 }).document;
+    const ring = created(doc, 'sweep_profile', {
+      pathId: doc.order[0],
+      radius: 4,
+      innerRadius: 3,
+    });
+    const { occt } = agree(ring, 0.04);
+    expect(occt / (2 * Math.PI * 30 * Math.PI * (16 - 9))).toBeGreaterThan(0.97);
+    expect(solidCount(ring)).toBe(1);
+  });
+
+  it('a smooth 3D loop with a flat section closes and booleans cleanly', () => {
+    const band = created(empty, 'sweep_profile', {
+      path: [
+        [0, 0, 0],
+        [40, 0, 8],
+        [40, 40, 0],
+        [0, 40, 8],
+      ],
+      closed: true,
+      smooth: true,
+      section: [
+        [-3, -1],
+        [3, -1],
+        [3, 1],
+        [-3, 1],
+      ],
+    });
+    agree(band, 0.05);
+    expect(
+      booleanMesh(kernels.occt, 'subtract', band, box([40, 0, 4], [10, 10, 20])),
+    ).not.toBeNull();
+  });
+});

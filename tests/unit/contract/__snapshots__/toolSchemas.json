@@ -6730,6 +6730,47 @@
     "name": "offset_2d"
   },
   {
+    "description": "Lay copies of an entity along a curve, each ORIENTED by the curve: chain links round a chainring and cassette loop, tyre tread blocks round a tyre, sprocket / gear teeth, cable clips, rivets, fence posts. Model the source at the world origin in its \"along the path\" pose: its local +X follows the path tangent, +Y the path normal, +Z the binormal (≈ world up on a horizontal path); copies rotate about their position. rollStep adds an extra roll about the tangent per copy (π/2 alternates chain plates). Path: `pathId` (a 2D sketch curve: line, arc, polyline, spline, circle, ellipse, rectangle; open or closed) or `path` points (straight runs, or smooth: true for a spline; closed: true loops back). Open paths put copies at both ends; closed loops space count copies evenly all round. The source is kept.",
+    "input_schema": {
+      "properties": {
+        "closed": {
+          "description": "With path points: loop back from the last point to the first.",
+          "type": "boolean"
+        },
+        "count": {
+          "description": "Number of copies, 1..10000.",
+          "type": "integer"
+        },
+        "path": {
+          "description": "World [x, y, z] points of the path (>= 2). Alternative to pathId.",
+          "type": "array"
+        },
+        "pathId": {
+          "description": "Id of a 2D sketch curve to follow (placed by its own work plane).",
+          "type": "string"
+        },
+        "rollStep": {
+          "description": "Extra roll about the tangent added per copy, in radians (default 0).",
+          "type": "number"
+        },
+        "smooth": {
+          "description": "With path points: a smooth spline through them (default: straight runs).",
+          "type": "boolean"
+        },
+        "sourceId": {
+          "description": "Id of the entity to copy (2D or 3D).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceId",
+        "count"
+      ],
+      "type": "object"
+    },
+    "name": "pattern_along_path"
+  },
+  {
     "annotations": {
       "idempotentHint": true,
       "readOnlyHint": true
@@ -7754,12 +7795,16 @@
     "name": "surface_report"
   },
   {
-    "description": "Sweep a closed cross-section along a 3D path into a solid: pipes, tubes, hoses, handrails, ducts, cable runs, coils. Right-handed world frame, +Z up. Path: either `path`, world [x, y, z] points — joined by straight runs whose corners are rounded with circular bends of bendRadius (pipe elbows), or with smooth: true a smooth spline through the points — or `pathId`, an open 2D sketch entity (line, arc, open polyline, open spline) placed by its work plane. Section (exactly one): `radius` for a round tube (+ innerRadius for a hollow pipe), `section` as [x, y] polygon points, or `sectionId` of a closed 2D sketch (circle, ellipse, rectangle, closed polyline/spline). The section is centred on the path; its +y axis points toward world +Z (toward +Y when the path starts vertical) and it is carried along with a rotation-minimizing (twist-free) frame. Paths, bends and sketched sections stay exact for the exact kernel and STEP export. Booleans with other solids work like any primitive (e.g. boolean_union to weld pipes to a flange).",
+    "description": "Sweep a closed cross-section along a 3D path into a solid: pipes, tubes, hoses, handrails, ducts, cable runs, coils. Right-handed world frame, +Z up. Path: either `path`, world [x, y, z] points — joined by straight runs whose corners are rounded with circular bends of bendRadius (pipe elbows), or with smooth: true a smooth spline through the points — or `pathId`, a 2D sketch curve (line, arc, polyline, spline, circle, ellipse, rectangle) placed by its work plane. Paths may be open or closed loops (closed: true, or a closed sketch); a loop has no end caps. Section (exactly one): `radius` for a round tube (+ innerRadius for a hollow pipe), `section` as [x, y] polygon points, or `sectionId` of a closed 2D sketch (circle, ellipse, rectangle, closed polyline/spline). The section is centred on the path; its +y axis points toward world +Z (toward +Y when the path starts vertical) and it is carried along with a rotation-minimizing (twist-free) frame. Paths, bends and sketched sections stay exact for the exact kernel and STEP export. Booleans with other solids work like any primitive (e.g. boolean_union to weld pipes to a flange).",
     "input_schema": {
       "properties": {
         "bendRadius": {
           "description": "Centre-line radius of the bend at each corner of a straight-run path, in document units. Default: 3 × the section radius (a long-radius elbow). Must exceed the section radius.",
           "type": "number"
+        },
+        "closed": {
+          "description": "With path points: also join the last point back to the first, making a closed loop (rings, chains, tyre treads, gaskets); the closing corner is bent or smoothed like the others. A closed sketch pathId (circle, ellipse, closed spline/polyline, rectangle) is a loop already.",
+          "type": "boolean"
         },
         "color": {
           "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
@@ -7782,7 +7827,7 @@
           "type": "array"
         },
         "pathId": {
-          "description": "Id of an open 2D sketch entity (line, arc, open polyline, open spline) to use as the path instead of path.",
+          "description": "Id of a 2D sketch curve (line, arc, polyline, spline, circle, ellipse, rectangle; open or closed) to use as the path instead of path.",
           "type": "string"
         },
         "radius": {

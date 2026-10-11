@@ -113,6 +113,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'make_tube_between',
     'add_spur_gear',
     'array_along_path',
+    'pattern_along_path',
     'distribute_on_arc',
     'distribute_along_path',
     'instantiate_template',

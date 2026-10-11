@@ -22,6 +22,9 @@ import { alignRing } from '../../geometry/sectionRing';
 import {
   catmullRomBeziers,
   chainIssue,
+  closesSmoothly,
+  filletClosedPolygon,
+  isClosedChain,
   filletPolyline,
   firstCorner,
   mapSegment,
@@ -110,6 +113,7 @@ function resolvePath(
   pathId: string | undefined,
   smooth: boolean,
   bendRadius: number,
+  closed: boolean,
 ): CurveSegment<Vec3>[] | string {
   if ((path === undefined) === (pathId === undefined)) return 'give exactly one of path or pathId';
   if (path !== undefined) {
@@ -118,16 +122,27 @@ function resolvePath(
     const points = path as Vec3[];
     if (points.length < 2 || points.length > MAX_PROFILE_POINTS)
       return `path needs 2..${MAX_PROFILE_POINTS} points (got ${points.length})`;
-    return smooth ? catmullRomBeziers(points, false) : filletPolyline(points, bendRadius);
+    return bentOrSmooth(points, closed, smooth, bendRadius);
   }
   const entity = doc.entities[pathId as string];
-  if (entity?.kind === 'polyline' && !entity.closed) {
-    const world = sketchPath(doc, pathId as string);
-    if (typeof world === 'string') return world;
-    const corners = [world[0]?.points[0] as Vec3, ...world.map((s) => s.points[1] as Vec3)];
-    return smooth ? catmullRomBeziers(corners, false) : filletPolyline(corners, bendRadius);
-  }
-  return sketchPath(doc, pathId as string);
+  const world = sketchPath(doc, pathId as string);
+  if (typeof world === 'string' || (entity?.kind !== 'polyline' && entity?.kind !== 'rectangle'))
+    return world;
+  const loop = entity.kind === 'rectangle' || entity.closed;
+  const corners = world.map((segment) => segment.points[0] as Vec3);
+  if (!loop) corners.push(world[world.length - 1]?.points[1] as Vec3);
+  return bentOrSmooth(corners, loop, smooth, bendRadius);
+}
+
+/** Corner points joined by bends (or a smooth spline through them), open or closed. */
+function bentOrSmooth(
+  points: readonly Vec3[],
+  closed: boolean,
+  smooth: boolean,
+  bendRadius: number,
+): CurveSegment<Vec3>[] | string {
+  if (smooth) return catmullRomBeziers(points, closed);
+  return closed ? filletClosedPolygon(points, bendRadius) : filletPolyline(points, bendRadius);
 }
 
 /** Tightest radius of curvature on the path (Infinity when it is straight). */
@@ -151,7 +166,8 @@ export const sweepProfile = defineCommand({
     'cable runs, coils. Right-handed world frame, +Z up. ' +
     'Path: either `path`, world [x, y, z] points — joined by straight runs whose corners are rounded with ' +
     'circular bends of bendRadius (pipe elbows), or with smooth: true a smooth spline through the points — ' +
-    'or `pathId`, an open 2D sketch entity (line, arc, open polyline, open spline) placed by its work plane. ' +
+    'or `pathId`, a 2D sketch curve (line, arc, polyline, spline, circle, ellipse, rectangle) placed by its work plane. ' +
+    'Paths may be open or closed loops (closed: true, or a closed sketch); a loop has no end caps. ' +
     'Section (exactly one): `radius` for a round tube (+ innerRadius for a hollow pipe), `section` as ' +
     '[x, y] polygon points, or `sectionId` of a closed 2D sketch (circle, ellipse, rectangle, closed ' +
     'polyline/spline). The section is centred on the path; its +y axis points toward world +Z (toward +Y ' +
@@ -166,7 +182,7 @@ export const sweepProfile = defineCommand({
     pathId: z
       .string()
       .describe(
-        'Id of an open 2D sketch entity (line, arc, open polyline, open spline) to use as the path instead of path.',
+        'Id of a 2D sketch curve (line, arc, polyline, spline, circle, ellipse, rectangle; open or closed) to use as the path instead of path.',
       )
       .optional(),
     smooth: z
@@ -174,6 +190,14 @@ export const sweepProfile = defineCommand({
       .describe(
         'With path points (or a polyline pathId): true = smooth spline through the points (centripetal ' +
           'Catmull-Rom), false (default) = straight runs with circular bends.',
+      )
+      .optional(),
+    closed: z
+      .boolean()
+      .describe(
+        'With path points: also join the last point back to the first, making a closed loop (rings, ' +
+          'chains, tyre treads, gaskets); the closing corner is bent or smoothed like the others. ' +
+          'A closed sketch pathId (circle, ellipse, closed spline/polyline, rectangle) is a loop already.',
       )
       .optional(),
     bendRadius: z
@@ -232,6 +256,7 @@ export const sweepProfile = defineCommand({
       path: rawPath,
       pathId,
       smooth = false,
+      closed = false,
       bendRadius: rawBend,
       radius,
       innerRadius,
@@ -262,14 +287,20 @@ export const sweepProfile = defineCommand({
       'stations' in resolved ? (resolved.stations as SweepStation[]) : undefined;
     const bendRadius = rawBend ?? DEFAULT_BEND_FACTOR * halfSize;
     if (!(bendRadius > 0)) return fail(`bendRadius must be > 0 (got ${bendRadius})`);
-    const path = resolvePath(doc, rawPath, pathId, smooth, bendRadius);
+    const path = resolvePath(doc, rawPath, pathId, smooth, bendRadius, closed);
     if (typeof path === 'string') return fail(path);
-    const issue = chainIssue(path, false);
+    const loop = isClosedChain(path);
+    if (loop && stations !== undefined) return fail('stations need an open path');
+    const issue = chainIssue(path, loop);
     if (issue !== null) return fail(`path invalid — ${issue}`);
     const corner = firstCorner(path);
     if (corner >= 0)
       return fail(
         `the path has a sharp corner at joint ${corner}; use a bendRadius or smooth: true`,
+      );
+    if (loop && !closesSmoothly(path))
+      return fail(
+        'the closed path has a sharp corner where it closes; use a bendRadius or smooth: true',
       );
     const bend = tightestBend(path);
     if (bend <= halfSize)

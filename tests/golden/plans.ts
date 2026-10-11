@@ -225,6 +225,15 @@ export const plans: Record<string, GoldenAction[]> = {
       },
     },
   ],
+  closed_sweep_and_chain_pattern: [
+    { command: 'draw_circle', params: { center: [0, 0], radius: 40 }, as: 'loop' },
+    { command: 'sweep_profile', params: { pathId: '$loop', radius: 3, innerRadius: 2 } },
+    { command: 'add_box', params: { size: [8, 2, 4] }, as: 'link' },
+    {
+      command: 'pattern_along_path',
+      params: { sourceId: '$link', count: 12, pathId: '$loop', rollStep: Math.PI / 2 },
+    },
+  ],
   loft_and_variable_sweep: [
     {
       command: 'loft_sections',

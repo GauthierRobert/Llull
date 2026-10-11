@@ -222,16 +222,15 @@ export function sketchLoop(doc: CadDocument, ids: readonly string[]): SketchLoop
 }
 
 /**
- * World-space path of one open 2D entity (line, arc, open polyline or spline) placed by its own
- * position and rotation.
- * @failure missing / closed / non-curve entity -> message
+ * World-space path of one 2D curve entity (line, arc, polyline, spline, circle, ellipse,
+ * rectangle — open or closed) placed by its own position and rotation.
+ * @failure missing / non-curve entity -> message
  */
 export function sketchPath(doc: CadDocument, id: string): CurveSegment<Vec3>[] | string {
   const entity = doc.entities[id];
   if (entity === undefined) return `no entity "${id}"`;
   const own = entityCurves(entity);
   if (own === null) return `entity "${id}" (kind="${entity.kind}") is not a 2D curve`;
-  if (own.closed) return `entity "${id}" is closed; a sweep path must be open`;
   const toWorld = ([x, y]: Vec2): Vec3 =>
     add3(applyEulerXYZ([x, y, 0], [0, 0, 0], entity.rotation), entity.position);
   return own.curves.map((segment) => mapSegment(segment, toWorld));

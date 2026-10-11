@@ -152,6 +152,8 @@ wildly unexpected orientation. Always use radians.
 | \`add_pyramid\`     | Create a rectangular pyramid (base-center anchor)  |
 | \`sweep_profile\`   | Pipe/tube/rail along a path; \`stations\` = tapered/variable section |
 | \`loft_sections\`   | Skin a solid through 2+ sections (round→square, tapered bodies) |
+| \`blend_union\`     | Weld solids into one piece with filleted joints (frames, tees) |
+| \`pattern_along_path\` | Oriented copies along a curve (chain links, tread, teeth) |
 | \`revolve_profile\` | Turned part from a profile or a sketched spline loop |
 | \`move_entity\`     | Translate an entity by a delta vector              |
 | \`delete_entity\`   | Remove an entity by id                             |
