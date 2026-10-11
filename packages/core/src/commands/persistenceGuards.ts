@@ -1,6 +1,7 @@
 import {
   type Layer,
   type CameraState,
+  type Vec2,
   type Vec3,
   SHAPE2D_KINDS,
   SOLID_KINDS,
@@ -9,6 +10,9 @@ import { isRecord } from '../lib/isRecord';
 import { isFiniteNumber, isPositiveNumber } from '../lib/isFiniteNumber';
 import { isHexColor } from '../lib/isHexColor';
 import { validateShapeRecipe } from '../geometry/shapeRecipe';
+import { chainIssue } from '../geometry/curveSegments';
+import type { CurveSegment } from '../model/curve';
+import { isVec2 } from '../lib/vec2';
 
 export function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === 'string');
@@ -27,6 +31,56 @@ const POSITIVE_FIELDS: Readonly<Record<string, readonly string[]>> = {
   ellipse: ['radiusX', 'radiusY'],
   text: ['height'],
 };
+
+/** First structural problem of a saved sweep (path chain + section), or null. */
+function sweepProblem(v: Record<string, unknown>): string | null {
+  const path = v['path'];
+  if (!Array.isArray(path) || path.length === 0 || !path.every((s) => isCurveSegment(s, 3)))
+    return 'path must be a non-empty array of line/arc/bezier segments with [x, y, z] points';
+  const pathIssue = chainIssue(path as CurveSegment<Vec3>[], false);
+  if (pathIssue !== null) return `path invalid — ${pathIssue}`;
+  const section = v['section'];
+  if (!isRecord(section)) return 'section must be an object';
+  if (section['shape'] === 'circle') {
+    if (!isPositiveNumber(section['radius'])) return 'section radius must be finite and > 0';
+    const bore = section['innerRadius'];
+    if (bore !== undefined && !(isPositiveNumber(bore) && bore < (section['radius'] as number)))
+      return 'section innerRadius must be > 0 and < radius';
+    return null;
+  }
+  const profile = section['profile'];
+  if (
+    section['shape'] !== 'profile' ||
+    !Array.isArray(profile) ||
+    profile.length < 3 ||
+    !profile.every(isVec2)
+  )
+    return "section must be { shape: 'circle', radius } or { shape: 'profile', profile (>= 3 points) }";
+  return curvesProblem(section['curves']);
+}
+
+/** Optional exact 2D boundary (`curves`) problem, or null. */
+function curvesProblem(curves: unknown): string | null {
+  if (curves === undefined) return null;
+  if (!(Array.isArray(curves) && curves.every((s) => isCurveSegment(s, 2))))
+    return 'curves must be line/arc/bezier segments with [x, y] points';
+  const issue = chainIssue(curves as CurveSegment<Vec2>[], true);
+  return issue === null ? null : `curves must form one closed loop — ${issue}`;
+}
+
+function isCurveSegment(s: unknown, dims: number): boolean {
+  return (
+    isRecord(s) &&
+    Array.isArray(s['points']) &&
+    s['points'].length === SEGMENT_POINT_COUNT[String(s['type'])] &&
+    s['points'].every(
+      (p: unknown) => Array.isArray(p) && p.length === dims && p.every(isFiniteNumber),
+    )
+  );
+}
+
+/** Points per curve segment type (`CurveSegment`). */
+const SEGMENT_POINT_COUNT: Readonly<Record<string, number>> = { line: 2, arc: 3, bezier: 4 };
 
 /** A Vec3 where all three components are finite numbers. */
 function isFiniteVec3(v: unknown): v is Vec3 {
@@ -105,6 +159,18 @@ export function validateEntityValue(v: unknown): string | null {
       const depth = v['depth'];
       if (!isFiniteNumber(depth))
         return `entity ${id} (extrusion): depth must be a finite number, got ${String(depth)}`;
+      const curves = curvesProblem(v['curves']);
+      if (curves !== null) return `entity ${id} (extrusion): ${curves}`;
+      break;
+    }
+    case 'revolution': {
+      const curves = curvesProblem(v['curves']);
+      if (curves !== null) return `entity ${id} (revolution): ${curves}`;
+      break;
+    }
+    case 'sweep': {
+      const problem = sweepProblem(v);
+      if (problem !== null) return `entity ${id} (sweep): ${problem}`;
       break;
     }
     case 'mesh': {

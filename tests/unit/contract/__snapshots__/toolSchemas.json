@@ -5558,7 +5558,7 @@
     "name": "extrude_profile"
   },
   {
-    "description": "Extrude a closed 2D shape entity (circle, rectangle, or closed polyline) into a 3D extrusion solid. Right-handed world frame, +Z up. The solid is placed at the source entity position and extends depth units along +Z (before the optional rotation); the source entity rotation is not inherited. Keeps the source entity in the document. depth must be > 0.",
+    "description": "Extrude a closed 2D sketch into a 3D extrusion solid. Right-handed world frame, +Z up. Give `id` of one closed shape (circle, rectangle, ellipse, closed polyline, closed spline), or `ids` of several coplanar open pieces (line, arc, open polyline, open spline) that join end to end into one closed loop, in any order and direction. Curved boundaries are kept exact (true arcs and Bézier splines for the exact kernel and STEP export; the polygon is only the display tessellation). The solid is placed at the (first) source entity position and extends depth units along +Z (before the optional rotation); the source rotation is not inherited. Sources stay in the document.",
     "input_schema": {
       "properties": {
         "depth": {
@@ -5566,8 +5566,15 @@
           "type": "number"
         },
         "id": {
-          "description": "Id of the closed 2D shape entity to extrude. Must be a circle, rectangle, or polyline with closed=true.",
+          "description": "Id of one closed 2D shape: circle, rectangle, ellipse, closed polyline or closed spline. Use ids instead for a loop made of several pieces.",
           "type": "string"
+        },
+        "ids": {
+          "description": "Ids of coplanar 2D pieces (line, arc, polyline, spline) that join end to end into one closed loop; order and direction do not matter. Alternative to id.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "rotation": {
           "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X) for the resulting extrusion solid. Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
@@ -5578,7 +5585,6 @@
         }
       },
       "required": [
-        "id",
         "depth"
       ],
       "type": "object"
@@ -5682,7 +5688,7 @@
           "type": "array"
         },
         "kind": {
-          "description": "Filter by entity kind. One of: \"box\", \"cylinder\", \"sphere\", \"extrusion\", \"mesh\", \"cone\", \"torus\", \"wedge\", \"pyramid\", \"revolution\", \"line\", \"polyline\", \"arc\", \"circle\", \"rectangle\", \"point\", \"ellipse\", \"spline\", \"text\", \"dimension\", \"instance\". Omit to match all kinds.",
+          "description": "Filter by entity kind. One of: \"box\", \"cylinder\", \"sphere\", \"extrusion\", \"mesh\", \"cone\", \"torus\", \"wedge\", \"pyramid\", \"revolution\", \"sweep\", \"line\", \"polyline\", \"arc\", \"circle\", \"rectangle\", \"point\", \"ellipse\", \"spline\", \"text\", \"dimension\", \"instance\". Omit to match all kinds.",
           "enum": [
             "box",
             "cylinder",
@@ -5694,6 +5700,7 @@
             "wedge",
             "pyramid",
             "revolution",
+            "sweep",
             "line",
             "polyline",
             "arc",
@@ -6276,7 +6283,7 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Compute the mass of a 3D solid from its volume and density. Supported entity kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', and 'instance' (assembly: the sum over its component solids, each with its own material density, else the instance material, else the density param). Density resolution: if the entity has a material assigned (via assign_material) and that material exists in doc.materials, the material's density is used automatically — the density param is ignored for that entity. Otherwise the caller-supplied density param is used (back-compat). The density is in g/(document-unit)³ — e.g. for a document in mm: steel ≈ 0.00785, aluminium ≈ 0.0027. Returns data: { volume, density, mass, unit } where unit describes the mass unit (grams). Does not modify the document.",
+    "description": "Compute the mass of a 3D solid from its volume and density. Supported entity kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', and 'instance' (assembly: the sum over its component solids, each with its own material density, else the instance material, else the density param). Density resolution: if the entity has a material assigned (via assign_material) and that material exists in doc.materials, the material's density is used automatically — the density param is ignored for that entity. Otherwise the caller-supplied density param is used (back-compat). The density is in g/(document-unit)³ — e.g. for a document in mm: steel ≈ 0.00785, aluminium ≈ 0.0027. Returns data: { volume, density, mass, unit } where unit describes the mass unit (grams). Does not modify the document.",
     "input_schema": {
       "properties": {
         "density": {
@@ -6284,7 +6291,7 @@
           "type": "number"
         },
         "entityId": {
-          "description": "Id of the 3D solid entity to compute mass for. Supported kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution'.",
+          "description": "Id of the 3D solid entity to compute mass for. Supported kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep'.",
           "type": "string"
         }
       },
@@ -6433,11 +6440,11 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Compute the volume of a 3D solid entity. Supported kinds: 'box' (w×h×d), 'cylinder' (π r² h), 'sphere' (4/3 π r³), 'extrusion' (profile area × depth), 'mesh' (signed-tetrahedra sum — assumes closed, consistently wound mesh), 'cone' (π r² h / 3), 'torus' (2 π² · ringRadius · tubeRadius²), 'wedge' (w×h×d / 2 — half the enclosing box), 'pyramid' (baseWidth × baseDepth × height / 3), 'instance' (sum of its component's solid children, baked with the instance scale), 'revolution' (Pappus's centroid theorem: sweepAngle × |x_centroid| × profileArea; falls back to bounding-box approximation if the profile crosses the revolution axis). Returns data: { volume, unit } where unit is the cubed document unit (e.g. \"mm³\"). 2D shape entities are rejected. Does not modify the document.",
+    "description": "Compute the volume of a 3D solid entity. Supported kinds: 'box' (w×h×d), 'cylinder' (π r² h), 'sphere' (4/3 π r³), 'extrusion' (profile area × depth), 'mesh' (signed-tetrahedra sum — assumes closed, consistently wound mesh), 'cone' (π r² h / 3), 'torus' (2 π² · ringRadius · tubeRadius²), 'wedge' (w×h×d / 2 — half the enclosing box), 'pyramid' (baseWidth × baseDepth × height / 3), 'instance' (sum of its component's solid children, baked with the instance scale), 'revolution' (Pappus's centroid theorem: sweepAngle × |x_centroid| × profileArea; falls back to bounding-box approximation if the profile crosses the revolution axis), 'sweep' (round section: section area × exact path length; other sections: closed-mesh sum). Returns data: { volume, unit } where unit is the cubed document unit (e.g. \"mm³\"). 2D shape entities are rejected. Does not modify the document.",
     "input_schema": {
       "properties": {
         "entityId": {
-          "description": "Id of the 3D solid entity to measure. Supported kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution'.",
+          "description": "Id of the 3D solid entity to measure. Supported kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep'.",
           "type": "string"
         }
       },
@@ -6802,7 +6809,7 @@
     "name": "replay_history"
   },
   {
-    "description": "Create a surface of revolution by rotating a closed 2D polygon profile around an axis. Right-handed world frame, +Z up. profile is an array of [x, y] points where x is the radial offset from the axis and y is the axial offset. At least 3 points required. The polygon is treated as implicitly closed. axis controls the revolution axis: \"x\", \"y\", or \"z\" (shorthand), or a [dx,dy,dz] direction vector. Default axis is \"z\" (+Z up, the natural axis for a Z-up document). angle is the sweep in radians (default 2π for a full revolution; must be > 0). segments is the number of radial subdivisions (default 32, minimum 3). Stores a parametric revolution entity; tessellated as triangles in render_view and export_stl.",
+    "description": "Create a surface of revolution by rotating a closed 2D profile around an axis. Right-handed world frame, +Z up. Either pass profile, an array of [x, y] points where x is the radial offset from the axis and y is the axial offset (at least 3 points, implicitly closed), or profileIds: drawn 2D sketch entities (spline, arc, line, polyline, circle, ellipse) that form one closed loop, read in their sketch-plane coordinates (x = radial, y = axial). A sketched profile keeps its exact curves (smooth bell nozzles, domes, fillets) for the exact kernel and STEP export. axis controls the revolution axis: \"x\", \"y\", or \"z\" (shorthand), or a [dx,dy,dz] direction vector. Default axis is \"z\" (+Z up, the natural axis for a Z-up document). angle is the sweep in radians (default 2π for a full revolution; must be > 0). segments is the number of radial subdivisions (default 32, minimum 3). Stores a parametric revolution entity; tessellated as triangles in render_view and export_stl.",
     "input_schema": {
       "properties": {
         "angle": {
@@ -6833,7 +6840,14 @@
           "type": "array"
         },
         "profile": {
-          "description": "Closed polygon cross-section: array of [x, y] points. x = radial offset from the axis (≥ 0 for outward), y = axial offset along the axis. Minimum 3 points. The polygon is implicitly closed — do NOT repeat the first point at the end.",
+          "description": "Closed polygon cross-section: array of [x, y] points. x = radial offset from the axis (≥ 0 for outward), y = axial offset along the axis. Minimum 3 points. The polygon is implicitly closed — do NOT repeat the first point at the end. Omit when profileIds is given.",
+          "type": "array"
+        },
+        "profileIds": {
+          "description": "Ids of coplanar 2D sketch entities forming one closed loop (one closed shape, or open pieces such as a spline plus lines that join end to end in any order). Their sketch-plane x is the radial offset, y the axial offset; curves are kept exact. Alternative to profile.",
+          "items": {
+            "type": "string"
+          },
           "type": "array"
         },
         "rotation": {
@@ -6848,9 +6862,7 @@
           "type": "integer"
         }
       },
-      "required": [
-        "profile"
-      ],
+      "required": [],
       "type": "object"
     },
     "name": "revolve_profile"
@@ -7632,6 +7644,60 @@
       "type": "object"
     },
     "name": "surface_report"
+  },
+  {
+    "description": "Sweep a closed cross-section along a 3D path into a solid: pipes, tubes, hoses, handrails, ducts, cable runs, coils. Right-handed world frame, +Z up. Path: either `path`, world [x, y, z] points — joined by straight runs whose corners are rounded with circular bends of bendRadius (pipe elbows), or with smooth: true a smooth spline through the points — or `pathId`, an open 2D sketch entity (line, arc, open polyline, open spline) placed by its work plane. Section (exactly one): `radius` for a round tube (+ innerRadius for a hollow pipe), `section` as [x, y] polygon points, or `sectionId` of a closed 2D sketch (circle, ellipse, rectangle, closed polyline/spline). The section is centred on the path; its +y axis points toward world +Z (toward +Y when the path starts vertical) and it is carried along with a rotation-minimizing (twist-free) frame. Paths, bends and sketched sections stay exact for the exact kernel and STEP export. Booleans with other solids work like any primitive (e.g. boolean_union to weld pipes to a flange).",
+    "input_schema": {
+      "properties": {
+        "bendRadius": {
+          "description": "Centre-line radius of the bend at each corner of a straight-run path, in document units. Default: 3 × the section radius (a long-radius elbow). Must exceed the section radius.",
+          "type": "number"
+        },
+        "color": {
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
+          "type": "string"
+        },
+        "id": {
+          "description": "Optional explicit entity id. If omitted a unique id is generated.",
+          "type": "string"
+        },
+        "innerRadius": {
+          "description": "Round section only: bore radius for a hollow pipe (0 < innerRadius < radius).",
+          "type": "number"
+        },
+        "layerId": {
+          "description": "Layer id to assign the entity to. Defaults to the document default layer.",
+          "type": "string"
+        },
+        "path": {
+          "description": "World-space [x, y, z] points the section follows (>= 2). Without smooth, consecutive points are joined by straight runs and every corner gets a circular bend of bendRadius.",
+          "type": "array"
+        },
+        "pathId": {
+          "description": "Id of an open 2D sketch entity (line, arc, open polyline, open spline) to use as the path instead of path.",
+          "type": "string"
+        },
+        "radius": {
+          "description": "Round section: outer radius (> 0). Use this for pipes, rods, tubes and wires.",
+          "type": "number"
+        },
+        "section": {
+          "description": "Polygon section: closed [x, y] points in section coordinates (centred on the path; +y toward world +Z). Alternative to radius / sectionId.",
+          "type": "array"
+        },
+        "sectionId": {
+          "description": "Id of a closed 2D sketch (circle, ellipse, rectangle, closed polyline or spline) used as the section; its local coordinates (relative to its own position) become section coordinates; curves stay exact.",
+          "type": "string"
+        },
+        "smooth": {
+          "description": "With path points (or a polyline pathId): true = smooth spline through the points (centripetal Catmull-Rom), false (default) = straight runs with circular bends.",
+          "type": "boolean"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "sweep_profile"
   },
   {
     "annotations": {

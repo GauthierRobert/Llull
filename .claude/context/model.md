@@ -14,7 +14,7 @@ type Vec3 = readonly [number, number, number];  // world, right-handed, +Z up
 // and persistence validation): DOCUMENT_UNITS, SOLID_KINDS, SHAPE2D_KINDS, CONSTRAINT_KINDS.
 type DocumentUnit = (typeof DOCUMENT_UNITS)[number];  // 'mm' | 'cm' | 'm' | 'in' | 'ft'
 type SolidKind = (typeof SOLID_KINDS)[number];  // 'box' | 'cylinder' | 'sphere' | 'extrusion'
-               // | 'mesh' | 'cone' | 'torus' | 'wedge' | 'pyramid' | 'revolution'
+               // | 'mesh' | 'cone' | 'torus' | 'wedge' | 'pyramid' | 'revolution' | 'sweep'
 type Shape2DKind = (typeof SHAPE2D_KINDS)[number];  // 'line' | 'polyline' | 'arc' | 'circle'
                // | 'rectangle' | 'point' | 'ellipse' | 'spline' | 'text' | 'dimension'
 type EntityKind = SolidKind | Shape2DKind | 'instance';
@@ -37,13 +37,14 @@ interface BaseEntity {
 BoxEntity        'box'        size: Vec3
 CylinderEntity   'cylinder'   radius; height
 SphereEntity     'sphere'     radius
-ExtrusionEntity  'extrusion'  profile: ReadonlyArray<[number, number]>; depth
+ExtrusionEntity  'extrusion'  profile: ReadonlyArray<[number, number]>; depth; curves?: CurveSegment<Vec2>[]  // exact boundary; profile = its tessellation
 MeshSolidEntity  'mesh'       mesh: MeshData; brep?: ShapeRecipe  // kernel result: display mesh + exact construction tree
 ConeEntity       'cone'       radius; height
 TorusEntity      'torus'      ringRadius; tubeRadius
 WedgeEntity      'wedge'      size: Vec3
 PyramidEntity    'pyramid'    baseWidth; baseDepth; height
-RevolutionEntity 'revolution' profile; axis: Vec3; angle; segments
+RevolutionEntity 'revolution' profile; axis: Vec3; angle; segments; curves?  // same rule as extrusion
+SweepEntity      'sweep'      path: CurveSegment<Vec3>[] (local, open, G1); section: {shape:'circle'; radius; innerRadius?} | {shape:'profile'; profile; curves?}
 // 2D (geometry LOCAL to the work plane placed by position/rotation; default z=0, normal +Z)
 LineEntity       'line'       start: Vec2; end: Vec2
 PolylineEntity   'polyline'   points: Vec2[]; closed
@@ -55,6 +56,7 @@ EllipseEntity    'ellipse'    center: Vec2; radiusX; radiusY
 SplineEntity     'spline'     points: Vec2[]; closed
 TextEntity       'text'       content; height; anchor?
 DimensionEntity  'dimension'  dimensionKind: 'linear'|'aligned'|'radial'|'angular'; entityIds; offset?; precision?; label?
+// CurveSegment<P> (model/curve.ts): {type:'line', points:[a,b]} | {type:'arc', points:[start,through,end]} | {type:'bezier', points:[p0,p1,p2,p3]}
 // Assembly
 InstanceEntity   'instance'   componentId; scale?: Vec3
 ```

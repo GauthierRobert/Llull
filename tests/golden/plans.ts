@@ -225,6 +225,65 @@ export const plans: Record<string, GoldenAction[]> = {
       },
     },
   ],
+  bell_nozzle_and_plumbing: [
+    {
+      command: 'draw_spline',
+      params: {
+        points: [
+          [3, 0],
+          [1.5, 3],
+          [4, 7],
+          [6, 10],
+        ],
+      },
+      as: 'wall',
+    },
+    { command: 'draw_line', params: { start: [6, 10], end: [5.6, 10] }, as: 'lip' },
+    {
+      command: 'draw_spline',
+      params: {
+        points: [
+          [5.6, 10],
+          [3.7, 7],
+          [1.2, 3],
+          [2.6, 0],
+        ],
+      },
+      as: 'inner',
+    },
+    { command: 'draw_line', params: { start: [2.6, 0], end: [3, 0] }, as: 'base' },
+    {
+      command: 'revolve_profile',
+      params: { profileIds: ['$wall', '$lip', '$inner', '$base'], segments: 24 },
+      as: 'bell',
+    },
+    {
+      command: 'sweep_profile',
+      params: {
+        path: [
+          [3.5, 0, 1],
+          [8, 0, 1],
+          [8, 0, 9],
+        ],
+        radius: 0.4,
+        innerRadius: 0.3,
+        bendRadius: 1.5,
+      },
+      as: 'feed',
+    },
+    {
+      command: 'sweep_profile',
+      params: {
+        path: [
+          [-3, 0, 2],
+          [-6, 2, 4],
+          [-5, 4, 8],
+        ],
+        smooth: true,
+        radius: 0.25,
+      },
+    },
+  ],
   transforms_move_rotate_scale_mirror: [
     { command: 'add_box', params: { size: [1, 1, 1] }, as: 'b' },
     { command: 'move_entity', params: { id: '$b', delta: [3, 2, 1] } },
@@ -592,6 +651,35 @@ export const plans: Record<string, GoldenAction[]> = {
 
 /** Plans needing the Manifold geometry kernel (booleans). */
 export const kernelPlans: Record<string, GoldenAction[]> = {
+  kernel_sweep_welded_to_revolution: [
+    {
+      command: 'revolve_profile',
+      params: {
+        profile: [
+          [0, 0],
+          [3, 0],
+          [3, 4],
+          [0, 4],
+        ],
+        segments: 24,
+      },
+      as: 'drum',
+    },
+    {
+      command: 'sweep_profile',
+      params: {
+        path: [
+          [2, 0, 2],
+          [7, 0, 2],
+          [7, 0, 8],
+        ],
+        radius: 0.5,
+        bendRadius: 2,
+      },
+      as: 'pipe',
+    },
+    { command: 'boolean_union', params: { a: '$drum', b: '$pipe' } },
+  ],
   kernel_boolean_union: [
     { command: 'add_box', params: { size: [2, 2, 2] }, as: 'a' },
     { command: 'add_box', params: { size: [2, 2, 2], position: [1, 1, 1] }, as: 'b' },

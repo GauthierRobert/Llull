@@ -8,6 +8,7 @@
 import type { Entity, Vec3 } from '../model/types';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { revolutionTriangles } from '../geometry/revolution';
+import { sweepTriangles } from '../geometry/sweep';
 import {
   SEG_CIRCLE,
   boxExtents,
@@ -163,6 +164,8 @@ function unrotatedTriangles(e: Entity): Triangle[] {
       return meshTriangles(e.mesh);
     case 'revolution':
       return revolutionTriangles(e.profile, e.axis, e.angle, e.segments, e.position);
+    case 'sweep':
+      return sweepTriangles(e.path, e.section, e.position);
     default:
       return []; // 2D shapes and instances
   }
