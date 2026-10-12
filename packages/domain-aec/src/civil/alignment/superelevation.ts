@@ -87,6 +87,22 @@ function outerFall(ramps: CurveRamps, station: number, crossfall: number, full: 
   return Math.min(Math.max(entering, leaving, -full), crossfall);
 }
 
+/** Full rate and the ramps of every curve, or null without a usable superelevation design. */
+function curvePlan(
+  alignment: AlignmentObject,
+  crossfall: number,
+  laneWidth: number,
+): { full: number; ramps: CurveRamps[] } | null {
+  const design = alignment.superelevation;
+  if (!design || !(design.maxRate > 0)) return null;
+  const full = Math.max(design.maxRate, crossfall);
+  const fallback = (full * laneWidth) / MAX_RELATIVE_GRADIENT;
+  const ramps = groupByCurve(horizontalElements(alignment)).flatMap(
+    (group) => rampsOf(group, fallback, design.runoffLength) ?? [],
+  );
+  return { full, ramps };
+}
+
 /**
  * Cross slopes of both carriageway sides at each requested station. `crossfall` is the normal crown
  * and `laneWidth` sizes the relative-gradient runoff of curves without a spiral. Without a
@@ -99,15 +115,12 @@ export function crossSlopesAt(
   station: number,
 ): CrossSlopes {
   const crown: CrossSlopes = { left: crossfall, right: crossfall };
-  const design = alignment.superelevation;
-  if (!design || !(design.maxRate > 0)) return crown;
-  const full = Math.max(design.maxRate, crossfall);
-  const fallback = (full * laneWidth) / MAX_RELATIVE_GRADIENT;
+  const plan = curvePlan(alignment, crossfall, laneWidth);
+  if (!plan) return crown;
+  const { full } = plan;
   let outer = crossfall;
   let turn: 1 | -1 = 1;
-  for (const group of groupByCurve(horizontalElements(alignment))) {
-    const ramps = rampsOf(group, fallback, design.runoffLength);
-    if (!ramps) continue;
+  for (const ramps of plan.ramps) {
     const fall = outerFall(ramps, station, crossfall, full);
     if (fall < outer) {
       outer = fall;
@@ -133,14 +146,11 @@ export function superelevationStations(
   crossfall: number,
   laneWidth: number,
 ): number[] {
-  const design = alignment.superelevation;
-  if (!design || !(design.maxRate > 0)) return [];
-  const full = Math.max(design.maxRate, crossfall);
-  const fallback = (full * laneWidth) / MAX_RELATIVE_GRADIENT;
+  const plan = curvePlan(alignment, crossfall, laneWidth);
+  if (!plan) return [];
+  const { full } = plan;
   const stations: number[] = [];
-  for (const group of groupByCurve(horizontalElements(alignment))) {
-    const ramps = rampsOf(group, fallback, design.runoffLength);
-    if (!ramps) continue;
+  for (const ramps of plan.ramps) {
     const flatIn = ramps.fullIn - ramps.runoffIn;
     const flatOut = ramps.fullOut + ramps.runoffOut;
     const runout = (crossfall * ramps.runoffIn) / full;

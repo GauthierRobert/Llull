@@ -16,7 +16,7 @@ import {
   type RunwayCheckRow,
 } from './runwayCheckModel';
 import { checkBeam } from './runwayBeamCheck';
-import { round } from '../../shared/numeric';
+import { firstNonPositive, round } from '../../shared/numeric';
 import { checkTable, failureSummary } from '../reports/checkReport';
 import { existingLevelIdParam } from '../../building/levelParams';
 
@@ -143,15 +143,14 @@ export const runwayCheck = defineCommand({
       return noop(doc, 'check_crane_runways failed: hoistingSpeed must be a number >= 0 (m/s).');
     if (!isNonNegativeNumber(minHookApproach))
       return noop(doc, 'check_crane_runways failed: minHookApproach must be a number >= 0 (m).');
-    for (const [name, value] of [
+    const nonPositive = firstNonPositive([
       ['craneSpan', craneSpan],
       ['craneSelfWeight', craneSelfWeight],
       ['travelSpeed', travelSpeed],
       ['bufferStiffness', bufferStiffness],
-    ] as const) {
-      if (value !== undefined && !isPositiveNumber(value))
-        return noop(doc, `check_crane_runways failed: ${name} must be a number > 0.`);
-    }
+    ]);
+    if (nonPositive !== undefined)
+      return noop(doc, `check_crane_runways failed: ${nonPositive} must be a number > 0.`);
     const building = getBuilding(doc);
     const levelId = existingLevelId(building, params.levelId);
     if (levelId === undefined)

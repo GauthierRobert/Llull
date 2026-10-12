@@ -25,7 +25,8 @@ import {
   orientedBox,
 } from '../building/evaluate/entities';
 import { prismMesh, sweepMesh } from '../shared/mesh';
-import { circleOutline, findProfile, profileOutline } from '../steel/profiles';
+import { circleOutline } from '@lib/gearOutline';
+import { findProfile, profileOutline } from '../steel/profiles';
 import { cross3, dot3, sub3 } from '@lib/vec3';
 import { normalize } from '../shared/vec3';
 import { shapeOf } from './equipment/equipmentShape';

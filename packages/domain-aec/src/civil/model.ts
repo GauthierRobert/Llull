@@ -63,6 +63,16 @@ export function civilObject<C extends CivilCategory>(
     : undefined;
 }
 
+/** The object `id` of `category`, or the failure summary `<tool> failed: no <category> <id>.` */
+export function civilObjectOrFailure<C extends CivilCategory>(
+  doc: Pick<CadDocument, 'civil'>,
+  id: string,
+  category: C,
+  tool: string,
+): Extract<CivilObject, { category: C }> | string {
+  return civilObject(getCivil(doc), id, category) ?? `${tool} failed: no ${category} ${id}.`;
+}
+
 /** Objects of one category in creation order. */
 export function civilObjectsOf<C extends CivilCategory>(
   civil: CivilModel,

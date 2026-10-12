@@ -9,7 +9,8 @@ import { noop } from '@core/commands/noop';
 import { safeFileName } from '@lib/safeFileName';
 import { fileSlug, getBuilding } from '../../building/model';
 import { PAPER_SIZES } from '../../shared/sheetFrame';
-import { civilObject, getCivil } from '../model';
+import { alignmentIdParam } from '../road/roadParams';
+import { civilObjectOrFailure } from '../model';
 import { buildCivilPlanSheet } from './civilPlanSheet';
 import { buildPlanProfileSheet } from './planProfileSheet';
 
@@ -88,7 +89,7 @@ export const exportPlanProfileSheet = defineCommand({
     'Needs set_alignment_profile. data.text holds the file, data.fileName its name.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
-    alignmentId: z.string().describe('Alignment id, e.g. "alignment-1".'),
+    alignmentId: alignmentIdParam,
     paper: z.enum(PAPER_SIZES).optional().describe('Paper size, landscape. Default A3.'),
     scale: z
       .number()
@@ -102,9 +103,13 @@ export const exportPlanProfileSheet = defineCommand({
       .describe('Vertical / horizontal scale ratio (> 0). Default 10.'),
   }),
   run: (doc, { alignmentId, paper = 'A3', scale, verticalExaggeration = 10 }): CommandResult => {
-    const alignment = civilObject(getCivil(doc), alignmentId, 'alignment');
-    if (!alignment)
-      return noop(doc, `export_plan_profile_sheet failed: no alignment ${alignmentId}.`);
+    const alignment = civilObjectOrFailure(
+      doc,
+      alignmentId,
+      'alignment',
+      'export_plan_profile_sheet',
+    );
+    if (typeof alignment === 'string') return noop(doc, alignment);
     const sheet = buildPlanProfileSheet(doc, alignment, { paper, scale, verticalExaggeration });
     if (typeof sheet === 'string') return noop(doc, `export_plan_profile_sheet failed: ${sheet}`);
     const fileName = `${safeFileName(alignment.name, alignment.id)}_plan_profile_${paper}_1-${sheet.scale}.svg`;

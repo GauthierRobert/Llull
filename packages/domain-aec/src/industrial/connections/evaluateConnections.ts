@@ -15,7 +15,8 @@ import type {
 import { fromMm } from '../../building/model';
 import { base, colorForMaterial, meshEntity, orientedBox } from '../../building/evaluate/entities';
 import { prismMesh, sweepFrame, type SweepFrame } from '../../shared/mesh';
-import { circleOutline, findProfile } from '../../steel/profiles';
+import { circleOutline } from '@lib/gearOutline';
+import { findProfile } from '../../steel/profiles';
 import { add3, distance3, scale3, sub3 } from '@lib/vec3';
 import { atLevel, boltSize } from '../evaluate';
 

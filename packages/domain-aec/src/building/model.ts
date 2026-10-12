@@ -64,6 +64,7 @@ export function elementsOnLevel(building: BuildingModel, levelId: string): Build
   );
 }
 
+/** Lenient plan point: first two components finite; a third (z) is tolerated and dropped by `toVec2`. Stricter than none, looser than `@lib/vec2` isVec2 (exactly 2). */
 export function isVec2(value: unknown): value is Vec2 {
   return (
     Array.isArray(value) &&

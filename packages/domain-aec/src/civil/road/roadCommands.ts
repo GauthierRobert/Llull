@@ -12,6 +12,7 @@ import { noop } from '@core/commands/noop';
 import { alignmentLength, endStation, validateHorizontal } from '../alignment/alignmentGeometry';
 import { grades, validateProfile, verticalCurves } from '../alignment/profileGeometry';
 import {
+  civilObjectOrFailure,
   civilObject,
   civilObjectsOf,
   formatStation,
@@ -25,13 +26,10 @@ import { commitCivil } from '../evaluate';
 import { roadReportCommands } from './roadReportCommands';
 import { setSuperelevation } from './roadSuperelevationCommand';
 import { toMetres } from '../../building/model';
+import { alignmentIdParam } from './roadParams';
 
 function pointsInput(): z.ZodArray<z.ZodTuple<[z.ZodNumber, z.ZodNumber], null>> {
   return z.array(vec2('Point of intersection [x, y] in document units.'));
-}
-
-function findAlignment(doc: CadDocument, alignmentId: string): AlignmentObject | undefined {
-  return civilObject(getCivil(doc), alignmentId, 'alignment');
 }
 
 function spiralsOrNone(spirals: ReadonlyArray<number>): { spirals?: readonly number[] } {
@@ -139,7 +137,7 @@ export const updateAlignment = defineCommand({
     '(corridor, batters, report) follow. If `points` changes length without `radii`, radii are padded ' +
     'with 0 / truncated.',
   params: z.object({
-    alignmentId: z.string().describe('Alignment id, e.g. "alignment-1".'),
+    alignmentId: alignmentIdParam,
     points: pointsInput().optional().describe('New PIs, at least 2.'),
     radii: z.array(z.number()).optional().describe('New radii (length = points - 2).'),
     spirals: z
@@ -152,9 +150,13 @@ export const updateAlignment = defineCommand({
     name: z.string().optional().describe('New name.'),
   }),
   run: (doc, params): CommandResult => {
-    const alignment = findAlignment(doc, params.alignmentId);
-    if (!alignment)
-      return noop(doc, `update_alignment failed: no alignment ${params.alignmentId}.`);
+    const alignment = civilObjectOrFailure(
+      doc,
+      params.alignmentId,
+      'alignment',
+      'update_alignment',
+    );
+    if (typeof alignment === 'string') return noop(doc, alignment);
     const points = params.points ?? alignment.points;
     const fitted = Array.from(
       { length: Math.max(points.length - 2, 0) },
@@ -239,7 +241,7 @@ export const setAlignmentProfile = defineCommand({
     'symmetric parabolic vertical curve centred on it (first / last PVI cannot). The first and last ' +
     'PVI stations must lie within the alignment stations. The summary lists grades and K values.',
   params: z.object({
-    alignmentId: z.string().describe('Alignment id, e.g. "alignment-1".'),
+    alignmentId: alignmentIdParam,
     pvis: z
       .array(
         z.object({
@@ -251,8 +253,8 @@ export const setAlignmentProfile = defineCommand({
       .describe('At least 2 PVIs; sorted by station automatically.'),
   }),
   run: (doc, { alignmentId, pvis }): CommandResult => {
-    const alignment = findAlignment(doc, alignmentId);
-    if (!alignment) return noop(doc, `set_alignment_profile failed: no alignment ${alignmentId}.`);
+    const alignment = civilObjectOrFailure(doc, alignmentId, 'alignment', 'set_alignment_profile');
+    if (typeof alignment === 'string') return noop(doc, alignment);
     const start = alignment.startStation;
     const end = endStation(alignment);
     // End PVIs typed from a rounded station (e.g. 130.01 for 130.0135) snap onto the alignment ends.
@@ -299,7 +301,7 @@ export const setRoadSection = defineCommand({
     '3.5 m lane, 1.0 m shoulder, 0.025, 1.5, 2.0 - or the current template values. With a profile the ' +
     'corridor is drawn; with a surface too, batters run to daylight.',
   params: z.object({
-    alignmentId: z.string().describe('Alignment id, e.g. "alignment-1".'),
+    alignmentId: alignmentIdParam,
     laneWidth: z.number().optional().describe('Carriageway width each side (> 0). Default 3.5 m.'),
     shoulderWidth: z
       .number()
@@ -310,9 +312,13 @@ export const setRoadSection = defineCommand({
     fillSlope: z.number().optional().describe('Fill batter H per 1 V (> 0). Default 2.0.'),
   }),
   run: (doc, params): CommandResult => {
-    const alignment = findAlignment(doc, params.alignmentId);
-    if (!alignment)
-      return noop(doc, `set_road_section failed: no alignment ${params.alignmentId}.`);
+    const alignment = civilObjectOrFailure(
+      doc,
+      params.alignmentId,
+      'alignment',
+      'set_road_section',
+    );
+    if (typeof alignment === 'string') return noop(doc, alignment);
     const current = alignment.section;
     const section: RoadSection = {
       laneWidth: params.laneWidth ?? current?.laneWidth ?? fromMetres(doc, 3.5),

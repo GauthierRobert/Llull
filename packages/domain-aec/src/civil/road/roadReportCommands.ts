@@ -11,7 +11,8 @@ import { commandCatalog, defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
 import { safeFileName } from '@lib/safeFileName';
 import { alignmentLength } from '../alignment/alignmentGeometry';
-import { civilObject, getCivil } from '../model';
+import { civilObjectOrFailure, getCivil } from '../model';
+import { alignmentIdParam } from './roadParams';
 import { designChecks } from './roadChecks';
 import { analyseStations, reportCsv, reportRows, reportStations } from './roadReport';
 import { longSectionSvg } from '../sheets/longSectionSvg';
@@ -25,8 +26,8 @@ function checkedAlignment(
   interval: number | undefined,
   command: string,
 ): { alignment: AlignmentObject; interval: number } | string {
-  const alignment = civilObject(getCivil(doc), alignmentId, 'alignment');
-  if (!alignment) return `${command} failed: no alignment ${alignmentId}.`;
+  const alignment = civilObjectOrFailure(doc, alignmentId, 'alignment', command);
+  if (typeof alignment === 'string') return alignment;
   const step = interval ?? alignment.stationInterval;
   if (!(step > 0)) return `${command} failed: interval must be > 0.`;
   if (alignmentLength(alignment) <= 0)
@@ -56,7 +57,7 @@ export const alignmentReport = defineCommand({
     'table), plus grade breaks over 0.5 % without a vertical curve; failures are listed.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
-    alignmentId: z.string().describe('Alignment id, e.g. "alignment-1".'),
+    alignmentId: alignmentIdParam,
     interval: z
       .number()
       .optional()
@@ -120,7 +121,7 @@ export const exportLongSection = defineCommand({
     'linked surface. Vertical exaggeration scales the vertical axis against the horizontal one.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
-    alignmentId: z.string().describe('Alignment id, e.g. "alignment-1".'),
+    alignmentId: alignmentIdParam,
     verticalExaggeration: z
       .number()
       .optional()
@@ -181,7 +182,7 @@ export const exportCrossSections = defineCommand({
     'areas need a linked surface. At most 60 stations are drawn (the spacing is widened).',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
-    alignmentId: z.string().describe('Alignment id, e.g. "alignment-1".'),
+    alignmentId: alignmentIdParam,
     interval: z
       .number()
       .optional()

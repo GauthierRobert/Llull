@@ -6,6 +6,7 @@
 
 import type { Entity, MeshData, Vec2, Vec3 } from '@core/model/types';
 import type { ManholeObject, PipeObject } from '@core/model/civil';
+import { circleOutline } from '@lib/gearOutline';
 import { cross3 } from '@lib/vec3';
 import { toMm } from '../../building/model';
 import { civilLine, civilMesh, civilPolyline, civilText } from '../entities';
@@ -21,7 +22,7 @@ function normalized(v: Vec3): Vec3 {
 }
 
 /** Closed prism of `sides` facets and `radius` about the axis `bottom` -> `top` (outward normals). */
-export function prismMesh(bottom: Vec3, top: Vec3, radius: number, sides: number): MeshData {
+function prismMesh(bottom: Vec3, top: Vec3, radius: number, sides: number): MeshData {
   const axis = normalized([top[0] - bottom[0], top[1] - bottom[1], top[2] - bottom[2]]);
   const reference: Vec3 = Math.abs(axis[2]) > 0.9 ? [1, 0, 0] : [0, 0, 1];
   const u = normalized(cross3(axis, reference));
@@ -53,10 +54,7 @@ export function prismMesh(bottom: Vec3, top: Vec3, radius: number, sides: number
 }
 
 function circlePoints(centre: Vec2, radius: number, sides: number): Vec2[] {
-  return Array.from({ length: sides }, (_, i): Vec2 => {
-    const angle = (2 * Math.PI * i) / sides;
-    return [centre[0] + Math.cos(angle) * radius, centre[1] + Math.sin(angle) * radius];
-  });
+  return circleOutline(radius, sides).map(([x, y]): Vec2 => [centre[0] + x, centre[1] + y]);
 }
 
 export function evaluateManhole(context: CivilContext, manhole: ManholeObject): Entity[] {

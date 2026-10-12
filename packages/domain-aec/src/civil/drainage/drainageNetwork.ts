@@ -198,14 +198,3 @@ export function analyseNetwork(
     diverging: flows.diverging,
   };
 }
-
-export function toCsv(
-  header: ReadonlyArray<string>,
-  rows: ReadonlyArray<ReadonlyArray<unknown>>,
-): string {
-  const cell = (value: unknown): string => {
-    const text = String(value);
-    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-  };
-  return [header, ...rows].map((row) => row.map(cell).join(',')).join('\n');
-}

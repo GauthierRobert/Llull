@@ -6,51 +6,20 @@
  * @layer domain-aec
  */
 
-import type { CadDocument } from '@core/model/types';
-import type { CadPlugin, DocumentExtension } from '@core/plugins/plugin';
+import type { CadPlugin } from '@core/plugins/plugin';
 import { buildingCommands, industrialCommands } from './index';
 import { buildingDerivationGuard } from './building/evaluate/integrity';
-import { mergeRestored } from './shared/derived';
+import { derivedModelExtension } from './shared/derived';
 import { aecRetiredCommands } from './retired';
 import { buildingErrors } from './building/validate';
 import { regenerateBuilding } from './building/evaluate/evaluateElements';
 
-function derivedEntityIds(doc: CadDocument): Set<string> {
-  const ids = new Set<string>();
-  for (const element of Object.values(doc.building?.elements ?? {})) {
-    for (const id of element.entityIds) ids.add(id);
-  }
-  return ids;
-}
-
-/**
- * Re-derive the building geometry a v2 file omits and restore the saved draw order
- * (regeneration appends; saved positions win, new ids follow).
- * @invariant raw documents without a valid building model are returned unchanged
- */
-function restore(raw: Record<string, unknown>): Record<string, unknown> {
-  const building = raw['building'];
-  if (building === undefined || buildingErrors(building).length > 0) return raw;
-  const savedOrder = Array.isArray(raw['order']) ? (raw['order'] as string[]) : [];
-  const base = raw as unknown as CadDocument;
-  const regenerated = regenerateBuilding(
-    { ...base, order: savedOrder.filter((id) => id in base.entities), selection: [] },
-    base.building as NonNullable<CadDocument['building']>,
-  );
-  return {
-    ...raw,
-    ...mergeRestored(raw, savedOrder, regenerated),
-    building: regenerated.building,
-    layers: regenerated.layers,
-    layerOrder: regenerated.layerOrder,
-  };
-}
-
-const buildingDocument: DocumentExtension = {
-  validate: (raw) => (raw['building'] === undefined ? [] : buildingErrors(raw['building'])),
-  derivedEntityIds,
-  restore,
-};
+const buildingDocument = derivedModelExtension({
+  key: 'building',
+  owners: (building) => Object.values(building.elements),
+  errors: buildingErrors,
+  regenerate: regenerateBuilding,
+});
 
 export const buildingPlugin: CadPlugin = {
   name: 'building',
