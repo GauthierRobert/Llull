@@ -18,6 +18,7 @@ import { TEXT_FONT_URL } from '@ui/viewport/textFont';
 import { planAnchor } from './planAnchor';
 import { useMinScreenSize } from './useMinScreenSize';
 import { positiveSweep } from '@lib/angle';
+import { sampleArc } from '@lib/arc';
 
 const ARC_SEGMENTS = 32;
 const DIMENSION_COLOR = '#d6a243';
@@ -80,12 +81,10 @@ function shapeOf(points: ReadonlyArray<Vec2>, anchor: Vec2): THREE.Shape {
   return new THREE.Shape(points.map(([x, y]) => new THREE.Vector2(x - anchor[0], y - anchor[1])));
 }
 
+/** `ARC_SEGMENTS + 1` points from `start` CCW to `end`, both ends included. */
 function arcPoints(center: Vec2, radius: number, start: number, end: number): Vec2[] {
-  const sweep = positiveSweep(end - start);
-  return Array.from({ length: ARC_SEGMENTS + 1 }, (_, index): Vec2 => {
-    const angle = start + (sweep * index) / ARC_SEGMENTS;
-    return [center[0] + radius * Math.cos(angle), center[1] + radius * Math.sin(angle)];
-  });
+  const first: Vec2 = [center[0] + radius * Math.cos(start), center[1] + radius * Math.sin(start)];
+  return [first, ...sampleArc(center, radius, start, positiveSweep(end - start), ARC_SEGMENTS)];
 }
 
 function addDimension(
