@@ -152,12 +152,23 @@ export function transformedCopy(api: OccApi, shape: OccShape, transform: OccHand
   return moved;
 }
 
-/** Copy of `shape` moved by `placement`; the input shape and the placement are released. */
-function placed(api: OccApi, shape: OccShape, placement: OccHandle): OccShape {
+/** Copy of `shape` placed at `at`'s rotation and position; the input shape is released. */
+function placed(
+  api: OccApi,
+  shape: OccShape,
+  at: { readonly rotation: Vec3; readonly position: Vec3 },
+  anchorShift?: Vec3,
+): OccShape {
+  const placement = placementTransform(api, at.rotation, at.position, anchorShift);
   const moved = transformedCopy(api, shape, placement);
   release(placement);
   release(shape);
   return moved;
+}
+
+/** `placed` for a builder result that may be null (null stays null). */
+function placedOrNull(api: OccApi, shape: OccShape | null, entity: Entity): OccShape | null {
+  return shape === null ? null : placed(api, shape, entity);
 }
 
 /**
@@ -185,7 +196,7 @@ function revolvedPrimitive(api: OccApi, entity: Entity): OccShape | null {
   }
   const shape = maker.Shape();
   maker.delete();
-  return placed(api, shape, placementTransform(api, entity.rotation, entity.position, anchorShift));
+  return placed(api, shape, entity, anchorShift);
 }
 
 /** Sweep `face` along `offset` into a prism, placed at the entity's rotation and position. */
@@ -197,7 +208,7 @@ function prism(api: OccApi, face: OccShape, offset: Vec3, entity: Entity): OccSh
   };
   const shape = maker.Shape();
   [maker, direction, face].forEach(release);
-  return placed(api, shape, placementTransform(api, entity.rotation, entity.position));
+  return placed(api, shape, entity);
 }
 
 /**
@@ -267,7 +278,7 @@ function revolvedProfile(api: OccApi, entity: Entity): OccShape | null {
   };
   const shape = maker.Shape();
   [maker, axis, direction, origin, face].forEach(release);
-  return placed(api, shape, placementTransform(api, entity.rotation, entity.position));
+  return placed(api, shape, entity);
 }
 
 /** Closed triangle-mesh solid (world space) rebuilt as a sewn OCC solid; open meshes -> null. */
@@ -275,9 +286,7 @@ function meshSolid(api: OccApi, entity: Entity): OccShape | null {
   if (entity.kind !== 'mesh') return null;
   const shape = meshDataToTopoDSShape(api, entity.mesh);
   const moved = [...entity.rotation, ...entity.position].some((value) => value !== 0);
-  return shape !== null && moved
-    ? placed(api, shape, placementTransform(api, entity.rotation, entity.position))
-    : shape;
+  return shape !== null && moved ? placed(api, shape, entity) : shape;
 }
 
 /** Pyramids (planar faces only, so their sewn triangles are already exact) use their triangles. */
@@ -328,22 +337,10 @@ export function entityToOccShape(api: OccApi, entity: Entity): OccShape | null {
   if (entity.kind === 'subdivision') {
     // Smooth cages become exact B-spline faces; a faceted (level 0) cage keeps its triangles.
     const shape = entity.levels > 0 ? subdivisionBSplineSolid(api, entity) : null;
-    return shape === null
-      ? tessellatedSolid(api, entity)
-      : placed(api, shape, placementTransform(api, entity.rotation, entity.position));
+    return placedOrNull(api, shape, entity) ?? tessellatedSolid(api, entity);
   }
-  if (entity.kind === 'loft') {
-    const shape = loftedSolid(api, entity);
-    return shape === null
-      ? null
-      : placed(api, shape, placementTransform(api, entity.rotation, entity.position));
-  }
-  if (entity.kind === 'sweep') {
-    const shape = sweptSolid(api, entity);
-    return shape === null
-      ? null
-      : placed(api, shape, placementTransform(api, entity.rotation, entity.position));
-  }
+  if (entity.kind === 'loft') return placedOrNull(api, loftedSolid(api, entity), entity);
+  if (entity.kind === 'sweep') return placedOrNull(api, sweptSolid(api, entity), entity);
   if (entity.kind !== 'box') return revolvedPrimitive(api, entity);
   const [sx, sy, sz] = entity.size;
   if (sx <= 0 || sy <= 0 || sz <= 0) return null;
@@ -360,7 +357,5 @@ export function entityToOccShape(api: OccApi, entity: Entity): OccShape | null {
   const shape = maker.Shape();
   origin.delete();
   maker.delete();
-  return rotated
-    ? placed(api, shape, placementTransform(api, entity.rotation, entity.position))
-    : shape;
+  return rotated ? placed(api, shape, entity) : shape;
 }
