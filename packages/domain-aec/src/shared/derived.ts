@@ -6,6 +6,7 @@
  */
 
 import type { CadDocument, Entity, Layer } from '@core/model/types';
+import type { DocumentExtension } from '@core/plugins/plugin';
 
 /** Adds layers referenced by `layerIds` that the document lacks (name from id, colour by id). */
 export function ensureLayerIds(
@@ -115,4 +116,68 @@ export function editedOwners(
     if (entity.tags?.includes(marker) === true && owner !== null) edited.add(owner);
   }
   return [...edited];
+}
+
+interface DerivedModelSpec<K extends 'building' | 'civil'> {
+  /** Key of the model in the raw document. */
+  readonly key: K;
+  /** Owners of generated entities in `model`. */
+  owners(model: NonNullable<CadDocument[K]>): Iterable<{ readonly entityIds: readonly string[] }>;
+  /** Value errors of the raw model. */
+  errors(model: unknown): string[];
+  /** Model placed in the document handed to `regenerate` (default: the saved model itself). */
+  seed?(model: NonNullable<CadDocument[K]>): NonNullable<CadDocument[K]>;
+  /** Re-derives the geometry of `model` into `doc`. */
+  regenerate(doc: CadDocument, model: NonNullable<CadDocument[K]>): CadDocument;
+}
+
+/**
+ * Document extension of a plugin whose entities derive from a model: validates the raw model,
+ * names the derived entity ids and re-derives the omitted geometry on load (saved order first).
+ * @invariant raw documents without a valid model, or whose regeneration throws, are returned unchanged
+ */
+export function derivedModelExtension<K extends 'building' | 'civil'>(
+  spec: DerivedModelSpec<K>,
+): DocumentExtension {
+  const restore = (raw: Record<string, unknown>): Record<string, unknown> => {
+    const saved = raw[spec.key];
+    if (saved === undefined || spec.errors(saved).length > 0) return raw;
+    const model = saved as NonNullable<CadDocument[K]>;
+    const savedOrder = Array.isArray(raw['order']) ? (raw['order'] as string[]) : [];
+    const base = raw as unknown as CadDocument;
+    const stale = new Set<string>();
+    for (const owner of spec.owners(model)) for (const id of owner.entityIds) stale.add(id);
+    let regenerated: CadDocument;
+    try {
+      regenerated = spec.regenerate(
+        {
+          ...base,
+          order: savedOrder.filter((id) => id in base.entities && !stale.has(id)),
+          selection: [],
+          [spec.key]: spec.seed ? spec.seed(model) : model,
+        },
+        model,
+      );
+    } catch {
+      return raw;
+    }
+    return {
+      ...raw,
+      ...mergeRestored(raw, savedOrder, regenerated),
+      [spec.key]: regenerated[spec.key],
+      layers: regenerated.layers,
+      layerOrder: regenerated.layerOrder,
+    };
+  };
+  return {
+    validate: (raw) => (raw[spec.key] === undefined ? [] : spec.errors(raw[spec.key])),
+    derivedEntityIds: (doc) => {
+      const ids = new Set<string>();
+      const model = doc[spec.key] as NonNullable<CadDocument[K]> | undefined;
+      if (model === undefined) return ids;
+      for (const owner of spec.owners(model)) for (const id of owner.entityIds) ids.add(id);
+      return ids;
+    },
+    restore,
+  };
 }

@@ -6,11 +6,9 @@
  */
 
 import { commandCatalog } from '@core/commands/schema';
-import type { CadDocument } from '@core/model/types';
-import type { CivilModel } from '@core/model/civil';
-import type { CadPlugin, DocumentExtension } from '@core/plugins/plugin';
+import type { CadPlugin } from '@core/plugins/plugin';
 import { civilDerivationGuard } from './integrity';
-import { mergeRestored } from '../shared/derived';
+import { derivedModelExtension } from '../shared/derived';
 import { civilErrors } from './validate';
 import { regenerateCivil } from './evaluate';
 import { createSurface, importSurveyPoints, updateSurface } from './survey/surveyCommands';
@@ -24,55 +22,13 @@ import { civilExchangeCommands } from './exchange/exchangeCommands';
 import { crsCommands } from './crs/crsCommands';
 import { civilSheetCommands } from './sheets/civilSheetCommands';
 
-function derivedEntityIds(doc: CadDocument): Set<string> {
-  const ids = new Set<string>();
-  for (const object of Object.values(doc.civil?.objects ?? {})) {
-    for (const id of object.entityIds) ids.add(id);
-  }
-  return ids;
-}
-
-/**
- * Re-derive the civil geometry a v2 file omits (saved order first, new ids after).
- * @invariant raw documents without a valid civil model are returned unchanged
- */
-function restore(raw: Record<string, unknown>): Record<string, unknown> {
-  const civil = raw['civil'];
-  if (civil === undefined || civilErrors(civil).length > 0) return raw;
-  const savedOrder = Array.isArray(raw['order']) ? (raw['order'] as string[]) : [];
-  const base = raw as unknown as CadDocument;
-  const stale = new Set(
-    Object.values((civil as CivilModel).objects).flatMap((object) => object.entityIds),
-  );
-  let regenerated: CadDocument;
-  try {
-    regenerated = regenerateCivil(
-      {
-        ...base,
-        order: savedOrder.filter((id) => id in base.entities && !stale.has(id)),
-        selection: [],
-        civil: { ...(civil as CivilModel), objects: {} },
-      },
-      civil as CivilModel,
-    );
-  } catch {
-    // Validation reports the problem; never let a corrupt file throw out of load.
-    return raw;
-  }
-  return {
-    ...raw,
-    ...mergeRestored(raw, savedOrder, regenerated),
-    civil: regenerated.civil,
-    layers: regenerated.layers,
-    layerOrder: regenerated.layerOrder,
-  };
-}
-
-const civilDocument: DocumentExtension = {
-  validate: (raw) => (raw['civil'] === undefined ? [] : civilErrors(raw['civil'])),
-  derivedEntityIds,
-  restore,
-};
+const civilDocument = derivedModelExtension({
+  key: 'civil',
+  owners: (civil) => Object.values(civil.objects),
+  errors: civilErrors,
+  seed: (civil) => ({ ...civil, objects: {} }),
+  regenerate: regenerateCivil,
+});
 
 /** Civil / site-engineering commands. */
 export const civilCommands = commandCatalog(
