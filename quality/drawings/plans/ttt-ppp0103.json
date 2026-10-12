@@ -6,15 +6,17 @@
   }
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    18,
-    0
-   ],
-   "end": [
-    77,
-    0
+   "points": [
+    [
+     18,
+     0
+    ],
+    [
+     77,
+     0
+    ]
    ],
    "position": [
     0,
@@ -43,15 +45,17 @@
   "as": "s2"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    95,
-    18
-   ],
-   "end": [
-    95,
-    34
+   "points": [
+    [
+     95,
+     18
+    ],
+    [
+     95,
+     34
+    ]
    ],
    "position": [
     0,
@@ -62,15 +66,17 @@
   "as": "s3"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    95,
-    34
-   ],
-   "end": [
-    77,
-    34
+   "points": [
+    [
+     95,
+     34
+    ],
+    [
+     77,
+     34
+    ]
    ],
    "position": [
     0,
@@ -81,15 +87,17 @@
   "as": "s4"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    77,
-    34
-   ],
-   "end": [
-    77,
-    23
+   "points": [
+    [
+     77,
+     34
+    ],
+    [
+     77,
+     23
+    ]
    ],
    "position": [
     0,
@@ -118,15 +126,17 @@
   "as": "s6"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    70,
-    16
-   ],
-   "end": [
-    21,
-    16
+   "points": [
+    [
+     70,
+     16
+    ],
+    [
+     21,
+     16
+    ]
    ],
    "position": [
     0,
@@ -155,15 +165,17 @@
   "as": "s8"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    14,
-    23
-   ],
-   "end": [
-    14,
-    34
+   "points": [
+    [
+     14,
+     23
+    ],
+    [
+     14,
+     34
+    ]
    ],
    "position": [
     0,
@@ -174,15 +186,17 @@
   "as": "s9"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    14,
-    34
-   ],
-   "end": [
-    0,
-    34
+   "points": [
+    [
+     14,
+     34
+    ],
+    [
+     0,
+     34
+    ]
    ],
    "position": [
     0,
@@ -193,15 +207,17 @@
   "as": "s10"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    0,
-    34
-   ],
-   "end": [
-    0,
-    18
+   "points": [
+    [
+     0,
+     34
+    ],
+    [
+     0,
+     18
+    ]
    ],
    "position": [
     0,
@@ -230,7 +246,7 @@
   "as": "s12"
  },
  {
-  "command": "extrude_sketch",
+  "command": "extrude_profile",
   "params": {
    "ids": [
     "$s1",

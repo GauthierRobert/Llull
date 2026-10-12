@@ -6,15 +6,17 @@
   }
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    36.5,
-    0
-   ],
-   "end": [
-    65,
-    0
+   "points": [
+    [
+     36.5,
+     0
+    ],
+    [
+     65,
+     0
+    ]
    ],
    "position": [
     0,
@@ -25,15 +27,17 @@
   "as": "t1"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    65,
-    0
-   ],
-   "end": [
-    65,
-    5
+   "points": [
+    [
+     65,
+     0
+    ],
+    [
+     65,
+     5
+    ]
    ],
    "position": [
     0,
@@ -62,15 +66,17 @@
   "as": "t3"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    62,
-    8
-   ],
-   "end": [
-    45,
-    8
+   "points": [
+    [
+     62,
+     8
+    ],
+    [
+     45,
+     8
+    ]
    ],
    "position": [
     0,
@@ -99,15 +105,17 @@
   "as": "t5"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    42,
-    11
-   ],
-   "end": [
-    42,
-    22
+   "points": [
+    [
+     42,
+     11
+    ],
+    [
+     42,
+     22
+    ]
    ],
    "position": [
     0,
@@ -136,15 +144,17 @@
   "as": "t7"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    39,
-    25
-   ],
-   "end": [
-    20.5,
-    25
+   "points": [
+    [
+     39,
+     25
+    ],
+    [
+     20.5,
+     25
+    ]
    ],
    "position": [
     0,
@@ -173,15 +183,17 @@
   "as": "t9"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    17.5,
-    28
-   ],
-   "end": [
-    17.5,
-    52
+   "points": [
+    [
+     17.5,
+     28
+    ],
+    [
+     17.5,
+     52
+    ]
    ],
    "position": [
     0,
@@ -192,15 +204,17 @@
   "as": "t10"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    17.5,
-    52
-   ],
-   "end": [
-    10,
-    52
+   "points": [
+    [
+     17.5,
+     52
+    ],
+    [
+     10,
+     52
+    ]
    ],
    "position": [
     0,
@@ -211,15 +225,17 @@
   "as": "t11"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    10,
-    52
-   ],
-   "end": [
-    10,
-    18
+   "points": [
+    [
+     10,
+     52
+    ],
+    [
+     10,
+     18
+    ]
    ],
    "position": [
     0,
@@ -230,15 +246,17 @@
   "as": "t12"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    10,
-    18
-   ],
-   "end": [
-    33.5,
-    18
+   "points": [
+    [
+     10,
+     18
+    ],
+    [
+     33.5,
+     18
+    ]
    ],
    "position": [
     0,
@@ -267,15 +285,17 @@
   "as": "t14"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    36.5,
-    15
-   ],
-   "end": [
-    36.5,
-    0
+   "points": [
+    [
+     36.5,
+     15
+    ],
+    [
+     36.5,
+     0
+    ]
    ],
    "position": [
     0,
@@ -333,14 +353,14 @@
    ],
    "depth": 20,
    "position": [
-    0.0,
-    10.0,
-    0.0
+    0,
+    10,
+    0
    ],
    "rotation": [
     1.5707963267948963,
-    0.0,
-    0.0
+    0,
+    0
    ]
   },
   "as": "t17"
@@ -369,7 +389,7 @@
    "depth": 60,
    "position": [
     4.536796564403577,
-    0.0,
+    0,
     54.46320343559643
    ],
    "rotation": [
@@ -421,7 +441,7 @@
    "position": [
     -8.660254037844387,
     -4.999999999999998,
-    0.0
+    0
    ],
    "rotation": [
     -1.5707963267948961,
@@ -507,7 +527,7 @@
    "position": [
     8.660254037844384,
     -5.000000000000004,
-    0.0
+    0
    ],
    "rotation": [
     -1.5707963267948961,
@@ -575,7 +595,7 @@
    "height": 30,
    "position": [
     53.975,
-    0.0,
+    0,
     4
    ]
   },
@@ -596,7 +616,7 @@
    "height": 10,
    "position": [
     53.975,
-    0.0,
+    0,
     9
    ]
   },

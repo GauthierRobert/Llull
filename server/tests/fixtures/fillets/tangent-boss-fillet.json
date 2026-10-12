@@ -6,15 +6,17 @@
   }
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -15,
-    15
-   ],
-   "end": [
-    15,
-    15
+   "points": [
+    [
+     -15,
+     15
+    ],
+    [
+     15,
+     15
+    ]
    ],
    "position": [
     0,
@@ -25,15 +27,17 @@
   "as": "t1"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    15,
-    15
-   ],
-   "end": [
-    15,
-    "=64-22*sqrt(2)"
+   "points": [
+    [
+     15,
+     15
+    ],
+    [
+     15,
+     "=64-22*sqrt(2)"
+    ]
    ],
    "position": [
     0,
@@ -62,15 +66,17 @@
   "as": "t3"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    "=27-6*sqrt(2)",
-    "=64-16*sqrt(2)"
-   ],
-   "end": [
-    "=22+5*sqrt(2)",
-    "=59-5*sqrt(2)"
+   "points": [
+    [
+     "=27-6*sqrt(2)",
+     "=64-16*sqrt(2)"
+    ],
+    [
+     "=22+5*sqrt(2)",
+     "=59-5*sqrt(2)"
+    ]
    ],
    "position": [
     0,
@@ -99,15 +105,17 @@
   "as": "t5"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    22,
-    69
-   ],
-   "end": [
-    -22,
-    69
+   "points": [
+    [
+     22,
+     69
+    ],
+    [
+     -22,
+     69
+    ]
    ],
    "position": [
     0,
@@ -136,15 +144,17 @@
   "as": "t7"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    "=-(22+5*sqrt(2))",
-    "=59-5*sqrt(2)"
-   ],
-   "end": [
-    "=-(27-6*sqrt(2))",
-    "=64-16*sqrt(2)"
+   "points": [
+    [
+     "=-(22+5*sqrt(2))",
+     "=59-5*sqrt(2)"
+    ],
+    [
+     "=-(27-6*sqrt(2))",
+     "=64-16*sqrt(2)"
+    ]
    ],
    "position": [
     0,
@@ -173,15 +183,17 @@
   "as": "t9"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -15,
-    "=64-22*sqrt(2)"
-   ],
-   "end": [
-    -15,
-    15
+   "points": [
+    [
+     -15,
+     "=64-22*sqrt(2)"
+    ],
+    [
+     -15,
+     15
+    ]
    ],
    "position": [
     0,
@@ -192,7 +204,7 @@
   "as": "t10"
  },
  {
-  "command": "extrude_sketch",
+  "command": "extrude_profile",
   "params": {
    "ids": [
     "$t1",
