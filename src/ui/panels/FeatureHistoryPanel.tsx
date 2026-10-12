@@ -7,12 +7,13 @@
  * The step label is read-only: no rename_step command exists yet.
  */
 
-import React, { useState } from 'react';
+import React, { memo, useState } from 'react';
 import { getCommand } from '@core/commands/registry';
 import { CommandParamForm } from '@ui/components/commandPalette/CommandParamForm';
 import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
 import type { FeatureStep } from '@core/model/types';
+import { useIsMounted } from '@ui/hooks/useIsMounted';
 import { Icon } from '@ui/components/Icon';
 import { PanelEmpty, PanelHeader, IconButton } from '@ui/panels/PanelParts';
 
@@ -22,10 +23,15 @@ interface FeatureStepRowProps {
   totalCount: number;
 }
 
-function FeatureStepRow({ step, index, totalCount }: FeatureStepRowProps): React.ReactElement {
+const FeatureStepRow = memo(function FeatureStepRow({
+  step,
+  index,
+  totalCount,
+}: FeatureStepRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const [editing, setEditing] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
+  const isMounted = useIsMounted();
   const command = getCommand(step.name);
 
   const isSuppressed = step.suppressed === true;
@@ -38,6 +44,7 @@ function FeatureStepRow({ step, index, totalCount }: FeatureStepRowProps): React
       { stepId: step.id, params },
       {
         onResult: ({ summary, changed }) => {
+          if (!isMounted()) return;
           if (changed) setEditing(false);
           else setRefusal(summary);
         },
@@ -132,7 +139,7 @@ function FeatureStepRow({ step, index, totalCount }: FeatureStepRowProps): React
       )}
     </>
   );
-}
+});
 
 interface FeatureHistoryPanelProps {
   className?: string;

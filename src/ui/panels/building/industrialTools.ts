@@ -43,7 +43,7 @@ const DN_OPTIONS: ReadonlyArray<readonly [string, string]> = [
   ]),
 ];
 
-const EQUIPMENT_SHAPE_OPTIONS: ReadonlyArray<readonly [string, string]> = [
+export const EQUIPMENT_SHAPE_OPTIONS: ReadonlyArray<readonly [string, string]> = [
   ['box', 'Box / machine'],
   ['vertical_vessel', 'Vertical vessel (tank, DT)'],
   ['horizontal_vessel', 'Horizontal vessel'],

@@ -11,6 +11,7 @@ import { useStore } from '@ui/store';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { orderedValues } from '@ui/panels/orderedValues';
 import { EquipmentEditor } from './EquipmentEditor';
+import { contentKey } from '@ui/contentKey';
 
 export function EquipmentSection(): React.ReactElement {
   const building = useStore((s) => s.document.building);
@@ -57,9 +58,7 @@ export function EquipmentSection(): React.ReactElement {
           </li>
         ))}
       </ul>
-      {editing && (
-        <EquipmentEditor key={JSON.stringify(editing)} element={editing} levels={levels} />
-      )}
+      {editing && <EquipmentEditor key={contentKey(editing)} element={editing} levels={levels} />}
     </PanelSection>
   );
 }

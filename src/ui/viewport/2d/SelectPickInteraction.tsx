@@ -9,10 +9,9 @@
  * which would otherwise occlude this one; having no move handler, this plane lets moves through.
  */
 
-import type { Entity } from '@core/model/types';
-import { isEntityVisible } from '../entityVisibility';
-import { useStore, useViewportStore } from '@ui/store';
-import { PICK_RADIUS_PX, pickEntityId } from './modifyHelpers';
+import { useStore } from '@ui/store';
+import { pickEntityId } from './modifyHelpers';
+import { pickContext } from './pickContext';
 import { GroundPlane, toDocumentPoint } from './GroundPlane';
 import { isAdditiveSelect } from '../selectClick';
 
@@ -31,13 +30,9 @@ export function SelectPickInteraction({ zoom }: SelectPickInteractionProps): Rea
       onClick={(e) => {
         if (e.delta > CLICK_MAX_TRAVEL_PX) return;
         const state = useStore.getState();
-        const tolerance = PICK_RADIUS_PX / (zoom > 0 ? zoom : 1);
-        const { hiddenLayerIds, hiddenEntityIds } = useViewportStore.getState();
-        const { layers } = state.document;
         // Only what the 2D view draws is pickable (same filters as Entities2D).
-        const isVisible = (entity: Entity): boolean =>
-          isEntityVisible(entity, layers, hiddenLayerIds, hiddenEntityIds);
-        const id = pickEntityId(state.document, toDocumentPoint(e.point), tolerance, isVisible);
+        const { document, tolerance, accepts } = pickContext(zoom);
+        const id = pickEntityId(document, toDocumentPoint(e.point), tolerance, accepts);
         const additive = isAdditiveSelect(e);
         if (id === null) {
           if (!additive) state.clearSelection();

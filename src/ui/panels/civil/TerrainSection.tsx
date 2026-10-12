@@ -9,32 +9,30 @@ import React, { useState } from 'react';
 import type { SurfaceObject } from '@core/model/civil';
 import { useStore } from '@ui/store';
 import { PanelSection } from '@ui/panels/PanelParts';
-import { CivilObjectRow, useCivilObjects, NumberField, TextField } from './CivilParts';
+import { useCivilObjects, NumberField, TextField } from './CivilParts';
+import { CivilReportRow } from './CivilReportRow';
 import { optionalNumber, parseNumber, optionalText } from '@ui/numberText';
-import { useCivilReport } from './civilQuery';
 
 function SurfaceRow({ surface }: { surface: SurfaceObject }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
-  const [interval, setIntervalText] = useState('');
-  const report = useCivilReport('surface_report', 'surfaceId', surface.id);
-  const applyInterval = (): void => {
-    const value = parseNumber(interval);
-    if (value === undefined || value <= 0) return;
-    dispatch('update_surface', { surfaceId: surface.id, contourInterval: value });
-    setIntervalText('');
-  };
   return (
-    <CivilObjectRow object={surface} detail={report}>
-      <NumberField
-        value={interval}
-        set={setIntervalText}
-        hint={String(surface.contourInterval)}
-        label={`Contour interval of ${surface.name}`}
-      />
-      <button type="button" className="btn btn--ghost btn--sm" onClick={applyInterval}>
-        Set interval
-      </button>
-    </CivilObjectRow>
+    <CivilReportRow
+      object={surface}
+      report={{ command: 'surface_report', idKey: 'surfaceId' }}
+      field={{
+        hint: String(surface.contourInterval),
+        label: `Contour interval of ${surface.name}`,
+      }}
+      action={{
+        label: 'Set interval',
+        run: (text) => {
+          const value = parseNumber(text);
+          if (value === undefined || value <= 0) return false;
+          dispatch('update_surface', { surfaceId: surface.id, contourInterval: value });
+          return true;
+        },
+      }}
+    />
   );
 }
 

@@ -8,23 +8,11 @@
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
-import { execute } from '@core/commands/registry';
+import { runQuery } from '@ui/services/localQuery';
 import type { BuildingModel } from '@core/model/building';
-import { isRecord } from '@lib/isRecord';
 import { PanelSection } from '@ui/panels/PanelParts';
+import { isFailing, toWarnings, worstRows, type ReportRow } from './structuralReport';
 import { LabeledInput } from './LabeledInput';
-
-/** The fields every structural check row shares (frames, bracing, foundations, runways). */
-interface ReportRow {
-  readonly key: string;
-  readonly elementId: string;
-  readonly label: string;
-  readonly utilisation: number;
-  /** False when the command reports the row as failing / not analysed whatever its utilisation. */
-  readonly ok: boolean;
-  /** Shown instead of the utilisation when the check is not a ratio (pipe span vs allowed). */
-  readonly detail: string;
-}
 
 interface Report {
   readonly summary: string;
@@ -45,69 +33,11 @@ const CHECKS = [
 
 type CheckCommand = (typeof CHECKS)[number]['command'];
 
-function isFailing(row: ReportRow): boolean {
-  return row.utilisation > 1 || !row.ok;
-}
-
 /** Multi-storey / rack check: its loads come from the model (slabs, equipment, pipes), not the form. */
 const loadsFromModel: ReadonlySet<CheckCommand> = new Set([
   'check_steel_members',
   'check_pipe_supports',
 ]);
-
-/** check_pipe_supports: one row per pipe, ratio = largest span / allowed span. */
-function toPipeRows(pipes: ReadonlyArray<unknown>): ReportRow[] {
-  return pipes.flatMap((pipe: unknown, index): ReportRow[] => {
-    if (!isRecord(pipe) || typeof pipe.largestSpanM !== 'number') return [];
-    const allowed = typeof pipe.allowedSpanM === 'number' ? pipe.allowedSpanM : 0;
-    const id = typeof pipe.id === 'string' ? pipe.id : '';
-    const name = [pipe.line, pipe.mark].find((part) => typeof part === 'string' && part !== '');
-    const dn = typeof pipe.dn === 'number' ? ` · DN${pipe.dn}` : '';
-    return [
-      {
-        key: `${index}:${id}`,
-        elementId: id,
-        label: `${typeof name === 'string' ? name : id}${dn}`,
-        utilisation: allowed > 0 ? pipe.largestSpanM / allowed : 0,
-        ok: pipe.ok !== false,
-        detail: `span ${pipe.largestSpanM.toFixed(1)} / ${allowed.toFixed(1)} m`,
-      },
-    ];
-  });
-}
-
-function toWarnings(data: unknown): string[] {
-  const warnings: unknown = isRecord(data) ? data.warnings : undefined;
-  return Array.isArray(warnings)
-    ? warnings.filter((warning): warning is string => typeof warning === 'string')
-    : [];
-}
-
-function toReportRows(data: unknown): ReportRow[] {
-  if (isRecord(data) && Array.isArray(data.pipes)) return toPipeRows(data.pipes);
-  const rows: unknown = isRecord(data) ? (data.rows ?? data.members) : undefined;
-  if (!Array.isArray(rows)) return [];
-  return rows.flatMap((row: unknown, index): ReportRow[] => {
-    if (!isRecord(row) || typeof row.utilisation !== 'number') return [];
-    const text = (key: string): string => {
-      const value = row[key];
-      return typeof value === 'string' ? value : '';
-    };
-    const label = [text('mark') || text('column'), text('kind') || text('check'), text('frame')]
-      .filter((part) => part !== '')
-      .join(' · ');
-    return [
-      {
-        key: `${index}:${text('elementId')}`,
-        elementId: text('elementId') || text('id'),
-        label,
-        utilisation: row.utilisation,
-        ok: row.ok !== false,
-        detail: '',
-      },
-    ];
-  });
-}
 
 export function StructuralSection(): React.ReactElement {
   const building = useStore((s) => s.document.building);
@@ -125,16 +55,10 @@ export function StructuralSection(): React.ReactElement {
   };
 
   const runCheck = (command: CheckCommand): void => {
-    const result = execute(
-      useStore.getState().document,
-      command,
-      loadsFromModel.has(command) ? {} : loads,
-    );
+    const result = runQuery(command, loadsFromModel.has(command) ? {} : loads);
     setReport({
       summary: result.summary,
-      rows: toReportRows(result.data)
-        .sort((a, b) => b.utilisation - a.utilisation)
-        .slice(0, 12),
+      rows: worstRows(result.data),
       warnings: toWarnings(result.data),
       building,
     });

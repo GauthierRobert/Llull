@@ -16,3 +16,26 @@ export function takeChosenFile(event: React.ChangeEvent<HTMLInputElement>): File
 export function fileStem(fileName: string): string {
   return fileName.replace(/\.[^.]+$/, '');
 }
+
+/** Reads the first chosen file as text, then hands it to `onText` (clears the input like `takeChosenFile`). */
+export function readChosenFile(
+  event: React.ChangeEvent<HTMLInputElement>,
+  onText: (text: string, fileName: string) => void,
+): void {
+  const file = takeChosenFile(event);
+  if (!file) return;
+  file
+    .text()
+    .then((text) => onText(text, file.name))
+    .catch(() => undefined);
+}
+
+/** Reads a file as a `data:` URL (images embedded in the document). */
+export function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error(`cannot read ${file.name}`));
+    reader.readAsDataURL(file);
+  });
+}

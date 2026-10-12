@@ -7,49 +7,20 @@
 import React from 'react';
 import { useStore } from '@ui/store';
 import { deleteSelection } from '@ui/actions/selectionActions';
-import type { BuildingElement, BuildingModel, SteelMemberElement } from '@core/model/building';
-import type { CadDocument } from '@core/model/types';
-import { toMetres, toMm } from '@core/model/units';
-import { findProfile } from '@aec/steel/profiles';
+import type { BuildingElement, BuildingModel } from '@core/model/building';
 import { Icon } from '@ui/components/Icon';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { PropRow } from '@ui/panels/propertyFields';
 import { orderedValues } from '@ui/panels/orderedValues';
 import { CATEGORY_LABEL, describe } from './describeElement';
+import { memberFacts } from './memberFacts';
 import { EquipmentEditor } from './EquipmentEditor';
 import { SteelMemberEditor } from './SteelMemberEditor';
 import { WallEditor } from './WallEditor';
-
-const formatPoint = (point: ReadonlyArray<number>): string =>
-  point.map((value) => Number(value.toFixed(1))).join(', ');
+import { contentKey } from '@ui/contentKey';
 
 function levelNameOf(building: BuildingModel, element: BuildingElement): string | null {
   return 'levelId' in element ? (building.levels[element.levelId]?.name ?? element.levelId) : null;
-}
-
-function memberFacts(
-  member: SteelMemberElement,
-  document: Pick<CadDocument, 'units'>,
-): ReadonlyArray<readonly [string, string]> {
-  const lengthUnits = Math.hypot(
-    member.end[0] - member.start[0],
-    member.end[1] - member.start[1],
-    member.end[2] - member.start[2],
-  );
-  const massPerMetre = findProfile(member.profile)?.massPerMetre;
-  const mass =
-    massPerMetre === undefined
-      ? '—'
-      : `${Math.round(toMetres(document, lengthUnits) * massPerMetre)} kg`;
-  return [
-    ['Role', member.role],
-    ['Profile', member.profile],
-    ['Grade', member.material],
-    ['Start', formatPoint(member.start)],
-    ['End', formatPoint(member.end)],
-    ['Length', `${Math.round(toMm(document, lengthUnits))} mm`],
-    ['Mass', mass],
-  ];
 }
 
 function ElementEditor({
@@ -62,11 +33,11 @@ function ElementEditor({
   const levels = orderedValues(building.levelOrder, building.levels);
   switch (element.category) {
     case 'member':
-      return <SteelMemberEditor key={JSON.stringify(element)} member={element} />;
+      return <SteelMemberEditor key={contentKey(element)} member={element} />;
     case 'equipment':
-      return <EquipmentEditor key={JSON.stringify(element)} element={element} levels={levels} />;
+      return <EquipmentEditor key={contentKey(element)} element={element} levels={levels} />;
     case 'wall':
-      return <WallEditor key={JSON.stringify(element)} wall={element} />;
+      return <WallEditor key={contentKey(element)} wall={element} />;
     default:
       return null;
   }

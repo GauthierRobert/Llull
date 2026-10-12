@@ -6,7 +6,7 @@
  * Keys are view-scoped: in the 3D view R/S drive the gizmo; in the 2D view they arm draw tools.
  */
 
-import type { DrawToolKind, GizmoMode, ViewMode } from '@ui/store';
+import type { DrawToolKind, GizmoMode, ModifyToolKind, ViewMode } from '@ui/store';
 
 const IS_APPLE_PLATFORM =
   typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.userAgent);
@@ -34,6 +34,16 @@ const KEYS_2D: Readonly<Record<string, DrawToolKind>> = {
   s: 'spline',
   m: 'move',
   v: 'none',
+};
+
+/** Modify-tool keys (2D view, handled by `useModifyTool` while its palette is open). */
+export const MODIFY_KEYS: Readonly<Record<string, ModifyToolKind>> = {
+  o: 'offset',
+  f: 'fillet',
+  k: 'chamfer',
+  t: 'trim',
+  x: 'extend',
+  e: 'explode',
 };
 
 const KEYS_3D: Readonly<Record<string, GizmoMode>> = {
@@ -113,7 +123,7 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
       { keys: 'R / C / S / .', action: 'Rectangle / Circle / Spline / Point' },
       { keys: 'Enter', action: 'Finish polyline, wall or spline' },
       {
-        keys: 'O F K T X E',
+        keys: Object.keys(MODIFY_KEYS).join(' ').toUpperCase(),
         action: 'Offset, Fillet, Chamfer, Trim, Extend, Explode (left palette)',
       },
     ],

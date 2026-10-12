@@ -115,7 +115,8 @@ export function TransformGizmo({
     setIndicator(next);
   }, []);
 
-  // Rebuild snap candidates (excluding the selected entity) when the selection changes.
+  // Rebuild snap candidates (excluding the selected entity) when the selection changes; drag start
+  // rebuilds them again from the latest entities, so document edits never leave a drag stale.
   useEffect(() => {
     snapCandidatesRef.current = collectSnapCandidates3D(useStore.getState().document, selectedId);
   }, [selectedId]);

@@ -7,7 +7,7 @@
  * command and never changes the document's `layer.visible`.
  */
 
-import React, { useState } from 'react';
+import React, { memo, useMemo, useState } from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore, useViewportStore } from '@ui/store';
 import { type Layer, DEFAULT_LAYER_ID } from '@core/model/types';
@@ -15,17 +15,20 @@ import { Icon } from '@ui/components/Icon';
 import { ConfirmDialog } from '@ui/components/ConfirmDialog';
 import { IconButton, PanelHeader } from '@ui/panels/PanelParts';
 import { CommitInput } from '@ui/panels/propertyFields';
+import { useIsMounted } from '@ui/hooks/useIsMounted';
 import { orderedValues } from '@ui/panels/orderedValues';
 
 function useLayerEntityCounts(): Record<string, number> {
   const entities = useStore((s) => s.document.entities);
-  const counts: Record<string, number> = {};
-  for (const entity of Object.values(entities)) {
-    if (entity) {
-      counts[entity.layerId] = (counts[entity.layerId] ?? 0) + 1;
+  return useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const entity of Object.values(entities)) {
+      if (entity) {
+        counts[entity.layerId] = (counts[entity.layerId] ?? 0) + 1;
+      }
     }
-  }
-  return counts;
+    return counts;
+  }, [entities]);
 }
 
 interface LayerRowProps {
@@ -33,16 +36,15 @@ interface LayerRowProps {
   entityCount: number;
 }
 
-function LayerRow({ layer, entityCount }: LayerRowProps): React.ReactElement {
+const LayerRow = memo(function LayerRow({ layer, entityCount }: LayerRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
-  const hiddenLayerIds = useViewportStore((s) => s.hiddenLayerIds);
+  const isLocallyHidden = useViewportStore((s) => s.hiddenLayerIds.has(layer.id));
   const toggleLayerVisibility = useViewportStore((s) => s.toggleLayerVisibility);
   const [renaming, setRenaming] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   // Local viewport visibility: starts from the document's layer.visible, then
   // the user can toggle it locally without touching the server document.
-  const isLocallyHidden = hiddenLayerIds.has(layer.id);
   const effectivelyVisible = layer.visible && !isLocallyHidden;
   const isDefaultLayer = layer.id === DEFAULT_LAYER_ID;
 
@@ -152,11 +154,12 @@ function LayerRow({ layer, entityCount }: LayerRowProps): React.ReactElement {
       )}
     </li>
   );
-}
+});
 
 function AddLayerForm(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const [name, setName] = useState('');
+  const isMounted = useIsMounted();
   const trimmed = name.trim();
 
   return (
@@ -171,7 +174,7 @@ function AddLayerForm(): React.ReactElement {
           { name: trimmed },
           {
             onResult: ({ changed }) => {
-              if (changed) setName('');
+              if (changed && isMounted()) setName('');
             },
           },
         );

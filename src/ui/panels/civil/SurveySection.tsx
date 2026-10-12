@@ -12,8 +12,8 @@ import { useStore } from '@ui/store';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { OptionSelect } from '@ui/panels/OptionSelect';
 import { CivilObjectRow, useCivilObjects, TextField } from './CivilParts';
-import { DxfImports, readChosenFile } from './DxfImports';
-import { fileStem } from '@ui/chosenFile';
+import { DxfImports } from './DxfImports';
+import { fileStem, readChosenFile } from '@ui/chosenFile';
 import { optionalText } from '@ui/numberText';
 
 const FORMATS = ['PENZD', 'PNEZD', 'PENZ', 'PNEZ', 'ENZ', 'NEZ'] as const;

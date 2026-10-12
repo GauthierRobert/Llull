@@ -74,6 +74,10 @@ export const useThemeStore = create<ThemeStoreState>()((set) => ({
 }));
 
 // Follow OS theme changes while the user has not chosen a theme explicitly.
-lightMediaQuery()?.addEventListener?.('change', () => {
+const systemQuery = lightMediaQuery();
+const onSystemThemeChange = (): void => {
   if (readStoredTheme() === null) useThemeStore.setState({ theme: systemTheme() });
-});
+};
+systemQuery?.addEventListener?.('change', onSystemThemeChange);
+// A hot-reloaded module would otherwise leave its listener behind next to the new one.
+import.meta.hot?.dispose(() => systemQuery?.removeEventListener?.('change', onSystemThemeChange));

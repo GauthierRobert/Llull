@@ -15,8 +15,8 @@ import {
   TextField,
   useChosenId,
 } from './CivilParts';
-import { optionalNumber, parseNumber, optionalText } from '@ui/numberText';
-import { parsePoints } from './civilInput';
+import { optionalNumber, optionalText } from '@ui/numberText';
+import { manholeParamsOf } from './civilRules';
 import { FormError } from '@ui/panels/PanelParts';
 
 const MANHOLE_FIELDS = [
@@ -51,22 +51,12 @@ export function ManholeForm(): React.ReactElement {
 
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
-    const at = parsePoints(position);
-    const invertElevation = parseNumber(invert);
-    if (at?.length !== 1 || invertElevation === undefined) {
-      setError('Enter the position "x,y" and the invert elevation.');
+    const gathered = manholeParamsOf({ position, invert, surfaceId, numbers: fields, name });
+    if (!gathered.ok) {
+      setError(gathered.error);
       return;
     }
-    dispatch('add_manhole', {
-      location: at[0],
-      invertElevation,
-      ...(surfaceId !== '' ? { surfaceId } : {}),
-      ...MANHOLE_FIELDS.reduce(
-        (params, [key]) => ({ ...params, ...optionalNumber(key, fields[key]) }),
-        {},
-      ),
-      ...optionalText('name', name),
-    });
+    dispatch('add_manhole', gathered.params);
     setError('');
     setPosition('');
     setName('');

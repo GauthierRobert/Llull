@@ -28,6 +28,7 @@ import { useKeyboardShortcuts } from '@ui/hooks/useKeyboardShortcuts';
 import { useAutoFrame } from '@ui/hooks/useAutoFrame';
 import { useAutosave } from '@ui/hooks/useAutosave';
 import { RestoredBanner } from '@ui/components/RestoredBanner';
+import { UpdateBanner } from '@ui/components/UpdateBanner';
 
 export function App(): React.ReactElement {
   const theme = useThemeStore((s) => s.theme);
@@ -58,6 +59,7 @@ export function App(): React.ReactElement {
           <MeasurementHUD />
           <EmptyState />
           <RestoredBanner />
+          <UpdateBanner />
 
           <div className="view-mode-toggle" role="group" aria-label="View mode">
             <button

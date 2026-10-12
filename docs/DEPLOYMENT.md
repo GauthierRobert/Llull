@@ -123,3 +123,11 @@ git pull && docker compose up -d --build
 Volumes are kept. The autosave is versioned and migrated on load; an unreadable one is moved aside
 as `autosave.json.unreadable-<ts>` and the server starts empty (restore from backup). Roll back by
 checking out the previous tag and rebuilding.
+
+Browsers pick the new web app up through its service worker (production builds only). Each build
+emits `sw.js` with a fresh version; open tabs show "A new version of llull is ready" and switch
+when the user clicks Reload, so a drawing in progress is never interrupted. What it caches is fixed
+by `serviceWorker/config.json`: the app shell (`index.html` and the hashed JS/CSS chunks, without
+the OpenCascade bundle or WASM) is precached per build, `/assets/` files are cache-first, and every
+server route (`/command`, `/live`, `/mcp`, exports, imports, `/license`, `/admin`) and `/samples`
+always go to the network. Activating a build deletes the previous build's cache.

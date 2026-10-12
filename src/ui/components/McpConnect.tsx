@@ -223,11 +223,20 @@ export function McpConnect({ onClose }: McpConnectProps): React.ReactElement {
 export function McpConnectButton(): React.ReactElement {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const focusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (focusTimer.current !== null) clearTimeout(focusTimer.current);
+    },
+    [],
+  );
 
   const handleClose = (): void => {
     setOpen(false);
     // Restore focus to the trigger after the next paint.
-    setTimeout(() => triggerRef.current?.focus(), 0);
+    if (focusTimer.current !== null) clearTimeout(focusTimer.current);
+    focusTimer.current = setTimeout(() => triggerRef.current?.focus(), 0);
   };
 
   return (

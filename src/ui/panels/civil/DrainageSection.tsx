@@ -14,29 +14,9 @@ import { isCsvData } from '@ui/resultData';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { CivilObjectRow, CivilStatus, useCivilObjects, NumberField } from './CivilParts';
 import { ManholeForm, PipeForm } from './DrainageForms';
-import { optionalNumber, parseNumber } from '@ui/numberText';
-import { downloadQuery, runQuery } from './civilQuery';
-
-function failuresOf(data: unknown): string[] {
-  if (typeof data !== 'object' || data === null || !('failures' in data)) return [];
-  const failures: unknown = data.failures;
-  return Array.isArray(failures)
-    ? failures.filter((item): item is string => typeof item === 'string')
-    : [];
-}
-
-const IDF_FIELDS = ['a', 'b', 'c'] as const;
-
-/** Design storm params: the IDF curve when a, b and c are all given, else the constant intensity. */
-function stormParams(
-  rainfall: string,
-  idf: Record<(typeof IDF_FIELDS)[number], string>,
-): Record<string, unknown> {
-  const [a, b, c] = IDF_FIELDS.map((key) => parseNumber(idf[key]));
-  return a !== undefined && b !== undefined && c !== undefined
-    ? { idf: { a, b, c } }
-    : optionalNumber('rainfallIntensityMmH', rainfall);
-}
+import { optionalNumber } from '@ui/numberText';
+import { IDF_FIELDS, failuresOf, stormParams } from './civilRules';
+import { downloadQuery, runQuery } from '@ui/services/localQuery';
 
 function NetworkChecks(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
@@ -117,8 +97,9 @@ function NetworkChecks(): React.ReactElement {
       <CivilStatus text={status} testId="civil-drainage-status" />
       {failures.length > 0 && (
         <ul className="civil-failures" aria-label="Drainage failures">
-          {failures.map((failure) => (
-            <li key={failure} className="panel__error">
+          {failures.map((failure, index) => (
+            // Messages may repeat, so the position disambiguates the key.
+            <li key={`${index}:${failure}`} className="panel__error">
               {failure}
             </li>
           ))}

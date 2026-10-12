@@ -59,6 +59,8 @@ export function CommitInput({
   autoFocus = false,
   onCommit,
   onFinish,
+  testId,
+  inputProps,
 }: {
   value: string;
   label: string;
@@ -69,16 +71,26 @@ export function CommitInput({
   onCommit: (text: string) => void;
   /** Called after every blur (committed, unchanged or cancelled) so a caller can close the editor. */
   onFinish?: () => void;
+  testId?: string;
+  /** Extra native attributes (type, title, aria-*); the editing handlers stay ours. */
+  inputProps?: Omit<
+    React.InputHTMLAttributes<HTMLInputElement>,
+    'value' | 'onChange' | 'onBlur' | 'onKeyDown' | 'className' | 'placeholder' | 'inputMode'
+  >;
 }): React.ReactElement {
   const [draft, setDraft] = useState(value);
   const [seenValue, setSeenValue] = useState(value);
+  const [focused, setFocused] = useState(false);
   const cancelledRef = useRef(false);
-  if (value !== seenValue) {
+  // An external change (undo, live sync, an agent) replaces the draft — unless the user is typing.
+  if (value !== seenValue && !focused) {
     setSeenValue(value);
     setDraft(value);
   }
   return (
     <input
+      {...inputProps}
+      data-testid={testId}
       className={className}
       aria-label={label}
       value={draft}
@@ -87,7 +99,9 @@ export function CommitInput({
       spellCheck={false}
       autoFocus={autoFocus}
       onChange={(e) => setDraft(e.target.value)}
+      onFocus={() => setFocused(true)}
       onBlur={() => {
+        setFocused(false);
         // Escape sets the flag before blurring: the blur handler would otherwise still see the
         // typed draft in its closure and commit it.
         const cancelled = cancelledRef.current;

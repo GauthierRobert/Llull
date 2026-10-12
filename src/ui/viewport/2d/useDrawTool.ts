@@ -19,17 +19,9 @@
 import { useState, useCallback, useRef } from 'react';
 import type { Vec2 } from '@core/model/types';
 import { type DrawToolKind, useStore, useToolStore } from '@ui/store';
-import { moveSelection } from '@ui/actions/selectionActions';
 import { isEditingKeyEvent } from '@ui/hooks/useKeyboardShortcuts';
 import { useCaptureKeydown } from '@ui/hooks/useCaptureKeydown';
-import {
-  CHAIN_DRAW_TOOLS,
-  rectParamsFromCorners,
-  circleRadiusFromPoints,
-  chainTolerance,
-  dropRepeatedPoints,
-  ellipseParamsFromCenterCorner,
-} from './drawHelpers';
+import { drawToolDescriptor, isChainTool } from './drawToolTable';
 
 interface UseDrawToolResult {
   /** The currently active tool. */
@@ -45,27 +37,6 @@ interface UseDrawToolResult {
   handleClick: (point: Vec2) => void;
   /** Finish the polyline / wall chain / spline in progress (double-click or Enter). */
   finishChain: () => void;
-}
-
-/**
- * Wall-chain params: consecutive near-duplicate clicks (a double-click to finish adds the last
- * point twice) are merged; clicking the first point again closes the loop.
- */
-export function wallChainParams(
-  points: ReadonlyArray<Vec2>,
-  closed: boolean,
-): { points: Vec2[]; closed: boolean } {
-  const distinct = dropRepeatedPoints(points);
-  const first = distinct[0];
-  const last = distinct[distinct.length - 1];
-  const returnsToStart =
-    distinct.length >= 4 &&
-    first !== undefined &&
-    last !== undefined &&
-    Math.hypot(first[0] - last[0], first[1] - last[1]) <= chainTolerance(points);
-  return returnsToStart
-    ? { points: distinct.slice(0, -1), closed: true }
-    : { points: distinct, closed };
 }
 
 interface DrawProgress {
@@ -109,70 +80,36 @@ export function useDrawTool(): UseDrawToolResult {
     [setDrawTool, setCollectedPoints],
   );
 
+  /** Points of the shape in progress, read from the synchronous mirror (never the render closure). */
+  const livePoints = useCallback(
+    (): Vec2[] =>
+      progressRef.current.tool === activeTool ? progressRef.current.points : EMPTY_POINTS,
+    [activeTool],
+  );
+
   const finishChain = useCallback(() => {
-    const livePoints =
-      progressRef.current.tool === activeTool ? progressRef.current.points : EMPTY_POINTS;
-    if (livePoints.length >= 2) {
-      if (activeTool === 'wall') dispatch('draw_walls', wallChainParams(livePoints, false));
-      else {
-        const points = dropRepeatedPoints(livePoints);
-        if (points.length >= 2) {
-          dispatch(activeTool === 'spline' ? 'draw_spline' : 'draw_polyline', {
-            points,
-            closed: false,
-          });
-        }
-      }
-    }
+    const points = livePoints();
+    if (points.length >= 2) drawToolDescriptor(activeTool)?.commit(points, dispatch);
     setCollectedPoints([]);
-  }, [activeTool, dispatch, setCollectedPoints]);
+  }, [activeTool, dispatch, livePoints, setCollectedPoints]);
 
   const handleClick = useCallback(
     (point: Vec2) => {
-      if (activeTool === 'none') return;
-      if (activeTool === 'point') {
-        dispatch('draw_point', { position: [point[0], point[1], 0] });
+      const descriptor = drawToolDescriptor(activeTool);
+      if (!descriptor) return;
+      if (descriptor.requiresSelection && useStore.getState().document.selection.length === 0) {
         return;
       }
-      // Each click appends a vertex; finishChain() (Enter / double-click) commits.
-      if (CHAIN_DRAW_TOOLS.has(activeTool)) {
-        setCollectedPoints((previous) => [...previous, point]);
+      const next = [...livePoints(), point];
+      // Chains keep appending until finishChain() (Enter / double-click); the others commit at maxPoints.
+      if (descriptor.maxPoints === null || next.length < descriptor.maxPoints) {
+        setCollectedPoints(next);
         return;
       }
-      if (activeTool === 'move' && useStore.getState().document.selection.length === 0) return;
-
-      // Two-click tools: the first click records the anchor, the second one commits the shape.
-      const [first] = collectedPoints;
-      if (first === undefined) {
-        setCollectedPoints([point]);
-        return;
-      }
-      switch (activeTool) {
-        case 'move':
-          moveSelection([point[0] - first[0], point[1] - first[1], 0]);
-          break;
-        case 'line':
-          dispatch('draw_polyline', { points: [first, point] });
-          break;
-        case 'circle': {
-          const radius = circleRadiusFromPoints(first, point);
-          if (radius !== null) dispatch('draw_arc', { center: first, radius });
-          break;
-        }
-        case 'rectangle': {
-          const params = rectParamsFromCorners(first, point);
-          if (params !== null) dispatch('draw_rectangle', params);
-          break;
-        }
-        case 'ellipse': {
-          const params = ellipseParamsFromCenterCorner(first, point);
-          if (params !== null) dispatch('draw_ellipse', params);
-          break;
-        }
-      }
+      descriptor.commit(next, dispatch);
       setCollectedPoints([]);
     },
-    [activeTool, collectedPoints, dispatch, setCollectedPoints],
+    [activeTool, dispatch, livePoints, setCollectedPoints],
   );
 
   // Keyboard: Escape cancels; Enter finishes a polyline, wall chain or spline.
@@ -185,7 +122,7 @@ export function useDrawTool(): UseDrawToolResult {
         e.preventDefault();
         if (inProgress) setCollectedPoints([]);
         else setActiveTool('none');
-      } else if (e.key === 'Enter' && CHAIN_DRAW_TOOLS.has(activeTool)) {
+      } else if (e.key === 'Enter' && isChainTool(activeTool)) {
         finishChain();
       }
     },
@@ -198,8 +135,7 @@ export function useDrawTool(): UseDrawToolResult {
   const onUndoKey = useCallback(
     (e: KeyboardEvent): void => {
       if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.key.toLowerCase() !== 'z') return;
-      const target = e.composedPath()[0];
-      if (target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      if (isEditingKeyEvent(e)) return;
       e.preventDefault();
       e.stopPropagation();
       setCollectedPoints((prev) => prev.slice(0, -1));

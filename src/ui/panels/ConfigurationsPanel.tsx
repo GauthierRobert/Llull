@@ -8,25 +8,16 @@
 import React, { useRef, useState } from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
-import type { Configuration, Parameter } from '@core/model/types';
+import type { Configuration } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
+import { useIsMounted } from '@ui/hooks/useIsMounted';
+import { configurationDraftOf, isConfigurationActive } from '@ui/panels/configurationRules';
 import { PanelEmpty, PanelHeader, IconButton } from '@ui/panels/PanelParts';
 
 interface ConfigurationRowProps {
   config: Configuration;
   /** True when every parameter already holds this configuration's expression. */
   active: boolean;
-}
-
-/** A configuration is active when each of its parameters currently has its expression. */
-function isConfigurationActive(
-  config: Configuration,
-  parameters: Readonly<Record<string, Parameter>>,
-): boolean {
-  const entries = Object.entries(config.parameterValues);
-  return (
-    entries.length > 0 && entries.every(([name, expr]) => parameters[name]?.expression === expr)
-  );
 }
 
 function ConfigurationRow({ config, active }: ConfigurationRowProps): React.ReactElement {
@@ -155,30 +146,19 @@ function CreateConfigurationForm(): React.ReactElement {
   const handleRemoveRow = (index: number): void =>
     setPvRows((prev) => prev.filter((_, i) => i !== index));
 
-  const nonEmptyRows = pvRows.filter(
-    (r) => r.paramName.trim() !== '' || r.expression.trim() !== '',
-  );
-  const isSubmittable =
-    configName.trim() !== '' &&
-    nonEmptyRows.length > 0 &&
-    nonEmptyRows.every((r) => r.paramName.trim() !== '' && r.expression.trim() !== '');
+  const isMounted = useIsMounted();
+  const draft = configurationDraftOf(configName, pvRows);
 
   const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
-    if (!isSubmittable) return;
-    const parameterValues: Record<string, string> = {};
-    for (const row of nonEmptyRows) parameterValues[row.paramName.trim()] = row.expression.trim();
-    dispatch(
-      'create_configuration',
-      { name: configName.trim(), parameterValues },
-      {
-        onResult: ({ changed }) => {
-          if (!changed) return;
-          setConfigName('');
-          setPvRows([newRow()]);
-        },
+    if (draft === null) return;
+    dispatch('create_configuration', draft, {
+      onResult: ({ changed }) => {
+        if (!changed || !isMounted()) return;
+        setConfigName('');
+        setPvRows([newRow()]);
       },
-    );
+    });
   };
 
   return (
@@ -235,7 +215,7 @@ function CreateConfigurationForm(): React.ReactElement {
       <button
         type="submit"
         className="btn btn--primary btn--block"
-        disabled={!isSubmittable}
+        disabled={draft === null}
         aria-label="Create configuration"
         title="Create configuration"
       >

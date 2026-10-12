@@ -2,9 +2,10 @@ import { defineConfig, configDefaults } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'node:path';
 import { workspaceAliases } from './workspaceAliases.ts';
+import { serviceWorkerPlugin } from './viteServiceWorker.ts';
 
 export default defineConfig(({ command }) => ({
-  plugins: [react()],
+  plugins: [react(), serviceWorkerPlugin(import.meta.dirname)],
   // Serve .wasm files with the correct MIME type so WebAssembly.instantiateStreaming
   // succeeds in the browser (manifold-3d, opencascade.js). Vite dev-server otherwise
   // serves them as application/octet-stream which browsers reject for streaming compile.
@@ -75,6 +76,7 @@ export default defineConfig(({ command }) => ({
       'server/**',
       'desktop/**',
       'tests/e2e/**',
+      'tests/pwa/**',
     ],
     coverage: {
       provider: 'v8',

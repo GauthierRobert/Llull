@@ -20,6 +20,7 @@ import { errorMessage } from '@lib/errorMessage';
 import { hashText } from '@lib/hash';
 import { getLiveDoc, getLiveLogPosition, setLiveDoc } from './liveDocument';
 import { ANONYMOUS_ACTOR, appendAudit, hashParams, type Actor } from './audit';
+import type { CommandResponseBody } from '@mcp/restProtocol';
 
 /** Maximum undo/redo depth — mirrors MAX_UNDO_DEPTH in the UI store. */
 const MAX_UNDO_DEPTH = 100;
@@ -28,7 +29,7 @@ const MAX_UNDO_DEPTH = 100;
 const MAX_IDEMPOTENCY_ENTRIES = 1000;
 interface CachedResult {
   readonly requestHash: string;
-  readonly result: CommandBusResult;
+  readonly result: CommandResponseBody;
 }
 const _resultsByCommandId = new Map<string, CachedResult>();
 
@@ -46,26 +47,9 @@ const history: Record<HistoryDirection, CadDocument[]> = { undo: [], redo: [] };
 const pushCapped = (stack: CadDocument[], doc: CadDocument): CadDocument[] =>
   [...stack, doc].slice(-MAX_UNDO_DEPTH);
 
-/**
- * The value returned by `applyCommand`, `undo`, and `redo`.
- * - `affected` — ids created/changed (empty for queries, undo/redo, and no-ops).
- * - `isError`  — true when `execute` rejected the call (unknown command, invalid params,
- *   kernel unavailable, derivation guard) or the command threw.
- * - `data`     — present only when the command returned data (queries, `build_project` reports).
- * - `changed`  — the live document was replaced (true even when `affected` is empty, e.g.
- *   `set_parameter`); a cached idempotent replay reports the original `changed`.
- */
-interface CommandBusResult {
-  summary: string;
-  affected: string[];
-  isError: boolean;
-  changed: boolean;
-  data?: unknown;
-  canUndo: boolean;
-  canRedo: boolean;
-}
-
-function withHistoryFlags(result: Omit<CommandBusResult, 'canUndo' | 'canRedo'>): CommandBusResult {
+function withHistoryFlags(
+  result: Omit<CommandResponseBody, 'canUndo' | 'canRedo'>,
+): CommandResponseBody {
   return { ...result, canUndo: canUndo(), canRedo: canRedo() };
 }
 
@@ -89,7 +73,7 @@ export function applyCommand(
   params: unknown,
   commandId?: string,
   actor?: Actor,
-): CommandBusResult {
+): CommandResponseBody {
   if (commandId === undefined) return runCommand(name, params, actor);
   const requestHash = requestHashOf(name, params);
   const cached = _resultsByCommandId.get(commandId);
@@ -124,7 +108,7 @@ const MAX_CACHED_DATA_CHARS = 64 * 1024;
  * a scene snapshot) would pin megabytes per entry, 1000 entries deep; a replay then reports the
  * same outcome without it and says so.
  */
-function boundedForReplay(result: CommandBusResult): CommandBusResult {
+function boundedForReplay(result: CommandResponseBody): CommandResponseBody {
   if (result.data === undefined) return result;
   if ((JSON.stringify(result.data)?.length ?? 0) <= MAX_CACHED_DATA_CHARS) return result;
   const { data: _dropped, ...rest } = result;
@@ -136,7 +120,7 @@ function boundedForReplay(result: CommandBusResult): CommandBusResult {
 }
 
 /** `changed` = the live document was replaced by this call. */
-function runCommand(name: string, params: unknown, actor?: Actor): CommandBusResult {
+function runCommand(name: string, params: unknown, actor?: Actor): CommandResponseBody {
   const prior = getLiveDoc();
   let result: ReturnType<typeof execute>;
   try {
@@ -203,7 +187,7 @@ function travelHistory(
   summary: string,
   emptySummary: string,
   actor?: Actor,
-): CommandBusResult {
+): CommandResponseBody {
   const target = history[from].at(-1);
   if (target === undefined) {
     return withHistoryFlags({
@@ -222,12 +206,12 @@ function travelHistory(
 }
 
 /** Undo the last mutating command. */
-export function undo(actor?: Actor): CommandBusResult {
+export function undo(actor?: Actor): CommandResponseBody {
   return travelHistory('undo', 'redo', 'Undid last change.', 'Nothing to undo.', actor);
 }
 
 /** Redo the last undone command. */
-export function redo(actor?: Actor): CommandBusResult {
+export function redo(actor?: Actor): CommandResponseBody {
   return travelHistory('redo', 'undo', 'Redid last change.', 'Nothing to redo.', actor);
 }
 

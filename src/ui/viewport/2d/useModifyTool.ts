@@ -25,6 +25,7 @@ import type { Vec2 } from '@core/model/types';
 import { type ModifyToolKind, useStore, useToolStore } from '@ui/store';
 import { isEditingKeyEvent } from '@ui/hooks/useKeyboardShortcuts';
 import { useCaptureKeydown } from '@ui/hooks/useCaptureKeydown';
+import { MODIFY_KEYS } from '@ui/hooks/shortcuts';
 import { nearestVertex, signedOffsetDistance } from './modifyHelpers';
 
 /** Describes what the user should do next for the active modify tool. */
@@ -88,15 +89,6 @@ interface UseModifyToolResult {
   /** Cancel the current in-progress operation. The tool stays active. */
   cancel: () => void;
 }
-
-const KEY_TO_TOOL: Readonly<Record<string, ModifyToolKind>> = {
-  o: 'offset',
-  f: 'fillet',
-  k: 'chamfer',
-  t: 'trim',
-  x: 'extend',
-  e: 'explode',
-};
 
 export function useModifyTool(): UseModifyToolResult {
   const dispatch = useStore((s) => s.dispatch);
@@ -220,7 +212,7 @@ export function useModifyTool(): UseModifyToolResult {
       } else if (e.key === 'Enter' && phase === 'enter-value') {
         commitValue();
       } else if (!e.ctrlKey && !e.metaKey && !e.altKey) {
-        const tool = KEY_TO_TOOL[e.key.toLowerCase()];
+        const tool = MODIFY_KEYS[e.key.toLowerCase()];
         if (tool !== undefined) {
           e.preventDefault();
           setActiveTool(activeTool === tool ? 'none' : tool);

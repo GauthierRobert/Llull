@@ -6,12 +6,15 @@
  * A parameter `error` is shown under its row in an aria-live region.
  */
 
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
 import type { Parameter } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
 import { significantNumber } from '@lib/compactNumber';
+import { CommitInput } from '@ui/panels/propertyFields';
+import { useIsMounted } from '@ui/hooks/useIsMounted';
+import { isParameterNameValid, parameterDraftOf } from '@ui/panels/parameterRules';
 import { PanelEmpty, PanelHeader, IconButton } from '@ui/panels/PanelParts';
 
 interface ParameterRowProps {
@@ -20,19 +23,7 @@ interface ParameterRowProps {
 
 function ParameterRow({ param }: ParameterRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
-  const [editingExpression, setEditingExpression] = useState<string | null>(null);
-  /** Set by Escape so the blur that follows discards the edit instead of committing it. */
-  const cancelled = useRef(false);
 
-  const commitExpression = (): void => {
-    const trimmed = editingExpression?.trim() ?? '';
-    if (!cancelled.current && trimmed !== '' && editingExpression !== param.expression) {
-      dispatch('set_parameter', { name: param.name, expression: trimmed });
-    }
-    setEditingExpression(null);
-  };
-
-  const displayExpression = editingExpression !== null ? editingExpression : param.expression;
   const hasError = param.error != null;
 
   return (
@@ -45,25 +36,20 @@ function ParameterRow({ param }: ParameterRowProps): React.ReactElement {
         {param.name}
       </span>
 
-      <input
-        type="text"
+      <CommitInput
         className={`param-expression-input${hasError ? ' input--error' : ''}`}
-        value={displayExpression}
-        onFocus={() => {
-          cancelled.current = false;
-          setEditingExpression(param.expression);
+        value={param.expression}
+        label={`Expression for parameter ${param.name}`}
+        onCommit={(text) => {
+          const expression = text.trim();
+          if (expression !== '') dispatch('set_parameter', { name: param.name, expression });
         }}
-        onChange={(e) => setEditingExpression(e.target.value)}
-        onBlur={commitExpression}
-        onKeyDown={(e) => {
-          // Blur commits (once); Escape flags the blur as a cancel.
-          if (e.key === 'Escape') cancelled.current = true;
-          if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur();
+        inputProps={{
+          type: 'text',
+          'aria-invalid': hasError,
+          'aria-describedby': hasError ? `param-error-${param.name}` : undefined,
+          title: 'Edit expression (Enter to commit, Esc to cancel)',
         }}
-        aria-label={`Expression for parameter ${param.name}`}
-        aria-invalid={hasError}
-        aria-describedby={hasError ? `param-error-${param.name}` : undefined}
-        title="Edit expression (Enter to commit, Esc to cancel)"
       />
 
       <span className="param-value" aria-label={`Value of ${param.name}`}>
@@ -98,25 +84,21 @@ function AddParameterRow(): React.ReactElement {
   const [name, setName] = useState('');
   const [expression, setExpression] = useState('');
 
+  const isMounted = useIsMounted();
+  const draft = parameterDraftOf(name, expression);
+  const nameValid = isParameterNameValid(name);
+
   const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
-    const trimmedName = name.trim();
-    const trimmedExpr = expression.trim();
-    if (trimmedName === '' || trimmedExpr === '') return;
-    dispatch(
-      'set_parameter',
-      { name: trimmedName, expression: trimmedExpr },
-      {
-        onResult: ({ changed }) => {
-          if (!changed) return;
-          setName('');
-          setExpression('');
-        },
+    if (draft === null) return;
+    dispatch('set_parameter', draft, {
+      onResult: ({ changed }) => {
+        if (!changed || !isMounted()) return;
+        setName('');
+        setExpression('');
       },
-    );
+    });
   };
-
-  const nameValid = name.trim() === '' || /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name.trim());
 
   return (
     <form
@@ -147,7 +129,7 @@ function AddParameterRow(): React.ReactElement {
         <button
           type="submit"
           className="btn btn--primary"
-          disabled={name.trim() === '' || expression.trim() === '' || !nameValid}
+          disabled={draft === null || !nameValid}
           aria-label="Add parameter"
           title="Add parameter"
         >

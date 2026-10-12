@@ -17,22 +17,13 @@
 import { SERVER_BASE, serverAuthHeaders } from '@ui/serverConfig';
 import { errorMessage } from '@lib/errorMessage';
 import type { LiveSnapshotEvent } from '@mcp/liveSync';
+import type { CommandResponseBody } from '@mcp/restProtocol';
 
 /**
- * Shape returned by POST /command, POST /undo, and POST /redo.
- *
- * The document itself is NOT in this payload — it arrives via the /live SSE stream.
+ * Shape returned by POST /command, POST /undo, and POST /redo (`@mcp/restProtocol`).
+ * `changed` is absent from older servers.
  */
-export interface ServerCommandResponse {
-  summary: string;
-  affected: string[];
-  isError: boolean;
-  /** The live document was replaced (also when `affected` is empty). Absent from older servers. */
-  changed?: boolean;
-  data?: unknown;
-  canUndo: boolean;
-  canRedo: boolean;
-}
+export type ServerCommandResponse = Omit<CommandResponseBody, 'changed'> & { changed?: boolean };
 
 export class ServerCommandError extends Error {
   /** 'network' = fetch failed (server unreachable); 'http' = server answered non-2xx. */
