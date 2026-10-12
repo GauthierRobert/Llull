@@ -8,15 +8,14 @@
  */
 
 import type { Feature, FeatureProgram } from './program';
+import { formatNumber, provenance, quote } from './format';
 import {
-  featureLinesWithHeadings,
-  formatNumber,
-  parameterLines,
-  provenance,
-  quote,
-  sectionBanner,
-} from './format';
-import { placementKwargs, pythonTuple, modifierLine, shapeCallOpen } from './pythonCalls';
+  modifierLine,
+  parametersAndModel,
+  placementKwargs,
+  pythonTuple,
+  shapeCallOpen,
+} from './pythonCalls';
 import { pythonRuntime, type PythonBackend } from './pythonRuntime';
 
 const LIBRARY: Readonly<Record<PythonBackend, string>> = {
@@ -71,16 +70,13 @@ export function emitPython(program: FeatureProgram, backend: PythonBackend): str
   lines.push(`LLULL_UNITS = ${quote(program.units)}`, '');
   lines.push(`# ── llull runtime (${LIBRARY[backend]}) · keep unchanged ${'─'.repeat(30)}`);
   lines.push(pythonRuntime(backend));
-  lines.push(sectionBanner('PARAMETERS'));
   lines.push(
-    ...parameterLines(
+    ...parametersAndModel(
       program,
-      '#',
       (p) => `${p.identifier} = param(${quote(p.name)}, ${p.expression ?? formatNumber(p.value)})`,
+      featureLine,
     ),
   );
-  lines.push('', sectionBanner('MODEL'));
-  lines.push(...featureLinesWithHeadings(program, '#', featureLine));
   lines.push(
     '',
     'result = finish()',
