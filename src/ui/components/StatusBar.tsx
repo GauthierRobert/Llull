@@ -7,7 +7,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useStore } from '@ui/store';
-import { SERVER_BASE } from '@ui/serverConfig';
+import { fetchLicenseLabel } from '@ui/services/serverFiles';
 
 interface StatusItemProps {
   label: string;
@@ -62,21 +62,15 @@ function LicenseBadge(): React.ReactElement | null {
   const [license, setLicense] = useState<string | null>(null);
 
   useEffect(() => {
-    if (liveStatus !== 'connected' || typeof fetch !== 'function') {
+    if (liveStatus !== 'connected') {
       setLicense(null);
       return;
     }
-    let cancelled = false;
-    fetch(`${SERVER_BASE}/license`)
-      .then((response) => (response.ok ? (response.json() as Promise<unknown>) : null))
-      .then((body) => {
-        const label = (body as { label?: unknown } | null)?.label;
-        if (!cancelled && typeof label === 'string') setLicense(label);
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
+    const controller = new AbortController();
+    void fetchLicenseLabel(controller.signal).then((label) => {
+      if (!controller.signal.aborted && label !== null) setLicense(label);
+    });
+    return () => controller.abort();
   }, [liveStatus]);
 
   if (license === null) return null;

@@ -17,6 +17,7 @@ import { applyCommand } from './commandBus';
 import { convertDwgToDxf, dwgConfigFromEnv, DwgConvertError } from './dwgConvert';
 import { guardMutation } from './security';
 import { actorOf } from './audit';
+import type { DwgImportResponseBody, ErrorResponseBody } from '@mcp/restProtocol';
 
 const LIST_KEYS = new Set(['layers', 'sources']);
 const BOOLEAN_KEYS = new Set(['keepZeroElevation']);
@@ -84,11 +85,17 @@ export function buildImportRouter(restLimiter: RequestHandler): Router {
           undefined,
           actorOf(res, 'rest'),
         );
-        res.status(200).json({ ...result, command, dxfBytes: Buffer.byteLength(text) });
+        const reply: DwgImportResponseBody = {
+          ...result,
+          command,
+          dxfBytes: Buffer.byteLength(text),
+        };
+        res.status(200).json(reply);
       })
       .catch((error: unknown) => {
         const status = error instanceof DwgConvertError ? error.status : 500;
-        res.status(status).json({ error: errorMessage(error) });
+        const reply: ErrorResponseBody = { error: errorMessage(error) };
+        res.status(status).json(reply);
       });
   });
 

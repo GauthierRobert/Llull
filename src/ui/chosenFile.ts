@@ -16,3 +16,13 @@ export function takeChosenFile(event: React.ChangeEvent<HTMLInputElement>): File
 export function fileStem(fileName: string): string {
   return fileName.replace(/\.[^.]+$/, '');
 }
+
+/** Reads the first chosen file as text, then hands it to `onText` (clears the input like `takeChosenFile`). */
+export function readChosenFile(
+  event: React.ChangeEvent<HTMLInputElement>,
+  onText: (text: string, fileName: string) => void,
+): void {
+  const file = takeChosenFile(event);
+  if (!file) return;
+  void file.text().then((text) => onText(text, file.name));
+}

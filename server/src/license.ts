@@ -10,6 +10,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import { isRecord } from '@lib/isRecord';
 import { errorMessage } from '@lib/errorMessage';
+import type { LicenseResponseBody } from '@mcp/restProtocol';
 
 export const EVALUATION_SEATS = 3;
 
@@ -140,7 +141,7 @@ export function getLicense(now: Date = new Date()): LicenseStatus {
 }
 
 /** Body of the public `GET /license`. */
-export function publicLicenseBody(status: LicenseStatus): Record<string, unknown> {
+export function publicLicenseBody(status: LicenseStatus): LicenseResponseBody {
   return {
     mode: status.mode,
     customer: status.customer,

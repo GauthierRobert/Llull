@@ -9,9 +9,9 @@
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import { execute } from '@core/commands/registry';
-import { SERVER_BASE, serverAuthHeaders } from '@ui/serverConfig';
 import { downloadBlob as download } from '@ui/download';
 import { isCodeExportData } from '@ui/resultData';
+import { fetchStepExport } from '@ui/services/serverFiles';
 
 type ExportFormat = 'cadquery' | 'build123d' | 'openscad' | 'freecad' | 'step';
 
@@ -43,20 +43,9 @@ export function ModelExport(): React.ReactElement {
 
   const exportStep = async (): Promise<void> => {
     setStatus('Exporting STEP…');
-    try {
-      const response = await fetch(`${SERVER_BASE}/export/step?name=model`, {
-        headers: serverAuthHeaders(),
-      });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as { error?: string };
-        setStatus(body.error ?? `STEP export failed (HTTP ${response.status}).`);
-        return;
-      }
-      download(await response.blob(), 'model.step');
-      setStatus('STEP exported from the server’s live model.');
-    } catch {
-      setStatus(`STEP export needs the llull server at ${SERVER_BASE}.`);
-    }
+    const result = await fetchStepExport('model');
+    if (result.ok) download(result.blob, 'model.step');
+    setStatus(result.message);
   };
 
   const handleExport = (): void => {
