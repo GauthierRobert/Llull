@@ -108,6 +108,7 @@ Main thread by default; delegate for ≥ 2 independent lanes or > ~4 files in on
 - `fix-bug` — reproduce first (failing test / golden plan), then fix
 - `draw-2d` — add/extend 2D drafting (lines, arcs, polylines, dimensions, snapping, sketch→solid)
 - `parametric` — parameters, constraints, feature history (edit-and-regenerate)
+- `drawing-to-model` — rebuild a part from a 2D technical drawing and prove it (mass, extents, llull views vs drawing views, 3D IoU vs a real STEP/STL)
 - `measure` — read-only measurement/inspection tools (distance, area, volume, mass)
 - `mcp-server` — build/extend the MCP host over the registry
 - `viewport-feature` — implement or change 2D/3D viewport behavior

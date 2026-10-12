@@ -1,6 +1,6 @@
 /**
  * Edge selection for fillet_edge / chamfer_edge against a solid's exact topology: explicit indices,
- * points (`edgesNear`: the roundable edge whose mid point is nearest each point), and the checks
+ * points (`edgesNear`: the roundable edge nearest each point, measured to the curve itself), and the checks
  * that reject a selection the kernel would silently drop.
  *
  * @layer core/commands
@@ -18,15 +18,59 @@ const roundable = (edge: ShapeEdge): boolean => !edge.seam && !edge.degenerate;
 const distanceSquared = (a: Vec3, b: Vec3): number =>
   (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
 
-/** Index of the roundable edge whose mid point is nearest `point`, or undefined when none is. */
+/** Squared distance from `point` to the segment a-b. */
+function segmentDistanceSquared(point: Vec3, a: Vec3, b: Vec3): number {
+  const ab: Vec3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const lengthSquared = ab[0] ** 2 + ab[1] ** 2 + ab[2] ** 2;
+  const t =
+    lengthSquared === 0
+      ? 0
+      : Math.min(
+          1,
+          Math.max(
+            0,
+            ((point[0] - a[0]) * ab[0] + (point[1] - a[1]) * ab[1] + (point[2] - a[2]) * ab[2]) /
+              lengthSquared,
+          ),
+        );
+  return distanceSquared(point, [a[0] + ab[0] * t, a[1] + ab[1] * t, a[2] + ab[2] * t]);
+}
+
+/** Squared distance from `point` to the edge (its sample polyline; start-mid-end when unsampled). */
+function edgeDistanceSquared(edge: ShapeEdge, point: Vec3): number {
+  const path = edge.samples ?? [edge.start, edge.mid, edge.end];
+  let best = distanceSquared(path[0] ?? edge.mid, point);
+  for (let k = 1; k < path.length; k++) {
+    const [a, b] = [path[k - 1], path[k]];
+    if (a !== undefined && b !== undefined)
+      best = Math.min(best, segmentDistanceSquared(point, a, b));
+  }
+  return best;
+}
+
+/**
+ * Index of the roundable edge nearest `point` (a point anywhere along a long edge picks it, not a
+ * short neighbour whose mid point happens to be closer); ties (a point on a shared vertex) go to
+ * the edge whose mid point is nearer. Undefined when no edge is roundable.
+ */
 function nearestEdge(topology: ShapeTopology, point: Vec3): number | undefined {
-  let best: ShapeEdge | undefined;
+  const EPSILON = 1e-9;
+  let best: { edge: ShapeEdge; distance: number; mid: number } | undefined;
   for (const edge of topology.edges) {
     if (!roundable(edge)) continue;
-    if (best === undefined || distanceSquared(edge.mid, point) < distanceSquared(best.mid, point))
-      best = edge;
+    const candidate = {
+      edge,
+      distance: edgeDistanceSquared(edge, point),
+      mid: distanceSquared(edge.mid, point),
+    };
+    if (
+      best === undefined ||
+      candidate.distance < best.distance - EPSILON ||
+      (Math.abs(candidate.distance - best.distance) <= EPSILON && candidate.mid < best.mid)
+    )
+      best = candidate;
   }
-  return best?.index;
+  return best?.edge.index;
 }
 
 /**

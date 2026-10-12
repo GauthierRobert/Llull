@@ -26,6 +26,7 @@ import {
   type OccBuilder,
   type OccFilletMaker,
   type OccFuse,
+  type OccUnifier,
   type OccShapeList,
   type OccHandle,
   type OccOffsetMaker,
@@ -226,6 +227,29 @@ function blendedUnion(api: OccApi, shapes: readonly OccShape[], radius: number):
   });
 }
 
+/**
+ * `shape` with coplanar / co-cylindrical faces and collinear edges merged
+ * (ShapeUpgrade_UnifySameDomain), the clean-up every CAD kernel runs after a boolean: without it a
+ * union leaves the seam between two fused boxes as a split face, so one visible edge is two B-rep
+ * edges and a fillet on it rounds only half. Falls back to `shape` when unification fails.
+ */
+function unified(
+  api: OccApi,
+  shape: OccShape,
+  own: <H extends OccHandle | null>(handle: H) => H,
+): OccShape {
+  try {
+    const unifier = own(
+      new api.ShapeUpgrade_UnifySameDomain_2(shape, true, true, false) as OccUnifier,
+    );
+    unifier.AllowInternalEdges(false);
+    unifier.Build();
+    return unifier.Shape();
+  } catch {
+    return shape;
+  }
+}
+
 /** Closed hollow: the solid minus its inward offset by `thickness` (a sealed internal cavity). */
 function hollow(api: OccApi, solid: OccShape, thickness: number): OccShape | null {
   if (!(thickness > 0)) return null;
@@ -281,7 +305,7 @@ export function occtOps(api: OccApi): KernelOps<OccShape> {
     boolean: (op: BooleanOp, a, b) =>
       guarded('fragile', (own) => {
         const builder = own(new api[BOOLEAN_BUILDERS[op]](a, b) as OccBuilder);
-        return builder.IsDone() ? builder.Shape() : null;
+        return builder.IsDone() ? unified(api, builder.Shape(), own) : null;
       }),
     fillet: (shape, edges, radius, radiusEnd) =>
       roundEdges(

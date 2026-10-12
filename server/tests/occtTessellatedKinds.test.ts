@@ -1,8 +1,8 @@
 /**
  * @layer server/tests
- * Live OpenCascade vs Manifold: wedge, pyramid and revolution (no exact OCC maker; their
- * triangles are sewn into a solid) are valid boolean operands that agree with Manifold, which
- * works from the same triangles.
+ * Live OpenCascade vs Manifold: wedge, pyramid and revolution are valid boolean operands whose
+ * exact OCC volume agrees with Manifold's (a revolution finely segmented so its facets do not
+ * count).
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -11,7 +11,7 @@ import type { GeometryKernel } from '@core/geometry/kernel';
 import type { MeshData } from '@core/model/types';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createNodeOcctKernel } from '../src/occtNode';
-import { common, booleanMesh, box, meshOf, volume } from './kernelTestSupport';
+import { common, booleanMesh, booleanRecipe, box, leaf, meshOf, volume } from './kernelTestSupport';
 
 const at = (
   position: Vec3,
@@ -43,7 +43,8 @@ const shapes: Array<[string, (position: Vec3, rotation: Vec3) => Entity]> = [
         ],
         axis: [0, 0, 1],
         angle: Math.PI * 2,
-        segments: 24,
+        // OCC revolves exactly; Manifold facets: 96 segments keep that under 0.1 %.
+        segments: 96,
         ...at(p, r),
       }) as Entity,
   ],
@@ -66,7 +67,8 @@ describe.each(shapes)('occt %s', (name, make) => {
     expect(fromOcct, name).not.toBeNull();
     expect(fromManifold, name).not.toBeNull();
     expect(volume(fromOcct!)).toBeGreaterThan(0);
-    expect(volume(fromOcct!) / volume(fromManifold!)).toBeCloseTo(1, 2);
+    const exact = occt.topology(occt.evaluate(leaf(entity))!)!.volume;
+    expect(exact / volume(fromManifold!)).toBeCloseTo(1, 2);
   });
 
   it.each(['union', 'subtract', 'intersect'] as const)(
@@ -80,7 +82,9 @@ describe.each(shapes)('occt %s', (name, make) => {
       ];
       expect(fromOcct, `${name} ${op}`).not.toBeNull();
       expect(fromManifold, `${name} ${op}`).not.toBeNull();
-      expect(volume(fromOcct!) / volume(fromManifold!)).toBeCloseTo(1, 2);
+      // The exact B-rep volume: the OCC display mesh is a coarse (0.5 rad) tessellation.
+      const exact = occt.topology(occt.evaluate(booleanRecipe(op, entity, other))!)!.volume;
+      expect(exact / volume(fromManifold!)).toBeCloseTo(1, 2);
     },
   );
 });

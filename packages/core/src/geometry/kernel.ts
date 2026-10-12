@@ -42,6 +42,8 @@ export interface ShapeEdge {
   readonly end: Vec3;
   /** Point at the parameter midpoint (on the curve, not the chord). */
   readonly mid: Vec3;
+  /** Points along the curve, start to end (curved edges); `edgesNear` measures distance to them. */
+  readonly samples?: readonly Vec3[];
   /** Bounds a single face (a cylinder's seam): no corner to fillet or chamfer. */
   readonly seam: boolean;
   /** Zero-length (a sphere or cone pole): no corner to fillet or chamfer. */

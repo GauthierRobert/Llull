@@ -141,7 +141,7 @@ export const filletEdge = defineCommand({
         ),
       )
       .describe(
-        'Select edges by location: each point picks the roundable edge whose mid point is nearest. ' +
+        'Select edges by location: each point picks the roundable edge nearest to it (distance to the edge curve, so any point on an edge, e.g. its visible corner on a drawing, selects it). ' +
           'Prefer this in parametric models: the feature history keeps the points, so the same edge is ' +
           're-selected after an upstream edit renumbers edges. Combines with edgeIndices.',
       )
@@ -213,7 +213,7 @@ export const chamferEdge = defineCommand({
         ),
       )
       .describe(
-        'Select edges by location: each point picks the roundable edge whose mid point is nearest. ' +
+        'Select edges by location: each point picks the roundable edge nearest to it (distance to the edge curve, so any point on an edge, e.g. its visible corner on a drawing, selects it). ' +
           'Prefer this in parametric models: the feature history keeps the points, so the same edge is ' +
           're-selected after an upstream edit renumbers edges. Combines with edgeIndices.',
       )

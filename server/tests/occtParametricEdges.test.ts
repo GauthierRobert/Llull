@@ -45,3 +45,26 @@ describe('occt fillet by location across a parametric edit', () => {
     expect(topology.faces.filter((face) => face.surface === 'cylinder')).toHaveLength(1);
   });
 });
+
+describe('occt booleans merge same-domain faces', () => {
+  it('a union of a plate and an upright flush with its side is one face per side', () => {
+    // Plate 60×20×10 and an upright 20×20×40 standing on its left end, flush with three sides.
+    let doc = apply(createEmptyDocument(), 'add_box', {
+      size: [60, 20, 10],
+      anchor: 'min',
+      position: [0, 0, 0],
+    });
+    doc = apply(doc, 'add_box', { size: [20, 20, 40], anchor: 'min', position: [0, 0, 0] });
+    const [plate, upright] = doc.order;
+    doc = apply(doc, 'boolean_union', { a: plate, b: upright });
+    // An L-shaped prism: 8 faces, 18 edges (two 6-gon caps + 6 side faces) — no split side faces.
+    const topology = topologyOf(doc);
+    expect(topology.faces).toHaveLength(8);
+    expect(topology.edges).toHaveLength(18);
+
+    // So one point on the outer vertical corner rounds its full height (0..40), not just 10..40.
+    const [lBracket] = doc.order;
+    doc = apply(doc, 'fillet_edge', { id: lBracket, edgesNear: [[0, 0, 5]], radius: 3 });
+    expect(topologyOf(doc).volume).toBeCloseTo(60 * 20 * 10 + 20 * 20 * 30 - filletLoss(3, 40), 4);
+  });
+});

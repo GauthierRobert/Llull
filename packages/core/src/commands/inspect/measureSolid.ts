@@ -1,6 +1,6 @@
 import type { CadDocument, Entity, Vec3 } from '../../model/types';
 import { cross3, dot3 } from '../../lib/vec3';
-import type { CommandResult } from '../types';
+import type { CommandResult, ExecutionContext } from '../types';
 import { defineCommand, z } from '../schema';
 import { entityBounds, entityBoundsInDoc, mergeBounds } from '../../geometry/bounds';
 import { expandInstance } from '../../geometry/instanceExpansion';
@@ -12,6 +12,7 @@ import { chainLength } from '../../geometry/curveSegments';
 import { sweepTriangles } from '../../geometry/sweep';
 import { loftTriangles } from '../../geometry/loft';
 import { subdivisionTriangles } from '../../geometry/subdivision';
+import { currentContext } from '../context';
 
 interface MeasureBoundingBoxData {
   min: Vec3;
@@ -92,6 +93,22 @@ export const measureBoundingBox = defineCommand({
 interface MeasureVolumeData {
   volume: number;
   unit: string;
+  /** 'exact': the kernel's B-rep volume; 'mesh': the display triangles; 'analytic': a closed form. */
+  method?: 'exact' | 'mesh';
+}
+
+/**
+ * Exact volume of a kernel result (a mesh entity that keeps its B-rep recipe), or null when no
+ * kernel with exact topology (OCC) is installed. The display mesh is a coarse tessellation (0.1
+ * linear / 0.5 rad angular deflection), so its volume is off by up to ~1 % on small curved parts —
+ * too much for a mass check against a drawing.
+ */
+function exactVolume(e: Entity, ctx: ExecutionContext | undefined): number | null {
+  if (e.kind !== 'mesh' || e.brep === undefined) return null;
+  const kernel = (ctx ?? currentContext()).kernel;
+  const shape = kernel?.evaluate(e.brep) ?? null;
+  const topology = shape === null ? null : (kernel?.topology(shape) ?? null);
+  return topology !== null && topology.volume > 0 ? topology.volume : null;
 }
 
 /** Round sections: annulus area × path length (Pappus); other sections: tessellated volume. */
@@ -141,7 +158,8 @@ export const measureVolume = defineCommand({
   description:
     "Compute the volume of a 3D solid entity. Supported kinds: 'box' (w×h×d), " +
     "'cylinder' (π r² h), 'sphere' (4/3 π r³), 'extrusion' (profile area × depth), " +
-    "'mesh' (signed-tetrahedra sum — assumes closed, consistently wound mesh), " +
+    "'mesh' (a kernel result with the OCC kernel: the exact B-rep volume; otherwise the signed-tetrahedra sum " +
+    'of its display triangles — data.method says which), ' +
     "'cone' (π r² h / 3), 'torus' (2 π² · ringRadius · tubeRadius²), " +
     "'wedge' (w×h×d / 2 — half the enclosing box), " +
     "'pyramid' (baseWidth × baseDepth × height / 3), " +
@@ -159,12 +177,13 @@ export const measureVolume = defineCommand({
           "'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', 'subdivision'.",
       ),
   }),
-  run: (doc, { entityId }): CommandResult => {
+  run: (doc, { entityId }, ctx): CommandResult => {
     const e = doc.entities[entityId];
     if (!e) return noop(doc, `measure_volume: entity '${entityId}' not found.`);
 
     const volumeUnit = `${doc.units}³`;
     let volume: number;
+    let method: MeasureVolumeData['method'];
 
     switch (e.kind) {
       case 'box':
@@ -179,9 +198,12 @@ export const measureVolume = defineCommand({
       case 'extrusion':
         volume = polygonArea(e.profile) * e.depth;
         break;
-      case 'mesh':
-        volume = meshVolume(e.mesh.positions, e.mesh.indices);
+      case 'mesh': {
+        const exact = exactVolume(e, ctx);
+        method = exact === null ? 'mesh' : 'exact';
+        volume = exact ?? meshVolume(e.mesh.positions, e.mesh.indices);
         break;
+      }
       case 'cone':
         volume = (Math.PI * e.radius * e.radius * e.height) / 3;
         break;
@@ -246,10 +268,20 @@ export const measureVolume = defineCommand({
         );
     }
 
-    const data: MeasureVolumeData = { volume, unit: volumeUnit };
+    const data: MeasureVolumeData = {
+      volume,
+      unit: volumeUnit,
+      ...(method === undefined ? {} : { method }),
+    };
+    const how =
+      method === 'exact'
+        ? ' (exact B-rep)'
+        : method === 'mesh'
+          ? ' (display mesh; the OCC kernel gives the exact B-rep volume)'
+          : '';
     return report(
       doc,
-      `Volume of ${entityId} = ${volume.toFixed(doc.displayPrecision)} ${volumeUnit}.`,
+      `Volume of ${entityId} = ${volume.toFixed(doc.displayPrecision)} ${volumeUnit}${how}.`,
       data,
     );
   },
@@ -346,7 +378,7 @@ export const massProperties = defineCommand({
           'Examples for a mm document: steel ≈ 0.00785, aluminium ≈ 0.0027, PLA ≈ 0.00124.',
       ),
   }),
-  run: (doc, { entityId, density }): CommandResult => {
+  run: (doc, { entityId, density }, ctx): CommandResult => {
     if (density <= 0)
       return noop(doc, `mass_properties: density must be > 0, got ${String(density)}.`);
 
@@ -377,7 +409,7 @@ export const massProperties = defineCommand({
       }
     }
 
-    const volumeResult = measureVolume.run(doc, { entityId });
+    const volumeResult = measureVolume.run(doc, { entityId }, ctx);
     if (!volumeResult.data) return noop(doc, volumeResult.summary);
 
     const { volume } = volumeResult.data as MeasureVolumeData;
