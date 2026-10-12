@@ -10,10 +10,10 @@
 
 import { useStore } from '@ui/store';
 
-export const CIVIL_SAMPLE_SURVEY_URL = `${import.meta.env.BASE_URL}samples/pilot-site-survey.csv`;
+const CIVIL_SAMPLE_SURVEY_URL = `${import.meta.env.BASE_URL}samples/pilot-site-survey.csv`;
 
 /** Design storm of the starter network: i = a / (t + b)^c mm/h (10-year, temperate climate). */
-export const CIVIL_STARTER_IDF = { a: 1000, b: 10, c: 0.8 } as const;
+const CIVIL_STARTER_IDF = { a: 1000, b: 10, c: 0.8 } as const;
 
 /** Local site grid origin of the sample survey (metres). */
 const ORIGIN_E = 1000;
@@ -42,7 +42,7 @@ const manhole = (
 });
 
 /** The starter site as `build_project` actions (ids are the ones minted on an empty document). */
-export function civilStarterActions(surveyText: string): PlanAction[] {
+function civilStarterActions(surveyText: string): PlanAction[] {
   return [
     { command: 'set_units', params: { units: 'm' } },
     { command: 'set_project_info', params: { name: 'Pilot site', client: 'Sample data' } },

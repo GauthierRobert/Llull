@@ -16,7 +16,7 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tests && tsc --noEmit -p tests/quality && tsc --noEmit -p tests/production",
     "claude:lint": "node .claude/hooks/claude-lint.mjs",
     "arch": "depcruise packages src server/src desktop/src --config .dependency-cruiser.cjs --output-type err",
-    "check": "npm run typecheck && npm run arch && npm run lint && npm run format:check && npm run test",
+    "check": "npm run typecheck && npm run arch && npm run deadcode && npm run lint && npm run format:check && npm run test",
     "format:check": "prettier --check \"**/*.{ts,tsx,mjs,cjs,js}\"",
     "test:e2e": "playwright test",
     "quality:fetch": "node quality/fetchCorpus.mjs",
@@ -29,7 +29,8 @@
     "production:agent": "npm --prefix server run production:agent",
     "production:ui": "playwright test --config playwright.production.config.ts",
     "production": "npm run production:scripted && npm run production:ui",
-    "llull": "node server/bin/llull.cjs"
+    "llull": "node server/bin/llull.cjs",
+    "deadcode": "knip --include exports,types"
   },
   "dependencies": {
     "@fontsource/geist-mono": "^5.3.0",
@@ -61,6 +62,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.13.0",
     "jsdom": "^29.1.1",
+    "knip": "^6.41.0",
     "opencascade.js": "^1.1.1",
     "prettier": "^3.3.3",
     "typescript": "~6.0.3",

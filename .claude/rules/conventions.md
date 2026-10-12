@@ -43,5 +43,6 @@ PostToolUse hook formats each edited file; never hand-format or fight it.
   `CadPlugin`, a new entity kind with a union member + render branch (`add-entity-kind` skill) —
   not by growing a `switch` in every caller.
 - Depend on narrow injected ports (`ctx.kernel`, `ctx.ids`, `ctx.registry`), never concretions.
-- No dead code, unused exports, or `console.log` (`console.warn`/`error` allowed).
+- No dead code, unused exports (`npm run deadcode`, knip), or `console.log` (`console.warn`/`error`
+  allowed). Export only what another module imports.
 - Minimal, uniform diffs: smallest change that does the job, matching surrounding style.

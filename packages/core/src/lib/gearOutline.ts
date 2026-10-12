@@ -9,7 +9,7 @@ import type { Point2 } from './polygon';
 export const DEFAULT_FLANK_SAMPLES = 7;
 
 /** Backlash added between mating gears, as a fraction of the module (tooth thickness at pitch). */
-export const BACKLASH_PER_MODULE = 0.05;
+const BACKLASH_PER_MODULE = 0.05;
 
 /**
  * One tooth-pattern description. The outline carries `teeth` teeth, tooth 0 centred on angle `phase`.

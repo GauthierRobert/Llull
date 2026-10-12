@@ -17,7 +17,7 @@ export interface Sheet {
 }
 
 /** ISO 216 landscape sheets, mm. */
-export const ISO_PAPER: Record<string, [number, number]> = {
+const ISO_PAPER: Record<string, [number, number]> = {
   A4: [297, 210],
   A3: [420, 297],
   A2: [594, 420],

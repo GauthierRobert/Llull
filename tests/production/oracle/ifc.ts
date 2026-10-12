@@ -22,7 +22,7 @@ export interface IfcFile {
 }
 
 /** Split a STEP argument list into values; strings keep their quotes, lists become arrays. */
-export function parseArgs(text: string): StepValue[] {
+function parseArgs(text: string): StepValue[] {
   const root: StepValue[] = [];
   const stack: StepValue[][] = [root];
   let token = '';
@@ -178,7 +178,7 @@ export function numbersIn(values: StepValue[]): number[] {
   return found;
 }
 
-export interface IfcStorey {
+interface IfcStorey {
   id: number;
   guid: string;
   name: string;
@@ -186,7 +186,7 @@ export interface IfcStorey {
 }
 
 /** IFCBUILDINGSTOREY(GlobalId, OwnerHistory, Name, Description, ObjectType, Placement, Representation, LongName, CompositionType, Elevation). */
-export function storeys(file: IfcFile): IfcStorey[] {
+function storeys(file: IfcFile): IfcStorey[] {
   return ofType(file, 'IFCBUILDINGSTOREY').map((entity) => ({
     id: entity.id,
     guid: stepString(entity.args[0]),
@@ -206,9 +206,4 @@ export function containment(file: IfcFile): Map<number, string> {
     for (const element of references([rel.args[4] ?? []])) contained.set(element, storeyName);
   }
   return contained;
-}
-
-/** Name attribute (3rd argument) of a rooted entity. */
-export function entityName(entity: StepEntity): string {
-  return stepString(entity.args[2]);
 }

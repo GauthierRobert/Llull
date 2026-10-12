@@ -59,7 +59,7 @@ function posInt(value: string | undefined, fallback: number): number {
 }
 
 /** Resolved audit file, or null when auditing is off (tests without LLULL_AUDIT_FILE). */
-export function auditFilePath(defaultDirectory: string): string | null {
+function auditFilePath(defaultDirectory: string): string | null {
   const configured = process.env['LLULL_AUDIT_FILE']?.trim();
   if (configured !== undefined && configured !== '') return configured;
   if (process.env['VITEST'] !== undefined || process.env['TEST'] === 'true') return null;

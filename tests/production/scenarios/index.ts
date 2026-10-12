@@ -16,7 +16,7 @@ export const SCENARIOS: readonly Scenario[] = [
   civilSite,
 ];
 
-export function scenarioById(id: string): Scenario {
+function scenarioById(id: string): Scenario {
   const scenario = SCENARIOS.find((s) => s.id === id);
   if (!scenario) throw new Error(`unknown production scenario ${id}`);
   return scenario;

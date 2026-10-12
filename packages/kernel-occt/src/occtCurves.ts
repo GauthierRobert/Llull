@@ -64,7 +64,7 @@ function segmentEdge(api: OccApi, segment: CurveSegment<Vec3>): OccShape | null 
 }
 
 /** Wire through a connected chain; null when any edge or the wire fails. */
-export function chainWire(api: OccApi, chain: ReadonlyArray<CurveSegment<Vec3>>): OccShape | null {
+function chainWire(api: OccApi, chain: ReadonlyArray<CurveSegment<Vec3>>): OccShape | null {
   const maker = new api.BRepBuilderAPI_MakeWire_1() as OccWireMaker;
   for (const segment of chain) {
     const edge = segmentEdge(api, segment);

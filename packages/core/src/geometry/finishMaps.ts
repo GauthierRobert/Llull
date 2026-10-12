@@ -11,7 +11,7 @@ import { parseHexRgb } from '../lib/isHexColor';
 import { map3 } from '../lib/vec3';
 
 /** Texture tile edge in pixels. */
-export const FINISH_TEXTURE_SIZE = 256;
+const FINISH_TEXTURE_SIZE = 256;
 
 /** RGBA maps of one finish tile (`size` × `size` pixels each). */
 export interface FinishMaps {

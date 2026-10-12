@@ -9,7 +9,7 @@ import { getCommand } from '@core/commands/registry';
 import { isRecord } from '@lib/isRecord';
 
 /** A step slower than this earns a warning line, whatever the progress setting. */
-export const SLOW_STEP_MS = 10_000;
+const SLOW_STEP_MS = 10_000;
 
 export interface StepObserverOptions {
   /** Millisecond clock (injected so tests are deterministic). */
@@ -24,7 +24,7 @@ export interface StepObserverOptions {
 }
 
 /** Where a `--timeout` deadline stopped the run. */
-export interface TimeoutStop {
+interface TimeoutStop {
   readonly seconds: number;
   readonly ordinal: number;
   readonly total: number;

@@ -1,4 +1,5 @@
-# Runs the same gate as `npm run check` (typecheck + architecture rules + lint + format + tests)
+# Runs the same gate as `npm run check` (typecheck + architecture rules + unused exports + lint +
+# format + tests)
 # plus the coverage gate and the server + desktop suites, so the architecture laws hold for every change.
 name: check
 
@@ -31,6 +32,7 @@ jobs:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       - run: npm run typecheck
       - run: npm run arch
+      - run: npm run deadcode
       - run: npm run lint
       - run: npm run format:check
       - run: npm run test:coverage

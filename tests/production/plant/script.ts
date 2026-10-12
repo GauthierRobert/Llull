@@ -16,7 +16,7 @@ export const OPENING_MARGIN = 300;
 const rel = (intent: PlantIntent, level: number, z: number): number =>
   z - (intent.levels[level]?.elevation ?? 0);
 
-export function openingAround(equipment: IntentEquipment, margin = OPENING_MARGIN): Vec2[] {
+function openingAround(equipment: IntentEquipment, margin = OPENING_MARGIN): Vec2[] {
   const [cx, cy] = equipment.location;
   const hx = equipment.size[0] / 2 + margin;
   const hy = equipment.size[1] / 2 + margin;
@@ -29,7 +29,7 @@ export function openingAround(equipment: IntentEquipment, margin = OPENING_MARGI
 }
 
 /** Floors an equipment passes through: FFL strictly between its base and top. */
-export function floorsCrossed(intent: PlantIntent, equipment: IntentEquipment): number[] {
+function floorsCrossed(intent: PlantIntent, equipment: IntentEquipment): number[] {
   const base = intent.levels[equipment.level]?.elevation ?? 0;
   const top = base + equipment.size[2];
   return intent.floors

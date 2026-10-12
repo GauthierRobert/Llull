@@ -48,7 +48,7 @@ export function underlayCorners(placement: UnderlayPlacement): [Vec3, Vec3, Vec3
   return [at([0, 0]), at([w, 0]), at([w, h]), at([0, h])];
 }
 
-export type UnderlayAxis = 'x' | 'y';
+type UnderlayAxis = 'x' | 'y';
 
 export interface UnderlayCalibration {
   /** Two image pixels whose real-world separation is known. */

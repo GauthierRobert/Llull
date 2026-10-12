@@ -49,7 +49,7 @@ export interface CheckOutcome {
   detail: string;
 }
 
-export type CriterionArea =
+type CriterionArea =
   | 'structure'
   | 'equipment'
   | 'piping'

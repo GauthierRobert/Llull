@@ -45,7 +45,7 @@ const PUMP_LINE: IntentPipe = {
 };
 const PROJECT = { revision: 'B', date: '2026-10-19' };
 
-export const revisedIntent: PlantIntent = {
+const revisedIntent: PlantIntent = {
   ...extractionIntent,
   project: { ...extractionIntent.project, ...PROJECT },
   equipment: [

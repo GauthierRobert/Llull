@@ -34,7 +34,7 @@ export function feedbackStats(doc: CadDocument): FeedbackStats {
   return { units: doc.units, entityCount: doc.order.length, civil };
 }
 
-export function feedbackBody(text: string, stats: FeedbackStats): string {
+function feedbackBody(text: string, stats: FeedbackStats): string {
   const counts = CIVIL_CATEGORIES.map((category) => `${category} ${stats.civil[category]}`);
   return [
     text.trim(),

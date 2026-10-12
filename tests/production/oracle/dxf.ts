@@ -6,7 +6,7 @@
  * R12 POLYLINE/VERTEX/SEQEND chains are folded into one entity with all vertices.
  */
 
-export interface DxfEntity {
+interface DxfEntity {
   type: string;
   layer: string;
   /** Points from 10/20 (+ 11/21 for LINE ends; every VERTEX for polylines). */

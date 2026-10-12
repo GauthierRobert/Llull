@@ -50,7 +50,7 @@ function polygonFace(api: OccApi, corners: readonly Vec3[]): OccShape | null {
  * promoted with BRepBuilderAPI_MakeSolid. Degenerate triangles are skipped.
  * @failure empty / malformed mesh, open shell, MakeSolid not done -> null
  */
-export function meshDataToTopoDSShape(api: OccApi, mesh: MeshData): OccShape | null {
+function meshDataToTopoDSShape(api: OccApi, mesh: MeshData): OccShape | null {
   const { positions, indices } = mesh;
   if (positions.length === 0 || indices.length === 0 || indices.length % 3 !== 0) return null;
 

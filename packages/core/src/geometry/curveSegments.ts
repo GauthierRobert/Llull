@@ -17,7 +17,7 @@ const ARC_STEPS_PER_TURN = 32;
 /** Samples per cubic Bézier. */
 const BEZIER_STEPS = 16;
 /** Joints whose tangents differ by more than this (radians) are corners. */
-export const G1_TOLERANCE = 1e-3;
+const G1_TOLERANCE = 1e-3;
 /** Distance under which two chain points are considered the same. */
 export const JOINT_TOLERANCE = 1e-6;
 
@@ -136,7 +136,7 @@ export function sampleProfile(segments: ReadonlyArray<CurveSegment<Vec2>>): Vec2
 }
 
 /** Same segment traversed backwards. */
-export function reverseSegment<P extends Point>(segment: CurveSegment<P>): CurveSegment<P> {
+function reverseSegment<P extends Point>(segment: CurveSegment<P>): CurveSegment<P> {
   const last = segment.points.length - 1;
   return mapSegment(segment, (_point, i) => segment.points[last - i] as P);
 }

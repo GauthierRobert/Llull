@@ -9,7 +9,7 @@ import type { MemberRole } from '@core/model/building';
  * (`criteria/*.ts`), so the three can never disagree.
  */
 
-export interface IntentLevel {
+interface IntentLevel {
   name: string;
   /** Finished-floor level (FFL). */
   elevation: number;
@@ -42,7 +42,7 @@ export interface IntentSupport {
   at: Vec3[];
 }
 
-export interface IntentFloor {
+interface IntentFloor {
   level: number;
   boundary: Vec2[];
   thickness: number;
@@ -81,7 +81,7 @@ export interface IntentTray {
   route: Vec3[];
 }
 
-export interface IntentStair {
+interface IntentStair {
   /** Index of the level the flight starts from; it climbs to the next level. */
   level: number;
   start: Vec2;

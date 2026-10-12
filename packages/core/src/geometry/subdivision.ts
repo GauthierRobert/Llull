@@ -101,7 +101,7 @@ interface EdgeInfo {
 }
 
 /** One Catmull-Clark step (cage assumed valid: see cageProblem). */
-export function subdivideOnce(cage: Cage): Cage {
+function subdivideOnce(cage: Cage): Cage {
   const { vertices, faces } = cage;
   const sharpKeys = new Set(cage.creases.map(([a, b]) => edgeKey(a, b)));
   const edges = new Map<string, EdgeInfo>();

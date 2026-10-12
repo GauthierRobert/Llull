@@ -16,10 +16,10 @@ export const TETRA: MeshData = {
 };
 
 /** One triangle: the smallest mesh a kernel can return. */
-export const TRIANGLE: MeshData = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] };
+const TRIANGLE: MeshData = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] };
 
 /** Native fake shape: the mesh it tessellates to, and the entity of a leaf. */
-export interface FakeShape {
+interface FakeShape {
   readonly mesh: MeshData;
   readonly entity?: Entity;
 }

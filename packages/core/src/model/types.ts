@@ -533,7 +533,7 @@ export const CONSTRAINT_KINDS = [
   'angle',
 ] as const;
 
-export type ConstraintKind = (typeof CONSTRAINT_KINDS)[number];
+type ConstraintKind = (typeof CONSTRAINT_KINDS)[number];
 
 interface ConstraintBase<K extends ConstraintKind> {
   readonly id: string;
