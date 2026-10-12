@@ -9,6 +9,7 @@
 import fs from 'fs';
 import path from 'path';
 import { isRecord } from '@lib/isRecord';
+import { nonEmptyString } from '@lib/nonEmptyString';
 import { rasterizeSvg } from '../renderImage';
 
 export interface OutputFile {
@@ -20,23 +21,18 @@ export interface OutputFile {
 const BASE64_KEYS = ['stlBase64', 'stepBase64', 'base64'] as const;
 const TEXT_KEYS = ['text', 'step', 'stl', 'ifc', 'svg', 'content'] as const;
 
-function stringField(record: Record<string, unknown>, key: string): string | undefined {
-  const value = record[key];
-  return typeof value === 'string' && value.length > 0 ? value : undefined;
-}
-
 /** The single file a data record carries, or null. */
 function fileOfRecord(record: Record<string, unknown>): OutputFile | null {
-  const bareName = stringField(record, 'name');
+  const bareName = nonEmptyString(record['name']);
   const name =
-    stringField(record, 'fileName') ??
+    nonEmptyString(record['fileName']) ??
     (bareName !== undefined && path.extname(bareName) !== '' ? bareName : null);
   for (const key of BASE64_KEYS) {
-    const value = stringField(record, key);
+    const value = nonEmptyString(record[key]);
     if (value !== undefined) return { name, bytes: Buffer.from(value, 'base64') };
   }
   for (const key of TEXT_KEYS) {
-    const value = stringField(record, key);
+    const value = nonEmptyString(record[key]);
     if (value !== undefined) return { name, bytes: Buffer.from(value, 'utf8') };
   }
   return null;
@@ -62,7 +58,7 @@ export function filesOfData(data: unknown): OutputFile[] {
 /** The PNG of `data.svg` (sized by `data.width`), or null when there is no svg or it fails. */
 function pngOfData(data: unknown): OutputFile | null {
   if (!isRecord(data)) return null;
-  const svg = stringField(data, 'svg');
+  const svg = nonEmptyString(data['svg']);
   if (svg === undefined) return null;
   const width = data['width'];
   const base64 = rasterizeSvg(svg, typeof width === 'number' ? width : undefined);
