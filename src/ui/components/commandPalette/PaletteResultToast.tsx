@@ -11,6 +11,7 @@ import React, { useEffect, useState } from 'react';
 import { usePaletteStore } from '@ui/store';
 import type { PaletteResult } from '@ui/store/paletteStore';
 import { Icon } from '@ui/components/Icon';
+import { IconButton } from '@ui/panels/PanelParts';
 import { humanizeName } from './paramForm';
 
 const TOAST_MS = 6000;
@@ -41,15 +42,13 @@ function ResultCard({ result }: { result: PaletteResult }): React.ReactElement {
         <strong className="palette-toast__title">{humanizeName(result.commandName)}</strong>
         <span className="palette-toast__summary">{result.summary}</span>
       </span>
-      <button
-        type="button"
-        className="icon-btn"
-        onClick={dismissResult}
-        aria-label="Dismiss result"
+      <IconButton
+        icon="close"
+        size={12}
+        label="Dismiss result"
         title="Dismiss"
-      >
-        <Icon name="close" size={12} />
-      </button>
+        onClick={dismissResult}
+      />
     </div>
   );
 }

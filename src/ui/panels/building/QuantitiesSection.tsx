@@ -11,7 +11,7 @@ import { useStore } from '@ui/store';
 import { downloadCsvQuery, runQuery } from '@ui/services/localQuery';
 import type { CostLine } from '@aec/index';
 import { PanelSection } from '@ui/panels/PanelParts';
-import { OptionSelect } from '@ui/panels/OptionSelect';
+import { OptionSelect, PairSelect } from '@ui/panels/OptionSelect';
 import { capitalize } from '@ui/panels/capitalize';
 import { isEstimateData } from '@ui/resultData';
 import { parseNumber } from '@ui/numberText';
@@ -59,18 +59,13 @@ function RateForm({ lines }: { lines: ReadonlyArray<CostLine> }): React.ReactEle
 
   return (
     <form className="building-inline-form" onSubmit={handleSubmit} aria-label="Set unit rate">
-      <select
+      <PairSelect
         value={selectedKey}
-        onChange={(event) => setKey(event.target.value)}
-        aria-label="Rate item"
-        data-testid="rate-key"
-      >
-        {lines.map((line) => (
-          <option key={line.key} value={line.key}>
-            {line.description}
-          </option>
-        ))}
-      </select>
+        options={lines.map((line) => [line.key, line.description] as const)}
+        label="Rate item"
+        testId="rate-key"
+        onChange={setKey}
+      />
       <input
         type="number"
         placeholder="Rate"

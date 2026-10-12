@@ -9,7 +9,7 @@ import React, { useEffect } from 'react';
 import { useStore } from '@ui/store';
 import { useSessionStore } from '@ui/store/sessionStore';
 import { browserStorage, clearAutosave } from '@ui/store/autosave';
-import { Icon } from '@ui/components/Icon';
+import { IconButton } from '@ui/panels/PanelParts';
 
 /** The notice hides itself after this long; the restored work stays. */
 const AUTO_DISMISS_MS = 20_000;
@@ -41,15 +41,13 @@ export function RestoredBanner(): React.ReactElement | null {
       <button type="button" className="btn btn--ghost btn--sm" onClick={startFresh}>
         Start fresh
       </button>
-      <button
-        type="button"
-        className="icon-btn"
-        onClick={() => setRestoredAt(null)}
-        aria-label="Dismiss restore notice"
+      <IconButton
+        icon="close"
+        size={12}
+        label="Dismiss restore notice"
         title="Dismiss"
-      >
-        <Icon name="close" size={12} />
-      </button>
+        onClick={() => setRestoredAt(null)}
+      />
     </div>
   );
 }

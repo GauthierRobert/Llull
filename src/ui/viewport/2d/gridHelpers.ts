@@ -15,6 +15,8 @@
  * visible and clearly coarser.
  */
 
+import { clamp } from '@lib/clamp';
+
 /** Minimum target pixel width for a minor grid cell. */
 const MIN_CELL_PX = 20;
 
@@ -155,7 +157,7 @@ export function pixelsToWorld(pixels: number, zoom: number): number {
  */
 export function formatScaleBarLength(worldLength: number): string {
   if (!Number.isFinite(worldLength) || worldLength <= 0) return '0';
-  const decimals = Math.min(Math.max(0, -Math.floor(Math.log10(worldLength))), 12);
+  const decimals = clamp(-Math.floor(Math.log10(worldLength)), 0, 12);
   return worldLength.toFixed(decimals);
 }
 

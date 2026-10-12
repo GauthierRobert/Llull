@@ -11,6 +11,7 @@ import React, { useState } from 'react';
 import { useLayoutStore, useStore, useToolStore } from '@ui/store';
 import { PALETTE_SHORTCUT_LABEL } from '@ui/hooks/shortcuts';
 import { Icon, type IconName } from '@ui/components/Icon';
+import { IconButton } from '@ui/panels/PanelParts';
 import { SOLID_PRESETS } from '@ui/components/toolbar/solidPresets';
 import { createSolid } from '@ui/actions/createSolid';
 import { startCivilSite } from '@ui/actions/civilStarter';
@@ -58,15 +59,14 @@ export function EmptyState(): React.ReactElement | null {
   return (
     <div className="empty-state" role="region" aria-label="Get started">
       <div className="empty-state__card">
-        <button
-          type="button"
-          className="icon-btn empty-state__dismiss"
-          onClick={() => setDismissed(true)}
-          aria-label="Dismiss hint"
+        <IconButton
+          icon="close"
+          size={14}
+          className="empty-state__dismiss"
+          label="Dismiss hint"
           title="Dismiss"
-        >
-          <Icon name="close" size={14} />
-        </button>
+          onClick={() => setDismissed(true)}
+        />
 
         <div className="empty-state__mark" aria-hidden="true">
           <Icon name="cube" size={22} />

@@ -10,10 +10,12 @@ import * as THREE from 'three';
 import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { MeshData } from '@core/model/types';
 import type { Triangle } from '@core/geometry/triangles';
+import { soupIndices } from '@core/geometry/meshVolume';
+import { toRadians } from '@lib/angle';
 import { positionsGeometry } from '../../lineGeometry';
 
 /** Edges sharper than this stay hard (radians). */
-const MESH_CREASE_ANGLE = (30 * Math.PI) / 180;
+const MESH_CREASE_ANGLE = toRadians(30);
 
 /** @pure — returns a new non-indexed geometry with `position` + `normal` attributes. */
 export function buildMeshSolidGeometry(mesh: MeshData): THREE.BufferGeometry {
@@ -30,6 +32,5 @@ export function buildTriangleSoupGeometry(
 ): THREE.BufferGeometry | null {
   const positions = triangles.flat(2);
   if (positions.length === 0) return null;
-  const indices = Array.from({ length: positions.length / 3 }, (_, corner) => corner);
-  return buildMeshSolidGeometry({ positions, indices });
+  return buildMeshSolidGeometry({ positions, indices: soupIndices(positions) });
 }

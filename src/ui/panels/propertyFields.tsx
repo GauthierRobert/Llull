@@ -1,6 +1,7 @@
 /** @layer ui/panels Presentational field primitives for the properties inspector. */
 
 import React, { useRef, useState } from 'react';
+import { fixedNumber } from '@lib/compactNumber';
 import { parseNumber } from '@ui/numberText';
 
 const AXES = ['x', 'y', 'z'] as const;
@@ -12,8 +13,7 @@ function formatReadout(n: number): string {
 
 /** Shortest text for an editable field: 3 decimals at most, no trailing zeros, no "-0". */
 function formatEditableNumber(n: number): string {
-  const rounded = Number(n.toFixed(3));
-  return String(Object.is(rounded, -0) ? 0 : rounded);
+  return fixedNumber(n, 3);
 }
 
 export function PropRow({
