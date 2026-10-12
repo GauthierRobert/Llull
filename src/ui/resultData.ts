@@ -6,11 +6,9 @@
 
 import type { CostLine } from '@aec/index';
 import type { Clash } from '@aec/industrial/clash/clash';
+import { isRecord } from '@lib/isRecord';
 
 type DataRecord = Record<string, unknown>;
-
-const isRecord = (value: unknown): value is DataRecord =>
-  typeof value === 'object' && value !== null;
 
 const isTriple = (value: unknown): value is [number, number, number] =>
   Array.isArray(value) && value.length === 3 && value.every((n) => typeof n === 'number');
@@ -77,8 +75,15 @@ export function isCodeExportData(value: unknown): value is { text: string; fileN
   );
 }
 
-export function isBoundsData(
-  value: unknown,
-): value is { min: [number, number, number]; max: [number, number, number] } {
+type Triple = [number, number, number];
+
+export function isBoundsData(value: unknown): value is { min: Triple; max: Triple } {
   return isRecord(value) && isTriple(value['min']) && isTriple(value['max']);
+}
+
+/** `measure_bounding_box` data: bounds plus their `size`. */
+export function isBoundingBoxData(
+  value: unknown,
+): value is { min: Triple; max: Triple; size: Triple } {
+  return isBoundsData(value) && isTriple((value as DataRecord)['size']);
 }
