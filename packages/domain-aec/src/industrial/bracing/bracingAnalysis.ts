@@ -8,7 +8,8 @@ import type { CadDocument } from '@core/model/types';
 import { levelMembersInMm } from '../common/memberSupport';
 import { round } from '../../shared/numeric';
 import { sectionResistance, yieldStrength } from '../steelDesign/steelDesign';
-import { craneCapacityOf, GAMMA_G, GAMMA_Q } from '../frames/frameModelTypes';
+import { craneCapacityOf } from '../frames/frameModelTypes';
+import { GAMMA_G, GAMMA_Q } from '../../shared/loadFactors';
 import { DEFAULT_CRANE_SPAN } from '../runway/runwayCheckModel';
 import {
   type BracingRow,

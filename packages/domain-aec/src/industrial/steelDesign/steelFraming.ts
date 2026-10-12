@@ -9,11 +9,9 @@
 import { projectOntoSegment } from '@lib/polygon';
 import { analyseSimpleBeam, type BeamResponse } from './steelBeamAnalysis';
 import { addPointLoad, flushBins, type BeamLoads } from './steelBeamLoads';
+import { GAMMA_G, GAMMA_Q } from '../../shared/loadFactors';
 import { E_STEEL } from './steelDesign';
 import { sectionOf, type SteelBar } from './steelMemberBars';
-
-export const GAMMA_PERMANENT = 1.35;
-export const GAMMA_IMPOSED = 1.5;
 
 type SupportRef =
   | { readonly type: 'column'; readonly id: string }
@@ -169,7 +167,7 @@ export function analyseFraming(
     const pair = ends.get(beam.bar.id) ?? [{ type: 'none' }, { type: 'none' }];
     results.set(beam.bar.id, {
       loads: beam,
-      uls: analyse(GAMMA_PERMANENT, GAMMA_IMPOSED),
+      uls: analyse(GAMMA_G, GAMMA_Q),
       sls: analyse(1, 1, rigidity),
       ends: pair as readonly [SupportRef, SupportRef],
     });

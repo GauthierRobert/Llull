@@ -31,13 +31,14 @@ import {
 } from './earthworksMath';
 import { daylightPoints } from './platformDaylight';
 import { toMetres } from '../../building/model';
+import { round as roundDigits } from '../../shared/numeric';
 
 const DEFAULT_CUT_SLOPE = 1.5;
 const DEFAULT_FILL_SLOPE = 2;
 const MAX_BOUNDARY_VERTICES = 2000;
 const BALANCE_ITERATIONS = 60;
 
-const round = (value: number, digits = 3): number => Number(value.toFixed(digits));
+const round = (value: number, digits = 3): number => roundDigits(value, digits);
 
 const slopeOf = (name: string, value: number): string | null =>
   value > 0 && Number.isFinite(value) ? null : `${name} must be > 0 (horizontal per 1 vertical).`;

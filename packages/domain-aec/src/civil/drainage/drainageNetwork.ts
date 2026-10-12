@@ -8,6 +8,7 @@
 import type { CadDocument } from '@core/model/types';
 import type { CivilModel, ManholeObject, PipeObject } from '@core/model/civil';
 import { toMetres, toMm } from '../../building/model';
+import { round } from '../../shared/numeric';
 import { civilObjectsOf, civilObject } from '../model';
 import { manningFullFlow, rationalFlowLps, solvePartialFlow } from './hydraulics';
 import { DEFAULT_ENTRY_TIME_MIN, intensityAt, type DrainageCriteria } from './drainageCriteria';
@@ -63,10 +64,6 @@ export function localFlowLps(manhole: ManholeObject, intensityMmH: number): numb
     ? rationalFlowLps(manhole.catchment.runoffCoefficient, intensityMmH, manhole.catchment.areaHa)
     : 0;
   return runoff + (manhole.inflow ?? 0);
-}
-
-function round(value: number, digits: number): number {
-  return Number(value.toFixed(digits));
 }
 
 function pipeRow(
