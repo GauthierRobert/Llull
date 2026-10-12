@@ -5,6 +5,7 @@
  * the stored value.
  */
 
+import { toDegrees, toRadians } from '@lib/angle';
 import React from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore, useViewportStore } from '@ui/store';
@@ -17,8 +18,6 @@ import { AxisFields, CommitInput, PropRow } from './propertyFields';
 import { dimensionRows } from './entityDimensions';
 import { ElementInspector } from './building/ElementInspector';
 import { buildingElementOf } from '@aec/index';
-
-const DEGREES_PER_RADIAN = 180 / Math.PI;
 
 /** Delta vector that changes component `axisIndex` of `current` to `target`. */
 function axisDelta(current: readonly number[], axisIndex: number, target: number): number[] {
@@ -106,12 +105,12 @@ function EntityDetail({ entity }: { entity: Entity }): React.ReactElement {
         {!is2D(entity) && (
           <PropRow label="Rotation°">
             <AxisFields
-              values={entity.rotation.map((r) => r * DEGREES_PER_RADIAN)}
+              values={entity.rotation.map((r) => toDegrees(r))}
               label="Rotation"
               onAxisCommit={(axisIndex, degrees) =>
                 dispatch('rotate_entity', {
                   id: entity.id,
-                  delta: axisDelta(entity.rotation, axisIndex, degrees / DEGREES_PER_RADIAN),
+                  delta: axisDelta(entity.rotation, axisIndex, toRadians(degrees)),
                 })
               }
             />

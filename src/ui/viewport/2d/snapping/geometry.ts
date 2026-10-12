@@ -5,6 +5,7 @@
  * advanced snap constructions (perpendicular, tangent, extension, nearest).
  */
 
+import { clamp } from '@lib/clamp';
 import type { Entity, Vec2 } from '@core/model/types';
 import { projectOntoSegment } from '@lib/polygon';
 import { wrapAngle } from '@lib/angle';
@@ -25,35 +26,6 @@ export function isAngleOnArc(angle: number, startAngle: number, endAngle: number
 /** Midpoint of two 2D points. */
 export function mid(ax: number, ay: number, bx: number, by: number): [number, number] {
   return [(ax + bx) / 2, (ay + by) / 2];
-}
-
-/**
- * Compute the intersection point of two line segments (if any).
- * Returns null when segments are parallel or do not intersect within their extents.
- */
-export function segmentIntersection(
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number,
-  cx: number,
-  cy: number,
-  dx: number,
-  dy: number,
-): [number, number] | null {
-  const r_x = bx - ax;
-  const r_y = by - ay;
-  const s_x = dx - cx;
-  const s_y = dy - cy;
-
-  const denom = r_x * s_y - r_y * s_x;
-  if (Math.abs(denom) < 1e-10) return null; // parallel
-
-  const t = ((cx - ax) * s_y - (cy - ay) * s_x) / denom;
-  const u = ((cx - ax) * r_y - (cy - ay) * r_x) / denom;
-
-  if (t >= 0 && t <= 1 && u >= 0 && u <= 1) return [ax + t * r_x, ay + t * r_y];
-  return null;
 }
 
 /** Entity-local 2D point -> world XY: rotated about the entity origin by rotation[2], then offset by position. */
@@ -251,7 +223,7 @@ export function nearestOnArc(
   const sweep = wrapAngle(endAngle - startAngle);
   // Offset of the cursor direction, measured from startAngle.
   const offset = wrapAngle(Math.atan2(py - cy, px - cx) - startAngle);
-  const clampedOffset = Math.max(0, Math.min(sweep, offset));
+  const clampedOffset = clamp(offset, 0, sweep);
   const clampedAngle = startAngle + clampedOffset;
   return [cx + r * Math.cos(clampedAngle), cy + r * Math.sin(clampedAngle)];
 }

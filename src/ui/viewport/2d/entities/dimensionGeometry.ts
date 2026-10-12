@@ -4,6 +4,7 @@
  * LineSegments (dimension / extension lines, arrowheads) for each dimension kind.
  */
 
+import { toDegrees } from '@lib/angle';
 import * as THREE from 'three';
 import type {
   ArcEntity,
@@ -161,7 +162,7 @@ function angularDrawing(
   ];
   const midAngle = startAngle + minorSweep / 2;
   return {
-    value: (minorSweep * 180) / Math.PI,
+    value: toDegrees(minorSweep),
     textX: vx + Math.cos(midAngle) * arcRadius * 1.4,
     textY: vy + Math.sin(midAngle) * arcRadius * 1.4,
     lines: drawLines(

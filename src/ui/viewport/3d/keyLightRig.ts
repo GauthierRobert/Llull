@@ -7,7 +7,7 @@
  * (world - renderOrigin), the space the light lives in.
  */
 
-import { type Bounds, boundsCenter } from '@core/geometry/bounds';
+import { type Bounds, boundsCenter, boundsDiagonalRadius } from '@core/geometry/bounds';
 import type { Vec3 } from '@core/model/types';
 import { toRenderPosition } from './floatingOrigin';
 
@@ -35,13 +35,7 @@ export interface KeyLightRig {
  */
 export function computeKeyLightRig(bounds: Bounds | null, renderOrigin: Vec3): KeyLightRig {
   const centre: Vec3 = bounds ? toRenderPosition(boundsCenter(bounds), renderOrigin) : [0, 0, 0];
-  const radius = bounds
-    ? Math.hypot(
-        bounds.max[0] - bounds.min[0],
-        bounds.max[1] - bounds.min[1],
-        bounds.max[2] - bounds.min[2],
-      ) / 2
-    : 0;
+  const radius = bounds ? boundsDiagonalRadius(bounds) : 0;
   const halfExtent = Math.max(MIN_SHADOW_HALF_EXTENT, radius * PADDING);
   const scale = halfExtent / MIN_SHADOW_HALF_EXTENT;
   return {

@@ -6,6 +6,7 @@
  * Memoized and disposed by the mesh components.
  */
 
+import { clamp } from '@lib/clamp';
 import * as THREE from 'three';
 import { revolutionTriangles } from '@core/geometry/revolution';
 import { positionsGeometry } from '../../lineGeometry';
@@ -38,7 +39,7 @@ export function buildConeGeometry(radius: number, height: number): THREE.BufferG
 /** Sphere centered at the origin, poles along +/-Z. */
 export function buildSphereGeometry(radius: number): THREE.BufferGeometry {
   const segments = radialSegmentsForDiag(sphereDiag(radius));
-  const heightSegments = Math.max(4, Math.min(32, Math.floor(segments / 2)));
+  const heightSegments = clamp(Math.floor(segments / 2), 4, 32);
   const geo = new THREE.SphereGeometry(radius, segments, heightSegments);
   geo.rotateX(Math.PI / 2);
   return geo;

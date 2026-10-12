@@ -5,6 +5,7 @@
  * ONE command + params (param-gathering only, react R1).
  */
 
+import { toRadians } from '@lib/angle';
 import { PIPE_OUTSIDE_DIAMETER_MM } from '@aec/industrial/piping/pipeSizes';
 import { PIPE_SUPPORT_TOOL } from './pipeSupportTool';
 import {
@@ -23,7 +24,6 @@ import {
   num,
   onLevel,
   placement,
-  radians,
   result,
   select,
   txt,
@@ -149,7 +149,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
         profile: reader.text('profile'),
         start: [reader.number('x1'), reader.number('y1'), reader.number('z1')],
         end: [reader.number('x2'), reader.number('y2'), reader.number('z2')],
-        roll: radians(reader.number('roll')),
+        roll: toRadians(reader.number('roll')),
         startJoint: joint('startJoint'),
         endJoint: joint('endJoint'),
         baseFixity: role === 'column' ? reader.text('baseFixity') || undefined : undefined,
@@ -255,7 +255,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
         location: reader.point('x', 'y'),
         size: [reader.number('length'), reader.number('width'), reader.number('height')],
         shape: reader.text('shape') === 'box' ? undefined : reader.text('shape'),
-        angle: radians(reader.number('angle')),
+        angle: toRadians(reader.number('angle')),
         clearance: reader.number('clearance'),
         weight: reader.optionalNumber('weight'),
         ...placement(reader, context),

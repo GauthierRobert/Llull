@@ -11,7 +11,7 @@
  */
 
 import { boundsCorners, localBounds } from '@core/geometry/bounds';
-import { applyEulerXYZ } from '@lib/eulerRotation';
+import { entityLocalToWorld } from '@core/geometry/entityFrame';
 import { sweepSegmentRings } from '@core/geometry/sweep';
 import { loftRings } from '@core/geometry/loft';
 import { circlePoints } from '@core/geometry/tessellation';
@@ -62,8 +62,8 @@ const isUpright = (e: Entity): boolean =>
 /** Entity-local 3D points -> world XY (Euler rotation about the entity origin, then position). */
 function toWorldXY(e: Entity, points: ReadonlyArray<Vec3>): Vec2[] {
   return points.map((point): Vec2 => {
-    const rotated = applyEulerXYZ(point, ORIGIN, e.rotation);
-    return [rotated[0] + e.position[0], rotated[1] + e.position[1]];
+    const world = entityLocalToWorld(e, point);
+    return [world[0], world[1]];
   });
 }
 
@@ -95,8 +95,8 @@ function instanceRings(document: ComponentsDoc, e: InstanceEntity, depth: number
   });
   const placed = rings.map((ring) =>
     ring.map(([x, y]): Vec2 => {
-      const rotated = applyEulerXYZ([x * sx, y * sy, 0], ORIGIN, e.rotation);
-      return [rotated[0] + e.position[0], rotated[1] + e.position[1]];
+      const world = entityLocalToWorld(e, [x * sx, y * sy, 0]);
+      return [world[0], world[1]];
     }),
   );
   // A tilted instance is no longer a flat union: use the hull of everything.

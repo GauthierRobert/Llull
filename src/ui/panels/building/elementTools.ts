@@ -5,6 +5,7 @@
  * command + params (param-gathering only — the command does all document work, react R1).
  */
 
+import { toRadians } from '@lib/angle';
 import {
   FieldReader,
   checkbox,
@@ -12,7 +13,6 @@ import {
   num,
   onLevel,
   placement,
-  radians,
   result,
   select,
   txt,
@@ -389,7 +389,7 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
       const reader = new FieldReader(values);
       return result(reader, 'add_stair', {
         start: reader.point('x', 'y'),
-        angle: radians(reader.number('direction')),
+        angle: toRadians(reader.number('direction')),
         width: reader.number('width'),
         treadDepth: reader.number('treadDepth'),
         ...placement(reader, context),

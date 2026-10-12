@@ -6,7 +6,7 @@
 
 import { type Entity, type CadDocument, is3D } from '@core/model/types';
 import { rotatedEntityBounds } from '@core/geometry/rotatedBounds';
-import { applyEulerXYZ } from '@lib/eulerRotation';
+import { entityLocalToWorld } from '@core/geometry/entityFrame';
 import { nearestSnap } from '../nearestSnap';
 
 export type Snap3DType = 'vertex' | 'edge' | 'face-center' | 'grid' | 'none';
@@ -90,15 +90,7 @@ function aabbSnapPoints({ min, max }: AABB): SnapPoint3D[] {
 /** Local (Z-up, pre-rotation) offsets placed in world space about the entity position. */
 function worldPoints(entity: Entity, offsets: ReadonlyArray<Triple>): SnapPoint3D[] {
   return offsets.map((offset) => {
-    const [x, y, z] = applyEulerXYZ(
-      [
-        entity.position[0] + offset[0],
-        entity.position[1] + offset[1],
-        entity.position[2] + offset[2],
-      ],
-      entity.position,
-      entity.rotation,
-    );
+    const [x, y, z] = entityLocalToWorld(entity, offset);
     return { x, y, z, type: 'vertex' };
   });
 }

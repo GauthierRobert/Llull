@@ -7,6 +7,7 @@
  * can draw a cue in the 3D viewport.
  */
 
+import { toDegrees } from '@lib/angle';
 import React from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore, useViewportStore } from '@ui/store';
@@ -166,8 +167,6 @@ interface JointRowProps {
   onHighlight: (id: string) => void;
 }
 
-const radiansToDegrees = (radians: number): number =>
-  Math.round(((radians * 180) / Math.PI) * 1e6) / 1e6;
 const degreesToRadians = (degrees: number): number => (degrees * Math.PI) / 180;
 
 function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.ReactElement {
@@ -177,7 +176,7 @@ function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.Rea
   const revolute = joint.kind === 'revolute';
   // Presentation only: revolute angles are shown in degrees (like Properties); the command
   // keeps radians.
-  const currentValue = revolute ? radiansToDegrees(joint.angle) : joint.displacement;
+  const currentValue = revolute ? toDegrees(joint.angle, 6) : joint.displacement;
 
   const commitInput = (text: string): void => {
     const parsed = parseNumber(text);

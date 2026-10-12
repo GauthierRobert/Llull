@@ -93,10 +93,6 @@ export function defaultedSelect(
 /** Picker group of the steel hall / plant tools. */
 export const INDUSTRIAL_TOOL_GROUP = 'Industrial / steel';
 
-export function radians(degrees: number): number {
-  return (degrees * Math.PI) / 180;
-}
-
 export function isFieldShown(field: ToolField, values: Readonly<Record<string, string>>): boolean {
   return (
     field.showWhen === undefined || field.showWhen.values.includes(values[field.showWhen.key] ?? '')
