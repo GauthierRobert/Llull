@@ -201,7 +201,11 @@ export const exportNcFiles = defineCommand({
       const frame = sweepFrame(element.start, element.end, element.roll);
       if (!profile || !frame) continue;
       pieces.push(
-        memberPiece(doc, element, profile, frame, allConnections, allMembers, building.levels),
+        memberPiece(doc, element, profile, frame, {
+          connections: allConnections,
+          members: allMembers,
+          levels: building.levels,
+        }),
       );
     }
     if (pieces.length === 0) {

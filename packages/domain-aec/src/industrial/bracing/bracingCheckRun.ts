@@ -7,9 +7,9 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { existingLevelId, getBuilding } from '../../building/model';
 import { noop } from '@core/commands/noop';
-import { isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
+import { isNonNegativeNumber } from '@lib/isFiniteNumber';
 import { DEFAULT_BUFFER_STIFFNESS, DEFAULT_TRAVEL_SPEED } from '../runway/runwayCheckModel';
-import { round } from '../../shared/numeric';
+import { firstNonPositive, round } from '../../shared/numeric';
 import { checkTable, failureSummary } from '../reports/checkReport';
 import { analyseBracing, locateMembers } from './bracingAnalysis';
 import { existingLevelIdParam } from '../../building/levelParams';
@@ -101,15 +101,14 @@ export const checkBracing = defineCommand({
     }
     const { travelSpeed = DEFAULT_TRAVEL_SPEED, bufferStiffness = DEFAULT_BUFFER_STIFFNESS } =
       params;
-    for (const [name, value] of [
+    const nonPositive = firstNonPositive([
       ['craneCapacity', params.craneCapacity],
       ['craneSelfWeight', params.craneSelfWeight],
       ['travelSpeed', travelSpeed],
       ['bufferStiffness', bufferStiffness],
-    ] as const) {
-      if (value !== undefined && !isPositiveNumber(value))
-        return noop(doc, `check_bracing failed: ${name} must be a number > 0.`);
-    }
+    ]);
+    if (nonPositive !== undefined)
+      return noop(doc, `check_bracing failed: ${nonPositive} must be a number > 0.`);
     const levelId = existingLevelId(getBuilding(doc), params.levelId);
     if (levelId === undefined)
       return noop(doc, `check_bracing failed: no level '${params.levelId ?? ''}'.`);

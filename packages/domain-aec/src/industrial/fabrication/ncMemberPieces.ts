@@ -70,15 +70,21 @@ function pitchCut(member: SteelMemberElement): number {
   return round((Math.atan2(Math.abs(dz), horizontal) * 180) / Math.PI);
 }
 
+/** The moment connections of a building with the members and levels they reference. */
+export interface JointLookup {
+  readonly connections: ReadonlyArray<MomentConnectionElement>;
+  readonly members: Readonly<Record<string, SteelMemberElement | undefined>>;
+  readonly levels: Readonly<Record<string, BuildingLevel | undefined>>;
+}
+
 /** Length (document units) removed from a member by the end plates welded to its ends. */
 function endPlateCutback(
   doc: CadDocument,
   member: SteelMemberElement,
   direction: Vec3,
-  connections: ReadonlyArray<MomentConnectionElement>,
-  members: Readonly<Record<string, SteelMemberElement | undefined>>,
-  levels: Readonly<Record<string, BuildingLevel | undefined>>,
+  joints: JointLookup,
 ): number {
+  const { connections, members, levels } = joints;
   const ends = { start: 0, end: 0 };
   const [start, end] = [
     atLevel(levels[member.levelId] as BuildingLevel, member.start),
@@ -120,10 +126,9 @@ function memberHoles(
   doc: CadDocument,
   member: SteelMemberElement,
   profile: SteelProfile,
-  connections: ReadonlyArray<MomentConnectionElement>,
-  members: Readonly<Record<string, SteelMemberElement | undefined>>,
-  levels: Readonly<Record<string, BuildingLevel | undefined>>,
+  joints: JointLookup,
 ): NcHole[] {
+  const { connections, members, levels } = joints;
   const mm = (value: number): number => toMm(doc, value);
   const holes: NcHole[] = [];
   for (const connection of connections) {
@@ -167,12 +172,10 @@ export function memberPiece(
   element: SteelMemberElement,
   profile: SteelProfile,
   frame: SweepFrame,
-  connections: ReadonlyArray<MomentConnectionElement>,
-  members: Readonly<Record<string, SteelMemberElement | undefined>>,
-  levels: Readonly<Record<string, BuildingLevel | undefined>>,
+  joints: JointLookup,
 ): NcPiece {
   const cut = pitchCut(element);
-  const cutback = endPlateCutback(doc, element, frame.d, connections, members, levels);
+  const cutback = endPlateCutback(doc, element, frame.d, joints);
   return {
     kind: 'member',
     mark: element.mark,
@@ -187,7 +190,7 @@ export function memberPiece(
     massPerMetre: profile.massPerMetre,
     paintPerMetre: round(profile.perimeter / 1000),
     cuts: [cut, cut, 0, 0],
-    holes: memberHoles(doc, element, profile, connections, members, levels),
+    holes: memberHoles(doc, element, profile, joints),
     contour: [],
     sourceIds: [element.id],
   };
