@@ -123,7 +123,7 @@ export async function startBackend(
     await waitForHealth(url, () => exitReason);
   } catch (error) {
     child.kill();
-    throw new Error(errorMessage(error));
+    throw new Error(errorMessage(error), { cause: error });
   }
   return {
     url,

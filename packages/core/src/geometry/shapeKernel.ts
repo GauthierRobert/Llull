@@ -171,7 +171,7 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
       shapes.set(key, hit); // most recent
       return hit;
     }
-    let shape: S | null = null;
+    let shape: S | null;
     try {
       builds++;
       shape = build(ops, recipe, evaluateNative);

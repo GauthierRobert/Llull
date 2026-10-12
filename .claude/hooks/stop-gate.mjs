@@ -18,7 +18,10 @@ import { readStdin } from './readStdin.mjs';
 async function main() {
   const data = await readStdin();
   if (data.stop_hook_active) return;
-  const status = spawnSync('git', ['status', '--porcelain', '-uall'], { encoding: 'utf8', timeout: 3000 });
+  const status = spawnSync('git', ['status', '--porcelain', '-uall'], {
+    encoding: 'utf8',
+    timeout: 3000,
+  });
   if (status.status !== 0) return;
   const changed = status.stdout
     .split('\n')
@@ -27,7 +30,9 @@ async function main() {
   if (changed.length === 0) return;
 
   const sources = changed.filter((f) => /^packages\/[^/]+\/src\/.*\.tsx?$/.test(f));
-  const tests = changed.filter((f) => /^(tests|server\/tests)\//.test(f) || /\.test\.tsx?$/.test(f));
+  const tests = changed.filter(
+    (f) => /^(tests|server\/tests)\//.test(f) || /\.test\.tsx?$/.test(f),
+  );
   const snapshots = changed.filter((f) => f.includes('__snapshots__/'));
   const claudeChanged = changed.some((f) => f.startsWith('.claude/') || f === 'CLAUDE.md');
 
@@ -47,18 +52,28 @@ async function main() {
     if (errors.length) findings.push(`claude-lint failed:\n  - ${errors.join('\n  - ')}`);
   }
   if (process.env.LLULL_STOP_VERIFY === '1' && sources.length && existsSync('node_modules')) {
-    const run = spawnSync('npx', ['vitest', 'related', '--run', ...sources], { encoding: 'utf8', timeout: 180000 });
+    const run = spawnSync('npx', ['vitest', 'related', '--run', ...sources], {
+      encoding: 'utf8',
+      timeout: 180000,
+    });
     if (run.status !== 0)
-      findings.push(`vitest related failed:\n${(run.stdout + run.stderr).trim().split('\n').slice(-25).join('\n')}`);
+      findings.push(
+        `vitest related failed:\n${(run.stdout + run.stderr).trim().split('\n').slice(-25).join('\n')}`,
+      );
   }
   if (findings.length === 0) return;
 
-  const fingerprintFile = join(tmpdir(), `llull-stop-gate-${String(data.session_id ?? 'default').replace(/\W/g, '')}.txt`);
+  const fingerprintFile = join(
+    tmpdir(),
+    `llull-stop-gate-${String(data.session_id ?? 'default').replace(/\W/g, '')}.txt`,
+  );
   const fingerprint = findings.map((f) => f.split('\n')[0]).join('|');
   if (existsSync(fingerprintFile) && readFileSync(fingerprintFile, 'utf8') === fingerprint) return;
   writeFileSync(fingerprintFile, fingerprint);
 
-  process.stdout.write(JSON.stringify({ decision: 'block', reason: 'llull done-gate:\n- ' + findings.join('\n- ') }));
+  process.stdout.write(
+    JSON.stringify({ decision: 'block', reason: 'llull done-gate:\n- ' + findings.join('\n- ') }),
+  );
 }
 
 main()

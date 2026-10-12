@@ -14,7 +14,7 @@ await build({
   tsconfig: path.join(root, 'tsconfig.json'),
   bundle: true,
   platform: 'node',
-  target: 'node20',
+  target: 'node22',
   format: 'cjs',
   external: ['electron'],
   outfile: path.join(root, 'dist', 'main.js'),

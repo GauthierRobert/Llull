@@ -6,6 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type { Mock } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { useStore } from '@ui/store';
@@ -32,7 +33,7 @@ function scriptedServer(
   refuse: (name: string, attempt: number) => number | undefined,
   initialDoc: CadDocument = createEmptyDocument(),
 ): {
-  fetch: ReturnType<typeof vi.fn>;
+  fetch: Mock<(url: string, init?: RequestInit) => Promise<unknown>>;
   applied: () => string[];
   doc: () => CadDocument;
   holdNext: () => void;

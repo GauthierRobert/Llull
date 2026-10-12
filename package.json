@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "llull — a modern, MCP-first 3D CAD app whose every operation is one command drivable by UI, AI, or any MCP agent.",
+  "description": "llull \u2014 a modern, MCP-first 3D CAD app whose every operation is one command drivable by UI, AI, or any MCP agent.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -12,12 +12,12 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . --max-warnings 0",
-    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"packages/*/src/**/*.ts\" \"tests/**/*.{ts,tsx}\" \"server/src/**/*.ts\" \"server/tests/**/*.ts\" \"server/examples/**/*.ts\" \"desktop/src/**/*.ts\" \"desktop/tests/**/*.ts\" \"desktop/scripts/*.mjs\" workspaceAliases.ts playwright.config.ts playwright.quality.config.ts playwright.production.config.ts server/vitest.quality.config.ts server/vitest.production.config.ts \"quality/**/*.mjs\"",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tests/quality && tsc --noEmit -p tests/production",
+    "format": "prettier --write \"**/*.{ts,tsx,mjs,cjs,js}\"",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tests && tsc --noEmit -p tests/quality && tsc --noEmit -p tests/production",
     "claude:lint": "node .claude/hooks/claude-lint.mjs",
     "arch": "depcruise packages src server/src desktop/src --config .dependency-cruiser.cjs --output-type err",
     "check": "npm run typecheck && npm run arch && npm run lint && npm run format:check && npm run test",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"packages/*/src/**/*.ts\" \"tests/**/*.{ts,tsx}\" \"server/src/**/*.ts\" \"server/tests/**/*.ts\" \"server/examples/**/*.ts\" \"desktop/src/**/*.ts\" \"desktop/tests/**/*.ts\" \"desktop/scripts/*.mjs\" workspaceAliases.ts playwright.config.ts playwright.quality.config.ts playwright.production.config.ts server/vitest.quality.config.ts server/vitest.production.config.ts \"quality/**/*.mjs\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,mjs,cjs,js}\"",
     "test:e2e": "playwright test",
     "quality:fetch": "node quality/fetchCorpus.mjs",
     "quality:step": "npm --prefix server run quality:step",
@@ -46,6 +46,7 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.56.1",
     "@testing-library/jest-dom": "^6.5.0",
     "@testing-library/react": "^16.0.1",
@@ -53,22 +54,22 @@
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
     "@types/three": "^0.169.0",
-    "@typescript-eslint/eslint-plugin": "^8.8.0",
-    "@typescript-eslint/parser": "^8.8.0",
-    "@vitejs/plugin-react": "^4.3.2",
-    "@vitest/coverage-v8": "^2.1.2",
+    "@vitejs/plugin-react": "^6.1.2",
+    "@vitest/coverage-v8": "^5.0.4",
     "dependency-cruiser": "^18.5.0",
-    "eslint": "^8.57.1",
-    "eslint-plugin-react-hooks": "^4.6.2",
-    "jsdom": "^25.0.1",
+    "eslint": "^10.12.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "jsdom": "^29.1.1",
     "opencascade.js": "^1.1.1",
     "prettier": "^3.3.3",
-    "typescript": "^5.6.2",
-    "vite": "^5.4.8",
-    "vitest": "^2.1.2"
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.1",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.4"
   },
   "engines": {
-    "node": ">=20.12"
+    "node": ">=22.12"
   },
   "workspaces": [
     "packages/*"

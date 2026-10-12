@@ -41,7 +41,7 @@ function LevelRow({ level, active, units, levels }: LevelRowProps): React.ReactE
           onClick={() => dispatch('set_active_level', { levelId: level.id })}
         >
           {/* The accessible name is the visible text plus this prefix (WCAG label-in-name). */}
-          <span className="visually-hidden">Activate level </span>
+          <span className="visually-hidden">Activate level</span>{' '}
           <span className="panel__row-main">{level.name}</span>{' '}
           <span className="panel__row-meta">
             +{level.elevation} {units} · h {level.height}

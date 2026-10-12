@@ -14,7 +14,7 @@
  * No geometry math or internals — behavioral testing only.
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { act, render, screen, fireEvent, within } from '@testing-library/react';

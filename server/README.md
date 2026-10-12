@@ -24,7 +24,7 @@ MCP_AUTH_TOKEN=changeme npm --prefix server start
 Variables are also read from `<repo>/.env` and `server/.env` (see `.env.example`); real
 environment variables take precedence.
 
-The server binds to `127.0.0.1:3001` by default (local tool; not reachable from the network). Override with `PORT=<n>` and `HOST=<addr>` (`HOST=0.0.0.0` to expose it; set `MCP_AUTH_TOKEN` when you do). SIGTERM/SIGINT shut down gracefully (autosave switches to synchronous writes, SSE/MCP streams closed with a 3 s time-box, connections drained, autosave flushed again); a second signal forces exit after a sync flush, and `uncaughtException` flushes before exiting. Requires Node >= 20.12.
+The server binds to `127.0.0.1:3001` by default (local tool; not reachable from the network). Override with `PORT=<n>` and `HOST=<addr>` (`HOST=0.0.0.0` to expose it; set `MCP_AUTH_TOKEN` when you do). SIGTERM/SIGINT shut down gracefully (autosave switches to synchronous writes, SSE/MCP streams closed with a 3 s time-box, connections drained, autosave flushed again); a second signal forces exit after a sync flush, and `uncaughtException` flushes before exiting. Requires Node >= 22.12.
 
 ## Routes
 

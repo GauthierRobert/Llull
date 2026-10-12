@@ -16,7 +16,7 @@
  * @layer tests/component
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { act, render, screen, fireEvent } from '@testing-library/react';

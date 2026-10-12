@@ -79,7 +79,7 @@ describe('blend_union on the live OCC kernel', () => {
     expect(blended.summary).toContain('welded 3 solids');
     const step = execute(blended.document, 'export_step_exact', {}).data as { step: string };
     expect(step.step).toMatch(/B_SPLINE_SURFACE|SURFACE_OF_REVOLUTION|TOROIDAL_SURFACE/);
-  });
+  }, 60_000); // live OCC union + fillets + STEP: ~10 s
 
   it('fillet_edge varies the radius along a box edge', () => {
     const box = execute(createEmptyDocument(), 'add_box', { size: [40, 40, 40] });

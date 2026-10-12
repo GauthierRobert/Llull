@@ -87,7 +87,7 @@ npm --prefix server run build      # bundles the MCP host to server/dist/index.j
 MCP_AUTH_TOKEN=<secret> npm --prefix server start
 ```
 
-- Requires Node >= 20.12. Variables are read from the environment, `.env`, or `server/.env`.
+- Requires Node >= 22.12. Variables are read from the environment, `.env`, or `server/.env`.
 - The server binds `127.0.0.1:3001` by default. Binding a non-loopback `HOST` requires
   `MCP_AUTH_TOKEN`; remote REST mutations then need the bearer token too.
 - Serve the web app from an origin listed in `LLULL_ALLOWED_ORIGINS`, and list public

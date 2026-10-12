@@ -190,7 +190,7 @@ describe('epoch', () => {
     expect(snapshot.epoch.length).toBeGreaterThan(0);
 
     const res = makeFakeRes();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     subscribeLive(res);
     setLiveDoc(createEmptyDocument(), { name: 'noop', params: {} });
     const commandFrame = parseSseFrame(res.written[res.written.length - 1] ?? '');
