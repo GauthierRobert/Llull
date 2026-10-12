@@ -592,7 +592,7 @@ export const plans: Record<string, GoldenAction[]> = {
     { command: 'set_units', params: { units: 'mm', displayPrecision: 2 } },
     { command: 'add_box', params: { size: [10, 10, 10] }, as: 'b' },
     { command: 'set_camera', params: { azimuth: 0.5, polar: 1, distance: 30 } },
-    { command: 'animate_spin', params: { targetId: '$b', speed: 1 } },
+    { command: 'animate', params: { targetId: '$b', mode: 'spin', speed: 1 } },
   ],
   building_shell_from_primitives: [
     { command: 'add_layer', params: { name: 'Walls' }, as: 'lw' },

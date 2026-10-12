@@ -176,8 +176,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'evaluate_motion',
     'bake_motion',
     'motion_study',
-    'animate_spin',
-    'animate_oscillate',
+    'animate',
     'stop_animation',
   ],
   exchange: [

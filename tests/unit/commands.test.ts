@@ -1351,15 +1351,15 @@ describe('scale_entity — ellipse and spline', () => {
     expect(data.volume).toBeCloseTo(expected, 6);
   });
 
-  // ── animate_spin ─────────────────────────────────────────────────────────
+  // ── animate spin ─────────────────────────────────────────────────────────
 
-  it('animate_spin on an entity adds one animation record', () => {
+  it('animate spin on an entity adds one animation record', () => {
     let doc = createEmptyDocument();
     const created = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = created.document;
     const entityId = created.affected[0]!;
 
-    const result = execute(doc, 'animate_spin', { targetId: entityId, speed: 1.0 });
+    const result = execute(doc, 'animate', { mode: 'spin', targetId: entityId, speed: 1.0 });
     expect(result.affected).toHaveLength(0);
     expect(result.document).not.toBe(doc);
     const animIds = Object.keys(result.document.animations);
@@ -1378,7 +1378,7 @@ describe('scale_entity — ellipse and spline', () => {
     expect(result.summary).toContain('rad/s');
   });
 
-  it('animate_spin on a group resolves targetKind as group', () => {
+  it('animate spin on a group resolves targetKind as group', () => {
     let doc = createEmptyDocument();
     const a = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = a.document;
@@ -1391,7 +1391,7 @@ describe('scale_entity — ellipse and spline', () => {
     doc = grouped.document;
     const groupId = grouped.affected[0]!;
 
-    const result = execute(doc, 'animate_spin', { targetId: groupId, speed: 6.283 });
+    const result = execute(doc, 'animate', { mode: 'spin', targetId: groupId, speed: 6.283 });
     const animIds = Object.keys(result.document.animations);
     expect(animIds).toHaveLength(1);
     const anim = result.document.animations[animIds[0]!]!;
@@ -1399,13 +1399,14 @@ describe('scale_entity — ellipse and spline', () => {
     expect(anim.targetId).toBe(groupId);
   });
 
-  it('animate_spin with custom axis, channel, pivot, and trigger', () => {
+  it('animate spin with custom axis, channel, pivot, and trigger', () => {
     let doc = createEmptyDocument();
     const created = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = created.document;
     const entityId = created.affected[0]!;
 
-    const result = execute(doc, 'animate_spin', {
+    const result = execute(doc, 'animate', {
+      mode: 'spin',
       targetId: entityId,
       speed: 2.0,
       axis: [1, 0, 0],
@@ -1421,45 +1422,46 @@ describe('scale_entity — ellipse and spline', () => {
     expect(result.summary).toContain('units/s');
   });
 
-  it('animate_spin omits pivot key when not supplied (exactOptionalPropertyTypes safe)', () => {
+  it('animate spin omits pivot key when not supplied (exactOptionalPropertyTypes safe)', () => {
     let doc = createEmptyDocument();
     const created = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = created.document;
     const entityId = created.affected[0]!;
 
-    const result = execute(doc, 'animate_spin', { targetId: entityId, speed: 1.0 });
+    const result = execute(doc, 'animate', { mode: 'spin', targetId: entityId, speed: 1.0 });
     const anim = Object.values(result.document.animations)[0]!;
     expect('pivot' in anim).toBe(false);
   });
 
-  it('animate_spin on a missing id is a safe no-op', () => {
+  it('animate spin on a missing id is a safe no-op', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'animate_spin', { targetId: 'no-such-id', speed: 1.0 });
+    const result = execute(doc, 'animate', { mode: 'spin', targetId: 'no-such-id', speed: 1.0 });
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
     expect(Object.keys(result.document.animations)).toHaveLength(0);
     expect(result.summary).toContain('no-such-id');
   });
 
-  it('animate_spin is pure — input document is not mutated', () => {
+  it('animate spin is pure — input document is not mutated', () => {
     let doc = createEmptyDocument();
     const created = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = created.document;
     const entityId = created.affected[0]!;
     const snapshot = JSON.stringify(doc);
-    execute(doc, 'animate_spin', { targetId: entityId, speed: 3.14 });
+    execute(doc, 'animate', { mode: 'spin', targetId: entityId, speed: 3.14 });
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 
-  // ── animate_oscillate ────────────────────────────────────────────────────
+  // ── animate oscillate ────────────────────────────────────────────────────
 
-  it('animate_oscillate on an entity adds one animation record', () => {
+  it('animate oscillate on an entity adds one animation record', () => {
     let doc = createEmptyDocument();
     const created = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = created.document;
     const entityId = created.affected[0]!;
 
-    const result = execute(doc, 'animate_oscillate', {
+    const result = execute(doc, 'animate', {
+      mode: 'oscillate',
       targetId: entityId,
       amplitude: 0.5,
       frequency: 2.0,
@@ -1480,13 +1482,14 @@ describe('scale_entity — ellipse and spline', () => {
     expect(result.summary).toContain('Hz');
   });
 
-  it('animate_oscillate with custom axis, channel, pivot, trigger', () => {
+  it('animate oscillate with custom axis, channel, pivot, trigger', () => {
     let doc = createEmptyDocument();
     const created = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = created.document;
     const entityId = created.affected[0]!;
 
-    const result = execute(doc, 'animate_oscillate', {
+    const result = execute(doc, 'animate', {
+      mode: 'oscillate',
       targetId: entityId,
       amplitude: 1.0,
       frequency: 0.5,
@@ -1503,13 +1506,14 @@ describe('scale_entity — ellipse and spline', () => {
     expect(result.summary).toContain('units');
   });
 
-  it('animate_oscillate omits pivot key when not supplied', () => {
+  it('animate oscillate omits pivot key when not supplied', () => {
     let doc = createEmptyDocument();
     const created = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = created.document;
     const entityId = created.affected[0]!;
 
-    const result = execute(doc, 'animate_oscillate', {
+    const result = execute(doc, 'animate', {
+      mode: 'oscillate',
       targetId: entityId,
       amplitude: 0.3,
       frequency: 1.0,
@@ -1518,9 +1522,10 @@ describe('scale_entity — ellipse and spline', () => {
     expect('pivot' in anim).toBe(false);
   });
 
-  it('animate_oscillate on a missing id is a safe no-op', () => {
+  it('animate oscillate on a missing id is a safe no-op', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'animate_oscillate', {
+    const result = execute(doc, 'animate', {
+      mode: 'oscillate',
       targetId: 'ghost',
       amplitude: 1.0,
       frequency: 1.0,
@@ -1530,13 +1535,14 @@ describe('scale_entity — ellipse and spline', () => {
     expect(result.summary).toContain('ghost');
   });
 
-  it('animate_oscillate with amplitude <= 0 is a safe no-op', () => {
+  it('animate oscillate with amplitude <= 0 is a safe no-op', () => {
     let doc = createEmptyDocument();
     const created = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = created.document;
     const entityId = created.affected[0]!;
 
-    const result = execute(doc, 'animate_oscillate', {
+    const result = execute(doc, 'animate', {
+      mode: 'oscillate',
       targetId: entityId,
       amplitude: 0,
       frequency: 1.0,
@@ -1546,13 +1552,14 @@ describe('scale_entity — ellipse and spline', () => {
     expect(result.summary).toContain('amplitude');
   });
 
-  it('animate_oscillate with frequency <= 0 is a safe no-op', () => {
+  it('animate oscillate with frequency <= 0 is a safe no-op', () => {
     let doc = createEmptyDocument();
     const created = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = created.document;
     const entityId = created.affected[0]!;
 
-    const result = execute(doc, 'animate_oscillate', {
+    const result = execute(doc, 'animate', {
+      mode: 'oscillate',
       targetId: entityId,
       amplitude: 1.0,
       frequency: -1,
@@ -1562,13 +1569,33 @@ describe('scale_entity — ellipse and spline', () => {
     expect(result.summary).toContain('frequency');
   });
 
-  it('animate_oscillate is pure — input document is not mutated', () => {
+  it('animate spin without a speed, or oscillate without amplitude/frequency, is a safe no-op', () => {
+    const created = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });
+    const doc = created.document;
+    const targetId = created.affected[0]!;
+    const spin = execute(doc, 'animate', { mode: 'spin', targetId });
+    expect(spin.document).toBe(doc);
+    expect(spin.summary).toContain('speed');
+    const rock = execute(doc, 'animate', { mode: 'oscillate', targetId, frequency: 1 });
+    expect(rock.document).toBe(doc);
+    expect(rock.summary).toContain('amplitude');
+    expect(
+      execute(doc, 'animate', { mode: 'oscillate', targetId, amplitude: 1 }).summary,
+    ).toContain('frequency');
+  });
+
+  it('animate oscillate is pure — input document is not mutated', () => {
     let doc = createEmptyDocument();
     const created = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = created.document;
     const entityId = created.affected[0]!;
     const snapshot = JSON.stringify(doc);
-    execute(doc, 'animate_oscillate', { targetId: entityId, amplitude: 0.5, frequency: 1.0 });
+    execute(doc, 'animate', {
+      mode: 'oscillate',
+      targetId: entityId,
+      amplitude: 0.5,
+      frequency: 1.0,
+    });
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 
@@ -1580,8 +1607,8 @@ describe('scale_entity — ellipse and spline', () => {
     doc = created.document;
     const entityId = created.affected[0]!;
 
-    doc = execute(doc, 'animate_spin', { targetId: entityId, speed: 1.0 }).document;
-    doc = execute(doc, 'animate_spin', { targetId: entityId, speed: 2.0 }).document;
+    doc = execute(doc, 'animate', { mode: 'spin', targetId: entityId, speed: 1.0 }).document;
+    doc = execute(doc, 'animate', { mode: 'spin', targetId: entityId, speed: 2.0 }).document;
     const [animId1, animId2] = Object.keys(doc.animations);
 
     const result = execute(doc, 'stop_animation', { animationId: animId1 });
@@ -1608,9 +1635,9 @@ describe('scale_entity — ellipse and spline', () => {
     const idA = boxA.affected[0]!;
     const idB = boxB.affected[0]!;
 
-    doc = execute(doc, 'animate_spin', { targetId: idA, speed: 1.0 }).document;
-    doc = execute(doc, 'animate_spin', { targetId: idA, speed: 2.0 }).document;
-    doc = execute(doc, 'animate_spin', { targetId: idB, speed: 3.0 }).document;
+    doc = execute(doc, 'animate', { mode: 'spin', targetId: idA, speed: 1.0 }).document;
+    doc = execute(doc, 'animate', { mode: 'spin', targetId: idA, speed: 2.0 }).document;
+    doc = execute(doc, 'animate', { mode: 'spin', targetId: idB, speed: 3.0 }).document;
     expect(Object.keys(doc.animations)).toHaveLength(3);
 
     const result = execute(doc, 'stop_animation', { targetId: idA });
@@ -1626,7 +1653,7 @@ describe('scale_entity — ellipse and spline', () => {
     const created = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = created.document;
     const entityId = created.affected[0]!;
-    doc = execute(doc, 'animate_spin', { targetId: entityId, speed: 1.0 }).document;
+    doc = execute(doc, 'animate', { mode: 'spin', targetId: entityId, speed: 1.0 }).document;
 
     const result = execute(doc, 'stop_animation', { targetId: 'other-entity' });
     expect(result.document).toBe(doc);
@@ -1639,8 +1666,9 @@ describe('scale_entity — ellipse and spline', () => {
     doc = created.document;
     const entityId = created.affected[0]!;
 
-    doc = execute(doc, 'animate_spin', { targetId: entityId, speed: 1.0 }).document;
-    doc = execute(doc, 'animate_oscillate', {
+    doc = execute(doc, 'animate', { mode: 'spin', targetId: entityId, speed: 1.0 }).document;
+    doc = execute(doc, 'animate', {
+      mode: 'oscillate',
       targetId: entityId,
       amplitude: 0.5,
       frequency: 1.0,
@@ -1665,7 +1693,7 @@ describe('scale_entity — ellipse and spline', () => {
     const created = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = created.document;
     const entityId = created.affected[0]!;
-    doc = execute(doc, 'animate_spin', { targetId: entityId, speed: 1.0 }).document;
+    doc = execute(doc, 'animate', { mode: 'spin', targetId: entityId, speed: 1.0 }).document;
     const snapshot = JSON.stringify(doc);
 
     const animId = Object.keys(doc.animations)[0]!;
@@ -1688,7 +1716,7 @@ describe('scale_entity — ellipse and spline', () => {
     expect(result.summary).toContain('0 animation');
 
     // Add one spin animation.
-    doc = execute(doc, 'animate_spin', { targetId: entityId, speed: 2.0 }).document;
+    doc = execute(doc, 'animate', { mode: 'spin', targetId: entityId, speed: 2.0 }).document;
     result = execute(doc, 'describe_scene', {});
     const snapshot2 = result.data as {
       animations: Array<{

@@ -3251,66 +3251,34 @@
     "name": "alignment_report"
   },
   {
-    "description": "Attach a sinusoidal oscillation animation to an entity or group. The motion follows sin(2π·frequency·t) · amplitude. amplitude is the peak displacement: radians for the rotation channel, document units for position. frequency is cycles per second (Hz); must be > 0. axis is the world-space direction vector ([0,1,0] = Y axis); it need not be unit-length — the viewport normalizes it. pivot is the world-space rotation pivot; when omitted the player uses the target position. trigger 'auto' runs under the global Play button; 'click' toggles when the user clicks the part.",
+    "description": "Attach a motion clip to an entity or group. mode 'spin' = constant velocity: speed is angular velocity in rad/s for the rotation channel (e.g. 6.283 = 1 revolution/s) or linear velocity in document units/s for the position channel. mode 'oscillate' = sinusoidal motion sin(2π·frequency·t) · amplitude: amplitude is the peak displacement (radians for rotation, document units for position) and frequency is in Hz; both must be > 0. axis is the world-space direction vector ([0,1,0] = Y axis); it need not be unit-length — the viewport normalizes it. pivot is the world-space rotation pivot point; when omitted, the player defaults to the target entity/group position. trigger 'auto' runs the animation under the global Play button; 'click' toggles it when the user clicks the part in the viewport.",
     "input_schema": {
       "properties": {
         "amplitude": {
-          "description": "Peak displacement of the oscillation. For the rotation channel this is radians; for the position channel this is document units. Must be greater than 0.",
+          "description": "oscillate: peak displacement, radians for the rotation channel or document units for the position channel. Must be > 0.",
           "type": "number"
         },
         "axis": {
-          "description": "World-space direction vector [x, y, z] the oscillation acts along. For rotation this is the axle; for position this is the translation direction. Need not be unit-length. Defaults to [0, 1, 0] (Y axis).",
+          "description": "World-space direction vector [x, y, z] the motion acts along. For rotation this is the axle; for position this is the translation direction. Need not be unit-length. Defaults to [0, 1, 0] (Y axis).",
           "items": {
             "type": "number"
           },
           "type": "array"
         },
         "channel": {
-          "description": "Transform channel to drive: 'rotation' (default) rocks the part; 'position' slides it back and forth.",
+          "description": "Transform channel to drive: 'rotation' (default) turns / rocks the part; 'position' translates / slides it.",
           "type": "string"
         },
         "frequency": {
-          "description": "Number of complete oscillation cycles per second (Hz). Must be greater than 0. Example: 0.5 = one full back-and-forth every 2 seconds; 2 = two cycles per second.",
+          "description": "oscillate: complete cycles per second (Hz), > 0. Example: 0.5 = one full back-and-forth every 2 seconds.",
           "type": "number"
         },
-        "pivot": {
-          "description": "World-space pivot point [x, y, z] for the rotation axis. Only meaningful for the rotation channel. When omitted the player uses the target entity/group position as the pivot.",
-          "items": {
-            "type": "number"
-          },
-          "type": "array"
-        },
-        "targetId": {
-          "description": "Id of the entity or group to animate. Must exist in the document.",
-          "type": "string"
-        },
-        "trigger": {
-          "description": "When to run the animation: 'auto' (default) starts under the global Play button; 'click' toggles the animation on/off when the user clicks the animated part in the viewport.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "targetId",
-        "amplitude",
-        "frequency"
-      ],
-      "type": "object"
-    },
-    "name": "animate_oscillate"
-  },
-  {
-    "description": "Attach a constant-velocity spin animation to an entity or group. For the rotation channel, speed is angular velocity in rad/s (e.g. 6.283 = 1 revolution/s). For the position channel, speed is linear velocity in document units per second. axis is the world-space direction vector ([0,1,0] = Y axis); it need not be unit-length — the viewport normalizes it. pivot is the world-space rotation pivot point; when omitted, the player defaults to the target entity/group position. trigger 'auto' runs the animation under the global Play button; 'click' toggles it when the user clicks the part in the viewport.",
-    "input_schema": {
-      "properties": {
-        "axis": {
-          "description": "World-space direction vector [x, y, z] the spin acts along. For rotation this is the spin axle; for position this is the translation direction. Need not be unit-length. Defaults to [0, 1, 0] (Y axis).",
-          "items": {
-            "type": "number"
-          },
-          "type": "array"
-        },
-        "channel": {
-          "description": "Transform channel to drive: 'rotation' (default) spins the part; 'position' translates it at constant speed.",
+        "mode": {
+          "description": "'spin' = constant velocity (give speed); 'oscillate' = back-and-forth sine motion (give amplitude and frequency).",
+          "enum": [
+            "spin",
+            "oscillate"
+          ],
           "type": "string"
         },
         "pivot": {
@@ -3321,7 +3289,7 @@
           "type": "array"
         },
         "speed": {
-          "description": "Constant velocity: rad/s for the rotation channel (e.g. 6.283 ≈ 1 rev/s), or document units/s for the position channel.",
+          "description": "spin: constant velocity, rad/s for the rotation channel (e.g. 6.283 ≈ 1 rev/s) or document units/s for the position channel.",
           "type": "number"
         },
         "targetId": {
@@ -3335,11 +3303,11 @@
       },
       "required": [
         "targetId",
-        "speed"
+        "mode"
       ],
       "type": "object"
     },
-    "name": "animate_spin"
+    "name": "animate"
   },
   {
     "annotations": {

@@ -11,7 +11,10 @@ import { isRecord } from '../../lib/isRecord';
 import { pluginRetiredCommands } from '../../plugins/host';
 
 /** Core commands folded into a more general one: old name -> rewrite onto the replacement. */
-const CORE_RETIRED_COMMANDS: Readonly<Record<string, RetiredCommandRewrite>> = {};
+const CORE_RETIRED_COMMANDS: Readonly<Record<string, RetiredCommandRewrite>> = {
+  animate_spin: (params) => ({ name: 'animate', params: { ...params, mode: 'spin' } }),
+  animate_oscillate: (params) => ({ name: 'animate', params: { ...params, mode: 'oscillate' } }),
+};
 
 type RewriteTable = Readonly<Record<string, RetiredCommandRewrite>>;
 

@@ -79,4 +79,26 @@ describe('retired command migration', () => {
     expect(migrateRetiredCommands(odd)).toEqual(odd);
     expect(migrateRetiredCommands({ featureHistory: 'nope' })).toEqual({ featureHistory: 'nope' });
   });
+
+  it('maps animate_spin / animate_oscillate onto animate', () => {
+    const doc = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
+    const boxId = doc.order[0]!;
+    const saved = serializeDocument({
+      ...doc,
+      featureHistory: [
+        ...doc.featureHistory,
+        { id: 'step-2', name: 'animate_spin', params: { targetId: boxId, speed: 2 } },
+        {
+          id: 'step-3',
+          name: 'animate_oscillate',
+          params: { targetId: boxId, amplitude: 1, frequency: 0.5 },
+        },
+      ],
+    });
+    const replayed = execute(deserializeDocument(saved), 'replay_history', {}).document;
+    expect(Object.values(replayed.animations).map((anim) => anim.mode)).toEqual([
+      'spin',
+      'oscillate',
+    ]);
+  });
 });
