@@ -8,7 +8,7 @@ import { defineCommand, z, vec2 } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
 import { safeFileName } from '@lib/safeFileName';
 import { fileSlug, getBuilding } from '../../building/model';
-import { PAPER_SIZES } from '../../building/drawings/sheet';
+import { PAPER_SIZES } from '../../shared/sheetFrame';
 import { civilObject, getCivil } from '../model';
 import { buildCivilPlanSheet } from './civilPlanSheet';
 import { buildPlanProfileSheet } from './planProfileSheet';

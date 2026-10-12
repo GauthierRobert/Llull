@@ -17,7 +17,7 @@ import {
   PAPER_MM,
   sheetDrawingArea,
   type PaperSize,
-} from '../../building/drawings/sheet';
+} from '../../shared/sheetFrame';
 import { toMetres, toMm } from '../../building/model';
 import { endStation, horizontalElements } from '../alignment/alignmentGeometry';
 import { formatStation, getCivil } from '../model';

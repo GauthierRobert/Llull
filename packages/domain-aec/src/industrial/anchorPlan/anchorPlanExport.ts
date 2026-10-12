@@ -18,7 +18,7 @@ import {
   sheetDrawingArea,
   type PaperSize,
   type Viewport,
-} from '../../building/drawings/sheet';
+} from '../../shared/sheetFrame';
 import { boltSize } from '../evaluate';
 import {
   BAND_STEP,

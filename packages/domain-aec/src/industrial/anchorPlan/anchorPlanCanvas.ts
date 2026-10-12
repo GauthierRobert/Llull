@@ -5,7 +5,7 @@
 import type { Vec2 } from '@core/model/types';
 import { escapeXml } from '@lib/escapeXml';
 import { distance } from '@lib/polygon';
-import { n, type Viewport } from '../../building/drawings/sheet';
+import { n, type Viewport } from '../../shared/sheetFrame';
 import { ROW_HEIGHT } from './anchorPlanLayout';
 
 export class PlanCanvas {

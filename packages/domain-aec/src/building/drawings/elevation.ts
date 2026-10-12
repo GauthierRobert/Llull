@@ -24,7 +24,7 @@ import {
   fitScale,
   n,
   sheetDrawingArea,
-} from './sheet';
+} from '../../shared/sheetFrame';
 
 export interface ElevationSheet {
   readonly filename: string;

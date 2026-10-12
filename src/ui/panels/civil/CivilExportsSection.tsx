@@ -6,7 +6,7 @@
  */
 
 import React, { useState } from 'react';
-import { PAPER_SIZES, type PaperSize } from '@aec/building/drawings/sheet';
+import { PAPER_SIZES, type PaperSize } from '@aec/shared/sheetFrame';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { OptionSelect } from '@ui/panels/OptionSelect';
 import { CivilStatus, NumberField } from './CivilParts';
