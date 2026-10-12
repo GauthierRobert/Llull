@@ -41,16 +41,18 @@ export function runCommandOutcome(
       },
     };
   } catch (error) {
-    return {
-      document: doc,
-      outcome: {
-        summary: `Command ${name} failed: ${errorMessage(error)}`,
-        affected: [],
-        isError: true,
-        changed: false,
-      },
-    };
+    return { document: doc, outcome: failedOutcome(name, error) };
   }
+}
+
+/** The outcome of a command that threw (`execute` or the caller's own follow-up work). */
+export function failedOutcome(name: string, error: unknown): CommandOutcome {
+  return {
+    summary: `Command ${name} failed: ${errorMessage(error)}`,
+    affected: [],
+    isError: true,
+    changed: false,
+  };
 }
 
 /**

@@ -9,7 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import { defaultContext } from '@core/commands/context';
 import type { CadDocument } from '@core/model/types';
-import { runCommandOutcome } from '@mcp/commandOutcome';
+import { failedOutcome, runCommandOutcome } from '@mcp/commandOutcome';
 import { parseCommandResponse, type CommandOutcome } from '@mcp/restProtocol';
 import { errorMessage } from '@lib/errorMessage';
 import type { StepObserver } from './progress';
@@ -74,12 +74,7 @@ export function createLocalBackend(docPath: string, options: LocalOptions): CliB
         ? { ...outcome, data: options.observer?.withDurations(outcome.data) ?? outcome.data }
         : outcome;
     } catch (error) {
-      return {
-        summary: `Command ${name} failed: ${errorMessage(error)}`,
-        affected: [],
-        isError: true,
-        changed: false,
-      };
+      return failedOutcome(name, error);
     }
   };
   const swapWithBackup = (label: string): Promise<CommandOutcome> => {

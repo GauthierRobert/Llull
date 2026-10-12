@@ -7,7 +7,7 @@ import os from 'os';
 import path from 'path';
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
-import { outcomeIsFailure, runCommandOutcome } from '@mcp/commandOutcome';
+import { failedOutcome, outcomeIsFailure, runCommandOutcome } from '@mcp/commandOutcome';
 import { DOCUMENT_ACCEPT, DOCUMENT_FILE_PATTERN } from '@mcp/documentFiles';
 import { exportStepFile } from '@mcp/exchangeTools';
 import { parseCommandResponse } from '@mcp/restProtocol';
@@ -181,5 +181,16 @@ describe('export_step without the Python bridge', () => {
     const doc = runCommandOutcome(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
     const file = await exportStepFile(() => doc, null, { name: 'part' });
     expect('error' in file && file.error).toMatch(/Python bridge/);
+  });
+});
+
+describe('failedOutcome', () => {
+  it('reports a thrown command as an error that changed nothing', () => {
+    expect(failedOutcome('add_box', new Error('boom'))).toEqual({
+      summary: 'Command add_box failed: boom',
+      affected: [],
+      isError: true,
+      changed: false,
+    });
   });
 });
