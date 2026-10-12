@@ -15,8 +15,11 @@ import {
   SEG_SPHERE_LAT,
   SEG_SPHERE_LON,
   SEG_TORUS_TUBE,
+  boxFaces,
   circlePoints,
   earClipTriangulate,
+  facetNormal,
+  wedgeFaces,
 } from '@core/geometry/tessellation';
 
 describe('tessellation — shared constants', () => {
@@ -155,5 +158,39 @@ describe('tessellation — earClipTriangulate', () => {
       [1, 0],
     ]);
     expect(tris).toHaveLength(1);
+  });
+});
+
+describe('tessellation - boxFaces / wedgeFaces', () => {
+  const centroid = (points: ReadonlyArray<readonly [number, number, number]>): number[] =>
+    [0, 1, 2].map((axis) => points.reduce((sum, p) => sum + (p[axis] ?? 0), 0) / points.length);
+
+  const outward = (faces: Array<Array<[number, number, number]>>, inside: number[]): boolean[] =>
+    faces.map((face) => {
+      const [a, b, c] = face as [
+        [number, number, number],
+        [number, number, number],
+        [number, number, number],
+      ];
+      const n = facetNormal(a, b, c);
+      const mid = centroid(face);
+      return (
+        n.reduce(
+          (sum, value, axis) => sum + value * (mid[axis] ?? 0) - value * (inside[axis] ?? 0),
+          0,
+        ) > 0
+      );
+    });
+
+  it('box: six quads with outward normals', () => {
+    const faces = boxFaces([0, 0, 0], [2, 4, 6]);
+    expect(faces).toHaveLength(6);
+    expect(outward(faces, [0, 0, 0])).toEqual([true, true, true, true, true, true]);
+  });
+
+  it('wedge: five faces with outward normals', () => {
+    const faces = wedgeFaces([0, 0, 0], [2, 4, 6]);
+    expect(faces).toHaveLength(5);
+    expect(outward(faces, [1, 1, 1.5])).toEqual([true, true, true, true, true]);
   });
 });
