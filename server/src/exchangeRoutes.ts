@@ -14,7 +14,24 @@ import { unshapeExchangeResult } from './exchangeResult';
 import { getLiveDoc } from './liveDocument';
 import type { ExchangeOptions } from './pythonExchange';
 import { guardMutation } from './security';
-import { actorOf } from './audit';
+import { actorOf, type Actor } from './audit';
+
+/** Run an exchange tool against the live document; its commands go through the command bus. */
+export function applyLiveExchangeToolCall(
+  name: string,
+  params: unknown,
+  exchange: ExchangeOptions,
+  actor: Actor,
+): ReturnType<typeof applyExchangeToolCall> {
+  return applyExchangeToolCall(name, params, {
+    port: exchange.port,
+    dwg: exchange.dwg ?? null,
+    getDoc: getLiveDoc,
+    applyCommand: (commandName, commandParams) =>
+      applyCommand(commandName, commandParams, undefined, actor),
+    allowCodeExecution: exchange.allowCodeExecution,
+  });
+}
 
 export function buildExchangeRouter(
   restLimiter: RequestHandler,
@@ -30,13 +47,7 @@ export function buildExchangeRouter(
     }
     const actor = actorOf(res, 'rest');
     const before = getLiveDoc();
-    applyExchangeToolCall(name, isRecord(body) ? body['params'] : undefined, {
-      port: exchange.port,
-      dwg: exchange.dwg ?? null,
-      getDoc: getLiveDoc,
-      applyCommand: (commandName, params) => applyCommand(commandName, params, undefined, actor),
-      allowCodeExecution: exchange.allowCodeExecution,
-    })
+    applyLiveExchangeToolCall(name, isRecord(body) ? body['params'] : undefined, exchange, actor)
       .then((shaped) => {
         if (shaped === null) {
           res.status(404).json({ error: `"${name}" is not an exchange tool; use POST /command.` });

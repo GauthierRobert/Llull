@@ -25,7 +25,6 @@ import {
   listMcpPrompts,
   getMcpPrompt,
   SERVER_INSTRUCTIONS,
-  applyExchangeToolCall,
   applyDiscoveryToolCall,
   isPromptEnabled,
   closestToolNames,
@@ -38,6 +37,7 @@ import type { ToolsetName } from '@mcp/index';
 import { errorMessage } from '@lib/errorMessage';
 import { getLiveDoc } from '../liveDocument';
 import { ANONYMOUS_ACTOR, type Actor } from '../audit';
+import { applyLiveExchangeToolCall } from '../exchangeRoutes';
 import type { Role } from '../users';
 import { applyCommand } from '../commandBus';
 import type { ExchangeOptions } from '../pythonExchange';
@@ -142,14 +142,7 @@ export function buildMcpServer(
 
     // export_step / import_step / import_code: Python I/O behind the injected port; document
     // changes still go through registry commands on the command bus.
-    const exchangeResult = await applyExchangeToolCall(name, args, {
-      port: exchange.port,
-      dwg: exchange.dwg ?? null,
-      getDoc: getLiveDoc,
-      applyCommand: (commandName, params) =>
-        applyCommand(commandName, params, undefined, caller.actor),
-      allowCodeExecution: exchange.allowCodeExecution,
-    });
+    const exchangeResult = await applyLiveExchangeToolCall(name, args, exchange, caller.actor);
     if (exchangeResult !== null) return exchangeResult;
 
     if (getCommand(name) === undefined) return unknownToolResult(name, enabledToolsets);
