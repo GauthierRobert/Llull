@@ -3,7 +3,7 @@
 **Date:** 2026-05-26
 **Author:** mcp-engineer (Lane 4, Batch 13)
 **Package:** `opencascade.js@1.1.1`
-**Spike file:** `src/ui/geometry/occtKernel.ts`
+**Spike file:** `src/ui/geometry/occtKernel.ts` (historical; the kernel now lives in `packages/kernel-occt/src/`)
 **Test file:** `tests/unit/occtKernel.test.ts`
 
 ---

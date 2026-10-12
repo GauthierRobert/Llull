@@ -35,7 +35,7 @@ interface CommandAnnotations {
 }
 
 interface ParamsSchema { type: 'object'; properties: Record<string, ParamSpec>; required: string[] }
-type ParamType = 'number' | 'string' | 'boolean' | 'array' | 'object';
+type ParamType = 'number' | 'integer' | 'string' | 'boolean' | 'array' | 'object';
 interface ParamSpec {                 // description written FOR an agent; assume no code access
   type: ParamType; description: string;
   enum?: readonly (string | number)[]; items?: ParamItemSpec;
@@ -62,7 +62,7 @@ toParamsSchema(schema): ParamsSchema; formatIssues(error: z.ZodError): string
 export { z }                          // import z from './schema' (plugins: '@core/commands/schema')
 ```
 
-## Execution context (`context.ts`)
+## Execution context (interface in `types.ts`, helpers in `context.ts`)
 
 ```ts
 interface ExecutionContext {
@@ -119,10 +119,11 @@ interface CadPlugin {
   readonly commands: ReadonlyArray<CommandDefinition<unknown>>;
   readonly guards?: ReadonlyArray<DerivationGuard>;   // commands/derivation.ts
   readonly document?: DocumentExtension;               // validate / derivedEntityIds / restore
+  readonly retiredCommands?: Readonly<Record<string, RetiredCommandRewrite>>; // migrated on load
 }
 installPlugin(plugin): void   // idempotent per name; src/app/plugins.ts installDefaultPlugins()
-installedPlugins(); onPluginInstalled(listener); pluginGuards(); documentExtensions();
-pluginToolNames(toolset): string[]
+onPluginInstalled(listener); pluginGuards(); pluginRetiredCommands(); documentExtensions();
+derivedEntityIds(doc): Set<string>; pluginToolNames(toolset): string[]
 interface DerivationGuard { readonly domain: string; check(previous, next): string | null }
 ```
 
