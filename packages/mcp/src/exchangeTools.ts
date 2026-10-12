@@ -18,13 +18,12 @@
  */
 
 import type { CadDocument } from '@core/model/types';
+import type { PythonBackend } from '@core/codegen/pythonRuntime';
 import { execute } from '@core/commands/registry';
 import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
 import type { McpToolDefinition } from './tools';
 import { shapeToolCallContent, type McpShapedResult } from './dispatch';
-
-export type PythonLanguage = 'cadquery' | 'build123d';
 
 export interface ProgramRun {
   /** LLULL_TRACE of a llull-runtime script, or an import_mesh trace for any other script. */
@@ -39,7 +38,7 @@ export interface ProgramRun {
 /** Port to the Python exchange process. Implementations throw Error with an agent-readable message. */
 export interface CadExchangePort {
   runProgram(request: {
-    language: PythonLanguage;
+    language: PythonBackend;
     source: string;
     step: boolean;
   }): Promise<ProgramRun>;
@@ -203,7 +202,7 @@ function stringArg(args: Record<string, unknown>, key: string): string | undefin
 }
 
 /** A tool's `language` argument (default cadquery), or null when it names another library. */
-function pythonLanguage(raw: unknown): PythonLanguage | null {
+function pythonLanguage(raw: unknown): PythonBackend | null {
   const value = raw ?? 'cadquery';
   return value === 'cadquery' || value === 'build123d' ? value : null;
 }

@@ -16,7 +16,8 @@
 import { spawn } from 'node:child_process';
 import { lstat, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { CadExchangePort, DwgConverterPort, ProgramRun, PythonLanguage } from '@mcp/index';
+import type { PythonBackend } from '@core/codegen/pythonRuntime';
+import type { CadExchangePort, DwgConverterPort, ProgramRun } from '@mcp/index';
 
 /** Response size cap (it is JSON.parse'd in memory). ~96 MB of STEP once base64-encoded. */
 const MAX_OUTPUT_BYTES = 128 * 1024 * 1024;
@@ -205,7 +206,7 @@ export function concurrencyLimiter(limit: number): <T>(task: () => Promise<T>) =
 export function createPythonExchangePort(config: PythonExchangeConfig): CadExchangePort {
   const limit = concurrencyLimiter(MAX_CONCURRENT_RUNS);
   const run = async (
-    language: PythonLanguage | 'step',
+    language: PythonBackend | 'step',
     request: Record<string, unknown>,
   ): Promise<BridgeResponse> => {
     const python = language === 'build123d' ? config.build123dPython : config.python;
