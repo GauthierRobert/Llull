@@ -10,6 +10,7 @@
 import React from 'react';
 import { useStore } from '@ui/store';
 import { isRecord } from '@lib/isRecord';
+import { type BoundingBoxData, isBoundingBoxData } from '@ui/resultData';
 import { Icon } from './Icon';
 
 interface DistanceData {
@@ -27,11 +28,6 @@ interface AreaData {
 interface PerimeterData {
   perimeter: number;
   unit: string;
-}
-interface BoundingBoxData {
-  min: readonly [number, number, number];
-  max: readonly [number, number, number];
-  size: readonly [number, number, number];
 }
 interface VolumeData {
   volume: number;
@@ -70,10 +66,6 @@ function isAreaData(data: unknown): data is AreaData {
 
 function isPerimeterData(data: unknown): data is PerimeterData {
   return hasShape(data, ['perimeter', 'unit']);
-}
-
-function isBoundingBoxData(data: unknown): data is BoundingBoxData {
-  return hasShape(data, ['min', 'max', 'size']);
 }
 
 function isVolumeData(data: unknown): data is VolumeData {

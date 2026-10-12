@@ -5,6 +5,8 @@
  * specs (param-gathering only, react R1).
  */
 
+import { parseNumber, parseNumberList } from '@ui/numberText';
+
 type FieldKind = 'number' | 'text' | 'select' | 'checkbox';
 
 /** Live element lists a select field can offer. */
@@ -111,18 +113,16 @@ export class FieldReader {
     return [this.number(xKey), this.number(yKey)];
   }
 
+  /** A required number; blank or invalid text is recorded as missing (value NaN). */
   number(key: string): number {
-    const value = Number(this.values[key]);
-    if (this.values[key]?.trim() === '' || !Number.isFinite(value)) this.missing.push(key);
-    return value;
+    const value = parseNumber(this.text(key));
+    if (value === undefined) this.missing.push(key);
+    return value ?? NaN;
   }
 
+  /** Blank → undefined (the command default applies); invalid text is recorded as missing. */
   optionalNumber(key: string): number | undefined {
-    const raw = this.values[key]?.trim() ?? '';
-    if (raw === '') return undefined;
-    const value = Number(raw);
-    if (!Number.isFinite(value)) this.missing.push(key);
-    return value;
+    return this.text(key) === '' ? undefined : this.number(key);
   }
 
   text(key: string): string {
@@ -134,12 +134,9 @@ export class FieldReader {
   }
 
   numberList(key: string): number[] {
-    const parts = this.text(key)
-      .split(/[,;\s]+/)
-      .filter((part) => part !== '')
-      .map(Number);
-    if (parts.length === 0 || parts.some((part) => !Number.isFinite(part))) this.missing.push(key);
-    return parts;
+    const parts = parseNumberList(this.text(key));
+    if (parts === null || parts.length === 0) this.missing.push(key);
+    return parts ?? [];
   }
 
   /** "x,y,z; x,y,z; …" → [[x, y, z], …] (at least `minimum` points). */

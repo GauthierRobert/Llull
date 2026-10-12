@@ -4,6 +4,7 @@ import { defineCommand, z } from '../schema';
 import { formatLength } from '../document/units';
 import { noop, report } from '../noop';
 import { elementAt } from '../../lib/elementAt';
+import { positiveSweep } from '../../lib/angle';
 
 /**
  * @command measure_area
@@ -127,9 +128,7 @@ export const measurePerimeter = defineCommand({
         break;
       case 'arc': {
         // Arcs sweep CCW; a non-positive span wraps into (0, 2π] (start === end is a full circle, as rendered).
-        let span = e.endAngle - e.startAngle;
-        if (span <= 0) span = ((span % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI) || 2 * Math.PI;
-        perimeter = e.radius * span;
+        perimeter = e.radius * positiveSweep(e.endAngle - e.startAngle);
         break;
       }
       default:

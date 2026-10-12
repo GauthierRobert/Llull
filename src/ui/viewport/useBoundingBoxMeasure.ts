@@ -9,18 +9,9 @@
 import { useEffect } from 'react';
 import { useThree } from '@react-three/fiber';
 import { useStore } from '@ui/store';
+import { type BoundingBoxData, isBoundingBoxData } from '@ui/resultData';
 
-interface BoundingBoxMeasure {
-  min: readonly [number, number, number];
-  max: readonly [number, number, number];
-  size: readonly [number, number, number];
-}
-
-function isBoundingBoxMeasure(d: unknown): d is BoundingBoxMeasure {
-  return typeof d === 'object' && d !== null && 'min' in d && 'max' in d && 'size' in d;
-}
-
-export function useBoundingBoxMeasure(): BoundingBoxMeasure | null {
+export function useBoundingBoxMeasure(): BoundingBoxData | null {
   const lastMeasure = useStore((s) => s.lastMeasure);
   const invalidate = useThree((s) => s.invalidate);
 
@@ -29,5 +20,5 @@ export function useBoundingBoxMeasure(): BoundingBoxMeasure | null {
   }, [lastMeasure, invalidate]);
 
   if (!lastMeasure || lastMeasure.command !== 'measure_bounding_box') return null;
-  return isBoundingBoxMeasure(lastMeasure.data) ? lastMeasure.data : null;
+  return isBoundingBoxData(lastMeasure.data) ? lastMeasure.data : null;
 }

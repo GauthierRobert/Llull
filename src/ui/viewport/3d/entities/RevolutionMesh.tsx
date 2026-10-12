@@ -15,26 +15,16 @@
 import { useMemo } from 'react';
 import type { RevolutionEntity } from '@core/model/types';
 import { SolidMeshShell, type SolidMeshKindProps } from './SolidMeshShell';
-import { useStableByKey } from '../../useStableByKey';
+import { pointsKey, useStableByKey } from '../../useStableByKey';
 import { buildRevolutionGeometry } from './primitiveGeometry';
-
-/** Stable string key for the profile array (used as useMemo dep). */
-function profileKey(profile: RevolutionEntity['profile']): string {
-  return profile.map(([r, a]) => `${r},${a}`).join(';');
-}
-
-/** Stable string key for a Vec3 axis (used as useMemo dep). */
-function axisKey(axis: RevolutionEntity['axis']): string {
-  return `${axis[0]},${axis[1]},${axis[2]}`;
-}
 
 function RevolutionSolid({
   entity,
   ...shell
 }: SolidMeshKindProps<RevolutionEntity>): React.ReactElement {
   const { angle, segments } = entity;
-  const profile = useStableByKey(entity.profile, profileKey(entity.profile));
-  const axis = useStableByKey(entity.axis, axisKey(entity.axis));
+  const profile = useStableByKey(entity.profile, pointsKey(entity.profile));
+  const axis = useStableByKey(entity.axis, pointsKey([entity.axis]));
 
   const geometry = useMemo(
     () => buildRevolutionGeometry(profile, axis, angle, segments),

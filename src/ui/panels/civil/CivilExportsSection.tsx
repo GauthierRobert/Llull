@@ -11,7 +11,7 @@ import { PanelSection } from '@ui/panels/PanelParts';
 import { OptionSelect } from '@ui/panels/OptionSelect';
 import { CivilStatus, NumberField } from './CivilParts';
 import { downloadQuery } from './civilQuery';
-import { optionalNumber } from './civilInput';
+import { optionalNumber } from '@ui/numberText';
 
 export function CivilExportsSection(): React.ReactElement {
   const [status, setStatus] = useState('');

@@ -10,7 +10,7 @@ import type { SurfaceObject } from '@core/model/civil';
 import { useStore } from '@ui/store';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { CivilObjectRow, useCivilObjects, NumberField, TextField } from './CivilParts';
-import { optionalNumber, parseNumber } from './civilInput';
+import { optionalNumber, parseNumber } from '@ui/numberText';
 import { runQuery } from './civilQuery';
 
 function SurfaceRow({ surface }: { surface: SurfaceObject }): React.ReactElement {

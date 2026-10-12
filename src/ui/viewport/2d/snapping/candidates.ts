@@ -5,6 +5,7 @@
  */
 
 import { type CadDocument, type Vec2, is3D } from '@core/model/types';
+import { wrapAngle } from '@lib/angle';
 import { solidSnapPoints } from '../solidOutline';
 import type { CollectOpts, SnapPoint, SnapType } from './types';
 import {
@@ -20,7 +21,6 @@ import {
   mid,
   nearestOnArc,
   nearestOnSegment,
-  normalizeAngle,
   snapExtension,
   snapPerpendicular,
   snapTangentToCircle,
@@ -162,7 +162,7 @@ export function collectSnapCandidates(
         // Midpoint along the SWEPT arc (direction-respecting), so an arc that crosses the 0/2π
         // wrap still lands on the arc itself rather than the opposite side.
         if (doMidpoints)
-          add('midpoint', ...onArc(startAngle + normalizeAngle(endAngle - startAngle) / 2));
+          add('midpoint', ...onArc(startAngle + wrapAngle(endAngle - startAngle) / 2));
         addCurveSnaps(cx, cy, r, startAngle, endAngle, false);
         break;
       }

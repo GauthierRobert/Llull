@@ -15,6 +15,7 @@
 import type { ImageEntity, Vec2, Vec3 } from '../model/types';
 import { applyEulerXYZ } from '../lib/eulerRotation';
 import { add3, sub3 } from '../lib/vec3';
+import { wrapSignedAngle } from '../lib/angle';
 
 export type UnderlayPlacement = Pick<
   ImageEntity,
@@ -77,7 +78,7 @@ export type CalibrationResult =
  * exact quarter turn keeps the sign that points the segment along the positive axis.
  */
 function smallestAxisTurn(angle: number): number {
-  const wrapped = angle - 2 * Math.PI * Math.round(angle / (2 * Math.PI));
+  const wrapped = wrapSignedAngle(angle);
   const quarter = Math.PI / 2 + 1e-12;
   if (wrapped > quarter) return wrapped - Math.PI;
   if (wrapped < -quarter) return wrapped + Math.PI;

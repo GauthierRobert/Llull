@@ -12,7 +12,8 @@ import { PAPER_SIZES, type PaperSize } from '@aec/shared/sheetFrame';
 import { useStore } from '@ui/store';
 import { OptionSelect } from '@ui/panels/OptionSelect';
 import { CivilObjectRow, CivilStatus, NumberField } from './CivilParts';
-import { optionalNumber, parseNumber, parsePvis } from './civilInput';
+import { optionalNumber, parseNumber } from '@ui/numberText';
+import { parsePvis } from './civilInput';
 import { downloadQuery } from './civilQuery';
 
 const SECTION_FIELDS = [

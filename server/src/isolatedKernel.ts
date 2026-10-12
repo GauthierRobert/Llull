@@ -21,6 +21,7 @@ import {
   type MessagePort,
 } from 'node:worker_threads';
 import type { GeometryKernel, ShapeHandle } from '@core/geometry/kernel';
+import { errorMessage } from '@lib/errorMessage';
 import { handleOf, keyOnlyHandle, SHAPE_NOT_CACHED } from '@core/geometry/shapeKernel';
 import {
   STATUS_DIED,
@@ -94,9 +95,6 @@ interface LiveWorker {
   /** False while the WASM module is still loading in the background. */
   ready: boolean;
 }
-
-const errorText = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
 
 class WorkerDiedOnStartError extends Error {
   constructor() {
@@ -188,7 +186,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
     try {
       live = launch();
     } catch (error) {
-      console.warn(`[occt] warm restart failed: ${errorText(error)}`);
+      console.warn(`[occt] warm restart failed: ${errorMessage(error)}`);
     }
   };
 
@@ -205,7 +203,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
         target = ensureLive();
       }
     } catch (error) {
-      console.warn(`[occt] ${errorText(error)}; returning null`);
+      console.warn(`[occt] ${errorMessage(error)}; returning null`);
       return null;
     }
     const { port, status } = target;
@@ -268,7 +266,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
         ensureLive();
         return true;
       } catch (error) {
-        console.warn(`[occt] ${errorText(error)}`);
+        console.warn(`[occt] ${errorMessage(error)}`);
         return false;
       }
     },

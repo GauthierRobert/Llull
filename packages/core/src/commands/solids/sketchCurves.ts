@@ -8,6 +8,7 @@ import type { CurveSegment } from '../../model/curve';
 import type { CadDocument, Entity, Vec2, Vec3 } from '../../model/types';
 import { applyEulerXYZ, inverseEulerXYZ } from '../../lib/eulerRotation';
 import { add3, distance3, sub3 } from '../../lib/vec3';
+import { positiveSweep } from '../../lib/angle';
 import {
   JOINT_TOLERANCE,
   catmullRomBeziers,
@@ -68,8 +69,7 @@ export function entityCurves(
     case 'line':
       return { curves: [line(entity.start, entity.end)], closed: false };
     case 'arc': {
-      let sweep = entity.endAngle - entity.startAngle;
-      while (sweep <= 0) sweep += 2 * Math.PI;
+      const sweep = positiveSweep(entity.endAngle - entity.startAngle);
       const { center, radius, startAngle } = entity;
       return {
         curves: [

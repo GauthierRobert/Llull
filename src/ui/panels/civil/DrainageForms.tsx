@@ -9,7 +9,8 @@
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import { chosenId, CivilObjectSelect, useCivilObjects, NumberField, TextField } from './CivilParts';
-import { optionalNumber, parseNumber, parsePoints } from './civilInput';
+import { optionalNumber, parseNumber } from '@ui/numberText';
+import { parsePoints } from './civilInput';
 import { FormError } from '@ui/panels/PanelParts';
 
 const MANHOLE_FIELDS = [

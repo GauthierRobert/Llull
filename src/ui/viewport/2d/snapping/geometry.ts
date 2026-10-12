@@ -7,20 +7,16 @@
 
 import type { Entity, Vec2 } from '@core/model/types';
 import { projectOntoSegment } from '@lib/polygon';
+import { wrapAngle } from '@lib/angle';
 import type { SnapPoint } from './types';
 
 /** Line segment as [x1, y1, x2, y2]. */
 export type Segment = [number, number, number, number];
 
-/** `angle` wrapped into [0, 2π). */
-export function normalizeAngle(angle: number): number {
-  return ((angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-}
-
 /** True when `angle` lies within the counter-clockwise sweep startAngle→endAngle (inclusive, with tolerance). */
 export function isAngleOnArc(angle: number, startAngle: number, endAngle: number): boolean {
-  const sweep = normalizeAngle(endAngle - startAngle);
-  const offset = normalizeAngle(angle - startAngle);
+  const sweep = wrapAngle(endAngle - startAngle);
+  const offset = wrapAngle(angle - startAngle);
   const eps = 1e-9;
   return offset <= sweep + eps || offset >= 2 * Math.PI - eps;
 }
@@ -264,9 +260,9 @@ export function nearestOnArc(
     const angle = Math.atan2(py - cy, px - cx);
     return [cx + r * Math.cos(angle), cy + r * Math.sin(angle)];
   }
-  const sweep = normalizeAngle(endAngle - startAngle);
+  const sweep = wrapAngle(endAngle - startAngle);
   // Offset of the cursor direction, measured from startAngle.
-  const offset = normalizeAngle(Math.atan2(py - cy, px - cx) - startAngle);
+  const offset = wrapAngle(Math.atan2(py - cy, px - cx) - startAngle);
   const clampedOffset = Math.max(0, Math.min(sweep, offset));
   const clampedAngle = startAngle + clampedOffset;
   return [cx + r * Math.cos(clampedAngle), cy + r * Math.sin(clampedAngle)];

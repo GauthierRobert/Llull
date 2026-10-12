@@ -8,6 +8,7 @@
 import type { CurveSegment } from '../model/curve';
 import type { Vec2, Vec3 } from '../model/types';
 import { add3, cross3, distance3, dot3, len3, normalize3, scale3, sub3 } from '../lib/vec3';
+import { positiveSweep } from '../lib/angle';
 
 type Point = Vec2 | Vec3;
 
@@ -50,8 +51,7 @@ export function arcGeometry(start: Point, through: Point, end: Point): ArcGeomet
   const u = normalize3(sub3(a, center));
   const v = cross3(normal, u);
   const rel = sub3(c, center);
-  let sweep = Math.atan2(dot3(rel, v), dot3(rel, u));
-  if (sweep <= 0) sweep += 2 * Math.PI;
+  const sweep = positiveSweep(Math.atan2(dot3(rel, v), dot3(rel, u)));
   return { center, radius, u, v, normal, sweep };
 }
 
