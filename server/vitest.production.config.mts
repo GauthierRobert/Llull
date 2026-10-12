@@ -5,7 +5,7 @@
  *   npm run production:scripted      npm run production:agent (needs Anthropic credentials)
  */
 import { defineConfig } from 'vitest/config';
-import base from './vitest.config';
+import base from './vitest.config.mts';
 
 export default defineConfig({
   ...base,

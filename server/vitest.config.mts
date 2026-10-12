@@ -5,7 +5,7 @@
  * Path aliases come from tsconfig.base.json (workspaceAliases), like every other config.
  */
 import { defineConfig } from 'vitest/config';
-import { workspaceAliases } from '../workspaceAliases';
+import { workspaceAliases } from '../workspaceAliases.ts';
 
 export default defineConfig({
   resolve: {

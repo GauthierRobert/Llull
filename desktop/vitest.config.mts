@@ -3,7 +3,7 @@
  * navigation, CLI shim, menu). Node environment; path aliases come from tsconfig.base.json.
  */
 import { defineConfig } from 'vitest/config';
-import { workspaceAliases } from '../workspaceAliases';
+import { workspaceAliases } from '../workspaceAliases.ts';
 
 export default defineConfig({
   resolve: {

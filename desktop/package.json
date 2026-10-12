@@ -14,7 +14,7 @@
     "prepare:python": "node scripts/prepare-python.mjs",
     "dist": "npm run build && npm run stage:server && npm run prepare:python && electron-builder --config electron-builder.yml",
     "typecheck": "tsc --noEmit",
-    "test": "npm --prefix ../server run --silent bundle && vitest run --config vitest.config.ts",
+    "test": "npm --prefix ../server run --silent bundle && vitest run --config vitest.config.mts",
     "stage:server": "node scripts/stage-server.mjs"
   },
   "devDependencies": {
