@@ -5,13 +5,8 @@
  * the camera distance that fits its bounding sphere in the perspective frustum.
  */
 
-import type { CadDocument, Entity, Vec3 } from '@core/model/types';
-import {
-  boundsCenter,
-  entityBounds,
-  instanceBoundsFromDoc,
-  mergeBounds,
-} from '@core/geometry/bounds';
+import type { CadDocument, Vec3 } from '@core/model/types';
+import { type Bounds, boundsCenter, entityBoundsInDoc, mergeBounds } from '@core/geometry/bounds';
 import { VIEWPORT_FOV_DEGREES } from '@core/model/viewport';
 
 /** Margin applied on top of the exact fit distance. */
@@ -25,27 +20,19 @@ export interface FitFraming {
   readonly distance: number;
 }
 
-function boundsOf(entity: Entity, document: CadDocument): ReturnType<typeof entityBounds> {
-  return entity.kind === 'instance'
-    ? instanceBoundsFromDoc(entity, document)
-    : entityBounds(entity);
-}
-
 /**
- * World AABB of the existing entities among `ids` (instances expanded through their component).
+ * World AABB of the existing entities among `ids` (instances expanded through their component,
+ * dimensions framed with the geometry they measure) — the same bounds `fit_view` uses.
  *
  * @pure
  * @failure no ids, or none that exist -> null
  */
-export function mergedEntityBounds(
-  document: CadDocument,
-  ids: readonly string[],
-): ReturnType<typeof entityBounds> | null {
-  let merged: ReturnType<typeof entityBounds> | null = null;
+export function mergedEntityBounds(document: CadDocument, ids: readonly string[]): Bounds | null {
+  let merged: Bounds | null = null;
   for (const id of ids) {
     const entity = document.entities[id];
     if (!entity) continue;
-    const bounds = boundsOf(entity, document);
+    const bounds = entityBoundsInDoc(document, entity);
     merged = merged ? mergeBounds(merged, bounds) : bounds;
   }
   return merged;
