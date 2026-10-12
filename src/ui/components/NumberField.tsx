@@ -8,6 +8,7 @@
  */
 
 import React, { forwardRef, useState } from 'react';
+import { parseNumber } from '@ui/numberText';
 
 type NativeInputProps = Omit<
   React.InputHTMLAttributes<HTMLInputElement>,
@@ -19,12 +20,6 @@ interface NumberFieldProps extends NativeInputProps {
   onValueChange: (value: number) => void;
 }
 
-function parseTyped(text: string): number | null {
-  if (text.trim() === '') return null;
-  const parsed = Number(text);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
 export const NumberField = forwardRef<HTMLInputElement, NumberFieldProps>(function NumberField(
   { value, onValueChange, ...inputProps },
   ref,
@@ -33,7 +28,7 @@ export const NumberField = forwardRef<HTMLInputElement, NumberFieldProps>(functi
   const [seenValue, setSeenValue] = useState(value);
   if (value !== seenValue) {
     setSeenValue(value);
-    if (parseTyped(text) !== value) setText(String(value));
+    if (parseNumber(text) !== value) setText(String(value));
   }
   return (
     <input
@@ -44,8 +39,8 @@ export const NumberField = forwardRef<HTMLInputElement, NumberFieldProps>(functi
       onChange={(event) => {
         const next = event.target.value;
         setText(next);
-        const parsed = parseTyped(next);
-        if (parsed !== null) {
+        const parsed = parseNumber(next);
+        if (parsed !== undefined) {
           onValueChange(parsed);
         }
       }}

@@ -15,6 +15,7 @@ import { OptionSelect } from '@ui/panels/OptionSelect';
 import { capitalize } from '@ui/panels/capitalize';
 import { orderedValues } from '@ui/panels/orderedValues';
 import { downloadText } from '@ui/download';
+import { optionalNumber } from '@ui/numberText';
 
 const PAPERS = ['A4', 'A3', 'A2', 'A1', 'A0'] as const;
 const SCALES = ['auto', '20', '50', '100', '200', '500'] as const;
@@ -149,9 +150,7 @@ export function BuildingExportsSection(): React.ReactElement {
                 direction,
                 paper,
                 ...scaleParams,
-                ...(cutAt.trim() !== '' && Number.isFinite(Number(cutAt))
-                  ? { cutAt: Number(cutAt) }
-                  : {}),
+                ...optionalNumber('cutAt', cutAt),
                 ...(hideCladding ? { exclude: ['panel'] } : {}),
               },
               'svg',

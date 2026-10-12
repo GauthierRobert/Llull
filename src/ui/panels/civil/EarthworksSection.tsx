@@ -19,13 +19,8 @@ import {
   NumberField,
   TextField,
 } from './CivilParts';
-import {
-  formatPoints,
-  optionalNumber,
-  parseNumber,
-  parsePoints,
-  selectedPolylinePoints,
-} from './civilInput';
+import { optionalNumber, parseNumber } from '@ui/numberText';
+import { formatPoints, parsePoints, selectedPolylinePoints } from './civilInput';
 import { runQuery } from './civilQuery';
 
 function PlatformRow({ platform }: { platform: PlatformObject }): React.ReactElement {

@@ -9,6 +9,7 @@
 
 import type { ParamSpec, ParamsSchema, ParamType } from '@core/commands/types';
 import type { EntityId } from '@core/model/types';
+import { parseNumber } from '@ui/numberText';
 
 type FieldKind = 'number' | 'text' | 'enum' | 'boolean' | 'numberList' | 'textList' | 'json';
 
@@ -160,8 +161,8 @@ function splitList(raw: string): string[] {
 function parseField(field: FormField, raw: string): { value: unknown } | string {
   switch (field.kind) {
     case 'number': {
-      const value = Number(raw);
-      return Number.isFinite(value) ? { value } : 'Enter a number.';
+      const value = parseNumber(raw);
+      return value !== undefined ? { value } : 'Enter a number.';
     }
     case 'boolean':
       return { value: raw === 'true' };

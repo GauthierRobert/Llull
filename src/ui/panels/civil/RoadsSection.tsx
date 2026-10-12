@@ -9,13 +9,8 @@ import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import { PanelSection, FormError } from '@ui/panels/PanelParts';
 import { chosenId, CivilObjectSelect, useCivilObjects, NumberField, TextField } from './CivilParts';
-import {
-  formatPoints,
-  optionalNumber,
-  parseNumberList,
-  parsePoints,
-  selectedPolylinePoints,
-} from './civilInput';
+import { optionalNumber, parseNumberList } from '@ui/numberText';
+import { formatPoints, parsePoints, selectedPolylinePoints } from './civilInput';
 import { AlignmentEditor } from './AlignmentEditor';
 
 export function RoadsSection(): React.ReactElement {

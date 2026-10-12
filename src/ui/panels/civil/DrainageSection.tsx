@@ -14,7 +14,7 @@ import { isCsvData } from '@ui/resultData';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { CivilObjectRow, CivilStatus, useCivilObjects, NumberField } from './CivilParts';
 import { ManholeForm, PipeForm } from './DrainageForms';
-import { optionalNumber, parseNumber } from './civilInput';
+import { optionalNumber, parseNumber } from '@ui/numberText';
 import { downloadQuery, runQuery } from './civilQuery';
 
 function failuresOf(data: unknown): string[] {
