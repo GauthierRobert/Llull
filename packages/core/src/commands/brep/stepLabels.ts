@@ -10,6 +10,8 @@
  *   the labels -> that part is left untouched (never throws, never corrupts)
  */
 
+import { isHexColor, parseHexRgb } from '../../lib/isHexColor';
+
 /** What to stamp on the n-th transferred shape. */
 export interface StepLabel {
   /** PRODUCT id and name (entity name, else its id). */
@@ -49,10 +51,10 @@ export function stepString(text: string): string {
 }
 
 function rgbOf(hex: string | undefined): [number, number, number] | null {
-  if (hex === undefined || !/^#[0-9a-fA-F]{6}$/.test(hex)) return null;
-  const channel = (offset: number): number =>
-    Math.round((parseInt(hex.slice(offset, offset + 2), 16) / 255) * 1000) / 1000;
-  return [channel(1), channel(3), channel(5)];
+  const rgb = isHexColor(hex) ? parseHexRgb(hex) : null;
+  if (rgb === null) return null;
+  const [r, g, b] = rgb.map((c) => Math.round((c / 255) * 1000) / 1000) as [number, number, number];
+  return [r, g, b];
 }
 
 /** `#id` numbers of the representation items that are solids/surfaces (not the placement axis). */
