@@ -12,7 +12,7 @@ import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { CommandDefinition } from '@core/commands/types';
 import { usePaletteStore, useStore } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
-import { trapTab } from '@ui/focusTrap';
+import { ModalDialog } from '@ui/components/ModalDialog';
 import { type PaletteItem, allPaletteItems, searchPaletteItems } from './paletteItems';
 import { CommandParamForm } from './CommandParamForm';
 
@@ -122,7 +122,6 @@ function OpenPalette(): React.ReactElement {
   const [activeIndex, setActiveIndex] = useState(0);
   const [formCommand, setFormCommand] = useState<CommandDefinition<unknown> | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const dialogRef = useRef<HTMLDivElement | null>(null);
   const listId = useId();
 
   const catalog = useMemo(() => allPaletteItems(), []);
@@ -130,14 +129,6 @@ function OpenPalette(): React.ReactElement {
     () => searchPaletteItems(catalog, query, recentIds),
     [catalog, query, recentIds],
   );
-
-  // Restore focus to whatever opened the palette when it closes (if it still exists).
-  useEffect(() => {
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    return () => {
-      if (opener?.isConnected === true) opener.focus();
-    };
-  }, []);
 
   useEffect(() => {
     if (formCommand === null) inputRef.current?.focus();
@@ -178,89 +169,74 @@ function OpenPalette(): React.ReactElement {
   };
 
   return (
-    <div
-      className="palette-backdrop"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) close();
-      }}
+    <ModalDialog
+      backdropClassName="palette-backdrop"
+      className="palette"
+      onClose={close}
+      closeOn="mousedown"
+      label="Command palette"
+      tabIndex={-1}
     >
-      <div
-        ref={dialogRef}
-        className="palette"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Command palette"
-        tabIndex={-1}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') {
-            e.preventDefault();
-            close();
-          } else if (e.key === 'Tab' && dialogRef.current !== null) {
-            trapTab(e, dialogRef.current);
-          }
-        }}
-      >
-        {formCommand === null ? (
-          <>
-            <div className="palette-search">
-              <Icon name="search" size={16} />
-              <input
-                ref={inputRef}
-                className="palette-search__input"
-                role="combobox"
-                aria-expanded={results.length > 0}
-                aria-controls={results.length > 0 ? listId : undefined}
-                aria-autocomplete="list"
-                aria-activedescendant={results.length > 0 ? `${listId}-${activeIndex}` : undefined}
-                aria-label="Search commands"
-                placeholder="Search actions and commands…"
-                spellCheck={false}
-                autoComplete="off"
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setActiveIndex(0);
-                }}
-                onKeyDown={onInputKeyDown}
-              />
-              <kbd className="kbd">Esc</kbd>
-            </div>
-            <PaletteList
-              items={results}
-              activeIndex={activeIndex}
-              listId={listId}
-              grouped={query.trim() === ''}
-              onHover={setActiveIndex}
-              onChoose={choose}
+      {formCommand === null ? (
+        <>
+          <div className="palette-search">
+            <Icon name="search" size={16} />
+            <input
+              ref={inputRef}
+              className="palette-search__input"
+              role="combobox"
+              aria-expanded={results.length > 0}
+              aria-controls={results.length > 0 ? listId : undefined}
+              aria-autocomplete="list"
+              aria-activedescendant={results.length > 0 ? `${listId}-${activeIndex}` : undefined}
+              aria-label="Search commands"
+              placeholder="Search actions and commands…"
+              spellCheck={false}
+              autoComplete="off"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setActiveIndex(0);
+              }}
+              onKeyDown={onInputKeyDown}
             />
-            <footer className="palette-footer" aria-hidden="true">
-              <span>
-                <kbd className="kbd">↑</kbd>
-                <kbd className="kbd">↓</kbd> navigate
-              </span>
-              <span>
-                <kbd className="kbd">↵</kbd> run
-              </span>
-              <span className="palette-footer__count">
-                {results.length} result{results.length === 1 ? '' : 's'}
-              </span>
-            </footer>
-          </>
-        ) : (
-          <CommandParamForm
-            command={formCommand}
-            onBack={() => {
-              setFormCommand(null);
-              setActiveIndex(0);
-            }}
-            onSubmit={(params) => {
-              recordRecent(`command:${formCommand.name}`);
-              close();
-              runCommand(formCommand, params);
-            }}
+            <kbd className="kbd">Esc</kbd>
+          </div>
+          <PaletteList
+            items={results}
+            activeIndex={activeIndex}
+            listId={listId}
+            grouped={query.trim() === ''}
+            onHover={setActiveIndex}
+            onChoose={choose}
           />
-        )}
-      </div>
-    </div>
+          <footer className="palette-footer" aria-hidden="true">
+            <span>
+              <kbd className="kbd">↑</kbd>
+              <kbd className="kbd">↓</kbd> navigate
+            </span>
+            <span>
+              <kbd className="kbd">↵</kbd> run
+            </span>
+            <span className="palette-footer__count">
+              {results.length} result{results.length === 1 ? '' : 's'}
+            </span>
+          </footer>
+        </>
+      ) : (
+        <CommandParamForm
+          command={formCommand}
+          onBack={() => {
+            setFormCommand(null);
+            setActiveIndex(0);
+          }}
+          onSubmit={(params) => {
+            recordRecent(`command:${formCommand.name}`);
+            close();
+            runCommand(formCommand, params);
+          }}
+        />
+      )}
+    </ModalDialog>
   );
 }

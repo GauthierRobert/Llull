@@ -10,7 +10,7 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { listCommands } from '@core/commands/registry';
 import { SERVER_BASE } from '@ui/serverConfig';
 import { Icon } from '@ui/components/Icon';
-import { focusableElements, trapTab } from '@ui/focusTrap';
+import { ModalDialog } from './ModalDialog';
 
 const SERVER_INSTALL_CMD = 'npm --prefix server install && npm --prefix server run dev';
 const SERVER_START_CMD = 'npm --prefix server run dev';
@@ -151,93 +151,72 @@ interface McpConnectProps {
 }
 
 export function McpConnect({ onClose }: McpConnectProps): React.ReactElement {
-  const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
-  // Focus the first focusable element when the modal opens.
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (dialog) focusableElements(dialog, { links: true })[0]?.focus();
-  }, []);
-
   return (
-    <div
-      className="mcp-connect-backdrop"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      aria-hidden="false"
+    <ModalDialog
+      backdropClassName="mcp-connect-backdrop"
+      className="mcp-connect"
+      onClose={onClose}
+      labelledBy={titleId}
+      initialFocus="first"
+      restoreFocus={false}
+      links
     >
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className="mcp-connect"
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') {
-            e.preventDefault();
-            onClose();
-          } else if (e.key === 'Tab' && dialogRef.current) {
-            trapTab(e, dialogRef.current, { links: true });
-          }
-        }}
-      >
-        <div className="mcp-connect__header">
-          <span className="mcp-connect__header-icon" aria-hidden="true">
-            <Icon name="plug" size={16} />
-          </span>
-          <div className="mcp-connect__heading">
-            <h2 id={titleId} className="mcp-connect__title">
-              Connect an MCP agent
-            </h2>
-            <p className="mcp-connect__subtitle">Let Claude or any MCP client drive this canvas.</p>
-          </div>
-          <button
-            type="button"
-            className="icon-btn mcp-connect__close"
-            onClick={onClose}
-            aria-label="Close dialog"
-            title="Close"
-          >
-            <Icon name="close" size={14} />
-          </button>
+      <div className="mcp-connect__header">
+        <span className="mcp-connect__header-icon" aria-hidden="true">
+          <Icon name="plug" size={16} />
+        </span>
+        <div className="mcp-connect__heading">
+          <h2 id={titleId} className="mcp-connect__title">
+            Connect an MCP agent
+          </h2>
+          <p className="mcp-connect__subtitle">Let Claude or any MCP client drive this canvas.</p>
         </div>
-
-        <div className="mcp-connect__body">
-          <div className="mcp-connect__badges" aria-label="Capabilities">
-            {capabilityBadges().map((badge) => (
-              <span key={badge} className="mcp-connect__badge">
-                {badge}
-              </span>
-            ))}
-          </div>
-
-          <ConnectStep
-            step={1}
-            ariaLabel="Install and start server"
-            label="Install & start the MCP server"
-          >
-            <CodeRow code={SERVER_INSTALL_CMD} copyLabel="install and start command" />
-            <p className="mcp-connect__hint mcp-connect__hint--inline">
-              If the server is already installed, use:{' '}
-              <code className="mcp-connect__inline-code">{SERVER_START_CMD}</code>
-            </p>
-          </ConnectStep>
-
-          <ConnectStep step={2} ariaLabel="Endpoint URL" label="MCP endpoint">
-            <CodeRow code={ENDPOINT_URL} copyLabel="endpoint URL" />
-            <p className="mcp-connect__hint mcp-connect__hint--inline">
-              Point your MCP client (Claude Desktop, Cursor, etc.) at this URL. Set{' '}
-              <code className="mcp-connect__inline-code">MCP_AUTH_TOKEN</code> to protect the
-              endpoint in production.
-            </p>
-          </ConnectStep>
-
-          <McpAgentLoop />
-        </div>
+        <button
+          type="button"
+          className="icon-btn mcp-connect__close"
+          onClick={onClose}
+          aria-label="Close dialog"
+          title="Close"
+        >
+          <Icon name="close" size={14} />
+        </button>
       </div>
-    </div>
+
+      <div className="mcp-connect__body">
+        <div className="mcp-connect__badges" aria-label="Capabilities">
+          {capabilityBadges().map((badge) => (
+            <span key={badge} className="mcp-connect__badge">
+              {badge}
+            </span>
+          ))}
+        </div>
+
+        <ConnectStep
+          step={1}
+          ariaLabel="Install and start server"
+          label="Install & start the MCP server"
+        >
+          <CodeRow code={SERVER_INSTALL_CMD} copyLabel="install and start command" />
+          <p className="mcp-connect__hint mcp-connect__hint--inline">
+            If the server is already installed, use:{' '}
+            <code className="mcp-connect__inline-code">{SERVER_START_CMD}</code>
+          </p>
+        </ConnectStep>
+
+        <ConnectStep step={2} ariaLabel="Endpoint URL" label="MCP endpoint">
+          <CodeRow code={ENDPOINT_URL} copyLabel="endpoint URL" />
+          <p className="mcp-connect__hint mcp-connect__hint--inline">
+            Point your MCP client (Claude Desktop, Cursor, etc.) at this URL. Set{' '}
+            <code className="mcp-connect__inline-code">MCP_AUTH_TOKEN</code> to protect the endpoint
+            in production.
+          </p>
+        </ConnectStep>
+
+        <McpAgentLoop />
+      </div>
+    </ModalDialog>
   );
 }
 

@@ -9,6 +9,7 @@
 import React, { useRef } from 'react';
 import { useStore } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
+import { takeChosenFile } from '@ui/chosenFile';
 
 function readAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -24,8 +25,7 @@ export function ImageUnderlayImport(): React.ReactElement {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
+    const file = takeChosenFile(e);
     if (!file) return;
     void readAsDataUrl(file).then(
       (dataUrl) => dispatch('add_image_underlay', { dataUrl, name: file.name, locked: true }),

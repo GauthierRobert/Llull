@@ -17,6 +17,7 @@ import { projectFileStem } from '@ui/components/projectName';
 import { serializeDocument } from '@core/commands/persistence/serialization';
 import { Icon } from '@ui/components/Icon';
 import { downloadBlob } from '@ui/download';
+import { takeChosenFile } from '@ui/chosenFile';
 
 function timestamp(): string {
   const d = new Date();
@@ -82,8 +83,7 @@ export function ProjectIO(): React.ReactElement {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
+    const file = takeChosenFile(e);
     if (!file) return;
     void file.text().then((json) => {
       const replacedContent = useStore.getState().document.order.length > 0;

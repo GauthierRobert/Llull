@@ -9,20 +9,20 @@ import React, { useState } from 'react';
 import type { DocumentUnit } from '@core/model/types';
 import { useStore } from '@ui/store';
 import { SERVER_BASE, serverAuthHeaders } from '@ui/serverConfig';
+import { fileStem, takeChosenFile } from '@ui/chosenFile';
 
 /** Reads the first chosen file as text (browser side effect, no document change). */
 export function readChosenFile(
   event: React.ChangeEvent<HTMLInputElement>,
   onText: (text: string, fileName: string) => void,
 ): void {
-  const file = event.target.files?.[0];
+  const file = takeChosenFile(event);
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
     if (typeof reader.result === 'string') onText(reader.result, file.name);
   };
   reader.readAsText(file);
-  event.target.value = '';
 }
 
 interface DwgImportReply {
@@ -37,7 +37,7 @@ async function uploadDwg(
   unit: DocumentUnit,
 ): Promise<string> {
   const query = new URLSearchParams({ target, sourceUnit: unit });
-  if (target === 'survey') query.set('name', file.name.replace(/\.[^.]+$/, ''));
+  if (target === 'survey') query.set('name', fileStem(file.name));
   try {
     const response = await fetch(`${SERVER_BASE}/import/dwg?${query.toString()}`, {
       method: 'POST',
@@ -52,8 +52,6 @@ async function uploadDwg(
   }
 }
 
-const stem = (fileName: string): string => fileName.replace(/\.[^.]+$/, '');
-
 export function DxfImports({ unit }: { unit: DocumentUnit }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const [dwgStatus, setDwgStatus] = useState('');
@@ -61,8 +59,7 @@ export function DxfImports({ unit }: { unit: DocumentUnit }): React.ReactElement
     event: React.ChangeEvent<HTMLInputElement>,
     target: 'drawing' | 'survey',
   ): void => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
+    const file = takeChosenFile(event);
     if (!file) return;
     setDwgStatus(`Converting ${file.name}…`);
     void uploadDwg(file, target, unit).then(setDwgStatus);
@@ -77,7 +74,7 @@ export function DxfImports({ unit }: { unit: DocumentUnit }): React.ReactElement
           aria-label="Survey DXF file"
           onChange={(event) =>
             readChosenFile(event, (text, fileName) =>
-              dispatch('import_survey_dxf', { text, name: stem(fileName), sourceUnit: unit }),
+              dispatch('import_survey_dxf', { text, name: fileStem(fileName), sourceUnit: unit }),
             )
           }
         />
