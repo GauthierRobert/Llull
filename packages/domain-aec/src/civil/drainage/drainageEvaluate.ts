@@ -6,7 +6,7 @@
 
 import type { Entity, MeshData, Vec2, Vec3 } from '@core/model/types';
 import type { ManholeObject, PipeObject } from '@core/model/civil';
-import { circleOutline } from '@lib/gearOutline';
+import { circlePolygon } from '@lib/arc';
 import { cross3 } from '@lib/vec3';
 import { toMm } from '../../building/model';
 import { civilLine, civilMesh, civilPolyline, civilText } from '../entities';
@@ -54,7 +54,7 @@ function prismMesh(bottom: Vec3, top: Vec3, radius: number, sides: number): Mesh
 }
 
 function circlePoints(centre: Vec2, radius: number, sides: number): Vec2[] {
-  return circleOutline(radius, sides).map(([x, y]): Vec2 => [centre[0] + x, centre[1] + y]);
+  return circlePolygon(centre, radius, sides);
 }
 
 export function evaluateManhole(context: CivilContext, manhole: ManholeObject): Entity[] {

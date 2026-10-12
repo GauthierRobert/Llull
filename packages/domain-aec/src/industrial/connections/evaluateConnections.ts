@@ -15,7 +15,7 @@ import type {
 import { fromMm } from '../../building/model';
 import { base, colorForMaterial, meshEntity, orientedBox } from '../../building/evaluate/entities';
 import { prismMesh, sweepFrame, type SweepFrame } from '../../shared/mesh';
-import { circleOutline } from '@lib/gearOutline';
+import { circlePolygon } from '@lib/arc';
 import { findProfile } from '../../steel/profiles';
 import { add3, distance3, scale3, sub3 } from '@lib/vec3';
 import { atLevel, boltSize } from '../evaluate';
@@ -230,7 +230,7 @@ export function connectionSolids(
   const edge = Math.max(2 * connection.boltDiameter, mm(40));
   const gauge = Math.max(width / 2 - edge, connection.boltDiameter);
   const radius = connection.boltDiameter / 2;
-  const circle = circleOutline(radius, 12);
+  const circle = circlePolygon([0, 0], radius, 12);
   const rows = Math.max(1, connection.boltRows);
   // Through the end plate and the column flange / the other end plate.
   const boltStart = sub3(face, scale3(plate.along, t + connection.boltDiameter));

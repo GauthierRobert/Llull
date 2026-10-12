@@ -12,6 +12,7 @@ import { dimensionLabelBox, textLocalBox, underlayFrame } from './modifyHelpers'
 import { solidOutline } from './solidOutline';
 import { wrapAngle } from '@lib/angle';
 import { closeLoop, rectangleCorners } from '../lineGeometry';
+import { arcPolyline } from '@lib/arc';
 
 export type BoxSelectMode = 'window' | 'crossing';
 
@@ -84,19 +85,6 @@ const insideOther = (inner: Box, outer: Box): boolean =>
   inner.minY >= outer.minY &&
   inner.maxY <= outer.maxY;
 
-function sampleArc(
-  center: Vec2,
-  radiusX: number,
-  radiusY: number,
-  startAngle: number,
-  sweep: number,
-): Vec2[] {
-  return Array.from({ length: CURVE_SAMPLES + 1 }, (_, i): Vec2 => {
-    const angle = startAngle + (sweep * i) / CURVE_SAMPLES;
-    return [center[0] + radiusX * Math.cos(angle), center[1] + radiusY * Math.sin(angle)];
-  });
-}
-
 /** Sampled world geometry of one 2D entity, or null for kinds with no selectable outline. */
 function sampleEntity(document: CadDocument, entity: Entity): SampledGeometry | null {
   const [ox, oy] = entity.position;
@@ -114,13 +102,15 @@ function sampleEntity(document: CadDocument, entity: Entity): SampledGeometry | 
     case 'rectangle':
       return lines(closeLoop(rectangleCorners(entity.width, entity.height)));
     case 'circle':
-      return lines(sampleArc(entity.center, entity.radius, entity.radius, 0, 2 * Math.PI));
+      return lines(arcPolyline(entity.center, entity.radius, 0, 2 * Math.PI, CURVE_SAMPLES));
     case 'ellipse':
-      return lines(sampleArc(entity.center, entity.radiusX, entity.radiusY, 0, 2 * Math.PI));
+      return lines(
+        arcPolyline(entity.center, entity.radiusX, 0, 2 * Math.PI, CURVE_SAMPLES, entity.radiusY),
+      );
     case 'arc': {
       const sweep = wrapAngle(entity.endAngle - entity.startAngle);
       return lines(
-        sampleArc(entity.center, entity.radius, entity.radius, entity.startAngle, sweep),
+        arcPolyline(entity.center, entity.radius, entity.startAngle, sweep, CURVE_SAMPLES),
       );
     }
     case 'point':

@@ -7,7 +7,7 @@
  */
 
 import type { Vec2 } from '@core/model/types';
-import { circleOutline } from '@lib/gearOutline';
+import { circlePolygon } from '@lib/arc';
 import { round } from '../shared/numeric';
 
 type ProfileShape = 'I' | 'U' | 'C' | 'SHS' | 'RHS' | 'CHS' | 'L';
@@ -279,7 +279,7 @@ interface ProfileOutline {
 const CIRCLE_SEGMENTS = 20;
 
 function circle(radius: number, clockwise: boolean): Vec2[] {
-  const points = circleOutline(radius, CIRCLE_SEGMENTS);
+  const points = circlePolygon([0, 0], radius, CIRCLE_SEGMENTS);
   return clockwise ? points.reverse() : points;
 }
 
