@@ -9,7 +9,8 @@ import { noop } from '@core/commands/noop';
 import { toMetres } from '../../building/model';
 import { civilAffected, civilObjectsOf, getCivil } from '../model';
 import { regenerateCivil } from '../evaluate';
-import { analyseNetwork, toCsv } from './drainageNetwork';
+import { csvLines } from '../../shared/csv';
+import { analyseNetwork } from './drainageNetwork';
 import { pipePlanLength, pipeSlope } from './drainageTopology';
 import { DEFAULT_CRITERIA, idfError, type DrainageCriteria, type Idf } from './drainageCriteria';
 import { sizeNetwork } from './drainageSizing';
@@ -148,7 +149,7 @@ export const checkDrainageNetwork = defineCommand({
         .filter((row) => row.status === 'fail')
         .map((r) => `${r.id} ${r.name}: ${r.reasons.join('; ')}`),
     ];
-    const csv = toCsv(
+    const csv = csvLines(
       [
         'pipe',
         'name',
@@ -239,7 +240,7 @@ export const drainageSchedule = defineCommand({
     const manholes = civilObjectsOf(civil, 'manhole');
     if (manholes.length === 0) return noop(doc, 'drainage_schedule: the document has no manholes.');
     const metres = (value: number): number => Number(toMetres(doc, value).toFixed(3));
-    const manholeCsv = toCsv(
+    const manholeCsv = csvLines(
       ['id', 'name', 'x_m', 'y_m', 'rim_m', 'invert_m', 'depth_m', 'diameter_mm'],
       manholes.map((m) => [
         m.id,
@@ -253,7 +254,7 @@ export const drainageSchedule = defineCommand({
       ]),
     );
     const pipes = civilObjectsOf(civil, 'pipe');
-    const pipeCsv = toCsv(
+    const pipeCsv = csvLines(
       [
         'id',
         'name',

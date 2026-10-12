@@ -19,12 +19,14 @@ import { clothoidLocal } from '../alignment/alignmentSpiral';
 
 type Doc = Pick<CadDocument, 'civil' | 'units'>;
 
-function metres(doc: Doc, value: number): string {
-  return String(Number(toMetres(doc, value).toFixed(4)));
+/** Metres with at most 4 decimals (0.1 mm), no trailing zeros, never "-0". */
+export function metres(doc: Doc, value: number): string {
+  const rounded = Number(toMetres(doc, value).toFixed(4));
+  return Object.is(rounded, -0) ? '0' : String(rounded);
 }
 
 /** LandXML points are "northing easting". */
-function ne(doc: Doc, point: Vec2): string {
+export function northEast(doc: Doc, point: Vec2): string {
   return `${metres(doc, point[1])} ${metres(doc, point[0])}`;
 }
 
@@ -42,8 +44,8 @@ function spiralXml(doc: Doc, element: SpiralElement): string {
     `radiusEnd="${radiusText(doc, element.radiusEnd)}" rot="${element.rotation}" spiType="clothoid" ` +
     `theta="${degrees}" totalX="${metres(doc, totalX)}" totalY="${metres(doc, totalY)}" ` +
     `tanLong="${metres(doc, totalX - totalY / Math.tan(theta))}" tanShort="${metres(doc, totalY / Math.sin(theta))}" ` +
-    `staStart="${metres(doc, element.startStation)}"><Start>${ne(doc, element.start)}</Start>` +
-    `<PI>${ne(doc, element.pi)}</PI><End>${ne(doc, element.end)}</End></Spiral>`
+    `staStart="${metres(doc, element.startStation)}"><Start>${northEast(doc, element.start)}</Start>` +
+    `<PI>${northEast(doc, element.pi)}</PI><End>${northEast(doc, element.end)}</End></Spiral>`
   );
 }
 
@@ -52,17 +54,17 @@ function alignmentXml(doc: Doc, alignment: AlignmentObject): string[] {
     const common = `staStart="${metres(doc, element.startStation)}" length="${metres(doc, element.length)}"`;
     if (element.kind === 'line') {
       return (
-        `        <Line ${common}><Start>${ne(doc, element.start)}</Start>` +
-        `<End>${ne(doc, element.end)}</End></Line>`
+        `        <Line ${common}><Start>${northEast(doc, element.start)}</Start>` +
+        `<End>${northEast(doc, element.end)}</End></Line>`
       );
     }
     if (element.kind === 'spiral') return spiralXml(doc, element);
     const delta = Number(((element.deflection * 180) / Math.PI).toFixed(6));
     return (
       `        <Curve rot="${element.rotation}" crvType="arc" radius="${metres(doc, element.radius)}" ` +
-      `delta="${delta}" ${common}><Start>${ne(doc, element.start)}</Start>` +
-      `<Center>${ne(doc, element.center)}</Center><End>${ne(doc, element.end)}</End>` +
-      `<PI>${ne(doc, element.pi)}</PI></Curve>`
+      `delta="${delta}" ${common}><Start>${northEast(doc, element.start)}</Start>` +
+      `<Center>${northEast(doc, element.center)}</Center><End>${northEast(doc, element.end)}</End>` +
+      `<PI>${northEast(doc, element.pi)}</PI></Curve>`
     );
   });
   const name = escapeXml(alignment.name);

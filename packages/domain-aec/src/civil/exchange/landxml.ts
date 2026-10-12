@@ -6,7 +6,7 @@
  * @pure
  */
 
-import type { CadDocument, Vec2 } from '@core/model/types';
+import type { CadDocument } from '@core/model/types';
 import type {
   CivilModel,
   ManholeObject,
@@ -18,7 +18,7 @@ import { escapeXml } from '@lib/escapeXml';
 import { toMetres } from '../../building/model';
 import { civilObjectsOf, getCivil } from '../model';
 import { surfaceTin } from '../surface/surfaceTin';
-import { alignmentsXml } from './landxmlAlignments';
+import { alignmentsXml, metres, northEast } from './landxmlAlignments';
 import { gridCivil, resolveFrame, type CoordinateFrame } from '../crs/crs';
 
 export const LANDXML_NAMESPACE = 'http://www.landxml.org/schema/LandXML-1.2';
@@ -31,17 +31,6 @@ export interface LandXmlCounts {
   readonly faces: number;
   readonly structures: number;
   readonly pipes: number;
-}
-
-/** Metres with at most 4 decimals (0.1 mm), no trailing zeros, never "-0". */
-function metres(doc: Doc, value: number): string {
-  const rounded = Number(toMetres(doc, value).toFixed(4));
-  return Object.is(rounded, -0) ? '0' : String(rounded);
-}
-
-/** "N E" (plan) or "N E Z" of a document-unit point. */
-function northEast(doc: Doc, point: Vec2): string {
-  return `${metres(doc, point[1])} ${metres(doc, point[0])}`;
 }
 
 const attr = (name: string, value: string): string => ` ${name}="${escapeXml(value)}"`;
