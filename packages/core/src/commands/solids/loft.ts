@@ -1,12 +1,18 @@
-import { type CadDocument, type Vec2, type Vec3, DEFAULT_LAYER_ID } from '../../model/types';
+import type { CadDocument, Vec2, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { colorField, defineCommand, vec3, z } from '../schema';
 import { noop } from '../noop';
-import { nextId } from '../../lib/id';
 import { add3, distance3, dot3, scale3, sub3 } from '../../lib/vec3';
 import { applyEulerXYZ } from '../../lib/eulerRotation';
 import { newEntity } from '../entity/newEntity';
-import { DEFAULT_SOLID_COLOR, commitSolid } from './shared';
+import {
+  DEFAULT_SOLID_COLOR,
+  commitSolid,
+  existingLayerOrDefault,
+  explicitIdField,
+  explicitIdOrNext,
+  explicitIdTaken,
+} from './shared';
 import { sketchLoop } from './sketchCurves';
 import { type SectionSpec, sectionSpecFields, specPolygon } from './sectionSpecs';
 import { alignRing, resampleRing } from '../../geometry/sectionRing';
@@ -133,32 +139,23 @@ export const loftSections = defineCommand({
       .describe('Layer id to assign the entity to. Defaults to the document default layer.')
       .optional(),
     color: colorField(DEFAULT_SOLID_COLOR),
-    id: z
-      .string()
-      .describe('Optional explicit entity id. If omitted a unique id is generated.')
-      .optional(),
+    id: explicitIdField(),
   }),
   run: (
     doc,
     { sectionIds, sections, ruled = false, layerId, color = DEFAULT_SOLID_COLOR, id: explicitId },
   ): CommandResult => {
     const fail = (why: string): CommandResult => noop(doc, `loft_sections: ${why}; no-op.`);
-    if (
-      explicitId !== undefined &&
-      explicitId.length > 0 &&
-      Object.hasOwn(doc.entities, explicitId)
-    )
-      return fail(`entity id "${explicitId}" already exists`);
+    if (explicitIdTaken(doc, explicitId)) return fail(`entity id "${explicitId}" already exists`);
     const placed = placedSections(doc, sectionIds, sections);
     if (typeof placed === 'string') return fail(placed);
     const world = loftRingsOf(placed);
     if (typeof world === 'string') return fail(world);
     const origin = centroid(world[0] as Vec3[]);
     const rings = world.map((ring) => ring.map((p) => sub3(p, origin)));
-    const id = explicitId !== undefined && explicitId.length > 0 ? explicitId : nextId('loft');
+    const id = explicitIdOrNext(explicitId, 'loft');
     const entity = newEntity('loft', id, { rings, ruled }, origin, color, {
-      layerId:
-        layerId !== undefined && Object.hasOwn(doc.layers, layerId) ? layerId : DEFAULT_LAYER_ID,
+      layerId: existingLayerOrDefault(doc, layerId),
     });
     const span = distance3(origin, centroid(world[world.length - 1] as Vec3[]));
     return commitSolid(
