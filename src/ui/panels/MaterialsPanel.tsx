@@ -10,7 +10,7 @@ import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
 import type { Material } from '@core/model/types';
 import { PanelEmpty, PanelHeader } from '@ui/panels/PanelParts';
-import { useDispatchThen } from '@ui/hooks/useDispatchThen';
+import { useDraftSubmit } from '@ui/hooks/useDraftSubmit';
 import { materialDraftOf } from '@ui/panels/materialRules';
 import { LabeledInput } from '@ui/panels/LabeledInput';
 import { parseNumber } from '@ui/numberText';
@@ -109,15 +109,10 @@ function CreateMaterialForm(): React.ReactElement {
     (value: string): void =>
       setForm((previous) => ({ ...previous, [field]: value }));
 
-  const dispatchThen = useDispatchThen();
   const draft = materialDraftOf(form);
 
-  const handleSubmit = (e: React.FormEvent): void => {
-    e.preventDefault();
-    if (draft === null) return;
-    // A rejected create (e.g. duplicate name) keeps the typed values for correction.
-    dispatchThen('create_material', draft, () => setForm(EMPTY_FORM));
-  };
+  // A rejected create (e.g. duplicate name) keeps the typed values for correction.
+  const handleSubmit = useDraftSubmit('create_material', draft, () => setForm(EMPTY_FORM));
 
   return (
     <form

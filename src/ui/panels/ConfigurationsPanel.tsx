@@ -10,7 +10,7 @@ import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
 import type { Configuration } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
-import { useDispatchThen } from '@ui/hooks/useDispatchThen';
+import { useDraftSubmit } from '@ui/hooks/useDraftSubmit';
 import { LabeledInput } from '@ui/panels/LabeledInput';
 import { configurationDraftOf, isConfigurationActive } from '@ui/panels/configurationRules';
 import { PanelEmpty, PanelHeader, IconButton } from '@ui/panels/PanelParts';
@@ -146,17 +146,12 @@ function CreateConfigurationForm(): React.ReactElement {
   const handleRemoveRow = (index: number): void =>
     setPvRows((prev) => prev.filter((_, i) => i !== index));
 
-  const dispatchThen = useDispatchThen();
   const draft = configurationDraftOf(configName, pvRows);
 
-  const handleSubmit = (e: React.FormEvent): void => {
-    e.preventDefault();
-    if (draft === null) return;
-    dispatchThen('create_configuration', draft, () => {
-      setConfigName('');
-      setPvRows([newRow()]);
-    });
-  };
+  const handleSubmit = useDraftSubmit('create_configuration', draft, () => {
+    setConfigName('');
+    setPvRows([newRow()]);
+  });
 
   return (
     <form

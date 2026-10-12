@@ -13,7 +13,7 @@ import type { Parameter } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
 import { significantNumber } from '@lib/compactNumber';
 import { CommitInput } from '@ui/panels/propertyFields';
-import { useDispatchThen } from '@ui/hooks/useDispatchThen';
+import { useDraftSubmit } from '@ui/hooks/useDraftSubmit';
 import { isParameterNameValid, parameterDraftOf } from '@ui/panels/parameterRules';
 import { PanelEmpty, PanelHeader, DeleteButton } from '@ui/panels/PanelParts';
 
@@ -80,18 +80,13 @@ function AddParameterRow(): React.ReactElement {
   const [name, setName] = useState('');
   const [expression, setExpression] = useState('');
 
-  const dispatchThen = useDispatchThen();
   const draft = parameterDraftOf(name, expression);
   const nameValid = isParameterNameValid(name);
 
-  const handleSubmit = (e: React.FormEvent): void => {
-    e.preventDefault();
-    if (draft === null) return;
-    dispatchThen('set_parameter', draft, () => {
-      setName('');
-      setExpression('');
-    });
-  };
+  const handleSubmit = useDraftSubmit('set_parameter', draft, () => {
+    setName('');
+    setExpression('');
+  });
 
   return (
     <form

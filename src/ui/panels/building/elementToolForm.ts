@@ -165,6 +165,17 @@ export function result(
   return { ok: true, command, params: cleaned };
 }
 
+/** `ElementTool.build` for a tool that always yields `command` with params read from the fields. */
+export function buildWith(
+  command: string,
+  params: (reader: FieldReader, context: ToolContext) => Record<string, unknown>,
+): ElementTool['build'] {
+  return (values, context) => {
+    const reader = new FieldReader(values);
+    return result(reader, command, params(reader, context));
+  };
+}
+
 /** Comma / semicolon separated text → trimmed non-empty items; blank → undefined. */
 export function textList(reader: FieldReader, key: string): string[] | undefined {
   const items = reader

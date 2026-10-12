@@ -11,7 +11,7 @@
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import type { ImageEntity } from '@core/model/types';
-import { closeLoop, flattenPoints, rectangleCorners } from '../../lineGeometry';
+import { rectangleOutline } from '../../lineGeometry';
 import { ShapeLine } from './ShapeLine';
 import { underlayPlaneGeometry } from './underlayPlane';
 
@@ -46,10 +46,7 @@ export function ImageUnderlayRenderer({
   useEffect(() => () => texture.dispose(), [texture]);
   useEffect(() => () => material.dispose(), [material]);
 
-  const frame = useMemo(
-    () => flattenPoints(closeLoop(rectangleCorners(width, height))),
-    [width, height],
-  );
+  const frame = useMemo(() => rectangleOutline(width, height), [width, height]);
 
   return (
     <group position={position} rotation={rotation}>

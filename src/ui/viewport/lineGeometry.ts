@@ -50,6 +50,11 @@ export function rectangleCorners(width: number, height: number): Vec2[] {
   ];
 }
 
+/** Flat xyz outline (closed loop) of a `width` x `height` rectangle at the origin. */
+export function rectangleOutline(width: number, height: number): number[] {
+  return flattenPoints(closeLoop(rectangleCorners(width, height)));
+}
+
 /** Segment vertex pairs approximating an axis-aligned ellipse outline. */
 export function ellipseOutline(
   cx: number,
