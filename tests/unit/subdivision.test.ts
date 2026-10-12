@@ -19,6 +19,7 @@ import {
   subdivisionTriangles,
 } from '@core/geometry/subdivision';
 import { expectNoOp } from '../helpers/expectNoOp';
+import { isWatertight } from '../helpers/fixtureDocument';
 
 const empty = createEmptyDocument();
 
@@ -35,19 +36,6 @@ function created(doc: CadDocument, params: object): { doc: CadDocument; e: Subdi
 
 function volumeOf(doc: CadDocument, id: string): number {
   return (run(doc, 'mass_properties', { entityId: id }).data as { volume: number }).volume;
-}
-
-function isWatertight(triangles: ReadonlyArray<ReadonlyArray<readonly number[]>>): boolean {
-  const key = (p: readonly number[]): string => p.map((v) => v.toFixed(7)).join(',');
-  const edges = new Map<string, number>();
-  for (const triangle of triangles) {
-    for (let k = 0; k < 3; k++) {
-      const [a, b] = [key(triangle[k] as number[]), key(triangle[(k + 1) % 3] as number[])];
-      const edge = a < b ? `${a}|${b}` : `${b}|${a}`;
-      edges.set(edge, (edges.get(edge) ?? 0) + 1);
-    }
-  }
-  return [...edges.values()].every((count) => count === 2);
 }
 
 const cubeEdges = (cage: ReturnType<typeof boxCage>): Array<[number, number]> => {
