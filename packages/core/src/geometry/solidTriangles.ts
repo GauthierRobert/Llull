@@ -111,7 +111,18 @@ function unrotatedTriangles(e: Entity): Triangle[] {
       return loftTriangles(e, e.position);
     case 'subdivision':
       return subdivisionTriangles(e, e.position);
-    default:
+    case 'line':
+    case 'polyline':
+    case 'arc':
+    case 'circle':
+    case 'rectangle':
+    case 'point':
+    case 'ellipse':
+    case 'spline':
+    case 'text':
+    case 'dimension':
+    case 'image':
+    case 'instance':
       return []; // 2D shapes and instances
   }
 }
