@@ -6,7 +6,7 @@ import type { CadDocument } from '@core/model/types';
 import { PURLIN_LOAD_SHAPE } from './purlinLoadParams';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { existingLevelId, getBuilding } from '../../building/model';
+import { levelOrFailure } from '../../building/levelLookup';
 import { noop, report } from '@core/commands/noop';
 import { isNonNegativeNumber } from '@lib/isFiniteNumber';
 import type { PurlinRow } from './purlinModel';
@@ -67,9 +67,8 @@ export const checkPurlins = defineCommand({
         'check_purlins failed: windPressure, snowLoad and roofDeadLoad must be >= 0.',
       );
     }
-    const levelId = existingLevelId(getBuilding(doc), params.levelId);
-    if (levelId === undefined)
-      return noop(doc, `check_purlins failed: no level '${params.levelId ?? ''}'.`);
+    const levelId = levelOrFailure(doc, 'check_purlins', params.levelId);
+    if (typeof levelId !== 'string') return levelId;
     const { members, skipped } = locatePurlinMembers(doc, levelId);
     const analysis = analysePurlins(members, levelId, { windPressure, snowLoad, roofDeadLoad });
     if ('reason' in analysis) return noop(doc, analysis.reason);

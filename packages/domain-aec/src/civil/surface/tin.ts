@@ -6,7 +6,7 @@
  */
 
 import type { Vec2, Vec3 } from '@core/model/types';
-import { pointInPolygon } from '@lib/polygon';
+import { distance, pointInPolygon } from '@lib/polygon';
 import { delaunay } from './delaunay';
 import { boundsOfPoints } from '@core/geometry/bounds';
 
@@ -37,7 +37,7 @@ function distinctPoints(points: ReadonlyArray<Vec3>): Vec3[] {
 }
 
 function planLength(a: Vec3, b: Vec3): number {
-  return Math.hypot(b[0] - a[0], b[1] - a[1]);
+  return distance([a[0], a[1]], [b[0], b[1]]);
 }
 
 /** Delaunay TIN of `source`, dropping triangles outside `boundary` or with an over-long edge. */

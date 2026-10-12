@@ -136,7 +136,7 @@ interface Skipped {
 const skip = (bar: SteelBar, reason: string): Skipped => ({ skipped: skippedRow(bar, reason) });
 
 /** Profile and resistance of a bar bent about its depth axis, or the row of a bar not covered (shape, class 4). */
-export function beamSection(
+function beamSection(
   bar: SteelBar,
 ): { profile: SteelProfile; resistance: ReturnType<typeof sectionResistance> } | Skipped {
   const { profile } = bar;
@@ -155,6 +155,18 @@ export function beamSection(
     );
   }
   return { profile, resistance };
+}
+
+/** Row built by `build` from the section of a beam bar, or the skipped row when it is not covered. */
+export function withBeamSection(
+  bar: SteelBar,
+  build: (section: {
+    profile: SteelProfile;
+    resistance: ReturnType<typeof sectionResistance>;
+  }) => MemberRow,
+): MemberRow {
+  const gate = beamSection(bar);
+  return 'skipped' in gate ? gate.skipped : build(gate);
 }
 
 /** Profile, compression class and resistance of a column, or the row of a bar not covered (shape, class 4). */

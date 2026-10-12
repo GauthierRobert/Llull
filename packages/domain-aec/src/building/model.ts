@@ -92,7 +92,7 @@ const MARK_PREFIX: Readonly<Record<Exclude<BimCategory, 'grid' | 'room'>, string
 };
 
 /** Largest integer N among keys "<prefix>N" (0 when none). */
-export function highestIndex(keys: ReadonlyArray<string>, prefix: string): number {
+function highestIndex(keys: ReadonlyArray<string>, prefix: string): number {
   let highest = 0;
   for (const key of keys) {
     if (!key.startsWith(prefix)) continue;
@@ -100,6 +100,11 @@ export function highestIndex(keys: ReadonlyArray<string>, prefix: string): numbe
     if (Number.isInteger(index) && index > highest) highest = index;
   }
   return highest;
+}
+
+/** The mark "<prefix>N" following the highest N among `marks`. */
+export function markAfter(prefix: string, marks: ReadonlyArray<string>): string {
+  return `${prefix}${highestIndex(marks, prefix) + 1}`;
 }
 
 function issued(building: BuildingModel, prefix: string, keys: ReadonlyArray<string>): number {
@@ -137,7 +142,7 @@ export function nextMark(
         MARK_PREFIX[element.category] === prefix,
     )
     .map((element) => element.mark);
-  return `${prefix}${highestIndex(marks, prefix) + 1}`;
+  return markAfter(prefix, marks);
 }
 
 export function nextLevelId(building: BuildingModel): string {
@@ -215,6 +220,24 @@ export function withElement(building: BuildingModel, element: BuildingElement): 
     },
     element.id,
   );
+}
+
+/** Appends one element per item (no regeneration); `build` gets the new id and mark, undefined skips the item. */
+export function appendElements<Item>(
+  building: BuildingModel,
+  items: ReadonlyArray<Item>,
+  category: Exclude<BimCategory, 'grid' | 'room'>,
+  build: (item: Item, id: string, mark: string) => BuildingElement | undefined,
+): { building: BuildingModel; ids: string[] } {
+  let next = building;
+  const ids: string[] = [];
+  for (const item of items) {
+    const element = build(item, nextElementId(next, category), nextMark(next, category));
+    if (!element) continue;
+    next = withElement(next, element);
+    ids.push(element.id);
+  }
+  return { building: next, ids };
 }
 
 /** Returns a building with every element whose id is in `ids` removed. */

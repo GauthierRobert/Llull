@@ -7,13 +7,14 @@ import { clamp01 } from '@lib/clamp';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import type { BimCategory, BuildingElement, BuildingModel } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
+import { unknownLevelFailure } from '../../building/levelLookup';
 import { defineCommand, z } from '@core/commands/schema';
 import { fromMm, toMm } from '@core/model/units';
 import { getBuilding } from '../../building/model';
 import { noop, report } from '@core/commands/noop';
 import { dot3, scale3, sub3 } from '@lib/vec3';
 import { atLevel } from '../evaluate';
-import { briefList } from '../common/utilisation';
+import { briefList } from '../../shared/briefList';
 import { type OrientedBox, boxOverlap, elementBoxes } from './clashBoxes';
 import { slabPenetrations } from './clashSlabs';
 
@@ -215,8 +216,8 @@ export const checkClashes = defineCommand({
   }),
   run: (doc, { levelId, tolerance }): CommandResult => {
     const building = getBuilding(doc);
-    if (levelId !== undefined && !building.levels[levelId])
-      return noop(doc, `check_clashes failed: no level '${levelId}'.`);
+    const unknownLevel = unknownLevelFailure(doc, 'check_clashes', levelId);
+    if (unknownLevel) return unknownLevel;
     const resolvedTolerance = tolerance ?? fromMm(doc, 5);
     if (!(resolvedTolerance >= 0))
       return noop(doc, 'check_clashes failed: tolerance must be >= 0.');

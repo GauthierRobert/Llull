@@ -13,6 +13,9 @@ import { planAreaM2 } from '@aec/shared/planArea';
 import { svgText } from '@aec/shared/sheetFrame';
 import { deflectionCheckLine, shearCheckLine } from '@aec/industrial/steelDesign/steelMemberRows';
 import { run } from '../../helpers/runFixtures';
+import { briefList } from '@aec/shared/briefList';
+import { craneValueProblem } from '@aec/industrial/common/craneParams';
+import { levelOrFailure, unknownLevelFailure } from '@aec/building/levelLookup';
 
 describe('utilisation reductions', () => {
   it('maxUtilisation is the largest value, 0 when empty', () => {
@@ -125,5 +128,36 @@ describe('second-pass shared helpers', () => {
     const deflection = deflectionCheckLine('B1', 'L/250', 30, 20);
     expect(deflection).toMatchObject({ name: 'deflection (L/250)', utilisation: 1.5 });
     expect(deflection.detail).toBe('B1: δ 30.0 mm ≤ L/250 = 20.0 mm');
+  });
+});
+
+describe('final-pass shared helpers', () => {
+  it('briefList truncates with the separator and an ellipsis', () => {
+    const label = (n: number): string => `#${n}`;
+    expect(briefList([1, 2], label, 5, ' | ')).toBe('#1 | #2');
+    expect(briefList([1, 2, 3], label, 2, ' | ')).toBe('#1 | #2 | …');
+    expect(briefList([], label)).toBe('');
+  });
+
+  it('craneValueProblem reports the first non-positive, then the first negative value', () => {
+    expect(craneValueProblem({ craneCapacity: 10, hoistingSpeed: 0 })).toBeUndefined();
+    expect(craneValueProblem({ craneCapacity: 0, hoistingSpeed: -1 })).toBe(
+      'craneCapacity must be a number > 0',
+    );
+    expect(craneValueProblem({ craneCapacity: 10, minHookApproach: -1 })).toBe(
+      'minHookApproach must be a number >= 0',
+    );
+  });
+
+  it('levelOrFailure resolves an existing level and fails on an unknown one', () => {
+    const doc = run(createEmptyDocument(), 'add_level', { name: 'L1', elevation: 0 });
+    const levelId = getBuilding(doc).levelOrder[0] as string;
+    expect(levelOrFailure(doc, 'check_x', levelId)).toBe(levelId);
+    const failure = levelOrFailure(doc, 'check_x', 'ghost');
+    expect(typeof failure === 'object' && failure.summary).toBe(
+      "check_x failed: no level 'ghost'.",
+    );
+    expect(unknownLevelFailure(doc, 'check_x', undefined)).toBeUndefined();
+    expect(unknownLevelFailure(doc, 'check_x', 'ghost')?.document).toBe(doc);
   });
 });

@@ -20,12 +20,3 @@ export const maxUtilisation = (items: readonly { utilisation: number }[]): numbe
 /** The items whose utilisation exceeds 1 (failing the check). */
 export const failingRows = <Item extends { utilisation: number }>(items: readonly Item[]): Item[] =>
   items.filter((item) => item.utilisation > 1);
-
-/** The labels of the first `max` items, joined by `separator`; `separator` + "…" follows when there are more. */
-export const briefList = <Item>(
-  items: readonly Item[],
-  label: (item: Item) => string,
-  max = 8,
-  separator = ', ',
-): string =>
-  `${items.slice(0, max).map(label).join(separator)}${items.length > max ? `${separator}…` : ''}`;

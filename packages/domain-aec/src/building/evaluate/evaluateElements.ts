@@ -52,14 +52,14 @@ function evaluateElement(context: EvaluationContext, element: BuildingElement): 
     if (!host || (host.category !== 'wall' && host.category !== 'curvedWall')) return [];
     const level = building.levels[host.levelId];
     const wall = host.category === 'wall' ? host : tangentWall(host, element.offset);
-    return level ? evaluateOpening(context, element, wall, level) : [];
+    return level ? evaluateOpening(context, element, { wall, level }) : [];
   }
   const leveled = element as Exclude<BuildingElement, GridElement | OpeningElement>;
   const level = building.levels[leveled.levelId];
   if (!level) return [];
   switch (leveled.category) {
     case 'wall':
-      return evaluateWall(context, leveled, level);
+      return evaluateWall(context, { wall: leveled, level });
     case 'slab':
       return evaluateSlab(leveled, level);
     case 'column':

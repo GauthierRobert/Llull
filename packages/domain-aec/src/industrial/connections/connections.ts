@@ -6,6 +6,7 @@
 import type { BuildingModel, MomentConnectionElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
+import { unknownLevelFailure } from '../../building/levelLookup';
 import { defineCommand, z } from '@core/commands/schema';
 import { fromMm, toMm } from '@core/model/units';
 import { existingLevelId, getBuilding } from '../../building/model';
@@ -79,8 +80,8 @@ export const addMomentConnections = defineCommand({
       );
     }
     const building = getBuilding(doc);
-    if (params.levelId !== undefined && !building.levels[params.levelId])
-      return noop(doc, `add_moment_connections failed: no level '${params.levelId}'.`);
+    const unknownLevel = unknownLevelFailure(doc, 'add_moment_connections', params.levelId);
+    if (unknownLevel) return unknownLevel;
     const levelId = existingLevelId(building, params.levelId) ?? '';
     const joints = findMomentJoints(
       building,

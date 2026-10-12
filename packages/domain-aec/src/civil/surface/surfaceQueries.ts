@@ -5,8 +5,8 @@
 
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
-import { noop, report } from '@core/commands/noop';
-import { civilObjectOrFailure, getCivil } from '../model';
+import { report } from '@core/commands/noop';
+import { civilObjectOrNoop, getCivil } from '../model';
 import { surfaceTin } from './surfaceTin';
 import { corners, elevationAt, slopeAt, tinBounds, tinPlanArea, triangleCount } from './tin';
 import { toMetres } from '@core/model/units';
@@ -30,8 +30,8 @@ export const surfaceElevation = defineCommand({
   }),
   run: (doc, { surfaceId, points }): CommandResult => {
     const civil = getCivil(doc);
-    const surface = civilObjectOrFailure(doc, surfaceId, 'surface', 'surface_elevation');
-    if (typeof surface === 'string') return noop(doc, surface);
+    const surface = civilObjectOrNoop(doc, surfaceId, 'surface', 'surface_elevation');
+    if ('summary' in surface) return surface;
     const tin = surfaceTin(civil, surface);
     const samples = points.map((at) => {
       const elevation = elevationAt(tin, at);
@@ -74,8 +74,8 @@ export const surfaceReport = defineCommand({
   params: z.object({ surfaceId: z.string().describe('Surface id, e.g. "surface-1".') }),
   run: (doc, { surfaceId }): CommandResult => {
     const civil = getCivil(doc);
-    const surface = civilObjectOrFailure(doc, surfaceId, 'surface', 'surface_report');
-    if (typeof surface === 'string') return noop(doc, surface);
+    const surface = civilObjectOrNoop(doc, surfaceId, 'surface', 'surface_report');
+    if ('summary' in surface) return surface;
     const tin = surfaceTin(civil, surface);
     const bounds = tinBounds(tin);
     const metres = (value: number): number => toMetres(doc, value);

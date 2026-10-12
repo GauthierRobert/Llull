@@ -6,6 +6,7 @@
 import type { BasePlateElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
+import { unknownLevelFailure } from '../../building/levelLookup';
 import { defineCommand, z } from '@core/commands/schema';
 import { fromMm } from '@core/model/units';
 import { existingLevelId, getBuilding } from '../../building/model';
@@ -74,8 +75,8 @@ export const addBasePlates = defineCommand({
     }
     const building = getBuilding(doc);
     const levelId = existingLevelId(building, params.levelId) ?? null;
-    if (params.levelId !== undefined && !building.levels[params.levelId])
-      return noop(doc, `add_base_plates failed: no level '${params.levelId}'.`);
+    const unknownLevel = unknownLevelFailure(doc, 'add_base_plates', params.levelId);
+    if (unknownLevel) return unknownLevel;
     const columns = columnsWithoutPlates(
       building,
       levelId,

@@ -6,12 +6,13 @@
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { fromMm } from '@core/model/units';
-import { elementAffected, getBuilding, withElement } from '../../building/model';
+import { getBuilding, withElement } from '../../building/model';
 import { noop } from '@core/commands/noop';
 import { regenerateBuilding } from '../../building/evaluate/evaluateElements';
 import { refitPlates } from '../connections/plateSupport';
 import { designFixedPlates } from '../connections/plateDesign';
 import { findProfile } from '../../steel/profiles';
+import { membersOf } from '../common/memberSupport';
 import {
   addProfileGroup,
   isValidTargetUtilisation,
@@ -28,7 +29,12 @@ import { checkFrames } from './frameCheckFrames';
 import type { BuildingModel, SteelMemberElement } from '@core/model/building';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { add3, scale3 } from '@lib/vec3';
-import { finalUtilisationText, noChangeResult, utilisationStats } from '../reports/designReport';
+import {
+  designResult,
+  finalUtilisationText,
+  noChangeResult,
+  utilisationStats,
+} from '../reports/designReport';
 import { sweepFrame } from '../../shared/mesh';
 
 /**
@@ -132,17 +138,17 @@ export const designPortalFrames = defineCommand({
         !analysed.has(element.id),
     );
     const stats = utilisationStats(final.rows);
-    return {
+    return designResult(
       document,
-      summary:
-        `Designed ${final.frames} frame(s) for ${final.combinations.length} ULS combination(s) + SLS (${describeLoads(loads)}): ` +
+      `Designed ${final.frames} frame(s) for ${final.combinations.length} ULS combination(s) + SLS (${describeLoads(loads)}): ` +
         `${changes.length > 0 ? changes.join('; ') : 'no change needed'}. ` +
         `${finalUtilisationText(stats, 'element(s)', limited)} ` +
         `Frames only (verify bracing, foundations and runways with their checks)` +
         `${unanalysedPosts ? '; gable posts are not analysed' : ''}.`,
-      affected: elementAffected(document, [...changed]),
-      data: { changes, ...stats },
-    };
+      changed,
+      changes,
+      stats,
+    );
   },
 });
 
@@ -170,8 +176,8 @@ function reseatDependents(
     Math.abs(member.start[1] - y) < tolerance && Math.abs(member.end[1] - y) < tolerance;
   let next = building;
   const moved: string[] = [];
-  for (const element of Object.values(building.elements)) {
-    if (element.category !== 'member' || analysed.has(element.id)) continue;
+  for (const element of membersOf(building)) {
+    if (analysed.has(element.id)) continue;
     let offset: Vec3 | null = null;
     let topOnly = false;
     if (element.role === 'purlin' || element.role === 'column') {

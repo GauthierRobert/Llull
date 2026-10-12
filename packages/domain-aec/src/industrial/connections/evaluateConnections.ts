@@ -120,13 +120,16 @@ export interface ConnectionSolid {
   readonly depth: number;
 }
 
-/** World solids of a moment connection: end plate(s), haunch, bolts (null without its rafter). */
-export function connectionSolids(
+type ConnectionSolidsArgs = [
   doc: Pick<CadDocument, 'units'>,
   connection: MomentConnectionElement,
   members: Readonly<Record<string, SteelMemberElement | undefined>>,
   level: BuildingLevel,
-): ConnectionSolid[] | null {
+];
+
+/** World solids of a moment connection: end plate(s), haunch, bolts (null without its rafter). */
+export function connectionSolids(...args: ConnectionSolidsArgs): ConnectionSolid[] | null {
+  const [doc, connection, members, level] = args;
   const rafter = members[connection.rafterId];
   const other = members[connection.otherId];
   const profile = rafter ? findProfile(rafter.profile) : undefined;
@@ -267,13 +270,9 @@ export function buildingConnectionSolids(
   return connectionSolids(doc, connection, members, level);
 }
 
-export function evaluateConnection(
-  doc: Pick<CadDocument, 'units'>,
-  connection: MomentConnectionElement,
-  members: Readonly<Record<string, SteelMemberElement | undefined>>,
-  level: BuildingLevel,
-): Entity[] {
-  const solids = connectionSolids(doc, connection, members, level);
+export function evaluateConnection(...args: ConnectionSolidsArgs): Entity[] {
+  const connection = args[1];
+  const solids = connectionSolids(...args);
   if (!solids) return [];
   const color = colorForMaterial(connection.material, '#5d6f80');
   return solids.flatMap((solid): Entity[] => {

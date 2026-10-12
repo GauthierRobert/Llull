@@ -6,9 +6,19 @@ import type { SteelMemberElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { toMm } from '@core/model/units';
-import { existingLevelId, getBuilding } from '../../building/model';
+import { getBuilding } from '../../building/model';
+import { levelOrFailure } from '../../building/levelLookup';
 import { noop, report } from '@core/commands/noop';
-import { isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
+import {
+  bufferStiffnessField,
+  craneSelfWeightField,
+  craneValueProblem,
+  hoistingClassField,
+  hoistingSpeedField,
+  minHookApproachField,
+  travelSpeedField,
+  wheelBaseField,
+} from '../common/craneParams';
 import { craneCapacityOf, type CraneModel } from '../frames/frameModelTypes';
 import {
   DEFAULT_BUFFER_STIFFNESS,
@@ -17,7 +27,7 @@ import {
   type RunwayCheckRow,
 } from './runwayCheckModel';
 import { checkBeam } from './runwayBeamCheck';
-import { firstNonPositive, round } from '../../shared/numeric';
+import { round } from '../../shared/numeric';
 import { checkTable, failureSummary } from '../reports/checkReport';
 import { existingLevelIdParam } from '../../building/levelParams';
 
@@ -60,47 +70,19 @@ export const runwayCheck = defineCommand({
         'Crane capacity in tonnes (> 0) applied to every runway beam. Default: read from each ' +
           "runway beam's note (add_crane_runway capacity).",
       ),
-    wheelBase: z
-      .number()
-      .optional()
-      .describe('Distance between the two wheels of a rail wheel group, mm (> 0). Default 3000.'),
-    hoistingClass: z
-      .enum(['HC1', 'HC2', 'HC3', 'HC4'])
-      .optional()
-      .describe(
-        'EN 1991-3 hoisting class: φ2 = φ2,min + β2 vh (HC1 1.05 + 0.17 vh, HC2 1.10 + 0.34 vh, HC3 1.15 + 0.51 vh, HC4 1.20 + 0.68 vh). Default HC2.',
-      ),
-    hoistingSpeed: z.number().optional().describe('Hoisting speed vh in m/s (>= 0). Default 0.1.'),
+    wheelBase: wheelBaseField,
+    hoistingClass: hoistingClassField,
+    hoistingSpeed: hoistingSpeedField,
     craneSpan: z
       .number()
       .optional()
       .describe(
         'Bridge span between the two runway rails, mm (> 0). Default: x distance to the paired runway beam, else 20000.',
       ),
-    craneSelfWeight: z
-      .number()
-      .optional()
-      .describe(
-        'Crane self-weight Gc in kN (> 0, bridge + trolley, trolley = 0.2 Gc). Default 0.5 Q + 20 kN.',
-      ),
-    minHookApproach: z
-      .number()
-      .optional()
-      .describe(
-        'Minimum hook approach to the rail in m (>= 0); positions the trolley for the maximum wheel load. Default 1.0.',
-      ),
-    travelSpeed: z
-      .number()
-      .optional()
-      .describe(
-        'Crane long travel speed in m/s (> 0) for the buffer force HB,1 (v1 = 0.7 × travelSpeed). Default 0.63 (about 38 m/min).',
-      ),
-    bufferStiffness: z
-      .number()
-      .optional()
-      .describe(
-        'Buffer spring constant SB in kN/m (> 0) for HB,1 = φ7 v1 √(mc SB). Default 1000 kN/m.',
-      ),
+    craneSelfWeight: craneSelfWeightField,
+    minHookApproach: minHookApproachField,
+    travelSpeed: travelSpeedField,
+    bufferStiffness: bufferStiffnessField,
     craneClass: z
       .enum(['S2', 'S3', 'S4'])
       .optional()
@@ -136,26 +118,20 @@ export const runwayCheck = defineCommand({
       railSize = 'A55',
       girder = 'rolled',
     } = params;
-    if (craneCapacity !== undefined && !isPositiveNumber(craneCapacity))
-      return noop(doc, 'check_crane_runways failed: craneCapacity must be a number > 0 (t).');
-    if (!isPositiveNumber(wheelBase))
-      return noop(doc, 'check_crane_runways failed: wheelBase must be a number > 0 (mm).');
-    if (!isNonNegativeNumber(hoistingSpeed))
-      return noop(doc, 'check_crane_runways failed: hoistingSpeed must be a number >= 0 (m/s).');
-    if (!isNonNegativeNumber(minHookApproach))
-      return noop(doc, 'check_crane_runways failed: minHookApproach must be a number >= 0 (m).');
-    const nonPositive = firstNonPositive([
-      ['craneSpan', craneSpan],
-      ['craneSelfWeight', craneSelfWeight],
-      ['travelSpeed', travelSpeed],
-      ['bufferStiffness', bufferStiffness],
-    ]);
-    if (nonPositive !== undefined)
-      return noop(doc, `check_crane_runways failed: ${nonPositive} must be a number > 0.`);
+    const problem = craneValueProblem({
+      craneCapacity,
+      wheelBase,
+      hoistingSpeed,
+      minHookApproach,
+      craneSpan,
+      craneSelfWeight,
+      travelSpeed,
+      bufferStiffness,
+    });
+    if (problem !== undefined) return noop(doc, `check_crane_runways failed: ${problem}.`);
     const building = getBuilding(doc);
-    const levelId = existingLevelId(building, params.levelId);
-    if (levelId === undefined)
-      return noop(doc, `check_crane_runways failed: no level '${params.levelId ?? ''}'.`);
+    const levelId = levelOrFailure(doc, 'check_crane_runways', params.levelId);
+    if (typeof levelId !== 'string') return levelId;
     const mm = (value: number): number => toMm(doc, value);
     const rows: RunwayCheckRow[] = [];
     const runways = Object.values(building.elements).filter(

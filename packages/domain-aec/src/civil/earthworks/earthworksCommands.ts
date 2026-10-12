@@ -8,10 +8,11 @@ import type { CadDocument, Vec2 } from '@core/model/types';
 import type { PlatformObject } from '@core/model/civil';
 import type { CommandResult } from '@core/commands/types';
 import { commandCatalog, defineCommand, z, vec2 } from '@core/commands/schema';
+import { newNameParam } from '../commonParams';
 import { noop, report } from '@core/commands/noop';
 import { isValidPolygon, segmentsIntersect, toCounterClockwise } from '@lib/polygon';
 import {
-  civilObjectOrFailure,
+  civilObjectOrNoop,
   civilObject,
   civilObjectsOf,
   getCivil,
@@ -140,8 +141,8 @@ export const addPlatform = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const civil = getCivil(doc);
-    const surface = civilObjectOrFailure(doc, params.surfaceId, 'surface', 'add_platform');
-    if (typeof surface === 'string') return noop(doc, surface);
+    const surface = civilObjectOrNoop(doc, params.surfaceId, 'surface', 'add_platform');
+    if ('summary' in surface) return surface;
     const tin = surfaceTin(civil, surface);
     const id = nextCivilId(civil, 'platform');
     const platform: PlatformObject = {
@@ -191,7 +192,7 @@ export const updatePlatform = defineCommand({
       .describe('New pad outline (>= 3 vertices, simple polygon, inside the surface).'),
     cutSlope: z.number().optional().describe('Cut batter, horizontal per 1 vertical (> 0).'),
     fillSlope: z.number().optional().describe('Fill batter, horizontal per 1 vertical (> 0).'),
-    name: z.string().optional().describe('New name.'),
+    name: newNameParam,
   }),
   run: (doc, params): CommandResult => {
     const civil = getCivil(doc);

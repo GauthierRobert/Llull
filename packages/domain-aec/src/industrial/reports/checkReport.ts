@@ -1,6 +1,7 @@
 import { round } from '../../shared/numeric';
 import { toCsv } from '../../shared/csv';
-import { briefList, failingRows, highestUtilisation } from '../common/utilisation';
+import { briefList } from '../../shared/briefList';
+import { failingRows, highestUtilisation } from '../common/utilisation';
 
 /** Summary tail of an engineering check: `allOkText`, or up to 8 failing rows (utilisation > 1). */
 export const failureSummary = <Row extends { utilisation: number }>(

@@ -112,6 +112,24 @@ export function placement(
   );
 }
 
+/** Placement at plan `location` (document units) and height `zMm` (mm); `angle` turns it about Z. */
+export function placementAt(
+  context: Context,
+  relativeTo: string,
+  location: readonly [number, number],
+  zMm: number,
+  angle = 0,
+): string {
+  return placement(
+    context,
+    relativeTo,
+    context.mm(location[0]),
+    context.mm(location[1]),
+    zMm,
+    angle,
+  );
+}
+
 export function extrusion(
   context: Context,
   profile: string,

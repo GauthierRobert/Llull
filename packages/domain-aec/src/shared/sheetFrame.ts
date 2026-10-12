@@ -6,6 +6,7 @@
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
+import { z } from '@core/commands/schema';
 import { toDegrees, toRadians } from '@lib/angle';
 import { escapeXml } from '@lib/escapeXml';
 import { getBuilding } from '../building/model';
@@ -13,6 +14,26 @@ import { round } from './numeric';
 
 export const PAPER_SIZES = ['A4', 'A3', 'A2', 'A1', 'A0'] as const;
 export type PaperSize = (typeof PAPER_SIZES)[number];
+
+/** `paper` parameter shared by the drawing-sheet commands. */
+export const PAPER_FIELD = z
+  .enum(PAPER_SIZES)
+  .optional()
+  .describe('Paper size (landscape). Default A3.');
+
+/** `scale` parameter of the building drawing sheets (plan, elevation). */
+export const SCALE_FIELD = z
+  .number()
+  .optional()
+  .describe(
+    'Scale denominator N for 1:N (e.g. 100). Default: the smallest standard scale that fits (1-2-5 steps beyond 1:2000).',
+  );
+
+/** Warning appended to a sheet summary when `what` is larger than the paper at the chosen scale. */
+export const sheetFitWarning = (fits: boolean, what: string): string =>
+  fits
+    ? ''
+    : ` WARNING: the ${what} is larger than the paper at this scale; omit scale to auto-fit or choose a larger paper.`;
 
 /** Landscape ISO 216 sizes, millimetres. */
 export const PAPER_MM: Readonly<Record<PaperSize, readonly [number, number]>> = {

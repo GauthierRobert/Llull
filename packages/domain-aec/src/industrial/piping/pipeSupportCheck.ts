@@ -5,14 +5,14 @@
 
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
+import { unknownLevelFailure } from '../../building/levelLookup';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop, report } from '@core/commands/noop';
 import { isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
-import { getBuilding } from '../../building/model';
 import { round, roundedMetres } from '../../shared/numeric';
 import { metres as shown } from '../steelDesign/steelMemberRows';
 import { toCsv } from '../../shared/csv';
-import { briefList } from '../common/utilisation';
+import { briefList } from '../../shared/briefList';
 import { collectSteelBars, modelUnits, type ModelUnits } from '../steelDesign/steelMemberBars';
 import { spanCoordinate } from './routeSupport';
 import { createBeamLoads, type BeamLoads } from '../steelDesign/steelBeamLoads';
@@ -211,9 +211,8 @@ export const checkPipeSupports = defineCommand({
       return noop(doc, 'check_pipe_supports failed: spanFactor must be a number > 0.');
     if (!isNonNegativeNumber(overhangRatio))
       return noop(doc, 'check_pipe_supports failed: overhangRatio must be a number >= 0.');
-    const building = getBuilding(doc);
-    if (params.levelId !== undefined && !building.levels[params.levelId])
-      return noop(doc, `check_pipe_supports failed: no level '${params.levelId}'.`);
+    const unknownLevel = unknownLevelFailure(doc, 'check_pipe_supports', params.levelId);
+    if (unknownLevel) return unknownLevel;
     const units = modelUnits(doc);
     const runs = pipeRunsOf(units);
     const selected = runs.filter(

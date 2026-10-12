@@ -7,7 +7,7 @@ import type { AlignmentObject } from '@core/model/civil';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
-import { civilObjectOrFailure, getCivil, toMetresText, withObject } from '../model';
+import { civilObjectOrNoop, getCivil, toMetresText, withObject } from '../model';
 import { alignmentIdParam } from './roadParams';
 import { commitCivil } from '../evaluate';
 
@@ -45,8 +45,8 @@ export const setSuperelevation = defineCommand({
       ),
   }),
   run: (doc, { alignmentId, maxRate, runoffLength }): CommandResult => {
-    const alignment = civilObjectOrFailure(doc, alignmentId, 'alignment', 'set_superelevation');
-    if (typeof alignment === 'string') return noop(doc, alignment);
+    const alignment = civilObjectOrNoop(doc, alignmentId, 'alignment', 'set_superelevation');
+    if ('summary' in alignment) return alignment;
     if (!Number.isFinite(maxRate) || maxRate < 0 || maxRate > MAX_SUPERELEVATION_RATE) {
       return noop(
         doc,

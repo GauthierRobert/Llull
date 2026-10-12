@@ -10,7 +10,7 @@ import { safeFileName } from '@lib/safeFileName';
 import { fileSlug, getBuilding } from '../../building/model';
 import { PAPER_SIZES } from '../../shared/sheetFrame';
 import { alignmentIdParam } from '../road/roadParams';
-import { civilObjectOrFailure } from '../model';
+import { civilObjectOrNoop } from '../model';
 import { buildCivilPlanSheet } from './civilPlanSheet';
 import { buildPlanProfileSheet } from './planProfileSheet';
 
@@ -101,13 +101,8 @@ export const exportPlanProfileSheet = defineCommand({
       .describe('Vertical / horizontal scale ratio (> 0). Default 10.'),
   }),
   run: (doc, { alignmentId, paper = 'A3', scale, verticalExaggeration = 10 }): CommandResult => {
-    const alignment = civilObjectOrFailure(
-      doc,
-      alignmentId,
-      'alignment',
-      'export_plan_profile_sheet',
-    );
-    if (typeof alignment === 'string') return noop(doc, alignment);
+    const alignment = civilObjectOrNoop(doc, alignmentId, 'alignment', 'export_plan_profile_sheet');
+    if ('summary' in alignment) return alignment;
     const sheet = buildPlanProfileSheet(doc, alignment, { paper, scale, verticalExaggeration });
     if (typeof sheet === 'string') return noop(doc, `export_plan_profile_sheet failed: ${sheet}`);
     const fileName = `${safeFileName(alignment.name, alignment.id)}_plan_profile_${paper}_1-${sheet.scale}.svg`;

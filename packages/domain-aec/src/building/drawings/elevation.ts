@@ -18,7 +18,9 @@ import {
 } from './elevationProjection';
 import {
   PAPER_MM,
-  PAPER_SIZES,
+  PAPER_FIELD,
+  SCALE_FIELD,
+  sheetFitWarning,
   type PaperSize,
   type Viewport,
   composeSheetSvg,
@@ -207,13 +209,8 @@ export const exportElevationSheet = defineCommand({
       .array(z.string())
       .optional()
       .describe('Building categories to leave out, e.g. ["panel", "slab"].'),
-    paper: z.enum(PAPER_SIZES).optional().describe('Paper size (landscape). Default A3.'),
-    scale: z
-      .number()
-      .optional()
-      .describe(
-        'Scale denominator N for 1:N. Default: the smallest standard scale that fits (1-2-5 steps beyond 1:2000).',
-      ),
+    paper: PAPER_FIELD,
+    scale: SCALE_FIELD,
     title: z.string().optional().describe('Drawing title. Default "<Direction> elevation".'),
   }),
   run: (
@@ -229,7 +226,7 @@ export const exportElevationSheet = defineCommand({
     }
     return report(
       doc,
-      `Elevation sheet ${sheet.filename}: ${sheet.faces} visible face(s) at 1:${sheet.scale} on ${sheet.paper}.${sheet.fits ? '' : ' WARNING: the view is larger than the paper at this scale; omit scale to auto-fit or choose a larger paper.'}`,
+      `Elevation sheet ${sheet.filename}: ${sheet.faces} visible face(s) at 1:${sheet.scale} on ${sheet.paper}.${sheetFitWarning(sheet.fits, 'view')}`,
       sheet,
     );
   },

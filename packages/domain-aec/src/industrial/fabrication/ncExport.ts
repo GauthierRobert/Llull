@@ -11,6 +11,7 @@ import type {
 } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
+import { unknownLevelFailure } from '../../building/levelLookup';
 import { defineCommand, z } from '@core/commands/schema';
 import { toMm } from '@core/model/units';
 import { getBuilding, orderedElements } from '../../building/model';
@@ -182,8 +183,8 @@ export const exportNcFiles = defineCommand({
   run: (doc, params): CommandResult => {
     const { memberIds, includePlates = true, levelId } = params;
     const building = getBuilding(doc);
-    if (levelId !== undefined && !building.levels[levelId])
-      return noop(doc, `export_nc_files failed: no level '${String(levelId)}'.`);
+    const unknownLevel = unknownLevelFailure(doc, 'export_nc_files', levelId);
+    if (unknownLevel) return unknownLevel;
     const elements = orderedElements(building);
     const allMembers: Record<string, SteelMemberElement | undefined> = {};
     const allConnections: MomentConnectionElement[] = [];

@@ -10,7 +10,12 @@ import { noop, report } from '@core/commands/noop';
 import { safeFileName } from '@lib/safeFileName';
 import { toMetres, toMm } from '@core/model/units';
 import { civilObject, civilObjectsOf, getCivil } from '../model';
-import { criteriaFrom, idfField, intensityField } from './drainageAnalysisCommands';
+import {
+  criteriaOrFailure,
+  HYDRAULIC_FIELDS,
+  idfField,
+  intensityField,
+} from './drainageAnalysisCommands';
 import { computeFlows } from './drainageFlow';
 import { computeHgl } from './drainageHgl';
 import { pipePlanLength, pipeSlope } from './drainageTopology';
@@ -68,22 +73,11 @@ export const exportDrainageLongSection = defineCommand({
       ),
     rainfallIntensityMmH: intensityField,
     idf: idfField,
-    outfallLevel: z
-      .number()
-      .optional()
-      .describe(
-        'Tailwater elevation at the outfall(s), document units. Default: outlet normal depth.',
-      ),
-    manholeLossK: z.number().optional().describe('Manhole loss coefficient K (>= 0). Default 0.5.'),
-    freeboardM: z
-      .number()
-      .optional()
-      .describe('Flooding freeboard below rim in metres. Default 0.3.'),
+    ...HYDRAULIC_FIELDS,
   }),
   run: (doc, params): CommandResult => {
-    const criteria = criteriaFrom(params);
-    if (typeof criteria === 'string')
-      return noop(doc, `export_drainage_long_section failed: ${criteria}`);
+    const criteria = criteriaOrFailure(doc, params, 'export_drainage_long_section');
+    if ('summary' in criteria) return criteria;
     const civil = getCivil(doc);
     const start = civilObject(civil, params.fromManholeId, 'manhole');
     if (!start)

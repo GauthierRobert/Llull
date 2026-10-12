@@ -12,6 +12,8 @@ import { distance } from '@lib/polygon';
 import {
   MARGIN,
   PAPER_MM,
+  PAPER_FIELD,
+  sheetFitWarning,
   composeSheetSvg,
   TITLE_HEIGHT,
   fitScale,
@@ -90,10 +92,7 @@ export const exportAnchorPlan = defineCommand({
       .describe(
         'Scale denominator N for 1:N (e.g. 100). Default: the smallest standard scale that fits the paper (1-2-5 steps beyond 1:2000).',
       ),
-    paper: z
-      .enum(Object.keys(PAPER_MM) as [PaperSize, ...PaperSize[]])
-      .optional()
-      .describe('Paper size (landscape). Default A3.'),
+    paper: PAPER_FIELD,
     embedment: z
       .number()
       .optional()
@@ -329,9 +328,7 @@ export const exportAnchorPlan = defineCommand({
     return report(
       doc,
       `Anchor plan ${filename}: ${plates.length} base plate(s), ${boltCount} anchor bolt(s), ${vertical.length + horizontal.length} grid line(s) at 1:${sheetScale} on ${sheetPaper}, embedment ${mmText(embedmentMm)} mm.` +
-        (fits
-          ? ''
-          : ' WARNING: the plan is larger than the paper at this scale; omit scale to auto-fit or choose a larger paper.'),
+        sheetFitWarning(fits, 'plan'),
       {
         svg: `${svg}\n`,
         filename,

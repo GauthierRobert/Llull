@@ -28,6 +28,8 @@ import {
 } from './gridFraming';
 import { levelIdParam } from '../../building/levelParams';
 
+const materialField = z.string().optional().describe('Steel grade. Default S355.');
+
 /** Length text with a precision suited to the unit: whole mm, otherwise up to 3 decimals. */
 const lengthText = (doc: Pick<CadDocument, 'units'>, value: number): string =>
   `${doc.units === 'mm' ? value.toFixed(0) : String(Math.round(value * 1000) / 1000)} ${doc.units}`;
@@ -161,7 +163,7 @@ export const addGridColumns = defineCommand({
       .describe(
         '"pinned" (default) or "fixed": the column foot restrains rotation in check_steel_members.',
       ),
-    material: z.string().optional().describe('Steel grade. Default S355.'),
+    material: materialField,
   }),
   run: (doc, params): CommandResult =>
     withSetup(doc, 'add_grid_columns', params, (prepared, tool) => {
@@ -300,7 +302,7 @@ export const addGridBeams = defineCommand({
     endJoint: jointFixitySchema
       .optional()
       .describe('Joint at each beam end: "pinned" (default) or "rigid".'),
-    material: z.string().optional().describe('Steel grade. Default S355.'),
+    material: materialField,
   }),
   run: (doc, params): CommandResult =>
     withSetup(doc, 'add_grid_beams', params, (prepared, tool) => {
@@ -417,7 +419,7 @@ export const addGridBracing = defineCommand({
       .describe(
         'Top node height relative to the NEXT storey FFL (base elevation + level height), in DOCUMENT UNITS (not necessarily mm). Default 0 (at the next FFL); negative puts the node under the floor beams.',
       ),
-    material: z.string().optional().describe('Steel grade. Default S355.'),
+    material: materialField,
   }),
   run: (doc, params): CommandResult =>
     withSetup(doc, 'add_grid_bracing', params, (prepared, tool) => {

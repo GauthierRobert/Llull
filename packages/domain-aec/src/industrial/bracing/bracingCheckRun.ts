@@ -5,11 +5,17 @@
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { existingLevelId, getBuilding } from '../../building/model';
+import { levelOrFailure } from '../../building/levelLookup';
 import { noop, report } from '@core/commands/noop';
 import { isNonNegativeNumber } from '@lib/isFiniteNumber';
+import {
+  bufferStiffnessField,
+  craneSelfWeightField,
+  craneValueProblem,
+  travelSpeedField,
+} from '../common/craneParams';
 import { DEFAULT_BUFFER_STIFFNESS, DEFAULT_TRAVEL_SPEED } from '../runway/runwayCheckModel';
-import { firstNonPositive, round } from '../../shared/numeric';
+import { round } from '../../shared/numeric';
 import { checkTable, failureSummary } from '../reports/checkReport';
 import { analyseBracing, locateMembers } from './bracingAnalysis';
 import { existingLevelIdParam } from '../../building/levelParams';
@@ -74,20 +80,9 @@ export const checkBracing = defineCommand({
       .describe(
         'Crane capacity in tonnes (> 0) for the crane longitudinal force. Default: read from the runway beam notes (add_crane_runway); no runway and no value = no crane force.',
       ),
-    craneSelfWeight: z
-      .number()
-      .optional()
-      .describe('Crane self-weight Gc in kN (> 0). Default 0.5 Q + 20 kN.'),
-    travelSpeed: z
-      .number()
-      .optional()
-      .describe(
-        'Crane long travel speed in m/s (> 0) for the buffer force (v1 = 0.7 × travelSpeed). Default 0.63 (about 38 m/min).',
-      ),
-    bufferStiffness: z
-      .number()
-      .optional()
-      .describe('Buffer spring constant SB in kN/m (> 0). Default 1000.'),
+    craneSelfWeight: craneSelfWeightField,
+    travelSpeed: travelSpeedField,
+    bufferStiffness: bufferStiffnessField,
     levelId: existingLevelIdParam,
   }),
   run: (doc: CadDocument, params): CommandResult => {
@@ -101,17 +96,15 @@ export const checkBracing = defineCommand({
     }
     const { travelSpeed = DEFAULT_TRAVEL_SPEED, bufferStiffness = DEFAULT_BUFFER_STIFFNESS } =
       params;
-    const nonPositive = firstNonPositive([
-      ['craneCapacity', params.craneCapacity],
-      ['craneSelfWeight', params.craneSelfWeight],
-      ['travelSpeed', travelSpeed],
-      ['bufferStiffness', bufferStiffness],
-    ]);
-    if (nonPositive !== undefined)
-      return noop(doc, `check_bracing failed: ${nonPositive} must be a number > 0.`);
-    const levelId = existingLevelId(getBuilding(doc), params.levelId);
-    if (levelId === undefined)
-      return noop(doc, `check_bracing failed: no level '${params.levelId ?? ''}'.`);
+    const problem = craneValueProblem({
+      craneCapacity: params.craneCapacity,
+      craneSelfWeight: params.craneSelfWeight,
+      travelSpeed,
+      bufferStiffness,
+    });
+    if (problem !== undefined) return noop(doc, `check_bracing failed: ${problem}.`);
+    const levelId = levelOrFailure(doc, 'check_bracing', params.levelId);
+    if (typeof levelId !== 'string') return levelId;
     const analysis = analyseBracing(locateMembers(doc, levelId), levelId, {
       windPressure,
       deadLoad,

@@ -53,20 +53,23 @@ export interface EvaluationContext {
   readonly building: BuildingModel;
 }
 
-/** Plan frame of `wall` and the elevation of its base on `level`. */
-function wallPlacement(
-  wall: WallElement,
-  level: BuildingLevel,
-): { frame: ReturnType<typeof wallFrame>; baseZ: number } {
+/** A wall and the level it stands on. */
+export interface WallHost {
+  readonly wall: WallElement;
+  readonly level: BuildingLevel;
+}
+
+/** Plan frame of the wall and the elevation of its base. */
+function wallPlacement({ wall, level }: WallHost): {
+  frame: ReturnType<typeof wallFrame>;
+  baseZ: number;
+} {
   return { frame: wallFrame(wall), baseZ: level.elevation + wall.baseOffset };
 }
 
-export function evaluateWall(
-  context: EvaluationContext,
-  wall: WallElement,
-  level: BuildingLevel,
-): Entity[] {
-  const { frame, baseZ } = wallPlacement(wall, level);
+export function evaluateWall(context: EvaluationContext, host: WallHost): Entity[] {
+  const { wall } = host;
+  const { frame, baseZ } = wallPlacement(host);
   const color = colorForMaterial(wall.material, '#c9c4b8');
   const pieces = wallPieces(
     wall,
@@ -89,10 +92,10 @@ export function evaluateWall(
 export function evaluateOpening(
   context: EvaluationContext,
   opening: OpeningElement,
-  wall: WallElement,
-  level: BuildingLevel,
+  host: WallHost,
 ): Entity[] {
-  const { frame, baseZ } = wallPlacement(wall, level);
+  const { wall, level } = host;
+  const { frame, baseZ } = wallPlacement(host);
   const [cx, cy] = pointAlong(wall, frame, opening.offset);
   const centerZ = baseZ + opening.sillHeight + opening.height / 2;
   if (opening.category === 'window') {

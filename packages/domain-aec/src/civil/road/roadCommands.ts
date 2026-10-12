@@ -9,11 +9,12 @@ import type { CadDocument } from '@core/model/types';
 import type { AlignmentObject, ProfilePvi, RoadSection } from '@core/model/civil';
 import type { CommandResult } from '@core/commands/types';
 import { commandCatalog, defineCommand, z, vec2 } from '@core/commands/schema';
+import { newNameParam } from '../commonParams';
 import { noop } from '@core/commands/noop';
 import { alignmentLength, endStation, validateHorizontal } from '../alignment/alignmentGeometry';
 import { grades, validateProfile, verticalCurves } from '../alignment/profileGeometry';
 import {
-  civilObjectOrFailure,
+  civilObjectOrNoop,
   civilObject,
   civilObjectsOf,
   stationText,
@@ -148,16 +149,11 @@ export const updateAlignment = defineCommand({
     startStation: z.number().optional().describe('New start station, document units.'),
     stationInterval: z.number().optional().describe('New station spacing (> 0).'),
     surfaceId: z.string().optional().describe('Ground surface id; "" removes the link.'),
-    name: z.string().optional().describe('New name.'),
+    name: newNameParam,
   }),
   run: (doc, params): CommandResult => {
-    const alignment = civilObjectOrFailure(
-      doc,
-      params.alignmentId,
-      'alignment',
-      'update_alignment',
-    );
-    if (typeof alignment === 'string') return noop(doc, alignment);
+    const alignment = civilObjectOrNoop(doc, params.alignmentId, 'alignment', 'update_alignment');
+    if ('summary' in alignment) return alignment;
     const points = params.points ?? alignment.points;
     const fitted = Array.from(
       { length: Math.max(points.length - 2, 0) },
@@ -254,8 +250,8 @@ export const setAlignmentProfile = defineCommand({
       .describe('At least 2 PVIs; sorted by station automatically.'),
   }),
   run: (doc, { alignmentId, pvis }): CommandResult => {
-    const alignment = civilObjectOrFailure(doc, alignmentId, 'alignment', 'set_alignment_profile');
-    if (typeof alignment === 'string') return noop(doc, alignment);
+    const alignment = civilObjectOrNoop(doc, alignmentId, 'alignment', 'set_alignment_profile');
+    if ('summary' in alignment) return alignment;
     const start = alignment.startStation;
     const end = endStation(alignment);
     // End PVIs typed from a rounded station (e.g. 130.01 for 130.0135) snap onto the alignment ends.
@@ -313,13 +309,8 @@ export const setRoadSection = defineCommand({
     fillSlope: z.number().optional().describe('Fill batter H per 1 V (> 0). Default 2.0.'),
   }),
   run: (doc, params): CommandResult => {
-    const alignment = civilObjectOrFailure(
-      doc,
-      params.alignmentId,
-      'alignment',
-      'set_road_section',
-    );
-    if (typeof alignment === 'string') return noop(doc, alignment);
+    const alignment = civilObjectOrNoop(doc, params.alignmentId, 'alignment', 'set_road_section');
+    if ('summary' in alignment) return alignment;
     const current = alignment.section;
     const section: RoadSection = {
       laneWidth: params.laneWidth ?? current?.laneWidth ?? fromMetres(doc, 3.5),

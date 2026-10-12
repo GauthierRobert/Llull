@@ -14,7 +14,7 @@ import { z } from '@core/commands/schema';
 import { toMm } from '@core/model/units';
 import {
   getBuilding,
-  highestIndex,
+  markAfter,
   nextElementId,
   withElement,
   levelElementsOf,
@@ -43,13 +43,18 @@ export const MEMBER_ROLES: ReadonlyArray<MemberRole> = [
   'crane',
 ];
 
+/** Every steel member of the building, in `elements` key order. */
+export function membersOf(building: BuildingModel): SteelMemberElement[] {
+  return Object.values(building.elements).filter(
+    (element): element is SteelMemberElement => element.category === 'member',
+  );
+}
+
 /** Next mark for a member role, e.g. "SC4", "PU12". */
 export function nextMemberMark(building: BuildingModel, role: MemberRole): string {
   const prefix = ROLE_MARK[role];
-  const marks = Object.values(building.elements)
-    .filter((element) => element.category === 'member')
-    .map((element) => element.mark);
-  return `${prefix}${highestIndex(marks, prefix) + 1}`;
+  const marks = membersOf(building).map((member) => member.mark);
+  return markAfter(prefix, marks);
 }
 
 /** A steel member of a level with its catalogue profile (if known) and endpoints in mm. */

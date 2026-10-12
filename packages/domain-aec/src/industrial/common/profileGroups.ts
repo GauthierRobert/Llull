@@ -9,6 +9,7 @@ import type { BuildingModel, SteelMemberElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { withElement } from '../../building/model';
+import { membersOf } from './memberSupport';
 import { findProfile, lightestProfile, sectionProperties } from '../../steel/profiles';
 
 /** Iteration cap of the design loops of design_portal_frames and design_purlins. */
@@ -51,13 +52,8 @@ export function resizeProfileGroup(
 ): { building: BuildingModel; resizedIds: string[] } {
   let next = building;
   const resizedIds: string[] = [];
-  for (const element of Object.values(building.elements)) {
-    if (
-      element.category !== 'member' ||
-      element.role !== group.role ||
-      element.profile !== group.profile ||
-      !isTarget(element)
-    )
+  for (const element of membersOf(building)) {
+    if (element.role !== group.role || element.profile !== group.profile || !isTarget(element))
       continue;
     next = resize(next, { ...element, profile: larger });
     resizedIds.push(element.id);

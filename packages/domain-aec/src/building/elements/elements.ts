@@ -7,7 +7,6 @@ import type { Vec2, Vec3 } from '@core/model/types';
 import type { BuildingElement, BuildingModel, RoomElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
-import { isValidPolygon } from '@lib/polygon';
 import { planAreaM2 } from '../../shared/planArea';
 import {
   getBuilding,
@@ -26,7 +25,7 @@ import {
 import { noop } from '@core/commands/noop';
 import { duplicateSummary, findTwin, sameRing } from '../../shared/duplicates';
 import { commitBuilding, regenerateBuilding } from '../evaluate/evaluateElements';
-import { resolveOutline } from './structure';
+import { outlineOrNoop } from './structure';
 import { openingFitIssues } from './walls';
 import { nextMemberMark } from '../../industrial/common/memberSupport';
 import { copyPipeSupports } from '../../industrial/piping/pipeSupportCopy';
@@ -64,18 +63,15 @@ export const addRoom = defineCommand({
   run: (doc, { name, number, boundary, wallIds, levelId }): CommandResult => {
     if (name.trim() === '') return noop(doc, 'add_room failed: name is required.');
     const building = getBuilding(doc);
-    const { outline, wallLevelId, failure } = resolveOutline(
+    const resolved = outlineOrNoop(
+      doc,
       building,
       { boundary, wallIds },
       (half) => -half,
+      'add_room',
     );
-    if (failure) return noop(doc, `add_room failed: ${failure}.`);
-    if (!outline || !isValidPolygon(outline)) {
-      return noop(
-        doc,
-        'add_room failed: give a boundary of ≥ 3 non-collinear [x, y] points, or wallIds forming a closed loop.',
-      );
-    }
+    if ('summary' in resolved) return resolved;
+    const { outline, wallLevelId } = resolved;
     const resolution = resolveLevel(doc, building, levelId ?? wallLevelId);
     if (!resolution.ok) return noop(doc, `add_room failed: ${resolution.reason}.`);
     const levelIndex = resolution.building.levelOrder.indexOf(resolution.level.id);

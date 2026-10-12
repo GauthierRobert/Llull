@@ -10,12 +10,17 @@ import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from '../frames/fr
 import { baseReactions } from '../frames/frameModelSolve';
 import { SOIL_SHAPE, soilInputs } from './soilParams';
 import { findFooting } from './foundationCombinations';
-import { defaultThrustTie, groundSlabWeight, slidingHorizontalOf } from './foundationThrust';
+import {
+  defaultThrustTie,
+  reactionColumn,
+  slabSharePerColumn,
+  slidingHorizontalOf,
+} from './foundationThrust';
 import { COVER_MM, type FootingDesignRow } from './footingModel';
 import { designFootingRow, isResized } from './footingDesignRow';
 import { sizeText } from './footingSizing';
 import { round } from '../../shared/numeric';
-import { briefList } from '../common/utilisation';
+import { briefList } from '../../shared/briefList';
 
 const footingDesignParams = z.object({
   ...FRAME_LOAD_SHAPE,
@@ -72,20 +77,16 @@ export const designFootings = defineCommand({
     const building = getBuilding(doc);
     const wind = loads.windPressure > 0;
     const reactions = baseReactions(doc, building, levelId, loads);
-    const slabShare =
-      thrustTie && reactions.length > 0
-        ? groundSlabWeight(doc, building, levelId) / reactions.length
-        : 0;
+    const slabShare = slabSharePerColumn(doc, building, levelId, thrustTie, reactions.length);
     const rows: FootingDesignRow[] = [];
     const seen = new Set<string>();
     let next = building;
     const changes: string[] = [];
     const changed: string[] = [];
     for (const reaction of reactions) {
-      const column = building.elements[reaction.columnId];
-      if (column?.category !== 'member') continue;
-      const footing = findFooting(doc, building, levelId, column);
-      if (!footing || seen.has(footing.id)) continue;
+      const column = reactionColumn(building, reaction);
+      const footing = column && findFooting(doc, building, levelId, column);
+      if (!column || !footing || seen.has(footing.id)) continue;
       seen.add(footing.id);
       const outcome = designFootingRow({
         doc,
@@ -122,6 +123,8 @@ export const designFootings = defineCommand({
     const maxPunching = maxOf((row) => row.punchingUtilisation);
     const format = (row: FootingDesignRow): string =>
       `${row.mark}${isResized(row.sizeBefore, row.sizeAfter) ? ` ${sizeText(row.sizeBefore)} → ${sizeText(row.sizeAfter)}` : ''} H${row.barDiameter} @ ${row.spacing} (As ${round(row.asRequired, 0)} ≤ ${round(row.asProvided ?? 0, 0)} mm²/m, shear ${round(row.shearUtilisation)}, punching ${round(row.punchingUtilisation)}${row.punchingDistance > 0 ? ` at a=${round(row.punchingDistance, 0)} mm` : ''})`;
+    const failureText = (row: FootingDesignRow): string =>
+      `${row.mark} (${row.note}; shear ${round(row.shearUtilisation)}, punching ${round(row.punchingUtilisation)})`;
     const document = changed.length > 0 ? { ...doc, building: next } : doc;
     return {
       document,
@@ -129,13 +132,7 @@ export const designFootings = defineCommand({
         `Designed ${designed.length} of ${rows.length} footing(s) on level '${levelId}' (${describeLoads(loads)}, soil ${soilBearing} kPa, C25/30 B500, cover ${COVER_MM} mm, ${allowShrink ? 'sizes may shrink' : 'sizes only grow'}; sizes B×L×h mm): ` +
         `${designed.length > 0 ? briefList(designed, format, 8, '; ') : 'none'}. ` +
         (failed.length > 0
-          ? `${failed.length} not sized — left unchanged: ${failed
-              .slice(0, 8)
-              .map(
-                (row) =>
-                  `${row.mark} (${row.note}; shear ${round(row.shearUtilisation)}, punching ${round(row.punchingUtilisation)})`,
-              )
-              .join('; ')}. `
+          ? `${failed.length} not sized — left unchanged: ${briefList(failed, failureText, 8, '; ')}. `
           : '') +
         `Max shear ${round(maxShear)}, max punching ${round(maxPunching)}; ` +
         `${changed.length > 0 ? `${changed.length} footing(s) changed` : 'no change'}. Bending in the frame plane.`,

@@ -3,12 +3,14 @@
  * @layer domain-aec/civil
  */
 
+import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop, report } from '@core/commands/noop';
 import { toMetres } from '@core/model/units';
 import { civilAffected, civilObjectsOf, getCivil } from '../model';
 import { regenerateCivil } from '../evaluate';
+import { briefList } from '../../shared/briefList';
 import { csvLines } from '../../shared/csv';
 import { analyseNetwork } from './drainageNetwork';
 import { pipePlanLength, pipeSlope } from './drainageTopology';
@@ -69,6 +71,37 @@ export function criteriaFrom(params: CriteriaInput): DrainageCriteria | string {
   return criteria;
 }
 
+/** The criteria of a command's params, or the no-op result naming `command` when they are invalid. */
+export function criteriaOrFailure(
+  doc: CadDocument,
+  params: CriteriaInput,
+  command: string,
+): DrainageCriteria | CommandResult {
+  const criteria = criteriaFrom(params);
+  return typeof criteria === 'string' ? noop(doc, `${command} failed: ${criteria}`) : criteria;
+}
+
+/** Tailwater and head-loss parameters shared by the hydraulic-grade-line commands. */
+export const HYDRAULIC_FIELDS = {
+  outfallLevel: z
+    .number()
+    .optional()
+    .describe(
+      'Tailwater elevation at the outfall(s) in document units, same datum as invert levels. ' +
+        'Default: normal-depth water level of the outlet pipe.',
+    ),
+  manholeLossK: z
+    .number()
+    .optional()
+    .describe('Manhole head-loss coefficient K in K v^2/2g (>= 0). Default 0.5.'),
+  freeboardM: z
+    .number()
+    .optional()
+    .describe(
+      'Required freeboard below the rim in metres (>= 0) before flooding is flagged. Default 0.3.',
+    ),
+};
+
 function rainfallText(criteria: DrainageCriteria): string {
   const idf = criteria.idf;
   return idf
@@ -115,28 +148,11 @@ export const checkDrainageNetwork = defineCommand({
       .number()
       .optional()
       .describe('Maximum design flow depth / diameter, 0 to 1. Default 0.8.'),
-    outfallLevel: z
-      .number()
-      .optional()
-      .describe(
-        'Tailwater elevation at the outfall(s) in document units, same datum as invert levels. ' +
-          'Default: normal-depth water level of the outlet pipe.',
-      ),
-    manholeLossK: z
-      .number()
-      .optional()
-      .describe('Manhole head-loss coefficient K in K v^2/2g (>= 0). Default 0.5.'),
-    freeboardM: z
-      .number()
-      .optional()
-      .describe(
-        'Required freeboard below the rim in metres (>= 0) before flooding is flagged. Default 0.3.',
-      ),
+    ...HYDRAULIC_FIELDS,
   }),
   run: (doc, params): CommandResult => {
-    const criteria = criteriaFrom(params);
-    if (typeof criteria === 'string')
-      return noop(doc, `check_drainage_network failed: ${criteria}`);
+    const criteria = criteriaOrFailure(doc, params, 'check_drainage_network');
+    if ('summary' in criteria) return criteria;
     const civil = getCivil(doc);
     if (civilObjectsOf(civil, 'pipe').length === 0)
       return noop(doc, 'check_drainage_network: the document has no drainage pipes.');
@@ -199,7 +215,7 @@ export const checkDrainageNetwork = defineCommand({
         r.status,
       ]),
     );
-    const worst = failures.slice(0, 5).join(' | ');
+    const worst = briefList(failures, String, 5, ' | ');
     const tcs = pipes.map((r) => r.tcMin);
     const flooded = manholes.filter((r) => r.flooding).length;
     const surcharged = pipes.filter((r) => r.surcharged).length;
@@ -317,13 +333,17 @@ export const sizeDrainagePipes = defineCommand({
     minVelocity: z.number().optional().describe('Minimum velocity in m/s. Default: not enforced.'),
   }),
   run: (doc, params): CommandResult => {
-    const criteria = criteriaFrom({
-      rainfallIntensityMmH: params.rainfallIntensityMmH,
-      idf: params.idf,
-      maxDepthRatio: params.maxDepthRatio,
-      minVelocity: params.minVelocity ?? 0,
-    });
-    if (typeof criteria === 'string') return noop(doc, `size_drainage_pipes failed: ${criteria}`);
+    const criteria = criteriaOrFailure(
+      doc,
+      {
+        rainfallIntensityMmH: params.rainfallIntensityMmH,
+        idf: params.idf,
+        maxDepthRatio: params.maxDepthRatio,
+        minVelocity: params.minVelocity ?? 0,
+      },
+      'size_drainage_pipes',
+    );
+    if ('summary' in criteria) return criteria;
     const candidates = [...(params.diameters ?? COMMERCIAL_DIAMETERS_MM)].sort((a, b) => a - b);
     if (candidates.length === 0 || candidates.some((d) => !(d > 0)))
       return noop(doc, 'size_drainage_pipes failed: diameters must be positive millimetres.');

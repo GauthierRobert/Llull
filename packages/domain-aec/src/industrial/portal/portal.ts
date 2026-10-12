@@ -140,21 +140,9 @@ export const addPortalFrameBuilding = defineCommand({
   run: (doc, params): CommandResult => {
     const inputs = portalInputs(doc, params);
     if ('reason' in inputs) return noop(doc, inputs.reason);
-    const {
-      mm,
-      origin,
-      span,
-      spanCount,
-      hallLength,
-      targetBay,
-      eave,
-      pitchDegrees,
-      purlinSpacing,
-      railSpacing,
-      roofType,
-      columnBase,
-      profiles: p,
-    } = inputs;
+    const { mm, origin, profiles: p, columnBase } = inputs;
+    const { span, spanCount, hallLength, targetBay, eave } = inputs;
+    const { pitchDegrees, purlinSpacing, railSpacing, roofType } = inputs;
     const resolution = resolveLevel(doc, getBuilding(doc), params.levelId);
     if (!resolution.ok) return noop(doc, `add_portal_frame_building failed: ${resolution.reason}.`);
     const levelId = resolution.level.id;

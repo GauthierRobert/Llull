@@ -24,7 +24,9 @@ import {
   svgPoints,
   northArrow,
   PAPER_MM,
-  PAPER_SIZES,
+  PAPER_FIELD,
+  SCALE_FIELD,
+  sheetFitWarning,
   sheetDrawingArea,
   svgText,
   type PaperSize,
@@ -235,13 +237,8 @@ export const exportPlanSheet = defineCommand({
     'filled from set_project_info. data.svg holds the file text.',
   params: z.object({
     levelId: z.string().optional().describe('Level to draw. Default: active level.'),
-    paper: z.enum(PAPER_SIZES).optional().describe('Paper size (landscape). Default A3.'),
-    scale: z
-      .number()
-      .optional()
-      .describe(
-        'Scale denominator N for 1:N (e.g. 100). Default: the smallest standard scale that fits (1-2-5 steps beyond 1:2000).',
-      ),
+    paper: PAPER_FIELD,
+    scale: SCALE_FIELD,
     title: z.string().optional().describe('Drawing title. Default "<level> — Floor plan".'),
   }),
   run: (doc, { levelId, paper = 'A3', scale, title }): CommandResult => {
@@ -254,7 +251,7 @@ export const exportPlanSheet = defineCommand({
     }
     return report(
       doc,
-      `Plan sheet ${sheet.filename}: level ${sheet.levelId} at 1:${sheet.scale} on ${sheet.paper}.${sheet.fits ? '' : ' WARNING: the drawing is larger than the paper at this scale; omit scale to auto-fit or choose a larger paper.'}`,
+      `Plan sheet ${sheet.filename}: level ${sheet.levelId} at 1:${sheet.scale} on ${sheet.paper}.${sheetFitWarning(sheet.fits, 'drawing')}`,
       sheet,
     );
   },

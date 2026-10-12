@@ -34,6 +34,7 @@ import {
   ifcReal,
   ifcString,
   placement,
+  placementAt,
   point2,
   point3,
   polygonProfile,
@@ -137,11 +138,10 @@ export function exportIndustrial(
       return { ref, material: element.material };
     }
     case 'footing': {
-      const local = placement(
+      const local = placementAt(
         context,
         storeyPlacement,
-        mm(element.location[0]),
-        mm(element.location[1]),
+        element.location,
         mm(element.topOffset - element.thickness),
       );
       const profile = rectangleProfile(context, [0, 0], mm(element.width), mm(element.length));
@@ -171,11 +171,10 @@ export function exportIndustrial(
     case 'equipment': {
       const [length, width, height] = element.size;
       const equipmentShape = shapeOf(element);
-      const local = placement(
+      const local = placementAt(
         context,
         storeyPlacement,
-        mm(element.location[0]),
-        mm(element.location[1]),
+        element.location,
         equipmentShape === 'horizontal_vessel' ? mm(width) / 2 : 0,
         element.angle,
       );

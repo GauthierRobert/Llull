@@ -39,23 +39,25 @@ const NUMBERS: Readonly<Record<string, ReadonlyArray<string>>> = {
 
 const CATEGORIES: ReadonlySet<string> = new Set(Object.keys(NUMBERS));
 
-/** Fields that must be strictly positive. */
-const POSITIVE: Readonly<Record<string, ReadonlyArray<string>>> = {
-  wall: ['thickness', 'height'],
-  door: ['width', 'height'],
-  window: ['width', 'height'],
-  slab: ['thickness'],
-  column: ['width', 'depth', 'height'],
-  beam: ['width', 'depth'],
-  stair: ['width', 'riserHeight', 'treadDepth'],
-  footing: ['width', 'length', 'thickness'],
-  panel: ['thickness'],
-  pipe: ['diameter'],
-  tray: ['width', 'height'],
-  plate: ['length', 'width', 'thickness', 'boltCount', 'boltDiameter'],
-  curvedWall: ['thickness', 'height'],
-  connection: ['plateThickness', 'boltRows', 'boltDiameter'],
+/** Numeric fields that may be zero or negative (every other numeric field must be > 0). */
+const SIGNED: Readonly<Record<string, ReadonlyArray<string>>> = {
+  wall: ['baseOffset'],
+  door: ['offset', 'sillHeight'],
+  window: ['offset', 'sillHeight'],
+  slab: ['offset'],
+  beam: ['topOffset'],
+  stair: ['angle', 'riserCount'],
+  member: ['roll'],
+  footing: ['topOffset'],
+  equipment: ['angle', 'clearance', 'weight'],
+  curvedWall: ['baseOffset'],
+  connection: ['haunchLength'],
+  pipeSupport: ['rodLength', 'pedestalHeight'],
 };
+
+/** Fields that must be strictly positive. */
+const positiveFields = (category: string): string[] =>
+  (NUMBERS[category] ?? []).filter((field) => !SIGNED[category]?.includes(field));
 
 /** Plan-point fields each category must carry (categories not listed carry none). */
 const POINTS: Readonly<Record<string, ReadonlyArray<string>>> = {
@@ -192,7 +194,7 @@ function elementErrors(
       errors.push(`building element ${key}: ${field} must be a finite number`);
     }
   }
-  for (const field of POSITIVE[category] ?? []) {
+  for (const field of positiveFields(category)) {
     const value = element[field];
     if (typeof value === 'number' && !(value > 0))
       errors.push(`building element ${key}: ${field} must be > 0`);
