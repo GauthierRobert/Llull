@@ -11,6 +11,7 @@ import type { Vec3 } from '../model/types';
 import { cross3, normalize3, sub3 } from '../lib/vec3';
 import { signedArea } from '../lib/polygon';
 import { triangulatePolygon } from '../lib/triangulate';
+import { circlePolygon } from '../lib/arc';
 
 /** Segments used for circular cross-sections (cylinder, cone, torus ring). */
 export const SEG_CIRCLE = 24;
@@ -38,12 +39,7 @@ export const SEG_TORUS_TUBE = 12;
  * @param segs - Number of vertices (== number of segments)
  */
 export function circlePoints(cx: number, cy: number, cz: number, r: number, segs: number): Vec3[] {
-  const pts: Vec3[] = [];
-  for (let i = 0; i < segs; i++) {
-    const a = (2 * Math.PI * i) / segs;
-    pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a), cz]);
-  }
-  return pts;
+  return circlePolygon([cx, cy], r, segs).map(([x, y]): Vec3 => [x, y, cz]);
 }
 
 /** Unit facet normal of triangle `v0 v1 v2` (right-hand rule: counter-clockwise ⇒ outward). */
@@ -147,22 +143,58 @@ export function wedgeCorners(
   };
 }
 
-/** Base corners (`bXY`, X/Y = low/high) and apex of a pyramid whose base centre is `position`. */
-export function pyramidCorners(e: {
+/** Faces of a pyramid whose base centre is `position` (base face down, then 4 sides to the apex). */
+export function pyramidFaces(e: {
   position: Vec3;
   baseWidth: number;
   baseDepth: number;
   height: number;
-}): { b00: Vec3; b10: Vec3; b11: Vec3; b01: Vec3; apex: Vec3 } {
+}): Vec3[][] {
   const [px, py, pz] = e.position;
   const hw = e.baseWidth / 2,
     hd = e.baseDepth / 2;
+  const b00: Vec3 = [px - hw, py - hd, pz];
+  const b10: Vec3 = [px + hw, py - hd, pz];
+  const b11: Vec3 = [px + hw, py + hd, pz];
+  const b01: Vec3 = [px - hw, py + hd, pz];
+  const apex: Vec3 = [px, py, pz + e.height];
+  return [
+    [b00, b01, b11, b10], // base, face down
+    [b00, b10, apex],
+    [b10, b11, apex],
+    [b11, b01, apex],
+    [b01, b00, apex],
+  ];
+}
+
+/**
+ * Z-up cone: base ring (CCW from +Z, at position.z), its centre, and one outward side triangle per
+ * base edge up to the apex at position + [0, 0, height].
+ */
+export function coneSurface(e: { position: Vec3; radius: number; height: number }): {
+  center: Vec3;
+  base: Vec3[];
+  sides: Array<[Vec3, Vec3, Vec3]>;
+} {
+  const [px, py, pz] = e.position;
+  const base = circlePoints(px, py, pz, e.radius, SEG_CIRCLE);
+  const apex: Vec3 = [px, py, pz + e.height];
   return {
-    b00: [px - hw, py - hd, pz],
-    b10: [px + hw, py - hd, pz],
-    b11: [px + hw, py + hd, pz],
-    b01: [px - hw, py + hd, pz],
-    apex: [px, py, pz + e.height],
+    center: [px, py, pz],
+    base,
+    sides: ringEdges(base).map(([from, to]): [Vec3, Vec3, Vec3] => [from, to, apex]),
+  };
+}
+
+/** Bottom and top rings (CCW from +Z) of a Z-up cylinder centred on `position`. */
+export function cylinderRings(e: { position: Vec3; radius: number; height: number }): {
+  bottom: Vec3[];
+  top: Vec3[];
+} {
+  const [px, py, pz] = e.position;
+  return {
+    bottom: circlePoints(px, py, pz - e.height / 2, e.radius, SEG_CIRCLE),
+    top: circlePoints(px, py, pz + e.height / 2, e.radius, SEG_CIRCLE),
   };
 }
 

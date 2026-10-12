@@ -12,12 +12,12 @@ import { sweepTriangles } from './sweep';
 import { loftTriangles } from './loft';
 import { subdivisionTriangles } from './subdivision';
 import {
-  SEG_CIRCLE,
   boxExtents,
-  circlePoints,
   extrusionRings,
   meshTriangles,
-  pyramidCorners,
+  coneSurface,
+  cylinderRings,
+  pyramidFaces,
   ringEdges,
   sideQuads,
   sphereQuads,
@@ -76,8 +76,7 @@ function triangulateCylinder(e: Kind<'cylinder'>): Triangle[] {
   const [px, py, pz] = e.position;
   const zb = pz - e.height / 2;
   const zt = pz + e.height / 2;
-  const bot = circlePoints(px, py, zb, e.radius, SEG_CIRCLE);
-  const top = circlePoints(px, py, zt, e.radius, SEG_CIRCLE);
+  const { bottom: bot, top } = cylinderRings(e);
   return [
     ...ringEdges(bot).map(([from, to]): Triangle => [[px, py, zb], to, from]),
     ...ringEdges(top).map(([from, to]): Triangle => [[px, py, zt], from, to]),
@@ -90,14 +89,8 @@ function triangulateSphere(e: Kind<'sphere'>): Triangle[] {
 }
 
 function triangulateCone(e: Kind<'cone'>): Triangle[] {
-  const [px, py, pz] = e.position;
-  const base = circlePoints(px, py, pz, e.radius, SEG_CIRCLE);
-  const apex: Vec3 = [px, py, pz + e.height];
-  const edges = ringEdges(base);
-  return [
-    ...edges.map(([from, to]): Triangle => [[px, py, pz], to, from]),
-    ...edges.map(([from, to]): Triangle => [from, to, apex]),
-  ];
+  const { center, base, sides } = coneSurface(e);
+  return [...ringEdges(base).map(([from, to]): Triangle => [center, to, from]), ...sides];
 }
 
 function triangulateTorus(e: Kind<'torus'>): Triangle[] {
@@ -116,14 +109,7 @@ function triangulateWedge(e: Kind<'wedge'>): Triangle[] {
 }
 
 function triangulatePyramid(e: Kind<'pyramid'>): Triangle[] {
-  const { b00, b10, b11, b01, apex } = pyramidCorners(e);
-  return [
-    ...fanTriangulate([b00, b01, b11, b10]), // base, face down
-    [b00, b10, apex],
-    [b10, b11, apex],
-    [b11, b01, apex],
-    [b01, b00, apex],
-  ];
+  return pyramidFaces(e).flatMap(fanTriangulate);
 }
 
 function triangulateExtrusion(e: Kind<'extrusion'>): Triangle[] {
