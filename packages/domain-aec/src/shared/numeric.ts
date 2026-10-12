@@ -3,6 +3,10 @@ import { isPositiveNumber } from '@lib/isFiniteNumber';
 /** m/s²; converts kg to kN (÷ 1000) and tonnes to N (× 1000 × GRAVITY). */
 export const GRAVITY = 9.80665;
 
+/** Weight in kN/m of a mass per metre in kg/m. */
+export const weightKnPerMetre = (massKgPerMetre: number): number =>
+  (massKgPerMetre * GRAVITY) / 1000;
+
 /** Rounds to `digits` decimals; never returns -0. */
 export const round = (value: number, digits = 2): number =>
   Math.round(value * 10 ** digits) / 10 ** digits + 0;

@@ -15,7 +15,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import { toMm } from '@core/model/units';
 import { getBuilding, orderedElements } from '../../building/model';
 import { round } from '../../shared/numeric';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { sweepFrame } from '../../shared/mesh';
 import { findProfile, STEEL_DENSITY_KG_PER_M3 } from '../../steel/profiles';
 import {
@@ -238,11 +238,10 @@ export const exportNcFiles = defineCommand({
     const memberFiles = files.filter((file) => file.kind === 'member').length;
     const plateCount = pieces.length - memberPieceCount;
     const data: NcExport = { files, count: files.length };
-    return {
-      document: doc,
-      summary: `DSTV NC1: ${files.length} file(s) — ${memberFiles} member file(s) for ${memberPieceCount} piece(s), ${files.length - memberFiles} plate file(s) for ${plateCount} plate(s).`,
-      affected: [],
+    return report(
+      doc,
+      `DSTV NC1: ${files.length} file(s) — ${memberFiles} member file(s) for ${memberPieceCount} piece(s), ${files.length - memberFiles} plate file(s) for ${plateCount} plate(s).`,
       data,
-    };
+    );
   },
 });

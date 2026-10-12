@@ -16,12 +16,11 @@ import {
   resolveLevel,
   toVec2,
   withElement,
-  elementAffected,
 } from '../model';
 import { distance } from '@lib/polygon';
 import { findTwin, sameSegment } from '../../shared/duplicates';
 import { noop } from '@core/commands/noop';
-import { commitBuilding, regenerateBuilding } from '../evaluate/evaluateElements';
+import { commitBuilding } from '../evaluate/evaluateElements';
 import { builtExtent, openingsOf, wallFrame } from '../geometry/wallGeometry';
 import type { WallExtent } from '../geometry/wallExtent';
 
@@ -157,26 +156,29 @@ function skippedSuffix(skippedAs: readonly string[]): string {
 }
 
 function wallResult(doc: CadDocument, build: Extract<WallBuild, { ok: true }>): CommandResult {
-  const document = regenerateBuilding(doc, build.building);
-  const walls = build.wallIds
-    .map((id) => document.building?.elements[id])
-    .filter((element): element is WallElement => element?.category === 'wall');
-  const totalLength = walls.reduce((sum, wall) => sum + distance(wall.start, wall.end), 0);
-  const first = walls[0];
-  const level = first ? document.building?.levels[first.levelId] : undefined;
-  return {
-    document,
-    summary:
+  const summarize = (document: CadDocument): string => {
+    const walls = build.wallIds
+      .map((id) => document.building?.elements[id])
+      .filter((element): element is WallElement => element?.category === 'wall');
+    const totalLength = walls.reduce((sum, wall) => sum + distance(wall.start, wall.end), 0);
+    const first = walls[0];
+    const level = first ? document.building?.levels[first.levelId] : undefined;
+    return (
       `Added ${walls.length} wall(s) ${walls.map((wall) => `${wall.mark} (${wall.id})`).join(', ')} ` +
       `on ${level?.name ?? 'level'}: total length ${totalLength.toFixed(3)} ${doc.units}, ` +
       `thickness ${first?.thickness ?? 0}, height ${first?.height ?? 0}, ${first?.material ?? ''}.` +
-      skippedSuffix(build.skippedAs),
-    affected: elementAffected(document, build.wallIds),
-    data:
-      build.skippedAs.length === 0
-        ? { wallIds: build.wallIds }
-        : { wallIds: build.wallIds, skippedDuplicatesOf: build.skippedAs },
+      skippedSuffix(build.skippedAs)
+    );
   };
+  return commitBuilding(
+    doc,
+    build.building,
+    build.wallIds,
+    summarize,
+    build.skippedAs.length === 0
+      ? { wallIds: build.wallIds }
+      : { wallIds: build.wallIds, skippedDuplicatesOf: build.skippedAs },
+  );
 }
 
 const MAX_WALL_POINTS = 500;

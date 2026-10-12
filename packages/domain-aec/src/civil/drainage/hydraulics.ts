@@ -4,10 +4,10 @@
  * @layer domain-aec/civil
  * @pure
  */
+import { bisect } from '@lib/bisect';
 
 /** Depth ratio y/D at which a circular pipe carries its maximum discharge (about 1.076 Q full). */
 const MAX_DISCHARGE_DEPTH_RATIO = 0.938;
-const BISECTION_STEPS = 60;
 
 export interface PartialFlow {
   /** Flow depth / diameter, 0..1 (1 when the pipe runs full or surcharged). */
@@ -64,13 +64,11 @@ export function solvePartialFlow(
   const maximum = partialFlowDischarge(diameter, slope, manningN, MAX_DISCHARGE_DEPTH_RATIO);
   if (flow > maximum)
     return { depthRatio: 1, velocity: flow / fullArea(diameter), surcharged: true };
-  let low = 0;
-  let high = MAX_DISCHARGE_DEPTH_RATIO;
-  for (let step = 0; step < BISECTION_STEPS; step += 1) {
-    const middle = (low + high) / 2;
-    if (partialFlowDischarge(diameter, slope, manningN, middle) < flow) low = middle;
-    else high = middle;
-  }
+  const { low, high } = bisect(
+    (ratio) => partialFlowDischarge(diameter, slope, manningN, ratio) < flow,
+    0,
+    MAX_DISCHARGE_DEPTH_RATIO,
+  );
   const depthRatio = (low + high) / 2;
   return { depthRatio, velocity: flow / wettedArea(diameter, depthRatio).area, surcharged: false };
 }

@@ -7,7 +7,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { fromMm } from '@core/model/units';
 import { fileSlug, getBuilding } from '../model';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { buildPlanDrawing } from '../drawings/planDrawing';
 import { DxfWriter, HIDDEN_LAYERS, INSUNITS, fmt, writePrimitive } from './dxfWriter';
 
@@ -245,11 +245,10 @@ export const exportDxf = defineCommand({
     if (!result) return noop(doc, `export_dxf failed: no level '${levelId ?? ''}'.`);
     if (result.entityCount === 0)
       return noop(doc, 'export_dxf: nothing to export (no building elements or 2D drafting).');
-    return {
-      document: doc,
-      summary: `DXF ${result.filename}: ${result.entityCount} entities on layers ${result.layers.join(', ')}.`,
-      affected: [],
-      data: result,
-    };
+    return report(
+      doc,
+      `DXF ${result.filename}: ${result.entityCount} entities on layers ${result.layers.join(', ')}.`,
+      result,
+    );
   },
 });

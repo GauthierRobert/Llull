@@ -13,6 +13,8 @@ import { toMetres } from '@core/model/units';
 import { type BaseReaction } from '../frames/frameModelSolve';
 import { WIND_CASES, WIND_PRESSURE_CASES, type LoadCase } from '../frames/frameModelTypes';
 import { type Combination, type Factors, TOLERANCE_METRES } from './foundationModel';
+import { GAMMA_CRANE } from '../../shared/loadFactors';
+import { highestUtilisation } from '../common/utilisation';
 
 /** Factored base reaction: vertical v and horizontal h in kN, base moment m in kN·m (CCW +). */
 export function combine(
@@ -115,7 +117,10 @@ export function ultimateCombinations(
   }
   if (crane) {
     for (const [label, loadCase] of CRANE_CASES) {
-      list.push({ name: name(`1.35${label}`), factors: { G: g, [loadCase]: 1.35, ...companion } });
+      list.push({
+        name: name(`1.35${label}`),
+        factors: { G: g, [loadCase]: GAMMA_CRANE, ...companion },
+      });
     }
   }
   return list;
@@ -162,8 +167,5 @@ export interface Candidate {
 }
 
 export function worst<T extends Candidate>(candidates: ReadonlyArray<T>): T | null {
-  return candidates.reduce<T | null>(
-    (best, item) => (best === null || item.utilisation > best.utilisation ? item : best),
-    null,
-  );
+  return highestUtilisation(candidates) ?? null;
 }

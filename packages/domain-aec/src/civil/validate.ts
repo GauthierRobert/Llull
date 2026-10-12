@@ -7,6 +7,7 @@
 
 import { type ProfilePvi, CIVIL_CATEGORIES } from '@core/model/civil';
 import type { Vec2 } from '@core/model/types';
+import { isFiniteNumber, isPositiveNumber } from '@lib/isFiniteNumber';
 import { isRecord } from '@lib/isRecord';
 import { isValidPolygon } from '@lib/polygon';
 import { validateHorizontal } from './alignment/alignmentGeometry';
@@ -15,8 +16,6 @@ import { MAX_SURFACE_POINTS } from './model';
 
 type Check = (object: Record<string, unknown>) => string | null;
 
-const finite = (value: unknown): boolean => typeof value === 'number' && Number.isFinite(value);
-const positive = (value: unknown): boolean => finite(value) && (value as number) > 0;
 const optional = (value: unknown, test: (value: unknown) => boolean): boolean =>
   value === undefined || test(value);
 
@@ -24,7 +23,7 @@ function isVecList(value: unknown, size: number, minimum: number): boolean {
   return (
     Array.isArray(value) &&
     value.length >= minimum &&
-    value.every((item) => Array.isArray(item) && item.length === size && item.every(finite))
+    value.every((item) => Array.isArray(item) && item.length === size && item.every(isFiniteNumber))
   );
 }
 
@@ -41,9 +40,9 @@ function profileError(value: unknown): string | null {
   const valid = value.every(
     (pvi) =>
       isRecord(pvi) &&
-      finite(pvi['station']) &&
-      finite(pvi['elevation']) &&
-      finite(pvi['curveLength']),
+      isFiniteNumber(pvi['station']) &&
+      isFiniteNumber(pvi['elevation']) &&
+      isFiniteNumber(pvi['curveLength']),
   );
   if (!valid) return 'profile entries must be { station, elevation, curveLength } numbers';
   return value.length === 0 ? null : validateProfile(value as ProfilePvi[]);
@@ -53,12 +52,12 @@ function sectionError(value: unknown): string | null {
   if (value === undefined) return null;
   if (!isRecord(value)) return 'section must be an object';
   const ok =
-    positive(value['laneWidth']) &&
-    finite(value['shoulderWidth']) &&
+    isPositiveNumber(value['laneWidth']) &&
+    isFiniteNumber(value['shoulderWidth']) &&
     (value['shoulderWidth'] as number) >= 0 &&
-    finite(value['crossfall']) &&
-    positive(value['cutSlope']) &&
-    positive(value['fillSlope']);
+    isFiniteNumber(value['crossfall']) &&
+    isPositiveNumber(value['cutSlope']) &&
+    isPositiveNumber(value['fillSlope']);
   return ok ? null : 'section needs laneWidth > 0, shoulderWidth >= 0, crossfall, slopes > 0';
 }
 
@@ -66,10 +65,10 @@ function superelevationError(value: unknown): string | null {
   if (value === undefined) return null;
   const ok =
     isRecord(value) &&
-    finite(value['maxRate']) &&
+    isFiniteNumber(value['maxRate']) &&
     (value['maxRate'] as number) > 0 &&
     (value['maxRate'] as number) <= 0.15 &&
-    optional(value['runoffLength'], positive);
+    optional(value['runoffLength'], isPositiveNumber);
   return ok ? null : 'superelevation needs maxRate in (0, 0.15] and runoffLength > 0';
 }
 
@@ -91,15 +90,16 @@ const CHECKS: Readonly<Record<(typeof CIVIL_CATEGORIES)[number], readonly Check[
   surface: [
     (o) => demand(isStringList(o['pointGroupIds']), 'pointGroupIds must be strings'),
     (o) => demand(isVecList(o['extraPoints'], 3, 0), 'extraPoints must be [x, y, z] points'),
-    (o) => demand(positive(o['contourInterval']), 'contourInterval must be > 0'),
-    (o) => demand(finite(o['majorEvery']) && (o['majorEvery'] as number) >= 0, 'bad majorEvery'),
+    (o) => demand(isPositiveNumber(o['contourInterval']), 'contourInterval must be > 0'),
+    (o) =>
+      demand(isFiniteNumber(o['majorEvery']) && (o['majorEvery'] as number) >= 0, 'bad majorEvery'),
     (o) =>
       demand(
         o['boundary'] === undefined ||
           (isVecList(o['boundary'], 2, 3) && isValidPolygon(o['boundary'] as Vec2[])),
         'bad boundary',
       ),
-    (o) => demand(optional(o['maxEdgeLength'], positive), 'maxEdgeLength must be > 0'),
+    (o) => demand(optional(o['maxEdgeLength'], isPositiveNumber), 'maxEdgeLength must be > 0'),
   ],
   platform: [
     (o) => demand(typeof o['surfaceId'] === 'string', 'surfaceId must be a string'),
@@ -108,19 +108,26 @@ const CHECKS: Readonly<Record<(typeof CIVIL_CATEGORIES)[number], readonly Check[
         isVecList(o['boundary'], 2, 3) && isValidPolygon(o['boundary'] as Vec2[]),
         'boundary must be a simple polygon of >= 3 [x, y] points',
       ),
-    (o) => demand(finite(o['elevation']), 'elevation must be a number'),
-    (o) => demand(positive(o['cutSlope']) && positive(o['fillSlope']), 'slopes must be > 0'),
+    (o) => demand(isFiniteNumber(o['elevation']), 'elevation must be a number'),
+    (o) =>
+      demand(
+        isPositiveNumber(o['cutSlope']) && isPositiveNumber(o['fillSlope']),
+        'slopes must be > 0',
+      ),
   ],
   alignment: [
     (o) => demand(isVecList(o['points'], 2, 2), 'points must have >= 2 [x, y] points'),
     (o) =>
       demand(
-        Array.isArray(o['radii']) && (o['radii'] as unknown[]).every(finite),
+        Array.isArray(o['radii']) && (o['radii'] as unknown[]).every(isFiniteNumber),
         'radii must be numbers',
       ),
     (o) =>
       demand(
-        optional(o['spirals'], (spirals) => Array.isArray(spirals) && spirals.every(finite)),
+        optional(
+          o['spirals'],
+          (spirals) => Array.isArray(spirals) && spirals.every(isFiniteNumber),
+        ),
         'spirals must be numbers',
       ),
     (o) =>
@@ -128,13 +135,13 @@ const CHECKS: Readonly<Record<(typeof CIVIL_CATEGORIES)[number], readonly Check[
         ? validateHorizontal(
             o['points'] as Vec2[],
             o['radii'] as number[],
-            Array.isArray(o['spirals']) && (o['spirals'] as unknown[]).every(finite)
+            Array.isArray(o['spirals']) && (o['spirals'] as unknown[]).every(isFiniteNumber)
               ? (o['spirals'] as number[])
               : [],
           )
         : null,
-    (o) => demand(finite(o['startStation']), 'startStation must be a number'),
-    (o) => demand(positive(o['stationInterval']), 'stationInterval must be > 0'),
+    (o) => demand(isFiniteNumber(o['startStation']), 'startStation must be a number'),
+    (o) => demand(isPositiveNumber(o['stationInterval']), 'stationInterval must be > 0'),
     (o) =>
       demand(
         optional(o['surfaceId'], (id) => typeof id === 'string'),
@@ -146,16 +153,20 @@ const CHECKS: Readonly<Record<(typeof CIVIL_CATEGORIES)[number], readonly Check[
   ],
   manhole: [
     (o) => demand(isVecList([o['position']], 2, 1), 'position must be [x, y]'),
-    (o) => demand(finite(o['rimElevation']) && finite(o['invertElevation']), 'bad elevations'),
-    (o) => demand(positive(o['diameter']), 'diameter must be > 0'),
+    (o) =>
+      demand(
+        isFiniteNumber(o['rimElevation']) && isFiniteNumber(o['invertElevation']),
+        'bad elevations',
+      ),
+    (o) => demand(isPositiveNumber(o['diameter']), 'diameter must be > 0'),
     (o) =>
       demand(
         optional(
           o['catchment'],
           (catchment) =>
             isRecord(catchment) &&
-            positive(catchment['areaHa']) &&
-            finite(catchment['runoffCoefficient']) &&
+            isPositiveNumber(catchment['areaHa']) &&
+            isFiniteNumber(catchment['runoffCoefficient']) &&
             (catchment['runoffCoefficient'] as number) >= 0 &&
             (catchment['runoffCoefficient'] as number) <= 1,
         ),
@@ -163,20 +174,24 @@ const CHECKS: Readonly<Record<(typeof CIVIL_CATEGORIES)[number], readonly Check[
       ),
     (o) =>
       demand(
-        optional(o['inflow'], (inflow) => finite(inflow) && (inflow as number) >= 0),
+        optional(o['inflow'], (inflow) => isFiniteNumber(inflow) && (inflow as number) >= 0),
         'inflow must be >= 0',
       ),
     (o) =>
       demand(
-        optional(o['entryTimeMin'], (entry) => positive(entry)),
+        optional(o['entryTimeMin'], (entry) => isPositiveNumber(entry)),
         'entryTimeMin must be > 0',
       ),
   ],
   pipe: [
     (o) => demand(typeof o['fromId'] === 'string' && typeof o['toId'] === 'string', 'bad ends'),
     (o) => demand(typeof o['material'] === 'string', 'material must be a string'),
-    (o) => demand(positive(o['diameter']) && positive(o['manningN']), 'bad diameter / n'),
-    (o) => demand(finite(o['invertFrom']) && finite(o['invertTo']), 'bad inverts'),
+    (o) =>
+      demand(
+        isPositiveNumber(o['diameter']) && isPositiveNumber(o['manningN']),
+        'bad diameter / n',
+      ),
+    (o) => demand(isFiniteNumber(o['invertFrom']) && isFiniteNumber(o['invertTo']), 'bad inverts'),
   ],
 };
 
@@ -214,8 +229,8 @@ function crsErrors(raw: unknown): string[] {
     !(
       isRecord(calibration) &&
       isVecList([calibration['localOrigin'], calibration['gridOrigin']], 2, 2) &&
-      finite(calibration['rotationDeg']) &&
-      positive(calibration['scaleFactor'])
+      isFiniteNumber(calibration['rotationDeg']) &&
+      isPositiveNumber(calibration['scaleFactor'])
     )
   ) {
     errors.push('civil.crs.calibration needs 2 origins, rotationDeg and scaleFactor > 0');
@@ -231,7 +246,7 @@ export function civilErrors(raw: unknown): string[] {
   if (!isRecord(objects)) return ['civil.objects must be an object'];
   if (!isStringList(order)) return ['civil.order must be an array of ids'];
   const counters = raw['counters'];
-  if (!isRecord(counters) || !Object.values(counters).every(finite))
+  if (!isRecord(counters) || !Object.values(counters).every(isFiniteNumber))
     return ['civil.counters must map prefixes to numbers'];
   const errors: string[] = crsErrors(raw['crs']);
   const ids = order as string[];

@@ -35,6 +35,17 @@ export function elementsOf<C extends BimCategory>(
   );
 }
 
+/** Elements of one category placed on `levelId`, in `elementOrder`. */
+export function levelElementsOf<C extends BimCategory>(
+  building: BuildingModel,
+  category: C,
+  levelId: string,
+): Array<Extract<BuildingElement, { category: C }>> {
+  return elementsOf(building, category).filter(
+    (element) => 'levelId' in element && element.levelId === levelId,
+  );
+}
+
 /** Elements placed on `levelId` (grids, doors and windows carry no level of their own). */
 export function elementsOnLevel(building: BuildingModel, levelId: string): BuildingElement[] {
   return Object.values(building.elements).filter(

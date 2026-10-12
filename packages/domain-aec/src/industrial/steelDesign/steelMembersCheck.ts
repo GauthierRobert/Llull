@@ -5,7 +5,7 @@
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { isFiniteNumber, isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
 import { getBuilding } from '../../building/model';
 import { round } from '../../shared/numeric';
@@ -197,42 +197,37 @@ export const checkSteelMembers = defineCommand({
       (analysis.warnings.length === 0
         ? '.'
         : `; ${analysis.warnings.length} warning(s) in data.warnings.`);
-    return {
-      document: doc,
-      summary,
-      affected: [],
-      data: {
-        ok: failing.length === 0 && notAnalysed.length === 0,
-        members,
-        csv,
-        totals: {
-          members: members.length,
-          analysed: analysed.length,
-          notAnalysed: notAnalysed.length,
-          failing: failing.length,
-          maxUtilisation: worst?.utilisation ?? 0,
-          maxUtilisationMark: worst?.mark ?? null,
-          steelMassKg: round(steelMassKg, 1),
-        },
-        failures: failing.map((row) => row.id),
-        notAnalysed: notAnalysed.map((row) => row.id),
-        loads: {
-          floorDeadLoad,
-          imposedLoad,
-          pipeContentDensity,
-          cableTrayWeight,
-          notionalFactor,
-          deflectionRatio,
-          swayRatio,
-          floors: analysis.floors,
-          equipment: analysis.equipment,
-          lines: analysis.lines,
-          assumptions: ASSUMPTIONS,
-        },
-        storeys: analysis.storeys,
-        frames: analysis.frames,
-        warnings: analysis.warnings,
+    return report(doc, summary, {
+      ok: failing.length === 0 && notAnalysed.length === 0,
+      members,
+      csv,
+      totals: {
+        members: members.length,
+        analysed: analysed.length,
+        notAnalysed: notAnalysed.length,
+        failing: failing.length,
+        maxUtilisation: worst?.utilisation ?? 0,
+        maxUtilisationMark: worst?.mark ?? null,
+        steelMassKg: round(steelMassKg, 1),
       },
-    };
+      failures: failing.map((row) => row.id),
+      notAnalysed: notAnalysed.map((row) => row.id),
+      loads: {
+        floorDeadLoad,
+        imposedLoad,
+        pipeContentDensity,
+        cableTrayWeight,
+        notionalFactor,
+        deflectionRatio,
+        swayRatio,
+        floors: analysis.floors,
+        equipment: analysis.equipment,
+        lines: analysis.lines,
+        assumptions: ASSUMPTIONS,
+      },
+      storeys: analysis.storeys,
+      frames: analysis.frames,
+      warnings: analysis.warnings,
+    });
   },
 });

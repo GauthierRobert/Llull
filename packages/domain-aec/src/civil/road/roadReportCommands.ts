@@ -8,7 +8,7 @@ import type { CadDocument } from '@core/model/types';
 import type { AlignmentObject } from '@core/model/civil';
 import type { CommandResult } from '@core/commands/types';
 import { commandCatalog, defineCommand, z } from '@core/commands/schema';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { safeFileName } from '@lib/safeFileName';
 import { alignmentLength } from '../alignment/alignmentGeometry';
 import { civilObjectOrFailure, getCivil } from '../model';
@@ -33,10 +33,6 @@ function checkedAlignment(
   if (alignmentLength(alignment) <= 0)
     return `${command} failed: ${alignment.name} has no valid geometry.`;
   return { alignment, interval: step };
-}
-
-function readOnly(doc: CadDocument, summary: string, data: unknown): CommandResult {
-  return { document: doc, summary, affected: [], data };
 }
 
 /**
@@ -98,7 +94,7 @@ export const alignmentReport = defineCommand({
         ? ` Design speed ${checks.designSpeedKmh} km/h: all checks pass.`
         : ` Design speed ${checks.designSpeedKmh} km/h: ${checks.failures.length} failure(s): ${checks.failures.join(' ')}`
       : '';
-    return readOnly(
+    return report(
       doc,
       `${alignment.name} (${alignment.id}): ${rows.length} stations over ${totals.lengthM} m; ${earthworks}.${checkText}`,
       { rows, totals, csv: reportCsv(rows), ...(checks ? { checks } : {}) },
@@ -156,7 +152,7 @@ export const exportLongSection = defineCommand({
     if (text === null)
       return noop(doc, 'export_long_section failed: the profile has no stations on the alignment.');
     const fileName = `${safeFileName(alignment.name, alignment.id)}_long_section.svg`;
-    return readOnly(
+    return report(
       doc,
       `Long section of ${alignment.name}: ${fileName} (${text.length} bytes, VE x${exaggeration}).`,
       {
@@ -216,7 +212,7 @@ export const exportCrossSections = defineCommand({
       return noop(doc, 'export_cross_sections failed: no station lies on the design profile.');
     const fileName = `${safeFileName(alignment.name, alignment.id)}_cross_sections.svg`;
     const drawn = analysis.filter((entry) => entry.cross !== null).length;
-    return readOnly(doc, `Cross sections of ${alignment.name}: ${drawn} stations, ${fileName}.`, {
+    return report(doc, `Cross sections of ${alignment.name}: ${drawn} stations, ${fileName}.`, {
       text,
       fileName,
       stations: drawn,

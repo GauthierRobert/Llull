@@ -6,7 +6,7 @@
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { getBuilding } from '../model';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { isNonNegativeNumber } from '@lib/isFiniteNumber';
 import { priceTakeoff } from './costing';
 import { computeTakeoff } from './takeoffCompute';
@@ -37,24 +37,21 @@ export const quantityTakeoff = defineCommand({
       lines.map((line) => [line.key, line.description, line.quantity, UNIT_LABEL[line.unit]]),
     );
     if (lines.length === 0) {
-      return {
-        document: doc,
-        summary: 'Quantity takeoff: the building model is empty (add walls, slabs, columns…).',
-        affected: [],
-        data: { lines, csv },
-      };
+      return report(
+        doc,
+        'Quantity takeoff: the building model is empty (add walls, slabs, columns…).',
+        { lines, csv },
+      );
     }
     const highlights = lines
       .filter((line) => line.unit === 'm3' || line.unit === 'ea' || line.unit === 'kg')
       .map(
         (line) => `${line.description.split(' — ')[0]}: ${line.quantity} ${UNIT_LABEL[line.unit]}`,
       );
-    return {
-      document: doc,
-      summary: `Quantity takeoff (${lines.length} lines). ${highlights.join('; ')}.`,
-      affected: [],
-      data: { lines, csv },
-    };
+    return report(doc, `Quantity takeoff (${lines.length} lines). ${highlights.join('; ')}.`, {
+      lines,
+      csv,
+    });
   },
 });
 
@@ -76,12 +73,11 @@ export const buildingSchedule = defineCommand({
   params: z.object({ kind: z.enum(SCHEDULE_KINDS).describe('Which schedule to produce.') }),
   run: (doc, { kind }): CommandResult => {
     const schedule = buildSchedule(doc, kind);
-    return {
-      document: doc,
-      summary: `${kind[0]?.toUpperCase()}${kind.slice(1)} schedule: ${schedule.rows.length} row(s).`,
-      affected: [],
-      data: { ...schedule, csv: toCsv(schedule.columns, schedule.rows) },
-    };
+    return report(
+      doc,
+      `${kind[0]?.toUpperCase()}${kind.slice(1)} schedule: ${schedule.rows.length} row(s).`,
+      { ...schedule, csv: toCsv(schedule.columns, schedule.rows) },
+    );
   },
 });
 
@@ -191,13 +187,11 @@ export const estimateCost = defineCommand({
         ['TOTAL', '', '', '', '', priced.total],
       ],
     );
-    return {
-      document: doc,
-      summary:
-        `Estimate: ${priced.total.toFixed(2)} ${resolvedCurrency} over ${priced.lines.length - priced.unpriced.length} priced line(s)` +
+    return report(
+      doc,
+      `Estimate: ${priced.total.toFixed(2)} ${resolvedCurrency} over ${priced.lines.length - priced.unpriced.length} priced line(s)` +
         (priced.unpriced.length > 0 ? `; unpriced: ${priced.unpriced.join(', ')}.` : '.'),
-      affected: [],
-      data: { currency: resolvedCurrency, ...priced, csv },
-    };
+      { currency: resolvedCurrency, ...priced, csv },
+    );
   },
 });

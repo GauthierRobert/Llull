@@ -8,8 +8,8 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
 import { fromMm, toMetres } from '@core/model/units';
-import { elementAffected, elementsOf, getBuilding, resolveLevel } from '../../building/model';
-import { regenerateBuilding } from '../../building/evaluate/evaluateElements';
+import { elementsOf, getBuilding, resolveLevel } from '../../building/model';
+import { commitBuilding } from '../../building/evaluate/evaluateElements';
 import { findProfile } from '../../steel/profiles';
 import {
   appendMembers,
@@ -99,13 +99,13 @@ function placed(
 ): CommandResult {
   const added = appendMembers(prepared.building, prepared.levelId, specs);
   if ('reason' in added) return noop(doc, `${tool} failed: ${added.reason}.`);
-  const document = regenerateBuilding(doc, added.building);
-  return {
-    document,
-    summary: summarize(document, added.ids),
-    affected: elementAffected(document, added.ids),
-    data: { elementIds: added.ids, skipped },
-  };
+  return commitBuilding(
+    doc,
+    added.building,
+    added.ids,
+    (document) => summarize(document, added.ids),
+    { elementIds: added.ids, skipped },
+  );
 }
 
 const selected = (

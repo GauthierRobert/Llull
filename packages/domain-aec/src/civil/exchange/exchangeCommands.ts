@@ -5,7 +5,7 @@
 
 import type { CommandDefinition, CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { fileSlug, getBuilding } from '../../building/model';
 import { getCivil } from '../model';
 import { buildLandXml } from './landxml';
@@ -51,14 +51,12 @@ export const exportLandxml = defineCommand({
       ...(coordinates !== undefined ? { coordinates } : {}),
     });
     const fileName = `${fileSlug(project.name, 'site')}.xml`;
-    return {
-      document: doc,
-      summary:
-        `LandXML ${fileName}: ${counts.cgPoints} CgPoints, ${counts.surfaces} surface(s) with ` +
+    return report(
+      doc,
+      `LandXML ${fileName}: ${counts.cgPoints} CgPoints, ${counts.surfaces} surface(s) with ` +
         `${counts.faces} faces, ${counts.structures} structure(s), ${counts.pipes} pipe(s).`,
-      affected: [],
-      data: { text, fileName, counts },
-    };
+      { text, fileName, counts },
+    );
   },
 });
 
@@ -86,12 +84,11 @@ export const exportCivilDxf = defineCommand({
     if (result.entityCount === 0)
       return noop(doc, 'export_civil_dxf: nothing to export (no civil entities).');
     const fileName = `${fileSlug(getBuilding(doc).project.name, 'site')}_civil.dxf`;
-    return {
-      document: doc,
-      summary: `DXF ${fileName}: ${result.entityCount} entities on layers ${result.layers.join(', ')}.`,
-      affected: [],
-      data: { text: result.text, fileName, entityCount: result.entityCount, layers: result.layers },
-    };
+    return report(
+      doc,
+      `DXF ${fileName}: ${result.entityCount} entities on layers ${result.layers.join(', ')}.`,
+      { text: result.text, fileName, entityCount: result.entityCount, layers: result.layers },
+    );
   },
 });
 

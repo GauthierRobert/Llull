@@ -9,7 +9,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { fromMm, toMm } from '@core/model/units';
 import { getBuilding } from '../../building/model';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { dot3, scale3, sub3 } from '@lib/vec3';
 import { atLevel } from '../evaluate';
 import { type OrientedBox, boxOverlap, elementBoxes } from './clashBoxes';
@@ -228,14 +228,12 @@ export const checkClashes = defineCommand({
       return `${clash.kind} ${a?.mark ?? clash.a} × ${b?.mark ?? clash.b} (${formatDepthMm(toMm(doc, clash.depth))} mm)`;
     };
     const hard = clashes.filter((clash) => clash.kind === 'hard').length;
-    return {
-      document: doc,
-      summary:
-        clashes.length === 0
-          ? 'No clashes found.'
-          : `${hard} hard clash(es), ${clashes.length - hard} clearance violation(s): ${clashes.slice(0, 10).map(describe).join('; ')}${clashes.length > 10 ? '; …' : ''}.`,
-      affected: [],
-      data: { clashes },
-    };
+    return report(
+      doc,
+      clashes.length === 0
+        ? 'No clashes found.'
+        : `${hard} hard clash(es), ${clashes.length - hard} clearance violation(s): ${clashes.slice(0, 10).map(describe).join('; ')}${clashes.length > 10 ? '; …' : ''}.`,
+      { clashes },
+    );
   },
 });

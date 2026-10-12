@@ -17,6 +17,7 @@ import {
   nextMark,
   withElement,
   withoutElements,
+  levelElementsOf,
 } from '../../building/model';
 import { distance3 } from '@lib/vec3';
 import { findProfile } from '../../steel/profiles';
@@ -30,7 +31,7 @@ export function findMomentJoints(
   rafterIds: ReadonlySet<string> | null,
   tolerance: number,
 ): MomentJoint[] {
-  const members = elementsOf(building, 'member').filter((member) => member.levelId === levelId);
+  const members = levelElementsOf(building, 'member', levelId);
   const existing = elementsOf(building, 'connection');
   const connected = new Set(existing.map((element) => `${element.rafterId}:${element.end}`));
   const pairKey = (a: string, b: string): string => (a < b ? `${a}|${b}` : `${b}|${a}`);

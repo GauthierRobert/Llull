@@ -8,8 +8,8 @@ import type { CadDocument, Vec2 } from '@core/model/types';
 import type { PlatformObject } from '@core/model/civil';
 import type { CommandResult } from '@core/commands/types';
 import { commandCatalog, defineCommand, z, vec2 } from '@core/commands/schema';
-import { noop } from '@core/commands/noop';
-import { isValidPolygon, segmentsIntersect, signedArea } from '@lib/polygon';
+import { noop, report } from '@core/commands/noop';
+import { isValidPolygon, segmentsIntersect, toCounterClockwise } from '@lib/polygon';
 import {
   civilObjectOrFailure,
   civilObject,
@@ -78,13 +78,8 @@ function platformProblem(platform: PlatformObject, tin: Tin): string | null {
   return null;
 }
 
-const counterClockwise = (points: ReadonlyArray<Vec2>): Vec2[] => {
-  const copy = points.map((point): Vec2 => [point[0], point[1]]);
-  return signedArea(copy) < 0 ? copy.reverse() : copy;
-};
-
 /** Volumes in m³ / areas in m² / depths in m. Net = cut - fill (positive = surplus to export). */
-function report(doc: CadDocument, works: Earthworks): Record<string, number> {
+function worksData(doc: CadDocument, works: Earthworks): Record<string, number> {
   const k = toMetres(doc, 1);
   return {
     cutM3: round(works.cutVolume * k ** 3),
@@ -157,14 +152,14 @@ export const addPlatform = defineCommand({
       name: params.name?.trim() || `Platform ${civilObjectsOf(civil, 'platform').length + 1}`,
       entityIds: [],
       surfaceId: surface.id,
-      boundary: counterClockwise(params.boundary),
+      boundary: toCounterClockwise(params.boundary),
       elevation: params.elevation,
       cutSlope: params.cutSlope ?? DEFAULT_CUT_SLOPE,
       fillSlope: params.fillSlope ?? DEFAULT_FILL_SLOPE,
     };
     const problem = platformProblem(platform, tin);
     if (problem) return noop(doc, `add_platform failed: ${problem}`);
-    const data = report(doc, worksOf(platform, tin));
+    const data = worksData(doc, worksOf(platform, tin));
     return commitCivil(
       doc,
       withObject(civil, platform),
@@ -210,7 +205,7 @@ export const updatePlatform = defineCommand({
     const updated: PlatformObject = {
       ...platform,
       name: params.name?.trim() || platform.name,
-      boundary: params.boundary ? counterClockwise(params.boundary) : platform.boundary,
+      boundary: params.boundary ? toCounterClockwise(params.boundary) : platform.boundary,
       elevation: params.elevation ?? platform.elevation,
       cutSlope: params.cutSlope ?? platform.cutSlope,
       fillSlope: params.fillSlope ?? platform.fillSlope,
@@ -219,7 +214,7 @@ export const updatePlatform = defineCommand({
       return noop(doc, `update_platform: nothing to change on ${platform.id}.`);
     const problem = platformProblem(updated, tin);
     if (problem) return noop(doc, `update_platform failed: ${problem}`);
-    const data = report(doc, worksOf(updated, tin));
+    const data = worksData(doc, worksOf(updated, tin));
     return commitCivil(
       doc,
       withObject(civil, updated),
@@ -265,7 +260,7 @@ export const platformEarthworks = defineCommand({
     }
     if (gridSpacing !== undefined && !(gridSpacing > 0))
       return noop(doc, 'platform_earthworks failed: gridSpacing must be > 0.');
-    const data = report(doc, worksOf(platform, tin, gridSpacing));
+    const data = worksData(doc, worksOf(platform, tin, gridSpacing));
     const daylight = daylightPoints(
       tin,
       platform.boundary,
@@ -273,21 +268,19 @@ export const platformEarthworks = defineCommand({
       platform.cutSlope,
       platform.fillSlope,
     );
-    return {
-      document: doc,
-      summary:
-        `${platform.name} (${platform.id}) at ${toMetresText(doc, platform.elevation)} m: ` +
+    return report(
+      doc,
+      `${platform.name} (${platform.id}) at ${toMetresText(doc, platform.elevation)} m: ` +
         `${volumeText(data)}; cut area ${data['cutAreaM2']} m², fill area ${data['fillAreaM2']} m², ` +
         `max cut ${data['maxCutDepthM']} m, max fill ${data['maxFillDepthM']} m; ` +
         `grid ${data['gridSpacingM']} m.`,
-      affected: [],
-      data: {
+      {
         platformId,
         ...data,
         daylight: daylight.map((point) => point.daylight),
         daylightClipped: daylight.filter((point) => point.clipped).length,
       },
-    };
+    );
   },
 });
 
@@ -388,7 +381,7 @@ export const balancePlatform = defineCommand({
       platform.cutSlope,
       platform.fillSlope,
     );
-    const data = report(doc, works);
+    const data = worksData(doc, works);
     const residual = round(
       (works.cutVolume * swellFactor - works.fillVolume) * toMetres(doc, 1) ** 3,
     );
@@ -458,17 +451,15 @@ export const compareSurfaces = defineCommand({
       samples: result.samples,
       samplesOutsideTin: result.outsideTin,
     };
-    return {
-      document: doc,
-      summary:
-        `${comparisonSurfaceId} vs ${baseSurfaceId}: cut ${data.cutM3} m³, fill ${data.fillM3} m³, ` +
+    return report(
+      doc,
+      `${comparisonSurfaceId} vs ${baseSurfaceId}: cut ${data.cutM3} m³, fill ${data.fillM3} m³, ` +
         `net ${data.netM3} m³ (cut - fill) over ${data.areaM2} m²; grid ${data.gridSpacingM} m` +
         (data.samplesOutsideTin > 0
           ? `; ${data.samplesOutsideTin} sample(s) outside a TIN skipped.`
           : '.'),
-      affected: [],
       data,
-    };
+    );
   },
 });
 

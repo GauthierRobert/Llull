@@ -112,6 +112,11 @@ export function formatStation(metres: number): string {
   return `${sign}${kilometres}+${rest.toFixed(2).padStart(6, '0')}`;
 }
 
+/** Station label of a document-unit station: `formatStation(toMetres(doc, station))`. */
+export function stationText(doc: Pick<CadDocument, 'units'>, station: number): string {
+  return formatStation(toMetres(doc, station));
+}
+
 /** Converts a length given in `unit` into the document's units. */
 export function fromUnit(
   doc: Pick<CadDocument, 'units'>,

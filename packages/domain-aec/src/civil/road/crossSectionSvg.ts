@@ -10,7 +10,7 @@ import type { AlignmentObject, CivilModel } from '@core/model/civil';
 import { groundAtOffset, sectionOffsets } from './roadSection';
 import { surfaceTinById } from '../surface/surfaceTin';
 import type { StationAnalysis } from './roadReport';
-import { formatStation } from '../model';
+import { stationText } from '../model';
 import { svgDocument, svgLine, svgPolygon, svgPolyline, svgRect, svgText } from './roadSvg';
 import { toMetres } from '@core/model/units';
 
@@ -64,12 +64,10 @@ export function crossSectionSvg(
     const py = (z: number): number => baseY - (z * metre - designM) * scale;
     body.push(svgRect(left, top, PANEL_WIDTH, PANEL_HEIGHT, '#bbb'));
     body.push(
-      svgText(
-        left + 6,
-        top + 14,
-        `${formatStation(toMetres(doc, cross.station))}  CL ${designM.toFixed(2)}`,
-        { size: 10, weight: 'bold' },
-      ),
+      svgText(left + 6, top + 14, `${stationText(doc, cross.station)}  CL ${designM.toFixed(2)}`, {
+        size: 10,
+        weight: 'bold',
+      }),
     );
     body.push(svgLine([centreX, top + 22], [centreX, top + PANEL_HEIGHT - 28], '#ddd', 1, '4,3'));
     const designLine = cross.design.map((node): Pair => [px(node.offset), py(node.z)]);

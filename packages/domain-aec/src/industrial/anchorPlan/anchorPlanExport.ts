@@ -7,7 +7,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { toMetres } from '@core/model/units';
 import { elementsOf, existingLevelId, fileSlug, getBuilding } from '../../building/model';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { distance } from '@lib/polygon';
 import {
   MARGIN,
@@ -326,15 +326,13 @@ export const exportAnchorPlan = defineCommand({
     const filename = `${fileSlug(building.project.name, 'project')}_${fileSlug(level.name, 'level')}_anchor-plan_${sheetPaper}_1-${sheetScale}.svg`;
     const fits =
       (maxX - minX) / sheetScale <= viewport.width && (maxY - minY) / sheetScale <= viewport.height;
-    return {
-      document: doc,
-      summary:
-        `Anchor plan ${filename}: ${plates.length} base plate(s), ${boltCount} anchor bolt(s), ${vertical.length + horizontal.length} grid line(s) at 1:${sheetScale} on ${sheetPaper}, embedment ${mmText(embedmentMm)} mm.` +
+    return report(
+      doc,
+      `Anchor plan ${filename}: ${plates.length} base plate(s), ${boltCount} anchor bolt(s), ${vertical.length + horizontal.length} grid line(s) at 1:${sheetScale} on ${sheetPaper}, embedment ${mmText(embedmentMm)} mm.` +
         (fits
           ? ''
           : ' WARNING: the plan is larger than the paper at this scale; omit scale to auto-fit or choose a larger paper.'),
-      affected: [],
-      data: {
+      {
         svg: `${svg}\n`,
         filename,
         boltCount,
@@ -344,6 +342,6 @@ export const exportAnchorPlan = defineCommand({
         levelId: level.id,
         fits,
       },
-    };
+    );
   },
 });

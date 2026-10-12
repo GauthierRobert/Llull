@@ -104,6 +104,35 @@ export function sectionResistance(
 export const eulerForce = (inertia: number, length: number): number =>
   (Math.PI ** 2 * E_STEEL * inertia) / length ** 2;
 
+/** One storey of a sway frame for the Horne αcr estimate. */
+export interface StoreyDrift {
+  readonly id: string;
+  /** Storey height, mm. */
+  readonly height: number;
+  /** Relative horizontal drift under HORNE_FACTOR-scaled loads (H/200), mm. */
+  readonly drift: number;
+  /** Largest column compression in the storey, N or kN (only its sign is used). */
+  readonly compression: number;
+}
+
+/** Horne αcr = min over compressed storeys of h / (200 δ); Infinity (id null) when none sways. */
+export function horneAlphaCritical(storeys: ReadonlyArray<StoreyDrift>): {
+  alpha: number;
+  id: string | null;
+} {
+  let alpha = Infinity;
+  let id: string | null = null;
+  for (const storey of storeys) {
+    if (!(storey.compression > 0 && storey.drift > 0)) continue;
+    const candidate = storey.height / (200 * storey.drift);
+    if (candidate < alpha) {
+      alpha = candidate;
+      id = storey.id;
+    }
+  }
+  return { alpha, id };
+}
+
 /** Flexural buckling reduction χ (EN 1993-1-1 §6.3.1.2) for a non-dimensional slenderness. */
 export function bucklingReduction(slenderness: number, imperfection: number): number {
   if (slenderness <= 0.2) return 1;

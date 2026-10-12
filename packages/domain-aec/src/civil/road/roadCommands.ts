@@ -15,7 +15,7 @@ import {
   civilObjectOrFailure,
   civilObject,
   civilObjectsOf,
-  formatStation,
+  stationText,
   fromMetres,
   getCivil,
   nextCivilId,
@@ -116,7 +116,7 @@ export const addAlignment = defineCommand({
       `Created alignment ${alignment.name} (${id}): ${params.points.length} PIs, ` +
         `${radii.filter((radius) => radius > 0).length} curve(s)` +
         `${spirals.some((length) => length > 0) ? ` (${spirals.filter((length) => length > 0).length} with spirals)` : ''}, length ${lengthM.toFixed(2)} m, ` +
-        `stations ${formatStation(toMetres(doc, startStation))} to ${formatStation(toMetres(doc, endStation(alignment)))}.`,
+        `stations ${stationText(doc, startStation)} to ${stationText(doc, endStation(alignment))}.`,
       { alignmentId: id, lengthM: Number(lengthM.toFixed(3)) },
     );
   },
@@ -218,7 +218,7 @@ function gradeSummary(doc: CadDocument, profile: ReadonlyArray<ProfilePvi>): str
   const curves = verticalCurves(profile)
     .map(
       (c) =>
-        `${c.kind} PVI ${formatStation(toMetres(doc, c.pviStation))} L=${toMetres(doc, c.length).toFixed(1)} m K=${c.k.toFixed(1)}`,
+        `${c.kind} PVI ${stationText(doc, c.pviStation)} L=${toMetres(doc, c.length).toFixed(1)} m K=${c.k.toFixed(1)}`,
     )
     .join('; ');
   return `Grades: ${gradeText}.${curves ? ` Vertical curves: ${curves}.` : ' No vertical curves.'}`;

@@ -6,8 +6,8 @@ import type { BuildingModel, SteelMemberElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import type { FrameNode } from '@lib/frame2d';
 import { toMm } from '@core/model/units';
-import { elementsOf } from '../../building/model';
-import { GRAVITY } from '../../shared/numeric';
+import { levelElementsOf } from '../../building/model';
+import { weightKnPerMetre } from '../../shared/numeric';
 import { findProfile, sectionProperties } from '../../steel/profiles';
 import { E_STEEL } from '../steelDesign/steelDesign';
 
@@ -38,7 +38,7 @@ export function framesOf(
 ): { frames: FrameModel[]; skipped: string[] } {
   const mm = (value: number): number => toMm(doc, value);
   const tolerance = 10;
-  const members = elementsOf(building, 'member').filter((member) => member.levelId === levelId);
+  const members = levelElementsOf(building, 'member', levelId);
   const rafters = members.filter(
     (member) =>
       member.role === 'rafter' && Math.abs(mm(member.start[1] - member.end[1])) < tolerance,
@@ -60,7 +60,7 @@ export function framesOf(
       .filter((member) => member.role === 'purlin' && spansY(member, y))
       .map((member) => mm(member.start[0]));
   const selfWeight = (profileName: string): number =>
-    ((findProfile(profileName)?.massPerMetre ?? 0) * GRAVITY) / 1000;
+    weightKnPerMetre(findProfile(profileName)?.massPerMetre ?? 0);
   const area = (kNPerSquareMetre: number): number => kNPerSquareMetre * 1e-3;
   const skipped: string[] = [];
   const frames = candidates.flatMap((candidate): FrameModel[] => {

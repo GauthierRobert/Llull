@@ -7,7 +7,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { toMm } from '@core/model/units';
 import { existingLevelId, getBuilding } from '../../building/model';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
 import { craneCapacityOf, type CraneModel } from '../frames/frameModelTypes';
 import {
@@ -249,23 +249,21 @@ export const runwayCheck = defineCommand({
         `check_crane_runways failed: no crane runway beam with a known capacity on level '${levelId}' (add_crane_runway first, or pass craneCapacity).`,
       );
     }
-    return {
-      document: doc,
-      summary:
-        `Checked ${beams} crane runway beam(s), ${rows.length} check(s) (${[...capacities].join('/')} t, class ${craneClass}, wheelBase ${wheelBase} mm): ` +
+    return report(
+      doc,
+      `Checked ${beams} crane runway beam(s), ${rows.length} check(s) (${[...capacities].join('/')} t, class ${craneClass}, wheelBase ${wheelBase} mm): ` +
         `max utilisation ${round(worst.utilisation)} (${worst.mark} ${worst.kind}: ${worst.check}); ` +
         failureSummary(
           failures,
           (row) => `${row.mark} ${row.kind}`,
           'all OK (preliminary, simply supported spans).',
         ),
-      affected: [],
-      data: {
+      {
         rows,
         csv,
         maxUtilisation: worst.utilisation,
         failures: [...new Set(failures.map((row) => row.elementId))],
       },
-    };
+    );
   },
 });

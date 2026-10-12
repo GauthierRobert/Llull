@@ -5,7 +5,7 @@
 
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { toMetres } from '@core/model/units';
 import { civilAffected, civilObjectsOf, getCivil } from '../model';
 import { regenerateCivil } from '../evaluate';
@@ -207,18 +207,16 @@ export const checkDrainageNetwork = defineCommand({
       diverging.length > 0
         ? ` Diverging at ${diverging.join(', ')}: flow split by full-bore capacity share.`
         : '';
-    return {
-      document: doc,
-      summary:
-        `Drainage check at ${rainfallText(criteria)}: ${pipes.length} pipes ` +
+    return report(
+      doc,
+      `Drainage check at ${rainfallText(criteria)}: ${pipes.length} pipes ` +
         `(${pipes.filter((r) => r.status === 'pass').length} pass), ${manholes.length} manholes; ` +
         `Tc ${Math.min(...tcs)}-${Math.max(...tcs)} min; HGL: ${surcharged} surcharged pipe(s), ` +
         `${flooded} flooding manhole(s). ` +
         (failures.length === 0 ? 'No failures.' : `${failures.length} failure(s): ${worst}`) +
         split,
-      affected: [],
-      data: { pipes, manholes, failures, diverging, csv },
-    };
+      { pipes, manholes, failures, diverging, csv },
+    );
   },
 });
 
@@ -280,12 +278,11 @@ export const drainageSchedule = defineCommand({
         metres(p.invertTo),
       ]),
     );
-    return {
-      document: doc,
-      summary: `Drainage schedule: ${manholes.length} manholes, ${pipes.length} pipes.`,
-      affected: [],
-      data: { manholeCsv, pipeCsv, csv: `${manholeCsv}\n\n${pipeCsv}` },
-    };
+    return report(doc, `Drainage schedule: ${manholes.length} manholes, ${pipes.length} pipes.`, {
+      manholeCsv,
+      pipeCsv,
+      csv: `${manholeCsv}\n\n${pipeCsv}`,
+    });
   },
 });
 

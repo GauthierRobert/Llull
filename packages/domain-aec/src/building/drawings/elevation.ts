@@ -8,7 +8,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { toMetres, toMm } from '@core/model/units';
 import { elementsOf, fileSlug, getBuilding } from '../model';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { escapeXml } from '@lib/escapeXml';
 import { sub2 } from '@lib/vec2';
 import {
@@ -227,11 +227,10 @@ export const exportElevationSheet = defineCommand({
         'export_elevation_sheet failed: no 3D geometry to draw (on that side of the cut) or invalid scale.',
       );
     }
-    return {
-      document: doc,
-      summary: `Elevation sheet ${sheet.filename}: ${sheet.faces} visible face(s) at 1:${sheet.scale} on ${sheet.paper}.${sheet.fits ? '' : ' WARNING: the view is larger than the paper at this scale; omit scale to auto-fit or choose a larger paper.'}`,
-      affected: [],
-      data: sheet,
-    };
+    return report(
+      doc,
+      `Elevation sheet ${sheet.filename}: ${sheet.faces} visible face(s) at 1:${sheet.scale} on ${sheet.paper}.${sheet.fits ? '' : ' WARNING: the view is larger than the paper at this scale; omit scale to auto-fit or choose a larger paper.'}`,
+      sheet,
+    );
   },
 });

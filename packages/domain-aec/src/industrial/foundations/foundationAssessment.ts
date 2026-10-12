@@ -5,7 +5,7 @@
  */
 
 import type { CadDocument } from '@core/model/types';
-import { getBuilding } from '../../building/model';
+import { getBuilding, levelElementsOf } from '../../building/model';
 import type { FrameLoads } from '../frames/frameModelTypes';
 import { baseReactions } from '../frames/frameModelSolve';
 import {
@@ -122,11 +122,8 @@ export function checkFoundations(
     }
   }
   rows.push(...differentialRows(doc, settlements));
-  const unchecked = Object.values(building.elements).filter(
-    (element) =>
-      element.category === 'footing' &&
-      element.levelId === levelId &&
-      !checkedFootings.has(element.id),
+  const unchecked = levelElementsOf(building, 'footing', levelId).filter(
+    (element) => !checkedFootings.has(element.id),
   ).length;
   return { rows, footings, plates, unchecked };
 }

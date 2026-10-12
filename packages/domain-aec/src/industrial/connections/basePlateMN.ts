@@ -8,11 +8,11 @@
 import { anchorBoltResistance } from '../steelDesign/steelDesign';
 import { FCD } from '../foundations/footingModel';
 import { MAX_UTILISATION } from '../foundations/foundationModel';
+import { bisect } from '@lib/bisect';
 
 const CONCENTRATION_FACTOR = 1.5;
 /** Concrete bearing strength fjd = 2/3 × 1.5 × fcd (C25/30), N/mm². */
 export const BEARING_STRENGTH = (2 / 3) * FCD * CONCENTRATION_FACTOR;
-const BISECTION_STEPS = 60;
 const MIN_TENSION_LEVER = 20;
 
 /** Plate and column sizes in mm. */
@@ -87,17 +87,7 @@ export function checkPlateMN(
     tension = lever > 0 ? (-axial + bending / lever) / 2 : Number.POSITIVE_INFINITY;
     tension = Math.max(tension, 0);
   } else {
-    let [low, high] = [0, maxBlock];
-    if (gap(high) < 0) {
-      block = maxBlock;
-    } else {
-      for (let step = 0; step < BISECTION_STEPS; step++) {
-        const middle = (low + high) / 2;
-        if (gap(middle) < 0) low = middle;
-        else high = middle;
-      }
-      block = high;
-    }
+    block = gap(maxBlock) < 0 ? maxBlock : bisect((width) => gap(width) < 0, 0, maxBlock).high;
     tension = tensionOf(block);
     bearing = (axial + tension) / (bearingForce * maxBlock);
   }

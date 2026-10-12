@@ -22,7 +22,6 @@ import {
   GAMMA_M0,
   GAMMA_MF,
   GAMMA_TEST,
-  GAMMA_ULS,
   type GirderType,
   LOCAL_CATEGORIES,
   LOCAL_LAMBDA_FACTOR,
@@ -37,7 +36,8 @@ import {
   wheelMoment,
   wheelShear,
 } from './runwayCheckModel';
-import { GRAVITY, round } from '../../shared/numeric';
+import { round, weightKnPerMetre } from '../../shared/numeric';
+import { GAMMA_CRANE } from '../../shared/loadFactors';
 
 export function checkBeam(
   beam: SteelMemberElement,
@@ -66,7 +66,7 @@ export function checkBeam(
       actions.group5.skewMax,
       actions.group5.skewMin,
     ) / 2;
-  const longitudinal = GAMMA_ULS * actions.group1.longitudinal;
+  const longitudinal = GAMMA_CRANE * actions.group1.longitudinal;
   const isI = profile.shape === 'I';
   const row = (
     kind: RunwayCheckRow['kind'],
@@ -88,10 +88,10 @@ export function checkBeam(
   });
 
   const rail = RAILS[railSize];
-  const distributed = (((profile.massPerMetre + rail.mass) * GRAVITY) / 1000) * GAMMA_ULS;
-  const momentY = GAMMA_ULS * wheelMoment(wheel, wheelBase, span) + (distributed * span ** 2) / 8;
-  const shear = GAMMA_ULS * wheelShear(wheel, wheelBase, span) + (distributed * span) / 2;
-  const momentZ = GAMMA_ULS * wheelMoment(lateralWheel, wheelBase, span);
+  const distributed = weightKnPerMetre(profile.massPerMetre + rail.mass) * GAMMA_CRANE;
+  const momentY = GAMMA_CRANE * wheelMoment(wheel, wheelBase, span) + (distributed * span ** 2) / 8;
+  const shear = GAMMA_CRANE * wheelShear(wheel, wheelBase, span) + (distributed * span) / 2;
+  const momentZ = GAMMA_CRANE * wheelMoment(lateralWheel, wheelBase, span);
   const flangeResistanceZ = isI
     ? (profile.tf * profile.b ** 2 * fy) / 4
     : (section.minorInertia / (profile.b / 2) / 2) * fy;
@@ -116,7 +116,7 @@ export function checkBeam(
   const flangeInertia = (effectiveWidth * profile.tf ** 3) / 12;
   const railFlangeInertia = RAIL_WEAR_INERTIA_FACTOR * rail.inertia + flangeInertia;
   const loadedLength = 3.25 * (railFlangeInertia / profile.tw) ** (1 / 3);
-  const localStress = (GAMMA_ULS * wheel) / (loadedLength * profile.tw);
+  const localStress = (GAMMA_CRANE * wheel) / (loadedLength * profile.tw);
   const localRange = (characteristic * FATIGUE_PHI) / (loadedLength * profile.tw);
   const localLambda = CLASSES[craneClass] * LOCAL_LAMBDA_FACTOR;
   const localCategory = LOCAL_CATEGORIES[girder];
@@ -139,7 +139,7 @@ export function checkBeam(
     0.4 * actions.selfWeight +
     (0.2 * actions.selfWeight + testFactor * hoistLoad) *
       ((craneSpan - actions.approach) / craneSpan);
-  const testDistributed = (((profile.massPerMetre + rail.mass) * GRAVITY) / 1000) * GAMMA_TEST;
+  const testDistributed = weightKnPerMetre(profile.massPerMetre + rail.mass) * GAMMA_TEST;
   const testMoment =
     GAMMA_TEST * wheelMoment(testRail / 2, wheelBase, span) + (testDistributed * span ** 2) / 8;
 

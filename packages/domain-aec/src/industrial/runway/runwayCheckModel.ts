@@ -33,8 +33,6 @@ export interface RunwayCheckRow {
   readonly utilisation: number;
 }
 
-export const GAMMA_ULS = 1.35;
-
 /** Bridge span (mm) when no paired runway beam is found and craneSpan is not given. */
 export const DEFAULT_CRANE_SPAN = 20000;
 

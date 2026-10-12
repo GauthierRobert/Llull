@@ -14,6 +14,7 @@ import type { SteelBar } from './steelMemberBars';
 import {
   analysedRow,
   beamSection,
+  metres,
   ULS_COMBINATION,
   type CheckLine,
   type MemberRow,
@@ -40,7 +41,7 @@ export function checkBeam(
   if ('skipped' in gate) return gate.skipped;
   const { profile, resistance } = gate;
   const lengthMm = bar.length;
-  const lengthText = `L ${(lengthMm / 1000).toFixed(2)} m`;
+  const lengthText = `L ${metres(lengthMm)} m`;
   const loads = result.loads;
   const restrained = loads.floorSupport || loads.lineSupport;
   const restraint = loads.floorSupport

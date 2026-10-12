@@ -18,10 +18,10 @@ import {
   elementsOf,
   resolveLevel,
   withElement,
-  elementAffected,
   followLevelHeight,
   withDependents,
   withoutElements,
+  levelElementsOf,
 } from '../model';
 import { noop } from '@core/commands/noop';
 import { duplicateSummary, findTwin, sameRing } from '../../shared/duplicates';
@@ -79,9 +79,7 @@ export const addRoom = defineCommand({
     const resolution = resolveLevel(doc, building, levelId ?? wallLevelId);
     if (!resolution.ok) return noop(doc, `add_room failed: ${resolution.reason}.`);
     const levelIndex = resolution.building.levelOrder.indexOf(resolution.level.id);
-    const roomsOnLevel = Object.values(resolution.building.elements).filter(
-      (element) => element.category === 'room' && element.levelId === resolution.level.id,
-    ).length;
+    const roomsOnLevel = levelElementsOf(resolution.building, 'room', resolution.level.id).length;
     const roomTwin = findTwin(resolution.building, 'room', resolution.level.id, (element) =>
       sameRing(element.boundary, outline),
     );
@@ -270,16 +268,13 @@ export const moveBuildingElement = defineCommand({
     const issues = openingFitIssues(next, movedLevels);
     if (issues.length > 0) return noop(doc, `move_building_element refused: ${issues[0]}.`);
     const supports = reconcilePipeSupports(doc, next);
-    const document = regenerateBuilding(doc, supports.building);
     const moved = withDependents(building, known);
-    return {
-      document,
-      summary: `Moved ${known.length} element(s) by [${delta[0]}, ${delta[1]}]: ${known.join(', ')}.${ignoredNote(ignored)}${reconciliationNote(supports)}`,
-      affected: elementAffected(document, [
-        ...moved,
-        ...[...supports.reattached, ...supports.detached].map((change) => change.id),
-      ]),
-    };
+    return commitBuilding(
+      doc,
+      supports.building,
+      [...moved, ...[...supports.reattached, ...supports.detached].map((change) => change.id)],
+      `Moved ${known.length} element(s) by [${delta[0]}, ${delta[1]}]: ${known.join(', ')}.${ignoredNote(ignored)}${reconciliationNote(supports)}`,
+    );
   },
 });
 

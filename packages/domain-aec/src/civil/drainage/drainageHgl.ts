@@ -10,12 +10,12 @@ import type { CadDocument } from '@core/model/types';
 import type { CivilModel, PipeObject } from '@core/model/civil';
 import { toMetres } from '@core/model/units';
 import { civilObjectsOf } from '../model';
+import { GRAVITY } from '../../shared/numeric';
 import { fullArea, solvePartialFlow } from './hydraulics';
 import type { DrainageCriteria } from './drainageCriteria';
 import type { FlowResult } from './drainageFlow';
 import { manholesUpstreamFirst, pipePlanLength, pipeSlope } from './drainageTopology';
 
-const GRAVITY = 9.80665;
 const LEVEL_TOLERANCE_M = 1e-6;
 
 export interface PipeHgl {

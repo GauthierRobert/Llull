@@ -11,6 +11,8 @@ import type { AlignmentObject, RoadSection } from '@core/model/civil';
 import { elevationAt, type Tin } from '../surface/tin';
 import { pointAtStation } from '../alignment/alignmentGeometry';
 import { crossSlopesAt, type CrossSlopes } from '../alignment/superelevation';
+import { bisect } from '@lib/bisect';
+import { batterLevel } from '../earthworks/batter';
 
 export interface SectionNode {
   readonly offset: number;
@@ -78,7 +80,7 @@ function findDaylight(
   if (ground0 === null) return null;
   const fill = ground0 < edgeZ;
   const batter = (d: number): number =>
-    fill ? edgeZ - d / rule.section.fillSlope : edgeZ + d / rule.section.cutSlope;
+    batterLevel(edgeZ, d, fill ? 'fill' : 'cut', rule.section.cutSlope, rule.section.fillSlope);
   const gap = (d: number): number | null => {
     const g = ground(d);
     return g === null ? null : fill ? g - batter(d) : batter(d) - g;
@@ -89,14 +91,7 @@ function findDaylight(
     const value = gap(d);
     if (value === null) return null;
     if (value >= 0) {
-      let low = previous;
-      let high = d;
-      for (let k = 0; k < 30; k++) {
-        const mid = (low + high) / 2;
-        if ((gap(mid) ?? 1) >= 0) high = mid;
-        else low = mid;
-      }
-      return high;
+      return bisect((mid) => (gap(mid) ?? 1) < 0, previous, d, 30).high;
     }
     previous = d;
   }

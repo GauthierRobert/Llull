@@ -5,7 +5,7 @@
 
 import type { CommandDefinition, CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { safeFileName } from '@lib/safeFileName';
 import { fileSlug, getBuilding } from '../../building/model';
 import { PAPER_SIZES } from '../../shared/sheetFrame';
@@ -54,13 +54,11 @@ export const exportCivilPlanSheet = defineCommand({
       );
     }
     const fileName = `${fileSlug(getBuilding(doc).project.name, 'site')}_civil_plan_${paper}_1-${sheet.scale}.svg`;
-    return {
-      document: doc,
-      summary:
-        `Civil plan sheet ${fileName}: ${sheet.drawn} entities drawn (${sheet.clipped} outside the viewport) ` +
+    return report(
+      doc,
+      `Civil plan sheet ${fileName}: ${sheet.drawn} entities drawn (${sheet.clipped} outside the viewport) ` +
         `at 1:${sheet.scale} on ${paper}, ${sheet.layers.length} layer(s).`,
-      affected: [],
-      data: {
+      {
         text: sheet.text,
         fileName,
         paper,
@@ -70,7 +68,7 @@ export const exportCivilPlanSheet = defineCommand({
         layers: sheet.layers,
         clipped: sheet.clipped,
       },
-    };
+    );
   },
 });
 
@@ -113,16 +111,14 @@ export const exportPlanProfileSheet = defineCommand({
     const sheet = buildPlanProfileSheet(doc, alignment, { paper, scale, verticalExaggeration });
     if (typeof sheet === 'string') return noop(doc, `export_plan_profile_sheet failed: ${sheet}`);
     const fileName = `${safeFileName(alignment.name, alignment.id)}_plan_profile_${paper}_1-${sheet.scale}.svg`;
-    return {
-      document: doc,
-      summary:
-        `Plan-profile sheet ${fileName}: ${alignment.name} at H 1:${sheet.scale}, VE x${verticalExaggeration} on ${paper}.` +
+    return report(
+      doc,
+      `Plan-profile sheet ${fileName}: ${alignment.name} at H 1:${sheet.scale}, VE x${verticalExaggeration} on ${paper}.` +
         (sheet.fits
           ? ''
           : ' WARNING: the long section is larger than the paper; use a larger paper, a smaller scale or lower verticalExaggeration.'),
-      affected: [],
-      data: { text: sheet.text, fileName, paper, scale: sheet.scale, fits: sheet.fits },
-    };
+      { text: sheet.text, fileName, paper, scale: sheet.scale, fits: sheet.fits },
+    );
   },
 });
 

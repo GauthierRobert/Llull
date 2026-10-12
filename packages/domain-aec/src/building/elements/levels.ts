@@ -18,7 +18,7 @@ import {
   withLevel,
   withoutElements,
 } from '../model';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { regenerateBuilding } from '../evaluate/evaluateElements';
 import { openingFitIssues } from './walls';
 
@@ -303,11 +303,10 @@ export const describeBuilding = defineCommand({
     const countText =
       [...counts.entries()].map(([category, count]) => `${count} ${category}`).join(', ') ||
       'no elements';
-    return {
-      document: doc,
-      summary: `Building "${building.project.name}": ${levels.length} level(s), ${countText}.`,
-      affected: [],
-      data: { project: building.project, units: doc.units, levels, elements },
-    };
+    return report(
+      doc,
+      `Building "${building.project.name}": ${levels.length} level(s), ${countText}.`,
+      { project: building.project, units: doc.units, levels, elements },
+    );
   },
 });

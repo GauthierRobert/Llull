@@ -140,12 +140,13 @@ export function commitBuilding(
   doc: CadDocument,
   model: BuildingModel,
   elementIds: ReadonlyArray<string>,
-  summary: string,
+  summary: string | ((document: CadDocument) => string),
   data?: Record<string, unknown>,
 ): CommandResult {
   const document = regenerateBuilding(doc, model);
+  const text = typeof summary === 'function' ? summary(document) : summary;
   const affected = elementAffected(document, elementIds);
   return data === undefined
-    ? { document, summary, affected }
-    : { document, summary, affected, data };
+    ? { document, summary: text, affected }
+    : { document, summary: text, affected, data };
 }

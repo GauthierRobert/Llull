@@ -6,7 +6,7 @@ import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { existingLevelId, getBuilding } from '../../building/model';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { isNonNegativeNumber } from '@lib/isFiniteNumber';
 import { DEFAULT_BUFFER_STIFFNESS, DEFAULT_TRAVEL_SPEED } from '../runway/runwayCheckModel';
 import { firstNonPositive, round } from '../../shared/numeric';
@@ -162,10 +162,9 @@ export const checkBracing = defineCommand({
         row.check,
       ],
     );
-    return {
-      document: doc,
-      summary:
-        `Bracing check (qp ${windPressure} kN/m², G ${deadLoad}, S ${snowLoad}): gable ${round(gableArea, 1)} m², ` +
+    return report(
+      doc,
+      `Bracing check (qp ${windPressure} kN/m², G ${deadLoad}, S ${snowLoad}): gable ${round(gableArea, 1)} m², ` +
         `ULS wind ${round(windUltimate, 1)} kN, roof level ${round(roofWind, 1)} kN + stability ${round(stability, 1)} kN ` +
         `over ${bayCount} braced bay(s) = ${round(bayForce, 1)} kN each; ${rows.length} check(s), ` +
         `max utilisation ${round(worst?.utilisation ?? 0)} (${worst?.mark ?? '—'} ${worst?.kind ?? ''}, ${worst?.group ?? '—'}); ` +
@@ -174,8 +173,7 @@ export const checkBracing = defineCommand({
           (row) => `${row.mark} ${row.kind}`,
           'all OK (preliminary, tension-only diagonals).',
         ),
-      affected: [],
-      data: {
+      {
         rows,
         csv,
         maxUtilisation: worst?.utilisation ?? 0,
@@ -196,6 +194,6 @@ export const checkBracing = defineCommand({
                 foundationHorizontalY: craneFoundation,
               },
       },
-    };
+    );
   },
 });

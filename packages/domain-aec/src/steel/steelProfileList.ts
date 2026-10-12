@@ -4,7 +4,7 @@
 
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, tolerant, z } from '@core/commands/schema';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { STEEL_PROFILES } from './profiles';
 
 /**
@@ -43,11 +43,10 @@ export const listSteelProfiles = defineCommand({
     const profiles = STEEL_PROFILES.filter(
       (profile) => wanted === undefined || profile.family === wanted,
     );
-    return {
-      document: doc,
-      summary: `${profiles.length} steel profile(s): ${profiles.map((profile) => profile.name).join(', ')}.`,
-      affected: [],
-      data: { profiles },
-    };
+    return report(
+      doc,
+      `${profiles.length} steel profile(s): ${profiles.map((profile) => profile.name).join(', ')}.`,
+      { profiles },
+    );
   },
 });

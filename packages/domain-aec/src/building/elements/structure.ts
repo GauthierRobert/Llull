@@ -24,6 +24,7 @@ import {
   resolveLevel,
   toVec2,
   withElement,
+  levelElementsOf,
 } from '../model';
 import { noop } from '@core/commands/noop';
 import {
@@ -310,10 +311,7 @@ export const addColumn = defineCommand({
     if (!resolution.ok) return noop(doc, `add_column failed: ${resolution.reason}.`);
     let next = resolution.building;
     const ids: string[] = [];
-    const existing = Object.values(next.elements).filter(
-      (element): element is ColumnElement =>
-        element.category === 'column' && element.levelId === resolution.level.id,
-    );
+    const existing = levelElementsOf(next, 'column', resolution.level.id);
     const occupied = (location: Vec2): ColumnElement | undefined =>
       existing.find(
         (column) => column.location[0] === location[0] && column.location[1] === location[1],

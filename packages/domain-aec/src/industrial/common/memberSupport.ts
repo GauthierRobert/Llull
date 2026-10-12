@@ -13,11 +13,11 @@ import type {
 import { z } from '@core/commands/schema';
 import { toMm } from '@core/model/units';
 import {
-  elementsOf,
   getBuilding,
   highestIndex,
   nextElementId,
   withElement,
+  levelElementsOf,
 } from '../../building/model';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { distance3 } from '@lib/vec3';
@@ -67,14 +67,12 @@ export function levelMembersInMm(doc: CadDocument, levelId: string): MemberInMm[
     toMm(doc, point[1] ?? 0),
     toMm(doc, point[2] ?? 0),
   ];
-  return elementsOf(getBuilding(doc), 'member')
-    .filter((member) => member.levelId === levelId)
-    .map((member) => ({
-      member,
-      profile: findProfile(member.profile),
-      start: toPointMm(member.start),
-      end: toPointMm(member.end),
-    }));
+  return levelElementsOf(getBuilding(doc), 'member', levelId).map((member) => ({
+    member,
+    profile: findProfile(member.profile),
+    start: toPointMm(member.start),
+    end: toPointMm(member.end),
+  }));
 }
 
 /** Accepts [x, y, z] or [x, y] (z = 0); null when malformed. */

@@ -6,7 +6,7 @@
 import type { CivilModel, PipeObject } from '@core/model/civil';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { safeFileName } from '@lib/safeFileName';
 import { toMetres, toMm } from '@core/model/units';
 import { civilObject, civilObjectsOf, getCivil } from '../model';
@@ -143,14 +143,12 @@ export const exportDrainageLongSection = defineCommand({
       segments,
     );
     const fileName = `${safeFileName(start.name, start.id)}_drainage_long_section.svg`;
-    return {
-      document: doc,
-      summary:
-        `Drainage long section ${start.id} to ${ids[ids.length - 1]}: ${segments.length} pipe(s), ` +
+    return report(
+      doc,
+      `Drainage long section ${start.id} to ${ids[ids.length - 1]}: ${segments.length} pipe(s), ` +
         `${chainage.toFixed(1)} m, ${segments.filter((s) => s.surcharged).length} surcharged, ` +
         `${stations.filter((s) => s.flooding).length} flooding manhole(s); ${fileName} (${text.length} bytes).`,
-      affected: [],
-      data: { text, fileName, pipeIds: run.map((p) => p.id), manholeIds: ids },
-    };
+      { text, fileName, pipeIds: run.map((p) => p.id), manholeIds: ids },
+    );
   },
 });

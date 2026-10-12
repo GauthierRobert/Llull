@@ -8,7 +8,7 @@
 
 import { solveFrame, type FrameResult } from '@lib/frame2d';
 import type { LoadFactors } from './steelBeamAnalysis';
-import { amplificationOf } from './steelDesign';
+import { amplificationOf, horneAlphaCritical } from './steelDesign';
 import type { FrameSystem, StoreyPiece } from './steelFrameModel';
 import { GAMMA_G, GAMMA_Q } from '../../shared/loadFactors';
 
@@ -83,11 +83,9 @@ export function solveFrameSystem(
   ];
   const [ulsPlus, ulsMinus, slsGravity, slsPlus, slsMinus, horne] = cases;
   if (!(ulsPlus && ulsMinus && slsGravity && slsPlus && slsMinus && horne)) return null;
-  let alphaCritical = Infinity;
-  let criticalColumn: string | null = null;
-  for (const piece of system.storeyPieces) {
+  const storeys = system.storeyPieces.flatMap((piece) => {
     const layout = system.layouts.get(piece.columnId);
-    if (!layout) continue;
+    if (!layout) return [];
     const from = layout.nodes.indexOf(piece.bottom);
     const to = layout.nodes.indexOf(piece.top);
     const compression = Math.max(
@@ -96,14 +94,11 @@ export function solveFrameSystem(
         .slice(from, to)
         .flatMap((index) => (ulsPlus.members[index]?.axial ?? []).map((axial) => -axial)),
     );
-    const drift = driftOf(horne, piece);
-    if (!(compression > 0 && drift > 0)) continue;
-    const alpha = piece.height / (200 * drift);
-    if (alpha < alphaCritical) {
-      alphaCritical = alpha;
-      criticalColumn = piece.columnId;
-    }
-  }
+    return [
+      { id: piece.columnId, height: piece.height, compression, drift: driftOf(horne, piece) },
+    ];
+  });
+  const { alpha: alphaCritical, id: criticalColumn } = horneAlphaCritical(storeys);
   return {
     uls: [ulsPlus, ulsMinus],
     slsGravity,

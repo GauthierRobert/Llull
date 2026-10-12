@@ -8,6 +8,7 @@
 import type { Vec2, Vec3 } from '@core/model/types';
 import { pointInPolygon } from '@lib/polygon';
 import { delaunay } from './delaunay';
+import { boundsOfPoints } from '@core/geometry/bounds';
 
 export interface Tin {
   readonly points: readonly Vec3[];
@@ -92,18 +93,7 @@ export interface TinBounds {
 /** Bounds of the vertices used by at least one triangle; null for an empty TIN. */
 export function tinBounds(tin: Tin): TinBounds | null {
   if (tin.triangles.length === 0) return null;
-  let [minX, minY, minZ] = [Infinity, Infinity, Infinity];
-  let [maxX, maxY, maxZ] = [-Infinity, -Infinity, -Infinity];
-  for (const index of tin.triangles) {
-    const [x, y, z] = tin.points[index] as Vec3;
-    minX = Math.min(minX, x);
-    minY = Math.min(minY, y);
-    minZ = Math.min(minZ, z);
-    maxX = Math.max(maxX, x);
-    maxY = Math.max(maxY, y);
-    maxZ = Math.max(maxZ, z);
-  }
-  return { min: [minX, minY, minZ], max: [maxX, maxY, maxZ] };
+  return boundsOfPoints(tin.triangles.map((index) => tin.points[index] as Vec3));
 }
 
 interface TinIndex {

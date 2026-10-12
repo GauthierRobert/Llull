@@ -6,7 +6,6 @@ import type { EquipmentElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, looseVec2, vec3, z } from '@core/commands/schema';
 import {
-  elementAffected,
   elementsOf,
   getBuilding,
   isVec2,
@@ -15,7 +14,7 @@ import {
   withElement,
 } from '../../building/model';
 import { noop } from '@core/commands/noop';
-import { regenerateBuilding } from '../../building/evaluate/evaluateElements';
+import { commitBuilding } from '../../building/evaluate/evaluateElements';
 import {
   SHAPE_PARAM_TEXT,
   describeEquipmentShape,
@@ -160,15 +159,14 @@ export const updateEquipment = defineCommand({
         `update_equipment: ${equipment.id} already has these values; nothing changed.`,
       );
     }
-    const document = regenerateBuilding(doc, withElement(building, updated));
-    return {
-      document,
-      summary:
-        `Updated equipment ${updated.mark} "${updated.name}" (${updated.id}): ` +
+    return commitBuilding(
+      doc,
+      withElement(building, updated),
+      [updated.id],
+      `Updated equipment ${updated.mark} "${updated.name}" (${updated.id}): ` +
         `[${updated.location.join(', ')}] on ${updated.levelId}, ${describeEquipmentShape(newShape, updated.size, doc.units)}, ` +
         `clearance ${updated.clearance}, ${updated.weight} kg.`,
-      affected: elementAffected(document, [updated.id]),
-      data: { elementId: updated.id },
-    };
+      { elementId: updated.id },
+    );
   },
 });

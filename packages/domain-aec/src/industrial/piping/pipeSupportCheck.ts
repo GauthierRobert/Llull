@@ -6,7 +6,7 @@
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
 import { getBuilding } from '../../building/model';
 import { round } from '../../shared/numeric';
@@ -264,15 +264,13 @@ export const checkPipeSupports = defineCommand({
       failing,
       (row) => `${row.mark}${row.line === '' ? '' : ` ${row.line}`} (${row.issues[0] ?? ''})`,
     );
-    return {
-      document: doc,
-      summary:
-        `Pipe support check (span table × ${spanFactor}): ${pipes.length} pipe(s), ${pipes.length - failing.length} ok` +
+    return report(
+      doc,
+      `Pipe support check (span table × ${spanFactor}): ${pipes.length} pipe(s), ${pipes.length - failing.length} ok` +
         (failing.length === 0 ? '' : `, ${failing.length} failing: ${list}`) +
         (unattached > 0 ? `; ${unattached} unattached support(s)` : '') +
         '.',
-      affected: [],
-      data: {
+      {
         ok: failing.length === 0,
         pipes,
         failures: failing.map((row) => row.id),
@@ -288,6 +286,6 @@ export const checkPipeSupports = defineCommand({
         csv,
         assumptions: ASSUMPTIONS,
       },
-    };
+    );
   },
 });

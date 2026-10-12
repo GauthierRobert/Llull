@@ -4,7 +4,7 @@
 
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { checkFrames } from './frameCheckFrames';
 import { round } from '../../shared/numeric';
 import { checkTable, failureSummary } from '../reports/checkReport';
@@ -78,10 +78,9 @@ export const checkPortalFrames = defineCommand({
         row.check,
       ],
     );
-    return {
-      document: doc,
-      summary:
-        `Checked ${frames} frame(s), ${rows.length} check(s) over ${combinations.length} ULS combination(s) + SLS (${describeLoads(loads)}): ` +
+    return report(
+      doc,
+      `Checked ${frames} frame(s), ${rows.length} check(s) over ${combinations.length} ULS combination(s) + SLS (${describeLoads(loads)}): ` +
         `max utilisation ${round(worst?.utilisation ?? 0)} (${worst?.mark ?? '—'} ${worst?.kind ?? ''}, ${worst?.frame ?? '—'}, ${worst?.combination ?? '—'}); ` +
         `min αcr ${Number.isFinite(minAlphaCritical) ? round(minAlphaCritical, 1) : '—'}; ` +
         failureSummary(
@@ -90,8 +89,7 @@ export const checkPortalFrames = defineCommand({
           'all OK (frames only: see check_bracing, check_foundations, check_crane_runways).',
         ) +
         `${skipped.length > 0 ? ` Not checked: ${skipped.join(', ')}.` : ''}`,
-      affected: [],
-      data: {
+      {
         rows,
         csv,
         maxUtilisation: worst?.utilisation ?? 0,
@@ -99,6 +97,6 @@ export const checkPortalFrames = defineCommand({
         combinations,
         alphaCritical: Number.isFinite(minAlphaCritical) ? minAlphaCritical : null,
       },
-    };
+    );
   },
 });

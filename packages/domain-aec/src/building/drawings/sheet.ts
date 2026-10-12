@@ -9,7 +9,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { toMm } from '@core/model/units';
 import { fileSlug, getBuilding } from '../model';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { type PlanDrawing, type PlanPrimitive } from './planModel';
 import { buildPlanDrawing } from './planDrawing';
 import { escapeXml } from '@lib/escapeXml';
@@ -260,11 +260,10 @@ export const exportPlanSheet = defineCommand({
         'export_plan_sheet failed: no such level (add_level / draw_walls first) or invalid scale (must be > 0).',
       );
     }
-    return {
-      document: doc,
-      summary: `Plan sheet ${sheet.filename}: level ${sheet.levelId} at 1:${sheet.scale} on ${sheet.paper}.${sheet.fits ? '' : ' WARNING: the drawing is larger than the paper at this scale; omit scale to auto-fit or choose a larger paper.'}`,
-      affected: [],
-      data: sheet,
-    };
+    return report(
+      doc,
+      `Plan sheet ${sheet.filename}: level ${sheet.levelId} at 1:${sheet.scale} on ${sheet.paper}.${sheet.fits ? '' : ' WARNING: the drawing is larger than the paper at this scale; omit scale to auto-fit or choose a larger paper.'}`,
+      sheet,
+    );
   },
 });

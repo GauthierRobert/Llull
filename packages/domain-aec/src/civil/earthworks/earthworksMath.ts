@@ -8,6 +8,7 @@
 import type { Vec2 } from '@core/model/types';
 import { pointInPolygon, polygonArea, projectOntoSegment } from '@lib/polygon';
 import { elevationAt, tinBounds, type Tin } from '../surface/tin';
+import { batterLevel } from './batter';
 
 /** Default grid: the pad gets about this many cells. */
 export const TARGET_PAD_CELLS = 2500;
@@ -168,8 +169,10 @@ function depthAt(
   fillSlope: number,
 ): number {
   if (distance === 0) return ground - elevation;
-  if (ground > elevation) return Math.max(0, ground - (elevation + distance / cutSlope));
-  if (ground < elevation) return Math.min(0, ground - (elevation - distance / fillSlope));
+  if (ground > elevation)
+    return Math.max(0, ground - batterLevel(elevation, distance, 'cut', cutSlope, fillSlope));
+  if (ground < elevation)
+    return Math.min(0, ground - batterLevel(elevation, distance, 'fill', cutSlope, fillSlope));
   return 0;
 }
 

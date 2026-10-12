@@ -15,7 +15,7 @@ import type { CadDocument } from '@core/model/types';
 import type { AlignmentObject } from '@core/model/civil';
 import { horizontalElements } from '../alignment/alignmentGeometry';
 import { validateProfile, verticalCurves } from '../alignment/profileGeometry';
-import { formatStation } from '../model';
+import { stationText } from '../model';
 import { toMetres } from '@core/model/units';
 
 export const MAX_SUPERELEVATION = 0.07;
@@ -83,7 +83,7 @@ export function designChecks(
   const horizontal = horizontalElements(alignment).flatMap((element) => {
     if (element.kind !== 'arc') return [];
     const radiusM = toMetres(doc, element.radius);
-    const station = formatStation(toMetres(doc, element.startStation));
+    const station = stationText(doc, element.startStation);
     const ok = radiusM >= minRadius - 1e-9;
     const required = Math.max((designSpeedKmh * designSpeedKmh) / (127 * radiusM) - friction, 0);
     if (!ok) {
@@ -110,7 +110,7 @@ export function designChecks(
     );
     const lengthM = toMetres(doc, element.length);
     const minLengthM = designSpeedKmh ** 3 / (46.656 * LATERAL_JERK * radiusM);
-    const station = formatStation(toMetres(doc, element.startStation));
+    const station = stationText(doc, element.startStation);
     const ok = lengthM >= minLengthM - 1e-9;
     if (!ok) {
       failures.push(
@@ -129,7 +129,7 @@ export function designChecks(
   const profileOk = validateProfile(alignment.profile) === null;
   const vertical = (profileOk ? verticalCurves(alignment.profile) : []).map((curve) => {
     const minK = curve.kind === 'crest' ? crestK : sagK;
-    const station = formatStation(toMetres(doc, curve.pviStation));
+    const station = stationText(doc, curve.pviStation);
     const ok = curve.k >= minK - 1e-9;
     if (!ok) {
       failures.push(
@@ -149,7 +149,7 @@ export function designChecks(
       );
       if (change > 0.005) {
         failures.push(
-          `Grade break at PVI ${formatStation(toMetres(doc, pvi.station))} changes grade by ${(change * 100).toFixed(2)} % without a vertical curve.`,
+          `Grade break at PVI ${stationText(doc, pvi.station)} changes grade by ${(change * 100).toFixed(2)} % without a vertical curve.`,
         );
       }
     });

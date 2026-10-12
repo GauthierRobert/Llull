@@ -9,7 +9,8 @@ import { toMm } from '@core/model/units';
 import { buildingConnectionSolids } from '../connections/evaluateConnections';
 import { type FrameModel, type WindCase, type LoadCase } from './frameModelTypes';
 import { solveCombination } from './frameModelSolve';
-import { amplificationOf, boltResistance } from '../steelDesign/steelDesign';
+import { amplificationOf, boltResistance, horneAlphaCritical } from '../steelDesign/steelDesign';
+import { GAMMA_CRANE } from '../../shared/loadFactors';
 
 export interface CheckRow {
   readonly frame: string;
@@ -82,14 +83,14 @@ export function ultimateCombinations(
         const snowLabel = snow > 0 ? '+0.75S' : '';
         combinations.push({
           name: `1.35G+1.35${side.label}${snowLabel}`,
-          factors: { G: 1.35, [side.load]: 1.35, S: snow },
+          factors: { G: 1.35, [side.load]: GAMMA_CRANE, S: snow },
           sway: side.sway,
         });
         if (!wind) continue;
         for (const direction of winds) {
           combinations.push({
             name: `1.35G+1.35${side.label}${snowLabel}+0.9${direction.label}`,
-            factors: { G: 1.35, [side.load]: 1.35, S: snow, [direction.load]: 0.9 },
+            factors: { G: 1.35, [side.load]: GAMMA_CRANE, S: snow, [direction.load]: 0.9 },
             sway: direction.sway,
           });
         }
@@ -98,7 +99,7 @@ export function ultimateCombinations(
       for (const direction of winds) {
         combinations.push({
           name: `1.35G+1.5${direction.label}+0.75S+1.35${side.label}`,
-          factors: { G: 1.35, [direction.load]: 1.5, S: 0.75, [side.load]: 1.35 },
+          factors: { G: 1.35, [direction.load]: 1.5, S: 0.75, [side.load]: GAMMA_CRANE },
           sway: direction.sway,
         });
       }
@@ -168,21 +169,19 @@ export function solveUltimate(frame: FrameModel, combination: Combination): Ulti
     })),
     frame.members.map((member) => member.geometry),
   );
-  let alphaCritical = Infinity;
-  let criticalMember: string | null = null;
-  let method = 'Horne';
-  for (const piece of pieces) {
-    const drift = Math.abs(
+  const storeys = pieces.map((piece) => ({
+    id: piece.member.elementId,
+    height: piece.height,
+    compression: piece.compression,
+    drift: Math.abs(
       (horne?.displacements[piece.member.geometry.b]?.[0] ?? 0) -
         (horne?.displacements[piece.member.geometry.a]?.[0] ?? 0),
-    );
-    if (piece.compression <= 0 || !(drift > 0)) continue;
-    const alpha = piece.height / (200 * drift);
-    if (alpha < alphaCritical) {
-      alphaCritical = alpha;
-      criticalMember = piece.member.elementId;
-    }
-  }
+    ),
+  }));
+  const critical = horneAlphaCritical(storeys);
+  let alphaCritical = critical.alpha;
+  let criticalMember: string | null = critical.id;
+  let method = 'Horne';
   // Horne scope (5.2.1(4)B Note 2B): slopes ≤ 26° and rafter N ≤ 0.09 Ncr (Ncr over the span).
   // Otherwise the modified estimate αcr = 0.8 αH (1 − N/Ncr)max (SCI P397, Lim & King) is used.
   let rafterRatio = 0;

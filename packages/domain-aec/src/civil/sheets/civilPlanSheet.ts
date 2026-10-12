@@ -23,6 +23,7 @@ import { toMetres, toMm } from '@core/model/units';
 import { niceStep } from '../road/roadSvg';
 import { clipPolyline, insideRect } from './planClip';
 import { gridToLocal, localToGrid } from '../crs/crs';
+import { entityPlanPoint } from '../entities';
 
 export interface CivilSheetOptions {
   readonly paper: PaperSize;
@@ -53,12 +54,7 @@ const isDrawable = (entity: Entity): entity is Drawable =>
   entity.kind === 'text';
 
 function worldPoints(entity: Drawable): Vec2[] {
-  const cos = Math.cos(entity.rotation[2]);
-  const sin = Math.sin(entity.rotation[2]);
-  const place = ([x, y]: Vec2): Vec2 => [
-    entity.position[0] + x * cos - y * sin,
-    entity.position[1] + x * sin + y * cos,
-  ];
+  const place = (point: Vec2): Vec2 => entityPlanPoint(entity, point);
   if (entity.kind === 'line') return [place(entity.start), place(entity.end)];
   if (entity.kind === 'polyline') return entity.points.map(place);
   return [[entity.position[0], entity.position[1]]];

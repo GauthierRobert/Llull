@@ -21,6 +21,7 @@ import {
   THICKNESS_STEP_MM,
 } from './footingModel';
 import { designMat } from './footingMat';
+import { maxUtilisation } from '../common/utilisation';
 
 export function geometryOf(
   doc: CadDocument,
@@ -84,7 +85,7 @@ export function evaluatePad(
     thickness: fromMm(doc, thicknessMm),
   };
   const rows = footingRows(context, trial, '');
-  const soilUtilisation = Math.max(0, ...rows.map((row) => row.utilisation));
+  const soilUtilisation = maxUtilisation(rows);
   if (soilUtilisation > 1) return { soilUtilisation, mat: null, passes: false };
   const geometry = geometryOf(doc, trial, context.face);
   const net = netLoads(

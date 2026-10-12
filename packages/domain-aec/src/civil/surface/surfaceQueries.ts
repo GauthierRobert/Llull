@@ -5,7 +5,7 @@
 
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { civilObjectOrFailure, getCivil } from '../model';
 import { surfaceTin } from './surfaceTin';
 import { corners, elevationAt, slopeAt, tinBounds, tinPlanArea, triangleCount } from './tin';
@@ -53,12 +53,11 @@ export const surfaceElevation = defineCommand({
           : `${toMetres(doc, sample.elevation).toFixed(3)} m (${sample.slopePercent} %)`,
       )
       .join('; ');
-    return {
-      document: doc,
-      summary: `${surface.name}: ${listed}${samples.length > 5 ? '; …' : ''}${outside > 0 ? ` (${outside} outside the surface)` : ''}.`,
-      affected: [],
-      data: { surfaceId, points: samples },
-    };
+    return report(
+      doc,
+      `${surface.name}: ${listed}${samples.length > 5 ? '; …' : ''}${outside > 0 ? ` (${outside} outside the surface)` : ''}.`,
+      { surfaceId, points: samples },
+    );
   },
 });
 
@@ -112,14 +111,12 @@ export const surfaceReport = defineCommand({
       meanElevationM: areaSum > 0 ? round(metres(weighted / areaSum)) : null,
       meanSlopePercent: areaSum > 0 ? round((slopeSum / areaSum) * 100, 2) : null,
     };
-    return {
-      document: doc,
-      summary:
-        `${surface.name}: ${data.points} points, ${data.triangles} triangles, ${data.planAreaM2} m²; ` +
+    return report(
+      doc,
+      `${surface.name}: ${data.points} points, ${data.triangles} triangles, ${data.planAreaM2} m²; ` +
         `elevation ${data.minElevationM}–${data.maxElevationM} m (mean ${data.meanElevationM} m); ` +
         `mean slope ${data.meanSlopePercent} %.`,
-      affected: [],
       data,
-    };
+    );
   },
 });
