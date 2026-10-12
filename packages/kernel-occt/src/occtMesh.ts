@@ -5,11 +5,13 @@
  */
 
 import type { MeshData } from '@core/model/types';
+import { isClosedMesh } from './meshClosure';
 import {
   explorer,
   release,
   type OccApi,
   type OccHandle,
+  type OccExplorer,
   type OccShape,
   type OccTopoDS,
   type OccTriangulation,
@@ -20,13 +22,14 @@ const DISPLAY_DEFLECTION = [0.1, 0.5] as const;
 
 /**
  * Display mesh of `shape`, or null. BRepMesh can leave a face without triangles, or a solid's mesh
- * open (a corner where several fillet blends meet); such a shape is refused rather than shown and
- * exported as a holed shell (re-meshing finer does not close those, and can overflow the WASM
- * stack). Open shells (surface parts) are not required to close.
+ * open (a corner where several fillet blends meet); a closed solid is then refused rather than
+ * shown and exported as a holed shell (re-meshing finer does not close those, and can overflow the
+ * WASM stack). Surface parts and compounds with free faces keep the old, lenient behaviour.
  */
 export function extractMeshData(api: OccApi, shape: OccShape): MeshData | null {
   const { mesh, missingFaces } = triangulate(api, shape, DISPLAY_DEFLECTION);
-  return missingFaces === 0 && (!hasSolid(api, shape) || isClosed(mesh)) ? mesh : null;
+  if (!isClosedSolid(api, shape)) return mesh;
+  return missingFaces === 0 && isClosedMesh(mesh) ? mesh : null;
 }
 
 interface Triangulated {
@@ -34,51 +37,20 @@ interface Triangulated {
   readonly missingFaces: number;
 }
 
-function hasSolid(api: OccApi, shape: OccShape): boolean {
-  const exp = explorer(api, shape, 'TopAbs_SOLID');
+/** Whether `shape` holds a solid and no face outside a solid (explorer: faces, avoiding solids). */
+function isClosedSolid(api: OccApi, shape: OccShape): boolean {
+  const solids = explorer(api, shape, 'TopAbs_SOLID');
+  const freeFaces = new api.TopExp_Explorer_2(
+    shape,
+    api.TopAbs_ShapeEnum.TopAbs_FACE,
+    api.TopAbs_ShapeEnum.TopAbs_SOLID,
+  ) as OccExplorer;
   try {
-    return exp.More() === true;
+    return solids.More() === true && freeFaces.More() !== true;
   } finally {
-    exp.delete();
+    solids.delete();
+    freeFaces.delete();
   }
-}
-
-/**
- * Whether every triangle edge is shared, vertices welded on a 1e-5 grid. Checked on two grids half
- * a cell apart, so two copies of one vertex that straddle a cell boundary still weld on one of them.
- */
-function isClosed(mesh: MeshData | null): boolean {
-  return openEdgeCount(mesh) === 0 || openEdgeCount(mesh, 0.5) === 0;
-}
-
-/** Triangle edges used by one triangle only, vertices welded by position (0 for a closed mesh). */
-function openEdgeCount(mesh: MeshData | null, gridOffset = 0): number {
-  if (mesh === null) return 0;
-  const { positions, indices } = mesh;
-  const weld = new Map<string, number>();
-  const vertexId = (corner: number): number => {
-    // Integer grid (1e-5) keys: toFixed would key -0.000001 and 0.000001 apart ("-0.00000").
-    const key = [0, 1, 2]
-      .map((axis) => `${Math.round((positions[corner * 3 + axis] ?? 0) * 1e5 + gridOffset)}`)
-      .join(',');
-    const known = weld.get(key);
-    if (known !== undefined) return known;
-    weld.set(key, weld.size);
-    return weld.size - 1;
-  };
-  const uses = new Map<string, number>();
-  for (let t = 0; t + 2 < indices.length; t += 3) {
-    const corners = [0, 1, 2].map((k) => vertexId(indices[t + k] ?? 0));
-    for (let k = 0; k < 3; k++) {
-      const [a, b] = [corners[k] ?? 0, corners[(k + 1) % 3] ?? 0];
-      if (a === b) continue;
-      const key = a < b ? `${a}-${b}` : `${b}-${a}`;
-      uses.set(key, (uses.get(key) ?? 0) + 1);
-    }
-  }
-  let open = 0;
-  for (const count of uses.values()) if (count === 1) open++;
-  return open;
 }
 
 function triangulate(

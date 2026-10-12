@@ -255,6 +255,14 @@ describe('modify3d commands', () => {
       expect(result.summary).not.toContain('Try ?kernel=occt');
     });
 
+    it('no-op when the result has no closed mesh; source not pruned', () => {
+      setGeometryKernel((fake = freshKernel({ [op]: { positions: [], indices: [] } })));
+      const { doc, boxId } = docWithBox();
+      const result = run(doc, boxId);
+      expectSourceKept(result, doc, boxId);
+      expect(result.summary).toContain('could not be tessellated into a closed mesh');
+    });
+
     it('no-op naming the OCC kernel when this kernel lacks the op; source not pruned', () => {
       setGeometryKernel((fake = freshKernel({ unsupported: [op], [op]: null })));
       const { doc, boxId } = docWithBox();

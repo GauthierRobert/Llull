@@ -75,12 +75,11 @@ export function planText(result: PrintableResult): string {
   const data = result.data;
   if (!isRecord(data) || !Array.isArray(data['steps'])) return resultText(result);
   const issues = Array.isArray(data['issues']) ? data['issues'].map((i) => `  ! ${String(i)}`) : [];
+  const aliases = result.planAliases === undefined ? null : aliasLine(result.planAliases);
   return [
     result.summary,
     ...data['steps'].map(stepLine).filter((line): line is string => line !== null),
     ...issues,
-    ...(result.planAliases !== undefined ? [aliasLine(result.planAliases) ?? ''] : []).filter(
-      Boolean,
-    ),
+    ...(aliases ? [aliases] : []),
   ].join('\n');
 }

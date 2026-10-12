@@ -125,7 +125,9 @@ export const drawArc = defineCommand({
     const tau = 2 * Math.PI;
     const span = endAngle - startAngle;
     const wrapped = Math.abs(span) > tau + 1e-9;
-    const end = wrapped ? startAngle + (((span % tau) + tau) % tau || tau) : endAngle;
+    const rest = ((span % tau) + tau) % tau;
+    // A whole number of turns (up to float noise) is a full circle, never a near-zero sliver.
+    const end = wrapped ? startAngle + (rest < 1e-6 || tau - rest < 1e-6 ? tau : rest) : endAngle;
     const id = nextId('arc');
     const safeCenter: Vec2 = [center[0], center[1]];
     const entity = newEntity(

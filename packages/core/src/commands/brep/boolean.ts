@@ -65,7 +65,7 @@ function runBoolean(
   if (result === 'empty') {
     return noop(
       doc,
-      `${opName}: the result of '${a}' and '${b}' is empty (no volume remains, e.g. disjoint solids for an intersection); operands kept.`,
+      `${opName}: the result of '${a}' and '${b}' has no usable mesh — it is empty (no volume remains, e.g. disjoint solids for an intersection) or its solid could not be meshed closed; operands kept.`,
     );
   }
 

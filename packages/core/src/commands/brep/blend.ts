@@ -73,7 +73,8 @@ export const blendUnion = defineCommand({
       return fail(
         `the kernel could not blend the joints of [${ids.join(', ')}] with radius ${radius}; try another radius (smaller usually fits; a crotch where 3 solids meet can reject specific radii)`,
       );
-    if (result === 'empty') return fail('the union is empty');
+    if (result === 'empty')
+      return fail('the union is empty or could not be meshed as a closed solid');
     return commitKernelResult(
       doc,
       kernel,

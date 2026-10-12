@@ -174,6 +174,21 @@ describe('2D draw commands', () => {
       expect(wrap.summary).not.toContain('wrapped');
       const full = execute(doc, 'draw_arc', { ...base, startAngle: 0, endAngle: 2 * Math.PI });
       expect(arcOf(full).endAngle).toBeCloseTo(2 * Math.PI, 12);
+      for (const turns of [2, 5]) {
+        const s0 = 5.886628178167261;
+        const whole = execute(doc, 'draw_arc', {
+          ...base,
+          startAngle: s0,
+          endAngle: s0 + turns * 2 * Math.PI,
+        });
+        expect(arcOf(whole).endAngle - arcOf(whole).startAngle).toBeCloseTo(2 * Math.PI, 9);
+      }
+      const justOver = execute(doc, 'draw_arc', {
+        ...base,
+        startAngle: 1,
+        endAngle: 1 + 2 * Math.PI + 2e-9,
+      });
+      expect(arcOf(justOver).endAngle - arcOf(justOver).startAngle).toBeCloseTo(2 * Math.PI, 9);
       const nan = execute(doc, 'draw_arc', { ...base, startAngle: 0, endAngle: Number.NaN });
       expect(nan.affected).toEqual([]);
     });
