@@ -1,7 +1,7 @@
 /**
  * Rewrites for retired edit/solid commands: single-entity edits folded into their batch forms, the
  * path/arc distribution family folded into `pattern_along_path`, `make_tube_between` into
- * `add_cylinder`.
+ * `add_cylinder`, the three boolean_* commands into `boolean`.
  *
  * @layer core/commands
  */
@@ -37,6 +37,9 @@ function polylineLength(path: unknown): number | null {
 }
 
 export const RETIRED_EDIT_COMMANDS: Readonly<Record<string, RetiredCommandRewrite>> = {
+  boolean_union: (params) => ({ name: 'boolean', params: { op: 'union', ...params } }),
+  boolean_subtract: (params) => ({ name: 'boolean', params: { op: 'subtract', ...params } }),
+  boolean_intersect: (params) => ({ name: 'boolean', params: { op: 'intersect', ...params } }),
   move_entity: ({ id, delta }) => call('move_entities', { ids: singleId(id), delta }),
   delete_entity: ({ id }) => call('delete_entities', { ids: singleId(id) }),
   duplicate_entity: ({ id, offset }) => call('duplicate_entities', { ids: singleId(id), offset }),

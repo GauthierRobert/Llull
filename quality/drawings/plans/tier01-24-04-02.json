@@ -61,8 +61,8 @@
   "as": "c1"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$body",
    "b": "$c1"
   },

@@ -394,7 +394,7 @@ describe('replay of a loop step that needs the kernel', () => {
           suppressed: false,
           params: {
             actions: [
-              { repeat: { count: 1 }, actions: [{ command: 'boolean_union', params: {} }] },
+              { repeat: { count: 1 }, actions: [{ command: 'boolean', params: { op: 'union' } }] },
             ],
           },
         },

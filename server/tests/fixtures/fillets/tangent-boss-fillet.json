@@ -246,8 +246,8 @@
   "as": "t12"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$t11",
    "b": "$t12"
   },
@@ -287,8 +287,8 @@
   "as": "t24"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t23",
    "b": "$t24"
   },

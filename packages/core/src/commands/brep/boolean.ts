@@ -82,71 +82,29 @@ function runBoolean(
 const SOLID_OPERANDS_NOTE =
   'Both operands must be 3D solids (any solid kind: box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, mesh); 2D shapes are rejected.';
 
-const SYMMETRIC_OPERANDS = z.object({
-  a: z.string().describe('Id of the first 3D solid operand.'),
-  b: z.string().describe('Id of the second 3D solid operand.'),
-});
-
 /**
- * @command boolean_union
+ * @command boolean
  * @pure
- * @affects removes entities a and b; creates 1 mesh entity (their union)
- * @invariant both a and b must be 3D solids; geometry kernel must be injected
- * @failure missing id, 2D operand, same id, kernel absent, or kernel failure -> no-op, affected:[]
+ * @affects removes entities a and b; creates 1 mesh entity (a ∪ b, a − b or a ∩ b)
+ * @invariant both a and b must be 3D solids; geometry kernel must be injected; subtract keeps a − b
+ * @failure missing id, 2D operand, same id, kernel absent, empty result or kernel failure -> no-op, affected:[]
  */
-export const booleanUnion = defineCommand({
-  name: 'boolean_union',
+export const booleanOperation = defineCommand({
+  name: 'boolean',
   annotations: { requiresKernel: true },
   description:
-    'Merge two 3D solid entities into a single mesh entity using a CSG union operation. ' +
-    'Both operand entities are consumed (removed) and replaced by the union mesh. ' +
+    'Combine two 3D solid entities with a CSG operation into a single mesh entity: ' +
+    'op "union" merges them, "subtract" removes the volume of b from a (order matters: result = a minus b), ' +
+    '"intersect" keeps only the volume shared by both. ' +
+    'Both operand entities are consumed (removed) and replaced by the result mesh. ' +
     'Requires a geometry kernel to be injected (available after app initialization). ' +
     SOLID_OPERANDS_NOTE,
-  params: SYMMETRIC_OPERANDS,
-  run: (doc, { a, b }, ctx): CommandResult => runBoolean(doc, 'boolean_union', 'union', a, b, ctx),
-});
-
-/**
- * @command boolean_subtract
- * @pure
- * @affects removes entities a and b; creates 1 mesh entity (a minus b)
- * @invariant both a and b must be 3D solids; result = a − b (order matters)
- * @failure missing id, 2D operand, same id, kernel absent, or kernel failure -> no-op, affected:[]
- */
-export const booleanSubtract = defineCommand({
-  name: 'boolean_subtract',
-  annotations: { requiresKernel: true },
-  description:
-    'Subtract the volume of 3D solid b from 3D solid a, producing a mesh entity. ' +
-    'Order matters: result = a minus b. ' +
-    'Both operand entities are consumed (removed) and replaced by the result mesh. ' +
-    'Requires a geometry kernel to be injected. ' +
-    SOLID_OPERANDS_NOTE,
   params: z.object({
-    a: z.string().describe('Id of the base 3D solid (the solid to subtract from).'),
-    b: z.string().describe('Id of the tool 3D solid (the solid to subtract with).'),
+    op: z
+      .enum(['union', 'subtract', 'intersect'])
+      .describe('"union" (a ∪ b), "subtract" (a minus b) or "intersect" (a ∩ b).'),
+    a: z.string().describe('Id of the first 3D solid operand (the base solid for subtract).'),
+    b: z.string().describe('Id of the second 3D solid operand (the tool solid for subtract).'),
   }),
-  run: (doc, { a, b }, ctx): CommandResult =>
-    runBoolean(doc, 'boolean_subtract', 'subtract', a, b, ctx),
-});
-
-/**
- * @command boolean_intersect
- * @pure
- * @affects removes entities a and b; creates 1 mesh entity (their intersection)
- * @invariant both a and b must be 3D solids; kernel must be injected
- * @failure missing id, 2D operand, same id, kernel absent, or kernel failure -> no-op, affected:[]
- */
-export const booleanIntersect = defineCommand({
-  name: 'boolean_intersect',
-  annotations: { requiresKernel: true },
-  description:
-    'Compute the intersection of two 3D solid entities, producing a mesh entity that covers ' +
-    'only the volume shared by both solids. ' +
-    'Both operand entities are consumed (removed) and replaced by the intersection mesh. ' +
-    'Requires a geometry kernel to be injected. ' +
-    SOLID_OPERANDS_NOTE,
-  params: SYMMETRIC_OPERANDS,
-  run: (doc, { a, b }, ctx): CommandResult =>
-    runBoolean(doc, 'boolean_intersect', 'intersect', a, b, ctx),
+  run: (doc, { op, a, b }, ctx): CommandResult => runBoolean(doc, `boolean ${op}`, op, a, b, ctx),
 });

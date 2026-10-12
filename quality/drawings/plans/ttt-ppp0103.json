@@ -308,16 +308,16 @@
   "as": "bR"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$c",
    "b": "$bL"
   },
   "as": "u1"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$u1",
    "b": "$bR"
   },
@@ -342,8 +342,8 @@
   "as": "h"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$u2",
    "b": "$h"
   },
@@ -368,8 +368,8 @@
   "as": "cs"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$u3",
    "b": "$cs"
   },

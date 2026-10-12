@@ -40,7 +40,7 @@ official mass; `npm run quality:drawings` replays them).
   (+Z) · XZ `["=pi/2",0,0]` (local y→Z, extrudes −Y) · YZ `["=pi/2","=pi/2",0]` (local x→Y,
   y→Z, extrudes +X). Tilted cutters: sketch in the face's own (s, w) frame, then
   `rotation [0, θ, 0]`. Prefer `rotation` to `axis` for sketches. Check every step's AABB.
-- **Trim, don't build**: extrude the main outline full width, then `boolean_intersect` with one
+- **Trim, don't build**: extrude the main outline full width, then `boolean` op `intersect` with one
   trim prism per other view (rounded ends, tapers, top-view corner radii). Avoid coplanar
   boolean junctions (overlap tools by ≥ 0.5; build multi-section lofts as one solid).
 - **Fillets**: OCC (`--kernel occt`), `fillet_edge edgesNear` = any point on the edge (use the

@@ -459,8 +459,8 @@
   "as": "rrp"
  },
  {
-  "command": "boolean_intersect",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "intersect", 
    "a": "$fil",
    "b": "$rrp"
   },

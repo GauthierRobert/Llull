@@ -619,24 +619,24 @@
   "as": "plateT"
  },
  {
-  "command": "boolean_intersect",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "intersect", 
    "a": "$front",
    "b": "$legT"
   },
   "as": "i27"
  },
  {
-  "command": "boolean_intersect",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "intersect", 
    "a": "$i27",
    "b": "$wallT"
   },
   "as": "i28"
  },
  {
-  "command": "boolean_intersect",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "intersect", 
    "a": "$i28",
    "b": "$plateT"
   },
@@ -656,8 +656,8 @@
   "as": "c30"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$i29",
    "b": "$c30"
   },
@@ -677,8 +677,8 @@
   "as": "c32"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$s31",
    "b": "$c32"
   },
@@ -698,8 +698,8 @@
   "as": "c34"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$s33",
    "b": "$c34"
   },
@@ -719,8 +719,8 @@
   "as": "c36"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$s35",
    "b": "$c36"
   },
@@ -745,8 +745,8 @@
   "as": "c38"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$s37",
    "b": "$c38"
   },
@@ -771,8 +771,8 @@
   "as": "c40"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$s39",
    "b": "$c40"
   },

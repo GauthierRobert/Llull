@@ -38,7 +38,7 @@ Flags
                               PATH.png rasterizes an svg (render_view)
   --json                      print one JSON object instead of text
   --quiet                     print nothing on success
-  --progress                  stream one stderr line per plan step ([12/189] boolean_subtract … 3.2s);
+  --progress                  stream one stderr line per plan step ([12/189] boolean … 3.2s);
                               automatic when stderr is a terminal. Steps over 10 s always warn, and
                               every step's durationMs is in the --json report (local runs only)
   --timeout SEC               stop a whole run after SEC seconds: exit 1 with a clear message, nothing

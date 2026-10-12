@@ -22,7 +22,7 @@ function unionOfTwoBoxes(topology: ShapeTopology | null): {
   const first = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }, ctx);
   const second = execute(first.document, 'add_box', { size: [1, 1, 1] }, ctx);
   const [a, b] = second.document.order;
-  const union = execute(second.document, 'boolean_union', { a, b }, ctx);
+  const union = execute(second.document, 'boolean', { op: 'union', a, b }, ctx);
   return { doc: union.document, id: union.affected[0]!, kernel };
 }
 

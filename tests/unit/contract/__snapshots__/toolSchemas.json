@@ -3350,7 +3350,7 @@
     "name": "bill_of_materials"
   },
   {
-    "description": "Weld 2+ solids into ONE exact solid and round every joint where they meet with a fillet: the one-piece frame operation (bike frame tubes, lugs and dropouts; pipe tees; brackets welded to plates; organic joints between swept or lofted parts). All intersection curves created by the union are filleted with `radius` (for a radius that varies along one edge, use fillet_edge radiusEnd on the result). The operands are consumed and replaced by one mesh entity that keeps the exact construction (STEP export, further fillets and booleans see true faces). Requires the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server); the default Manifold kernel cannot fillet and gracefully no-ops (use boolean_union there). If the kernel refuses, try another radius: a blend must fit inside the smallest wall it touches, and a crotch where three solids meet can reject specific radii.",
+    "description": "Weld 2+ solids into ONE exact solid and round every joint where they meet with a fillet: the one-piece frame operation (bike frame tubes, lugs and dropouts; pipe tees; brackets welded to plates; organic joints between swept or lofted parts). All intersection curves created by the union are filleted with `radius` (for a radius that varies along one edge, use fillet_edge radiusEnd on the result). The operands are consumed and replaced by one mesh entity that keeps the exact construction (STEP export, further fillets and booleans see true faces). Requires the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server); the default Manifold kernel cannot fillet and gracefully no-ops (use boolean op union there). If the kernel refuses, try another radius: a blend must fit inside the smallest wall it touches, and a crotch where three solids meet can reject specific radii.",
     "input_schema": {
       "properties": {
         "ids": {
@@ -3374,67 +3374,35 @@
     "name": "blend_union"
   },
   {
-    "description": "Compute the intersection of two 3D solid entities, producing a mesh entity that covers only the volume shared by both solids. Both operand entities are consumed (removed) and replaced by the intersection mesh. Requires a geometry kernel to be injected. Both operands must be 3D solids (any solid kind: box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, mesh); 2D shapes are rejected.",
+    "description": "Combine two 3D solid entities with a CSG operation into a single mesh entity: op \"union\" merges them, \"subtract\" removes the volume of b from a (order matters: result = a minus b), \"intersect\" keeps only the volume shared by both. Both operand entities are consumed (removed) and replaced by the result mesh. Requires a geometry kernel to be injected (available after app initialization). Both operands must be 3D solids (any solid kind: box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, mesh); 2D shapes are rejected.",
     "input_schema": {
       "properties": {
         "a": {
-          "description": "Id of the first 3D solid operand.",
+          "description": "Id of the first 3D solid operand (the base solid for subtract).",
           "type": "string"
         },
         "b": {
-          "description": "Id of the second 3D solid operand.",
+          "description": "Id of the second 3D solid operand (the tool solid for subtract).",
+          "type": "string"
+        },
+        "op": {
+          "description": "\"union\" (a ∪ b), \"subtract\" (a minus b) or \"intersect\" (a ∩ b).",
+          "enum": [
+            "union",
+            "subtract",
+            "intersect"
+          ],
           "type": "string"
         }
       },
       "required": [
+        "op",
         "a",
         "b"
       ],
       "type": "object"
     },
-    "name": "boolean_intersect"
-  },
-  {
-    "description": "Subtract the volume of 3D solid b from 3D solid a, producing a mesh entity. Order matters: result = a minus b. Both operand entities are consumed (removed) and replaced by the result mesh. Requires a geometry kernel to be injected. Both operands must be 3D solids (any solid kind: box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, mesh); 2D shapes are rejected.",
-    "input_schema": {
-      "properties": {
-        "a": {
-          "description": "Id of the base 3D solid (the solid to subtract from).",
-          "type": "string"
-        },
-        "b": {
-          "description": "Id of the tool 3D solid (the solid to subtract with).",
-          "type": "string"
-        }
-      },
-      "required": [
-        "a",
-        "b"
-      ],
-      "type": "object"
-    },
-    "name": "boolean_subtract"
-  },
-  {
-    "description": "Merge two 3D solid entities into a single mesh entity using a CSG union operation. Both operand entities are consumed (removed) and replaced by the union mesh. Requires a geometry kernel to be injected (available after app initialization). Both operands must be 3D solids (any solid kind: box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, mesh); 2D shapes are rejected.",
-    "input_schema": {
-      "properties": {
-        "a": {
-          "description": "Id of the first 3D solid operand.",
-          "type": "string"
-        },
-        "b": {
-          "description": "Id of the second 3D solid operand.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "a",
-        "b"
-      ],
-      "type": "object"
-    },
-    "name": "boolean_union"
+    "name": "boolean"
   },
   {
     "description": "Apply an ordered list of command actions as one project. Each action is one of: (1) { command, params, as? } — plain action; (2) { repeat: { count, as? }, step: { command, params } } — run step N times; count may be a number or expression string. Each iteration exposes $i (0-based) in params expressions. (3) { for_each: { values, as }, step: { command, params } } — iterate over values array (or expression). $as is the current element, $i the index. (4) NESTABLE LOOPS (preferred): { repeat: { count, as? }, actions: [ ...actions ] } runs the body count times with loop variable `as` (default \"i\", 0-based); { for: { var, from, to, step? }, actions: [...] } runs var from..to inclusive. count/from/to/step are numbers or \"=expr\" strings (count must be a non-negative integer; at most 1000 iterations per plan); bodies may contain loops. Use the loop variable and document parameters in any \"=expr\", e.g. \"position\": [\"=r*cos(2*pi*i/n)\", \"=r*sin(2*pi*i/n)\", 80] with parameters n and r. Expressions support + - * / ( ), pi, sin cos tan asin acos atan atan2 sqrt abs floor ceil round trunc sign exp ln log10 pow hypot mod min max. Aliases inside loops interpolate {expr}: \"as\": \"piston{i}\" binds $piston0, $piston1, ... (usable later, and as \"$piston{i}\" in the same body). A top-level loop is recorded as ONE history step that re-expands on replay, so set_parameter on n/r (even the count) regenerates it; entities made by later steps that reference loop-made ids by position may break if the count shrinks. Validation reports issues by path (\"step 4 › iter 2 › step 1\"). A step may bind its result to an alias with \"as\"; later steps reference it as \"$alias\" or \"$alias[N]\". params values starting with \"=\" are evaluated as arithmetic expressions against doc.parameters plus $i/$as. onError=\"abort\" (default) rolls the whole document back on the first failing step; \"continue\" applies what it can. validate=true performs a dry run without changing the document.",
@@ -8451,7 +8419,7 @@
     "name": "surface_report"
   },
   {
-    "description": "Sweep a closed cross-section along a 3D path into a solid: pipes, tubes, hoses, handrails, ducts, cable runs, coils. Right-handed world frame, +Z up. Path: either `path`, world [x, y, z] points — joined by straight runs whose corners are rounded with circular bends of bendRadius (pipe elbows), or with smooth: true a smooth spline through the points — or `pathId`, a 2D sketch curve (line, arc, polyline, spline, circle, ellipse, rectangle) placed by its work plane. Paths may be open or closed loops (closed: true, or a closed sketch); a loop has no end caps. Section (exactly one): `radius` for a round tube (+ innerRadius for a hollow pipe), `section` as [x, y] polygon points, or `sectionId` of a closed 2D sketch (circle, ellipse, rectangle, closed polyline/spline). The section is centred on the path; its +y axis points toward world +Z (toward +Y when the path starts vertical) and it is carried along with a rotation-minimizing (twist-free) frame. Paths, bends and sketched sections stay exact for the exact kernel and STEP export. Booleans with other solids work like any primitive (e.g. boolean_union to weld pipes to a flange).",
+    "description": "Sweep a closed cross-section along a 3D path into a solid: pipes, tubes, hoses, handrails, ducts, cable runs, coils. Right-handed world frame, +Z up. Path: either `path`, world [x, y, z] points — joined by straight runs whose corners are rounded with circular bends of bendRadius (pipe elbows), or with smooth: true a smooth spline through the points — or `pathId`, a 2D sketch curve (line, arc, polyline, spline, circle, ellipse, rectangle) placed by its work plane. Paths may be open or closed loops (closed: true, or a closed sketch); a loop has no end caps. Section (exactly one): `radius` for a round tube (+ innerRadius for a hollow pipe), `section` as [x, y] polygon points, or `sectionId` of a closed 2D sketch (circle, ellipse, rectangle, closed polyline/spline). The section is centred on the path; its +y axis points toward world +Z (toward +Y when the path starts vertical) and it is carried along with a rotation-minimizing (twist-free) frame. Paths, bends and sketched sections stay exact for the exact kernel and STEP export. Booleans with other solids work like any primitive (e.g. boolean op union to weld pipes to a flange).",
     "input_schema": {
       "properties": {
         "bendRadius": {

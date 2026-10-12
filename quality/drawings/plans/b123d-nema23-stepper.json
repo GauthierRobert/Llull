@@ -1524,16 +1524,16 @@
   "as": "cap1"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$cap0",
    "b": "$mid"
   },
   "as": "bb"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$bb",
    "b": "$cap1"
   },
@@ -1718,8 +1718,8 @@
   "as": "fl"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$body",
    "b": "$fl"
   },
@@ -1740,8 +1740,8 @@
   "as": "hl0"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$b",
    "b": "$hl0"
   },
@@ -1762,8 +1762,8 @@
   "as": "hl1"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t0",
    "b": "$hl1"
   },
@@ -1784,8 +1784,8 @@
   "as": "hl2"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t1",
    "b": "$hl2"
   },
@@ -1806,8 +1806,8 @@
   "as": "hl3"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t2",
    "b": "$hl3"
   },
@@ -1828,8 +1828,8 @@
   "as": "pilot"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$t3",
    "b": "$pilot"
   },
@@ -1850,8 +1850,8 @@
   "as": "shaft"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$p1",
    "b": "$shaft"
   },
@@ -1874,8 +1874,8 @@
   "as": "flat"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$p2",
    "b": "$flat"
   },

@@ -57,10 +57,10 @@ const run = (
 ): ReturnType<typeof execute> => execute(doc, name, params, { ...defaultContext(), kernel });
 
 describe('kernel results keep their exact construction', () => {
-  it('boolean_union stores the boolean recipe of both exact operands and reports the topology', () => {
+  it('boolean union stores the boolean recipe of both exact operands and reports the topology', () => {
     const { doc, a, b } = twoBoxes();
     const kernel = fakeKernel({ boolean: TETRA, topology: TOPOLOGY });
-    const result = run(doc, 'boolean_union', { a, b }, kernel);
+    const result = run(doc, 'boolean', { op: 'union', a, b }, kernel);
     const mesh = result.document.entities[result.affected[0]!] as MeshSolidEntity;
     expect(mesh.brep).toMatchObject({
       op: 'boolean',
@@ -74,7 +74,7 @@ describe('kernel results keep their exact construction', () => {
   it('a fillet on a boolean result builds on its recipe, not on its triangles', () => {
     const { doc, a, b } = twoBoxes();
     const kernel = fakeKernel({ boolean: TETRA, fillet: TETRA });
-    const unioned = run(doc, 'boolean_union', { a, b }, kernel);
+    const unioned = run(doc, 'boolean', { op: 'union', a, b }, kernel);
     const id = unioned.affected[0]!;
     const filleted = run(
       unioned.document,
@@ -97,7 +97,7 @@ describe('kernel results keep their exact construction', () => {
     const filleted = run(doc, 'fillet_edge', { id: a, radius: 0.2 }, fakeKernel({ fillet: TETRA }));
     const id = filleted.affected[0]!;
     const meshOnly = fakeKernel({ boolean: TETRA, unsupported: ['fillet', 'chamfer', 'shell'] });
-    const unioned = run(filleted.document, 'boolean_union', { a: id, b }, meshOnly);
+    const unioned = run(filleted.document, 'boolean', { op: 'union', a: id, b }, meshOnly);
     expect(unioned.summary).toContain(
       `This kernel cannot rebuild '${id}' (its exact tree needs fillet)`,
     );
@@ -115,7 +115,7 @@ describe('kernel results keep their exact construction', () => {
     const filleted = run(doc, 'fillet_edge', { id: a, radius: 0.2 }, fakeKernel({ fillet: TETRA }));
     const id = filleted.affected[0]!;
     const flaky = fakeKernel({ boolean: TETRA, fillet: null });
-    const unioned = run(filleted.document, 'boolean_union', { a: id, b }, flaky);
+    const unioned = run(filleted.document, 'boolean', { op: 'union', a: id, b }, flaky);
     expect(unioned.affected).toEqual([]);
     expect(unioned.summary).toMatch(/kernel returned null/);
   });
@@ -231,7 +231,7 @@ describe('kernel results keep their exact construction', () => {
 
   it('scale_entity on a kernel result scales its recipe too', () => {
     const { doc, a, b } = twoBoxes();
-    const unioned = run(doc, 'boolean_union', { a, b }, fakeKernel({ boolean: TETRA }));
+    const unioned = run(doc, 'boolean', { op: 'union', a, b }, fakeKernel({ boolean: TETRA }));
     const id = unioned.affected[0]!;
     const scaled = execute(unioned.document, 'scale_entity', { id, factor: 2 });
     const mesh = scaled.document.entities[id] as MeshSolidEntity;
@@ -241,7 +241,7 @@ describe('kernel results keep their exact construction', () => {
 
   it('load_document rejects a malformed brep recipe', () => {
     const { doc, a, b } = twoBoxes();
-    const unioned = run(doc, 'boolean_union', { a, b }, fakeKernel({ boolean: TETRA }));
+    const unioned = run(doc, 'boolean', { op: 'union', a, b }, fakeKernel({ boolean: TETRA }));
     const id = unioned.affected[0]!;
     const broken = {
       ...unioned.document,

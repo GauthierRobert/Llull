@@ -45,7 +45,7 @@ function conversation(userText: string, assistantText: string): McpPromptMessage
 
 /**
  * @prompt model_bracket
- * draw_rectangle → extrude_profile body, then N × (draw_arc → extrude_profile → boolean_subtract)
+ * draw_rectangle → extrude_profile body, then N × (draw_arc → extrude_profile → boolean subtract)
  * for the mounting holes, as one build_project action-list.
  */
 const modelBracket: PromptTemplate = {
@@ -83,7 +83,7 @@ const modelBracket: PromptTemplate = {
     const holeRadius = Math.max(t * 0.4, 2);
     const holeDepth = t + 2; // punch fully through
 
-    // Hole centers are evenly spaced along the width. boolean_subtract consumes BOTH operands and
+    // Hole centers are evenly spaced along the width. a boolean subtract consumes BOTH operands and
     // returns a NEW mesh, so the subtracts chain: body → body_0 → body_1 → … → body_${n - 1}.
     const holeActions: string[] = [];
     for (let i = 0; i < n; i++) {
@@ -94,7 +94,7 @@ const modelBracket: PromptTemplate = {
       holeActions.push(
         `    { "command": "draw_arc",       "params": { "center": [${cx}, ${h / 2}], "radius": ${holeRadius} }, "as": "${holeSketchAlias}" },`,
         `    { "command": "extrude_profile", "params": { "id": "$${holeSketchAlias}", "depth": ${holeDepth} }, "as": "${holeSolidAlias}" },`,
-        `    { "command": "boolean_subtract","params": { "a": "$${bodyIn}", "b": "$${holeSolidAlias}" }, "as": "body_${i}" },`,
+        `    { "command": "boolean",        "params": { "op": "subtract", "a": "$${bodyIn}", "b": "$${holeSolidAlias}" }, "as": "body_${i}" },`,
       );
     }
     const finalBodyAlias = `body_${n - 1}`;
@@ -122,7 +122,7 @@ const modelBracket: PromptTemplate = {
         `**Key points**\n` +
         `- \`draw_rectangle\` requires only \`width\` and \`height\`; \`position\` (optional [x,y,z]) places the work-plane origin.\n` +
         `- \`extrude_profile\` takes \`id\` (or \`ids\` of open pieces forming one loop) and \`depth\`; it inherits the sketch's position automatically.\n` +
-        `- \`boolean_subtract\` uses params \`a\` (base solid) and \`b\` (tool solid); BOTH operands are consumed and replaced by a new mesh entity — bind the result with \`as\` so later steps can reference it.\n` +
+        `- \`boolean\` with \`op: "subtract"\` uses params \`a\` (base solid) and \`b\` (tool solid); BOTH operands are consumed and replaced by a new mesh entity — bind the result with \`as\` so later steps can reference it.\n` +
         `- Each subtract chains to the previous result: body → body_0 → body_1 → … The final mesh alias is \`$${finalBodyAlias}\`.\n` +
         `- \`$alias\` references let later steps use entity ids created in earlier steps without knowing them in advance.\n` +
         `- \`describe_scene\` at the end lets you verify the final entity count and bounding box.\n` +
@@ -255,10 +255,10 @@ const parametricPart: PromptTemplate = {
         `      "as": "cutter" },\n` +
         `\n` +
         `    // Step 4 — subtract cutter from body\n` +
-        `    // boolean_subtract params are a (base solid) and b (tool solid).\n` +
+        `    // boolean op subtract: a (base solid) minus b (tool solid).\n` +
         `    // BOTH operands are consumed; bind the new mesh with as so later steps can use it.\n` +
-        `    { "command": "boolean_subtract",\n` +
-        `      "params": { "a": "$body", "b": "$cutter" },\n` +
+        `    { "command": "boolean",\n` +
+        `      "params": { "op": "subtract", "a": "$body", "b": "$cutter" },\n` +
         `      "as": "result" },\n` +
         `\n` +
         `    // Step 5 — name the final solid\n` +

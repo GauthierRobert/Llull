@@ -148,9 +148,9 @@ const STOPWORDS: ReadonlySet<string> = new Set([
 
 /** Everyday phrasing -> the vocabulary tool names use. */
 const SYNONYMS: Readonly<Record<string, readonly string[]>> = {
-  hole: ['subtract', 'cut'],
-  drill: ['subtract', 'cut'],
-  cut: ['subtract'],
+  hole: ['boolean', 'subtract', 'cut'],
+  drill: ['boolean', 'subtract', 'cut'],
+  cut: ['boolean', 'subtract'],
   round: ['fillet'],
   bevel: ['chamfer'],
   hollow: ['shell'],
@@ -163,9 +163,9 @@ const SYNONYMS: Readonly<Record<string, readonly string[]>> = {
   resize: ['scale'],
   spin: ['rotate'],
   turn: ['rotate'],
-  merge: ['union'],
-  join: ['union'],
-  combine: ['union'],
+  merge: ['boolean', 'union'],
+  join: ['boolean', 'union'],
+  combine: ['boolean', 'union'],
   size: ['bounding', 'measure'],
   length: ['measure', 'distance'],
   area: ['measure'],

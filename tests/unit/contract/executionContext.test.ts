@@ -67,8 +67,8 @@ describe('ExecutionContext', () => {
     const { doc, a, b } = twoBoxes();
     const result = execute(
       doc,
-      'boolean_union',
-      { a, b },
+      'boolean',
+      { op: 'union', a, b },
       contextWith({ kernel: triangleKernel() }),
     );
     const created = result.document.entities[result.affected[0] ?? ''] as MeshSolidEntity;
@@ -77,7 +77,7 @@ describe('ExecutionContext', () => {
 
   it('no-ops a requiresKernel command with an explicit summary when no kernel is available', () => {
     const { doc, a, b } = twoBoxes();
-    const result = execute(doc, 'boolean_union', { a, b });
+    const result = execute(doc, 'boolean', { op: 'union', a, b });
     expect(result.document).toBe(doc);
     expect(result.affected).toEqual([]);
     expect(result.summary).toContain('kernel not available');
@@ -87,8 +87,8 @@ describe('ExecutionContext', () => {
     const { doc, a, b } = twoBoxes();
     const unioned = execute(
       doc,
-      'boolean_union',
-      { a, b },
+      'boolean',
+      { op: 'union', a, b },
       contextWith({ kernel: triangleKernel() }),
     );
     const replayed = execute(unioned.document, 'replay_history', {});

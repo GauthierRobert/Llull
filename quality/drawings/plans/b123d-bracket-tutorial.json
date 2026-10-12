@@ -288,8 +288,8 @@
   "as": "t14"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t13",
    "b": "$t14"
   },
@@ -309,8 +309,8 @@
   "as": "t16"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t15",
    "b": "$t16"
   },
@@ -330,8 +330,8 @@
   "as": "t18"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t17",
    "b": "$t18"
   },
@@ -356,8 +356,8 @@
   "as": "t20"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t19",
    "b": "$t20"
   },

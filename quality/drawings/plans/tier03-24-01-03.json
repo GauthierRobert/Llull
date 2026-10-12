@@ -389,8 +389,8 @@
   "as": "rv12"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$rv6",
    "b": "$rv12"
   },
@@ -440,16 +440,16 @@
   "as": "b16"
  },
  {
-  "command": "boolean_intersect",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "intersect", 
    "a": "$rv15",
    "b": "$b16"
   },
   "as": "i17"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$s13",
    "b": "$i17"
   },

@@ -154,7 +154,7 @@ describe('history lowering', () => {
     let doc = run(createEmptyDocument(), 'add_box', { size: [4, 4, 4], color: '#111111' });
     doc = run(doc, 'add_cylinder', { radius: 1, height: 9 });
     const [boxId, cylinderId] = doc.order as [string, string];
-    doc = run(doc, 'boolean_subtract', { a: boxId, b: cylinderId });
+    doc = run(doc, 'boolean', { op: 'subtract', a: boxId, b: cylinderId });
     const cutId = doc.order[0]!;
     doc = run(doc, 'move_entities', { ids: [cutId], delta: [1, 2, 3] });
     doc = run(doc, 'set_entity_name', { id: cutId, name: 'Block' });
@@ -171,7 +171,7 @@ describe('history lowering', () => {
     expect(p.features.map((f) => f.command)).toEqual([
       'add_box',
       'add_cylinder',
-      'boolean_subtract',
+      'boolean',
       'move_entities',
       'set_entity_name',
     ]);
@@ -376,7 +376,7 @@ function handProgram(rotation: readonly [Term, Term, Term]): FeatureProgram {
     {
       op: 'boolean',
       step: 20,
-      command: 'boolean_union',
+      command: 'boolean',
       variable: 's0',
       kind: 'union',
       left: 's0',
@@ -385,7 +385,7 @@ function handProgram(rotation: readonly [Term, Term, Term]): FeatureProgram {
     {
       op: 'boolean',
       step: 21,
-      command: 'boolean_subtract',
+      command: 'boolean',
       variable: 's0',
       kind: 'cut',
       left: 's0',
@@ -394,7 +394,7 @@ function handProgram(rotation: readonly [Term, Term, Term]): FeatureProgram {
     {
       op: 'boolean',
       step: 22,
-      command: 'boolean_intersect',
+      command: 'boolean',
       variable: 's0',
       kind: 'intersect',
       left: 's0',

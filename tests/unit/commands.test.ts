@@ -5259,7 +5259,10 @@ describe('export_stl', () => {
     doc = r1.document;
     const r2 = execute(doc, 'add_box', { size: [2, 2, 2], position: [1, 0, 0] });
     doc = r2.document;
-    const u = execute(doc, 'boolean_union', { entityIds: [r1.affected[0]!, r2.affected[0]!] });
+    const u = execute(doc, 'boolean', {
+      op: 'union',
+      entityIds: [r1.affected[0]!, r2.affected[0]!],
+    });
     if (u.affected.length > 0) {
       // Only assert if boolean union produced a mesh (OCC might not be available)
       const meshEntity = u.document.entities[u.affected[0]!];

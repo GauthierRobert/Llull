@@ -203,8 +203,8 @@
   "as": "rv10"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$omid",
    "b": "$rv10"
   },
@@ -290,8 +290,8 @@
   "as": "rv16"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$u11",
    "b": "$rv16"
   },
@@ -608,8 +608,8 @@
   "as": "rv33"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$imid",
    "b": "$rv33"
   },
@@ -726,16 +726,16 @@
   "as": "rv41"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$u34",
    "b": "$rv41"
   },
   "as": "u42"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$u17",
    "b": "$u42"
   },

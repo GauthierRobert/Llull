@@ -24,7 +24,7 @@ thickness = param("thickness", width / 10)
 box_1 = box((width, 40, thickness), position=(0, 0, thickness / 2), color="#8899aa")
 # step 2 · add_cylinder
 cylinder_1 = cylinder(6, thickness * 3, position=(20, 0, 4), color="#6b8f9c")
-# step 3 · boolean_subtract
+# step 3 · boolean
 box_1 = cut(box_1, cylinder_1)
 # step 4 · set_entity_name
 label(box_1, "Base plate")
@@ -52,7 +52,7 @@ helpers (`param`, `box`, `cylinder`, `sphere`, `cone`, `torus`, `wedge`, `pyrami
 
 On import, the server runs the script and passes `LLULL_TRACE` to the registry command
 `apply_code_trace`. That command sets the parameters, then runs each traced feature as its
-llull command (`add_box`, `boolean_subtract`, …), keeping the `=expr` strings in the feature
+llull command (`add_box`, `boolean`, …), keeping the `=expr` strings in the feature
 history. Only the whitelisted commands the runtime emits can appear in a trace.
 
 Loops, functions and `math` work. Anything computed from parameters with `+ - * /` keeps its

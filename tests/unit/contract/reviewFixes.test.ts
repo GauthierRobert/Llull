@@ -62,7 +62,8 @@ describe('S4/S7: history operations refuse without a kernel instead of reporting
     doc = a.document;
     const b = execute(doc, 'add_box', { size: [2, 2, 2], position: [1, 0, 0] }, ctx);
     doc = b.document;
-    return execute(doc, 'boolean_union', { a: a.affected[0], b: b.affected[0] }, ctx).document;
+    return execute(doc, 'boolean', { op: 'union', a: a.affected[0], b: b.affected[0] }, ctx)
+      .document;
   }
 
   it('edit_step_params / set_step_suppressed / insert_step no-op with an explicit summary', () => {

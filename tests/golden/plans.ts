@@ -939,16 +939,16 @@ export const kernelPlans: Record<string, GoldenAction[]> = {
       },
       as: 'pipe',
     },
-    { command: 'boolean_union', params: { a: '$drum', b: '$pipe' } },
+    { command: 'boolean', params: { op: 'union', a: '$drum', b: '$pipe' } },
   ],
   kernel_boolean_union: [
     { command: 'add_box', params: { size: [2, 2, 2] }, as: 'a' },
     { command: 'add_box', params: { size: [2, 2, 2], position: [1, 1, 1] }, as: 'b' },
-    { command: 'boolean_union', params: { a: '$a', b: '$b' } },
+    { command: 'boolean', params: { op: 'union', a: '$a', b: '$b' } },
   ],
   kernel_boolean_subtract: [
     { command: 'add_box', params: { size: [4, 4, 4] }, as: 'a' },
     { command: 'add_cylinder', params: { radius: 1, height: 6 }, as: 'b' },
-    { command: 'boolean_subtract', params: { a: '$a', b: '$b' } },
+    { command: 'boolean', params: { op: 'subtract', a: '$a', b: '$b' } },
   ],
 };

@@ -68,7 +68,7 @@ function solidsAndVolume(doc: CadDocument, id: string): { solids: number; volume
 describe('blend_union on the live OCC kernel', () => {
   it('welds the frame junction into one solid with filleted joints', () => {
     const doc = frameJunction();
-    const plain = execute(doc, 'boolean_union', { a: doc.order[0], b: doc.order[1] });
+    const plain = execute(doc, 'boolean', { op: 'union', a: doc.order[0], b: doc.order[1] });
     expect(plain.affected).toHaveLength(1);
     const blended = execute(doc, 'blend_union', { ids: doc.order, radius: 6 });
     expect(blended.affected, blended.summary).toHaveLength(1);

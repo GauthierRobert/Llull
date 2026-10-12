@@ -175,16 +175,16 @@
   "as": "lugB"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$base",
    "b": "$lugA"
   },
   "as": "u1"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$u1",
    "b": "$lugB"
   },
@@ -364,8 +364,8 @@
   "as": "rrPrism"
  },
  {
-  "command": "boolean_intersect",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "intersect", 
    "a": "$u2",
    "b": "$rrPrism"
   },
@@ -390,8 +390,8 @@
   "as": "bore"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$u3",
    "b": "$bore"
   },
@@ -416,8 +416,8 @@
   "as": "cbA"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$s1",
    "b": "$cbA"
   },
@@ -442,8 +442,8 @@
   "as": "cbB"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$s2",
    "b": "$cbB"
   },
@@ -466,8 +466,8 @@
   "as": "slotBox"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$s3",
    "b": "$slotBox"
   },
@@ -487,8 +487,8 @@
   "as": "slotEndA"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$s4",
    "b": "$slotEndA"
   },
@@ -508,8 +508,8 @@
   "as": "slotEndB"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$s5",
    "b": "$slotEndB"
   },
@@ -559,8 +559,8 @@
   "as": "dove"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$s6",
    "b": "$dove"
   },

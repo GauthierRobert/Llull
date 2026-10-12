@@ -137,7 +137,7 @@ function commitEntity(doc: CadDocument, entity: Entity, summary: string): Comman
 ```
 
 Commands to imitate: `add_box` (`solids/basic.ts`), `set_units` (`document/units.ts`),
-`extrude_profile` / `revolve_profile` (`solids/profile.ts`), `boolean_subtract` (`brep/boolean.ts`, kernel),
+`extrude_profile` / `revolve_profile` (`solids/profile.ts`), `boolean` (`brep/boolean.ts`, kernel),
 `measure_distance` (`inspect/measureDistanceAngle.ts`, query), a building command in `packages/domain-aec/src`.
 
 - Create: build entity with `nextId(prefix)` from `@lib/id` (scoped to the step's id source),

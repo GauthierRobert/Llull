@@ -351,8 +351,9 @@
       },
       {
         "id": "#7",
-        "name": "boolean_subtract",
+        "name": "boolean",
         "params": {
+          "op": "subtract",
           "a": "#2",
           "b": "#4"
         },

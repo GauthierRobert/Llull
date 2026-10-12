@@ -36,7 +36,8 @@ function run(doc: CadDocument, name: string, params: unknown): ReturnType<typeof
 function filletedBlock(): { doc: CadDocument; id: string } {
   const block = run(createEmptyDocument(), 'add_box', { size: [40, 40, 20], name: 'Block' });
   const drill = run(block.document, 'add_cylinder', { radius: 6, height: 40 });
-  const drilled = run(drill.document, 'boolean_subtract', {
+  const drilled = run(drill.document, 'boolean', {
+    op: 'subtract',
     a: block.affected[0],
     b: drill.affected[0],
   });
@@ -81,7 +82,7 @@ describe.skipIf(!hasCadQuery)('exact recipes through CadQuery', () => {
     const result = await port.runProgram({ language: 'cadquery', source: code, step: false });
     const applied = execute(createEmptyDocument(), 'apply_code_trace', { trace: result.trace });
     const names = applied.document.featureHistory.map((step) => step.name);
-    expect(names).toEqual(['add_box', 'add_cylinder', 'boolean_subtract', 'fillet_edge']);
+    expect(names).toEqual(['add_box', 'add_cylinder', 'boolean', 'fillet_edge']);
     const volumeOf = (source: CadDocument): number => {
       const [id] = source.order;
       return (execute(source, 'inspect_topology', { id }).data as ShapeTopology).volume;

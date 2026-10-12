@@ -173,7 +173,7 @@ export const sweepProfile = defineCommand({
     'polyline/spline). The section is centred on the path; its +y axis points toward world +Z (toward +Y ' +
     'when the path starts vertical) and it is carried along with a rotation-minimizing (twist-free) frame. ' +
     'Paths, bends and sketched sections stay exact for the exact kernel and STEP export. ' +
-    'Booleans with other solids work like any primitive (e.g. boolean_union to weld pipes to a flange).',
+    'Booleans with other solids work like any primitive (e.g. boolean op union to weld pipes to a flange).',
   params: z.object({
     path: untypedArray(
       'World-space [x, y, z] points the section follows (>= 2). Without smooth, consecutive points are ' +

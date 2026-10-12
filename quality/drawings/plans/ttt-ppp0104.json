@@ -204,8 +204,8 @@
   "as": "cyl"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$cyl",
    "b": "$arm"
   },
@@ -239,8 +239,8 @@
   "as": "ft"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$fd",
    "b": "$ft"
   },
@@ -264,16 +264,16 @@
   "as": "fb"
  },
  {
-  "command": "boolean_intersect",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "intersect", 
    "a": "$fr",
    "b": "$fb"
   },
   "as": "fil"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$u1",
    "b": "$fil"
   },
@@ -294,8 +294,8 @@
   "as": "boss"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$f1",
    "b": "$boss"
   },
@@ -315,8 +315,8 @@
   "as": "hole"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$u2",
    "b": "$hole"
   },
@@ -339,8 +339,8 @@
   "as": "sb"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$u3",
    "b": "$sb"
   },
@@ -365,8 +365,8 @@
   "as": "sc"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$u4",
    "b": "$sc"
   },
@@ -389,8 +389,8 @@
   "as": "cb"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$u5",
    "b": "$cb"
   },
@@ -415,8 +415,8 @@
   "as": "cc"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$u6",
    "b": "$cc"
   },

@@ -40,8 +40,8 @@
   "as": "t2"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$t1",
    "b": "$t2"
   },
@@ -62,8 +62,8 @@
   "as": "t4"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$t3",
    "b": "$t4"
   },
@@ -84,8 +84,8 @@
   "as": "t6"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$t5",
    "b": "$t6"
   },
@@ -106,8 +106,8 @@
   "as": "t8"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$t7",
    "b": "$t8"
   },
@@ -128,8 +128,8 @@
   "as": "t10"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$t9",
    "b": "$t10"
   },
@@ -153,8 +153,8 @@
   "as": "t12"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$t11",
    "b": "$t12"
   },
@@ -192,8 +192,8 @@
   "as": "t14"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$t13",
    "b": "$t14"
   },
@@ -218,8 +218,8 @@
   "as": "t16"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t15",
    "b": "$t16"
   },
@@ -243,8 +243,8 @@
   "as": "t18"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$t17",
    "b": "$t18"
   },
@@ -282,8 +282,8 @@
   "as": "t20"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$t19",
    "b": "$t20"
   },
@@ -308,8 +308,8 @@
   "as": "t22"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t21",
    "b": "$t22"
   },
@@ -329,8 +329,8 @@
   "as": "t24"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t23",
    "b": "$t24"
   },
@@ -350,8 +350,8 @@
   "as": "t26"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t25",
    "b": "$t26"
   },
@@ -371,8 +371,8 @@
   "as": "t28"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t27",
    "b": "$t28"
   },
@@ -392,8 +392,8 @@
   "as": "t30"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t29",
    "b": "$t30"
   },
@@ -413,8 +413,8 @@
   "as": "t32"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t31",
    "b": "$t32"
   },

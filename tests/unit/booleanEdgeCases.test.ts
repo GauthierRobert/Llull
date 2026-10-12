@@ -17,7 +17,7 @@ describe('boolean edge cases', () => {
 
   it('an empty kernel result keeps both operands instead of consuming them', () => {
     setGeometryKernel(kernelReturning({ positions: [], indices: [] }));
-    const result = execute(doc, 'boolean_intersect', { a: idA, b: idB });
+    const result = execute(doc, 'boolean', { op: 'intersect', a: idA, b: idB });
     expect(result.document).toBe(doc);
     expect(result.affected).toEqual([]);
     expect(result.summary).toContain('is empty');
@@ -27,7 +27,7 @@ describe('boolean edge cases', () => {
     setGeometryKernel(
       kernelReturning({ positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] }),
     );
-    const result = execute(doc, 'boolean_union', { a: idA, b: idB });
+    const result = execute(doc, 'boolean', { op: 'union', a: idA, b: idB });
     expect(result.affected).toHaveLength(1);
     expect(result.document.entities[idA]).toBeUndefined();
   });
@@ -42,7 +42,7 @@ describe('boolean edge cases', () => {
       componentId: 'comp-part',
     });
     const instanceId = component.affected[0]!;
-    const result = execute(component.document, 'boolean_union', { a: instanceId, b: idB });
+    const result = execute(component.document, 'boolean', { op: 'union', a: instanceId, b: idB });
     expect(result.document).toBe(component.document);
     expect(result.summary).toContain('explode_instance');
   });

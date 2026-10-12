@@ -16,7 +16,7 @@ export interface StepObserverOptions {
   readonly now: () => number;
   /** One stderr line. */
   readonly print: (line: string) => void;
-  /** Stream a line per step (`[12/189] boolean_subtract … 3.2s`). */
+  /** Stream a line per step (`[12/189] boolean … 3.2s`). */
   readonly progress: boolean;
   /** Stop starting new steps this many seconds after creation. */
   readonly timeoutSeconds?: number;

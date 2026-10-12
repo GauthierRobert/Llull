@@ -131,7 +131,7 @@ function fixtureActions(): unknown[] {
       as: 'hole',
       params: { radius: 6, height: 30, position: [40, 20, 4] },
     },
-    { command: 'boolean_subtract', as: 'cut', params: { a: '$plate', b: '$hole' } },
+    { command: 'boolean', as: 'cut', params: { op: 'subtract', a: '$plate', b: '$hole' } },
     { command: 'set_entity_name', params: { id: '$cut', name: 'Base plate' } },
   ];
   for (const [name, command, params] of PRIMITIVES) {

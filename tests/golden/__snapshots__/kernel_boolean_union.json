@@ -314,8 +314,9 @@
       },
       {
         "id": "#7",
-        "name": "boolean_union",
+        "name": "boolean",
         "params": {
+          "op": "union",
           "a": "#2",
           "b": "#4"
         },

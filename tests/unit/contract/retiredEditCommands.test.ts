@@ -219,3 +219,22 @@ describe('retired make_tube_between', () => {
     }
   });
 });
+
+describe('retired boolean_* commands', () => {
+  it('boolean_union / boolean_subtract / boolean_intersect become boolean with their op', () => {
+    const raw = migrateRetiredCommands({
+      featureHistory: ['union', 'subtract', 'intersect'].map((op, i) => ({
+        id: `step-${i + 1}`,
+        name: `boolean_${op}`,
+        params: { a: 'box-1.1', b: 'cyl-2.1' },
+      })),
+    });
+    expect(raw['featureHistory']).toEqual(
+      ['union', 'subtract', 'intersect'].map((op, i) => ({
+        id: `step-${i + 1}`,
+        name: 'boolean',
+        params: { op, a: 'box-1.1', b: 'cyl-2.1' },
+      })),
+    );
+  });
+});

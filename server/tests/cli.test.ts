@@ -196,7 +196,7 @@ describe('llull CLI — local document', () => {
       JSON.stringify([
         { command: 'add_box', params: { size: [20, 20, 20] }, as: 'body' },
         { command: 'add_cylinder', params: { radius: 4, height: 30 }, as: 'hole' },
-        { command: 'boolean_subtract', params: { a: '$body', b: '$hole' } },
+        { command: 'boolean', params: { op: 'subtract', a: '$body', b: '$hole' } },
       ]),
     );
     const validate = capture();
@@ -205,7 +205,7 @@ describe('llull CLI — local document', () => {
 
     const apply = capture();
     expect(await runCli(['run', planPath, ...docFlag()], apply.io)).toBe(EXIT_OK);
-    expect(apply.out[0]).toMatch(/#2 ok {3}boolean_subtract/);
+    expect(apply.out[0]).toMatch(/#2 ok {3}boolean/);
     expect(entityIds()).toEqual(['mesh-3.1']);
 
     const failing = capture({
@@ -230,7 +230,7 @@ describe('llull CLI — local document', () => {
     const plan = [
       { command: 'add_box', params: { size: [20, 20, 20] }, as: 'body' },
       { command: 'add_cylinder', params: { radius: 4, height: 30 }, as: 'hole' },
-      { command: 'boolean_subtract', params: { a: '$body', b: '$hole' }, as: 'part' },
+      { command: 'boolean', params: { op: 'subtract', a: '$body', b: '$hole' }, as: 'part' },
     ];
     const text = capture({ stdin: JSON.stringify(plan) });
     expect(await runCli(['run', '-', ...docFlag()], text.io)).toBe(EXIT_OK);

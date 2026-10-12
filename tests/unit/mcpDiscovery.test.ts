@@ -43,8 +43,8 @@ describe('search_tools on natural phrasing', () => {
     searchTools(query, count, new Set(parseToolsets('all').enabled)).map((r) => r.name);
 
   it.each([
-    ['cut a hole', 'boolean_subtract'],
-    ['make a hole in a plate', 'boolean_subtract'],
+    ['cut a hole', 'boolean'],
+    ['make a hole in a plate', 'boolean'],
     ['round the edges', 'fillet_edge'],
     ['bevel the edges', 'chamfer_edge'],
     ['how heavy is it', 'mass_properties'],
@@ -125,7 +125,7 @@ describe('search_tools', () => {
 describe('closestToolNames', () => {
   it('finds the intended tool for a typo, closest first', () => {
     expect(closestToolNames('add_boxx', 3)[0]).toBe('add_box');
-    expect(closestToolNames('Boolean_Subtrct', 3)).toContain('boolean_subtract');
+    expect(closestToolNames('Boolen', 3)).toContain('boolean');
     expect(closestToolNames('add_box', 3)[0]).toBe('add_box');
   });
 

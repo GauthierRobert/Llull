@@ -37,7 +37,7 @@ verify and refine.
 | 2D edit             | `offset_2d` `trim` `extend` `fillet_2d` `chamfer_2d` `explode_polyline`                                                              |
 | 2D→3D               | `extrude_profile` (profile / id / ids) `revolve_profile`                                                                                 |
 | Primitives          | `add_box` `add_cylinder` `add_sphere` `add_cone` `add_torus` `add_wedge` `add_pyramid`                                               |
-| Combine             | `boolean_union` `boolean_subtract` `boolean_intersect`                                                           |
+| Combine             | `boolean` (op `union` / `subtract` / `intersect`)                                                           |
 | Modify 3D           | `fillet_edge` `chamfer_edge`                                                                                                         |
 | Place/replicate     | `move_entities` `rotate_entity` `scale_entity` `mirror_entity` `array_linear` `array_polar` `duplicate_entities`                         |
 | Organize            | `group_entities` `ungroup_entities` `set_entity_name` `set_entity_layer` `assign_material`                                           |
@@ -71,7 +71,7 @@ its first affected id later as `$base` (or `$base[N]` for the Nth). Typical shap
     { "command": "set_parameter", "params": { "name": "bore", "value": 20 } },
     { "command": "add_cylinder", "params": { "radius": 40, "height": 30 }, "as": "body" },
     { "command": "add_cylinder", "params": { "radius": 10, "height": 40 }, "as": "hole" },
-    { "command": "boolean_subtract", "params": { "a": "$body", "b": "$hole" }, "as": "part" },
+    { "command": "boolean", "params": { "op": "subtract",  "a": "$body", "b": "$hole" }, "as": "part" },
     { "command": "fillet_edge", "params": { "id": "$part", "radius": 2 } },
   ],
 }
