@@ -14,6 +14,7 @@ import { OptionSelect } from '@ui/panels/OptionSelect';
 import { CivilObjectRow, useCivilObjects, TextField } from './CivilParts';
 import { DxfImports, readChosenFile } from './DxfImports';
 import { fileStem } from '@ui/chosenFile';
+import { optionalText } from '@ui/numberText';
 
 const FORMATS = ['PENZD', 'PNEZD', 'PENZ', 'PNEZ', 'ENZ', 'NEZ'] as const;
 
@@ -48,7 +49,7 @@ export function SurveySection(): React.ReactElement {
       text,
       format,
       sourceUnit: unit,
-      ...(name.trim() !== '' ? { name: name.trim() } : {}),
+      ...optionalText('name', name),
     });
     setText('');
     setName('');

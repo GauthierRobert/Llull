@@ -1,6 +1,7 @@
 /**
  * @layer ui
- * @pure Number parsing for form text (param gathering only; the commands validate).
+ * @pure Form text -> command params: numbers and optional strings (param gathering only; the
+ * commands validate).
  */
 
 /** A finite number, or undefined for blank / invalid text. */
@@ -14,6 +15,12 @@ export function parseNumber(text: string): number | undefined {
 export function optionalNumber<K extends string>(key: K, text: string): Partial<Record<K, number>> {
   const value = parseNumber(text);
   return value === undefined ? {} : ({ [key]: value } as Record<K, number>);
+}
+
+/** `{ [key]: trimmed text }` when `text` is not blank, `{}` otherwise. */
+export function optionalText<K extends string>(key: K, text: string): Partial<Record<K, string>> {
+  const value = text.trim();
+  return value === '' ? {} : ({ [key]: value } as Record<K, string>);
 }
 
 /** Numeric fields of one "a, b, c" (or space separated) row; null when one is not a number. */

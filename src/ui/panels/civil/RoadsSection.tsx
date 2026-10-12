@@ -9,14 +9,14 @@ import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import { PanelSection, FormError } from '@ui/panels/PanelParts';
 import {
-  chosenId,
   CivilObjectSelect,
   useCivilObjects,
   NumberField,
   PointsFromSelectionRow,
   TextField,
+  useChosenId,
 } from './CivilParts';
-import { optionalNumber, parseNumberList } from '@ui/numberText';
+import { optionalNumber, parseNumberList, optionalText } from '@ui/numberText';
 import { parsePoints } from './civilInput';
 import { AlignmentEditor } from './AlignmentEditor';
 
@@ -27,11 +27,10 @@ export function RoadsSection(): React.ReactElement {
   const [points, setPoints] = useState('');
   const [radii, setRadii] = useState('');
   const [spirals, setSpirals] = useState('');
-  const [surface, setSurface] = useState('');
+  const [surfaceId, setSurface] = useChosenId(surfaces, true);
   const [interval, setIntervalText] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
-  const surfaceId = chosenId(surfaces, surface, true);
 
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
@@ -56,7 +55,7 @@ export function RoadsSection(): React.ReactElement {
       ...(spiralList.length > 0 ? { spirals: spiralList } : {}),
       ...(surfaceId !== '' ? { surfaceId } : {}),
       ...optionalNumber('stationInterval', interval),
-      ...(name.trim() !== '' ? { name: name.trim() } : {}),
+      ...optionalText('name', name),
     });
     setError('');
   };

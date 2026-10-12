@@ -10,7 +10,7 @@ import { useStore } from '@ui/store';
 import type { BuildingLevel } from '@core/model/building';
 import { PanelSection, IconButton } from '@ui/panels/PanelParts';
 import { orderedValues } from '@ui/panels/orderedValues';
-import { optionalNumber } from '@ui/numberText';
+import { optionalNumber, optionalText } from '@ui/numberText';
 import { CopyLevelForm, LevelEditForm } from './LevelEditors';
 
 const EMPTY_LEVELS: ReadonlyArray<BuildingLevel> = [];
@@ -101,7 +101,7 @@ function AddLevelForm(): React.ReactElement {
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
     dispatch('add_level', {
-      ...(name.trim() !== '' ? { name: name.trim() } : {}),
+      ...optionalText('name', name),
       ...optionalNumber('height', height),
     });
     setName('');

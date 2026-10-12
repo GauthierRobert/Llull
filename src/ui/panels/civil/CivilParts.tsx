@@ -5,7 +5,7 @@
  * button (`delete_civil_object`), an object select and a status line. Presentation only.
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { CivilCategory, CivilObject } from '@core/model/civil';
 import { useStore } from '@ui/store';
 import { formatPoints, selectedPolylinePoints } from './civilInput';
@@ -94,13 +94,25 @@ export function CivilObjectSelect({
 }
 
 /** `value` when it names one of `objects`, else the first id ('' when `allowEmpty` or none). */
-export function chosenId(
-  objects: ReadonlyArray<CivilObject>,
-  value: string,
-  allowEmpty = false,
-): string {
+function chosenId(objects: ReadonlyArray<CivilObject>, value: string, allowEmpty = false): string {
   if (objects.some((object) => object.id === value)) return value;
   return allowEmpty ? '' : (objects[0]?.id ?? '');
+}
+
+/**
+ * A select's chosen object id with its setter: the picked id while it still names one of `objects`,
+ * else the object at `preferredIndex` (when given and nothing was picked), else `chosenId`'s
+ * fallback.
+ */
+export function useChosenId(
+  objects: ReadonlyArray<CivilObject>,
+  allowEmpty = false,
+  preferredIndex?: number,
+): [string, (id: string) => void] {
+  const [picked, setPicked] = useState('');
+  const value =
+    picked === '' && preferredIndex !== undefined ? (objects[preferredIndex]?.id ?? '') : picked;
+  return [chosenId(objects, value, allowEmpty), setPicked];
 }
 
 export function CivilStatus({
@@ -125,9 +137,16 @@ interface CivilFieldProps {
   label: string;
 }
 
-export function TextField({ value, set, hint, label }: CivilFieldProps): React.ReactElement {
+function CivilInput({
+  value,
+  set,
+  hint,
+  label,
+  type,
+}: CivilFieldProps & { type?: 'number' }): React.ReactElement {
   return (
     <input
+      type={type}
       value={value}
       placeholder={hint}
       aria-label={label}
@@ -136,16 +155,12 @@ export function TextField({ value, set, hint, label }: CivilFieldProps): React.R
   );
 }
 
-export function NumberField({ value, set, hint, label }: CivilFieldProps): React.ReactElement {
-  return (
-    <input
-      type="number"
-      value={value}
-      placeholder={hint}
-      aria-label={label}
-      onChange={(event) => set(event.target.value)}
-    />
-  );
+export function TextField(props: CivilFieldProps): React.ReactElement {
+  return <CivilInput {...props} />;
+}
+
+export function NumberField(props: CivilFieldProps): React.ReactElement {
+  return <CivilInput {...props} type="number" />;
 }
 
 interface PointsFromSelectionRowProps {

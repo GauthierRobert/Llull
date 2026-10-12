@@ -11,7 +11,6 @@ import type { PlatformObject } from '@core/model/civil';
 import { useStore } from '@ui/store';
 import { PanelSection, FormError } from '@ui/panels/PanelParts';
 import {
-  chosenId,
   CivilObjectRow,
   CivilObjectSelect,
   CivilStatus,
@@ -19,8 +18,9 @@ import {
   NumberField,
   PointsFromSelectionRow,
   TextField,
+  useChosenId,
 } from './CivilParts';
-import { optionalNumber, parseNumber } from '@ui/numberText';
+import { optionalNumber, parseNumber, optionalText } from '@ui/numberText';
 import { parsePoints } from './civilInput';
 import { runQuery, useCivilReport } from './civilQuery';
 
@@ -55,11 +55,9 @@ function PlatformRow({ platform }: { platform: PlatformObject }): React.ReactEle
 
 function CompareSurfaces(): React.ReactElement {
   const surfaces = useCivilObjects('surface');
-  const [base, setBase] = useState('');
-  const [comparison, setComparison] = useState('');
+  const [baseId, setBase] = useChosenId(surfaces);
+  const [comparisonId, setComparison] = useChosenId(surfaces, false, 1);
   const [status, setStatus] = useState('');
-  const baseId = chosenId(surfaces, base);
-  const comparisonId = chosenId(surfaces, comparison !== '' ? comparison : (surfaces[1]?.id ?? ''));
   return (
     <div className="building-inline-form" aria-label="Compare surfaces">
       <CivilObjectSelect
@@ -98,14 +96,13 @@ export function EarthworksSection(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const surfaces = useCivilObjects('surface');
   const platforms = useCivilObjects('platform');
-  const [surface, setSurface] = useState('');
+  const [surfaceId, setSurface] = useChosenId(surfaces);
   const [outline, setOutline] = useState('');
   const [elevation, setElevation] = useState('');
   const [cutSlope, setCutSlope] = useState('');
   const [fillSlope, setFillSlope] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
-  const surfaceId = chosenId(surfaces, surface);
 
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
@@ -125,7 +122,7 @@ export function EarthworksSection(): React.ReactElement {
       elevation: level,
       ...optionalNumber('cutSlope', cutSlope),
       ...optionalNumber('fillSlope', fillSlope),
-      ...(name.trim() !== '' ? { name: name.trim() } : {}),
+      ...optionalText('name', name),
     });
     setError('');
   };

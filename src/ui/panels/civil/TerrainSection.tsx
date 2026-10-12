@@ -10,7 +10,7 @@ import type { SurfaceObject } from '@core/model/civil';
 import { useStore } from '@ui/store';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { CivilObjectRow, useCivilObjects, NumberField, TextField } from './CivilParts';
-import { optionalNumber, parseNumber } from '@ui/numberText';
+import { optionalNumber, parseNumber, optionalText } from '@ui/numberText';
 import { useCivilReport } from './civilQuery';
 
 function SurfaceRow({ surface }: { surface: SurfaceObject }): React.ReactElement {
@@ -51,7 +51,7 @@ export function TerrainSection(): React.ReactElement {
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
     dispatch('create_surface', {
-      ...(name.trim() !== '' ? { name: name.trim() } : {}),
+      ...optionalText('name', name),
       ...optionalNumber('contourInterval', interval),
       ...optionalNumber('majorEvery', majorEvery),
       ...optionalNumber('maxEdgeLength', maxEdge),
