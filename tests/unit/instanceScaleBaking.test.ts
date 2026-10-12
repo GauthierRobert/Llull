@@ -78,7 +78,7 @@ function expectVecClose(actual: Vec3, expected: Vec3): void {
 }
 
 function volumeOf(doc: CadDocument, entityId: string): number {
-  const result = execute(doc, 'measure_volume', { entityId });
+  const result = execute(doc, 'mass_properties', { entityId });
   return (result.data as { volume: number }).volume;
 }
 

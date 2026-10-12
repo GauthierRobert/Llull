@@ -11,6 +11,7 @@ import { isRecord } from '../../lib/isRecord';
 import { stepKeyOf } from '../../lib/id';
 import { pluginRetiredCommands } from '../../plugins/host';
 import { RETIRED_EDIT_COMMANDS } from './retiredEditCommands';
+import { RETIRED_DRAW_COMMANDS } from './retiredDrawCommands';
 
 /** Core commands folded into a more general one: old name -> rewrite onto the replacement. */
 const CORE_RETIRED_COMMANDS: Readonly<Record<string, RetiredCommandRewrite>> = {
@@ -30,6 +31,7 @@ const CORE_RETIRED_COMMANDS: Readonly<Record<string, RetiredCommandRewrite>> = {
     },
   }),
   ...RETIRED_EDIT_COMMANDS,
+  ...RETIRED_DRAW_COMMANDS,
 };
 
 type RewriteTable = Readonly<Record<string, RetiredCommandRewrite>>;

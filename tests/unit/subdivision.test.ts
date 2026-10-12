@@ -34,7 +34,7 @@ function created(doc: CadDocument, params: object): { doc: CadDocument; e: Subdi
 }
 
 function volumeOf(doc: CadDocument, id: string): number {
-  return (run(doc, 'measure_volume', { entityId: id }).data as { volume: number }).volume;
+  return (run(doc, 'mass_properties', { entityId: id }).data as { volume: number }).volume;
 }
 
 function isWatertight(triangles: ReadonlyArray<ReadonlyArray<readonly number[]>>): boolean {

@@ -16,30 +16,44 @@ import {
   commitSolid,
   rejectBadProfile,
   rejectZeroAreaProfile,
+  resolveRotation,
+  axisField,
+  rotationField,
 } from './shared';
 import { sketchLoop } from './sketchCurves';
 import { mapSegment } from '../../geometry/curveSegments';
 
 /**
- * @command extrude_sketch
+ * @command extrude_profile
  * @pure
  * @layer core/commands
- * @affects creates 1 extrusion entity at the (first) source position; sources kept
- * @invariant depth > 0; resulting rotation = `rotation` param only (source rotation not inherited)
- * @invariant curved sources (arc, circle, ellipse, spline) store their exact `curves`
- * @failure missing id / unsupported or open source / pieces that do not close / depth <= 0 -> no-op
+ * @affects creates 1 extrusion entity; sources (id/ids) are kept
+ * @invariant depth > 0; exactly one of profile (>= 3 finite [x,y] points), id, ids
+ * @invariant sketch sources store their exact `curves` and sit at the (first) source position unless
+ *   `position` is given; the source rotation is not inherited
+ * @failure no/ambiguous source, profile < 3 points or non-finite, open/unsupported sketch, pieces
+ *   that do not close, depth <= 0, zero-length axis -> no-op, affected:[]
+ * @failure malformed rotation -> entity still created with rotation [0,0,0]
  */
-export const extrudeSketch = defineCommand({
-  name: 'extrude_sketch',
+export const extrudeProfile = defineCommand({
+  name: 'extrude_profile',
   description:
-    'Extrude a closed 2D sketch into a 3D extrusion solid. Right-handed world frame, +Z up. ' +
-    'Give `id` of one closed shape (circle, rectangle, ellipse, closed polyline, closed spline), or `ids` ' +
-    'of several coplanar open pieces (line, arc, open polyline, open spline) that join end to end into ' +
-    'one closed loop, in any order and direction. Curved boundaries are kept exact (true arcs and ' +
-    'Bézier splines for the exact kernel and STEP export; the polygon is only the display tessellation). ' +
-    'The solid is placed at the (first) source entity position and extends depth units along +Z ' +
-    '(before the optional rotation); the source rotation is not inherited. Sources stay in the document.',
+    'Extrude a closed 2D profile along +Z into an extrusion solid. Right-handed world frame, +Z up. ' +
+    'Give EXACTLY ONE source: `profile` (inline array of [x, y] points, at least 3, implicitly closed, ' +
+    'placed at `position`, default [0,0,0]); OR `id` of one closed drawn shape (circle, rectangle, ellipse, ' +
+    'closed polyline, closed spline); OR `ids` of several coplanar open pieces (line, arc, open polyline, ' +
+    'open spline) that join end to end into one closed loop, in any order and direction. A drawn sketch ' +
+    'keeps its curved boundaries exact (true arcs and Bézier splines for the exact kernel and STEP export; ' +
+    'the polygon is only the display tessellation), is placed at the (first) source entity position ' +
+    '(override with `position`), does not inherit the source rotation, and stays in the document. ' +
+    'The solid spans from the position along +Z for depth units (depth must be > 0). ' +
+    'Orientation: pass EITHER rotation (Euler radians) OR axis [dx,dy,dz] = the extrusion direction ' +
+    '(the profile plane normal; local +Z maps to it). axis wins when both are given; the derived Euler angles are stored.',
   params: z.object({
+    profile: untypedArray(
+      'Inline closed loop: array of [x, y] points in the XY plane of the profile (at least 3, do not repeat ' +
+        'the first point). Omit when id or ids is given.',
+    ).optional(),
     id: z
       .string()
       .describe(
@@ -49,63 +63,131 @@ export const extrudeSketch = defineCommand({
     ids: z
       .array(z.string())
       .describe(
-        'Ids of coplanar 2D pieces (line, arc, polyline, spline) that join end to end into one closed loop; order and direction do not matter. Alternative to id.',
+        'Ids of coplanar 2D pieces (line, arc, polyline, spline) that join end to end into one closed loop; order and direction do not matter. Alternative to id and profile.',
       )
       .optional(),
     depth: z
       .number()
-      .describe(
-        'Extrusion depth in document units along +Z from the source entity position. Must be > 0.',
-      ),
-    rotation: z
-      .array(z.number())
-      .describe(
-        `${ROTATION_CONVENTION} for the resulting extrusion solid. ` +
-          'Matches rotate_entity convention. Defaults to [0, 0, 0]. ' +
-          'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
-      )
-      .optional(),
+      .describe('Extrusion depth in document units along +Z from the position. Must be > 0.'),
+    position: looseVec3(
+      'World-space origin of the profile plane [x, y, z] in document units. Defaults to [0, 0, 0] for an ' +
+        'inline profile and to the (first) source entity position for id/ids.',
+    ).optional(),
+    rotation: rotationField(),
+    axis: axisField('is the extrusion direction (local +Z)'),
+    color: colorField(EXTRUSION_COLOR),
   }),
-  run: (doc, { id, ids, depth, rotation }): CommandResult => {
+  run: (doc, { profile, id, ids, depth, position, rotation, axis, color = EXTRUSION_COLOR }) => {
+    const sources = [profile, id, ids].filter((source) => source !== undefined).length;
+    if (sources === 0)
+      return noop(
+        doc,
+        'extrude_profile: give profile (inline points), id (one closed shape) or ids (pieces of a loop); no-op.',
+      );
+    if (sources > 1)
+      return noop(doc, 'extrude_profile: pass only one of profile, id or ids, not both; no-op.');
+    if (profile !== undefined) {
+      const rejected = rejectInlineProfile(doc, profile, depth);
+      if (rejected) return rejected;
+      return extrusionResult(doc, {
+        profile,
+        depth,
+        position: position ?? ORIGIN,
+        rotation,
+        axis,
+        color,
+        describe: () => `Extruded a ${profile.length}-point profile by ${depth}`,
+      });
+    }
     const label = id ?? (ids ?? []).join(', ');
     if (depth <= 0)
       return noop(
         doc,
-        `extrude_sketch: depth must be > 0 (got ${depth}); entity ${label} unchanged.`,
+        `extrude_profile: depth must be > 0 (got ${depth}); entity ${label} unchanged.`,
       );
-    if (id !== undefined && ids !== undefined)
-      return noop(doc, 'extrude_sketch: pass either id or ids, not both; no-op.');
     const sourceIds = ids ?? (id !== undefined ? [id] : []);
-    if (sourceIds.length === 0)
-      return noop(doc, 'extrude_sketch: give id (one closed shape) or ids (pieces of a loop).');
+    if (sourceIds.length === 0) return noop(doc, 'extrude_profile: ids must not be empty.');
     if (sourceIds.length === 1) {
       const single = singleSourceIssue(doc, sourceIds[0] as string);
-      if (single !== null) return noop(doc, `extrude_sketch: ${single}`);
+      if (single !== null) return noop(doc, `extrude_profile: ${single}`);
     }
     const loop = sketchLoop(doc, sourceIds);
-    if (typeof loop === 'string') return noop(doc, `extrude_sketch: ${loop}; no-op.`);
-    const { profile } = loop;
-    const flatProfile = rejectZeroAreaProfile(doc, 'extrude_sketch', profile);
+    if (typeof loop === 'string') return noop(doc, `extrude_profile: ${loop}; no-op.`);
+    const flatProfile = rejectZeroAreaProfile(doc, 'extrude_profile', loop.profile);
     if (flatProfile) return flatProfile;
-
-    const extId = nextId('ext');
-    const extrusion = newEntity(
-      'extrusion',
-      extId,
-      { profile, depth, ...exactCurves(loop.curves) },
-      loop.origin,
-      EXTRUSION_COLOR,
-      { rotation: finiteVec3OrZero(rotation) },
-    );
     const source =
       sourceIds.length === 1 ? `${doc.entities[label]?.kind} "${label}"` : `[${label}]`;
-    return commitSolid(
-      doc,
-      extrusion,
-      `extrude_sketch: created extrusion "${extId}" from ${source} (${profile.length}-point profile${curveNote(loop.curves)}, depth=${depth})`,
-    );
+    return extrusionResult(doc, {
+      profile: loop.profile,
+      depth,
+      position: position ?? loop.origin,
+      rotation,
+      axis,
+      color,
+      curves: loop.curves,
+      describe: (extId) =>
+        `extrude_profile: created extrusion "${extId}" from ${source} (${loop.profile.length}-point profile${curveNote(loop.curves)}, depth=${depth})`,
+    });
   },
 });
+
+function rejectInlineProfile(
+  doc: CadDocument,
+  profile: ReadonlyArray<readonly [number, number]>,
+  depth: number,
+): CommandResult | null {
+  if (profile.length < 3)
+    return noop(
+      doc,
+      `extrude_profile: profile must be an array of at least 3 [x,y] points; no-op.`,
+    );
+  if (profile.length > MAX_PROFILE_POINTS)
+    return noop(
+      doc,
+      `extrude_profile: profile has ${profile.length} points, exceeding MAX_PROFILE_POINTS (${MAX_PROFILE_POINTS}); no-op.`,
+    );
+  const badProfile = rejectBadProfile(doc, 'extrude_profile', profile);
+  if (badProfile) return badProfile;
+  const flatProfile = rejectZeroAreaProfile(doc, 'extrude_profile', profile);
+  if (flatProfile) return flatProfile;
+  if (depth <= 0)
+    return noop(
+      doc,
+      `extrude_profile: depth must be a finite number > 0 (got ${String(depth)}); no-op.`,
+    );
+  return null;
+}
+
+function extrusionResult(
+  doc: CadDocument,
+  extrusion: {
+    readonly profile: ReadonlyArray<readonly [number, number]>;
+    readonly depth: number;
+    readonly position: Vec3;
+    readonly rotation: unknown;
+    readonly axis: unknown;
+    readonly color: string;
+    readonly curves?: ReadonlyArray<CurveSegment<Vec2>>;
+    readonly describe: (id: string) => string;
+  },
+): CommandResult {
+  const resolved = resolveRotation(extrusion.axis, extrusion.rotation);
+  if (resolved.error !== undefined) return noop(doc, `extrude_profile: ${resolved.error}; no-op.`);
+  const id = nextId('ext');
+  const entity = newEntity(
+    'extrusion',
+    id,
+    {
+      profile: extrusion.profile,
+      depth: extrusion.depth,
+      ...exactCurves(extrusion.curves ?? []),
+    },
+    extrusion.position,
+    extrusion.color,
+    { rotation: resolved.rotation },
+  );
+  return commitSolid(doc, entity, extrusion.describe(id));
+}
 
 /** Legacy single-shape messages: missing, open, too short or a non-closable kind. */
 function singleSourceIssue(doc: CadDocument, id: string): string | null {

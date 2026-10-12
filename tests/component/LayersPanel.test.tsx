@@ -156,7 +156,7 @@ describe('LayersPanel — layer commands', () => {
     expect(input.value).toBe('');
   });
 
-  it('toggles the document lock through set_layer_lock', () => {
+  it('toggles the document lock through update_layer', () => {
     const id = addLayer('Locky');
     render(<LayersPanel />);
     fireEvent.click(screen.getByRole('button', { name: 'Lock layer Locky' }));
@@ -167,7 +167,7 @@ describe('LayersPanel — layer commands', () => {
     expect(useStore.getState().document.layers[id]?.locked).toBe(false);
   });
 
-  it('renames a layer through rename_layer (Enter commits, Escape cancels)', () => {
+  it('renames a layer through update_layer (Enter commits, Escape cancels)', () => {
     const id = addLayer('Old');
     render(<LayersPanel />);
     fireEvent.click(screen.getByRole('button', { name: 'Rename layer Old' }));

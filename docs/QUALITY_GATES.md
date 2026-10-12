@@ -86,7 +86,7 @@ table), independently of the bridge's code path.
 | ----- | ----------- |
 | `imports` | at least one mesh per reference solid and per closed free shell |
 | `mesh-integrity` | finite coordinates, < 1 % degenerate triangles; solids: < 0.1 % open/non-manifold edges and every body outward-wound (positive signed volume) |
-| `volume` | `measure_volume` total within 1.5 % of the exact B-rep volume |
+| `volume` | `mass_properties` total within 1.5 % of the exact B-rep volume |
 | `bounding-box` | `measure_bounding_box` within 0.5 % of the diagonal (+ 2× chord tolerance) of the face bbox. Catches scale, unit and axis-swap errors |
 | `part-placement` | every body's bbox matches a distinct reference solid. Catches assembly-transform errors that keep total volume |
 | `surface-area` | imported triangle area within 2 % of the area of every face in the file. Catches **dropped geometry** whatever the grouping |

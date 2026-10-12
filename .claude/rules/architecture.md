@@ -56,7 +56,7 @@ CLI (`server/src/cli`) is a third caller of `execute`. Local agents use the CLI;
 
 2D shapes (`Shape2DKind`) and 3D solids (`SolidKind`) are both `Entity` kinds in ONE entity bag,
 distinguished by `kind` (`is2D`/`is3D`). A 2D shape is planar: local `Vec2` geometry, `position`
-places the plane (default z=0, +Z normal). The 2D⇄3D bridge is a command (`extrude_sketch`,
+places the plane (default z=0, +Z normal). The 2D⇄3D bridge is a command (`extrude_profile`,
 `extrude_profile`, `revolve_profile`) — sketch once, never duplicate geometry. The 2D view is
 orthographic top-down over the same store: presentation, not a second model.
 

@@ -108,7 +108,7 @@ describe('solidOutline — exact upright outlines', () => {
   });
 
   it('returns null for 2D shapes', () => {
-    const { doc, id } = add(createEmptyDocument(), 'draw_circle', { center: [0, 0], radius: 1 });
+    const { doc, id } = add(createEmptyDocument(), 'draw_arc', { center: [0, 0], radius: 1 });
     expect(solidOutline(doc, doc.entities[id] as Entity)).toBeNull();
   });
 });

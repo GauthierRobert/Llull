@@ -35,7 +35,12 @@ afterEach(() => setGeometryKernel(null));
 function twoBoxes(): { doc: CadDocument; a: string; b: string; line: string } {
   const first = execute(createEmptyDocument(), 'add_box', { size: [2, 2, 2] });
   const second = execute(first.document, 'add_box', { size: [1, 1, 1], position: [1, 0, 0] });
-  const line = execute(second.document, 'draw_line', { start: [0, 0], end: [1, 0] });
+  const line = execute(second.document, 'draw_polyline', {
+    points: [
+      [0, 0],
+      [1, 0],
+    ],
+  });
   return {
     doc: line.document,
     a: first.affected[0]!,

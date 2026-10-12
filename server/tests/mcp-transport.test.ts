@@ -18,7 +18,7 @@
  *   (b) tools/list → every registered command has a tool entry.
  *   (c) tools/call add_box (mutation) → summary block, "Affected entity ids" block,
  *       isError:false.
- *   (d) tools/call measure_volume on the created entity (query) → json data block,
+ *   (d) tools/call mass_properties on the created entity (query) → json data block,
  *       structuredContent is the record, isError:false.
  *   (e) tools/call add_box (MCP) then POST /undo (REST) → entity is reverted
  *       (real MCP-to-shared-history interop, replacing the comment-only test).
@@ -259,9 +259,9 @@ describe('MCP tools/call — mutation (add_box)', () => {
   });
 });
 
-// (d) tools/call measure_volume (query) → json data block + structuredContent
+// (d) tools/call mass_properties (query) → json data block + structuredContent
 
-describe('MCP tools/call — query (measure_volume)', () => {
+describe('MCP tools/call — query (mass_properties)', () => {
   it('returns json data block and structuredContent with volume record', async () => {
     const sessionId = await mcpSession();
 
@@ -278,7 +278,7 @@ describe('MCP tools/call — query (measure_volume)', () => {
     expect(entityId.length).toBeGreaterThan(0);
 
     // Measure volume via MCP.
-    const measureResult = await mcpCallTool(sessionId, 'measure_volume', { entityId });
+    const measureResult = await mcpCallTool(sessionId, 'mass_properties', { entityId });
 
     expect(measureResult.isError).toBeFalsy();
 
@@ -290,7 +290,7 @@ describe('MCP tools/call — query (measure_volume)', () => {
     // structuredContent must be present with volume + unit fields
     expect(measureResult.structuredContent).toBeDefined();
     expect(typeof measureResult.structuredContent!['volume']).toBe('number');
-    expect(measureResult.structuredContent!['unit']).toBe('mm³');
+    expect(measureResult.structuredContent!['volumeUnit']).toBe('mm³');
     // 2×2×2 box = volume 8
     expect(measureResult.structuredContent!['volume']).toBeCloseTo(8);
   });
@@ -302,7 +302,7 @@ describe('MCP tools/call — query (measure_volume)', () => {
     const entityId = Object.keys(getLiveDoc().entities)[0]!;
 
     const docBefore = getLiveDoc();
-    await mcpCallTool(sessionId, 'measure_volume', { entityId });
+    await mcpCallTool(sessionId, 'mass_properties', { entityId });
 
     // Same reference — query did not swap the live document.
     expect(getLiveDoc()).toBe(docBefore);

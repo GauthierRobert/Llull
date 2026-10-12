@@ -31,7 +31,7 @@ function buildDocWithComponent(): DocWithComponent {
 }
 
 /**
- * Draw a horizontal open polyline from (0,0) to (length, 0) in local space,
+ * Draw a horizontal open polyline (3 points: a 2-point series would be a `line`) from (0,0) to (length, 0) in local space,
  * placed at world origin.
  */
 function drawHorizontalPolyline(
@@ -41,6 +41,7 @@ function drawHorizontalPolyline(
   const result = execute(doc, 'draw_polyline', {
     points: [
       [0, 0],
+      [length / 2, 0],
       [length, 0],
     ],
     closed: false,
@@ -58,6 +59,7 @@ function drawVerticalPolyline(
   const result = execute(doc, 'draw_polyline', {
     points: [
       [0, 0],
+      [0, length / 2],
       [0, length],
     ],
     closed: false,

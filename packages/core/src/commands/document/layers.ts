@@ -19,23 +19,6 @@ const withLayer = (doc: CadDocument, layer: Layer): CadDocument => ({
   layers: { ...doc.layers, [layer.id]: layer },
 });
 
-/** `layer` `id` with boolean `flag` set to `value`; a missing layer is a no-op naming `command`. */
-function setLayerFlag(
-  doc: CadDocument,
-  command: string,
-  id: string,
-  flag: 'visible' | 'locked',
-  value: boolean,
-): CommandResult {
-  const layer = doc.layers[id];
-  if (!layer) return noop(doc, `No layer ${id} — ${command} is a no-op.`);
-  return changed(
-    withLayer(doc, { ...layer, [flag]: value }),
-    `Layer ${id} ("${layer.name}"): ${flag} = ${value}.`,
-    [id],
-  );
-}
-
 /**
  * @command add_layer
  * @pure
@@ -86,82 +69,66 @@ export const addLayer = defineCommand({
 });
 
 /**
- * @command rename_layer
+ * @command update_layer
  * @pure
  * @layer core/commands
- * @affects updates name on the target layer; affected = [id]
- * @invariant layer geometry/visibility/lock state is unchanged
- * @failure missing id -> no-op, affected:[]; empty name -> no-op, affected:[]
+ * @affects updates the given fields (name, visible, locked, color) on the target layer; affected = [id]
+ * @invariant fields not given, and entities, are unchanged
+ * @failure missing id, no field given, empty name, or non-#rrggbb color -> no-op, affected:[]
  */
-export const renameLayer = defineCommand({
-  name: 'rename_layer',
+export const updateLayer = defineCommand({
+  name: 'update_layer',
   annotations: { idempotent: true },
   description:
-    'Rename a layer. Does not affect visibility, lock state, or entities. ' +
-    'Graceful no-op if the layer id does not exist or the name is empty.',
+    'Change one or more properties of a layer: rename it (name), show or hide it (visible; hidden ' +
+    'layers are not rendered), lock or unlock it (locked; entities on a locked layer cannot be ' +
+    'reassigned via set_entity_layer, but geometry edits are not blocked), or tint it (color). ' +
+    'Give at least one field; fields not given are kept. Entities are not affected. ' +
+    'Graceful no-op if the layer id does not exist, no field is given, the name is empty or the ' +
+    'color is not #rrggbb.',
   params: z.object({
-    id: z.string().describe('Id of the layer to rename.'),
-    name: z.string().describe('New display name for the layer. Must be non-empty.'),
+    id: z.string().describe('Id of the layer to change.'),
+    name: z.string().describe('New display name for the layer. Must be non-empty.').optional(),
+    visible: z.boolean().describe('true to make the layer visible; false to hide it.').optional(),
+    locked: z.boolean().describe('true to lock the layer; false to unlock it.').optional(),
+    color: z
+      .string()
+      .describe(
+        'New layer tint as a hex string #rrggbb, e.g. "#ff0000"; any other format is rejected.',
+      )
+      .optional(),
   }),
-  run: (doc, { id, name }): CommandResult => {
+  run: (doc, { id, name, visible, locked, color }): CommandResult => {
     const layer = doc.layers[id];
-    if (!layer) return noop(doc, `No layer ${id} — rename_layer is a no-op.`);
+    if (!layer) return noop(doc, `No layer ${id} — update_layer is a no-op.`);
 
-    const trimmed = name.trim();
-    if (!trimmed) return noop(doc, 'rename_layer requires a non-empty name.');
+    const trimmed = name?.trim();
+    if (trimmed === '') return noop(doc, 'update_layer requires a non-empty name.');
+    if (color !== undefined && !isHexColor(color))
+      return noop(doc, `update_layer: color must be a #rrggbb hex string (got "${color}").`);
 
-    const prevName = layer.name;
+    const patch: Partial<Layer> = {
+      ...(trimmed === undefined ? {} : { name: trimmed }),
+      ...(visible === undefined ? {} : { visible }),
+      ...(locked === undefined ? {} : { locked }),
+      ...(color === undefined ? {} : { color }),
+    };
+    const fields = Object.keys(patch);
+    if (fields.length === 0)
+      return noop(
+        doc,
+        `update_layer: give at least one of name, visible, locked, color for ${id}.`,
+      );
+
+    const changes = Object.entries(patch).map(
+      ([field, value]) => `${field} = ${JSON.stringify(value)}`,
+    );
     return changed(
-      withLayer(doc, { ...layer, name: trimmed }),
-      `Layer ${id}: renamed "${prevName}" → "${trimmed}".`,
+      withLayer(doc, { ...layer, ...patch }),
+      `Layer ${id} ("${layer.name}"): ${changes.join(', ')}.`,
       [id],
     );
   },
-});
-
-/**
- * @command set_layer_visibility
- * @pure
- * @layer core/commands
- * @affects updates visible flag on the target layer; affected = [id]
- * @invariant layer name/lock state and entities are unchanged
- * @failure missing id -> no-op, affected:[]
- */
-export const setLayerVisibility = defineCommand({
-  name: 'set_layer_visibility',
-  annotations: { idempotent: true },
-  description:
-    'Show or hide a layer. Hidden layers are not rendered in the viewport. ' +
-    'Graceful no-op if the layer id does not exist.',
-  params: z.object({
-    id: z.string().describe('Id of the layer to change.'),
-    visible: z.boolean().describe('true to make the layer visible; false to hide it.'),
-  }),
-  run: (doc, { id, visible }): CommandResult =>
-    setLayerFlag(doc, 'set_layer_visibility', id, 'visible', visible),
-});
-
-/**
- * @command set_layer_lock
- * @pure
- * @layer core/commands
- * @affects updates locked flag on the target layer; affected = [id]
- * @invariant layer name/visibility and entities are unchanged
- * @failure missing id -> no-op, affected:[]
- */
-export const setLayerLock = defineCommand({
-  name: 'set_layer_lock',
-  annotations: { idempotent: true },
-  description:
-    'Lock or unlock a layer. Entities on a locked layer cannot have their layer reassigned ' +
-    'via set_entity_layer. (Note: locking does not yet block geometry edits to those entities — ' +
-    'broader lock enforcement is a planned follow-up.) Graceful no-op if the layer id does not exist.',
-  params: z.object({
-    id: z.string().describe('Id of the layer to lock or unlock.'),
-    locked: z.boolean().describe('true to lock the layer; false to unlock it.'),
-  }),
-  run: (doc, { id, locked }): CommandResult =>
-    setLayerFlag(doc, 'set_layer_lock', id, 'locked', locked),
 });
 
 /**

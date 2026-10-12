@@ -905,15 +905,17 @@
       },
       {
         "id": "#10",
-        "name": "draw_line",
+        "name": "draw_polyline",
         "params": {
-          "start": [
-            6,
-            10
-          ],
-          "end": [
-            5.6,
-            10
+          "points": [
+            [
+              6,
+              10
+            ],
+            [
+              5.6,
+              10
+            ]
           ]
         },
         "suppressed": false,
@@ -951,15 +953,17 @@
       },
       {
         "id": "#12",
-        "name": "draw_line",
+        "name": "draw_polyline",
         "params": {
-          "start": [
-            2.6,
-            0
-          ],
-          "end": [
-            3,
-            0
+          "points": [
+            [
+              2.6,
+              0
+            ],
+            [
+              3,
+              0
+            ]
           ]
         },
         "suppressed": false,

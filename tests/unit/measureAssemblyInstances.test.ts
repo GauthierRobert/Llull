@@ -21,15 +21,16 @@ function assembly(scale?: number[]): { doc: CadDocument; instanceId: string; box
 const data = <T>(result: { data?: unknown }): T => result.data as T;
 
 describe('measure commands on assembly instances', () => {
-  it('measure_volume sums the component solids', () => {
+  it('mass_properties sums the component solids', () => {
     const { doc, instanceId } = assembly();
-    const result = execute(doc, 'measure_volume', { entityId: instanceId });
+    const result = execute(doc, 'mass_properties', { entityId: instanceId });
     expect(data<{ volume: number }>(result).volume).toBeCloseTo(8 + (4 / 3) * Math.PI);
+    expect(data<{ mass?: number }>(result).mass).toBeUndefined();
   });
 
-  it('measure_volume scales with the instance scale (cubed)', () => {
+  it('mass_properties scales with the instance scale (cubed)', () => {
     const { doc, instanceId } = assembly([2, 2, 2]);
-    const result = execute(doc, 'measure_volume', { entityId: instanceId });
+    const result = execute(doc, 'mass_properties', { entityId: instanceId });
     expect(data<{ volume: number }>(result).volume).toBeCloseTo((8 + (4 / 3) * Math.PI) * 8);
   });
 
@@ -75,7 +76,7 @@ describe('measure commands on assembly instances', () => {
     const { doc, instanceId } = assembly();
     const broken: CadDocument = { ...doc, components: {} };
     for (const [name, params] of [
-      ['measure_volume', { entityId: instanceId }],
+      ['mass_properties', { entityId: instanceId }],
       ['mass_properties', { entityId: instanceId, density: 1 }],
     ] as const) {
       const result = execute(broken, name, params);

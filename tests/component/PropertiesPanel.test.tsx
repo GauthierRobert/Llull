@@ -172,7 +172,12 @@ describe('PropertiesPanel — editing', () => {
   });
 
   it('offers rotation for solids only', () => {
-    const line = localDispatch('draw_line', { start: [0, 0], end: [1, 0] }).affected[0]!;
+    const line = localDispatch('draw_polyline', {
+      points: [
+        [0, 0],
+        [1, 0],
+      ],
+    }).affected[0]!;
     useStore.getState().select([line]);
     render(<PropertiesPanel />);
     expect(screen.queryByLabelText('Rotation Z')).toBeNull();

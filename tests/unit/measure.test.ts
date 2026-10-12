@@ -141,9 +141,19 @@ describe('measure commands', () => {
 
     it('happy: angle between two line entities', () => {
       let doc = createEmptyDocument();
-      const l1 = execute(doc, 'draw_line', { start: [0, 0], end: [1, 0] });
+      const l1 = execute(doc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [1, 0],
+        ],
+      });
       doc = l1.document;
-      const l2 = execute(doc, 'draw_line', { start: [0, 0], end: [0, 1] });
+      const l2 = execute(doc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [0, 1],
+        ],
+      });
       doc = l2.document;
       const id1 = l1.affected[0]!;
       const id2 = l2.affected[0]!;
@@ -217,7 +227,7 @@ describe('measure commands', () => {
   describe('measure_area', () => {
     it('happy: circle area', () => {
       let doc = createEmptyDocument();
-      const r = execute(doc, 'draw_circle', { center: [0, 0], radius: 5 });
+      const r = execute(doc, 'draw_arc', { center: [0, 0], radius: 5 });
       doc = r.document;
       const id = r.affected[0]!;
 
@@ -353,7 +363,12 @@ describe('measure commands', () => {
   describe('measure_perimeter', () => {
     it('happy: line length', () => {
       let doc = createEmptyDocument();
-      const r = execute(doc, 'draw_line', { start: [0, 0], end: [3, 4] });
+      const r = execute(doc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [3, 4],
+        ],
+      });
       doc = r.document;
       const id = r.affected[0]!;
 
@@ -367,7 +382,7 @@ describe('measure commands', () => {
 
     it('happy: circle circumference', () => {
       let doc = createEmptyDocument();
-      const r = execute(doc, 'draw_circle', { center: [0, 0], radius: 1 });
+      const r = execute(doc, 'draw_arc', { center: [0, 0], radius: 1 });
       doc = r.document;
       const id = r.affected[0]!;
 
@@ -465,7 +480,12 @@ describe('measure commands', () => {
 
     it('purity: input doc not mutated', () => {
       let doc = createEmptyDocument();
-      const r = execute(doc, 'draw_line', { start: [0, 0], end: [1, 0] });
+      const r = execute(doc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [1, 0],
+        ],
+      });
       doc = r.document;
       const id = r.affected[0]!;
       const snapshot = JSON.stringify(doc);
@@ -553,21 +573,70 @@ describe('measure commands', () => {
     });
   });
 
-  // 6. measure_volume
+  // 6. mass_properties without a density (volume only)
 
-  describe('measure_volume', () => {
+  describe('mass_properties without density', () => {
+    it('returns the volume only — no mass, density or mass unit', () => {
+      const r = addBox(createEmptyDocument(), [2, 4, 6]);
+      const result = execute(r.document, 'mass_properties', { entityId: r.affected[0]! });
+      expect(result.data).toEqual({ volume: 48, volumeUnit: 'mm³' });
+      expect(result.summary).toContain('Volume of');
+    });
+
+    it('adds mass and density when a density is given, keeping volumeUnit', () => {
+      const r = addBox(createEmptyDocument(), [2, 4, 6]);
+      const result = execute(r.document, 'mass_properties', {
+        entityId: r.affected[0]!,
+        density: 0.5,
+      });
+      expect(result.data).toEqual({
+        volume: 48,
+        volumeUnit: 'mm³',
+        density: 0.5,
+        mass: 24,
+        unit: 'g',
+      });
+    });
+
+    it('flags the bounding-box approximation for a revolution crossing its axis', () => {
+      const r = execute(createEmptyDocument(), 'revolve_profile', {
+        profile: [
+          [-1, 0],
+          [1, 0],
+          [1, 1],
+          [-1, 1],
+        ],
+      });
+      const result = execute(r.document, 'mass_properties', { entityId: r.affected[0]! });
+      expect(result.summary).toContain('bounding-box approximation');
+    });
+
+    it('rejects a 2D entity and a missing id without changing the document', () => {
+      const line = execute(createEmptyDocument(), 'draw_polyline', {
+        points: [
+          [0, 0],
+          [1, 0],
+        ],
+      });
+      const rejected = execute(line.document, 'mass_properties', { entityId: line.affected[0]! });
+      expect(rejected.document).toBe(line.document);
+      expect(rejected.data).toBeUndefined();
+      expect(rejected.summary).toContain("kind 'line'");
+      expect(execute(line.document, 'mass_properties', { entityId: 'ghost' }).affected).toEqual([]);
+    });
+
     it('happy: box volume', () => {
       let doc = createEmptyDocument();
       const r = addBox(doc, [2, 4, 6]);
       doc = r.document;
       const id = r.affected[0]!;
 
-      const result = execute(doc, 'measure_volume', { entityId: id });
+      const result = execute(doc, 'mass_properties', { entityId: id });
       expect(result.affected).toEqual([]);
       expect(result.document).toBe(doc);
-      const d = result.data as { volume: number; unit: string };
+      const d = result.data as { volume: number; volumeUnit: string };
       expect(d.volume).toBeCloseTo(48, 10);
-      expect(d.unit).toBe('mm³');
+      expect(d.volumeUnit).toBe('mm³');
       expect(result.summary).toContain('48');
     });
 
@@ -577,8 +646,8 @@ describe('measure commands', () => {
       doc = r.document;
       const id = r.affected[0]!;
 
-      const result = execute(doc, 'measure_volume', { entityId: id });
-      const d = result.data as { volume: number; unit: string };
+      const result = execute(doc, 'mass_properties', { entityId: id });
+      const d = result.data as { volume: number; volumeUnit: string };
       const expected = (4 / 3) * Math.PI * 27;
       expect(d.volume).toBeCloseTo(expected, 5);
     });
@@ -589,8 +658,8 @@ describe('measure commands', () => {
       doc = r.document;
       const id = r.affected[0]!;
 
-      const result = execute(doc, 'measure_volume', { entityId: id });
-      const d = result.data as { volume: number; unit: string };
+      const result = execute(doc, 'mass_properties', { entityId: id });
+      const d = result.data as { volume: number; volumeUnit: string };
       expect(d.volume).toBeCloseTo(Math.PI * 4 * 5, 5);
     });
 
@@ -608,8 +677,8 @@ describe('measure commands', () => {
       doc = r.document;
       const id = r.affected[0]!;
 
-      const result = execute(doc, 'measure_volume', { entityId: id });
-      const d = result.data as { volume: number; unit: string };
+      const result = execute(doc, 'mass_properties', { entityId: id });
+      const d = result.data as { volume: number; volumeUnit: string };
       expect(d.volume).toBeCloseTo(3, 10);
     });
 
@@ -622,18 +691,18 @@ describe('measure commands', () => {
       doc = created.document;
       const id = created.affected[0]!;
 
-      const result = execute(doc, 'measure_volume', { entityId: id });
+      const result = execute(doc, 'mass_properties', { entityId: id });
       expect(result.affected).toEqual([]);
       expect(result.document).toBe(doc);
-      const d = result.data as { volume: number; unit: string };
+      const d = result.data as { volume: number; volumeUnit: string };
       const expected = 2 * Math.PI ** 2 * 4 * 0.25; // 2π²
       expect(d.volume).toBeCloseTo(expected, 5);
-      expect(d.unit).toBe('mm³');
+      expect(d.volumeUnit).toBe('mm³');
     });
 
     it('failure: missing entity id', () => {
       const doc = createEmptyDocument();
-      const result = execute(doc, 'measure_volume', { entityId: 'ghost' });
+      const result = execute(doc, 'mass_properties', { entityId: 'ghost' });
       expect(result.affected).toEqual([]);
       expect(result.document).toBe(doc);
       expect(result.data).toBeUndefined();
@@ -642,11 +711,16 @@ describe('measure commands', () => {
 
     it('failure: 2D entity (line) not a solid', () => {
       let doc = createEmptyDocument();
-      const r = execute(doc, 'draw_line', { start: [0, 0], end: [1, 0] });
+      const r = execute(doc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [1, 0],
+        ],
+      });
       doc = r.document;
       const id = r.affected[0]!;
 
-      const result = execute(doc, 'measure_volume', { entityId: id });
+      const result = execute(doc, 'mass_properties', { entityId: id });
       expect(result.affected).toEqual([]);
       expect(result.document).toBe(doc);
       expect(result.data).toBeUndefined();
@@ -718,12 +792,12 @@ describe('measure commands', () => {
         order: [...doc.order, 'mesh-test-1'],
       };
 
-      const result = execute(docWithMesh, 'measure_volume', { entityId: 'mesh-test-1' });
+      const result = execute(docWithMesh, 'mass_properties', { entityId: 'mesh-test-1' });
       expect(result.affected).toEqual([]);
       expect(result.document).toBe(docWithMesh);
-      const d = result.data as { volume: number; unit: string };
+      const d = result.data as { volume: number; volumeUnit: string };
       expect(d.volume).toBeCloseTo(1, 10);
-      expect(d.unit).toBe('mm³');
+      expect(d.volumeUnit).toBe('mm³');
       expect(result.summary).toContain('1');
     });
 
@@ -732,7 +806,7 @@ describe('measure commands', () => {
       const r = addBox(doc);
       doc = r.document;
       const snapshot = JSON.stringify(doc);
-      execute(doc, 'measure_volume', { entityId: r.affected[0]! });
+      execute(doc, 'mass_properties', { entityId: r.affected[0]! });
       expect(JSON.stringify(doc)).toBe(snapshot);
     });
 
@@ -775,12 +849,12 @@ describe('measure commands', () => {
         [2, 2],
       ];
       const doc = makeRevolution(profile, 2 * Math.PI);
-      const result = execute(doc, 'measure_volume', { entityId: 'rev-test' });
+      const result = execute(doc, 'mass_properties', { entityId: 'rev-test' });
       expect(result.affected).toEqual([]);
       expect(result.document).toBe(doc);
-      const d = result.data as { volume: number; unit: string };
+      const d = result.data as { volume: number; volumeUnit: string };
       expect(d.volume).toBeCloseTo(24 * Math.PI, 6);
-      expect(d.unit).toBe('mm³');
+      expect(d.volumeUnit).toBe('mm³');
       expect(result.summary).toContain('rev-test');
     });
 
@@ -795,8 +869,8 @@ describe('measure commands', () => {
         [1, 2],
       ];
       const doc = makeRevolution(profile, 2 * Math.PI);
-      const result = execute(doc, 'measure_volume', { entityId: 'rev-test' });
-      const d = result.data as { volume: number; unit: string };
+      const result = execute(doc, 'mass_properties', { entityId: 'rev-test' });
+      const d = result.data as { volume: number; volumeUnit: string };
       expect(d.volume).toBeCloseTo((20 * Math.PI) / 3, 6);
     });
 
@@ -810,10 +884,10 @@ describe('measure commands', () => {
       const docFull = makeRevolution(profile, 2 * Math.PI);
       const docHalf = makeRevolution(profile, Math.PI);
       const full = (
-        execute(docFull, 'measure_volume', { entityId: 'rev-test' }).data as { volume: number }
+        execute(docFull, 'mass_properties', { entityId: 'rev-test' }).data as { volume: number }
       ).volume;
       const half = (
-        execute(docHalf, 'measure_volume', { entityId: 'rev-test' }).data as { volume: number }
+        execute(docHalf, 'mass_properties', { entityId: 'rev-test' }).data as { volume: number }
       ).volume;
       expect(half).toBeCloseTo(full / 2, 6);
     });
@@ -845,8 +919,8 @@ describe('measure commands', () => {
         entities: { ...doc.entities, 'rev-no-angle': entity },
         order: [...doc.order, 'rev-no-angle'],
       };
-      const result = execute(docWithEntity, 'measure_volume', { entityId: 'rev-no-angle' });
-      const d = result.data as { volume: number; unit: string };
+      const result = execute(docWithEntity, 'mass_properties', { entityId: 'rev-no-angle' });
+      const d = result.data as { volume: number; volumeUnit: string };
       // Should treat missing angle as 2π → same result as A1
       expect(d.volume).toBeCloseTo(24 * Math.PI, 6);
     });
@@ -860,12 +934,12 @@ describe('measure commands', () => {
         [-1, 2],
       ];
       const doc = makeRevolution(profile, 2 * Math.PI);
-      const result = execute(doc, 'measure_volume', { entityId: 'rev-test' });
+      const result = execute(doc, 'mass_properties', { entityId: 'rev-test' });
       expect(result.affected).toEqual([]);
       expect(result.document).toBe(doc);
       // Data must still be present (bbox approximation, not a hard no-op).
       expect(result.data).toBeDefined();
-      const d = result.data as { volume: number; unit: string };
+      const d = result.data as { volume: number; volumeUnit: string };
       expect(d.volume).toBeGreaterThan(0);
       // Summary must note the approximation.
       expect(result.summary).toContain('approximation');
@@ -884,8 +958,8 @@ describe('measure commands', () => {
         [2, 2],
       ];
       const doc = makeRevolution(profile, 2 * Math.PI);
-      const result = execute(doc, 'measure_volume', { entityId: 'rev-test' });
-      const d = result.data as { volume: number; unit: string };
+      const result = execute(doc, 'mass_properties', { entityId: 'rev-test' });
+      const d = result.data as { volume: number; volumeUnit: string };
       expect(d.volume).toBeCloseTo((16 * Math.PI) / 3, 6);
       expect(result.summary).not.toContain('approximation');
     });
@@ -899,7 +973,7 @@ describe('measure commands', () => {
       ];
       const doc = makeRevolution(profile, 2 * Math.PI);
       const snapshot = JSON.stringify(doc);
-      execute(doc, 'measure_volume', { entityId: 'rev-test' });
+      execute(doc, 'mass_properties', { entityId: 'rev-test' });
       expect(JSON.stringify(doc)).toBe(snapshot);
     });
   });
@@ -940,7 +1014,7 @@ describe('measure commands', () => {
     });
 
     it('happy: indexed unit-cube mesh mass = volume × density', () => {
-      // Same unit-cube mesh as in measure_volume. volume ≈ 1 mm³.
+      // Same unit-cube mesh as in mass_properties. volume ≈ 1 mm³.
       const positions: number[] = [
         0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1,
       ];
@@ -1009,7 +1083,7 @@ describe('measure commands', () => {
 
     it('failure: 2D entity (circle) not a solid', () => {
       let doc = createEmptyDocument();
-      const r = execute(doc, 'draw_circle', { center: [0, 0], radius: 5 });
+      const r = execute(doc, 'draw_arc', { center: [0, 0], radius: 5 });
       doc = r.document;
       const id = r.affected[0]!;
 

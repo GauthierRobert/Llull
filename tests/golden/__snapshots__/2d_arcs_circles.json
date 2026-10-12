@@ -121,7 +121,7 @@
       },
       {
         "id": "#6",
-        "name": "draw_circle",
+        "name": "draw_arc",
         "params": {
           "center": [
             3,
@@ -136,7 +136,7 @@
       },
       {
         "id": "#7",
-        "name": "draw_circle",
+        "name": "draw_arc",
         "params": {
           "center": [
             -3,

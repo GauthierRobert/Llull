@@ -82,7 +82,9 @@ describe('llull CLI — discovery', () => {
     const json = capture();
     await runCli(['list', '--toolset', 'measure', '--json'], json.io);
     expect(JSON.parse(json.out[0] ?? '')).toEqual(
-      expect.arrayContaining([expect.objectContaining({ name: 'measure_volume', readOnly: true })]),
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'mass_properties', readOnly: true }),
+      ]),
     );
 
     const search = capture();

@@ -73,7 +73,7 @@ describe('serializeDocument / deserializeDocument', () => {
   it('round-trips a document with a box and a circle entity', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'add_box', { size: [2, 3, 4], position: [1, 0, 0] }).document;
-    doc = execute(doc, 'draw_circle', { center: [0, 0], radius: 5 }).document;
+    doc = execute(doc, 'draw_arc', { center: [0, 0], radius: 5 }).document;
 
     const serialized = serializeDocument(doc);
     const restored = deserializeDocument(serialized);
@@ -170,7 +170,7 @@ describe('load_document command', () => {
   it('happy path: replaces the document and reports entity/layer counts', () => {
     let sourceDoc = createEmptyDocument();
     sourceDoc = execute(sourceDoc, 'add_box', { size: [1, 1, 1] }).document;
-    sourceDoc = execute(sourceDoc, 'draw_circle', { center: [0, 0], radius: 3 }).document;
+    sourceDoc = execute(sourceDoc, 'draw_arc', { center: [0, 0], radius: 3 }).document;
 
     const json = serializeDocument(sourceDoc);
     const emptyDoc = createEmptyDocument();
@@ -862,7 +862,7 @@ describe('deserializeDocument — migration / back-compat defaults', () => {
   it('a current-version document round-trips fully unchanged (serialize → deserialize identity)', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'add_box', { size: [1, 2, 3] }).document;
-    doc = execute(doc, 'draw_circle', { center: [1, 1], radius: 2 }).document;
+    doc = execute(doc, 'draw_arc', { center: [1, 1], radius: 2 }).document;
     const json = serializeDocument(doc);
     const restored = deserializeDocument(json);
     expect(restored).toEqual(doc);

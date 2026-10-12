@@ -2,7 +2,7 @@
  * @layer ui/components
  *
  * MeasurementHUD — overlay showing the result of the most recent read-only query command
- * (`lastMeasure`: measure_distance / angle / area / perimeter / bounding_box / volume,
+ * (`lastMeasure`: measure_distance / angle / area / perimeter / bounding_box,
  * mass_properties). Renders nothing without a measurement; the close button clears it.
  * Presentation ONLY (PRIME DIRECTIVE).
  */
@@ -35,10 +35,11 @@ interface BoundingBoxData {
 }
 interface VolumeData {
   volume: number;
-  unit: string;
+  volumeUnit: string;
 }
 interface MassPropertiesData {
   volume: number;
+  volumeUnit: string;
   density: number;
   mass: number;
   unit: string;
@@ -76,11 +77,11 @@ function isBoundingBoxData(data: unknown): data is BoundingBoxData {
 }
 
 function isVolumeData(data: unknown): data is VolumeData {
-  return hasShape(data, ['volume', 'unit'], ['density']);
+  return hasShape(data, ['volume', 'volumeUnit'], ['density']);
 }
 
 function isMassPropertiesData(data: unknown): data is MassPropertiesData {
-  return hasShape(data, ['volume', 'density', 'mass', 'unit']);
+  return hasShape(data, ['volume', 'volumeUnit', 'density', 'mass', 'unit']);
 }
 
 function fmt(n: number, precision = 3): string {
@@ -141,22 +142,14 @@ function BoundingBoxResult({ data }: { data: BoundingBoxData }): React.ReactElem
 }
 
 function VolumeResult({ data }: { data: VolumeData }): React.ReactElement {
-  return <Row label="Volume" value={fmt(data.volume)} unit={data.unit} />;
+  return <Row label="Volume" value={fmt(data.volume)} unit={data.volumeUnit} />;
 }
 
 function MassPropertiesResult({ data }: { data: MassPropertiesData }): React.ReactElement {
   return (
     <>
-      <Row
-        label="Volume"
-        value={fmt(data.volume)}
-        unit={`${data.unit.replace('g', '')}³`.trim() || 'mm³'}
-      />
-      <Row
-        label="Density"
-        value={fmt(data.density, 5)}
-        unit={`g/${data.unit.replace('g', '') || 'mm'}³`}
-      />
+      <Row label="Volume" value={fmt(data.volume)} unit={data.volumeUnit} />
+      <Row label="Density" value={fmt(data.density, 5)} unit={`g/${data.volumeUnit}`} />
       <Row label="Mass" value={fmt(data.mass)} unit={data.unit} />
     </>
   );
@@ -168,7 +161,6 @@ const COMMAND_TITLES: Record<string, string> = {
   measure_area: 'Area',
   measure_perimeter: 'Perimeter',
   measure_bounding_box: 'Bounding Box',
-  measure_volume: 'Volume',
   mass_properties: 'Mass Properties',
 };
 

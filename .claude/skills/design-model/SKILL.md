@@ -33,9 +33,9 @@ verify and refine.
 | Phase               | Commands                                                                                                                             |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | Setup               | `set_units`, `set_parameter`, `add_layer`, `create_material`                                                                         |
-| 2D sketch           | `draw_line` `draw_polyline` `draw_arc` `draw_circle` `draw_rectangle` `draw_ellipse` `draw_spline` `draw_point`                      |
+| 2D sketch           | `draw_polyline` (2 points = line) `draw_arc` (no angles = circle) `draw_rectangle` `draw_ellipse` `draw_spline` `draw_point`                      |
 | 2D edit             | `offset_2d` `trim` `extend` `fillet_2d` `chamfer_2d` `explode_polyline`                                                              |
-| 2D→3D               | `extrude_sketch` `extrude_profile` `revolve_profile`                                                                                 |
+| 2D→3D               | `extrude_profile` (profile / id / ids) `revolve_profile`                                                                                 |
 | Primitives          | `add_box` `add_cylinder` `add_sphere` `add_cone` `add_torus` `add_wedge` `add_pyramid`                                               |
 | Combine             | `boolean_union` `boolean_subtract` `boolean_intersect`                                                           |
 | Modify 3D           | `fillet_edge` `chamfer_edge`                                                                                                         |
@@ -44,7 +44,7 @@ verify and refine.
 | Reuse               | `instantiate_template` (`bolt_hole_pattern`, `flange`, `rectangular_plate_with_holes`), `instantiate_recipe`, `create_configuration` |
 | Annotate            | `add_text` `add_dimension`                                                                                                           |
 | Inspect (read-only) | `describe_scene` `find_entities` `check_model`                                                                                       |
-| Measure (read-only) | `measure_distance` `measure_angle` `measure_area` `measure_perimeter` `measure_bounding_box` `measure_volume` `mass_properties`      |
+| Measure (read-only) | `measure_distance` `measure_angle` `measure_area` `measure_perimeter` `measure_bounding_box` `mass_properties` (volume, +mass with density)      |
 | Output              | `render_view` `export_stl` `save_recipe`                                                                                             |
 | Orchestrate         | **`build_project`** (the plan transaction) · `replay_history` + history edits                                                        |
 
@@ -137,7 +137,7 @@ kind/name/layer for follow-up steps.
 
 - `check_model` — geometry defects, structural issues, parameter errors. Resolve all.
 - Verify the driving dims with `measure_bounding_box`, `measure_distance`,
-  `measure_volume`; `mass_properties` for mass/CoM if a material is assigned.
+  `mass_properties` for volume, and mass if a material or density is given.
 - Compare against the intent's requirements; if off, go to step 6.
 
 ### 6. Refine parametrically (edit the recipe, not the geometry)

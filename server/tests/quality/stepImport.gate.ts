@@ -94,10 +94,10 @@ interface Imported {
   bridgeMs: number;
 }
 
-/** Sum of `measure_volume` over every imported body (NaN when a body cannot be measured). */
+/** Sum of `mass_properties` over every imported body (NaN when a body cannot be measured). */
 const totalVolume = (imported: Imported): number =>
   imported.meshes.reduce((total, mesh) => {
-    const result = execute(imported.document, 'measure_volume', { entityId: mesh.id });
+    const result = execute(imported.document, 'mass_properties', { entityId: mesh.id });
     return total + ((result.data as { volume?: number } | undefined)?.volume ?? NaN);
   }, 0);
 

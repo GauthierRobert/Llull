@@ -35,9 +35,14 @@ function created(command: string, params: unknown): string {
 }
 const addPoint = (x: number, y: number): string => created('draw_point', { position: [x, y, 0] });
 const addLine = (x1: number, y1: number, x2: number, y2: number): string =>
-  created('draw_line', { start: [x1, y1, 0], end: [x2, y2, 0] });
+  created('draw_polyline', {
+    points: [
+      [x1, y1, 0],
+      [x2, y2, 0],
+    ],
+  });
 const addCircle = (cx: number, cy: number, r: number): string =>
-  created('draw_circle', { center: [cx, cy, 0], radius: r });
+  created('draw_arc', { center: [cx, cy, 0], radius: r });
 
 interface Dimensioned {
   affected: readonly string[];

@@ -6,15 +6,17 @@
   }
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    0,
-    -14.5
-   ],
-   "end": [
-    50.5,
-    -14.5
+   "points": [
+    [
+     0,
+     -14.5
+    ],
+    [
+     50.5,
+     -14.5
+    ]
    ]
   },
   "as": "s1"
@@ -33,35 +35,39 @@
   "as": "s2"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    50.5,
-    14.5
-   ],
-   "end": [
-    0,
-    14.5
+   "points": [
+    [
+     50.5,
+     14.5
+    ],
+    [
+     0,
+     14.5
+    ]
    ]
   },
   "as": "s3"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    0,
-    14.5
-   ],
-   "end": [
-    0,
-    -14.5
+   "points": [
+    [
+     0,
+     14.5
+    ],
+    [
+     0,
+     -14.5
+    ]
    ]
   },
   "as": "s4"
  },
  {
-  "command": "extrude_sketch",
+  "command": "extrude_profile",
   "params": {
    "ids": [
     "$s1",

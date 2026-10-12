@@ -37,8 +37,13 @@ const GARBAGE: unknown[] = [
 function seeded(): CadDocument {
   let doc = createEmptyDocument();
   doc = execute(doc, 'add_box', { size: [10, 10, 10] }).document;
-  doc = execute(doc, 'draw_line', { start: [0, 0], end: [10, 0] }).document;
-  doc = execute(doc, 'draw_circle', { center: [0, 0], radius: 5 }).document;
+  doc = execute(doc, 'draw_polyline', {
+    points: [
+      [0, 0],
+      [10, 0],
+    ],
+  }).document;
+  doc = execute(doc, 'draw_arc', { center: [0, 0], radius: 5 }).document;
   return doc;
 }
 

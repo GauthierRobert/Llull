@@ -16,7 +16,7 @@ If a comment restates the code, delete it. Prose belongs in `docs/` (the human l
 
 ## C3 — Naming
 
-- Command / MCP tool `name`: `snake_case` (`add_box`, `draw_line`, `extrude_profile`); 2D commands
+- Command / MCP tool `name`: `snake_case` (`add_box`, `draw_polyline`, `extrude_profile`); 2D commands
   read as drafting verbs. Exported definition const: `camelCase` (`addBox`).
 - Components `PascalCase`; hooks `useThing`; types `PascalCase`, no `I` prefix.
 - Params: one inline zod `z.object(...)` per command; TS type inferred. No `<Command>Params`.

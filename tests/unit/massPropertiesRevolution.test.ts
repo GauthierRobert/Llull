@@ -26,7 +26,12 @@ describe('mass_properties on a revolution', () => {
   });
 
   it('still rejects a 2D entity', () => {
-    const line = execute(revolved.document, 'draw_line', { start: [0, 0], end: [1, 0] });
+    const line = execute(revolved.document, 'draw_polyline', {
+      points: [
+        [0, 0],
+        [1, 0],
+      ],
+    });
     const result = execute(line.document, 'mass_properties', {
       entityId: line.affected[0]!,
       density: 1,

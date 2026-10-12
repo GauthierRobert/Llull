@@ -3,8 +3,18 @@ import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 
 function twoLines(): { doc: CadDocument; a: string; b: string } {
-  const first = execute(createEmptyDocument(), 'draw_line', { start: [0, 0], end: [10, 0] });
-  const second = execute(first.document, 'draw_line', { start: [0, 5], end: [10, 5] });
+  const first = execute(createEmptyDocument(), 'draw_polyline', {
+    points: [
+      [0, 0],
+      [10, 0],
+    ],
+  });
+  const second = execute(first.document, 'draw_polyline', {
+    points: [
+      [0, 5],
+      [10, 5],
+    ],
+  });
   return { doc: second.document, a: first.affected[0]!, b: second.affected[0]! };
 }
 

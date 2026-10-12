@@ -194,11 +194,21 @@ describe('2D modify commands', () => {
     doc = polyRes.document;
     const polyId = polyRes.affected[0]!;
 
-    const lineARes = execute(doc, 'draw_line', { start: [0, 0], end: [10, 0] });
+    const lineARes = execute(doc, 'draw_polyline', {
+      points: [
+        [0, 0],
+        [10, 0],
+      ],
+    });
     doc = lineARes.document;
     const lineAId = lineARes.affected[0]!;
 
-    const lineBRes = execute(doc, 'draw_line', { start: [5, -5], end: [5, 5] });
+    const lineBRes = execute(doc, 'draw_polyline', {
+      points: [
+        [5, -5],
+        [5, 5],
+      ],
+    });
     doc = lineBRes.document;
     const lineBId = lineBRes.affected[0]!;
 
@@ -298,7 +308,12 @@ describe('2D modify commands', () => {
 
     it('failure: entity is not a polyline', () => {
       let doc = createEmptyDocument();
-      const r = execute(doc, 'draw_line', { start: [0, 0], end: [1, 1] });
+      const r = execute(doc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [1, 1],
+        ],
+      });
       doc = r.document;
       const lineId = r.affected[0]!;
 
@@ -308,27 +323,16 @@ describe('2D modify commands', () => {
       expect(result.summary).toContain("'line'");
     });
 
-    it('failure: polyline with fewer than 2 points is a no-op', () => {
-      // Cannot draw a polyline with <2 points via draw_polyline (it validates),
-      // so we test directly via the model: manually create such a doc state.
-      // Instead, test with 1-point by patching — but the draw command prevents it.
-      // Verify the command is robust: draw_polyline with 2 points is fine,
-      // but if we fake a 1-point polyline...
-      // We rely on type-safe doc construction — we can't easily inject a bad entity via commands.
-      // Instead, verify via a 2-point polyline (which succeeds) just to ensure the >=2 path works.
-      let doc = createEmptyDocument();
-      const r = execute(doc, 'draw_polyline', {
+    it('a 2-point open series is a line, which cannot be exploded', () => {
+      const r = execute(createEmptyDocument(), 'draw_polyline', {
         points: [
           [0, 0],
           [1, 0],
         ],
-        closed: false,
       });
-      doc = r.document;
-      const id = r.affected[0]!;
-      const result = execute(doc, 'explode_polyline', { id });
-      // 2 points → 1 segment
-      expect(result.affected).toHaveLength(1);
+      const result = execute(r.document, 'explode_polyline', { id: r.affected[0]! });
+      expect(result.affected).toHaveLength(0);
+      expect(result.document).toBe(r.document);
     });
 
     it('inherits color and layerId from the source polyline', () => {
@@ -355,7 +359,12 @@ describe('2D modify commands', () => {
   describe('offset_2d', () => {
     it('happy path: offsets a line to the left', () => {
       let doc = createEmptyDocument();
-      const r = execute(doc, 'draw_line', { start: [0, 0], end: [4, 0] });
+      const r = execute(doc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [4, 0],
+        ],
+      });
       doc = r.document;
       const lineId = r.affected[0]!;
 
@@ -375,7 +384,12 @@ describe('2D modify commands', () => {
 
     it('happy path: negative distance offsets right', () => {
       let doc = createEmptyDocument();
-      const r = execute(doc, 'draw_line', { start: [0, 0], end: [4, 0] });
+      const r = execute(doc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [4, 0],
+        ],
+      });
       doc = r.document;
       const lineId = r.affected[0]!;
 
@@ -414,7 +428,7 @@ describe('2D modify commands', () => {
 
     it('happy path: offsets a circle outward', () => {
       let doc = createEmptyDocument();
-      const r = execute(doc, 'draw_circle', { center: [0, 0], radius: 5 });
+      const r = execute(doc, 'draw_arc', { center: [0, 0], radius: 5 });
       doc = r.document;
       const circId = r.affected[0]!;
 
@@ -453,7 +467,12 @@ describe('2D modify commands', () => {
 
     it('failure: zero distance is a no-op', () => {
       let doc = createEmptyDocument();
-      const r = execute(doc, 'draw_line', { start: [0, 0], end: [1, 0] });
+      const r = execute(doc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [1, 0],
+        ],
+      });
       doc = r.document;
       const result = execute(doc, 'offset_2d', { id: r.affected[0]!, distance: 0 });
       expect(result.affected).toHaveLength(0);
@@ -462,7 +481,7 @@ describe('2D modify commands', () => {
 
     it('failure: circle offset to degenerate radius', () => {
       let doc = createEmptyDocument();
-      const r = execute(doc, 'draw_circle', { center: [0, 0], radius: 2 });
+      const r = execute(doc, 'draw_arc', { center: [0, 0], radius: 2 });
       doc = r.document;
       const result = execute(doc, 'offset_2d', { id: r.affected[0]!, distance: -3 });
       expect(result.affected).toHaveLength(0);
@@ -500,12 +519,22 @@ describe('2D modify commands', () => {
     it('happy path: trims the start-closer endpoint', () => {
       let doc = createEmptyDocument();
       // Horizontal line from (0,0) to (10,0)
-      const rA = execute(doc, 'draw_line', { start: [0, 0], end: [10, 0] });
+      const rA = execute(doc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [10, 0],
+        ],
+      });
       doc = rA.document;
       const lineId = rA.affected[0]!;
 
       // Vertical boundary at x=3 from (3,-5) to (3,5)
-      const rB = execute(doc, 'draw_line', { start: [3, -5], end: [3, 5] });
+      const rB = execute(doc, 'draw_polyline', {
+        points: [
+          [3, -5],
+          [3, 5],
+        ],
+      });
       doc = rB.document;
       const boundaryId = rB.affected[0]!;
 
@@ -522,9 +551,19 @@ describe('2D modify commands', () => {
     it('happy path: trims the end-closer endpoint', () => {
       let doc = createEmptyDocument();
       // Line from (0,0) to (10,0); boundary at x=8
-      const rA = execute(doc, 'draw_line', { start: [0, 0], end: [10, 0] });
+      const rA = execute(doc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [10, 0],
+        ],
+      });
       doc = rA.document;
-      const rB = execute(doc, 'draw_line', { start: [8, -5], end: [8, 5] });
+      const rB = execute(doc, 'draw_polyline', {
+        points: [
+          [8, -5],
+          [8, 5],
+        ],
+      });
       doc = rB.document;
 
       const result = execute(doc, 'trim', { id: rA.affected[0]!, boundaryId: rB.affected[0]! });
@@ -544,7 +583,12 @@ describe('2D modify commands', () => {
 
     it('failure: boundary not found', () => {
       let doc = createEmptyDocument();
-      const r = execute(doc, 'draw_line', { start: [0, 0], end: [5, 0] });
+      const r = execute(doc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [5, 0],
+        ],
+      });
       doc = r.document;
       const result = execute(doc, 'trim', { id: r.affected[0]!, boundaryId: 'missing' });
       expect(result.affected).toHaveLength(0);
@@ -562,7 +606,12 @@ describe('2D modify commands', () => {
         closed: false,
       });
       doc = rPoly.document;
-      const rLine = execute(doc, 'draw_line', { start: [2, -5], end: [2, 5] });
+      const rLine = execute(doc, 'draw_polyline', {
+        points: [
+          [2, -5],
+          [2, 5],
+        ],
+      });
       doc = rLine.document;
 
       const result = execute(doc, 'trim', {
@@ -575,9 +624,19 @@ describe('2D modify commands', () => {
 
     it('failure: parallel lines have no intersection', () => {
       let doc = createEmptyDocument();
-      const rA = execute(doc, 'draw_line', { start: [0, 0], end: [5, 0] });
+      const rA = execute(doc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [5, 0],
+        ],
+      });
       doc = rA.document;
-      const rB = execute(doc, 'draw_line', { start: [0, 1], end: [5, 1] });
+      const rB = execute(doc, 'draw_polyline', {
+        points: [
+          [0, 1],
+          [5, 1],
+        ],
+      });
       doc = rB.document;
 
       const result = execute(doc, 'trim', {
@@ -593,9 +652,19 @@ describe('2D modify commands', () => {
       let doc = createEmptyDocument();
       // Two non-parallel segments that don't actually cross within their bounds
       // Line A: (0,0)→(1,0); Boundary: (5,-1)→(5,1) — no overlap in x
-      const rA = execute(doc, 'draw_line', { start: [0, 0], end: [1, 0] });
+      const rA = execute(doc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [1, 0],
+        ],
+      });
       doc = rA.document;
-      const rB = execute(doc, 'draw_line', { start: [5, -1], end: [5, 1] });
+      const rB = execute(doc, 'draw_polyline', {
+        points: [
+          [5, -1],
+          [5, 1],
+        ],
+      });
       doc = rB.document;
 
       const result = execute(doc, 'trim', {
@@ -608,7 +677,12 @@ describe('2D modify commands', () => {
 
     it('failure: same entity for id and boundaryId', () => {
       let doc = createEmptyDocument();
-      const r = execute(doc, 'draw_line', { start: [0, 0], end: [5, 0] });
+      const r = execute(doc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [5, 0],
+        ],
+      });
       doc = r.document;
       const result = execute(doc, 'trim', {
         id: r.affected[0]!,
@@ -625,10 +699,20 @@ describe('2D modify commands', () => {
     it('happy path: extends the start-closer endpoint to boundary', () => {
       let doc = createEmptyDocument();
       // Short line from (2,0) to (4,0) — start (x=2) is closer to boundary at x=0
-      const rA = execute(doc, 'draw_line', { start: [2, 0], end: [4, 0] });
+      const rA = execute(doc, 'draw_polyline', {
+        points: [
+          [2, 0],
+          [4, 0],
+        ],
+      });
       doc = rA.document;
       // Vertical boundary at x=0
-      const rB = execute(doc, 'draw_line', { start: [0, -5], end: [0, 5] });
+      const rB = execute(doc, 'draw_polyline', {
+        points: [
+          [0, -5],
+          [0, 5],
+        ],
+      });
       doc = rB.document;
 
       const result = execute(doc, 'extend', {
@@ -647,9 +731,19 @@ describe('2D modify commands', () => {
     it('happy path: extends the end-closer endpoint', () => {
       let doc = createEmptyDocument();
       // Line from (0,0) to (3,0); boundary at x=10
-      const rA = execute(doc, 'draw_line', { start: [0, 0], end: [3, 0] });
+      const rA = execute(doc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [3, 0],
+        ],
+      });
       doc = rA.document;
-      const rB = execute(doc, 'draw_line', { start: [10, -5], end: [10, 5] });
+      const rB = execute(doc, 'draw_polyline', {
+        points: [
+          [10, -5],
+          [10, 5],
+        ],
+      });
       doc = rB.document;
 
       const result = execute(doc, 'extend', {
@@ -672,9 +766,19 @@ describe('2D modify commands', () => {
 
     it('failure: parallel lines', () => {
       let doc = createEmptyDocument();
-      const rA = execute(doc, 'draw_line', { start: [0, 0], end: [5, 0] });
+      const rA = execute(doc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [5, 0],
+        ],
+      });
       doc = rA.document;
-      const rB = execute(doc, 'draw_line', { start: [0, 2], end: [5, 2] });
+      const rB = execute(doc, 'draw_polyline', {
+        points: [
+          [0, 2],
+          [5, 2],
+        ],
+      });
       doc = rB.document;
 
       const result = execute(doc, 'extend', {
@@ -688,9 +792,14 @@ describe('2D modify commands', () => {
 
     it('failure: entity is not a line', () => {
       let doc = createEmptyDocument();
-      const rCirc = execute(doc, 'draw_circle', { center: [0, 0], radius: 3 });
+      const rCirc = execute(doc, 'draw_arc', { center: [0, 0], radius: 3 });
       doc = rCirc.document;
-      const rLine = execute(doc, 'draw_line', { start: [0, -5], end: [0, 5] });
+      const rLine = execute(doc, 'draw_polyline', {
+        points: [
+          [0, -5],
+          [0, 5],
+        ],
+      });
       doc = rLine.document;
 
       const result = execute(doc, 'extend', {
@@ -703,7 +812,12 @@ describe('2D modify commands', () => {
 
     it('failure: same entity for id and boundaryId', () => {
       let doc = createEmptyDocument();
-      const r = execute(doc, 'draw_line', { start: [0, 0], end: [5, 0] });
+      const r = execute(doc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [5, 0],
+        ],
+      });
       doc = r.document;
       const result = execute(doc, 'extend', {
         id: r.affected[0]!,
@@ -800,7 +914,12 @@ describe('2D modify commands', () => {
 
     it('failure: entity is not a polyline', () => {
       let doc = createEmptyDocument();
-      const r = execute(doc, 'draw_line', { start: [0, 0], end: [5, 0] });
+      const r = execute(doc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [5, 0],
+        ],
+      });
       doc = r.document;
       const result = execute(doc, 'fillet_2d', {
         id: r.affected[0]!,
@@ -1068,7 +1187,12 @@ describe('2D modify commands', () => {
 
     it('failure: entity is not a polyline', () => {
       let doc = createEmptyDocument();
-      const r = execute(doc, 'draw_line', { start: [0, 0], end: [5, 0] });
+      const r = execute(doc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [5, 0],
+        ],
+      });
       doc = r.document;
       const result = execute(doc, 'chamfer_2d', {
         id: r.affected[0]!,

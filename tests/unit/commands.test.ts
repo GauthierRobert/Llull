@@ -1097,19 +1097,19 @@ describe('scale_entity — ellipse and spline', () => {
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 
-  it('measure_volume for cone = π r² h / 3', () => {
+  it('mass_properties for cone = π r² h / 3', () => {
     let doc = createEmptyDocument();
     const created = execute(doc, 'add_cone', { radius: 3, height: 4 });
     doc = created.document;
     const id = created.affected[0]!;
 
-    const result = execute(doc, 'measure_volume', { entityId: id });
+    const result = execute(doc, 'mass_properties', { entityId: id });
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
-    const data = result.data as { volume: number; unit: string };
+    const data = result.data as { volume: number; volumeUnit: string };
     const expected = (Math.PI * 3 * 3 * 4) / 3;
     expect(data.volume).toBeCloseTo(expected, 6);
-    expect(data.unit).toContain('mm');
+    expect(data.volumeUnit).toContain('mm');
   });
 
   // ── add_torus ─────────────────────────────────────────────────────────────
@@ -1176,13 +1176,13 @@ describe('scale_entity — ellipse and spline', () => {
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 
-  it('measure_volume for torus = 2 π² · ringRadius · tubeRadius²', () => {
+  it('mass_properties for torus = 2 π² · ringRadius · tubeRadius²', () => {
     let doc = createEmptyDocument();
     const created = execute(doc, 'add_torus', { ringRadius: 4, tubeRadius: 1 });
     doc = created.document;
     const id = created.affected[0]!;
 
-    const result = execute(doc, 'measure_volume', { entityId: id });
+    const result = execute(doc, 'mass_properties', { entityId: id });
     const data = result.data as { volume: number; unit: string };
     const expected = 2 * Math.PI * Math.PI * 4 * 1 * 1;
     expect(data.volume).toBeCloseTo(expected, 6);
@@ -1248,13 +1248,13 @@ describe('scale_entity — ellipse and spline', () => {
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 
-  it('measure_volume for wedge = w×h×d / 2', () => {
+  it('mass_properties for wedge = w×h×d / 2', () => {
     let doc = createEmptyDocument();
     const created = execute(doc, 'add_wedge', { size: [4, 3, 6] });
     doc = created.document;
     const id = created.affected[0]!;
 
-    const result = execute(doc, 'measure_volume', { entityId: id });
+    const result = execute(doc, 'mass_properties', { entityId: id });
     const data = result.data as { volume: number; unit: string };
     const expected = (4 * 3 * 6) / 2;
     expect(data.volume).toBeCloseTo(expected, 6);
@@ -1339,13 +1339,13 @@ describe('scale_entity — ellipse and spline', () => {
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 
-  it('measure_volume for pyramid = baseWidth × baseDepth × height / 3', () => {
+  it('mass_properties for pyramid = baseWidth × baseDepth × height / 3', () => {
     let doc = createEmptyDocument();
     const created = execute(doc, 'add_pyramid', { baseWidth: 6, baseDepth: 4, height: 9 });
     doc = created.document;
     const id = created.affected[0]!;
 
-    const result = execute(doc, 'measure_volume', { entityId: id });
+    const result = execute(doc, 'mass_properties', { entityId: id });
     const data = result.data as { volume: number; unit: string };
     const expected = (6 * 4 * 9) / 3;
     expect(data.volume).toBeCloseTo(expected, 6);
@@ -1870,7 +1870,7 @@ describe('render_view', () => {
 
   it('SVG contains 2D shape stroked paths when doc has a circle', () => {
     let doc = createEmptyDocument();
-    doc = execute(doc, 'draw_circle', { center: [0, 0], radius: 3 }).document;
+    doc = execute(doc, 'draw_arc', { center: [0, 0], radius: 3 }).document;
 
     const result = execute(doc, 'render_view', { view: 'top' });
     const svg = (result.data as { svg: string }).svg;
@@ -1950,7 +1950,12 @@ describe('render_view', () => {
       startAngle: 0,
       endAngle: 1,
     }).document;
-    doc = execute(doc, 'draw_line', { start: [0, 0], end: [1, 1] }).document;
+    doc = execute(doc, 'draw_polyline', {
+      points: [
+        [0, 0],
+        [1, 1],
+      ],
+    }).document;
     doc = execute(doc, 'draw_polyline', {
       points: [
         [0, 0],
@@ -2971,10 +2976,15 @@ describe('add_dimension', () => {
     const p3 = execute(doc, 'draw_point', { position: [5, 5, 0] });
     doc = p3.document;
     // A circle for radial
-    const circ = execute(doc, 'draw_circle', { center: [0, 0], radius: 5 });
+    const circ = execute(doc, 'draw_arc', { center: [0, 0], radius: 5 });
     doc = circ.document;
     // A line for linear/aligned/angular
-    const ln = execute(doc, 'draw_line', { start: [0, 0], end: [10, 0] });
+    const ln = execute(doc, 'draw_polyline', {
+      points: [
+        [0, 0],
+        [10, 0],
+      ],
+    });
     doc = ln.document;
     return {
       doc,
@@ -3010,7 +3020,12 @@ describe('add_dimension', () => {
   it('linear — works with 2 line entities', () => {
     const { doc, lineId } = makeDoc();
     // Need a second line
-    const ln2 = execute(doc, 'draw_line', { start: [0, 5], end: [10, 5] });
+    const ln2 = execute(doc, 'draw_polyline', {
+      points: [
+        [0, 5],
+        [10, 5],
+      ],
+    });
     const result = execute(ln2.document, 'add_dimension', {
       dimensionKind: 'linear',
       entityIds: [lineId, ln2.affected[0]!],
@@ -3086,7 +3101,12 @@ describe('add_dimension', () => {
 
   it('angular — accepts line entities', () => {
     const { doc, lineId, pointId1 } = makeDoc();
-    const ln2 = execute(doc, 'draw_line', { start: [0, 0], end: [0, 10] });
+    const ln2 = execute(doc, 'draw_polyline', {
+      points: [
+        [0, 0],
+        [0, 10],
+      ],
+    });
     const result = execute(ln2.document, 'add_dimension', {
       dimensionKind: 'angular',
       entityIds: [pointId1, lineId, ln2.affected[0]!],
@@ -5389,8 +5409,13 @@ describe('export_stl', () => {
 
   it('2D-only document: valid empty solid with triangleCount:0', () => {
     let doc = createEmptyDocument();
-    doc = execute(doc, 'draw_line', { start: [0, 0], end: [5, 5] }).document;
-    doc = execute(doc, 'draw_circle', { center: [0, 0], radius: 3 }).document;
+    doc = execute(doc, 'draw_polyline', {
+      points: [
+        [0, 0],
+        [5, 5],
+      ],
+    }).document;
+    doc = execute(doc, 'draw_arc', { center: [0, 0], radius: 3 }).document;
 
     const result = execute(doc, 'export_stl', {});
     const data = result.data as StlData;
@@ -5404,7 +5429,12 @@ describe('export_stl', () => {
 
   it('2D entities in entityIds list are silently skipped', () => {
     let doc = createEmptyDocument();
-    const rLine = execute(doc, 'draw_line', { start: [0, 0], end: [1, 1] });
+    const rLine = execute(doc, 'draw_polyline', {
+      points: [
+        [0, 0],
+        [1, 1],
+      ],
+    });
     doc = rLine.document;
     const lineId = rLine.affected[0]!;
 
@@ -6428,13 +6458,13 @@ describe('set_camera', () => {
   });
 });
 
-// look_at
+// set_camera: target-only re-centring
 
-describe('look_at', () => {
+describe('set_camera target', () => {
   it('sets target and preserves distance', () => {
     const doc = createEmptyDocument();
     const prevDistance = doc.camera.distance;
-    const result = execute(doc, 'look_at', { target: [5, 10, 0] });
+    const result = execute(doc, 'set_camera', { target: [5, 10, 0] });
 
     expect(result.affected).toHaveLength(0);
     expect(result.document).not.toBe(doc);
@@ -6444,7 +6474,7 @@ describe('look_at', () => {
 
   it('optionally overrides azimuth and polar', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'look_at', { target: [0, 0, 0], azimuth: 1.57, polar: 0.8 });
+    const result = execute(doc, 'set_camera', { target: [0, 0, 0], azimuth: 1.57, polar: 0.8 });
 
     expect(result.document.camera.azimuth).toBeCloseTo(1.57);
     expect(result.document.camera.polar).toBeCloseTo(0.8);
@@ -6453,7 +6483,7 @@ describe('look_at', () => {
   it('preserves existing azimuth/polar when not specified', () => {
     const doc = createEmptyDocument();
     const prev = doc.camera;
-    const result = execute(doc, 'look_at', { target: [3, 3, 3] });
+    const result = execute(doc, 'set_camera', { target: [3, 3, 3] });
 
     expect(result.document.camera.azimuth).toBe(prev.azimuth);
     expect(result.document.camera.polar).toBe(prev.polar);
@@ -6462,27 +6492,27 @@ describe('look_at', () => {
   it('is pure — input document is never mutated', () => {
     const doc = createEmptyDocument();
     const snapshot = JSON.stringify(doc);
-    execute(doc, 'look_at', { target: [1, 2, 3] });
+    execute(doc, 'set_camera', { target: [1, 2, 3] });
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 
   it('does NOT append to featureHistory', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'look_at', { target: [0, 0, 0] });
+    const result = execute(doc, 'set_camera', { target: [0, 0, 0] });
     expect(result.document.featureHistory).toHaveLength(0);
   });
 
-  it('graceful no-op when target is missing', () => {
+  it('graceful no-op when no field is given', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'look_at', {} as { target: [number, number, number] });
+    const result = execute(doc, 'set_camera', {});
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
-    expect(result.summary).toContain('target');
+    expect(result.summary).toContain('no fields');
   });
 
   it('graceful no-op when target has wrong length', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'look_at', {
+    const result = execute(doc, 'set_camera', {
       target: [1, 2] as unknown as [number, number, number],
     });
     expect(result.affected).toHaveLength(0);
@@ -6491,16 +6521,16 @@ describe('look_at', () => {
 
   it('graceful no-op when target contains non-finite value', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'look_at', { target: [1, Infinity, 0] });
+    const result = execute(doc, 'set_camera', { target: [1, Infinity, 0] });
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
   });
 
-  it('tool schema is present and lists target as required', () => {
+  it('tool schema is present and target is optional', () => {
     const schemas = toToolSchemas();
-    const schema = schemas.find((s) => s.name === 'look_at');
+    const schema = schemas.find((s) => s.name === 'set_camera');
     expect(schema).toBeDefined();
-    expect(schema!.input_schema.required).toContain('target');
+    expect(schema!.input_schema.required ?? []).not.toContain('target');
   });
 });
 
@@ -6736,7 +6766,12 @@ describe('export_obj', () => {
 
   it('2D-only entities skipped, triangleCount=0', () => {
     let doc = createEmptyDocument();
-    doc = execute(doc, 'draw_line', { start: [0, 0], end: [5, 5] }).document;
+    doc = execute(doc, 'draw_polyline', {
+      points: [
+        [0, 0],
+        [5, 5],
+      ],
+    }).document;
 
     const data = execute(doc, 'export_obj', {}).data as ObjData;
     expect(data.triangleCount).toBe(0);

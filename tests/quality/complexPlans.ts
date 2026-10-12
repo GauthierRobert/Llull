@@ -26,24 +26,34 @@ export const COMPLEX_2D: Record<string, GoldenAction[]> = {
   dense_drawing: [
     ...range(30).flatMap((i) =>
       range(30).map((j) => ({
-        command: 'draw_circle',
+        command: 'draw_arc',
         params: { center: [i * 2 + 1, j * 2 + 1], radius: 0.8 },
       })),
     ),
     ...range(31).map((i) => ({
-      command: 'draw_line',
-      params: { start: [i * 2, 0], end: [i * 2, 60] },
+      command: 'draw_polyline',
+      params: {
+        points: [
+          [i * 2, 0],
+          [i * 2, 60],
+        ],
+      },
     })),
     ...range(31).map((j) => ({
-      command: 'draw_line',
-      params: { start: [0, j * 2], end: [60, j * 2] },
+      command: 'draw_polyline',
+      params: {
+        points: [
+          [0, j * 2],
+          [60, j * 2],
+        ],
+      },
     })),
     { command: 'draw_polyline', params: { points: zigzag(200, 60, -6), closed: false } },
   ],
   /** A small drawing 2 000 km from the origin. */
   far_from_origin: [
     { command: 'draw_rectangle', params: { width: 40, height: 10, position: FAR } },
-    { command: 'draw_circle', params: { center: [FAR[0] + 50, FAR[1] + 5], radius: 5 } },
+    { command: 'draw_arc', params: { center: [FAR[0] + 50, FAR[1] + 5], radius: 5 } },
     {
       command: 'draw_spline',
       params: {
@@ -58,20 +68,28 @@ export const COMPLEX_2D: Record<string, GoldenAction[]> = {
   /** A 10 µm part: grid adaptivity and zoom limits. */
   micro_part: [
     { command: 'draw_rectangle', params: { width: 0.01, height: 0.004 } },
-    { command: 'draw_circle', params: { center: [0.005, 0.002], radius: 0.001 } },
+    { command: 'draw_arc', params: { center: [0.005, 0.002], radius: 0.001 } },
   ],
   /** A 100 m x 25 m site plan with 50 pile markers. */
   site_plan: [
     { command: 'draw_rectangle', params: { width: 100000, height: 25000 } },
     ...range(50).map((index) => ({
-      command: 'draw_circle',
+      command: 'draw_arc',
       params: { center: [2000 * index + 1000, 12500], radius: 400 },
     })),
   ],
   /** 20:1 aspect ratio. */
   extreme_aspect: [
     { command: 'draw_rectangle', params: { width: 1000, height: 50 } },
-    { command: 'draw_line', params: { start: [0, 25], end: [1000, 25] } },
+    {
+      command: 'draw_polyline',
+      params: {
+        points: [
+          [0, 25],
+          [1000, 25],
+        ],
+      },
+    },
   ],
 };
 

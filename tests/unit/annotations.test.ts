@@ -43,7 +43,6 @@ describe('CommandDefinition.annotations — readOnly commands', () => {
     'measure_area',
     'measure_perimeter',
     'measure_bounding_box',
-    'measure_volume',
     'mass_properties',
     'describe_scene',
     'check_model',
@@ -84,9 +83,7 @@ describe('CommandDefinition.annotations — idempotent commands', () => {
   const IDEMPOTENT_NAMES = [
     'set_units',
     'set_parameter',
-    'rename_layer',
-    'set_layer_visibility',
-    'set_layer_lock',
+    'update_layer',
     'set_entity_layer',
     'set_entity_name',
     'stop_animation',
@@ -194,8 +191,8 @@ describe('buildMcpTools() — annotations on idempotent command', () => {
     expect(findTool('set_units').annotations?.idempotentHint).toBe(true);
   });
 
-  it('rename_layer tool has annotations.idempotentHint === true', () => {
-    expect(findTool('rename_layer').annotations?.idempotentHint).toBe(true);
+  it('update_layer tool has annotations.idempotentHint === true', () => {
+    expect(findTool('update_layer').annotations?.idempotentHint).toBe(true);
   });
 });
 

@@ -6,8 +6,8 @@ function twoLines(
   a: { start: [number, number]; end: [number, number] },
   b: { start: [number, number]; end: [number, number] },
 ): { doc: CadDocument; idA: string; idB: string } {
-  const first = execute(createEmptyDocument(), 'draw_line', a);
-  const second = execute(first.document, 'draw_line', b);
+  const first = execute(createEmptyDocument(), 'draw_polyline', { points: [a.start, a.end] });
+  const second = execute(first.document, 'draw_polyline', { points: [b.start, b.end] });
   return { doc: second.document, idA: first.affected[0]!, idB: second.affected[0]! };
 }
 

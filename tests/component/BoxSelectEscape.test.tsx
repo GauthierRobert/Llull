@@ -19,7 +19,7 @@ describe('BoxSelectInteraction — Esc', () => {
   const select = vi.fn();
   beforeEach(() => {
     select.mockClear();
-    const drawn = execute(createEmptyDocument(), 'draw_circle', { center: [2, 2], radius: 1 });
+    const drawn = execute(createEmptyDocument(), 'draw_arc', { center: [2, 2], radius: 1 });
     useStore.setState({ document: drawn.document, select });
   });
 

@@ -151,11 +151,11 @@ export function useDrawTool(): UseDrawToolResult {
           moveSelection([point[0] - first[0], point[1] - first[1], 0]);
           break;
         case 'line':
-          dispatch('draw_line', { start: first, end: point });
+          dispatch('draw_polyline', { points: [first, point] });
           break;
         case 'circle': {
           const radius = circleRadiusFromPoints(first, point);
-          if (radius !== null) dispatch('draw_circle', { center: first, radius });
+          if (radius !== null) dispatch('draw_arc', { center: first, radius });
           break;
         }
         case 'rectangle': {

@@ -151,8 +151,8 @@ Calling a tool of a disabled toolset returns an error that names `enable_toolset
 
 1. `tools/list` returns the `core` toolset plus the `search_tools` / `enable_toolset` discovery tools by default (`LLULL_TOOLSETS=all` lists every registry command, matching `listCommands()` — no duplication, one source of truth); the demo then calls `enable_toolset` for `3d` and `2d`.
 2. `add_box` creates a 2×2×2 box and returns its entity id in `affected`.
-3. `draw_circle` creates a circle and returns its entity id.
-4. `extrude_sketch` receives the circle's id (parsed from step 3's result) and extrudes it into a 3-unit solid — proving that id chaining between sequential tool calls works correctly.
+3. `draw_arc` (no angles) creates a circle and returns its entity id.
+4. `extrude_profile` receives the circle's id (parsed from step 3's result) and extrudes it into a 3-unit solid — proving that id chaining between sequential tool calls works correctly.
 5. The client closes cleanly; the shared live document now holds all three entities (and the web app shows them).
 
 ### How to run
@@ -190,11 +190,11 @@ Step 1: add_box
   summary  : Added box box-<step>.1 of size 2×2×2; ...
   affected : box-<step>.1
 
-Step 2: draw_circle
+Step 2: draw_arc
   summary  : Drew circle ... with radius 1.
   affected : <circle id>
 
-Step 3: extrude_sketch (source: <circle id>)
+Step 3: extrude_profile (source: <circle id>)
   summary  : Extruded <circle id> into extrusion ... with depth 3.
   affected : <extrusion id>
 
@@ -205,7 +205,7 @@ Done. Client closed cleanly.
 
 - **"Failed to connect"** — the server is not running. Start it with `npm --prefix server run dev`.
 - **401 Unauthorized** — the server was started with `MCP_AUTH_TOKEN` but the script was not given a matching token. Pass `MCP_AUTH_TOKEN=<token>` before the run command.
-- **extrude_sketch no-op** — the circle `id` was not found in the server's working document. This can happen if the document was cleared or replaced (e.g. `clear_document`, `load_document`, or a restart with autosave disabled) between step 2 and step 3.
+- **extrude_profile no-op** — the circle `id` was not found in the server's working document. This can happen if the document was cleared or replaced (e.g. `clear_document`, `load_document`, or a restart with autosave disabled) between step 2 and step 3.
 
 ---
 

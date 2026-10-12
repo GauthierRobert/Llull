@@ -72,7 +72,7 @@ describe('isToolEnabled() / toolsetOf()', () => {
   it('exposes tools of enabled toolsets only', () => {
     expect(isToolEnabled('add_box', coreAnd3d)).toBe(true);
     expect(isToolEnabled('describe_scene', coreAnd3d)).toBe(true);
-    expect(isToolEnabled('draw_line', coreAnd3d)).toBe(false);
+    expect(isToolEnabled('draw_polyline', coreAnd3d)).toBe(false);
     expect(isToolEnabled('draw_walls', coreAnd3d)).toBe(false);
   });
 

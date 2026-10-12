@@ -3,8 +3,18 @@ import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 
 describe('clear_document also clears constraints, joints and drive relations', () => {
-  const a = execute(createEmptyDocument(), 'draw_line', { start: [0, 0], end: [10, 0] });
-  const b = execute(a.document, 'draw_line', { start: [0, 5], end: [10, 5] });
+  const a = execute(createEmptyDocument(), 'draw_polyline', {
+    points: [
+      [0, 0],
+      [10, 0],
+    ],
+  });
+  const b = execute(a.document, 'draw_polyline', {
+    points: [
+      [0, 5],
+      [10, 5],
+    ],
+  });
   const constrained = execute(b.document, 'add_constraint', {
     constraint: {
       kind: 'distance',
