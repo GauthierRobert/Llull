@@ -263,7 +263,6 @@ export const addBevelGear = defineCommand({
       `Created bevel_gear ${id}: module=${fmt(mod)} teeth=${teeth} matingTeeth=${matingTeeth} ` +
         `pitchAngle=${fmt(toDegrees(checked.pitchAngle))}deg coneDistance=${fmt(checked.coneDistance)} ` +
         `face=${fmt(faceWidth)} apexHeight=${fmt(checked.apexHeight)} bore=${fmt(bore)} at ${vecText(at)}`,
-      '. ',
     );
   },
 });

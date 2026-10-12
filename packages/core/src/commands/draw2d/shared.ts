@@ -1,6 +1,6 @@
 import type { CadDocument, Vec2, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
-import { looseVec3, z } from '../schema';
+import { colorField, looseVec3, nameField, z } from '../schema';
 import { nextId } from '../../lib/id';
 import { commitEntity } from '../entity/commitEntity';
 import { noop } from '../noop';
@@ -24,6 +24,24 @@ export function workPlaneRotationField(): z.ZodOptional<z.ZodArray<z.ZodNumber>>
     .array(z.number())
     .describe(`${ROTATION_CONVENTION} for the work plane. Defaults to [0,0,0].`)
     .optional();
+}
+
+/** `position` + `color` params of a drafted shape (spread into `z.object`). */
+export function workPlaneStyleFields(): {
+  position: ReturnType<typeof workPlanePositionField>;
+  color: ReturnType<typeof colorField>;
+} {
+  return { position: workPlanePositionField(), color: colorField(DEFAULT_DRAW_COLOR) };
+}
+
+/** `position` + `rotation` + `color` + `name` params of a drafted shape (spread into `z.object`). */
+export function workPlaneNamedFields(): {
+  position: ReturnType<typeof workPlanePositionField>;
+  rotation: ReturnType<typeof workPlaneRotationField>;
+  color: ReturnType<typeof colorField>;
+  name: ReturnType<typeof nameField>;
+} {
+  return { ...workPlaneStyleFields(), rotation: workPlaneRotationField(), name: nameField() };
 }
 
 const POINT_SERIES_ID_PREFIX = { polyline: 'poly', spline: 'spline' } as const;

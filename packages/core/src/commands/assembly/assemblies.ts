@@ -24,6 +24,7 @@ import {
   replaceEntities,
   withoutEntities,
 } from '../entity/entityOps';
+import { entityOfKind } from '../entity/entityOfKind';
 import { changed, noop } from '../noop';
 import { EXTRUSION_COLOR } from '../solids/shared';
 import { ORIGIN } from '../../lib/vec3';
@@ -240,9 +241,8 @@ export const explodeInstance = defineCommand({
       .describe('Id of an InstanceEntity to explode into its world-space component entities.'),
   }),
   run: (doc, { id }): CommandResult => {
-    const entity = doc.entities[id];
-    if (!entity || entity.kind !== 'instance')
-      return noop(doc, `explode_instance: entity "${id}" is not an instance or does not exist.`);
+    const entity = entityOfKind(doc, id, ['instance']);
+    if (typeof entity === 'string') return noop(doc, `explode_instance: ${entity}.`);
 
     const component = doc.components[entity.componentId];
     if (!component) {

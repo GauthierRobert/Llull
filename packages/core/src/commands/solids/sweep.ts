@@ -1,7 +1,7 @@
 import type { CurveSegment } from '../../model/curve';
 import type { CadDocument, SweepSection, SweepStation, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
-import { colorField, defineCommand, untypedArray, z, layerIdField } from '../schema';
+import { defineCommand, untypedArray, z } from '../schema';
 import { failer } from '../noop';
 import { isVec3, sub3 } from '../../lib/vec3';
 import { polygonArea } from '../../lib/polygon';
@@ -10,7 +10,7 @@ import {
   DEFAULT_SOLID_COLOR,
   commitSolid,
   existingLayerOrDefault,
-  explicitIdField,
+  solidStyleFields,
   explicitIdOrNext,
   explicitIdTaken,
 } from './shared';
@@ -226,9 +226,7 @@ export const sweepProfile = defineCommand({
           'Replaces radius / innerRadius / section / sectionId.',
       )
       .optional(),
-    layerId: layerIdField(),
-    color: colorField(DEFAULT_SOLID_COLOR),
-    id: explicitIdField(),
+    ...solidStyleFields(),
   }),
   run: (
     doc,

@@ -6,7 +6,7 @@
 
 import type { SubdivisionEntity, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
-import { colorField, defineCommand, vec3, z, layerIdField, nameField } from '../schema';
+import { defineCommand, vec3, z } from '../schema';
 import { failer } from '../noop';
 import { finiteVec3OrZero, map3 } from '../../lib/vec3';
 import { entityLocalToWorld } from '../../geometry/entityFrame';
@@ -16,7 +16,7 @@ import {
   commitSolid,
   rotationField,
   existingLayerOrDefault,
-  explicitIdField,
+  namedSolidStyleFields,
   explicitIdOrNext,
   explicitIdTaken,
 } from './shared';
@@ -179,10 +179,7 @@ export const addSubdivisionSolid = defineCommand({
     levels: levelsField.optional(),
     position: vec3('World position of the cage origin. Defaults to [0, 0, 0].').optional(),
     rotation: rotationField(),
-    layerId: layerIdField(),
-    color: colorField(DEFAULT_SOLID_COLOR),
-    name: nameField(),
-    id: explicitIdField(),
+    ...namedSolidStyleFields(),
   }),
   run: (doc, params): CommandResult => {
     const fail = failer(doc, 'add_subdivision_solid');

@@ -3,6 +3,7 @@ import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { lerp2, len2, sub2 } from '../../lib/vec2';
 import { lineIntersectionParams } from '../../lib/polygon';
+import { entityOfKind } from '../entity/entityOfKind';
 import { changed, noop } from '../noop';
 import { replaceEntity } from '../entity/entityOps';
 
@@ -22,18 +23,10 @@ function resolveLinePair(
 ): { line: LineEntity; boundary: LineEntity } | CommandResult {
   if (id === boundaryId)
     return noop(doc, `${command}: id and boundaryId must be different entities.`);
-  const line = doc.entities[id];
-  const boundary = doc.entities[boundaryId];
-  if (!line) return noop(doc, `${command}: entity ${id} not found.`);
-  if (!boundary) return noop(doc, `${command}: boundary entity ${boundaryId} not found.`);
-  if (line.kind !== 'line')
-    return noop(doc, `${command}: entity ${id} is kind '${line.kind}', expected 'line'.`);
-  if (boundary.kind !== 'line') {
-    return noop(
-      doc,
-      `${command}: boundary ${boundaryId} is kind '${boundary.kind}', expected 'line'.`,
-    );
-  }
+  const line = entityOfKind(doc, id, ['line']);
+  if (typeof line === 'string') return noop(doc, `${command}: ${line}.`);
+  const boundary = entityOfKind(doc, boundaryId, ['line']);
+  if (typeof boundary === 'string') return noop(doc, `${command}: boundary ${boundary}.`);
   return { line, boundary };
 }
 

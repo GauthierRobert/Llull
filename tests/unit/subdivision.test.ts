@@ -395,8 +395,8 @@ describe('edit_subdivision_cage', () => {
   });
 
   it.each([
-    [{ id: 'nope', levels: 1 }, "no entity 'nope'"],
-    [{ levels: 1 }, 'not a subdivision solid'],
+    [{ id: 'nope', levels: 1 }, "entity 'nope' not found"],
+    [{ levels: 1 }, "expected 'subdivision'"],
     [{}, 'give at least one of'],
     [{ vertexIndices: [0], region: { min: [0, 0, 0], max: [1, 1, 1] }, levels: 1 }, 'not both'],
     [{ vertexIndices: [99], translate: [0, 0, 1] }, 'outside 0..'],
@@ -410,7 +410,7 @@ describe('edit_subdivision_cage', () => {
   ])('rejects bad edits (%#)', (params, text) => {
     const withBox = run(base.doc, 'add_box', { size: [1, 1, 1] });
     const boxId = withBox.affected[0] as string;
-    const id = text === 'not a subdivision solid' ? boxId : base.e.id;
+    const id = text === "expected 'subdivision'" ? boxId : base.e.id;
     expectNoOp(
       run(withBox.document, 'edit_subdivision_cage', { id, ...params }),
       withBox.document,

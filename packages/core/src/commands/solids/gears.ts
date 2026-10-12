@@ -190,9 +190,8 @@ export const addSpurGear = defineCommand({
       `Created spur_gear ${id}: module=${fmt(mod)} teeth=${teethInt} ` +
         `pitchD=${fmt(pitchDiameter)} outerD=${fmt(outerDiameter)} ` +
         `bore=${bore} face=${fmt(faceWidth)} ` +
-        `at ${vecText(resolvedPosition)}.` +
-        `${bore > 0 ? ' Bored: mesh solid.' : ''}`,
-      ' ',
+        `at ${vecText(resolvedPosition)}` +
+        `${bore > 0 ? '; bored: mesh solid' : ''}`,
     );
   },
 });

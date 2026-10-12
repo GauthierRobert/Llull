@@ -6,6 +6,7 @@ import { offsetSegment, miterJoin, resolvePolyline } from './geometry';
 import { commitEntity } from '../entity/commitEntity';
 import { referenceSuffix, withEntities, withoutEntities } from '../entity/entityOps';
 import { newEntity } from '../entity/newEntity';
+import { entityOfKind } from '../entity/entityOfKind';
 import { changed, noop } from '../noop';
 import { elementAt } from '../../lib/elementAt';
 
@@ -97,8 +98,8 @@ export const offset2D = defineCommand({
       ),
   }),
   run: (doc, { id, distance }): CommandResult => {
-    const entity = doc.entities[id];
-    if (!entity) return noop(doc, `offset_2d: entity ${id} not found.`);
+    const entity = entityOfKind(doc, id);
+    if (typeof entity === 'string') return noop(doc, `offset_2d: ${entity}.`);
     if (distance === 0) return noop(doc, `offset_2d: distance is 0 — no-op.`);
 
     const newId = nextId('offset');

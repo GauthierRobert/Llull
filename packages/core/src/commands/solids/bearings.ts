@@ -21,7 +21,7 @@ import { compactNumber as fmt, vecText } from '../../lib/compactNumber';
 import { withEntity } from '../entity/entityOps';
 import { positionField } from './shared';
 import { newEntity } from '../entity/newEntity';
-import { noop } from '../noop';
+import { failer } from '../noop';
 import { BEARING_TABLE, BEARING_TYPES, lookupBearing, type BearingType } from './bearingTable';
 import { toRadians } from '../../lib/angle';
 
@@ -242,8 +242,7 @@ export const addBearing = defineCommand({
       name,
     },
   ): CommandResult => {
-    const fail = (reason: string): CommandResult =>
-      noop(doc, `add_bearing failed: ${reason}; no-op.`);
+    const fail = failer(doc, 'add_bearing');
     const resolved = resolveSection(doc, { type, designation, bore, outerDiameter, width });
     if ('error' in resolved) return fail(resolved.error);
     const unitAxis = axis === undefined ? ([0, 0, 1] as Vec3) : unitAxisOrNull(axis);

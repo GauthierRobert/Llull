@@ -1,5 +1,6 @@
 import type { CadDocument } from '../../model/types';
 import { z } from '../schema';
+import { entityOfKind } from '../entity/entityOfKind';
 
 type InstanceFrameRefSchema = z.ZodObject<{
   instanceId: z.ZodString;
@@ -41,8 +42,8 @@ export function instanceRefsProblem(
     const { instanceId } = refs[side];
     if (instanceId.length === 0)
       return `${command}: ${side} must be an object with a non-empty instanceId string.`;
-    if (doc.entities[instanceId]?.kind !== 'instance')
-      return `${command}: ${side}.instanceId '${instanceId}' does not exist or is not an InstanceEntity.`;
+    const found = entityOfKind(doc, instanceId, ['instance']);
+    if (typeof found === 'string') return `${command}: ${side}.instanceId: ${found}.`;
   }
   return null;
 }

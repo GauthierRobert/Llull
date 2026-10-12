@@ -3,6 +3,7 @@ import type { CommandResult } from '../types';
 import { lineIntersection } from '../../lib/polygon';
 import { add2, normalize2, perp2, scale2, sub2 } from '../../lib/vec2';
 import { noop } from '../noop';
+import { entityOfKind } from '../entity/entityOfKind';
 
 /** The polyline entity `id`, or the no-op result naming `command` when it is missing or another kind. */
 export function resolvePolyline(
@@ -10,11 +11,8 @@ export function resolvePolyline(
   command: string,
   id: string,
 ): PolylineEntity | CommandResult {
-  const entity = doc.entities[id];
-  if (!entity) return noop(doc, `${command}: entity ${id} not found.`);
-  if (entity.kind !== 'polyline')
-    return noop(doc, `${command}: entity ${id} is kind '${entity.kind}', expected 'polyline'.`);
-  return entity;
+  const found = entityOfKind(doc, id, ['polyline']);
+  return typeof found === 'string' ? noop(doc, `${command}: ${found}.`) : found;
 }
 
 /**

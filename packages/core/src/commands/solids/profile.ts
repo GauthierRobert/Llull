@@ -1,15 +1,7 @@
 import type { CadDocument, Vec2, Vec3 } from '../../model/types';
 import type { CurveSegment } from '../../model/curve';
 import type { CommandResult } from '../types';
-import {
-  defineCommand,
-  z,
-  looseVec3,
-  tolerant,
-  untypedArray,
-  colorField,
-  layerIdField,
-} from '../schema';
+import { defineCommand, z, looseVec3, tolerant, untypedArray, colorField } from '../schema';
 import { axisVector, isValidAxis } from '../../lib/axis';
 import { ORIGIN, finiteVec3OrZero, len3 } from '../../lib/vec3';
 import { noop } from '../noop';
@@ -28,7 +20,7 @@ import {
   axisField,
   rotationField,
   existingLayerOrDefault,
-  explicitIdField,
+  solidStyleFields,
   explicitIdOrNext,
   explicitIdTaken,
 } from './shared';
@@ -317,9 +309,7 @@ export const revolveProfile = defineCommand({
           'Malformed or non-length-3 values are ignored and [0,0,0] is used.',
       ),
     ).optional(),
-    layerId: layerIdField(),
-    color: colorField(DEFAULT_SOLID_COLOR),
-    id: explicitIdField(),
+    ...solidStyleFields(),
   }),
   run: (
     doc,

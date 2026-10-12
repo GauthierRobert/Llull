@@ -119,7 +119,6 @@ export const addSplineShaft = defineCommand({
       entity,
       `Created spline_shaft ${id}: W${fmt(referenceDiameter)}x${fmt(mod)}x${count} tipD=${fmt(2 * tipRadius)} ` +
         `rootD=${fmt(2 * rootRadius)} length=${fmt(length)} (${profile.length} profile points) at ${vecText(at)}`,
-      '. ',
     );
   },
 });

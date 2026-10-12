@@ -1,13 +1,13 @@
 import type { CommandResult } from '../types';
 import { compactNumber } from '../../lib/compactNumber';
-import { defineCommand, z, colorField, nameField } from '../schema';
+import { defineCommand, z } from '../schema';
 import { nextId } from '../../lib/id';
 import { sampleArc } from '../../lib/arc';
 import { positiveSweep } from '../../lib/angle';
 import { len2 } from '../../lib/vec2';
 import { ORIGIN, finiteVec3OrZero } from '../../lib/vec3';
 import { MAX_CURVE_SAMPLES } from '../limits';
-import { DEFAULT_DRAW_COLOR, workPlanePositionField, workPlaneRotationField } from './shared';
+import { DEFAULT_DRAW_COLOR, workPlaneNamedFields } from './shared';
 import { commitEntity } from '../entity/commitEntity';
 import { newEntity } from '../entity/newEntity';
 import { pointsExtent } from '../../geometry/bounds';
@@ -86,10 +86,7 @@ export const drawBeltAround = defineCommand({
           'Must be >= 2. Default 12. Higher values give smoother arcs.',
       )
       .optional(),
-    position: workPlanePositionField(),
-    rotation: workPlaneRotationField(),
-    color: colorField(DEFAULT_DRAW_COLOR),
-    name: nameField(),
+    ...workPlaneNamedFields(),
   }),
   run: (
     doc,

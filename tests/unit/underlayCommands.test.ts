@@ -146,8 +146,8 @@ describe('calibrate_underlay', () => {
       expectNoOp(execute(target, 'calibrate_underlay', params), target, message);
     };
     const points = { pixelA: [0, 0], pixelB: [10, 0] };
-    calibrate(doc, { id: 'nope', ...points, distance: 5 }, 'no entity nope');
-    calibrate(withBox.document, { id: boxId, ...points, distance: 5 }, 'not an image underlay');
+    calibrate(doc, { id: 'nope', ...points, distance: 5 }, "entity 'nope' not found");
+    calibrate(withBox.document, { id: boxId, ...points, distance: 5 }, "expected 'image'");
     calibrate(doc, { id, ...points, distance: 0 }, 'distance must be');
     calibrate(doc, { id, pixelA: [3, 3], pixelB: [3, 3], distance: 5 }, 'two different pixels');
   });
@@ -172,7 +172,11 @@ describe('set_underlay', () => {
 
   it('rejects missing id, nothing to set, and out-of-range opacity', () => {
     const { doc, id } = withUnderlay();
-    expectNoOp(execute(doc, 'set_underlay', { id: 'x', opacity: 0.1 }), doc, 'no entity x');
+    expectNoOp(
+      execute(doc, 'set_underlay', { id: 'x', opacity: 0.1 }),
+      doc,
+      "entity 'x' not found",
+    );
     expectNoOp(execute(doc, 'set_underlay', { id }), doc, 'give opacity and/or locked');
     expectNoOp(execute(doc, 'set_underlay', { id, opacity: -1 }), doc, 'opacity must be');
   });

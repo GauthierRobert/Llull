@@ -15,7 +15,8 @@ import { parseImageDataUrl } from '../../lib/imageDataUrl';
 import { calibrateUnderlay, pixelToWorld } from '../../geometry/imageUnderlay';
 import { commitEntity } from '../entity/commitEntity';
 import { replaceEntity } from '../entity/entityOps';
-import { changed, noop, report } from '../noop';
+import { entityOfKind } from '../entity/entityOfKind';
+import { changed, failer, noop, report } from '../noop';
 import { MAX_IMAGE_DATA_URL_LENGTH, MAX_IMAGE_PIXEL_SIDE, MAX_PROFILE_POINTS } from '../limits';
 import { ROTATION_CONVENTION } from '../solids/shared';
 import { toDegrees } from '../../lib/angle';
@@ -32,11 +33,8 @@ const formatPoint = (point: readonly number[]): string =>
 
 /** The image entity `id`, or a no-op result explaining why there is none. */
 function underlayOf(doc: CadDocument, id: string, command: string): ImageEntity | CommandResult {
-  const entity = doc.entities[id];
-  if (entity === undefined) return noop(doc, `${command}: no entity ${id}.`);
-  if (entity.kind !== 'image')
-    return noop(doc, `${command}: entity ${id} is a ${entity.kind}, not an image underlay.`);
-  return entity;
+  const found = entityOfKind(doc, id, ['image']);
+  return typeof found === 'string' ? noop(doc, `${command}: ${found}.`) : found;
 }
 
 const isImage = (value: ImageEntity | CommandResult): value is ImageEntity => 'kind' in value;
@@ -102,8 +100,7 @@ export const addImageUnderlay = defineCommand({
       name,
     },
   ): CommandResult => {
-    const fail = (why: string): CommandResult =>
-      noop(doc, `add_image_underlay: ${why}; image not added.`);
+    const fail = failer(doc, 'add_image_underlay');
     if (dataUrl.length > MAX_IMAGE_DATA_URL_LENGTH)
       return fail(
         `dataUrl is ${dataUrl.length} characters, over the ${MAX_IMAGE_DATA_URL_LENGTH} limit — downscale or recompress the image`,

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { execute } from '@core/commands/registry';
+import { docWith } from '../helpers/fixtureDocument';
 import { ellipsePoint } from '@lib/arc';
 import { isStringArray } from '@lib/isStringArray';
 import { planPoint } from '@lib/vec2';
@@ -78,5 +80,22 @@ describe('numeric helpers', () => {
   it('unitsToMm converts document-unit lengths to millimetres', () => {
     expect(unitsToMm({ units: 'm' })(1.5)).toBe(1500);
     expect(unitsToMm({ units: 'mm' })(42)).toBe(42);
+  });
+});
+
+describe('check_model positive-field table', () => {
+  it('flags NaN / Infinity sizes as degenerate (previously leaked through `x <= 0`)', () => {
+    for (const radius of [Number.NaN, Number.POSITIVE_INFINITY, 0]) {
+      const doc = docWith({ id: 'c', kind: 'cylinder', radius, height: 2 });
+      const data = execute(doc, 'check_model', {}).data as {
+        issues: Array<{ code: string; entityId?: string }>;
+      };
+      expect(data.issues.some((i) => i.code === 'degenerate_size' && i.entityId === 'c')).toBe(
+        true,
+      );
+    }
+    const healthy = docWith({ id: 'c', kind: 'cylinder', radius: 1, height: 2 });
+    const data = execute(healthy, 'check_model', {}).data as { issues: Array<{ code: string }> };
+    expect(data.issues.some((i) => i.code === 'degenerate_size')).toBe(false);
   });
 });

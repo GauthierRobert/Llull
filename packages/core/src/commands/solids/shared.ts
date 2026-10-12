@@ -6,7 +6,7 @@ import {
   type Vec3,
 } from '../../model/types';
 import type { CommandResult } from '../types';
-import { z, colorField, looseVec3, tolerant } from '../schema';
+import { z, colorField, layerIdField, looseVec3, nameField, tolerant } from '../schema';
 import { rotatedEntityBounds } from '../../geometry/rotatedBounds';
 import { add3, finiteVec3OrZero } from '../../lib/vec3';
 import { nextId } from '../../lib/id';
@@ -166,6 +166,30 @@ export function placedSolidFields(
   return { position: positionField(), anchor, rotation, color: colorField(DEFAULT_SOLID_COLOR) };
 }
 
+/** Fields every created solid ends with: layerId, color, id (spread into `z.object`; order is schema order). */
+export function solidStyleFields(): {
+  layerId: ReturnType<typeof layerIdField>;
+  color: ReturnType<typeof colorField>;
+  id: ReturnType<typeof explicitIdField>;
+} {
+  return { layerId: layerIdField(), color: colorField(DEFAULT_SOLID_COLOR), id: explicitIdField() };
+}
+
+/** `solidStyleFields` with `name` between color and id. */
+export function namedSolidStyleFields(): {
+  layerId: ReturnType<typeof layerIdField>;
+  color: ReturnType<typeof colorField>;
+  name: ReturnType<typeof nameField>;
+  id: ReturnType<typeof explicitIdField>;
+} {
+  return {
+    layerId: layerIdField(),
+    color: colorField(DEFAULT_SOLID_COLOR),
+    name: nameField(),
+    id: explicitIdField(),
+  };
+}
+
 /** Optional explicit `id` param of a created solid. */
 export function explicitIdField(): z.ZodOptional<z.ZodString> {
   return z
@@ -285,20 +309,10 @@ export function rejectZeroAreaProfile(
 }
 
 /**
- * Append `entity` and report it: `<description><separator>world AABB ...` with
- * `affected: [entity.id]` (`separator` defaults to `'; '`).
+ * Append `entity` and report it: `<description>; world AABB ...` with `affected: [entity.id]`.
  */
-export function commitSolid(
-  doc: CadDocument,
-  entity: Entity,
-  description: string,
-  separator = '; ',
-): CommandResult {
-  return commitEntity(
-    doc,
-    entity,
-    `${description}${separator}${boundsText(rotatedEntityBounds(entity))}.`,
-  );
+export function commitSolid(doc: CadDocument, entity: Entity, description: string): CommandResult {
+  return commitEntity(doc, entity, `${description}; ${boundsText(rotatedEntityBounds(entity))}.`);
 }
 
 /**

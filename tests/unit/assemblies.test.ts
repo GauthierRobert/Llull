@@ -279,7 +279,7 @@ describe('assemblies', () => {
 
   it('explode_instance on a non-instance entity is a graceful no-op', () => {
     const doc = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
-    expectNoOp(execute(doc, 'explode_instance', { id: doc.order[0]! }), doc, 'not an instance');
+    expectNoOp(execute(doc, 'explode_instance', { id: doc.order[0]! }), doc, "expected 'instance'");
   });
 
   it('explode_instance on a missing id is a graceful no-op', () => {

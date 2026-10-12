@@ -1,6 +1,6 @@
 import type { CadDocument, Vec2, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
-import { colorField, defineCommand, vec3, z, layerIdField } from '../schema';
+import { defineCommand, vec3, z } from '../schema';
 import { failer } from '../noop';
 import { centroid3, distance3, dot3, sub3 } from '../../lib/vec3';
 import { newEntity } from '../entity/newEntity';
@@ -8,7 +8,7 @@ import {
   DEFAULT_SOLID_COLOR,
   commitSolid,
   existingLayerOrDefault,
-  explicitIdField,
+  solidStyleFields,
   explicitIdOrNext,
   explicitIdTaken,
 } from './shared';
@@ -126,9 +126,7 @@ export const loftSections = defineCommand({
         'true: straight lines between neighbouring sections; false (default): smooth blend.',
       )
       .optional(),
-    layerId: layerIdField(),
-    color: colorField(DEFAULT_SOLID_COLOR),
-    id: explicitIdField(),
+    ...solidStyleFields(),
   }),
   run: (
     doc,

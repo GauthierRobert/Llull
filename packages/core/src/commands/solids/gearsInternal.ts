@@ -140,7 +140,6 @@ export const addInternalGear = defineCommand({
       `Created internal_gear ${id}: module=${fmt(mod)} teeth=${teethInt} pitchD=${fmt(2 * pitchRadius)} ` +
         `tipD=${fmt(2 * (pitchRadius - mod))} rootD=${fmt(2 * (pitchRadius + 1.25 * mod))} ` +
         `outerR=${fmt(outerRadius)} face=${fmt(faceWidth)} at ${vecText(at)}`,
-      '. ',
     );
   },
 });

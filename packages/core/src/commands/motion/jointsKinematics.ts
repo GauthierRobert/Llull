@@ -1,3 +1,4 @@
+import { entityOfKind } from '../entity/entityOfKind';
 import type {
   CadDocument,
   InstanceEntity,
@@ -32,9 +33,8 @@ function rotateAboutAxis(v: Vec3, axis: Vec3, angle: number): Vec3 {
 
 /** Resolve a JointMateRef to the InstanceEntity, returning null on missing/wrong kind. */
 function resolveInstance(ref: JointMateRef, doc: CadDocument): InstanceEntity | null {
-  const e = doc.entities[ref.instanceId];
-  if (!e || e.kind !== 'instance') return null;
-  return e;
+  const found = entityOfKind(doc, ref.instanceId, ['instance']);
+  return typeof found === 'string' ? null : found;
 }
 
 /** Joint ids ordered driver before driven; joints on a drive cycle are omitted. */

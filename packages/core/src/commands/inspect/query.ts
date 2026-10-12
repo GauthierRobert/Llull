@@ -12,7 +12,9 @@
 import { type EntityKind, SHAPE2D_KINDS, SOLID_KINDS } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
-import { noop, report } from '../noop';
+import { failer, report } from '../noop';
+import { entityOfKind } from '../entity/entityOfKind';
+import { POINT_3D } from './measureDistanceAngle';
 import { boundsCenter, boundsOverlap, entityBoundsInDoc } from '../../geometry/bounds';
 import type { Bounds } from '../../geometry/bounds';
 import { distanceSq3 } from '../../lib/vec3';
@@ -43,8 +45,6 @@ const insideAabb = (b: Bounds, qMin: Corner, qMax: Corner): boolean =>
   axes.every((i) => b.min[i] >= qMin[i] && b.max[i] <= qMax[i]);
 
 const isInverted = (min: Corner, max: Corner): boolean => axes.some((i) => min[i] > max[i]);
-
-const POINT_3D = z.tuple([z.number(), z.number(), z.number()]);
 
 /**
  * @command find_entities
@@ -171,17 +171,17 @@ export const findEntities = defineCommand({
       tagFuzzy,
     } = params;
 
+    const fail = failer(doc, 'find_entities');
     if ((bboxMin === undefined) !== (bboxMax === undefined))
-      return noop(doc, 'find_entities: bboxMin and bboxMax must both be provided or both omitted.');
+      return fail('bboxMin and bboxMax must both be provided or both omitted');
     if (nearPoint !== undefined && nearPoint.radius <= 0)
-      return noop(doc, 'find_entities: nearPoint.radius must be a finite number > 0.');
+      return fail('nearPoint.radius must be a finite number > 0');
     if (insideBBox !== undefined && isInverted(insideBBox[0], insideBBox[1]))
-      return noop(doc, 'find_entities: insideBBox min must be <= max on every axis.');
+      return fail('insideBBox min must be <= max on every axis');
     if (overlapsBBox !== undefined && isInverted(overlapsBBox[0], overlapsBBox[1]))
-      return noop(doc, 'find_entities: overlapsBBox min must be <= max on every axis.');
-    const touchingRef = touchingId !== undefined ? doc.entities[touchingId] : undefined;
-    if (touchingId !== undefined && !touchingRef)
-      return noop(doc, `find_entities: touchingId "${touchingId}" does not exist in the document.`);
+      return fail('overlapsBBox min must be <= max on every axis');
+    const touchingRef = touchingId !== undefined ? entityOfKind(doc, touchingId) : undefined;
+    if (typeof touchingRef === 'string') return fail(`touchingId: ${touchingRef}`);
     const touchingBounds = touchingRef ? entityBoundsInDoc(doc, touchingRef) : null;
     const nearRadiusSq = nearPoint ? nearPoint.radius * nearPoint.radius : 0;
     const nameLc = name?.toLowerCase();

@@ -1,6 +1,7 @@
 import type { CadDocument, SubdivisionEntity, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
+import { entityOfKind } from '../entity/entityOfKind';
 import { changed, failer } from '../noop';
 import { add3, distance3, map3, scale3, sub3 } from '../../lib/vec3';
 import { inverseEulerXYZ } from '../../lib/eulerRotation';
@@ -81,11 +82,7 @@ function reported(
 }
 
 function subdivisionTarget(doc: CadDocument, id: string): SubdivisionEntity | string {
-  const entity = doc.entities[id];
-  if (entity === undefined) return `no entity '${id}'`;
-  if (entity.kind !== 'subdivision')
-    return `'${id}' is a ${entity.kind}, not a subdivision solid (add_subdivision_solid)`;
-  return entity;
+  return entityOfKind(doc, id, ['subdivision']);
 }
 
 /**

@@ -5,7 +5,7 @@ import { nextId } from '../../lib/id';
 import { ORIGIN } from '../../lib/vec3';
 import { commitEntity } from '../entity/commitEntity';
 import { newEntity } from '../entity/newEntity';
-import { DEFAULT_DRAW_COLOR, drawPointSeries, workPlanePositionField } from './shared';
+import { DEFAULT_DRAW_COLOR, drawPointSeries, workPlaneStyleFields } from './shared';
 import { noop } from '../noop';
 
 /**
@@ -36,8 +36,7 @@ export const drawPolyline = defineCommand({
         'When true, the last point connects back to the first point, forming a closed loop. Defaults to false.',
       )
       .optional(),
-    position: workPlanePositionField(),
-    color: colorField(DEFAULT_DRAW_COLOR),
+    ...workPlaneStyleFields(),
   }),
   run: (
     doc,
@@ -95,8 +94,7 @@ export const drawArc = defineCommand({
         'End angle in radians, measured counter-clockwise from the +X axis. Arc sweeps from startAngle to endAngle counter-clockwise. Omit together with startAngle for a full circle.',
       )
       .optional(),
-    position: workPlanePositionField(),
-    color: colorField(DEFAULT_DRAW_COLOR),
+    ...workPlaneStyleFields(),
   }),
   run: (
     doc,
