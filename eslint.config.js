@@ -30,6 +30,14 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/explicit-function-return-type': ['warn', { allowExpressions: true }],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { group: ['@core/lib/*'], message: 'Import core helpers via @lib/* instead.' },
+          ],
+        },
+      ],
       '@typescript-eslint/consistent-type-imports': [
         'error',
         { fixStyle: 'separate-type-imports', disallowTypeAnnotations: false },

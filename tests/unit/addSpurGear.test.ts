@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { type ExtrusionEntity, type MeshSolidEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { buildSpurGearProfile } from '@core/commands/solids/gears';
-import { polygonArea, segmentsIntersect, signedArea } from '@core/lib/polygon';
+import { polygonArea, segmentsIntersect, signedArea } from '@lib/polygon';
 import { isWatertight, meshTris, signedVolume } from './gearTestUtils';
 import { expectSingleEntity } from '../helpers/expectNoOp';
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
-import { flattenDxf, parseDxf } from '@core/lib/dxfRead';
+import { flattenDxf, parseDxf } from '@lib/dxfRead';
 import { civilErrors } from '@aec/civil/validate';
 import { gridSize, MAX_SAMPLES } from '@aec/civil/earthworks/earthworksMath';
 import { drawnInterval, MAX_CONTOUR_LEVELS } from '@aec/civil/surface/surfaceEvaluate';

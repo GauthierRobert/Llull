@@ -1,5 +1,5 @@
 import type { CadDocument, ExtrusionEntity, MeshSolidEntity, Vec3 } from '@core/model/types';
-import { pointInPolygon } from '@core/lib/polygon';
+import { pointInPolygon } from '@lib/polygon';
 
 export type Tri = readonly [Vec3, Vec3, Vec3];
 

@@ -12,7 +12,7 @@ import * as THREE from 'three';
 import type { Entity } from '@core/model/types';
 import { decalPatch } from '@core/geometry/decal';
 import { localTriangles } from '@core/geometry/solidTriangles';
-import { rasterizeText } from '@core/lib/blockFont';
+import { rasterizeText } from '@lib/blockFont';
 
 interface DecalItem {
   readonly id: string;
