@@ -1,4 +1,4 @@
-import type { CadDocument, Entity, Vec2, PolylineEntity } from '../../model/types';
+import type { BaseEntity, CadDocument, Entity, Vec2, PolylineEntity } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { nextId } from '../../lib/id';
@@ -18,17 +18,23 @@ interface Corner {
   lenNext: number;
 }
 
-/** `poly` with `vertexIndex` replaced by `first`, `second`, plus a new `extra` entity. */
-function commitCorner(
+/**
+ * `poly` with `vertexIndex` replaced by `first`, `second`, plus a new corner piece (`kind`, `id`,
+ * `geometry`) placed on the polyline's plane, colour and layer.
+ */
+function commitCorner<K extends 'arc' | 'line'>(
   doc: CadDocument,
   poly: PolylineEntity,
   vertexIndex: number,
-  first: Vec2,
-  second: Vec2,
-  extra: Entity,
+  [first, second]: readonly [Vec2, Vec2],
+  piece: { kind: K; id: string; geometry: Omit<Extract<Entity, { kind: K }>, keyof BaseEntity> },
 ): { document: CadDocument; pointCount: number } {
   const points = poly.points.flatMap((p, i): Vec2[] => (i === vertexIndex ? [first, second] : [p]));
   const updated: Entity = { ...poly, points };
+  const extra = newEntity(piece.kind, piece.id, piece.geometry, poly.position, poly.color, {
+    rotation: poly.rotation,
+    layerId: poly.layerId,
+  });
   return {
     document: withEntity(replaceEntity(doc, updated), extra),
     pointCount: points.length,
@@ -158,22 +164,16 @@ export const fillet2D = defineCommand({
     const arcEnd = leftTurn ? startAngle : endAngle;
 
     const arcId = nextId('arc');
-    const arcEntity = newEntity(
-      'arc',
-      arcId,
-      { center: arcCenter, radius, startAngle: arcStart, endAngle: arcEnd },
-      poly.position,
-      poly.color,
-      { rotation: poly.rotation, layerId: poly.layerId },
-    );
-
     const { document, pointCount } = commitCorner(
       doc,
       poly,
       vertexIndex,
-      tangentPrev,
-      tangentNext,
-      arcEntity,
+      [tangentPrev, tangentNext],
+      {
+        kind: 'arc',
+        id: arcId,
+        geometry: { center: arcCenter, radius, startAngle: arcStart, endAngle: arcEnd },
+      },
     );
 
     return changed(
@@ -242,23 +242,11 @@ export const chamfer2D = defineCommand({
     const bevelNext = add2(vertex, scale2(dirNext, distance));
 
     const bevelId = nextId('line');
-    const bevelLine = newEntity(
-      'line',
-      bevelId,
-      { start: bevelPrev, end: bevelNext },
-      poly.position,
-      poly.color,
-      { rotation: poly.rotation, layerId: poly.layerId },
-    );
-
-    const { document, pointCount } = commitCorner(
-      doc,
-      poly,
-      vertexIndex,
-      bevelPrev,
-      bevelNext,
-      bevelLine,
-    );
+    const { document, pointCount } = commitCorner(doc, poly, vertexIndex, [bevelPrev, bevelNext], {
+      kind: 'line',
+      id: bevelId,
+      geometry: { start: bevelPrev, end: bevelNext },
+    });
 
     return changed(
       document,
