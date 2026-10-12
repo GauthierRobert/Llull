@@ -25,6 +25,11 @@ export function cross2(a: Vec2, b: Vec2): number {
   return a[0] * b[1] - a[1] * b[0];
 }
 
+/** @pure z-component of (a − o) × (b − o); > 0 when o → a → b turns counter-clockwise */
+export function orient2(o: Vec2, a: Vec2, b: Vec2): number {
+  return cross2(sub2(a, o), sub2(b, o));
+}
+
 /** @pure Euclidean length */
 export function len2(a: Vec2): number {
   return Math.sqrt(a[0] * a[0] + a[1] * a[1]);

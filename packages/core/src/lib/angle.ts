@@ -5,6 +5,8 @@
  * @pure
  */
 
+import { roundTo } from './compactNumber';
+
 const TURN = 2 * Math.PI;
 
 /** `angle` wrapped into [0, 2π). */
@@ -35,9 +37,7 @@ export function toRadians(degrees: number): number {
 /** Radians to degrees; with `decimals`, rounded to that many decimal places. */
 export function toDegrees(radians: number, decimals?: number): number {
   const degrees = (radians * 180) / Math.PI;
-  if (decimals === undefined) return degrees;
-  const scale = 10 ** decimals;
-  return Math.round(degrees * scale) / scale;
+  return decimals === undefined ? degrees : roundTo(degrees, decimals);
 }
 
 /** Angle in [0, π] between two vectors given their dot product of unit vectors (acos, clamped). */

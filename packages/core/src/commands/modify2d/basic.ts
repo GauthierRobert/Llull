@@ -122,11 +122,10 @@ export const offset2D = defineCommand({
         const pts = entity.points;
         if (pts.length < 2)
           return noop(doc, `offset_2d: polyline ${id} has fewer than 2 points — no-op.`);
-        const segs = pts
-          .slice(0, -1)
-          .map((p, i) => offsetSegment(p, elementAt(pts, i + 1), distance));
-        if (entity.closed)
-          segs.push(offsetSegment(elementAt(pts, pts.length - 1), elementAt(pts, 0), distance));
+        const edgeCount = entity.closed ? pts.length : pts.length - 1;
+        const segs = Array.from({ length: edgeCount }, (_, i) =>
+          offsetSegment(elementAt(pts, i), elementAt(pts, (i + 1) % pts.length), distance),
+        );
         const joins = (entity.closed ? segs : segs.slice(1)).map((seg, i) => {
           const prev = elementAt(segs, entity.closed ? (i - 1 + segs.length) % segs.length : i);
           return miterJoin(prev[0], prev[1], seg[0], seg[1]);

@@ -14,6 +14,7 @@ import { kernelRefusal } from '../kernelRefusal';
 import { replayHistory } from './replay';
 import { unresolvedExpressionsNote } from './replayStep';
 import { changed, noop } from '../noop';
+import { clamp } from '../../lib/clamp';
 
 /**
  * Refuse (kernel) or replay `newHistory`; `done` receives "<n> entity|entities".
@@ -241,7 +242,7 @@ export const reorderStep = defineCommand({
       'reorder_step',
       stepId,
       (idx, step) => {
-        const clamped = Math.max(0, Math.min(newIndex, doc.featureHistory.length - 1));
+        const clamped = clamp(newIndex, 0, doc.featureHistory.length - 1);
         if (clamped === idx) return `step '${stepId}' is already at index ${idx}.`;
         const without = doc.featureHistory.filter((_, i) => i !== idx);
         return {

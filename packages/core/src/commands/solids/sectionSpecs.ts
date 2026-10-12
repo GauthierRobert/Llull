@@ -5,6 +5,7 @@
  * (`sectionId`), resolved to a section ring (geometry/sectionRing). Pure helpers.
  */
 
+import type { CurveSegment } from '../../model/curve';
 import type { CadDocument, Vec2 } from '../../model/types';
 import { isVec2 } from '../../lib/vec2';
 import { polygonArea } from '../../lib/polygon';
@@ -41,6 +42,25 @@ export interface SectionSpec {
 
 const ELLIPSE_POINTS = 96;
 
+/**
+ * The closed loop of an explicit `section` point list (no exact curves) or of the `sectionId`
+ * sketch (with its exact curves), or an error message; exactly one of the two must be given.
+ */
+export function sectionLoop(
+  doc: CadDocument,
+  section: ReadonlyArray<unknown> | undefined,
+  sectionId: string | undefined,
+): { profile: Vec2[]; curves: CurveSegment<Vec2>[] } | string {
+  if (section !== undefined) {
+    const bad = section.findIndex((point) => !isVec2(point));
+    if (bad >= 0) return `section point ${bad} must be a finite [x, y] pair`;
+    if (section.length < 3 || section.length > MAX_PROFILE_POINTS)
+      return `section needs 3..${MAX_PROFILE_POINTS} points (got ${section.length})`;
+    return { profile: section as Vec2[], curves: [] };
+  }
+  const loop = sketchLoop(doc, [sectionId as string]);
+  return typeof loop === 'string' ? `section ${loop}` : loop;
+}
 /** Dense closed polygon of a spec, or an error message. */
 export function specPolygon(doc: CadDocument, spec: SectionSpec): Vec2[] | string {
   const { radius, radiusX, radiusY, section, sectionId } = spec;
@@ -57,15 +77,9 @@ export function specPolygon(doc: CadDocument, spec: SectionSpec): Vec2[] | strin
       const angle = (2 * Math.PI * k) / ELLIPSE_POINTS;
       return [rx * Math.cos(angle), ry * Math.sin(angle)];
     });
-  } else if (section !== undefined) {
-    const bad = section.findIndex((point) => !isVec2(point));
-    if (bad >= 0) return `section point ${bad} must be a finite [x, y] pair`;
-    if (section.length < 3 || section.length > MAX_PROFILE_POINTS)
-      return `section needs 3..${MAX_PROFILE_POINTS} points (got ${section.length})`;
-    polygon = section as Vec2[];
   } else {
-    const loop = sketchLoop(doc, [sectionId as string]);
-    if (typeof loop === 'string') return `section ${loop}`;
+    const loop = sectionLoop(doc, section, sectionId);
+    if (typeof loop === 'string') return loop;
     polygon = loop.profile;
   }
   if (polygonArea(polygon) <= 1e-12) return 'section encloses no area';

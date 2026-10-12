@@ -6,7 +6,7 @@
  */
 
 import type { Vec3 } from '../model/vectors';
-import { positiveSweep } from './angle';
+import { positiveSweep, toRadians } from './angle';
 import { arcPolyline } from './arc';
 
 export interface DxfRecord {
@@ -257,7 +257,7 @@ function insertTransform(record: DxfRecord, block: DxfBlock, parent: Transform):
   const sx = codeNumber(record, 41, 1);
   const sy = codeNumber(record, 42, 1);
   const sz = codeNumber(record, 43, 1);
-  const rotation = (codeNumber(record, 50, 0) * Math.PI) / 180;
+  const rotation = toRadians(codeNumber(record, 50, 0));
   const at = point(record);
   const cos = Math.cos(rotation);
   const sin = Math.sin(rotation);
@@ -362,8 +362,8 @@ export function flattenDxf(
           const local = point(record);
           const radius = codeNumber(record, 40, 0);
           if (!(radius > 0)) break;
-          let start = record.type === 'ARC' ? (codeNumber(record, 50, 0) * Math.PI) / 180 : 0;
-          let end = record.type === 'ARC' ? (codeNumber(record, 51, 360) * Math.PI) / 180 : 0;
+          let start = record.type === 'ARC' ? toRadians(codeNumber(record, 50, 0)) : 0;
+          let end = record.type === 'ARC' ? toRadians(codeNumber(record, 51, 360)) : 0;
           if (mirrored(record)) [start, end] = [Math.PI - end, Math.PI - start];
           const center = world(local);
           if (transform.scale === null) {
@@ -416,7 +416,7 @@ export function flattenDxf(
             kind: 'text',
             at: world(point(record)),
             height: height > 0 ? height : 1,
-            rotation: (codeNumber(record, 50, 0) * Math.PI) / 180 + transform.rotation,
+            rotation: toRadians(codeNumber(record, 50, 0)) + transform.rotation,
             content: raw,
           });
           break;

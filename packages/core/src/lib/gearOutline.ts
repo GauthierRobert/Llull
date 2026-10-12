@@ -3,6 +3,7 @@
  * @layer lib
  */
 
+import { polar as polarAbout } from './arc';
 import type { Point2 } from './polygon';
 
 /** Default points per involute flank: ≈ 0.03% radial error against the true curve for standard teeth. */
@@ -104,10 +105,7 @@ function flankSamplesOf(pattern: ToothPattern): {
   return { flank, undercut, halfAngle };
 }
 
-const polar = (radius: number, angle: number): Point2 => [
-  radius * Math.cos(angle),
-  radius * Math.sin(angle),
-];
+const polar = (radius: number, angle: number): Point2 => polarAbout([0, 0], radius, angle);
 
 /**
  * Closed CCW tooth outline (first point NOT repeated), tooth 0 centred at `phase`, plus the exact

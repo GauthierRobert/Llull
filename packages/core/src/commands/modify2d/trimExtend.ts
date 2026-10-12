@@ -1,8 +1,8 @@
 import type { CadDocument, LineEntity, Vec2 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
-import { len2, sub2 } from '../../lib/vec2';
-import { segIntersect, evalLine } from './geometry';
+import { lerp2, len2, sub2 } from '../../lib/vec2';
+import { lineIntersectionParams } from '../../lib/polygon';
 import { changed, noop } from '../noop';
 import { replaceEntity } from '../entity/entityOps';
 
@@ -50,7 +50,7 @@ function moveEndpointToBoundary(
   const pair = resolveLinePair(doc, command, id, boundaryId);
   if ('summary' in pair) return pair;
   const { line, boundary } = pair;
-  const hit = segIntersect(line.start, line.end, boundary.start, boundary.end);
+  const hit = lineIntersectionParams(line.start, line.end, boundary.start, boundary.end);
   if (hit === null)
     return noop(doc, `${command}: lines ${id} and ${boundaryId} are parallel — no intersection.`);
   if (
@@ -62,7 +62,7 @@ function moveEndpointToBoundary(
       `${command}: intersection of ${id} and ${boundaryId} is outside segment bounds.`,
     );
   }
-  const point = evalLine(line.start, line.end, hit.t);
+  const point = lerp2(line.start, line.end, hit.t);
   const done =
     command === 'trim'
       ? `Trimmed line ${id} to intersection with ${boundaryId}`

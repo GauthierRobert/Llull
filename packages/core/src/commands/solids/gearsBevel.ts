@@ -29,13 +29,17 @@ import {
   createMeshBuilder,
   placeMesh,
 } from '../../geometry/prismMesh';
-import { MAX_GEAR_TEETH } from '../limits';
-import { rotatedEntityBounds } from '../../geometry/rotatedBounds';
-import { commitEntity } from '../entity/commitEntity';
 import { withEntity } from '../entity/entityOps';
-import { boundsText, positionField, rotationField } from './shared';
-import { AXIS_ROTATION, meshGearEntity, pressureAngleProblem } from './gearSolid';
+import { commitSolid, positionField, rotationField } from './shared';
+import {
+  AXIS_ROTATION,
+  meshGearEntity,
+  moduleProblem,
+  pressureAngleProblem,
+  teethCountProblem,
+} from './gearSolid';
 import { noop } from '../noop';
+import { toDegrees } from '../../lib/angle';
 
 const ORIGIN: Vec3 = [0, 0, 0];
 const MAX_FACE_FRACTION = 0.7;
@@ -116,14 +120,11 @@ interface BevelInputs {
 /** Rejection reason for bevel parameters, or the pitch cone when valid. */
 function checkBevel(input: BevelInputs): string | BevelGeometry {
   const { mod, teeth, matingTeeth, shaftAngle, pitchAngle, faceWidth, pressureAngle, bore } = input;
-  if (!(mod > 0 && Number.isFinite(mod)))
-    return `module must be finite and > 0, got ${String(mod)}.`;
-  if (!(Number.isInteger(teeth) && teeth >= 6 && teeth <= MAX_GEAR_TEETH)) {
-    return `teeth must be an integer in [6, ${MAX_GEAR_TEETH}], got ${String(teeth)}.`;
-  }
-  if (!(Number.isInteger(matingTeeth) && matingTeeth >= 6 && matingTeeth <= MAX_GEAR_TEETH)) {
-    return `matingTeeth must be an integer in [6, ${MAX_GEAR_TEETH}], got ${String(matingTeeth)}.`;
-  }
+  const countProblem =
+    moduleProblem(mod) ??
+    teethCountProblem('teeth', teeth, 6) ??
+    teethCountProblem('matingTeeth', matingTeeth, 6);
+  if (countProblem !== null) return countProblem;
   if (!(shaftAngle > 0 && shaftAngle < Math.PI)) {
     return `shaftAngle must be in (0, π) radians, got ${String(shaftAngle)}.`;
   }
@@ -256,13 +257,13 @@ export const addBevelGear = defineCommand({
     const oriented = placeMesh(local, ORIGIN, AXIS_ROTATION[axis]);
     const id = nextId('bevel');
     const pivoted = meshGearEntity(id, placeMesh(oriented, at, turn), color, name);
-    return commitEntity(
+    return commitSolid(
       doc,
       pivoted,
       `Created bevel_gear ${id}: module=${fmt(mod)} teeth=${teeth} matingTeeth=${matingTeeth} ` +
-        `pitchAngle=${fmt((checked.pitchAngle * 180) / Math.PI)}deg coneDistance=${fmt(checked.coneDistance)} ` +
-        `face=${fmt(faceWidth)} apexHeight=${fmt(checked.apexHeight)} bore=${fmt(bore)} at ${vecText(at)}. ` +
-        `${boundsText(rotatedEntityBounds(pivoted))}.`,
+        `pitchAngle=${fmt(toDegrees(checked.pitchAngle))}deg coneDistance=${fmt(checked.coneDistance)} ` +
+        `face=${fmt(faceWidth)} apexHeight=${fmt(checked.apexHeight)} bore=${fmt(bore)} at ${vecText(at)}`,
+      '. ',
     );
   },
 });

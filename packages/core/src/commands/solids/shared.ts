@@ -284,9 +284,21 @@ export function rejectZeroAreaProfile(
   );
 }
 
-/** Append `entity` and report it: `<description>; world AABB ...` with `affected: [entity.id]`. */
-export function commitSolid(doc: CadDocument, entity: Entity, description: string): CommandResult {
-  return commitEntity(doc, entity, `${description}; ${boundsText(rotatedEntityBounds(entity))}.`);
+/**
+ * Append `entity` and report it: `<description><separator>world AABB ...` with
+ * `affected: [entity.id]` (`separator` defaults to `'; '`).
+ */
+export function commitSolid(
+  doc: CadDocument,
+  entity: Entity,
+  description: string,
+  separator = '; ',
+): CommandResult {
+  return commitEntity(
+    doc,
+    entity,
+    `${description}${separator}${boundsText(rotatedEntityBounds(entity))}.`,
+  );
 }
 
 /**

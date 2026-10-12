@@ -18,6 +18,8 @@ import { replaceEntity } from '../entity/entityOps';
 import { changed, noop, report } from '../noop';
 import { MAX_IMAGE_DATA_URL_LENGTH, MAX_IMAGE_PIXEL_SIDE, MAX_PROFILE_POINTS } from '../limits';
 import { ROTATION_CONVENTION } from '../solids/shared';
+import { toDegrees } from '../../lib/angle';
+import { roundTo } from '../../lib/compactNumber';
 
 const DEFAULT_OPACITY = 0.5;
 
@@ -25,7 +27,7 @@ const PIXEL_CONVENTION =
   'Image pixel coordinates [px, py]: origin at the TOP-left corner of the picture, +px right, ' +
   '+py DOWN (as read off the image); fractional values are fine.';
 
-const round = (value: number): number => Math.round(value * 1e6) / 1e6;
+const round = (value: number): number => roundTo(value, 6);
 
 const formatPoint = (point: readonly number[]): string => `[${point.map(round).join(', ')}]`;
 
@@ -202,7 +204,7 @@ export const calibrateUnderlayCommand = defineCommand({
     const turned =
       placement.rotation[2] === image.rotation[2]
         ? ''
-        : `, rotated in-plane to ${round((placement.rotation[2] * 180) / Math.PI)}°`;
+        : `, rotated in-plane to ${round(toDegrees(placement.rotation[2]))}°`;
     return changed(
       replaceEntity(doc, calibrated),
       `Calibrated underlay ${id}: ${round(pixelDistance)} px = ${distance} units → ` +

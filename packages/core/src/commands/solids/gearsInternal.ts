@@ -18,10 +18,14 @@ import {
 } from '../../lib/gearOutline';
 import { circleThrough, ringMesh } from '../../geometry/prismMesh';
 import { MAX_GEAR_TEETH } from '../limits';
-import { rotatedEntityBounds } from '../../geometry/rotatedBounds';
-import { commitEntity } from '../entity/commitEntity';
-import { boundsText, positionField, rotationField } from './shared';
-import { faceWidthProblem, placedMeshEntity, pressureAngleProblem } from './gearSolid';
+import { commitSolid, positionField, rotationField } from './shared';
+import {
+  faceWidthProblem,
+  moduleProblem,
+  placedMeshEntity,
+  pressureAngleProblem,
+  teethCountProblem,
+} from './gearSolid';
 import { failedWith } from '../noop';
 
 /** Minimum radial wall (in modules) between the tooth-space roots and the rim. */
@@ -105,12 +109,12 @@ export const addInternalGear = defineCommand({
     },
   ): CommandResult => {
     const fail = failedWith(doc, 'add_internal_gear');
-    if (!(mod > 0)) return fail(`module must be finite and > 0, got ${String(mod)}.`);
     const teethInt = Math.round(teeth);
-    if (!(teethInt >= 12 && teethInt <= MAX_GEAR_TEETH)) {
-      return fail(`teeth must be an integer in [12, ${MAX_GEAR_TEETH}], got ${String(teeth)}.`);
-    }
-    const shapeProblem = pressureAngleProblem(pressureAngle) ?? faceWidthProblem(faceWidth);
+    const shapeProblem =
+      moduleProblem(mod) ??
+      teethCountProblem('teeth', teethInt, 12, teeth) ??
+      pressureAngleProblem(pressureAngle) ??
+      faceWidthProblem(faceWidth);
     if (shapeProblem !== null) return fail(shapeProblem);
     const minRim = minRingOuterRadius(mod, teethInt);
     if (!(outerRadius >= minRim && Number.isFinite(outerRadius))) {
@@ -130,13 +134,13 @@ export const addInternalGear = defineCommand({
       name,
     );
     const pitchRadius = pitchRadiusOf(mod, teethInt);
-    return commitEntity(
+    return commitSolid(
       doc,
       entity,
       `Created internal_gear ${id}: module=${fmt(mod)} teeth=${teethInt} pitchD=${fmt(2 * pitchRadius)} ` +
         `tipD=${fmt(2 * (pitchRadius - mod))} rootD=${fmt(2 * (pitchRadius + 1.25 * mod))} ` +
-        `outerR=${fmt(outerRadius)} face=${fmt(faceWidth)} at ${vecText(at)}. ` +
-        `${boundsText(rotatedEntityBounds(entity))}.`,
+        `outerR=${fmt(outerRadius)} face=${fmt(faceWidth)} at ${vecText(at)}`,
+      '. ',
     );
   },
 });

@@ -11,7 +11,12 @@ import { nextId } from '../../lib/id';
 import { compactNumber as fmt, vecText } from '../../lib/compactNumber';
 import { applyEulerXYZ } from '../../lib/eulerRotation';
 import { finiteVec3OrZero } from '../../lib/vec3';
-import { DEFAULT_FLANK_SAMPLES, externalGearPattern, toothOutline } from '../../lib/gearOutline';
+import {
+  DEFAULT_FLANK_SAMPLES,
+  externalGearPattern,
+  pitchRadiusOf,
+  toothOutline,
+} from '../../lib/gearOutline';
 import { MAX_GEAR_TEETH } from '../limits';
 import { withEntity } from '../entity/entityOps';
 import { newEntity } from '../entity/newEntity';
@@ -21,6 +26,7 @@ import {
   faceWidthProblem,
   placedMeshEntity,
   pressureAngleProblem,
+  moduleProblem,
 } from './gearSolid';
 import { internalGearMesh, minRingOuterRadius } from './gearsInternal';
 import { failedWith } from '../noop';
@@ -117,8 +123,8 @@ export const addPlanetaryGearset = defineCommand({
     },
   ): CommandResult => {
     const fail = failedWith(doc, 'add_planetary_gearset');
-    if (!(mod > 0 && Number.isFinite(mod)))
-      return fail(`module must be finite and > 0, got ${String(mod)}.`);
+    const moduleIssue = moduleProblem(mod);
+    if (moduleIssue !== null) return fail(moduleIssue);
     const [sun, planet, count] = [sunTeeth, planetTeeth, planetCount].map(Math.round) as [
       number,
       number,
@@ -152,7 +158,7 @@ export const addPlanetaryGearset = defineCommand({
         `ringOuterRadius must be >= ${fmt(minRim)} (ring pitch radius + 2.25*module), got ${String(ringOuterRadius)}.`,
       );
     }
-    const centerDistance = (mod * (sun + planet)) / 2;
+    const centerDistance = pitchRadiusOf(mod, sun + planet);
     if (count > 1 && 2 * centerDistance * Math.sin(Math.PI / count) <= mod * (planet + 2.2)) {
       return fail(
         `neighbouring planets would collide: ${count} planets of ${planet} teeth do not fit on centre distance ${fmt(centerDistance)}. Use fewer planets or fewer planet teeth.`,
@@ -218,7 +224,7 @@ export const addPlanetaryGearset = defineCommand({
         ringTeeth: ring,
         ratio,
         centerDistance,
-        ringPitchRadius: (mod * ring) / 2,
+        ringPitchRadius: pitchRadiusOf(mod, ring),
         ids: { sun: sunId, planets: planetIds, ring: ringId },
       },
     };

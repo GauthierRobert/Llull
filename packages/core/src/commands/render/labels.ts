@@ -11,6 +11,7 @@ import { escapeXml } from '../../lib/escapeXml';
 import { type Projector, makeProjector } from './camera';
 import { appendBeforeClose, r2, svgDot } from './svg';
 import { planeToWorld } from '../../geometry/workPlane';
+import { clamp } from '../../lib/clamp';
 
 /** Colour-coding group of an entity in the label overlay. */
 type EntityCategory = 'point' | 'curve2d' | 'solid3d' | 'annotation';
@@ -166,8 +167,8 @@ export function appendEntityLabels(
 
     // The label is always drawn (clamped inside the viewport), even if its markers clip.
     const [lx, ly] = labelAnchor(keyPoints, project);
-    const clampedLx = Math.max(4, Math.min(width - 4, lx));
-    const clampedLy = Math.max(12, Math.min(height - 4, ly));
+    const clampedLx = clamp(lx, 4, width - 4);
+    const clampedLy = clamp(ly, 12, height - 4);
     lines.push(
       `    <text x="${r2(clampedLx)}" y="${r2(clampedLy)}" ${labelStyle} fill="${color}" text-anchor="middle">${escapeXml(e.name ?? e.id)}</text>`,
     );

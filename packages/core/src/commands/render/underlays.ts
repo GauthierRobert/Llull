@@ -1,9 +1,10 @@
+import { roundTo } from '../../lib/compactNumber';
 import type { ImageEntity } from '../../model/types';
 import { pixelToWorld } from '../../geometry/imageUnderlay';
 import type { Projector } from './camera';
 
 /** 6 decimals: the per-pixel matrix terms of a large scan are tiny. */
-const r6 = (n: number): number => Math.round(n * 1e6) / 1e6;
+const r6 = (n: number): number => roundTo(n, 6);
 
 /**
  * `<image>` of an underlay, mapped onto the screen by one affine `matrix(...)`: an orthographic

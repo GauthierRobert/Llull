@@ -23,8 +23,9 @@ import { positionField } from './shared';
 import { newEntity } from '../entity/newEntity';
 import { noop } from '../noop';
 import { BEARING_TABLE, BEARING_TYPES, lookupBearing, type BearingType } from './bearingTable';
+import { toRadians } from '../../lib/angle';
 
-const TAPER_ANGLE = (12 * Math.PI) / 180;
+const TAPER_ANGLE = toRadians(12);
 const MAX_ROLLING_ELEMENTS = 40;
 const ROLLING_COLOR = '#8c93a0';
 

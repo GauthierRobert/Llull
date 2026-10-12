@@ -9,6 +9,7 @@ import type { CadDocument, Entity, Vec2, Vec3 } from '../../model/types';
 import { inverseEulerXYZ } from '../../lib/eulerRotation';
 import { distance3, sub3 } from '../../lib/vec3';
 import { positiveSweep } from '../../lib/angle';
+import { polar } from '../../lib/arc';
 import {
   JOINT_TOLERANCE,
   catmullRomBeziers,
@@ -35,10 +36,6 @@ export interface SketchLoop {
 }
 
 const line = (a: Vec2, b: Vec2): CurveSegment<Vec2> => ({ type: 'line', points: [a, b] });
-
-function polar(center: Vec2, radius: number, angle: number): Vec2 {
-  return [center[0] + radius * Math.cos(angle), center[1] + radius * Math.sin(angle)];
-}
 
 function ellipseCurves(center: Vec2, rx: number, ry: number): CurveSegment<Vec2>[] {
   const at = (x: number, y: number): Vec2 => [center[0] + x, center[1] + y];

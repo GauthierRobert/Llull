@@ -7,8 +7,9 @@
 
 import { type Component, type Entity, type InstanceEntity, type Vec3, is3D } from '../model/types';
 import { solidTriangles } from './solidTriangles';
-import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
-import { ORIGIN, add3 } from '../lib/vec3';
+import { isZeroRotation } from '../lib/eulerRotation';
+import { add3 } from '../lib/vec3';
+import { instanceToWorld } from './instanceTransform';
 import { scaleGeometry } from './scaleGeometry';
 import { soupIndices } from './meshVolume';
 
@@ -36,13 +37,7 @@ function needsMeshBake(child: Entity, scale: Vec3): boolean {
 function bakedMeshChild(child: Entity, instance: InstanceEntity, scale: Vec3, id: string): Entity {
   const { rotation, position } = instance;
   const mirrored = scale[0] * scale[1] * scale[2] < 0;
-  const toWorld = (point: Vec3): Vec3 => {
-    const scaled: Vec3 = [point[0] * scale[0], point[1] * scale[1], point[2] * scale[2]];
-    return add3(
-      isZeroRotation(rotation) ? scaled : applyEulerXYZ(scaled, ORIGIN, rotation),
-      position,
-    );
-  };
+  const toWorld = instanceToWorld(scale, rotation, position);
   const positions: number[] = [];
   for (const [a, b, c] of solidTriangles(child)) {
     for (const corner of mirrored ? [a, c, b] : [a, b, c]) positions.push(...toWorld(corner));
@@ -93,7 +88,7 @@ export function expandInstance(instance: InstanceEntity, component: Component): 
   const [sx, sy, sz] = instance.scale ?? UNIT_SCALE;
   const rot = instance.rotation;
   const pos = instance.position;
-  const hasRotation = !isZeroRotation(rot);
+  const toWorld = instanceToWorld([sx, sy, sz], rot, pos);
 
   return component.order
     .map((cid) => component.entities[cid])
@@ -107,17 +102,10 @@ export function expandInstance(instance: InstanceEntity, component: Component): 
           expandedId(instance.id, childEntity.id),
         );
       }
-      const localPos: Vec3 = [
-        childEntity.position[0] * sx,
-        childEntity.position[1] * sy,
-        childEntity.position[2] * sz,
-      ];
-      const rotatedPos: Vec3 = hasRotation ? applyEulerXYZ(localPos, [0, 0, 0], rot) : localPos;
-
       return {
         ...scaledChild(childEntity, [sx, sy, sz]),
         id: expandedId(instance.id, childEntity.id),
-        position: add3(rotatedPos, pos),
+        position: toWorld(childEntity.position),
         rotation: add3(childEntity.rotation, rot),
       } as Entity;
     });

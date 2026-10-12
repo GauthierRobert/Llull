@@ -14,16 +14,15 @@ import { kernelUnavailable } from '../kernelRefusal';
 import { operandRecipe } from './kernelShape';
 import { labelStep, type StepLabel } from './stepLabels';
 import { noop, report } from '../noop';
+import { fixedNumber } from '../../lib/compactNumber';
 
 const OCC_HINT = 'the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server)';
 
 /** Edges listed in the summary itself; the full list is always in `data.edges`. */
 const SUMMARY_EDGE_LIMIT = 24;
 
-const fmt = (value: number, precision: number): string =>
-  Number(value.toFixed(precision)).toString();
 const fmtVec = (v: Vec3, precision: number): string =>
-  `[${v.map((c) => fmt(c, precision)).join(', ')}]`;
+  `[${v.map((c) => fixedNumber(c, precision)).join(', ')}]`;
 
 function topologySummary(id: string, topology: ShapeTopology, precision: number): string {
   const surfaces = new Map<string, number>();
@@ -34,7 +33,7 @@ function topologySummary(id: string, topology: ShapeTopology, precision: number)
     .slice(0, SUMMARY_EDGE_LIMIT)
     .map(
       (edge) =>
-        `#${edge.index} ${edge.curve} len ${fmt(edge.length, precision)} mid ${fmtVec(edge.mid, precision)}`,
+        `#${edge.index} ${edge.curve} len ${fixedNumber(edge.length, precision)} mid ${fmtVec(edge.mid, precision)}`,
     )
     .join('; ');
   const more =
@@ -42,7 +41,7 @@ function topologySummary(id: string, topology: ShapeTopology, precision: number)
       ? `; … ${topology.edges.length - SUMMARY_EDGE_LIMIT} more in data.edges`
       : '';
   return (
-    `inspect_topology: '${id}' is ${topology.solids} exact solid(s), volume ${fmt(topology.volume, precision)}, ` +
+    `inspect_topology: '${id}' is ${topology.solids} exact solid(s), volume ${fixedNumber(topology.volume, precision)}, ` +
     `${topology.faces.length} faces (${faceKinds}), ${topology.edges.length} edges, ${topology.vertices} vertices. ` +
     `Edges (index for fillet_edge/chamfer_edge edgeIndices): ${edges}${more}.`
   );

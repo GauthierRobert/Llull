@@ -16,14 +16,17 @@ import {
   toothProfile,
 } from '../../lib/gearOutline';
 import { circleThrough, ringMesh } from '../../geometry/prismMesh';
-import { faceWidthProblem, placedMeshEntity, pressureAngleProblem } from './gearSolid';
+import {
+  faceWidthProblem,
+  moduleProblem,
+  placedMeshEntity,
+  pressureAngleProblem,
+} from './gearSolid';
 import { finiteVec3OrZero } from '../../lib/vec3';
 import { MAX_GEAR_TEETH } from '../limits';
-import { rotatedEntityBounds } from '../../geometry/rotatedBounds';
-import { commitEntity } from '../entity/commitEntity';
 import { newEntity } from '../entity/newEntity';
-import { ROTATION_CONVENTION, boundsText } from './shared';
-import { noop } from '../noop';
+import { ROTATION_CONVENTION, commitSolid } from './shared';
+import { failedWith } from '../noop';
 import type { Vec2 as Point } from '../../model/vectors';
 
 const DEFAULT_GEAR_COLOR = '#7a9cbb';
@@ -128,28 +131,24 @@ export const addSpurGear = defineCommand({
       name,
     },
   ): CommandResult => {
-    if (mod <= 0)
-      return noop(doc, `add_spur_gear failed: module must be finite and > 0, got ${String(mod)}.`);
+    const fail = failedWith(doc, 'add_spur_gear');
+    const moduleIssue = moduleProblem(mod);
+    if (moduleIssue !== null) return fail(moduleIssue);
 
     const teethInt = teeth;
     if (teethInt < 3 || teethInt > MAX_GEAR_TEETH) {
-      return noop(
-        doc,
-        `add_spur_gear failed: teeth must be a finite integer in [3, ${MAX_GEAR_TEETH}], got ${String(teeth)}.`,
+      return fail(
+        `teeth must be a finite integer in [3, ${MAX_GEAR_TEETH}], got ${String(teeth)}.`,
       );
     }
 
     const shapeProblem = pressureAngleProblem(pressureAngle) ?? faceWidthProblem(faceWidth);
-    if (shapeProblem !== null) return noop(doc, `add_spur_gear failed: ${shapeProblem}`);
+    if (shapeProblem !== null) return fail(shapeProblem);
 
     const pitchRadius = pitchRadiusOf(mod, teethInt);
-    if (bore < 0)
-      return noop(doc, `add_spur_gear failed: bore must be finite and >= 0, got ${String(bore)}.`);
+    if (bore < 0) return fail(`bore must be finite and >= 0, got ${String(bore)}.`);
     if (bore >= pitchRadius) {
-      return noop(
-        doc,
-        `add_spur_gear failed: bore (${bore}) must be < pitchRadius (${pitchRadius}).`,
-      );
+      return fail(`bore (${bore}) must be < pitchRadius (${pitchRadius}).`);
     }
 
     const resolvedPosition = finiteVec3OrZero(position);
@@ -185,14 +184,15 @@ export const addSpurGear = defineCommand({
             },
           );
 
-    return commitEntity(
+    return commitSolid(
       doc,
       entity,
       `Created spur_gear ${id}: module=${fmt(mod)} teeth=${teethInt} ` +
         `pitchD=${fmt(pitchDiameter)} outerD=${fmt(outerDiameter)} ` +
         `bore=${bore} face=${fmt(faceWidth)} ` +
         `at ${vecText(resolvedPosition)}.` +
-        `${bore > 0 ? ' Bored: mesh solid.' : ''} ${boundsText(rotatedEntityBounds(entity))}.`,
+        `${bore > 0 ? ' Bored: mesh solid.' : ''}`,
+      ' ',
     );
   },
 });
