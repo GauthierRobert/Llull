@@ -13,7 +13,7 @@ import { createEmptyDocument, type CadDocument, type Entity } from '@core/model/
 import { execute } from '@core/commands/registry';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { entityToTriangles } from '@core/geometry/entityTriangles';
-import type { PythonLanguage } from '@mcp/index';
+import type { PythonBackend } from '@core/codegen/pythonRuntime';
 import { installGeometryKernel } from '../src/geometryKernel';
 import { createPythonExchangePort } from '../src/pythonExchange';
 import {
@@ -201,7 +201,7 @@ interface StepBody {
   positions: number[];
 }
 
-function exportedCode(doc: CadDocument, language: PythonLanguage): string {
+function exportedCode(doc: CadDocument, language: PythonBackend): string {
   const result = execute(doc, 'export_code', { language, name: 'model' });
   const text = (result.data as { text?: string } | undefined)?.text;
   if (text === undefined) throw new Error(result.summary);
@@ -217,7 +217,7 @@ const deviationTable: Array<{
 
 // Suites
 
-function describeLanguage(language: PythonLanguage, enabled: boolean): void {
+function describeLanguage(language: PythonBackend, enabled: boolean): void {
   describe.skipIf(!enabled)(`${language} exchange against the real bridge`, () => {
     let doc: CadDocument;
     let bodies: StepBody[];
