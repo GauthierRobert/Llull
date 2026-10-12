@@ -6,14 +6,16 @@ import {
   DEFAULT_SOLID_COLOR,
   EXTRUSION_COLOR,
   commitSolid,
+  axisField,
   placeSolid,
+  resolveRotation,
   placedSolidFields,
   rejectBadProfile,
   rejectZeroAreaProfile,
   rejectBadSize,
   rotationField,
 } from './shared';
-import { ORIGIN, finiteVec3OrZero } from '../../lib/vec3';
+import { ORIGIN } from '../../lib/vec3';
 import { noop } from '../noop';
 import { MAX_PROFILE_POINTS } from '../limits';
 
@@ -75,7 +77,9 @@ export const extrude = defineCommand({
   description:
     'Extrude a closed 2D polygon profile along +Z into a solid. Right-handed world frame, +Z up. ' +
     'position is the origin of the profile plane [x, y, z] in document units; the solid spans ' +
-    'from position.z to position.z + depth. depth must be > 0.',
+    'from position.z to position.z + depth. depth must be > 0. ' +
+    'Orientation: pass EITHER rotation (Euler radians) OR axis [dx,dy,dz] = the extrusion direction ' +
+    '(the profile plane normal; local +Z maps to it). axis wins when both are given; the derived Euler angles are stored.',
   params: z.object({
     profile: untypedArray(
       'Array of [x, y] points forming a closed loop in the XY plane of the profile. ' +
@@ -89,11 +93,12 @@ export const extrude = defineCommand({
         'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
     ).optional(),
     rotation: rotationField(),
+    axis: axisField('is the extrusion direction (local +Z)'),
     color: colorField(EXTRUSION_COLOR),
   }),
   run: (
     doc,
-    { profile, depth, position = ORIGIN, rotation, color = EXTRUSION_COLOR },
+    { profile, depth, position = ORIGIN, rotation, axis, color = EXTRUSION_COLOR },
   ): CommandResult => {
     if (profile.length < 3) {
       return noop(
@@ -117,9 +122,12 @@ export const extrude = defineCommand({
         `extrude_profile: depth must be a finite number > 0 (got ${String(depth)}); no-op.`,
       );
     }
+    const resolved = resolveRotation(axis, rotation);
+    if (resolved.error !== undefined)
+      return noop(doc, `extrude_profile: ${resolved.error}; no-op.`);
     const id = nextId('ext');
     const entity = newEntity('extrusion', id, { profile, depth }, position, color, {
-      rotation: finiteVec3OrZero(rotation),
+      rotation: resolved.rotation,
     });
     return commitSolid(doc, entity, `Extruded a ${profile.length}-point profile by ${depth}`);
   },

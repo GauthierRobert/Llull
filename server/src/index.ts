@@ -7,6 +7,7 @@
  *   /license /admin/*      `adminRoutes.ts` (license status; admin: users, audit, license)
  *   /live /command /undo /redo   `liveRoutes.ts`      /export/*   `exportRoutes.ts`
  *   POST /import/dwg       `importRoutes.ts` (DWG -> DXF converter, then import_dxf)
+ *   POST /exchange         `exchangeRoutes.ts` (STEP / DWG / CadQuery exchange tools for the CLI)
  *   ALL /mcp               `mcp.ts` (Streamable HTTP; bearer auth + rate limit)
  *
  * Env: PORT (3001), HOST (127.0.0.1: llull is a local tool and /command is unauthenticated for the
@@ -22,6 +23,7 @@ import cors from 'cors';
 import { buildMcpRouter } from './mcp';
 import { exchangeOptionsWithDwg } from './dwgConvert';
 import { buildImportRouter } from './importRoutes';
+import { buildExchangeRouter } from './exchangeRoutes';
 import { getActiveKernelName } from './geometryKernel';
 import { buildLiveRouter } from './liveRoutes';
 import { buildExportRouter } from './exportRoutes';
@@ -64,6 +66,7 @@ app.use(buildLiveRouter(restLimiter));
 app.use(buildAdminRouter(restLimiter));
 app.use('/export', restLimiter, buildExportRouter(exchange));
 app.use('/import', buildImportRouter(restLimiter));
+app.use(buildExchangeRouter(restLimiter, exchange));
 app.use('/mcp', buildMcpRouter(exchange));
 // On-prem: serve the built web app (`LLULL_STATIC_DIR`, e.g. /app/dist) from the same origin.
 const staticDir = process.env['LLULL_STATIC_DIR'];

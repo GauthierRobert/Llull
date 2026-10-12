@@ -23,7 +23,9 @@ import {
   toolsetCounts,
 } from '../src/cli/catalog';
 import { filesOfData, saveDataFiles, withoutPayloads } from '../src/cli/saveFiles';
+import { imageDataUrl, resolveImageRefs } from '../src/cli/imageParams';
 import { listCommands } from '@core/commands/registry';
+import { exchangeToolDefinitions } from '../src/cli/exchange';
 
 describe('parseArgv', () => {
   it('splits positionals, value flags, boolean flags and --k=v', () => {
@@ -85,10 +87,36 @@ describe('paramsSource', () => {
   });
 });
 
+describe('imageParams', () => {
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2]);
+  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0]);
+
+  it('sniffs png / jpeg from magic bytes and rejects anything else', () => {
+    expect(imageDataUrl(png, 'a')).toBe(`data:image/png;base64,${png.toString('base64')}`);
+    expect(imageDataUrl(jpeg, 'b')).toMatch(/^data:image\/jpeg;base64,/);
+    expect(() => imageDataUrl(Buffer.from('GIF89a'), 'c.gif')).toThrow(/c\.gif is not a PNG/);
+  });
+
+  it('replaces only top-level "@img:" strings of an object', () => {
+    const read = (file: string): Buffer => (file === 'scan.jpg' ? jpeg : png);
+    const resolved = resolveImageRefs(
+      { dataUrl: '@img:scan.jpg', name: 'scan', nested: { dataUrl: '@img:x.png' }, n: 2 },
+      read,
+    ) as Record<string, unknown>;
+    expect(resolved['dataUrl']).toMatch(/^data:image\/jpeg;base64,/);
+    expect(resolved['name']).toBe('scan');
+    expect(resolved['nested']).toEqual({ dataUrl: '@img:x.png' });
+    expect(resolved['n']).toBe(2);
+    expect(resolveImageRefs(['@img:a.png'], read)).toEqual(['@img:a.png']);
+    expect(resolveImageRefs(null, read)).toBeNull();
+  });
+});
+
 describe('catalog', () => {
-  it('lists every registry command exactly once, filterable by toolset', () => {
+  it('lists every registry command and exchange tool exactly once, filterable by toolset', () => {
     const all = listCatalog();
-    expect(all).toHaveLength(listCommands().length);
+    expect(all).toHaveLength(listCommands().length + exchangeToolDefinitions().length);
+    expect(new Set(all.map((entry) => entry.name)).size).toBe(all.length);
     const twoD = listCatalog('2d');
     expect(twoD.length).toBeGreaterThan(0);
     expect(twoD.every((entry) => entry.toolset === '2d')).toBe(true);

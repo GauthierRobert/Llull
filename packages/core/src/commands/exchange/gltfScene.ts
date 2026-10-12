@@ -40,7 +40,7 @@ export interface PartAppearance {
 }
 
 /** One exported part: its world-space triangles and appearance. */
-export interface ExportPart {
+export interface ScenePart {
   readonly name: string;
   readonly entityId: string;
   readonly kind: Entity['kind'];
@@ -57,7 +57,7 @@ function appearanceOf(doc: CadDocument, entity: Entity, inherited?: string): Par
     return { name, color, metalness, roughness, ...(finish !== undefined ? { finish } : {}) };
   }
   return {
-    name: `paint ${entity.color.toLowerCase()}`,
+    name: entity.color,
     color: entity.color,
     metalness: DEFAULT_METALNESS,
     roughness: DEFAULT_ROUGHNESS,
@@ -68,8 +68,8 @@ function appearanceOf(doc: CadDocument, entity: Entity, inherited?: string): Par
  * Exported parts of the entities named by `ids` (instances expand into one part per child; 2D and
  * empty parts are dropped).
  */
-export function collectExportParts(doc: CadDocument, ids: readonly string[]): ExportPart[] {
-  const parts: ExportPart[] = [];
+export function collectSceneParts(doc: CadDocument, ids: readonly string[]): ScenePart[] {
+  const parts: ScenePart[] = [];
   for (const id of ids) {
     const entity = doc.entities[id];
     if (entity === undefined) continue;
@@ -241,15 +241,36 @@ function materialOf(builder: GltfBuilder, appearance: PartAppearance): Record<st
   };
 }
 
-/** glTF JSON (without buffer uri) and its BIN payload for `parts`. */
+/** The group an entity belongs to (its glTF parent node), when any. */
+export type GroupOf = (
+  entityId: string,
+) => { readonly id: string; readonly name: string } | undefined;
+
+/**
+ * glTF JSON (without buffer uri) and its BIN payload for `parts`; an entity in a group (`groupOf`)
+ * hangs under a node named after the group.
+ */
 export function buildGltfScene(
-  parts: readonly ExportPart[],
+  parts: readonly ScenePart[],
   decals: readonly DecalPart[] = [],
+  groupOf: GroupOf = () => undefined,
 ): {
   json: Record<string, unknown>;
   bin: Uint8Array;
+  nodeCount: number;
+  materialCount: number;
 } {
   const builder = new GltfBuilder();
+  const groupNodes = new Map<string, number>();
+  const parentOf = (entityId: string): number | undefined => {
+    const group = groupOf(entityId);
+    if (group === undefined) return undefined;
+    const existing = groupNodes.get(group.id);
+    if (existing !== undefined) return existing;
+    const node = builder.node(group.name);
+    groupNodes.set(group.id, node);
+    return node;
+  };
   for (const part of parts) {
     const { appearance } = part;
     const key = JSON.stringify(appearance);
@@ -265,7 +286,13 @@ export function buildGltfScene(
         boxUvs(part.localTris, appearance.finish.scale),
         2,
       );
-    builder.mesh(part.name, attributes, material, { llullId: part.entityId, kind: part.kind });
+    builder.mesh(
+      part.name,
+      attributes,
+      material,
+      { llullId: part.entityId, kind: part.kind },
+      parentOf(part.entityId),
+    );
   }
   decals.forEach((decal, index) => {
     const material = builder.material(`decal:${index}`, () => ({
@@ -299,6 +326,7 @@ export function buildGltfScene(
       },
       material,
       { llullId: decal.entityId, kind: 'decal' },
+      parentOf(decal.entityId),
     );
   });
   return builder.result();

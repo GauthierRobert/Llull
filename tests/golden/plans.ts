@@ -3,6 +3,8 @@
  * Plans reference earlier results via `as` aliases, never literal ids.
  */
 
+import { pngDataUrl } from '../helpers/imageFixtures';
+
 export interface GoldenAction {
   command?: string;
   params?: Record<string, unknown>;
@@ -10,6 +12,8 @@ export interface GoldenAction {
   repeat?: { count: number | string; as?: string };
   for_each?: { values: unknown[] | string; as: string };
   step?: { command: string; params?: Record<string, unknown> };
+  for?: { var: string; from: number | string; to: number | string; step?: number | string };
+  actions?: GoldenAction[];
 }
 
 const CUBE_COMPONENT: GoldenAction[] = [
@@ -91,6 +95,21 @@ export const plans: Record<string, GoldenAction[]> = {
       },
     },
     { command: 'draw_ellipse', params: { center: [0, 0], radiusX: 6, radiusY: 3 } },
+  ],
+  '2d_image_underlay': [
+    { command: 'add_image_underlay', params: { dataUrl: pngDataUrl(400, 300) }, as: 'scan' },
+    {
+      command: 'calibrate_underlay',
+      params: {
+        id: '$scan',
+        pixelA: [50, 250],
+        pixelB: [350, 245],
+        distance: 450,
+        origin: { pixel: [50, 250], world: [0, 0, 0] },
+        align: 'x',
+      },
+    },
+    { command: 'set_underlay', params: { id: '$scan', opacity: 0.3, locked: true } },
   ],
   '2d_text_dimensions': [
     { command: 'draw_point', params: { position: [0, 0, 0] }, as: 'p1' },
@@ -445,6 +464,25 @@ export const plans: Record<string, GoldenAction[]> = {
       for_each: { values: [1, 2, 3], as: 'r' },
       step: { command: 'add_sphere', params: { radius: '=$r', position: ['=$r * 10', 5, 0] } },
     },
+  ],
+  loops_polar_pattern: [
+    { command: 'set_parameter', params: { name: 'n', expression: '7' } },
+    { command: 'set_parameter', params: { name: 'r', expression: '50' } },
+    {
+      repeat: { count: '=n', as: 'i' },
+      actions: [
+        {
+          command: 'add_cylinder',
+          as: 'piston{i}',
+          params: {
+            radius: 4,
+            height: 30,
+            position: ['=r*cos(2*pi*i/n)', '=r*sin(2*pi*i/n)', 80],
+          },
+        },
+      ],
+    },
+    { command: 'move_entity', params: { id: '$piston0', delta: [0, 0, 5] } },
   ],
   configurations: [
     { command: 'set_parameter', params: { name: 'w', expression: '10' } },

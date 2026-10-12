@@ -44,6 +44,7 @@ export const SHAPE2D_KINDS = [
   'spline',
   'text',
   'dimension',
+  'image',
 ] as const;
 
 export type Shape2DKind = (typeof SHAPE2D_KINDS)[number];
@@ -334,6 +335,27 @@ export interface DimensionEntity extends BaseEntity {
 }
 
 /**
+ * Raster underlay (a scanned drawing to trace over). Occupies [0, width] × [0, height] of its work
+ * plane, lower-left corner at `position`; pixel (0, 0) is the image's TOP-left corner, +y down.
+ * @invariant dataUrl is a base64 `data:image/png` or `data:image/jpeg` URL of pixelWidth × pixelHeight
+ * @invariant width, height > 0; 0 <= opacity <= 1
+ * @see add_image_underlay, calibrate_underlay, image_to_world
+ */
+export interface ImageEntity extends BaseEntity {
+  readonly kind: 'image';
+  dataUrl: string;
+  /** Intrinsic raster size, integers > 0. */
+  pixelWidth: number;
+  pixelHeight: number;
+  /** Placed size in document units. */
+  width: number;
+  height: number;
+  opacity: number;
+  /** Locked underlays are not pickable in the viewport (they never get in the way of tracing). */
+  locked: boolean;
+}
+
+/**
  * Placed reference to a Component definition; geometry is never copied.
  * @invariant componentId exists in CadDocument.components
  * @see Component, create_component, insert_instance, explode_instance
@@ -369,6 +391,7 @@ export type Entity =
   | SplineEntity
   | TextEntity
   | DimensionEntity
+  | ImageEntity
   | InstanceEntity;
 
 const SHAPE2D_KIND_SET: ReadonlySet<string> = new Set(SHAPE2D_KINDS);

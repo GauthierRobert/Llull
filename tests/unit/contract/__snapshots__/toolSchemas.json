@@ -156,6 +156,207 @@
     "name": "add_beam"
   },
   {
+    "description": "Create a simplified rolling bearing: an inner ring and an outer ring (revolved raceway sections) plus a ring of rolling elements (balls for deep_groove_ball; straight rollers for spherical_roller / cylindrical_roller; rollers tilted 12 degrees for tapered_roller), all grouped under one named group (group_entities semantics). Size it with designation (ISO 15 boundary dimensions in MILLIMETRES, converted to the document units; case/space-insensitive, a suffix after \"-\" is ignored; known: 60xx/62xx/63xx deep groove e.g. \"6205\", 222xx spherical roller e.g. \"22220\", 302xx tapered roller e.g. \"30210\", NU2xx/NU3xx cylindrical roller e.g. \"NU210\") OR explicit bore, outerDiameter, width in document units (type then defaults to deep_groove_ball). An unknown designation, or a type that contradicts the designation, is rejected. The bearing is centered on position with its rotation axis along axis (default +Z). Returns affected = [inner ring, outer ring, ...rolling elements, group id] and data {groupId, innerRingId, outerRingId, rollingElementIds, type, bore, outerDiameter, width, designation?}.",
+    "input_schema": {
+      "properties": {
+        "axis": {
+          "description": "Rotation axis direction [dx, dy, dz] (non-zero, normalized) of the bearing. Defaults to [0, 0, 1].",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "bore": {
+          "description": "Bore (inner diameter) in document units. Needed with outerDiameter and width when no designation.",
+          "type": "number"
+        },
+        "color": {
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#b0b6bf\".",
+          "type": "string"
+        },
+        "designation": {
+          "description": "Bearing designation, e.g. \"6205\", \"22220\", \"30210\", \"NU210\". Dimensions in mm, scaled to document units.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Optional group name. Defaults to \"Bearing <designation|type>\".",
+          "type": "string"
+        },
+        "outerDiameter": {
+          "description": "Outer diameter in document units. Must exceed bore by >= 20% of itself.",
+          "type": "number"
+        },
+        "position": {
+          "description": "World-space location of the anchor point [x, y, z] in document units. Right-handed frame, +Z up. Center of the bearing (mid-width on its axis). Defaults to [0, 0, 0]. Format [x, y, z]; [x, y] is accepted and placed at z=0.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "type": {
+          "description": "Bearing type. Optional when designation is given (inferred); must match it if both are given.",
+          "enum": [
+            "deep_groove_ball",
+            "spherical_roller",
+            "tapered_roller",
+            "cylindrical_roller"
+          ],
+          "type": "string"
+        },
+        "width": {
+          "description": "Bearing width along the axis in document units.",
+          "type": "number"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "add_bearing"
+  },
+  {
+    "description": "Create a straight bevel gear with real involute-style teeth as ONE closed mesh solid (no booleans). The pitch cone is derived from teeth, matingTeeth and shaftAngle (90° default): pitchAngle = atan(sin(shaft)/(matingTeeth/teeth + cos(shaft))); or pass pitchAngle explicitly. Heel (large end) face lies at the local z = 0 plane centred on `position`; the tooth profile is the module*teeth/2 pitch-circle spur outline and shrinks linearly towards the cone apex, which lies on the axis at +axis side (apex height = coneDistance*cos(pitchAngle)). `axis` selects the world direction of the gear axis (apex side), `rotation` is then applied about `position`. Tooth form is approximate (no Tredgold back-cone correction). `bore` cuts a cylindrical through hole. For two meshing gears use add_bevel_gear_pair. Result is a world-space mesh entity.",
+    "input_schema": {
+      "properties": {
+        "axis": {
+          "description": "World direction of the gear axis (towards the apex). Default \"z\".",
+          "enum": [
+            "x",
+            "y",
+            "z"
+          ],
+          "type": "string"
+        },
+        "bore": {
+          "description": "Radius of a central through hole, >= 0. Default 0 (solid).",
+          "type": "number"
+        },
+        "color": {
+          "description": "Hex color. Default \"#b08d57\".",
+          "type": "string"
+        },
+        "faceWidth": {
+          "description": "Tooth length along the cone element (heel to toe), > 0 and <= 0.7 * cone distance; usual practice <= cone distance / 3.",
+          "type": "number"
+        },
+        "matingTeeth": {
+          "description": "Tooth count of the mating gear, integer >= 6. Default: same as teeth (miter gear).",
+          "type": "number"
+        },
+        "module": {
+          "description": "Gear module (metric) at the heel (large end), > 0.",
+          "type": "number"
+        },
+        "name": {
+          "description": "Optional display name.",
+          "type": "string"
+        },
+        "pitchAngle": {
+          "description": "Pitch-cone half angle in RADIANS, in (0, π/2). Overrides the value derived from the tooth counts.",
+          "type": "number"
+        },
+        "position": {
+          "description": "World-space location of the anchor point [x, y, z] in document units. Right-handed frame, +Z up. Centre of the heel face. Defaults to [0, 0, 0]. Format [x, y, z]; [x, y] is accepted and placed at z=0.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "pressureAngle": {
+          "description": "Pressure angle in RADIANS, in (0, π/2). Default 0.3491 (20°).",
+          "type": "number"
+        },
+        "rotation": {
+          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X). Applied about `position` after `axis`.  Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "shaftAngle": {
+          "description": "Angle between the two shaft axes in RADIANS, in (0, π). Default π/2 (90°).",
+          "type": "number"
+        },
+        "teeth": {
+          "description": "Tooth count of THIS gear, integer >= 6.",
+          "type": "number"
+        },
+        "toothPhase": {
+          "description": "Rotation of the tooth pattern about the gear axis in RADIANS. Default 0 (tooth 0 centred on +X).",
+          "type": "number"
+        }
+      },
+      "required": [
+        "module",
+        "faceWidth",
+        "teeth"
+      ],
+      "type": "object"
+    },
+    "name": "add_bevel_gear"
+  },
+  {
+    "description": "Create a meshing pair of straight bevel gears at a 90° shaft angle: a pinion (axis along world Z) and a wheel (axis along world X) whose pitch-cone apexes coincide at `position` (the cone apex, default origin). The pinion heel face lies at z = apex - apexHeight, the wheel heel face at x = apex - apexHeight; teeth are phased so they mesh with backlash. Pitch angles: pinion atan(pinionTeeth/wheelTeeth), wheel 90° minus that. Returns affected = [pinion, wheel] and data {ratio, pinionPitchAngle, wheelPitchAngle, coneDistance}.",
+    "input_schema": {
+      "properties": {
+        "faceWidth": {
+          "description": "Tooth length along the cone element (heel to toe), > 0 and <= 0.7 * cone distance; usual practice <= cone distance / 3.",
+          "type": "number"
+        },
+        "module": {
+          "description": "Gear module (metric) at the heel (large end), > 0.",
+          "type": "number"
+        },
+        "namePrefix": {
+          "description": "Name prefix: \"<prefix>_pinion\", \"<prefix>_wheel\".",
+          "type": "string"
+        },
+        "pinionBore": {
+          "description": "Pinion through-hole radius, >= 0. Default 0.",
+          "type": "number"
+        },
+        "pinionColor": {
+          "description": "Pinion hex color. Default \"#b08d57\".",
+          "type": "string"
+        },
+        "pinionTeeth": {
+          "description": "Pinion tooth count, integer >= 6.",
+          "type": "number"
+        },
+        "position": {
+          "description": "World-space location of the anchor point [x, y, z] in document units. Right-handed frame, +Z up. This is the common cone apex. Defaults to [0, 0, 0]. Format [x, y, z]; [x, y] is accepted and placed at z=0.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "pressureAngle": {
+          "description": "Pressure angle in RADIANS, in (0, π/2). Default 0.3491 (20°).",
+          "type": "number"
+        },
+        "wheelBore": {
+          "description": "Wheel through-hole radius, >= 0. Default 0.",
+          "type": "number"
+        },
+        "wheelColor": {
+          "description": "Wheel hex color. Default \"#7a9cbb\".",
+          "type": "string"
+        },
+        "wheelTeeth": {
+          "description": "Wheel tooth count, integer >= 6.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "module",
+        "faceWidth",
+        "pinionTeeth",
+        "wheelTeeth"
+      ],
+      "type": "object"
+    },
+    "name": "add_bevel_gear_pair"
+  },
+  {
     "description": "Create a rectangular box solid. Right-handed world frame, +Z up. size is [width, height, depth] in document units; all components must be > 0. anchor controls which point on the entity the position refers to: \"center\" (default) = geometric center; \"min\" = min-XYZ corner; \"base-center\" = center of bottom face (mid X/Y, min Z). The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.",
     "input_schema": {
       "properties": {
@@ -316,7 +517,7 @@
     "name": "add_column"
   },
   {
-    "description": "Create a cone solid. Right-handed world frame, +Z up. radius and height must both be > 0. anchor controls which point the position refers to: \"base-center\" (default) = center of the circular base (the apex is at position + [0,0,height]); \"center\" = geometric center of the AABB; \"min\" = min-XYZ corner of the AABB. The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.",
+    "description": "Create a cone solid. Right-handed world frame, +Z up. radius and height must both be > 0. anchor controls which point the position refers to: \"base-center\" (default) = center of the circular base (the apex is at position + [0,0,height]); \"center\" = geometric center of the AABB; \"min\" = min-XYZ corner of the AABB. The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin. Orientation: pass EITHER rotation (Euler radians) OR axis [dx,dy,dz] = direction the local +Z (symmetry) axis should point in world space; axis wins when both are given and Euler angles are derived and stored.",
     "input_schema": {
       "properties": {
         "anchor": {
@@ -327,6 +528,13 @@
             "base-center"
           ],
           "type": "string"
+        },
+        "axis": {
+          "description": "Optional direction [dx, dy, dz] (any non-zero length, normalized) that the primitive local +Z axis (its symmetry axis) points along in world space, e.g. [1, 0, 0] lays it along +X. When given it OVERRIDES rotation (the rotation param is ignored and the resolved Euler angles are stored). A zero-length or malformed axis is rejected as a no-op.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
         },
         "color": {
           "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
@@ -560,7 +768,7 @@
     "name": "add_curved_wall"
   },
   {
-    "description": "Create a cylinder solid. Right-handed world frame, +Z up. radius and height must both be > 0. anchor controls which point the position refers to: \"center\" (default) = geometric center (cylinder spans ±height/2 about stored position along its axis); \"min\" = min-XYZ corner of the AABB; \"base-center\" = center of the bottom face (mid X/Y, min Z of AABB). The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.",
+    "description": "Create a cylinder solid. Right-handed world frame, +Z up. radius and height must both be > 0. anchor controls which point the position refers to: \"center\" (default) = geometric center (cylinder spans ±height/2 about stored position along its axis); \"min\" = min-XYZ corner of the AABB; \"base-center\" = center of the bottom face (mid X/Y, min Z of AABB). The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin. Orientation: pass EITHER rotation (Euler radians) OR axis [dx,dy,dz] = direction the local +Z (symmetry) axis should point in world space; axis wins when both are given and Euler angles are derived and stored.",
     "input_schema": {
       "properties": {
         "anchor": {
@@ -571,6 +779,13 @@
             "base-center"
           ],
           "type": "string"
+        },
+        "axis": {
+          "description": "Optional direction [dx, dy, dz] (any non-zero length, normalized) that the primitive local +Z axis (its symmetry axis) points along in world space, e.g. [1, 0, 0] lays it along +X. When given it OVERRIDES rotation (the rotation param is ignored and the resolved Euler angles are stored). A zero-length or malformed axis is rejected as a no-op.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
         },
         "color": {
           "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
@@ -1154,6 +1369,175 @@
     "name": "add_grid_system"
   },
   {
+    "description": "Create a helical compression spring as one sweep solid (round wire swept along a smooth helix spline). The spring axis runs from position along axis (default +Z); the base plane center is at position and the spring extends to position + axis * free length, wire thickness included. Wire size: give wireRadius or wireDiameter. coilRadius is the MEAN coil radius (axis to wire centerline) and must exceed wireRadius. Give at least two of pitch (centerline advance per turn, >= wire diameter), turns (number of coils, may be fractional, <= 200) and length (free length = overall extent along the axis incl. wire). Pitch and turns win if all three are given. closedEnds=true flattens the first and last turn (pitch = wire diameter) like ground/closed spring ends; the middle turns get the pitch needed to keep the overall length (requires turns > 2). The result is a sweep entity, so booleans, measuring, rendering and STEP/STL export work like any solid. Returns the entity id and data {freeLength, turns, pitch, wireDiameter, outerDiameter}.",
+    "input_schema": {
+      "properties": {
+        "axis": {
+          "description": "Direction [dx, dy, dz] (non-zero, normalized) the spring extends along from position. Defaults to [0, 0, 1].",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "closedEnds": {
+          "description": "Flatten the first and last turn to wire-diameter pitch. Default false. Needs turns > 2.",
+          "type": "boolean"
+        },
+        "coilRadius": {
+          "description": "Mean coil radius (axis to wire centerline) in document units; must be > wire radius.",
+          "type": "number"
+        },
+        "color": {
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#8a8f98\".",
+          "type": "string"
+        },
+        "length": {
+          "description": "Free length along the axis incl. wire thickness, document units.",
+          "type": "number"
+        },
+        "name": {
+          "description": "Optional entity name, e.g. \"Return spring\".",
+          "type": "string"
+        },
+        "pitch": {
+          "description": "Centerline advance along the axis per full turn, document units; >= wire diameter.",
+          "type": "number"
+        },
+        "position": {
+          "description": "World-space location of the anchor point [x, y, z] in document units. Right-handed frame, +Z up. Center of the spring base plane (start of the spring). Defaults to [0, 0, 0]. Format [x, y, z]; [x, y] is accepted and placed at z=0.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "turns": {
+          "description": "Number of coils (may be fractional), 0 < turns <= 200.",
+          "type": "number"
+        },
+        "wireDiameter": {
+          "description": "Wire diameter in document units (> 0). Used when wireRadius is absent.",
+          "type": "number"
+        },
+        "wireRadius": {
+          "description": "Wire radius in document units (> 0). Alternative: wireDiameter.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "coilRadius"
+      ],
+      "type": "object"
+    },
+    "name": "add_helix_spring"
+  },
+  {
+    "description": "Place a raster image (a scanned drawing, a photo of a sketch) on a 2D work plane as a semi-transparent underlay to trace over. The lower-left corner of the image sits at `position`; size it with `width` (document units) OR `pixelSize` (document units per pixel, e.g. 1.5 for 1.5 mm/px); with neither, 1 unit per pixel. Then use calibrate_underlay (two pixel points + their real distance) to fix the scale, origin and orientation, and image_to_world to convert pixel coordinates read off the picture into model coordinates for draw_polyline / extrude_profile / revolve_profile. Accepts PNG or JPEG base64 data URLs up to 8000000 characters.",
+    "input_schema": {
+      "properties": {
+        "dataUrl": {
+          "description": "The image as a base64 data URL: \"data:image/png;base64,…\" or \"data:image/jpeg;base64,…\".",
+          "type": "string"
+        },
+        "locked": {
+          "description": "true: the viewport never picks/selects it while tracing. Defaults to false.",
+          "type": "boolean"
+        },
+        "name": {
+          "description": "Optional display name for the entity (shown in the scene tree).",
+          "type": "string"
+        },
+        "opacity": {
+          "description": "Opacity in [0, 1] (0 = invisible, 1 = opaque). Defaults to 0.5.",
+          "type": "number"
+        },
+        "pixelSize": {
+          "description": "Document units per image pixel (> 0), e.g. 1.5 for a 1.5 mm/px scan. Excludes width.",
+          "type": "number"
+        },
+        "position": {
+          "description": "World position [x, y, z] of the image lower-left corner (work-plane origin). Defaults to [0, 0, 0]. Format [x, y, z]; [x, y] is accepted and placed at z=0.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "rotation": {
+          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X) of the work plane. Defaults to [0, 0, 0].",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "width": {
+          "description": "Placed image width in document units (> 0); height follows the aspect ratio.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "dataUrl"
+      ],
+      "type": "object"
+    },
+    "name": "add_image_underlay"
+  },
+  {
+    "description": "Create an internal (ring) involute gear: a cylindrical rim whose bore carries inward-pointing teeth, as ONE closed mesh solid built without booleans. Same tooth convention as add_spur_gear (addendum 1·module, dedendum 1.25·module), tooth spaces widened by 0.05·module backlash so an external gear of the same module and pressure angle meshes without interference. The ring is centred on its axis (+Z, z from 0 to faceWidth) at `position`; tooth pitch diameter = module * teeth. Pair with add_spur_gear: centre distance = module * (ringTeeth - pinionTeeth) / 2. For a complete sun/planet/ring set use add_planetary_gearset (it phases the teeth for you). The result is a world-space mesh entity (position/rotation are baked in).",
+    "input_schema": {
+      "properties": {
+        "color": {
+          "description": "Hex color. Default \"#8892a0\".",
+          "type": "string"
+        },
+        "faceWidth": {
+          "description": "Gear thickness along the axis (+Z), > 0.",
+          "type": "number"
+        },
+        "module": {
+          "description": "Gear module (metric), > 0. pitchDiameter = module * teeth.",
+          "type": "number"
+        },
+        "name": {
+          "description": "Optional display name.",
+          "type": "string"
+        },
+        "outerRadius": {
+          "description": "Radius of the cylindrical rim (outside of the ring). Must be >= pitchRadius + 2.25 * module so that material remains behind the tooth spaces.",
+          "type": "number"
+        },
+        "position": {
+          "description": "World-space location of the anchor point [x, y, z] in document units. Right-handed frame, +Z up. Centre of the ring on its axis (z = bottom face). Defaults to [0, 0, 0]. Format [x, y, z]; [x, y] is accepted and placed at z=0.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "pressureAngle": {
+          "description": "Pressure angle in RADIANS, in (0, π/2). Default 0.3491 (20°).",
+          "type": "number"
+        },
+        "rotation": {
+          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X). Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "teeth": {
+          "description": "Number of internal teeth, integer >= 12 and <= 1000. Typical ring gears have 40-120.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "module",
+        "teeth",
+        "faceWidth",
+        "outerRadius"
+      ],
+      "type": "object"
+    },
+    "name": "add_internal_gear"
+  },
+  {
     "description": "Add a kinematic joint between two InstanceEntity frames to model a mechanism. A \"revolute\" joint allows rotation of instance b around the given axis through instance a's origin. A \"prismatic\" joint allows translation of instance b along the given axis from instance a's origin. \"a\" and \"b\" are MateRef objects: { instanceId: \"<id>\", frame?: \"origin\"|\"axis-x\"|\"axis-y\"|\"axis-z\" }. \"axis\" is the rotation/slide axis: use \"x\", \"y\", or \"z\" for world axes, or a [x,y,z] unit vector. Initial joint value (angle / displacement) defaults to 0. Use set_joint_value to drive the joint. Use evaluate_motion or bake_motion to apply motion to instances. Returns the new joint id in affected[0].",
     "input_schema": {
       "properties": {
@@ -1229,6 +1613,77 @@
       "type": "object"
     },
     "name": "add_joint"
+  },
+  {
+    "description": "Create a round shaft along +Z (z from 0 to length) with a rectangular keyway (pocket) on its +X side, built as one closed mesh solid without booleans. Keyway width b, groove depth t1 (from the shaft surface to the groove floor) and the optional key height h default to the DIN 6885 form A values for the shaft diameter (e.g. d=40 -> b=12, t1=5, h=8). The pocket spans keyLength starting keyOffset above the bottom end (defaults: keyLength = 60% of length, centred); keyOffset 0 or reaching the top gives an open-ended keyway. includeKey=true also creates the matching parallel key as a separate mesh solid seated in the groove (affected = [shaft, key]). Result is world-space mesh entities.",
+    "input_schema": {
+      "properties": {
+        "color": {
+          "description": "Shaft hex color. Default \"#9aa3ad\".",
+          "type": "string"
+        },
+        "diameter": {
+          "description": "Shaft diameter, > 0.",
+          "type": "number"
+        },
+        "includeKey": {
+          "description": "Also create the parallel key part. Default false.",
+          "type": "boolean"
+        },
+        "keyColor": {
+          "description": "Key hex color. Default \"#c0a060\".",
+          "type": "string"
+        },
+        "keyDepth": {
+          "description": "Groove depth t1 measured from the shaft surface. Default from DIN 6885.",
+          "type": "number"
+        },
+        "keyHeight": {
+          "description": "Key height h (only used when includeKey is true). Default from DIN 6885.",
+          "type": "number"
+        },
+        "keyLength": {
+          "description": "Keyway length along the shaft, > 0 and <= length. Default 60% of length.",
+          "type": "number"
+        },
+        "keyOffset": {
+          "description": "Distance from the shaft bottom end (z = 0) to the keyway start, >= 0. Default centred.",
+          "type": "number"
+        },
+        "keyWidth": {
+          "description": "Keyway width b. Default from DIN 6885 for the diameter.",
+          "type": "number"
+        },
+        "length": {
+          "description": "Shaft length along +Z, > 0.",
+          "type": "number"
+        },
+        "name": {
+          "description": "Optional display name for the shaft.",
+          "type": "string"
+        },
+        "position": {
+          "description": "World-space location of the anchor point [x, y, z] in document units. Right-handed frame, +Z up. Centre of the shaft bottom face. Defaults to [0, 0, 0]. Format [x, y, z]; [x, y] is accepted and placed at z=0.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "rotation": {
+          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X). Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "diameter",
+        "length"
+      ],
+      "type": "object"
+    },
+    "name": "add_keyed_shaft"
   },
   {
     "description": "Create a new layer with the given name and append it to the layer order. Returns the new layer id in affected. The layer starts visible and unlocked.",
@@ -1640,6 +2095,83 @@
       "type": "object"
     },
     "name": "add_pipe_support"
+  },
+  {
+    "description": "Create a complete planetary (epicyclic) gear stage: one sun gear, planetCount planet gears and an internal ring gear, all sharing one module and pressure angle, with tooth phasing computed so that every planet meshes with the sun and the ring without interference. ringTeeth = sunTeeth + 2*planetTeeth. Assembly condition: (sunTeeth + ringTeeth) must be divisible by planetCount (e.g. sun 12, planet 18 -> ring 48, sum 60: planetCount 1-6, 10 or 12 work); otherwise the command is rejected and the summary lists the valid planetCounts. Centre distance (sun-planet) = module*(sunTeeth+planetTeeth)/2. Planets below ~12 teeth can show tip interference with the ring (undercut) - prefer planetTeeth >= 12. Gear ratio (sun in, ring fixed, carrier out) = 1 + ringTeeth/sunTeeth. All gears share the axis direction (default +Z); the sun and ring are centred on `position`, planets orbit it. Returns affected = [sun, ...planets, ring] and data {ringTeeth, ratio, centerDistance, ringPitchRadius, ids:{sun, planets, ring}}. The sun and planets are extrusion entities, the ring a mesh entity.",
+    "input_schema": {
+      "properties": {
+        "axis": {
+          "description": "Direction of the gear axis in world space. Default \"z\" (gears lie in the XY plane).",
+          "enum": [
+            "x",
+            "y",
+            "z"
+          ],
+          "type": "string"
+        },
+        "faceWidth": {
+          "description": "Thickness of every gear along the axis, > 0.",
+          "type": "number"
+        },
+        "module": {
+          "description": "Gear module (metric), > 0, shared by sun, planets and ring.",
+          "type": "number"
+        },
+        "namePrefix": {
+          "description": "Prefix for entity names: \"<prefix>_sun\", \"<prefix>_planet_1\".., \"<prefix>_ring\".",
+          "type": "string"
+        },
+        "planetColor": {
+          "description": "Planet hex color. Default \"#7a9cbb\".",
+          "type": "string"
+        },
+        "planetCount": {
+          "description": "Number of planets, integer in [1, 12]. (sunTeeth + ringTeeth) must be divisible by it.",
+          "type": "number"
+        },
+        "planetTeeth": {
+          "description": "Planet gear tooth count, integer >= 6.",
+          "type": "number"
+        },
+        "position": {
+          "description": "World-space location of the anchor point [x, y, z] in document units. Right-handed frame, +Z up. Centre of the sun/ring on the axis (z = bottom face). Defaults to [0, 0, 0]. Format [x, y, z]; [x, y] is accepted and placed at z=0.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "pressureAngle": {
+          "description": "Pressure angle in RADIANS, in (0, π/2). Default 0.3491 (20°).",
+          "type": "number"
+        },
+        "ringColor": {
+          "description": "Ring hex color. Default \"#8892a0\".",
+          "type": "string"
+        },
+        "ringOuterRadius": {
+          "description": "Outer radius of the ring gear rim, >= ring pitch radius + 2.25*module (the command reports the minimum).",
+          "type": "number"
+        },
+        "sunColor": {
+          "description": "Sun hex color. Default \"#d9a441\".",
+          "type": "string"
+        },
+        "sunTeeth": {
+          "description": "Sun gear tooth count, integer >= 6.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "module",
+        "sunTeeth",
+        "planetTeeth",
+        "planetCount",
+        "faceWidth",
+        "ringOuterRadius"
+      ],
+      "type": "object"
+    },
+    "name": "add_planetary_gearset"
   },
   {
     "description": "Grade a flat building pad (platform) into an existing-ground surface. Give the pad outline `boundary` (plan polygon, >= 3 simple [x, y] vertices inside the surface) and the finished level `elevation`, both in document units. Cut and fill batters (side slopes, horizontal per 1 vertical; defaults 1.5 cut, 2 fill) are projected to the ground, producing the pad, its daylight line and cut / fill volumes. Returns data { platformId, cutM3, fillM3, netM3 }. Edit later with update_platform; find the balancing level with balance_platform.",
@@ -2054,11 +2586,67 @@
     "name": "add_sphere"
   },
   {
-    "description": "Create a parametric involute spur gear solid (extrusion). Computes the full closed 2D tooth profile from module, tooth count, and pressure angle, then extrudes it by faceWidth along +Z. module (metric) sets the tooth scale: pitchDiameter = module * teeth. pressureAngle is in RADIANS; standard value is 0.3491 rad (20 degrees = Math.PI/9). faceWidth is the gear thickness along Z. bore is a central hole radius; if > 0 it is currently ignored (kernel hole not yet wired) and noted in the summary. position is [x, y, z] of the gear center; rotation is three.js intrinsic XYZ Euler angles in radians (about world Z, then Y, then X). Right-handed frame, +Z up.",
+    "description": "Create an involute spline shaft in the style of DIN 5480 (e.g. W200x5x38 = referenceDiameter 200, module 5, 38 teeth) as one extrusion along +Z (z from 0 to length). Tooth count follows DIN 5480: teeth = referenceDiameter/module - 2 (override with `teeth`). Flanks are involutes of the generating circle (module*teeth/2) at the 30° pressure angle; the nominal tooth thickness on the reference circle is half the pitch; tip radius = referenceDiameter/2 - 0.1*module, tooth depth 0.9*module (approximation of the DIN tolerances). Tooth flanks are sampled coarsely (7 points) to keep STEP/boolean cost low.",
+    "input_schema": {
+      "properties": {
+        "color": {
+          "description": "Hex color. Default \"#9aa3ad\".",
+          "type": "string"
+        },
+        "length": {
+          "description": "Shaft length along +Z, > 0.",
+          "type": "number"
+        },
+        "module": {
+          "description": "Spline module, > 0 (e.g. 5 for W200x5x38).",
+          "type": "number"
+        },
+        "name": {
+          "description": "Optional display name.",
+          "type": "string"
+        },
+        "position": {
+          "description": "World-space location of the anchor point [x, y, z] in document units. Right-handed frame, +Z up. Centre of the bottom face. Defaults to [0, 0, 0]. Format [x, y, z]; [x, y] is accepted and placed at z=0.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "pressureAngle": {
+          "description": "Flank pressure angle in RADIANS, in (0, π/2). Default 0.5236 (30°, DIN 5480).",
+          "type": "number"
+        },
+        "referenceDiameter": {
+          "description": "DIN 5480 reference diameter dB, > 0 (e.g. 200 for W200x5x38).",
+          "type": "number"
+        },
+        "rotation": {
+          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X). Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "teeth": {
+          "description": "Tooth count, integer >= 6. Default round(referenceDiameter/module) - 2 (DIN 5480).",
+          "type": "number"
+        }
+      },
+      "required": [
+        "referenceDiameter",
+        "module",
+        "length"
+      ],
+      "type": "object"
+    },
+    "name": "add_spline_shaft"
+  },
+  {
+    "description": "Create a parametric involute spur gear solid (extrusion with exact Bézier/arc tooth curves; mesh when bore > 0). Computes the full closed 2D tooth profile from module, tooth count, and pressure angle, then extrudes it by faceWidth along +Z. module (metric) sets the tooth scale: pitchDiameter = module * teeth. pressureAngle is in RADIANS; standard value is 0.3491 rad (20 degrees = Math.PI/9). faceWidth is the gear thickness along Z. bore is a central hole radius; if > 0 the gear is emitted as a closed mesh solid with a through hole (no boolean needed). position is [x, y, z] of the gear center; rotation is three.js intrinsic XYZ Euler angles in radians (about world Z, then Y, then X). Right-handed frame, +Z up.",
     "input_schema": {
       "properties": {
         "bore": {
-          "description": "Central bore hole radius in document units. >= 0. Default 0 (solid hub). Currently ignored if > 0 (kernel hole not yet wired); a note appears in the summary.",
+          "description": "Central bore hole radius in document units. >= 0 and < pitch radius. Default 0 (solid hub, extrusion entity). When > 0 the result is a mesh solid with a through hole.",
           "type": "number"
         },
         "color": {
@@ -2411,7 +2999,7 @@
     "name": "add_text"
   },
   {
-    "description": "Create a torus (donut) solid. Right-handed world frame, +Z up. ringRadius is the distance from the torus center to the tube center (major radius); tubeRadius is the radius of the tube cross-section (minor radius). Both must be > 0; tubeRadius < ringRadius for a non-self-intersecting torus. anchor controls which point the position refers to: \"center\" (default) = geometric center of the torus; \"min\" = min-XYZ corner of the AABB; \"base-center\" = center of the bottom face (mid X/Y, min Z). The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.",
+    "description": "Create a torus (donut) solid. Right-handed world frame, +Z up. ringRadius is the distance from the torus center to the tube center (major radius); tubeRadius is the radius of the tube cross-section (minor radius). Both must be > 0; tubeRadius < ringRadius for a non-self-intersecting torus. anchor controls which point the position refers to: \"center\" (default) = geometric center of the torus; \"min\" = min-XYZ corner of the AABB; \"base-center\" = center of the bottom face (mid X/Y, min Z). The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin. Orientation: pass EITHER rotation (Euler radians) OR axis [dx,dy,dz] = direction the local +Z (symmetry) axis should point in world space; axis wins when both are given and Euler angles are derived and stored.",
     "input_schema": {
       "properties": {
         "anchor": {
@@ -2422,6 +3010,13 @@
             "base-center"
           ],
           "type": "string"
+        },
+        "axis": {
+          "description": "Optional direction [dx, dy, dz] (any non-zero length, normalized) that the primitive local +Z axis (its symmetry axis) points along in world space, e.g. [1, 0, 0] lays it along +X. When given it OVERRIDES rotation (the rotation param is ignored and the resolved Euler angles are stored). A zero-length or malformed axis is rejected as a no-op.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
         },
         "color": {
           "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
@@ -2836,15 +3431,22 @@
     "name": "array_linear"
   },
   {
-    "description": "Duplicate an entity into a polar (circular) pattern around the Z axis through center. The original counts as instance 0; count-1 new copies are created. Copy k is rotated by k*(angle/count) radians around center (XY plane). angle defaults to 2*PI (full circle). Each copy also has rotation[2] incremented by the same step so the part faces outward consistently. Z position and other rotation components are unchanged. count must be >= 2.",
+    "description": "Duplicate an entity into a polar (circular) pattern about an axis line through center. The original counts as instance 0; count-1 new copies are created. Copy k is the original rigidly rotated by k*(angle/count) radians about the axis: its position orbits the axis line and its orientation is composed with the same rotation (R_axis(k*step) applied after the existing rotation), so already-rotated parts (e.g. radial cylinders) stay correctly oriented. axis defaults to [0, 0, 1] (world Z; then center only uses cx, cy and Z position is unchanged). angle defaults to 2*PI (full circle). count must be >= 2.",
     "input_schema": {
       "properties": {
         "angle": {
           "description": "Total sweep angle in radians over which instances are distributed. Defaults to 2*PI (full 360-degree circle). A partial angle (e.g. PI) fans the instances over that arc.",
           "type": "number"
         },
+        "axis": {
+          "description": "Optional rotation axis direction [dx, dy, dz] (any non-zero length, normalized). Defaults to [0, 0, 1]. Right-hand rule gives the positive angle direction.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
         "center": {
-          "description": "World-space center point [cx, cy, cz] for the polar rotation axis (Z axis through this point). Only cx and cy are used for the rotation; cz is ignored.",
+          "description": "World-space point [cx, cy, cz] the rotation axis passes through. With the default Z axis only cx and cy matter.",
           "items": {
             "type": "number"
           },
@@ -3024,11 +3626,11 @@
     "name": "boolean_union"
   },
   {
-    "description": "Apply an ordered list of command actions as one project. Each action is one of: (1) { command, params, as? } — plain action; (2) { repeat: { count, as? }, step: { command, params } } — run step N times; count may be a number or expression string. Each iteration exposes $i (0-based) in params expressions. (3) { for_each: { values, as }, step: { command, params } } — iterate over values array (or expression). $as is the current element, $i the index. A step may bind its result to an alias with \"as\"; later steps reference it as \"$alias\" or \"$alias[N]\". params values starting with \"=\" are evaluated as arithmetic expressions against doc.parameters plus $i/$as. onError=\"abort\" (default) rolls the whole document back on the first failing step; \"continue\" applies what it can. validate=true performs a dry run without changing the document.",
+    "description": "Apply an ordered list of command actions as one project. Each action is one of: (1) { command, params, as? } — plain action; (2) { repeat: { count, as? }, step: { command, params } } — run step N times; count may be a number or expression string. Each iteration exposes $i (0-based) in params expressions. (3) { for_each: { values, as }, step: { command, params } } — iterate over values array (or expression). $as is the current element, $i the index. (4) NESTABLE LOOPS (preferred): { repeat: { count, as? }, actions: [ ...actions ] } runs the body count times with loop variable `as` (default \"i\", 0-based); { for: { var, from, to, step? }, actions: [...] } runs var from..to inclusive. count/from/to/step are numbers or \"=expr\" strings (count must be a non-negative integer; at most 1000 iterations per plan); bodies may contain loops. Use the loop variable and document parameters in any \"=expr\", e.g. \"position\": [\"=r*cos(2*pi*i/n)\", \"=r*sin(2*pi*i/n)\", 80] with parameters n and r. Expressions support + - * / ( ), pi, sin cos tan asin acos atan atan2 sqrt abs floor ceil round trunc sign exp ln log10 pow hypot mod min max. Aliases inside loops interpolate {expr}: \"as\": \"piston{i}\" binds $piston0, $piston1, ... (usable later, and as \"$piston{i}\" in the same body). A top-level loop is recorded as ONE history step that re-expands on replay, so set_parameter on n/r (even the count) regenerates it; entities made by later steps that reference loop-made ids by position may break if the count shrinks. Validation reports issues by path (\"step 4 › iter 2 › step 1\"). A step may bind its result to an alias with \"as\"; later steps reference it as \"$alias\" or \"$alias[N]\". params values starting with \"=\" are evaluated as arithmetic expressions against doc.parameters plus $i/$as. onError=\"abort\" (default) rolls the whole document back on the first failing step; \"continue\" applies what it can. validate=true performs a dry run without changing the document.",
     "input_schema": {
       "properties": {
         "actions": {
-          "description": "Ordered list of actions. Each item is { command, params?, as? } OR { repeat: { count, as? }, step: { command, params? } } OR { for_each: { values, as }, step: { command, params? } }. Params values may be \"$alias\" references or \"=expr\" arithmetic expressions.",
+          "description": "Ordered list of actions. Each item is { command, params?, as? } OR { repeat: { count, as? }, step: { command, params? } } OR { for_each: { values, as }, step: { command, params? } } OR nestable { repeat: { count, as? } | for: { var, from, to, step? }, actions: [ ...actions ] }. Params values may be \"$alias\" references or \"=expr\" arithmetic expressions.",
           "items": {
             "type": "object"
           },
@@ -3092,6 +3694,76 @@
       "type": "object"
     },
     "name": "building_schedule"
+  },
+  {
+    "description": "Set an image underlay to true scale from a known dimension: two points in IMAGE PIXEL coordinates and the real distance between them (document units). The scale becomes distance / pixel distance units per pixel (uniform). By default pixelA keeps its world position; pass `origin` to pin a pixel to a world point instead (e.g. the drawing datum to [0, 0, 0]). Pass `align` \"x\" or \"y\" to rotate the image in its plane (by the smallest angle) so the A→B segment runs along that axis — this also de-skews a crooked scan. Image pixel coordinates [px, py]: origin at the TOP-left corner of the picture, +px right, +py DOWN (as read off the image); fractional values are fine.",
+    "input_schema": {
+      "properties": {
+        "align": {
+          "description": "Rotate in-plane so A→B lies along the work-plane \"x\" or \"y\" axis. Default \"none\".",
+          "enum": [
+            "none",
+            "x",
+            "y"
+          ],
+          "type": "string"
+        },
+        "distance": {
+          "description": "Real distance between pixelA and pixelB, in document units (> 0).",
+          "type": "number"
+        },
+        "id": {
+          "description": "Id of the image underlay to calibrate.",
+          "type": "string"
+        },
+        "origin": {
+          "description": "Optional: pin an image pixel to a world point. Defaults to pixelA staying where it is.",
+          "properties": {
+            "pixel": {
+              "description": "Image pixel [px, py] to pin (same convention as pixelA).",
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "world": {
+              "description": "World point [x, y, z] that pixel maps to after calibration.",
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "pixel",
+            "world"
+          ],
+          "type": "object"
+        },
+        "pixelA": {
+          "description": "First reference point. Image pixel coordinates [px, py]: origin at the TOP-left corner of the picture, +px right, +py DOWN (as read off the image); fractional values are fine.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "pixelB": {
+          "description": "Second reference point, same pixel convention as pixelA.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "pixelA",
+        "pixelB",
+        "distance"
+      ],
+      "type": "object"
+    },
+    "name": "calibrate_underlay"
   },
   {
     "description": "Bevel a single vertex of a polyline with a straight chamfer at the given distance. The polyline entity is updated: the vertex at vertexIndex is replaced by two points located distance back from the vertex along each adjacent segment, and a new line entity is added connecting those two points (the bevel face). vertexIndex is 0-based; for an open polyline valid range is 1 to N-2 (interior vertices only); for a closed polyline any vertex 0 to N-1 is valid. No-op if distance is too large for the adjacent segment lengths.",
@@ -5542,7 +6214,7 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Export the document (or a subset of entities) to glTF 2.0 format. Produces a triangle tessellation in world space for every exportable 3D solid entity. 2D shape entities are silently skipped. Revolution and instance entities are fully expanded. Returns the UNCHANGED document, affected:[], and a data object with:   format (\"gltf\" or \"glb\"), triangleCount,   text (glTF 2.0 JSON string — when binary=false, default),   base64 (GLB binary blob base64-encoded — when binary=true). Each part (entity, or each child of an instance) becomes its own named node + mesh (POSITION and creased smooth NORMAL attributes) with a PBR material: the assigned document material (color, metalness, roughness) or else the entity color, converted to linear glTF factors and shared between parts with the same appearance — ready for Blender / Cycles, three.js or any viewer. Node extras carry the llull entity id and kind. The BIN buffer is inlined as a data: URI in JSON mode. In GLB mode the 12-byte header + JSON chunk + BIN chunk are packed per the glTF 2.0 spec. entityIds: omit to export all 3D entities; provide an array to export a subset. binary: false (default) → data.text contains JSON; true → data.base64 contains GLB. Does NOT modify the document.",
+    "description": "Export the document (or a subset of entities) to glTF 2.0 format. Produces a triangle tessellation in world space for every exportable 3D solid entity. 2D shape entities are silently skipped. Revolution and instance entities are fully expanded. Returns the UNCHANGED document, affected:[], and a data object with:   format (\"gltf\" or \"glb\"), triangleCount, nodeCount, materialCount,   text (glTF 2.0 JSON string — when binary=false, default),   base64 (GLB binary blob base64-encoded — when binary=true). Structure: one glTF node + mesh per entity (node.name = the entity name from set_entity_name, else its id; each child of an instance is its own node), and entities that belong to a group (group_entities) are children of a node named after the group. Node extras carry the llull entity id and kind. Meshes carry POSITION and creased smooth NORMAL attributes. One PBR material per distinct appearance: the assigned document material (color, metalness, roughness) or else the entity color, converted to linear glTF factors — ready for Blender / Cycles or any viewer. A material finish (create_material finish) embeds procedural albedo / normal / roughness PNG maps with box-projected TEXCOORD_0 (plus KHR_materials_clearcoat); text decals (add_decal) are extra alpha-blended textured meshes. The BIN buffer is inlined as a data: URI in JSON mode. In GLB mode the 12-byte header + JSON chunk + BIN chunk are packed per the glTF 2.0 spec. entityIds: omit to export all 3D entities; provide an array to export a subset. binary: false (default) → data.text contains JSON; true → data.base64 contains GLB. Does NOT modify the document.",
     "input_schema": {
       "properties": {
         "binary": {
@@ -5667,7 +6339,7 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Export the document (or a subset of entities) to Wavefront OBJ text format. Produces a triangle tessellation in world space for every exportable 3D solid entity. 2D shape entities are silently skipped. Revolution and instance entities are fully expanded. Returns the UNCHANGED document, affected:[], and a data object with:   format (\"obj\"), triangleCount, text (the full OBJ string with v/vn/f records). entityIds: omit to export all 3D entities; provide an array to export a subset. units: optional units label embedded in the OBJ comment (defaults to doc units). Does NOT modify the document.",
+    "description": "Export the document (or a subset of entities) to Wavefront OBJ text format. Produces a triangle tessellation in world space for every exportable 3D solid entity. 2D shape entities are silently skipped. Revolution and instance entities are fully expanded. Returns the UNCHANGED document, affected:[], and a data object with:   format (\"obj\"), triangleCount, text (the full OBJ string with v/vn/f records). Each entity is one OBJ object (`o <entity name or id>`). entityIds: omit to export all 3D entities; provide an array to export a subset. units: optional units label embedded in the OBJ comment (defaults to doc units). Does NOT modify the document.",
     "input_schema": {
       "properties": {
         "entityIds": {
@@ -5767,7 +6439,7 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Export 3D solids to STEP (AP214, ISO 10303-21) directly from the geometry kernel's exact B-rep: primitives, booleans, fillets, chamfers and shells are written as true analytic/NURBS faces, not triangles. No Python needed. Requires the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server); the default Manifold kernel gracefully no-ops (use export_step via the Python bridge, or export_stl, instead). Returns data: { format, step (the file text), solidCount, entityIds, skipped }. Instances are skipped (explode_instance first). Does not modify the document.",
+    "description": "Export 3D solids to STEP (AP214, ISO 10303-21) directly from the geometry kernel's exact B-rep: primitives, booleans, fillets, chamfers and shells are written as true analytic/NURBS faces, not triangles. No Python needed. Requires the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server); the default Manifold kernel gracefully no-ops (use export_step via the Python bridge, or export_stl, instead). Each solid becomes one STEP product named after its entity (set_entity_name, else the id; the group name goes in the product description) and carries its entity color as a surface style. Returns data: { format, step (the file text), solidCount, entityIds, skipped }. Instances are skipped (explode_instance first). Does not modify the document.",
     "input_schema": {
       "properties": {
         "entityIds": {
@@ -5787,7 +6459,7 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Export the document (or a subset of entities) to STL format — the standard triangle-mesh interchange format accepted by slicers, mesh editors, and 3D printers. Produces a triangle tessellation in world space for every exportable 3D solid entity. 2D shape entities (line, polyline, arc, circle, rectangle, text, dimension, etc.) are silently skipped — STL is a solid/mesh format. Returns the UNCHANGED document, affected:[], and a data object with:   format (\"ascii\"|\"binary\"), triangleCount (number of exported triangles),   stl (ASCII STL string — when format=\"ascii\"),   stlBase64 (base64-encoded binary STL bytes — when format=\"binary\"). Supported entity kinds: box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, mesh. entityIds: omit to export all 3D entities; provide an array to export a subset. format: \"ascii\" (default, human-readable) or \"binary\" (more compact, required by some importers). name: optional solid name embedded in the STL header (default \"llull\"). Does NOT modify the document.",
+    "description": "Export the document (or a subset of entities) to STL format — the standard triangle-mesh interchange format accepted by slicers, mesh editors, and 3D printers. Produces a triangle tessellation in world space for every exportable 3D solid entity. 2D shape entities (line, polyline, arc, circle, rectangle, text, dimension, etc.) are silently skipped — STL is a solid/mesh format. Returns the UNCHANGED document, affected:[], and a data object with:   format (\"ascii\"|\"binary\"), triangleCount (number of exported triangles),   stl (ASCII STL string — when format=\"ascii\"),   stlBase64 (base64-encoded binary STL bytes — when format=\"binary\"). Supported entity kinds: box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, mesh. entityIds: omit to export all 3D entities; provide an array to export a subset. format: \"ascii\" (default, human-readable) or \"binary\" (more compact, required by some importers). name: optional solid name embedded in the STL header (default: the entity name when exactly one named entity is exported, else \"llull\"). perEntity: one named solid block per entity (ASCII). Does NOT modify the document.",
     "input_schema": {
       "properties": {
         "entityIds": {
@@ -5808,6 +6480,10 @@
         "name": {
           "description": "Solid name to embed in the STL header (ASCII: \"solid <name>\"…\"endsolid <name>\"; binary: first bytes of the 80-byte header). Default: \"llull\". Use a meaningful name to help downstream tools identify the mesh.",
           "type": "string"
+        },
+        "perEntity": {
+          "description": "ASCII only: write one \"solid <entity name or id>\" … \"endsolid\" block per entity (names from set_entity_name, else the entity id) instead of one merged solid; `name` is then ignored. Default false. Binary STL has no per-solid names.",
+          "type": "boolean"
         }
       },
       "required": [],
@@ -5837,9 +6513,16 @@
     "name": "extend"
   },
   {
-    "description": "Extrude a closed 2D polygon profile along +Z into a solid. Right-handed world frame, +Z up. position is the origin of the profile plane [x, y, z] in document units; the solid spans from position.z to position.z + depth. depth must be > 0.",
+    "description": "Extrude a closed 2D polygon profile along +Z into a solid. Right-handed world frame, +Z up. position is the origin of the profile plane [x, y, z] in document units; the solid spans from position.z to position.z + depth. depth must be > 0. Orientation: pass EITHER rotation (Euler radians) OR axis [dx,dy,dz] = the extrusion direction (the profile plane normal; local +Z maps to it). axis wins when both are given; the derived Euler angles are stored.",
     "input_schema": {
       "properties": {
+        "axis": {
+          "description": "Optional direction [dx, dy, dz] (any non-zero length, normalized) that is the extrusion direction (local +Z) points along in world space, e.g. [1, 0, 0] lays it along +X. When given it OVERRIDES rotation (the rotation param is ignored and the resolved Euler angles are stored). A zero-length or malformed axis is rejected as a no-op.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
         "color": {
           "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#c8553d\".",
           "type": "string"
@@ -6010,7 +6693,7 @@
           "type": "array"
         },
         "kind": {
-          "description": "Filter by entity kind. One of: \"box\", \"cylinder\", \"sphere\", \"extrusion\", \"mesh\", \"cone\", \"torus\", \"wedge\", \"pyramid\", \"revolution\", \"sweep\", \"loft\", \"subdivision\", \"line\", \"polyline\", \"arc\", \"circle\", \"rectangle\", \"point\", \"ellipse\", \"spline\", \"text\", \"dimension\", \"instance\". Omit to match all kinds.",
+          "description": "Filter by entity kind. One of: \"box\", \"cylinder\", \"sphere\", \"extrusion\", \"mesh\", \"cone\", \"torus\", \"wedge\", \"pyramid\", \"revolution\", \"sweep\", \"loft\", \"subdivision\", \"line\", \"polyline\", \"arc\", \"circle\", \"rectangle\", \"point\", \"ellipse\", \"spline\", \"text\", \"dimension\", \"image\", \"instance\". Omit to match all kinds.",
           "enum": [
             "box",
             "cylinder",
@@ -6035,6 +6718,7 @@
             "spline",
             "text",
             "dimension",
+            "image",
             "instance"
           ],
           "type": "string"
@@ -6157,6 +6841,37 @@
       "type": "object"
     },
     "name": "group_entities"
+  },
+  {
+    "annotations": {
+      "readOnlyHint": true
+    },
+    "description": "Convert points read off an image underlay (pixel coordinates) into model coordinates. Returns `data.world` ([x, y, z] per point) and `data.xy` ([x, y] per point — ready for draw_polyline, extrude_profile or revolve_profile when the underlay lies on the XY plane), plus `data.unitsPerPixel`. Calibrate first (calibrate_underlay) so the numbers are true scale. Image pixel coordinates [px, py]: origin at the TOP-left corner of the picture, +px right, +py DOWN (as read off the image); fractional values are fine.",
+    "input_schema": {
+      "properties": {
+        "id": {
+          "description": "Id of the image underlay the pixel coordinates refer to.",
+          "type": "string"
+        },
+        "points": {
+          "description": "Pixel points [[px, py], …] to convert (1..10000).",
+          "items": {
+            "description": "Image pixel coordinates [px, py]: origin at the TOP-left corner of the picture, +px right, +py DOWN (as read off the image); fractional values are fine.",
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "points"
+      ],
+      "type": "object"
+    },
+    "name": "image_to_world"
   },
   {
     "description": "Import an ASCII DXF drawing (AutoCAD, Civil 3D, BricsCAD, QCAD, survey software exports) as editable 2D entities on their DXF layers: LINE, LWPOLYLINE (bulges as arcs), POLYLINE, ARC, CIRCLE, POINT, TEXT, MTEXT, block INSERTs (exploded) and 3DFACE (one mesh per layer). Elevations are kept as the entity plane height. Units come from $INSUNITS unless `sourceUnit` is given. Binary DXF and DWG are not supported (save as ASCII DXF). For terrain from survey DXFs use import_survey_dxf.",
@@ -7151,9 +7866,68 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Render the document to a self-contained SVG image string so an AI agent can SEE the scene and self-correct. Returns the unchanged document plus a `data` object containing: `svg` (complete SVG string), `view` (resolved view name), `width`, `height`, `entityCount`, `bounds` (world AABB or null), and `camera` ({position, target, up}). Choose `view` to orient the render: \"iso\" (default isometric), \"top\", \"bottom\", \"front\", \"back\", \"left\", or \"right\" (all orthographic). Adjust `width`/`height` (pixels, clamped to [64, 2000], default 800×600) for resolution. The SVG uses flat Lambertian shading on 3D solids and stroked paths for 2D shapes. Enrichments: turntable (multi-frame strip), isolate (highlight entities), section (cut-plane view), showDimensions (bbox labels), showAxes (world triad, default on), showGrid (ground grid, default on), showLabels (entity id/name labels + key-point markers, default off). Does NOT modify the document; `affected` is always [].",
+    "description": "Render the document to a self-contained SVG image string so an AI agent can SEE the scene and self-correct. Returns the unchanged document plus a `data` object containing: `svg` (complete SVG string), `view` (resolved view name), `width`, `height`, `entityCount`, `bounds` (world AABB or null), and `camera` ({position, target, up}). Choose `view` to orient the render: \"iso\" (default isometric), \"top\", \"bottom\", \"front\", \"back\", \"left\", or \"right\" (all orthographic). Adjust `width`/`height` (pixels, clamped to [64, 2000], default 800×600) for resolution. The SVG uses flat Lambertian shading on 3D solids and stroked paths for 2D shapes. Camera: `zoom` (>1 magnifies), `direction` ([x,y,z] vector from the scene toward the camera, overrides `view`), `target` (point to look at). `title` draws text top-left, `background` sets the image color. Cutaway: `cut` clips solids (triangles are split, not dropped) and draws the section as a hatched cap, e.g. remove the quadrant x>0,y<0 with planes [{normal:[1,0,0],offset:0},{normal:[0,-1,0],offset:0}] and mode \"intersection\". Large scenes are never silently truncated: the polygon budget (`maxPolygons`) is shared fairly between entities, and `data.simplifiedEntityIds` / `data.skippedEntityIds` / `data.polygonCount` report what was reduced. Enrichments: turntable (multi-frame strip), isolate (highlight entities), section (cut-plane view), showDimensions (bbox labels), showAxes (world triad, default on), showGrid (ground grid, default on), showLabels (entity id/name labels + key-point markers, default off). Does NOT modify the document; `affected` is always [].",
     "input_schema": {
       "properties": {
+        "background": {
+          "description": "Background CSS color: \"#rrggbb\", \"#rgb\", a color name (\"white\") or rgb()/hsl(). Default \"#1a1a2e\" (dark navy).",
+          "type": "string"
+        },
+        "cut": {
+          "description": "Cutaway: clips the selected 3D solids against the planes (triangles are split exactly) and draws the exposed section as a light, hatched, outlined cap so solids do not look hollow. Rendered together with isolate/section/turntable.",
+          "properties": {
+            "entityIds": {
+              "description": "Entity ids to cut. Omit to cut every solid; other entities stay whole.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "mode": {
+              "description": "\"intersection\" (default): remove only the region on the cut side of ALL planes (e.g. a quadrant or octant notch). \"union\": remove everything on the cut side of ANY plane.",
+              "enum": [
+                "intersection",
+                "union"
+              ],
+              "type": "string"
+            },
+            "planes": {
+              "description": "1 to 6 cut planes. Each removes the half-space dot(unitNormal, p) > offset.",
+              "items": {
+                "properties": {
+                  "normal": {
+                    "description": "Plane normal [x, y, z] (any non-zero length). It points to the REMOVED side.",
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array"
+                  },
+                  "offset": {
+                    "description": "Plane position: points p with dot(unitNormal, p) = offset lie on the plane.",
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "normal",
+                  "offset"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "planes"
+          ],
+          "type": "object"
+        },
+        "direction": {
+          "description": "Custom viewing direction: a non-zero [x, y, z] vector pointing from the scene center toward the camera (Z-up). Overrides `view`; e.g. [1,-1,0.5] looks from +X/-Y above. Result `view` is \"custom\".",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
         "height": {
           "description": "Output image height in pixels. Clamped to [64, 2000]. Default: 600.",
           "type": "number"
@@ -7161,6 +7935,10 @@
         "isolate": {
           "description": "Entity id (or array of ids) to highlight. All other entities are rendered dimmed/desaturated; the specified id(s) are shown at full color.",
           "type": "string"
+        },
+        "maxPolygons": {
+          "description": "Polygon budget, clamped to [500, 100000], default 20000. Entities over their fair share are decimated (see data.simplifiedEntityIds); raise it for finer detail at the cost of a larger SVG.",
+          "type": "number"
         },
         "section": {
           "description": "Render a section-plane view: entities on the negative side of the cut plane are dimmed; a colored dashed line marks the cut. axis: \"x\"|\"y\"|\"z\"; offset: world-space position of the plane.",
@@ -7201,6 +7979,17 @@
           "description": "When true, overlay per-entity id/name labels and key-point markers on the image. Each entity shows its name (or id) at the centroid of its key points (endpoints, center, corners, AABB corners for solids). Markers are color-coded by category: orange=point, cyan=2D curve, purple=3D solid, yellow=annotation. A legend appears in the top-right corner. Default: false (opt in to avoid clutter).",
           "type": "boolean"
         },
+        "target": {
+          "description": "World point the camera looks at (default: center of the scene bounds). Combine with `zoom` to inspect a detail.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "title": {
+          "description": "Text drawn top-left of the image (max 120 characters, longer is truncated).",
+          "type": "string"
+        },
         "turntable": {
           "description": "Produce a horizontal strip of N evenly-spaced rotation frames around the Z (up) axis. frames: integer 1..12. When omitted, behavior is unchanged (single frame).",
           "properties": {
@@ -7229,6 +8018,10 @@
         },
         "width": {
           "description": "Output image width in pixels. Clamped to [64, 2000]. Default: 800.",
+          "type": "number"
+        },
+        "zoom": {
+          "description": "Magnification of the framed scene, clamped to [0.1, 50]. 1 (default) fits the whole scene; 3 shows a third of it.",
           "type": "number"
         }
       },
@@ -7849,6 +8642,33 @@
       "type": "object"
     },
     "name": "set_superelevation"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true
+    },
+    "description": "Change an image underlay's display: `opacity` in [0, 1] and/or `locked` (a locked underlay is never picked in the viewport, so tracing over it cannot select it by accident).",
+    "input_schema": {
+      "properties": {
+        "id": {
+          "description": "Id of the image underlay.",
+          "type": "string"
+        },
+        "locked": {
+          "description": "Lock (true) or unlock (false). Omit to keep.",
+          "type": "boolean"
+        },
+        "opacity": {
+          "description": "Opacity in [0, 1] (0 = invisible, 1 = opaque). Omit to keep the current value.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "set_underlay"
   },
   {
     "annotations": {

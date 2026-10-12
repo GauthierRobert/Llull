@@ -59,6 +59,7 @@ describe('export_gltf scene layout', () => {
     const gltf = gltfOf(scene());
     expect(gltf.materials).toHaveLength(2);
     const [paint, steel] = gltf.materials;
+    expect(paint?.name).toBe('#ffffff');
     expect(paint?.pbrMetallicRoughness.baseColorFactor).toEqual([1, 1, 1, 1]);
     expect(paint?.pbrMetallicRoughness.metallicFactor).toBeCloseTo(0.08);
     expect(steel?.name).toBe('steel');
@@ -67,10 +68,10 @@ describe('export_gltf scene layout', () => {
     expect(gltf.meshes.map((m) => m.primitives[0]?.material)).toEqual([0, 0, 1]);
   });
 
-  it('summary and GLB data report the part and material counts', () => {
+  it('summary and GLB data report the node and material counts', () => {
     const result = execute(scene(), 'export_gltf', { binary: true });
-    expect(result.summary).toContain('3 part(s), 2 material(s)');
-    expect(result.data).toMatchObject({ format: 'glb', partCount: 3, materialCount: 2 });
+    expect(result.summary).toContain('3 node(s), 2 material(s)');
+    expect(result.data).toMatchObject({ format: 'glb', nodeCount: 3, materialCount: 2 });
   });
 
   it('exports a subset and expands instances into one part per child', () => {
@@ -96,8 +97,24 @@ describe('export_gltf scene layout', () => {
 
   it('an empty document is still a valid scene', () => {
     const gltf = gltfOf(createEmptyDocument());
-    expect(gltf.nodes).toEqual([]);
-    expect(gltf.materials).toEqual([]);
+    expect(gltf.scenes).toEqual([{ nodes: [] }]);
+    expect(gltf.nodes).toBeUndefined();
+  });
+
+  it('hangs grouped entities under the group node', () => {
+    const doc = build([
+      { command: 'add_box', params: { size: [1, 1, 1] }, as: 'a' },
+      { command: 'add_box', params: { size: [1, 1, 1], position: [4, 0, 0] }, as: 'b' },
+      { command: 'group_entities', params: { ids: ['$a', '$b'], name: 'Pair' } },
+    ]);
+    const gltf = gltfOf(doc);
+    const root = gltf.nodes[gltf.scenes[0]?.nodes[0] ?? -1] as unknown as {
+      name: string;
+      children: number[];
+    };
+    expect(gltf.scenes[0]?.nodes).toHaveLength(1);
+    expect(root.name).toBe('Pair');
+    expect(root.children).toHaveLength(2);
   });
 });
 

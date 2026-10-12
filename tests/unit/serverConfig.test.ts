@@ -26,6 +26,12 @@ describe('serverConfig', () => {
     expect(config.SERVER_BASE).toBe('https://cad.example.com/api');
   });
 
+  it('uses the page origin for VITE_LLULL_SERVER_URL=same-origin', async () => {
+    vi.stubEnv('VITE_LLULL_SERVER_URL', 'same-origin');
+    const config = await loadConfig();
+    expect(config.SERVER_BASE).toBe(window.location.origin);
+  });
+
   it('sends a bearer token when VITE_LLULL_API_TOKEN is set', async () => {
     vi.stubEnv('VITE_LLULL_API_TOKEN', 's3cret');
     const config = await loadConfig();

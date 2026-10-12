@@ -24,8 +24,19 @@ export interface ForEachStep {
   step: { command: string; params?: Record<string, unknown> };
 }
 
-/** A top-level action item — either a plain action or a control-flow step. */
-export type ActionItem = PlanAction | RepeatStep | ForEachStep;
+/**
+ * Nestable loop with a body of actions. `repeat`: `count` iterations of variable `as` (default
+ * `i`, 0-based). `for`: `var` from `from` to `to` inclusive, stepping by `step` (default 1).
+ * Numbers or `=expr` strings; loop variables are usable as `i` or `$i` in expressions.
+ */
+export interface LoopNode {
+  repeat?: { count: number | string; as?: string };
+  for?: { var: string; from: number | string; to: number | string; step?: number | string };
+  actions: ActionItem[];
+}
+
+/** A plan item — a plain action, a legacy single-step loop, or a nestable loop. */
+export type ActionItem = PlanAction | RepeatStep | ForEachStep | LoopNode;
 
 export interface BuildProjectParams {
   actions: ActionItem[];
@@ -35,6 +46,8 @@ export interface BuildProjectParams {
 
 export interface StepReport {
   index: number;
+  /** Loop-aware location, e.g. `step 4 › iter 2 › step 1` (present for steps inside loops). */
+  path?: string;
   command: string;
   ok: boolean;
   summary: string;

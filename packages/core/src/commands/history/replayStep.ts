@@ -26,6 +26,8 @@ export function resolveStepForReplay(
   warnings: string[] | undefined,
   warningLabel: string,
 ): unknown {
+  // A recorded plan (loop) resolves its own `=expr` per iteration, with its loop variables.
+  if (step.name === 'build_project') return remapIds(step.params, idMap);
   const { resolved, errors } = resolveStepParams(step.params, buildParamEnv(doc.parameters));
   for (const e of errors) {
     warnings?.push(

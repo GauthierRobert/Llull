@@ -8,7 +8,7 @@ import type { Entity, Vec3 } from '../../model/types';
 import type { RenderViewData } from './types';
 import { boundsCorners, entityBounds } from '../../geometry/bounds';
 import { escapeXml } from '../../lib/escapeXml';
-import { type Projector, makeProjector, computeOrthoHalf } from './camera';
+import { type Projector, makeProjector } from './camera';
 import { appendBeforeClose, r2, svgDot } from './svg';
 
 /** Colour-coding group of an entity in the label overlay. */
@@ -36,6 +36,7 @@ function entityCategory(e: Entity): EntityCategory {
       return 'curve2d';
     case 'text':
     case 'dimension':
+    case 'image':
       return 'annotation';
     default:
       return 'solid3d';
@@ -87,6 +88,7 @@ function entityKeyPoints(e: Entity): Vec3[] {
         lift(e.center[0], e.center[1] + e.radiusY),
       ];
     case 'rectangle':
+    case 'image':
       return [lift(0, 0), lift(e.width, 0), lift(e.width, e.height), lift(0, e.height)];
     case 'instance':
       return [pos]; // its component's extent needs the document; anchor the label at its origin
@@ -116,7 +118,7 @@ export function appendEntityLabels(
   entities: ReadonlyArray<Entity>,
 ): string {
   const { camera, width, height } = data;
-  const project = makeProjector(camera, computeOrthoHalf(data.bounds), width, height);
+  const project = makeProjector(camera, data.orthoHalf, width, height);
 
   const lines: string[] = ['  <!-- entity labels overlay -->'];
   const labelStyle = `font-family="monospace" font-size="10" stroke="#0d0d1a" stroke-width="2.5" paint-order="stroke"`;

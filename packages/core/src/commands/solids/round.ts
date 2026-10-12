@@ -3,6 +3,7 @@ import { defineCommand, z } from '../schema';
 import { ORIGIN } from '../../lib/vec3';
 import {
   DEFAULT_SOLID_COLOR,
+  axisField,
   placeSolid,
   placedSolidFields,
   positionField,
@@ -30,17 +31,19 @@ export const addCylinder = defineCommand({
     '"center" (default) = geometric center (cylinder spans ±height/2 about stored position along its axis); ' +
     '"min" = min-XYZ corner of the AABB; ' +
     '"base-center" = center of the bottom face (mid X/Y, min Z of AABB). ' +
-    'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.',
+    'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin. ' +
+    'Orientation: pass EITHER rotation (Euler radians) OR axis [dx,dy,dz] = direction the local +Z (symmetry) axis should point in world space; axis wins when both are given and Euler angles are derived and stored.',
   params: z.object({
     radius: z
       .number()
       .describe('Radius of the cylinder cross-section in document units. Must be > 0.'),
     height: z.number().describe('Total height of the cylinder in document units. Must be > 0.'),
     ...placedSolidFields('cylinder', 'center'),
+    axis: axisField(),
   }),
   run: (
     doc,
-    { radius, height, position = ORIGIN, rotation, color = DEFAULT_SOLID_COLOR, anchor },
+    { radius, height, position = ORIGIN, rotation, axis, color = DEFAULT_SOLID_COLOR, anchor },
   ): CommandResult => {
     const rejected = rejectNonPositive(doc, 'add_cylinder', [
       ['radius', radius],
@@ -56,6 +59,7 @@ export const addCylinder = defineCommand({
       anchor,
       position,
       rotation,
+      axis,
       color,
       describe: (id) => `Added cylinder ${id} with radius ${radius} and height ${height}`,
     });
@@ -135,7 +139,8 @@ export const addCone = defineCommand({
     '"base-center" (default) = center of the circular base (the apex is at position + [0,0,height]); ' +
     '"center" = geometric center of the AABB; ' +
     '"min" = min-XYZ corner of the AABB. ' +
-    'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.',
+    'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin. ' +
+    'Orientation: pass EITHER rotation (Euler radians) OR axis [dx,dy,dz] = direction the local +Z (symmetry) axis should point in world space; axis wins when both are given and Euler angles are derived and stored.',
   params: z.object({
     radius: z.number().describe('Radius of the circular base in document units. Must be > 0.'),
     height: z
@@ -147,10 +152,11 @@ export const addCone = defineCommand({
       'base-center': 'center of the circular base; apex at position+[0,0,height]',
       center: 'geometric center of the AABB (mid X/Y/Z)',
     }),
+    axis: axisField(),
   }),
   run: (
     doc,
-    { radius, height, position = ORIGIN, rotation, color = DEFAULT_SOLID_COLOR, anchor },
+    { radius, height, position = ORIGIN, rotation, axis, color = DEFAULT_SOLID_COLOR, anchor },
   ): CommandResult => {
     const rejected = rejectNonPositive(doc, 'add_cone', [
       ['radius', radius],
@@ -166,6 +172,7 @@ export const addCone = defineCommand({
       anchor,
       position,
       rotation,
+      axis,
       color,
       describe: (id) => `Added cone ${id} with base radius ${radius} and height ${height}`,
     });
@@ -196,7 +203,8 @@ export const addTorus = defineCommand({
     'anchor controls which point the position refers to: ' +
     '"center" (default) = geometric center of the torus; "min" = min-XYZ corner of the AABB; ' +
     '"base-center" = center of the bottom face (mid X/Y, min Z). ' +
-    'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.',
+    'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin. ' +
+    'Orientation: pass EITHER rotation (Euler radians) OR axis [dx,dy,dz] = direction the local +Z (symmetry) axis should point in world space; axis wins when both are given and Euler angles are derived and stored.',
   params: z.object({
     ringRadius: z
       .number()
@@ -210,11 +218,20 @@ export const addTorus = defineCommand({
           'Should be less than ringRadius for a non-self-intersecting torus.',
       ),
     ...placedSolidFields('torus', 'center'),
+    axis: axisField(),
     position: positionField('The ring lies in the XY plane. '),
   }),
   run: (
     doc,
-    { ringRadius, tubeRadius, position = ORIGIN, rotation, color = DEFAULT_SOLID_COLOR, anchor },
+    {
+      ringRadius,
+      tubeRadius,
+      position = ORIGIN,
+      rotation,
+      axis,
+      color = DEFAULT_SOLID_COLOR,
+      anchor,
+    },
   ): CommandResult => {
     const rejected = rejectNonPositive(doc, 'add_torus', [
       ['ringRadius', ringRadius],
@@ -231,6 +248,7 @@ export const addTorus = defineCommand({
       anchor,
       position,
       rotation,
+      axis,
       color,
       describe: (id) =>
         `Added torus ${id} with ringRadius ${ringRadius} and tubeRadius ${tubeRadius}`,

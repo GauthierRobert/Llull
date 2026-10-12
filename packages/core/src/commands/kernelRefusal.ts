@@ -17,6 +17,15 @@ function recipeSteps(doc: Pick<CadDocument, 'recipes'>, step: FeatureStep): Feat
   return typeof name === 'string' ? (doc.recipes[name]?.steps ?? []) : [];
 }
 
+/** Commands a recorded `build_project` step (a loop plan) will run, nested loops included. */
+function plannedCommands(value: unknown): string[] {
+  if (Array.isArray(value)) return value.flatMap(plannedCommands);
+  if (value === null || typeof value !== 'object') return [];
+  const record = value as Record<string, unknown>;
+  const own = typeof record['command'] === 'string' ? [record['command']] : [];
+  return [...own, ...plannedCommands(record['actions']), ...plannedCommands(record['step'])];
+}
+
 /** Name of the first live step (recursing into recipes) that needs the kernel, else null. */
 function kernelStepIn(
   doc: Pick<CadDocument, 'recipes'>,
@@ -27,6 +36,12 @@ function kernelStepIn(
   for (const step of steps) {
     if (step.suppressed) continue;
     if (registry(step.name)?.annotations?.requiresKernel === true) return step.name;
+    if (step.name === 'build_project') {
+      const planned = plannedCommands(step.params).find(
+        (name) => registry(name)?.annotations?.requiresKernel === true,
+      );
+      if (planned !== undefined) return planned;
+    }
     if (depth < 8) {
       const nested = kernelStepIn(doc, recipeSteps(doc, step), registry, depth + 1);
       if (nested !== null) return nested;

@@ -1,7 +1,8 @@
 /**
  * glTF 2.0 document builder: one binary buffer holding vertex attributes and PNG images (each
  * view 4-byte aligned), with accessors, textures (one shared REPEAT sampler), materials, meshes and
- * root nodes. Used by the export scene (./gltfScene).
+ * nodes (roots, or children of empty parent nodes such as entity groups). Used by the export
+ * scene (./gltfScene).
  *
  * @layer core/commands
  * @pure
@@ -30,7 +31,8 @@ export class GltfBuilder {
   private readonly materials: Array<Record<string, unknown>> = [];
   private readonly materialIndex = new Map<string, number>();
   private readonly meshes: Array<Record<string, unknown>> = [];
-  private readonly nodes: Array<Record<string, unknown>> = [];
+  private readonly nodes: Array<Record<string, unknown> & { children?: number[] }> = [];
+  private readonly roots: number[] = [];
   private readonly extensionsUsed = new Set<string>();
 
   private view(bytes: Uint8Array, target?: number): number {
@@ -83,18 +85,39 @@ export class GltfBuilder {
     this.extensionsUsed.add(name);
   }
 
-  /** One triangle mesh + root node. */
+  /** Attach a new node under `parent` (a node index), or as a scene root. */
+  private attach(node: Record<string, unknown>, parent: number | undefined): number {
+    const index = this.nodes.push(node) - 1;
+    const owner = parent === undefined ? undefined : this.nodes[parent];
+    if (owner === undefined) this.roots.push(index);
+    else (owner.children ??= []).push(index);
+    return index;
+  }
+
+  /** An empty parent node (e.g. an entity group); returns its index. */
+  node(name: string, parent?: number): number {
+    return this.attach({ name }, parent);
+  }
+
+  /** One triangle mesh and its node (under `parent`, else a scene root). */
   mesh(
     name: string,
     attributes: Record<string, number>,
     material: number,
     extras: Record<string, unknown>,
+    parent?: number,
   ): void {
     this.meshes.push({ name, primitives: [{ attributes, mode: 4, material }] });
-    this.nodes.push({ name, mesh: this.meshes.length - 1, extras });
+    this.attach({ name, mesh: this.meshes.length - 1, extras }, parent);
   }
 
-  result(): { json: Record<string, unknown>; bin: Uint8Array } {
+  /** The glTF JSON (no buffer uri; empty lists omitted, as glTF requires) and its BIN payload. */
+  result(): {
+    json: Record<string, unknown>;
+    bin: Uint8Array;
+    nodeCount: number;
+    materialCount: number;
+  } {
     const bin = new Uint8Array(this.byteOffset);
     let offset = 0;
     for (const chunk of this.chunks) {
@@ -107,10 +130,10 @@ export class GltfBuilder {
         asset: { version: '2.0', generator: 'llull' },
         ...(this.extensionsUsed.size > 0 ? { extensionsUsed: [...this.extensionsUsed] } : {}),
         scene: 0,
-        scenes: [{ nodes: this.nodes.map((_, i) => i) }],
-        nodes: this.nodes,
-        meshes: this.meshes,
-        materials: this.materials,
+        scenes: [{ nodes: this.roots }],
+        ...(this.nodes.length > 0 ? { nodes: this.nodes } : {}),
+        ...(this.meshes.length > 0 ? { meshes: this.meshes } : {}),
+        ...(this.materials.length > 0 ? { materials: this.materials } : {}),
         ...(textured
           ? {
               images: this.images,
@@ -118,11 +141,13 @@ export class GltfBuilder {
               samplers: [{ magFilter: 9729, minFilter: 9987, wrapS: 10497, wrapT: 10497 }],
             }
           : {}),
-        accessors: this.accessors,
-        bufferViews: this.bufferViews,
-        buffers: [{ byteLength: bin.byteLength }],
+        ...(this.accessors.length > 0 ? { accessors: this.accessors } : {}),
+        ...(this.bufferViews.length > 0 ? { bufferViews: this.bufferViews } : {}),
+        ...(bin.byteLength > 0 ? { buffers: [{ byteLength: bin.byteLength }] } : {}),
       },
       bin,
+      nodeCount: this.nodes.length,
+      materialCount: this.materials.length,
     };
   }
 }

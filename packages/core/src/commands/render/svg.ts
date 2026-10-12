@@ -1,20 +1,28 @@
-import type { Vec3 } from '../../model/types';
+import type { ImageEntity, Vec3 } from '../../model/types';
 import { type Polygon3D } from './types';
 import { add3, scale3 } from '../../lib/vec3';
 import { type Camera, type Projector, makeProjector, shade } from './camera';
-
-export const MAX_POLYGONS = 4000;
+import { underlaySvg } from './underlays';
 
 /** Round to 2 decimals (SVG coordinates and labels). */
 export function r2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/** Wrap `layers` in a `width`×`height` SVG with the standard dark background. */
-export function svgDocument(width: number, height: number, layers: string[]): string {
+export const DEFAULT_BACKGROUND = '#1a1a2e';
+
+/** Wrap `layers` in a `width`×`height` SVG with `background` (a CSS color; `null` for none). */
+export function svgDocument(
+  width: number,
+  height: number,
+  layers: string[],
+  background: string | null = DEFAULT_BACKGROUND,
+): string {
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
-    `  <rect width="${width}" height="${height}" fill="#1a1a2e"/>`,
+    ...(background === null
+      ? []
+      : [`  <rect width="${width}" height="${height}" fill="${background}"/>`]),
     ...layers,
     '</svg>',
   ].join('\n');
@@ -38,28 +46,80 @@ export function svgDot(center: readonly [number, number], attributes: string): s
 /** Build the complete SVG string. */
 export function buildSvg(
   polygons: Polygon3D[],
+  underlays: readonly ImageEntity[],
   cam: Camera,
   orthoHalf: number,
   width: number,
   height: number,
   viewName: string,
   entityCount: number,
+  background: string | null = DEFAULT_BACKGROUND,
 ): string {
   const project = makeProjector(cam, orthoHalf, width, height);
   // Painter's algorithm: `depth` grows away from the camera, so draw farthest first so nearer
-  // faces paint on top. Strokes (2D) always draw on top.
+  // faces paint on top. Strokes (2D) always draw on top; image underlays sit below everything.
   const filled = polygons.filter((p) => !p.stroke).sort((a, b) => b.depth - a.depth);
   const stroked = polygons.filter((p) => p.stroke);
 
-  return svgDocument(width, height, [
-    buildGroundGrid(project, cam.target, orthoHalf),
-    ...[...filled, ...stroked].map((poly) => polygonSvg(poly, project)),
-    buildAxisTriad(project, cam.target, width, height, orthoHalf),
-    `  <text x="8" y="20" font-family="monospace" font-size="13" fill="#aaaacc">${viewName.toUpperCase()} | ${entityCount} entit${entityCount === 1 ? 'y' : 'ies'}</text>`,
-  ]);
+  const hasCap = filled.some((p) => p.loops !== undefined);
+  return svgDocument(
+    width,
+    height,
+    [
+      ...(hasCap ? [HATCH_PATTERN] : []),
+      buildGroundGrid(project, cam.target, orthoHalf),
+      ...underlays.map((image) => underlaySvg(image, project)),
+      ...[...filled, ...stroked].map((poly) => polygonSvg(poly, project)),
+      buildAxisTriad(project, cam.target, width, height, orthoHalf),
+      `  <text x="8" y="20" font-family="monospace" font-size="13" fill="#aaaacc">${viewName.toUpperCase()} | ${entityCount} entit${entityCount === 1 ? 'y' : 'ies'}</text>`,
+    ],
+    background,
+  );
+}
+
+const HATCH_PATTERN =
+  '  <defs><pattern id="llull-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">' +
+  '<line x1="0" y1="0" x2="0" y2="6" stroke="#000000" stroke-opacity="0.4" stroke-width="1"/></pattern></defs>';
+
+/** `#rrggbb` blended 45 % toward white, so a cut face reads brighter than the shaded body. */
+function lighten(color: string): string {
+  const hex = color.replace('#', '');
+  if (!/^[0-9a-fA-F]{6}$/.test(hex)) return color;
+  const channel = (i: number): number =>
+    Math.round(parseInt(hex.substring(i, i + 2), 16) * 0.55 + 255 * 0.45);
+  return `rgb(${channel(0)},${channel(2)},${channel(4)})`;
+}
+
+const screenPath = (loop: readonly Vec3[], project: Projector): string =>
+  'M' +
+  loop
+    .map((vertex) => {
+      const [sx, sy] = project(vertex);
+      return `${r2(sx)},${r2(sy)}`;
+    })
+    .join('L') +
+  'Z';
+
+/** Section cap: flat light fill with a dark outline and a diagonal hatch on top. */
+function capSvg(loops: readonly Vec3[][], color: string, project: Projector): string {
+  const d = loops.map((loop) => screenPath(loop, project)).join('');
+  return (
+    `  <path d="${d}" fill="${lighten(color)}" fill-rule="evenodd" stroke="#111111" stroke-width="1.2" stroke-linejoin="round"/>` +
+    `<path d="${d}" fill="url(#llull-hatch)" fill-rule="evenodd" stroke="none"/>`
+  );
+}
+
+/** Stroke width (px) that bridges the gaps left by decimating an entity by `ratio`. */
+function gapBridgeWidth(poly: Polygon3D, project: Projector): number {
+  const [a, b] = poly.verts;
+  if (!a || !b || !poly.inflate) return 0.5;
+  const [ax, ay] = project(a);
+  const [bx, by] = project(b);
+  return Math.min(4, 0.5 + (Math.sqrt(poly.inflate) - 1) * Math.hypot(ax - bx, ay - by));
 }
 
 function polygonSvg(poly: Polygon3D, project: Projector): string {
+  if (poly.loops) return capSvg(poly.loops, poly.color, project);
   const points = poly.verts
     .map((vertex) => {
       const [sx, sy] = project(vertex);
@@ -68,7 +128,11 @@ function polygonSvg(poly: Polygon3D, project: Projector): string {
     .join(' ');
   if (poly.stroke)
     return `  <polyline points="${points}" fill="none" stroke="${poly.color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`;
-  return `  <polygon points="${points}" fill="${shade(poly.normal, poly.color)}" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>`;
+  const fill = shade(poly.normal, poly.color);
+  if (poly.inflate) {
+    return `  <polygon points="${points}" fill="${fill}" stroke="${fill}" stroke-width="${r2(gapBridgeWidth(poly, project))}" stroke-linejoin="round"/>`;
+  }
+  return `  <polygon points="${points}" fill="${fill}" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>`;
 }
 
 /** A faint 5-line ground grid in the XY plane (Z=0), centred on the camera target. */

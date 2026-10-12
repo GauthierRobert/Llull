@@ -8,25 +8,22 @@
 import fs from 'fs';
 import path from 'path';
 import { execute } from '@core/commands/registry';
+import { defaultContext } from '@core/commands/context';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence/serialization';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
-
-/** One command outcome, the same shape whichever backend ran it. */
-export interface CliRunResult {
-  readonly summary: string;
-  readonly affected: readonly string[];
-  readonly isError: boolean;
-  /** The document was replaced (and saved, for a local backend not in dry-run). */
-  readonly changed: boolean;
-  readonly data?: unknown;
-}
+import type { StepObserver } from './progress';
+import type { ExchangeOptions } from '../pythonExchange';
+import { runLocalExchange } from './exchange';
+import type { CliRunResult } from './result';
 
 export interface CliBackend {
   /** Human label: the document path or the server URL. */
   readonly target: string;
   run(name: string, params: unknown): Promise<CliRunResult>;
+  /** An exchange tool (export_step, import_step, import_dwg, import_code). */
+  exchange(name: string, params: unknown): Promise<CliRunResult>;
   /** Step back one change (local: swap with the `.bak` copy; server: `POST /undo`). */
   undo(): Promise<CliRunResult>;
   /** Re-apply the undone change (local: the same swap; server: `POST /redo`). */
@@ -60,11 +57,51 @@ export function writeDocumentFile(docPath: string, doc: CadDocument): void {
 interface LocalOptions {
   /** Run and report, but never write the document file. */
   readonly dryRun: boolean;
+  /** Watches `build_project` steps: progress lines, per-step timing, the `--timeout` deadline. */
+  readonly observer?: StepObserver;
+  /** Python / DWG ports for the exchange tools, created on first use. */
+  readonly exchangeOptions: () => ExchangeOptions;
 }
 
 /** Offline backend over a document file: load, `execute`, save when the document changed. */
 export function createLocalBackend(docPath: string, options: LocalOptions): CliBackend {
   let doc: CadDocument | null = null;
+  const currentDoc = (): CadDocument => {
+    doc ??= readDocumentFile(docPath);
+    return doc;
+  };
+  const runCommand = (name: string, params: unknown): CliRunResult => {
+    try {
+      const prior = currentDoc();
+      const result = execute(
+        prior,
+        name,
+        params,
+        options.observer !== undefined
+          ? { ...defaultContext(), onStep: options.observer.onStep }
+          : undefined,
+      );
+      const changed = result.document !== prior;
+      doc = result.document;
+      if (changed && !options.dryRun) writeDocumentFile(docPath, result.document);
+      return {
+        summary: result.summary,
+        affected: result.affected,
+        isError: result.rejected === true,
+        changed,
+        ...(result.data !== undefined
+          ? { data: options.observer?.withDurations(result.data) ?? result.data }
+          : {}),
+      };
+    } catch (error) {
+      return {
+        summary: `Command ${name} failed: ${errorMessage(error)}`,
+        affected: [],
+        isError: true,
+        changed: false,
+      };
+    }
+  };
   const swapWithBackup = (label: string): Promise<CliRunResult> => {
     const backup = backupPathOf(docPath);
     if (!fs.existsSync(backup)) {
@@ -92,29 +129,13 @@ export function createLocalBackend(docPath: string, options: LocalOptions): CliB
   };
   return {
     target: docPath,
-    run(name, params) {
-      try {
-        const prior = doc ?? readDocumentFile(docPath);
-        const result = execute(prior, name, params);
-        const changed = result.document !== prior;
-        doc = result.document;
-        if (changed && !options.dryRun) writeDocumentFile(docPath, result.document);
-        return Promise.resolve({
-          summary: result.summary,
-          affected: result.affected,
-          isError: result.rejected === true,
-          changed,
-          ...(result.data !== undefined ? { data: result.data } : {}),
-        });
-      } catch (error) {
-        return Promise.resolve({
-          summary: `Command ${name} failed: ${errorMessage(error)}`,
-          affected: [],
-          isError: true,
-          changed: false,
-        });
-      }
-    },
+    run: (name, params) => Promise.resolve(runCommand(name, params)),
+    exchange: (name, params) =>
+      runLocalExchange(name, params, {
+        options: options.exchangeOptions(),
+        getDoc: currentDoc,
+        runCommand,
+      }),
     undo: () => swapWithBackup('undo'),
     redo: () => swapWithBackup('redo'),
   };
@@ -150,6 +171,8 @@ const REMOTE_TIMEOUT_MS = 120_000;
 
 interface RemoteOptions {
   readonly token: string | undefined;
+  /** `--timeout` in seconds: how long one call may take (default 120 s). */
+  readonly timeoutSeconds?: number;
   /** Injected for tests; the global `fetch` otherwise. */
   readonly fetchImpl?: FetchLike;
 }
@@ -157,6 +180,8 @@ interface RemoteOptions {
 /** Backend over a running llull server: every call goes through its command bus (shared history). */
 export function createRemoteBackend(serverUrl: string, options: RemoteOptions): CliBackend {
   const base = serverUrl.replace(/\/+$/, '');
+  const timeoutMs =
+    options.timeoutSeconds !== undefined ? options.timeoutSeconds * 1000 : REMOTE_TIMEOUT_MS;
   const fetchImpl: FetchLike = options.fetchImpl ?? ((url, init) => fetch(url, init));
   const post = async (route: string, body: unknown): Promise<CliRunResult> => {
     try {
@@ -167,7 +192,7 @@ export function createRemoteBackend(serverUrl: string, options: RemoteOptions): 
           ...(options.token !== undefined ? { Authorization: `Bearer ${options.token}` } : {}),
         },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(REMOTE_TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMs),
       });
       const text = await response.text();
       let parsed: unknown = null;
@@ -178,6 +203,14 @@ export function createRemoteBackend(serverUrl: string, options: RemoteOptions): 
       }
       return resultOfBody(parsed, response.status);
     } catch (error) {
+      if (error instanceof Error && error.name === 'TimeoutError') {
+        return {
+          summary: `Timed out after ${timeoutMs / 1000}s waiting for the llull server at ${base}${options.timeoutSeconds !== undefined ? ' (--timeout)' : ''}; the server may still be running the command.`,
+          affected: [],
+          isError: true,
+          changed: false,
+        };
+      }
       return {
         summary: `Cannot reach the llull server at ${base}: ${errorMessage(error)} (start it with npm --prefix server run dev, or drop --server to work on a local file).`,
         affected: [],
@@ -189,6 +222,7 @@ export function createRemoteBackend(serverUrl: string, options: RemoteOptions): 
   return {
     target: base,
     run: (name, params) => post('/command', { name, params }),
+    exchange: (name, params) => post('/exchange', { name, params }),
     undo: () => post('/undo', {}),
     redo: () => post('/redo', {}),
   };

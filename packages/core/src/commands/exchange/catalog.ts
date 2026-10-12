@@ -2,7 +2,8 @@
 
 import { commandCatalog } from '../schema';
 import { exportStl } from './exportStl';
-import { exportObj, exportGltf } from './exportFormats';
+import { exportObj } from './exportFormats';
+import { exportGltf } from './exportGltf';
 import { exportCode } from './exportCode';
 import { applyCodeTrace } from './codeTrace';
 import { importMesh } from './importMesh';

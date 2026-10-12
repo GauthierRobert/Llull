@@ -41,6 +41,7 @@ The server binds to `127.0.0.1:3001` by default (local tool; not reachable from 
 | GET    | /export/stl    | Download the live model as STL                                                                                                                                                                                                                                                                                                                                                |
 | GET    | /export/code   | Download the model as parametric code (`?language=cadquery\|build123d\|openscad\|freecad`)                                                                                                                                                                                                                                                                                    |
 | GET    | /export/step   | Download an exact B-rep STEP file (needs the Python bridge; 503 otherwise)                                                                                                                                                                                                                                                                                                    |
+| POST   | /exchange      | Run an exchange tool `{ name, params }` (`export_step`, `import_step`, `import_dwg`, `import_code`) on the shared document: the MCP handlers for REST callers (the CLI with `--app` / `--server`). Answers `{ summary, affected, isError, data?, changed }`                                                                                                                    |
 
 ---
 
@@ -221,7 +222,9 @@ node server/bin/llull.cjs add_box size=[10,10,10] --doc part.llull.json
 node server/bin/llull.cjs run plan.json --validate   # build_project plan file (then without --validate)
 node server/bin/llull.cjs export_stl format=binary --save out/part.stl
 node server/bin/llull.cjs render_view --save view.png
+node server/bin/llull.cjs import_step file=part.step --doc part.llull   # exchange tools too (Python bridge)
 node server/bin/llull.cjs add_box size=[1,1,1] --server http://localhost:3001 --token $LLULL_TOKEN
+node server/bin/llull.cjs add_box size=[1,1,1] --app                    # the running desktop app
 ```
 
 `server/bin/llull.cjs` bundles `src/cli/bin.ts` with esbuild into `dist/llull-cli.cjs` when a source

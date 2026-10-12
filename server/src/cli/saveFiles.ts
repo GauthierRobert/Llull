@@ -2,7 +2,7 @@
  * @layer server
  * `--save`: write the file(s) a command returned in `data` to disk. Generic over every export /
  * render command — no per-command code — by reading the payload conventions they share:
- * `files[]` ({ name|fileName, content|text }), base64 (`stlBase64`, `base64`) or text
+ * `files[]` ({ name|fileName, content|text }), base64 (`stlBase64`, `stepBase64`, `base64`) or text
  * (`text`, `step`, `stl`, `ifc`, `svg`). A `.png` target rasterizes `data.svg`.
  */
 
@@ -17,7 +17,7 @@ export interface OutputFile {
   readonly bytes: Buffer;
 }
 
-const BASE64_KEYS = ['stlBase64', 'base64'] as const;
+const BASE64_KEYS = ['stlBase64', 'stepBase64', 'base64'] as const;
 const TEXT_KEYS = ['text', 'step', 'stl', 'ifc', 'svg', 'content'] as const;
 
 function stringField(record: Record<string, unknown>, key: string): string | undefined {
