@@ -1,7 +1,22 @@
 import type { Vec3 } from '../model/vectors';
+import { isFiniteNumber } from './isFiniteNumber';
+
+/** @pure true for an exact-length-3 array of finite numbers */
+export function isVec3(value: unknown): value is Vec3 {
+  return Array.isArray(value) && value.length === 3 && value.every(isFiniteNumber);
+}
 
 /** The world origin `[0, 0, 0]`. */
 export const ORIGIN: Vec3 = Object.freeze<Vec3>([0, 0, 0]);
+
+/** @pure vertex average of `points` (`[0, 0, 0]` when empty) */
+export function centroid3(points: readonly Vec3[]): Vec3 {
+  if (points.length === 0) return [0, 0, 0];
+  return scale3(
+    points.reduce<Vec3>((sum, p) => add3(sum, p), [0, 0, 0]),
+    1 / points.length,
+  );
+}
 
 /** @pure component-wise a + b */
 export function add3(a: Vec3, b: Vec3): Vec3 {

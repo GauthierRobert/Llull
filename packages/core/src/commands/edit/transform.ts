@@ -12,7 +12,7 @@ import { changed, noop } from '../noop';
 import { nextId } from '../../lib/id';
 import { MAX_COPIES_PER_COMMAND } from '../limits';
 import { scaleGeometry } from '../../geometry/scaleGeometry';
-import { add3, scale3, sub3 } from '../../lib/vec3';
+import { add3, isVec3, scale3, sub3 } from '../../lib/vec3';
 import {
   applyMat3,
   eulerFromMat,
@@ -28,11 +28,6 @@ const arrayCountField = z
   .number()
   .int()
   .describe('Total number of instances including the original. Must be an integer >= 2.');
-
-/** True for exactly three finite numbers (looseVec3 params are unchecked at the schema level). */
-function isFiniteVec3(v: readonly number[]): boolean {
-  return v.length === 3 && v.every(Number.isFinite);
-}
 
 /**
  * @command rotate_entity
@@ -54,10 +49,10 @@ export const rotateEntity = defineCommand({
   run: (doc, { id, delta }): CommandResult => {
     const target = doc.entities[id];
     if (!target) return noop(doc, `No entity ${id} to rotate.`);
-    if (!isFiniteVec3(delta)) {
+    if (!isVec3(delta)) {
       return noop(
         doc,
-        `rotate_entity: delta must be 3 finite numbers [dRx, dRy, dRz] (got [${delta.join(', ')}]); entity ${id} unchanged.`,
+        `rotate_entity: delta must be 3 finite numbers [dRx, dRy, dRz] (got [${(delta as readonly number[]).join(', ')}]); entity ${id} unchanged.`,
       );
     }
     const rotated: Entity = { ...target, rotation: add3(target.rotation, delta) };
@@ -195,10 +190,10 @@ export const arrayLinear = defineCommand({
         `array_linear: count must be an integer in [2, ${MAX_COPIES_PER_COMMAND}] (got ${count}); entity ${id} unchanged.`,
       );
     }
-    if (!isFiniteVec3(offset)) {
+    if (!isVec3(offset)) {
       return noop(
         doc,
-        `array_linear: offset must be 3 finite numbers [dx, dy, dz] (got [${offset.join(', ')}]); entity ${id} unchanged.`,
+        `array_linear: offset must be 3 finite numbers [dx, dy, dz] (got [${(offset as readonly number[]).join(', ')}]); entity ${id} unchanged.`,
       );
     }
     const { document, newIds } = addCopies(
@@ -262,7 +257,7 @@ export const arrayPolar = defineCommand({
         `array_polar: count must be an integer in [2, ${MAX_COPIES_PER_COMMAND}] (got ${count}); entity ${id} unchanged.`,
       );
     }
-    if (!isFiniteVec3(center) || !Number.isFinite(angle)) {
+    if (!isVec3(center) || !Number.isFinite(angle)) {
       return noop(
         doc,
         `array_polar: center must be 3 finite numbers and angle finite (got center [${center.join(', ')}], angle ${angle}); entity ${id} unchanged.`,

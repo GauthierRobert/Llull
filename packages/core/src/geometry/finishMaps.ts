@@ -7,6 +7,7 @@
  */
 
 import type { FinishPattern, Material } from '../model/types';
+import { parseHexRgb } from '../lib/isHexColor';
 
 /** Texture tile edge in pixels. */
 export const FINISH_TEXTURE_SIZE = 256;
@@ -34,13 +35,7 @@ interface Sample {
 }
 
 function hexRgb(hex: string): Rgb {
-  const match = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex.trim());
-  if (match === null) return [128, 128, 128];
-  return [
-    parseInt(match[1] as string, 16),
-    parseInt(match[2] as string, 16),
-    parseInt(match[3] as string, 16),
-  ];
+  return parseHexRgb(hex) ?? [128, 128, 128];
 }
 
 /** Integer hash → [0, 1) (deterministic, tileable when the inputs wrap). */

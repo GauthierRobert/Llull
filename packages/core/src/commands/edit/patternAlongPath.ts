@@ -13,7 +13,7 @@ import type { CommandResult } from '../types';
 import { defineCommand, looseVec3, untypedArray, z } from '../schema';
 import { changed, noop } from '../noop';
 import { MAX_COPIES_PER_COMMAND, MAX_PROFILE_POINTS } from '../limits';
-import { add3, cross3, scale3, ORIGIN } from '../../lib/vec3';
+import { add3, cross3, isVec3, scale3, ORIGIN } from '../../lib/vec3';
 import { composeEulerXYZ, eulerFromAxes } from '../../lib/eulerRotation';
 import {
   catmullRomBeziers,
@@ -26,9 +26,6 @@ import { sketchPath } from '../solids/sketchCurves';
 import { instanceEntity } from '../assembly/assemblies';
 import { arcPath, type ArcSpec } from './arcPath';
 import { addCopies } from './transform';
-
-const isVec3 = (value: unknown): value is Vec3 =>
-  Array.isArray(value) && value.length === 3 && value.every(Number.isFinite);
 
 interface PathSource {
   readonly path: ReadonlyArray<unknown> | undefined;

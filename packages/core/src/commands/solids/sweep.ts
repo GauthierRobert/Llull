@@ -4,7 +4,7 @@ import type { CommandResult } from '../types';
 import { colorField, defineCommand, untypedArray, z, layerIdField } from '../schema';
 import { noop } from '../noop';
 import { isVec2 } from '../../lib/vec2';
-import { sub3 } from '../../lib/vec3';
+import { isVec3, sub3 } from '../../lib/vec3';
 import { polygonArea } from '../../lib/polygon';
 import { newEntity } from '../entity/newEntity';
 import {
@@ -34,9 +34,6 @@ import {
 
 /** Default bend radius as a multiple of the section half-size (a long-radius pipe elbow). */
 const DEFAULT_BEND_FACTOR = 3;
-
-const isVec3 = (value: unknown): value is Vec3 =>
-  Array.isArray(value) && value.length === 3 && value.every(Number.isFinite);
 
 /** Section and its half-size (largest distance from the path), or an error message. */
 function resolveSection(

@@ -9,8 +9,8 @@
 import type { Decal, Vec3 } from '../model/types';
 import { add3, cross3, dot3, normalize3, scale3, sub3 } from '../lib/vec3';
 import { facetNormal } from './tessellation';
-
-type Triangle = readonly [Vec3, Vec3, Vec3];
+import { edgeCrossing, forEachEdge } from './planeEdges';
+import type { Triangle } from './triangles';
 
 /** Decal projector axes: x along the text, y up the text, z = outward normal. */
 export function decalAxes(decal: Pick<Decal, 'normal' | 'angle'>): { x: Vec3; y: Vec3; z: Vec3 } {
@@ -25,13 +25,11 @@ export function decalAxes(decal: Pick<Decal, 'normal' | 'angle'>): { x: Vec3; y:
 
 /** Clip a convex polygon (projector coordinates) to `coordinate[axis] * sign <= limit`. */
 function clip(polygon: Vec3[], axis: 0 | 1 | 2, sign: 1 | -1, limit: number): Vec3[] {
+  const normal: Vec3 = [axis === 0 ? sign : 0, axis === 1 ? sign : 0, axis === 2 ? sign : 0];
   const out: Vec3[] = [];
-  polygon.forEach((a, i) => {
-    const b = polygon[(i + 1) % polygon.length] as Vec3;
-    const da = a[axis] * sign - limit;
-    const db = b[axis] * sign - limit;
+  forEachEdge(polygon, { normal, offset: limit }, (a, b, da, db) => {
     if (da <= 0) out.push(a);
-    if (da * db < 0) out.push(add3(a, scale3(sub3(b, a), da / (da - db))));
+    if (da * db < 0) out.push(edgeCrossing(a, b, da, db));
   });
   return out;
 }

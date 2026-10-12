@@ -15,6 +15,7 @@ import { decalPatch } from '../../geometry/decal';
 import { rasterizeText } from '../../lib/blockFont';
 import { applyEulerXYZ } from '../../lib/eulerRotation';
 import { add3 } from '../../lib/vec3';
+import { parseHexRgb } from '../../lib/isHexColor';
 import { boxUv, finishMaps } from '../../geometry/finishMaps';
 import { encodePng } from '../../lib/png';
 import { GltfBuilder } from './gltfBuilder';
@@ -152,11 +153,14 @@ function srgbToLinear(c: number): number {
 
 /** `#rrggbb` → linear RGBA factor; malformed input falls back to mid grey. */
 export function linearColorFactor(hex: string): [number, number, number, number] {
-  const match = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex.trim());
-  if (match === null) return [0.214, 0.214, 0.214, 1];
-  const channel = (index: number): number =>
-    Number(srgbToLinear(parseInt(match[index] as string, 16) / 255).toFixed(4));
-  return [channel(1), channel(2), channel(3), 1];
+  const rgb = parseHexRgb(hex);
+  if (rgb === null) return [0.214, 0.214, 0.214, 1];
+  const [r, g, b] = rgb.map((c) => Number(srgbToLinear(c / 255).toFixed(4))) as [
+    number,
+    number,
+    number,
+  ];
+  return [r, g, b, 1];
 }
 
 /**

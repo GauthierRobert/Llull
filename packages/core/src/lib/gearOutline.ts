@@ -175,12 +175,34 @@ export function toothOutline(pattern: ToothPattern): Point2[] {
   return toothProfile(pattern).points;
 }
 
-/** Circle polygon of `segments` points, CCW, first point at angle 0. */
-export function circleOutline(radius: number, segments: number): Point2[] {
-  return Array.from({ length: segments }, (_, i): Point2 => {
-    const a = (2 * Math.PI * i) / segments;
-    return [radius * Math.cos(a), radius * Math.sin(a)];
-  });
+/** Tip/root radii (as pitch radius + `tip`·m / − `root`·m) and backlash direction of a pattern. */
+interface PatternDepths {
+  readonly tip: number;
+  readonly root: number;
+  /** −1 thins the teeth (external gear), +1 widens the spaces (internal ring cavity). */
+  readonly backlashSign: -1 | 1;
+}
+
+function gearPattern(
+  mod: number,
+  teeth: number,
+  pressureAngle: number,
+  flankSamples: number,
+  phase: number,
+  { tip, root, backlashSign }: PatternDepths,
+): ToothPattern {
+  const pitchRadius = (mod * teeth) / 2;
+  return {
+    teeth,
+    baseRadius: pitchRadius * Math.cos(pressureAngle),
+    tipRadius: pitchRadius + tip * mod,
+    rootRadius: pitchRadius - root * mod,
+    refRadius: pitchRadius,
+    halfAngleAtRef:
+      Math.PI / (2 * teeth) + (backlashSign * (BACKLASH_PER_MODULE * mod)) / (4 * pitchRadius),
+    flankSamples,
+    phase,
+  };
 }
 
 /** Standard full-depth (addendum m, dedendum 1.25m) external tooth pattern of module `mod`. */
@@ -191,17 +213,11 @@ export function externalGearPattern(
   flankSamples: number,
   phase = 0,
 ): ToothPattern {
-  const pitchRadius = (mod * teeth) / 2;
-  return {
-    teeth,
-    baseRadius: pitchRadius * Math.cos(pressureAngle),
-    tipRadius: pitchRadius + mod,
-    rootRadius: pitchRadius - 1.25 * mod,
-    refRadius: pitchRadius,
-    halfAngleAtRef: Math.PI / (2 * teeth) - (BACKLASH_PER_MODULE * mod) / (4 * pitchRadius),
-    flankSamples,
-    phase,
-  };
+  return gearPattern(mod, teeth, pressureAngle, flankSamples, phase, {
+    tip: 1,
+    root: 1.25,
+    backlashSign: -1,
+  });
 }
 
 /**
@@ -216,15 +232,9 @@ export function internalCavityPattern(
   flankSamples: number,
   phase = 0,
 ): ToothPattern {
-  const pitchRadius = (mod * teeth) / 2;
-  return {
-    teeth,
-    baseRadius: pitchRadius * Math.cos(pressureAngle),
-    tipRadius: pitchRadius + 1.25 * mod,
-    rootRadius: pitchRadius - mod,
-    refRadius: pitchRadius,
-    halfAngleAtRef: Math.PI / (2 * teeth) + (BACKLASH_PER_MODULE * mod) / (4 * pitchRadius),
-    flankSamples,
-    phase,
-  };
+  return gearPattern(mod, teeth, pressureAngle, flankSamples, phase, {
+    tip: 1.25,
+    root: 1,
+    backlashSign: 1,
+  });
 }

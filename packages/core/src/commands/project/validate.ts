@@ -14,7 +14,15 @@ import { evaluateExpression, parameterValues } from '../parametric/expression';
 import { getCommand } from '../commandTable';
 import { MAX_LOOP_ITERATIONS } from '../limits';
 import { isLoopNode, resolveLoopHeader } from './loopHeader';
-import { REF, interpolate, isForEachStep, isPlanAction, isRepeatStep } from './resolve';
+import {
+  REF,
+  evaluateLeafExpression,
+  fillPlaceholders,
+  interpolate,
+  isForEachStep,
+  isPlanAction,
+  isRepeatStep,
+} from './resolve';
 import { type ActionItem, type LoopNode } from './types';
 import { mapStringLeaves } from '../history/regenerate';
 
@@ -37,20 +45,17 @@ function findParamIssue(
   let first: string | null = null;
   mapStringLeaves(value, (raw) => {
     if (first !== null) return raw;
-    let text = raw;
-    if (text.startsWith('$') && text.includes('{')) {
-      const filled = interpolate(text, env);
-      if (filled.error !== null) {
-        first = filled.error;
-        return raw;
-      }
-      text = filled.text;
+    const filled = fillPlaceholders(raw, env);
+    if (filled.error !== null) {
+      first = filled.error;
+      return raw;
     }
+    const text = filled.text;
     const ref = REF.exec(text);
     if (ref?.[1] !== undefined) {
       if (!defined.has(ref[1])) first = `references undefined alias $${ref[1]}`;
     } else if (text.startsWith('=')) {
-      const r = evaluateExpression(text.slice(1).replace(/\$([A-Za-z_]\w*)/g, '$1'), env);
+      const r = evaluateLeafExpression(text, env).result;
       if (!r.ok) first = `expression "${text.slice(1)}": ${r.error}`;
     }
     return raw;

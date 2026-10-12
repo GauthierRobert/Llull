@@ -18,6 +18,8 @@ import {
 } from '../model/types';
 import { hashText } from '../lib/hash';
 import { isRecord } from '../lib/isRecord';
+import { isFiniteNumber } from '../lib/isFiniteNumber';
+import { isVec3 } from '../lib/vec3';
 
 const PRESENTATION_FIELDS = new Set(['id', 'name', 'color', 'layerId', 'tags', 'materialId']);
 
@@ -93,9 +95,6 @@ export function meshRecipeOf(entity: Entity): ShapeRecipe | null {
 /** Max nesting accepted from a loaded document (a deeper tree is rejected, not evaluated). */
 const MAX_RECIPE_DEPTH = 256;
 
-const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
-const vec3Ok = (v: unknown): boolean => Array.isArray(v) && v.length === 3 && v.every(finite);
-
 /** Checks one leaf entity of an untrusted recipe; returns an error text or null. */
 export type LeafValidator = (entity: Record<string, unknown>) => string | null;
 
@@ -111,7 +110,7 @@ function leafError(entity: Record<string, unknown>, validateLeaf: LeafValidator)
   if (kind === 'mesh') {
     const mesh = entity['mesh'];
     const positions = isRecord(mesh) ? mesh['positions'] : undefined;
-    if (!Array.isArray(positions) || positions.length % 3 !== 0 || !positions.every(finite))
+    if (!Array.isArray(positions) || positions.length % 3 !== 0 || !positions.every(isFiniteNumber))
       return 'mesh leaf positions must be finite xyz triples';
     if (!isIndexArray(isRecord(mesh) ? mesh['indices'] : undefined, positions.length / 3))
       return 'mesh leaf indices must be integers within the vertex range';
@@ -139,17 +138,18 @@ function nodeError(
       const edges = node['edges'];
       if (!Array.isArray(edges) || !edges.every((e) => Number.isInteger(e) && (e as number) >= 0))
         return `${String(node['op'])}: edges must be non-negative integers`;
-      if (!finite(node['size']) || node['size'] <= 0)
+      if (!isFiniteNumber(node['size']) || node['size'] <= 0)
         return `${String(node['op'])}: size must be > 0`;
       const sizeEnd = node['sizeEnd'];
-      if (sizeEnd !== undefined && (!finite(sizeEnd) || sizeEnd <= 0))
+      if (sizeEnd !== undefined && (!isFiniteNumber(sizeEnd) || sizeEnd <= 0))
         return `${String(node['op'])}: sizeEnd must be > 0`;
       return child(node['source']);
     }
     case 'blend': {
       const sources = node['sources'];
       if (!Array.isArray(sources) || sources.length < 2) return 'blend: needs >= 2 sources';
-      if (!finite(node['radius']) || node['radius'] <= 0) return 'blend: radius must be > 0';
+      if (!isFiniteNumber(node['radius']) || node['radius'] <= 0)
+        return 'blend: radius must be > 0';
       for (const source of sources) {
         const problem = child(source);
         if (problem !== null) return problem;
@@ -157,15 +157,16 @@ function nodeError(
       return null;
     }
     case 'shell':
-      if (!finite(node['thickness']) || node['thickness'] <= 0)
+      if (!isFiniteNumber(node['thickness']) || node['thickness'] <= 0)
         return 'shell: thickness must be > 0';
       return child(node['source']);
     case 'place':
-      if (!vec3Ok(node['position']) || !vec3Ok(node['rotation']))
+      if (!isVec3(node['position']) || !isVec3(node['rotation']))
         return 'place: position and rotation must be finite Vec3';
       return child(node['source']);
     case 'scale':
-      if (!finite(node['factor']) || node['factor'] <= 0) return 'scale: factor must be > 0';
+      if (!isFiniteNumber(node['factor']) || node['factor'] <= 0)
+        return 'scale: factor must be > 0';
       return child(node['source']);
     default:
       return `unknown recipe op '${String(node['op'])}'`;
