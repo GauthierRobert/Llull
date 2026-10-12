@@ -6,11 +6,12 @@
  */
 
 import type { Feature, FeatureProgram, Term } from './program';
+import { significantNumber } from '../lib/compactNumber';
 
 /** Shortest faithful decimal for a coordinate (12 significant digits, no `-0`). */
 export function formatNumber(value: number): string {
   if (!Number.isFinite(value) || Math.abs(value) < 1e-12) return '0';
-  return String(Number(value.toPrecision(12)));
+  return significantNumber(value, 12);
 }
 
 /** A term's source: its parameter expression when bound, otherwise the literal number. */
@@ -22,7 +23,7 @@ export function formatTerm(term: Term): string {
 export function formatDegrees(term: Term, piName: string): string {
   if (term.expression !== undefined) return `(${term.expression}) * 180 / ${piName}`;
   const degrees = (term.value * 180) / Math.PI;
-  return Math.abs(degrees) < 1e-12 ? '0' : String(Number(degrees.toPrecision(15)));
+  return Math.abs(degrees) < 1e-12 ? '0' : significantNumber(degrees, 15);
 }
 
 /** `# ── TITLE ───…` comment rule, padded to 66 columns. */

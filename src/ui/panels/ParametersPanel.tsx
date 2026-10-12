@@ -11,6 +11,7 @@ import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
 import type { Parameter } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
+import { significantNumber } from '@lib/compactNumber';
 import { PanelEmpty, PanelHeader, IconButton } from '@ui/panels/PanelParts';
 
 interface ParameterRowProps {
@@ -66,7 +67,7 @@ function ParameterRow({ param }: ParameterRowProps): React.ReactElement {
       />
 
       <span className="param-value" aria-label={`Value of ${param.name}`}>
-        {hasError ? '—' : String(parseFloat(param.value.toPrecision(6)))}
+        {hasError ? '—' : significantNumber(param.value, 6)}
       </span>
 
       <IconButton
