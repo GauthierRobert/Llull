@@ -85,7 +85,8 @@ export function scaleGeometry(e: Entity, f: number): { scaled: Entity; dims: str
         dims: `new center [${center.join(', ')}] radius ${radius}`,
       };
     }
-    case 'rectangle': {
+    case 'rectangle':
+    case 'image': {
       const width = e.width * f;
       const height = e.height * f;
       return { scaled: { ...e, width, height }, dims: `new size ${width}×${height}` };

@@ -16,7 +16,7 @@ describe('export_obj units label', () => {
     const lines = objText('mm\nv 9 9 9\r\nf 1 2 3').split('\n');
     expect(lines[0]).toBe('# llull OBJ export — units: mm v 9 9 9 f 1 2 3');
     expect(lines).not.toContain('v 9 9 9');
-    expect(lines[1]).toBe('o llull_export');
+    expect(lines[1]).toBe(`o ${doc.order[0]}`);
   });
 
   it('falls back to the document units for a blank label', () => {

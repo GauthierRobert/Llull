@@ -10,6 +10,7 @@ import { noop } from '../noop';
 import { compactNumber } from '../../lib/compactNumber';
 import { isVec2 } from '../../lib/vec2';
 import { polygonArea, polygonPerimeter } from '../../lib/polygon';
+import { eulerFromAxis } from '../../lib/axisRotation';
 
 /** `entity` with its position offset by `delta` (the one translation used by every move command). */
 export function translated(entity: Entity, delta: Vec3): Entity {
@@ -158,6 +159,35 @@ export function placedSolidFields(
   return { position: positionField(), anchor, rotation, color: colorField(DEFAULT_SOLID_COLOR) };
 }
 
+/** `axis` param of a placed primitive: direction of the primitive's local +Z (its symmetry axis). */
+export function axisField(
+  what = 'the primitive local +Z axis (its symmetry axis)',
+): z.ZodOptional<z.ZodCatch<z.ZodType<Vec3>>> {
+  return tolerant(
+    looseVec3(
+      `Optional direction [dx, dy, dz] (any non-zero length, normalized) that ${what} points along ` +
+        'in world space, e.g. [1, 0, 0] lays it along +X. When given it OVERRIDES rotation (the ' +
+        'rotation param is ignored and the resolved Euler angles are stored). A zero-length or ' +
+        'malformed axis is rejected as a no-op.',
+    ),
+  ).optional();
+}
+
+/**
+ * Stored rotation for a command with both `axis` and `rotation` params: a given `axis` wins.
+ * `error` is set (and rotation is absent) when `axis` was supplied but is zero-length/malformed.
+ */
+export function resolveRotation(
+  axis: unknown,
+  rotation: unknown,
+): { readonly rotation: Vec3; readonly error?: undefined } | { readonly error: string } {
+  if (axis === undefined) return { rotation: finiteVec3OrZero(rotation) };
+  const euler = eulerFromAxis(axis);
+  return euler
+    ? { rotation: euler }
+    : { error: `axis must be 3 finite numbers with non-zero length, got ${JSON.stringify(axis)}` };
+}
+
 /**
  * Reject non-finite or non-positive named dimensions: returns the failing no-op result, or `null`
  * when every value is finite and > 0. Checked in order.
@@ -245,10 +275,13 @@ export function placeSolid<K extends Entity['kind']>(
     readonly anchor: unknown;
     readonly position: Vec3;
     readonly rotation: unknown;
+    readonly axis?: unknown;
     readonly color: string;
     readonly describe: (id: string) => string;
   },
 ): CommandResult {
+  const resolved = resolveRotation(spec.axis, spec.rotation);
+  if (resolved.error !== undefined) return noop(doc, `Add ${spec.kind} failed: ${resolved.error}.`);
   const storedPosition = resolvePosition(
     spec.halfExtents,
     spec.defaultAnchor,
@@ -257,7 +290,7 @@ export function placeSolid<K extends Entity['kind']>(
   );
   const id = nextId(spec.idPrefix);
   const entity = newEntity(spec.kind, id, spec.geometry, storedPosition, spec.color, {
-    rotation: finiteVec3OrZero(spec.rotation),
+    rotation: resolved.rotation,
   });
   return commitSolid(doc, entity, spec.describe(id));
 }

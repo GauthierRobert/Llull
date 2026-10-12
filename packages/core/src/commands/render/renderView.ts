@@ -8,10 +8,13 @@
  */
 
 import type { CommandResult } from '../types';
-import { defineCommand, z } from '../schema';
+import { defineCommand, vec3, z } from '../schema';
+import { escapeXml } from '../../lib/escapeXml';
 import type { ViewName } from './camera';
 import { renderDocument } from './scene';
 import { composeOverlays } from './overlays';
+import { appendBeforeClose } from './svg';
+import { renderNotes, resolveRenderOptions } from './options';
 import { buildTurntableSvg, buildIsolateSvg, buildSectionSvg } from './multiPass';
 import { report } from '../noop';
 
@@ -39,6 +42,12 @@ export const renderView = defineCommand({
     '"left", or "right" (all orthographic). ' +
     'Adjust `width`/`height` (pixels, clamped to [64, 2000], default 800×600) for resolution. ' +
     'The SVG uses flat Lambertian shading on 3D solids and stroked paths for 2D shapes. ' +
+    'Camera: `zoom` (>1 magnifies), `direction` ([x,y,z] vector from the scene toward the camera, overrides `view`), ' +
+    '`target` (point to look at). `title` draws text top-left, `background` sets the image color. ' +
+    'Cutaway: `cut` clips solids (triangles are split, not dropped) and draws the section as a hatched cap, ' +
+    'e.g. remove the quadrant x>0,y<0 with planes [{normal:[1,0,0],offset:0},{normal:[0,-1,0],offset:0}] and mode "intersection". ' +
+    'Large scenes are never silently truncated: the polygon budget (`maxPolygons`) is shared fairly between entities, ' +
+    'and `data.simplifiedEntityIds` / `data.skippedEntityIds` / `data.polygonCount` report what was reduced. ' +
     'Enrichments: turntable (multi-frame strip), isolate (highlight entities), section (cut-plane view), ' +
     'showDimensions (bbox labels), showAxes (world triad, default on), showGrid (ground grid, default on), ' +
     'showLabels (entity id/name labels + key-point markers, default off). ' +
@@ -93,6 +102,66 @@ export const renderView = defineCommand({
         'Render a section-plane view: entities on the negative side of the cut plane are dimmed; ' +
           'a colored dashed line marks the cut. axis: "x"|"y"|"z"; offset: world-space position of the plane.',
       ),
+    zoom: z
+      .number()
+      .optional()
+      .describe(
+        'Magnification of the framed scene, clamped to [0.1, 50]. 1 (default) fits the whole scene; 3 shows a third of it.',
+      ),
+    direction: vec3(
+      'Custom viewing direction: a non-zero [x, y, z] vector pointing from the scene center toward the camera (Z-up). ' +
+        'Overrides `view`; e.g. [1,-1,0.5] looks from +X/-Y above. Result `view` is "custom".',
+    ).optional(),
+    target: vec3(
+      'World point the camera looks at (default: center of the scene bounds). Combine with `zoom` to inspect a detail.',
+    ).optional(),
+    title: z
+      .string()
+      .optional()
+      .describe('Text drawn top-left of the image (max 120 characters, longer is truncated).'),
+    background: z
+      .string()
+      .optional()
+      .describe(
+        'Background CSS color: "#rrggbb", "#rgb", a color name ("white") or rgb()/hsl(). Default "#1a1a2e" (dark navy).',
+      ),
+    maxPolygons: z
+      .number()
+      .optional()
+      .describe(
+        'Polygon budget, clamped to [500, 100000], default 20000. Entities over their fair share are decimated (see data.simplifiedEntityIds); raise it for finer detail at the cost of a larger SVG.',
+      ),
+    cut: z
+      .object({
+        planes: z
+          .array(
+            z.object({
+              normal: vec3(
+                'Plane normal [x, y, z] (any non-zero length). It points to the REMOVED side.',
+              ),
+              offset: z
+                .number()
+                .describe(
+                  'Plane position: points p with dot(unitNormal, p) = offset lie on the plane.',
+                ),
+            }),
+          )
+          .describe('1 to 6 cut planes. Each removes the half-space dot(unitNormal, p) > offset.'),
+        mode: z
+          .enum(['intersection', 'union'])
+          .optional()
+          .describe(
+            '"intersection" (default): remove only the region on the cut side of ALL planes (e.g. a quadrant or octant notch). "union": remove everything on the cut side of ANY plane.',
+          ),
+        entityIds: z
+          .array(z.string())
+          .optional()
+          .describe('Entity ids to cut. Omit to cut every solid; other entities stay whole.'),
+      })
+      .optional()
+      .describe(
+        'Cutaway: clips the selected 3D solids against the planes (triangles are split exactly) and draws the exposed section as a light, hatched, outlined cap so solids do not look hollow. Rendered together with isolate/section/turntable.',
+      ),
     showDimensions: z
       .boolean()
       .optional()
@@ -127,18 +196,36 @@ export const renderView = defineCommand({
       ),
   }),
   run: (doc, params): CommandResult => {
-    const view: ViewName = params.view ?? 'iso';
+    const resolved = resolveRenderOptions(doc, params);
+    if ('error' in resolved) {
+      return { document: doc, summary: `render_view rejected: ${resolved.error}.`, affected: [] };
+    }
+    const { options } = resolved;
+    const view: ViewName = options.direction ? 'custom' : (params.view ?? 'iso');
     const width = clampPixels(params.width, 800);
     const height = clampPixels(params.height, 600);
-    const base = renderDocument(doc, view, width, height);
+    const base = renderDocument(doc, view, width, height, options);
+    const notes = renderNotes(base, options.cut);
+    const withNotes = (text: string): string => (notes === '' ? text : `${text} ${notes}`);
+    const decorate = (svg: string): string => {
+      const captions = [
+        params.title === undefined
+          ? ''
+          : `  <text x="8" y="44" font-family="sans-serif" font-size="16" font-weight="bold" fill="#e8e8f4" stroke="#1a1a2e" stroke-width="3" paint-order="stroke">${escapeXml(params.title.slice(0, 120))}</text>`,
+        options.cut
+          ? `  <text x="${width - 8}" y="${height - 10}" text-anchor="end" font-family="monospace" font-size="11" fill="#ffb060">CUTAWAY (${options.cut.mode}, ${options.cut.planes.length} plane(s))</text>`
+          : '',
+      ].filter((c) => c !== '');
+      return captions.length === 0 ? svg : appendBeforeClose(svg, captions.join('\n'));
+    };
 
     if (params.turntable) {
       const frames = Math.max(1, Math.min(12, params.turntable.frames));
-      const strip = buildTurntableSvg(doc, frames, view, width, height);
+      const strip = buildTurntableSvg(doc, frames, view, width, height, options);
       return report(
         doc,
-        `Rendered turntable strip: ${frames} frame(s), ${strip.width}×${height}.`,
-        { ...base, width: strip.width, svg: strip.svg },
+        withNotes(`Rendered turntable strip: ${frames} frame(s), ${strip.width}×${height}.`),
+        { ...base, width: strip.width, svg: decorate(strip.svg) },
       );
     }
 
@@ -147,11 +234,11 @@ export const renderView = defineCommand({
     let summary = `Rendered ${view} view: ${base.entityCount} entit${plural}, ${width}×${height}.`;
     if (params.isolate !== undefined) {
       const ids = typeof params.isolate === 'string' ? [params.isolate] : params.isolate;
-      svg = buildIsolateSvg(doc, ids, view, width, height);
+      svg = buildIsolateSvg(doc, ids, view, width, height, options);
       summary = `Rendered isolated view: ${ids.length} entity/entities highlighted, ${width}×${height}.`;
     } else if (params.section) {
       const { axis, offset } = params.section;
-      svg = buildSectionSvg(doc, axis, offset, view, width, height);
+      svg = buildSectionSvg(doc, axis, offset, view, width, height, options);
       summary = `Rendered section view: cut at ${axis}=${offset}, ${width}×${height}.`;
     }
     svg = composeOverlays(svg, base, doc, {
@@ -161,6 +248,6 @@ export const renderView = defineCommand({
       showLabels: params.showLabels === true,
     });
 
-    return report(doc, summary, { ...base, svg });
+    return report(doc, withNotes(summary), { ...base, svg: decorate(svg) });
   },
 });

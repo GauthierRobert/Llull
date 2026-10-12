@@ -1,42 +1,60 @@
 /**
  * @layer server
- * Process entry of the `llull` CLI (launched by `server/bin/llull.cjs`): installs the default
- * plugins, wires real stdio, and installs the geometry kernel only when a local command runs.
+ * Process entry of the `llull` CLI (launched by `server/bin/llull.cjs`). A local run with
+ * `--timeout` is supervised: the CLI re-runs itself as a child and kills it shortly after the
+ * deadline, because a single slow step (an OCC boolean) blocks the child's event loop and could
+ * never stop itself. Everything else loads `cliProcess.ts` directly.
  */
 
-import '../plugins';
+import { spawn } from 'node:child_process';
 import { parseArgv, stringFlag } from './argv';
-import { runCli } from './main';
 
-function readStdin(): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    process.stdin.on('data', (chunk: Buffer) => chunks.push(chunk));
-    process.stdin.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-    process.stdin.on('error', reject);
+/** Set in the supervised child so it runs the CLI instead of supervising again. */
+const CHILD_ENV = 'LLULL_CLI_CHILD';
+
+/** The child enforces the deadline between steps itself; the kill comes this much later. */
+const KILL_GRACE_SECONDS = 5;
+
+function graceSeconds(env: NodeJS.ProcessEnv): number {
+  const override = Number(env['LLULL_CLI_KILL_GRACE_SECONDS']);
+  return env['LLULL_CLI_KILL_GRACE_SECONDS'] !== undefined && override >= 0
+    ? override
+    : KILL_GRACE_SECONDS;
+}
+
+/** Seconds of a `--timeout` that needs supervising (a local run, not yet supervised), else undefined. */
+function supervisedTimeout(argv: readonly string[], env: NodeJS.ProcessEnv): number | undefined {
+  if (env[CHILD_ENV] !== undefined) return undefined;
+  const args = parseArgv(argv);
+  if (stringFlag(args, 'server') !== undefined || env['LLULL_SERVER'] !== undefined)
+    return undefined;
+  const seconds = Number(stringFlag(args, 'timeout'));
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined;
+}
+
+function supervise(seconds: number): void {
+  const child = spawn(process.execPath, process.argv.slice(1), {
+    stdio: 'inherit',
+    env: { ...process.env, [CHILD_ENV]: '1' },
+  });
+  let killed = false;
+  const timer = setTimeout(
+    () => {
+      killed = true;
+      child.kill('SIGKILL');
+    },
+    (seconds + graceSeconds(process.env)) * 1000,
+  );
+  child.on('exit', (code) => {
+    clearTimeout(timer);
+    if (killed)
+      process.stderr.write(
+        `llull: timed out after ${seconds}s (--timeout); the run was killed, nothing was saved.\n`,
+      );
+    process.exit(killed ? 1 : (code ?? 1));
   });
 }
 
-async function prepareKernel(): Promise<void> {
-  const kernel = stringFlag(parseArgv(process.argv.slice(2)), 'kernel');
-  if (kernel !== undefined) process.env['LLULL_KERNEL'] = kernel;
-  const { installGeometryKernel } = await import('../geometryKernel');
-  await installGeometryKernel();
-}
-
-runCli(process.argv.slice(2), {
-  stdout: (text) => process.stdout.write(`${text}\n`),
-  stderr: (text) => process.stderr.write(`${text}\n`),
-  readStdin,
-  env: process.env,
-  prepareKernel,
-})
-  .then((code) => {
-    // Kernel workers / wasm handles would otherwise keep the process alive.
-    process.exitCode = code;
-    process.stdout.write('', () => process.exit(code));
-  })
-  .catch((error: unknown) => {
-    process.stderr.write(`llull: internal error: ${String(error)}\n`);
-    process.exit(1);
-  });
+const seconds = supervisedTimeout(process.argv.slice(2), process.env);
+if (seconds !== undefined) supervise(seconds);
+else void import('./cliProcess');

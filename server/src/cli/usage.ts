@@ -16,7 +16,8 @@ Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first cha
   exec <command> [params]     run one command; params are key=value pairs (values parsed as
                               JSON unless the param is a string: size=[1,2,3] name=123),
                               one JSON object,
-                              @params.json or - (stdin)
+                              @params.json or - (stdin); a value @img:scan.png is
+                              read as an image data URL (add_image_underlay dataUrl=…)
   <command> [params]          shorthand for exec
                               exchange tools too (export_step, import_step, import_dwg,
                               import_code): file=PATH reads a local file into their content
@@ -37,6 +38,12 @@ Flags
                               PATH.png rasterizes an svg (render_view)
   --json                      print one JSON object instead of text
   --quiet                     print nothing on success
+  --progress                  stream one stderr line per plan step ([12/189] boolean_subtract … 3.2s);
+                              automatic when stderr is a terminal. Steps over 10 s always warn, and
+                              every step's durationMs is in the --json report (local runs only)
+  --timeout SEC               stop a whole run after SEC seconds: exit 1 with a clear message, nothing
+                              saved. Local: checked between plan steps, a hard kill 5 s later for a
+                              step that never ends; --server: per-request limit (default 120 s)
   --kernel manifold|occt      geometry kernel for local runs (default manifold; $LLULL_KERNEL)
 
 Exit codes: 0 ok · 1 the command failed, a plan step failed, or a change command changed

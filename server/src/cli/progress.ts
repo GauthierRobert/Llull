@@ -1,0 +1,97 @@
+/**
+ * @layer server
+ * Per-step progress, timing and the whole-run deadline of a local `build_project` run, fed by the
+ * registry's `ExecutionContext.onStep` (core stays clock- and I/O-free; this is the observer).
+ */
+
+import type { PlanStepEvent } from '@core/commands/types';
+import { getCommand } from '@core/commands/registry';
+import { isRecord } from '@lib/isRecord';
+
+/** A step slower than this earns a warning line, whatever the progress setting. */
+export const SLOW_STEP_MS = 10_000;
+
+export interface StepObserverOptions {
+  /** Millisecond clock (injected so tests are deterministic). */
+  readonly now: () => number;
+  /** One stderr line. */
+  readonly print: (line: string) => void;
+  /** Stream a line per step (`[12/189] boolean_subtract … 3.2s`). */
+  readonly progress: boolean;
+  /** Stop starting new steps this many seconds after creation. */
+  readonly timeoutSeconds?: number;
+  readonly slowMs?: number;
+}
+
+/** Where a `--timeout` deadline stopped the run. */
+export interface TimeoutStop {
+  readonly seconds: number;
+  readonly ordinal: number;
+  readonly total: number;
+  readonly command: string;
+}
+
+export interface StepObserver {
+  readonly onStep: (event: PlanStepEvent) => void;
+  /** `data` of a plan report with `durationMs` added to each step that ran. */
+  withDurations(data: unknown): unknown;
+  /** Set when the deadline stopped the run. */
+  timeout(): TimeoutStop | undefined;
+}
+
+/** `3.2s`, or `1m05s` from a minute on. */
+export function formatDuration(ms: number): string {
+  const seconds = ms / 1000;
+  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}m${String(Math.floor(seconds % 60)).padStart(2, '0')}s`;
+}
+
+export function createStepObserver(options: StepObserverOptions): StepObserver {
+  const { now, print, progress, timeoutSeconds, slowMs = SLOW_STEP_MS } = options;
+  const deadline = timeoutSeconds === undefined ? undefined : now() + timeoutSeconds * 1000;
+  const startedAt = new Map<number, number>();
+  const durations = new Map<number, number>();
+  let stopped: TimeoutStop | undefined;
+
+  const onStart = (event: PlanStepEvent): void => {
+    if (deadline !== undefined && timeoutSeconds !== undefined && now() > deadline) {
+      stopped = {
+        seconds: timeoutSeconds,
+        ordinal: event.ordinal,
+        total: event.total,
+        command: event.command,
+      };
+      const abort = new Error(`--timeout ${timeoutSeconds}s exceeded before step ${event.ordinal}`);
+      abort.stack = abort.message; // the registry logs a thrown error's stack: keep that to one line
+      throw abort;
+    }
+    startedAt.set(event.ordinal, now());
+    // Kernel commands (booleans, fillets) are the slow class: announce them before they block.
+    if (progress && getCommand(event.command)?.annotations?.requiresKernel === true)
+      print(`[${event.ordinal}/${event.total}] ${event.command} …`);
+  };
+
+  const onEnd = (event: PlanStepEvent): void => {
+    const elapsed = now() - (startedAt.get(event.ordinal) ?? now());
+    if (event.stepPosition !== undefined) durations.set(event.stepPosition, elapsed);
+    const label = `[${event.ordinal}/${event.total}] ${event.command}`;
+    if (progress)
+      print(`${label} … ${formatDuration(elapsed)}${event.ok === false ? ' FAILED' : ''}`);
+    if (elapsed >= slowMs)
+      print(`llull: warning: slow step ${label} took ${formatDuration(elapsed)}`);
+  };
+
+  return {
+    onStep: (event) => (event.phase === 'start' ? onStart(event) : onEnd(event)),
+    withDurations(data) {
+      if (!isRecord(data) || !Array.isArray(data['steps']) || durations.size === 0) return data;
+      const steps = data['steps'].map((step: unknown, position) => {
+        const durationMs = durations.get(position);
+        return durationMs === undefined || !isRecord(step) ? step : { ...step, durationMs };
+      });
+      return { ...data, steps };
+    },
+    timeout: () => stopped,
+  };
+}

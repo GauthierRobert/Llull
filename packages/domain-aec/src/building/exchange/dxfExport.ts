@@ -80,6 +80,8 @@ function writeDrafting(writer: DxfWriter, doc: CadDocument): void {
       case 'point':
         writer.point2(layer, [entity.position[0], entity.position[1]]);
         break;
+      case 'image':
+        break; // a raster underlay is tracing reference, not drawing content
       default:
         break;
     }

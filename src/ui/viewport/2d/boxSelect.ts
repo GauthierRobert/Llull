@@ -8,7 +8,7 @@
  */
 
 import type { CadDocument, Entity, EntityId, Vec2 } from '@core/model/types';
-import { dimensionLabelBox, textLocalBox } from './modifyHelpers';
+import { dimensionLabelBox, textLocalBox, underlayFrame } from './modifyHelpers';
 import { solidOutline } from './solidOutline';
 
 export type BoxSelectMode = 'window' | 'crossing';
@@ -142,6 +142,10 @@ function sampleEntity(document: CadDocument, entity: Entity): SampledGeometry | 
         polylines: [],
         boxes: [{ minX: x0, minY: y0, maxX: x0 + width, maxY: y0 + height }],
       };
+    }
+    case 'image': {
+      const frame = underlayFrame(entity);
+      return frame === null ? null : { polylines: [[...frame, ...frame.slice(0, 1)]], boxes: [] };
     }
     case 'dimension': {
       const label = dimensionLabelBox(document, entity);

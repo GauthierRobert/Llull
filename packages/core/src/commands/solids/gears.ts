@@ -8,8 +8,14 @@ import type { CommandResult } from '../types';
 import { defineCommand, z, colorField, nameField, looseVec3 } from '../schema';
 import { nextId } from '../../lib/id';
 import { compactNumber as fmt } from '../../lib/compactNumber';
-import { rotatePoint2 } from '../../lib/polygon';
-import { sampleArc } from '../../lib/arc';
+import {
+  DEFAULT_FLANK_SAMPLES,
+  externalGearPattern,
+  toothOutline,
+  toothProfile,
+} from '../../lib/gearOutline';
+import { circleThrough, ringMesh } from '../../geometry/prismMesh';
+import { placedMeshEntity } from './gearSolid';
 import { finiteVec3OrZero } from '../../lib/vec3';
 import { MAX_GEAR_TEETH } from '../limits';
 import { rotatedEntityBounds } from '../../geometry/rotatedBounds';
@@ -17,7 +23,6 @@ import { commitEntity } from '../entity/commitEntity';
 import { newEntity } from '../entity/newEntity';
 import { ROTATION_CONVENTION, boundsText } from './shared';
 import { noop } from '../noop';
-import { elementAt } from '../../lib/elementAt';
 
 const DEFAULT_GEAR_COLOR = '#7a9cbb';
 
@@ -40,79 +45,18 @@ export function sampleInvolute(
   });
 }
 
-/** Involute parameter t at which the curve reaches radius `r` (0 when r <= rb). */
-function involuteT(rb: number, r: number): number {
-  return r <= rb ? 0 : Math.sqrt((r / rb) ** 2 - 1);
-}
-
-/** `segments` points on the circle of radius `r`, from just after `startAngle` through `endAngle` (CCW). */
-function arcPoints(r: number, startAngle: number, endAngle: number, segments: number): Point[] {
-  return [...sampleArc([0, 0], r, startAngle, endAngle - startAngle, Math.max(segments, 1))];
-}
-
-const angleOf = (p: Point): number => Math.atan2(p[1], p[0]);
-
 /**
- * Closed CCW involute spur gear outline centred at the origin (first point repeated last).
+ * Closed CCW involute spur gear outline centred at the origin (first point NOT repeated).
  * @param pressureAngle radians (typical 20° = π/9)
- * @invariant baseRadius >= rootRadius (teeth < ~17) undercuts: the flank starts on the root circle (approximation)
+ * @invariant baseRadius >= rootRadius (teeth < ~42) undercuts: each flank starts with a radial lead-in to the root circle
  */
 export function buildSpurGearProfile(
   module: number,
   teeth: number,
   pressureAngle: number,
-  flankSamples = 14,
+  flankSamples = DEFAULT_FLANK_SAMPLES,
 ): ReadonlyArray<Point> {
-  const pitchRadius = (module * teeth) / 2;
-  const baseRadius = pitchRadius * Math.cos(pressureAngle);
-  const outerRadius = pitchRadius + module;
-  const rootRadius = pitchRadius - 1.25 * module;
-  const toothAngle = (2 * Math.PI) / teeth;
-  const halfToothPitchAngle = Math.PI / (2 * teeth);
-
-  const tMax = involuteT(baseRadius, outerRadius);
-  const tPitch = involuteT(baseRadius, pitchRadius);
-  const involuteAngleAtPitch =
-    baseRadius > 0
-      ? Math.atan2(
-          baseRadius * (Math.sin(tPitch) - tPitch * Math.cos(tPitch)),
-          baseRadius * (Math.cos(tPitch) + tPitch * Math.sin(tPitch)),
-        )
-      : 0;
-  // The pitch-circle point of the right flank lands at +halfToothPitchAngle (tooth symmetric about its centre line).
-  const rightFlankRotation = halfToothPitchAngle - involuteAngleAtPitch;
-  const leftFlankRotation = -halfToothPitchAngle + involuteAngleAtPitch;
-  const tStart = baseRadius >= rootRadius ? involuteT(baseRadius, rootRadius) : 0;
-  const rawFlank = sampleInvolute(baseRadius, tStart, tMax, flankSamples);
-  const rootArcSegments = teeth >= 10 ? 3 : 2;
-
-  const profile: Point[] = [];
-  for (let t = 0; t < teeth; t++) {
-    const toothCenter = t * toothAngle;
-    const rightFlank = rawFlank.map((pt) => rotatePoint2(pt, rightFlankRotation + toothCenter));
-    const leftFlank = rawFlank.map((pt) =>
-      rotatePoint2([pt[0], -pt[1]], leftFlankRotation + toothCenter),
-    );
-    const rightTipAngle = angleOf(elementAt(rightFlank, rightFlank.length - 1));
-    let tipArcEnd = angleOf(elementAt(leftFlank, leftFlank.length - 1));
-    if (tipArcEnd < rightTipAngle) tipArcEnd += 2 * Math.PI;
-
-    const leftRootAngle = angleOf(elementAt(leftFlank, 0));
-    const nextToothCenter = ((t + 1) % teeth) * toothAngle;
-    let rootArcEnd = angleOf(
-      rotatePoint2(elementAt(rawFlank, 0), rightFlankRotation + nextToothCenter),
-    );
-    if (rootArcEnd <= leftRootAngle) rootArcEnd += 2 * Math.PI;
-
-    profile.push(
-      ...rightFlank,
-      ...arcPoints(outerRadius, rightTipAngle, tipArcEnd, 2),
-      ...[...leftFlank].reverse(),
-      ...arcPoints(rootRadius, leftRootAngle, rootArcEnd, rootArcSegments),
-    );
-  }
-  if (profile.length > 0) profile.push(elementAt(profile, 0));
-  return profile;
+  return toothOutline(externalGearPattern(module, teeth, pressureAngle, flankSamples));
 }
 
 /**
@@ -122,7 +66,7 @@ export function buildSpurGearProfile(
  * @affects creates 1 extrusion entity (spur gear solid)
  * @invariant module > 0; teeth >= 3; pressureAngle in (0, π/2); faceWidth > 0; bore >= 0 and bore < pitchRadius
  * @failure invalid params -> unchanged doc, summary explains which param violated, affected:[]
- * @failure bore > 0 when ExtrusionEntity does not support holes natively -> bore is ignored, noted in summary
+ * @affects bore > 0 -> creates 1 mesh entity instead (ExtrusionEntity has no holes)
  * @invariant when baseRadius >= rootRadius (typically teeth < 17), undercut occurs;
  *            the involute start is clamped to rootRadius (approximate — not geometrically exact undercut)
  */
@@ -130,13 +74,13 @@ export function buildSpurGearProfile(
 export const addSpurGear = defineCommand({
   name: 'add_spur_gear',
   description:
-    'Create a parametric involute spur gear solid (extrusion). ' +
+    'Create a parametric involute spur gear solid (extrusion with exact Bézier/arc tooth curves; mesh when bore > 0). ' +
     'Computes the full closed 2D tooth profile from module, tooth count, and pressure angle, ' +
     'then extrudes it by faceWidth along +Z. ' +
     'module (metric) sets the tooth scale: pitchDiameter = module * teeth. ' +
     'pressureAngle is in RADIANS; standard value is 0.3491 rad (20 degrees = Math.PI/9). ' +
     'faceWidth is the gear thickness along Z. ' +
-    'bore is a central hole radius; if > 0 it is currently ignored (kernel hole not yet wired) and noted in the summary. ' +
+    'bore is a central hole radius; if > 0 the gear is emitted as a closed mesh solid with a through hole (no boolean needed). ' +
     'position is [x, y, z] of the gear center; rotation is three.js intrinsic XYZ Euler angles in radians (about world Z, then Y, then X). ' +
     'Right-handed frame, +Z up.',
   params: z.object({
@@ -169,8 +113,8 @@ export const addSpurGear = defineCommand({
     bore: z
       .number()
       .describe(
-        'Central bore hole radius in document units. >= 0. Default 0 (solid hub). ' +
-          'Currently ignored if > 0 (kernel hole not yet wired); a note appears in the summary.',
+        'Central bore hole radius in document units. >= 0 and < pitch radius. Default 0 (solid hub, extrusion entity). ' +
+          'When > 0 the result is a mesh solid with a through hole.',
       )
       .optional(),
     position: looseVec3(
@@ -239,22 +183,35 @@ export const addSpurGear = defineCommand({
     const resolvedPosition = finiteVec3OrZero(position);
     const resolvedRotation = finiteVec3OrZero(rotation);
 
-    const profile = buildSpurGearProfile(mod, teethInt, pressureAngle);
+    const { points: profile, curves } = toothProfile(
+      externalGearPattern(mod, teethInt, pressureAngle, DEFAULT_FLANK_SAMPLES),
+    );
 
     const pitchDiameter = mod * teethInt;
     const outerDiameter = pitchDiameter + 2 * mod;
 
-    const boreNote = bore > 0 ? ` bore=${bore} ignored — kernel hole not yet wired.` : '';
-
     const id = nextId('gear');
-    const entity = newEntity(
-      'extrusion',
-      id,
-      { profile, depth: faceWidth },
-      resolvedPosition,
-      color,
-      { rotation: resolvedRotation, name },
-    );
+    const entity =
+      bore > 0
+        ? placedMeshEntity(
+            id,
+            ringMesh(profile, circleThrough(profile, bore), faceWidth),
+            resolvedPosition,
+            resolvedRotation,
+            color,
+            name,
+          )
+        : newEntity(
+            'extrusion',
+            id,
+            { profile, depth: faceWidth, curves },
+            resolvedPosition,
+            color,
+            {
+              rotation: resolvedRotation,
+              name,
+            },
+          );
 
     return commitEntity(
       doc,
@@ -263,7 +220,7 @@ export const addSpurGear = defineCommand({
         `pitchD=${fmt(pitchDiameter)} outerD=${fmt(outerDiameter)} ` +
         `bore=${bore} face=${fmt(faceWidth)} ` +
         `at [${resolvedPosition.map(fmt).join(', ')}].` +
-        `${boreNote} ${boundsText(rotatedEntityBounds(entity))}.`,
+        `${bore > 0 ? ' Bored: mesh solid.' : ''} ${boundsText(rotatedEntityBounds(entity))}.`,
     );
   },
 });

@@ -12,8 +12,15 @@ import { changed, noop } from '../noop';
 import { nextId } from '../../lib/id';
 import { MAX_COPIES_PER_COMMAND } from '../limits';
 import { scaleGeometry } from '../../geometry/scaleGeometry';
-import { add3, scale3 } from '../../lib/vec3';
-import { rotatePoint2 } from '../../lib/polygon';
+import { add3, scale3, sub3 } from '../../lib/vec3';
+import {
+  applyMat3,
+  eulerFromMat,
+  matFromAxisAngle,
+  matFromEulerXYZ,
+  mulMat3,
+  unitAxisOrNull,
+} from '../../lib/axisRotation';
 import { replaceEntity } from '../entity/entityOps';
 import { rotateEulerAboutWorldZ } from '../../lib/eulerRotation';
 
@@ -213,26 +220,31 @@ export const arrayLinear = defineCommand({
 /**
  * @command array_polar
  * @pure
- * @affects creates count-1 new copies of the source entity arranged around a Z-axis center point
- * @invariant count >= 2; copies are distributed over total sweep angle (default 2*PI full circle)
- * @failure missing id or count < 2 -> no-op, affected:[]
+ * @affects creates count-1 new copies of the source entity arranged around an axis through center
+ * @invariant count >= 2; copy k is the source rotated k*(angle/count) about the axis line (position and orientation)
+ * @failure missing id, count < 2 or zero-length axis -> no-op, affected:[]
  */
 export const arrayPolar = defineCommand({
   name: 'array_polar',
   description:
-    'Duplicate an entity into a polar (circular) pattern around the Z axis through center. ' +
+    'Duplicate an entity into a polar (circular) pattern about an axis line through center. ' +
     'The original counts as instance 0; count-1 new copies are created. ' +
-    'Copy k is rotated by k*(angle/count) radians around center (XY plane). ' +
-    'angle defaults to 2*PI (full circle). Each copy also has rotation[2] incremented by the same ' +
-    'step so the part faces outward consistently. Z position and other rotation components are unchanged. ' +
-    'count must be >= 2.',
+    'Copy k is the original rigidly rotated by k*(angle/count) radians about the axis: its position ' +
+    'orbits the axis line and its orientation is composed with the same rotation (R_axis(k*step) applied ' +
+    'after the existing rotation), so already-rotated parts (e.g. radial cylinders) stay correctly oriented. ' +
+    'axis defaults to [0, 0, 1] (world Z; then center only uses cx, cy and Z position is unchanged). ' +
+    'angle defaults to 2*PI (full circle). count must be >= 2.',
   params: z.object({
     id: z.string().describe('Id of the entity to array.'),
     count: arrayCountField,
     center: looseVec3(
-      'World-space center point [cx, cy, cz] for the polar rotation axis (Z axis through this point). ' +
-        'Only cx and cy are used for the rotation; cz is ignored.',
+      'World-space point [cx, cy, cz] the rotation axis passes through. ' +
+        'With the default Z axis only cx and cy matter.',
     ),
+    axis: looseVec3(
+      'Optional rotation axis direction [dx, dy, dz] (any non-zero length, normalized). Defaults to [0, 0, 1]. ' +
+        'Right-hand rule gives the positive angle direction.',
+    ).optional(),
     angle: z
       .number()
       .describe(
@@ -241,7 +253,7 @@ export const arrayPolar = defineCommand({
       )
       .optional(),
   }),
-  run: (doc, { id, count, center, angle = 2 * Math.PI }): CommandResult => {
+  run: (doc, { id, count, center, axis, angle = 2 * Math.PI }): CommandResult => {
     const target = doc.entities[id];
     if (!target) return noop(doc, `array_polar: No entity ${id}.`);
     if (count < 2 || count > MAX_COPIES_PER_COMMAND) {
@@ -256,18 +268,30 @@ export const arrayPolar = defineCommand({
         `array_polar: center must be 3 finite numbers and angle finite (got center [${center.join(', ')}], angle ${angle}); entity ${id} unchanged.`,
       );
     }
+    const unitAxis = axis === undefined ? ([0, 0, 1] as Vec3) : unitAxisOrNull(axis);
+    if (!unitAxis) {
+      return noop(
+        doc,
+        `array_polar: axis must be 3 finite numbers with non-zero length; entity ${id} unchanged.`,
+      );
+    }
 
-    const [cx, cy] = center;
+    const zAxis = unitAxis[0] === 0 && unitAxis[1] === 0 && unitAxis[2] === 1;
+    const base: Vec3 = zAxis ? [center[0], center[1], target.position[2]] : center;
+    const offset = sub3(target.position, base);
+    const oldMatrix = matFromEulerXYZ(target.rotation);
     const step = angle / count;
     const { document, newIds } = addCopies(
       doc,
       target,
       Array.from({ length: count - 1 }, (_, i) => {
         const theta = (i + 1) * step;
-        const [rx, ry] = rotatePoint2([target.position[0] - cx, target.position[1] - cy], theta);
+        const turn = matFromAxisAngle(unitAxis, theta);
         return {
-          position: [cx + rx, cy + ry, target.position[2]] as Vec3,
-          rotation: rotateEulerAboutWorldZ(target.rotation, theta),
+          position: add3(base, applyMat3(turn, offset)),
+          rotation: zAxis
+            ? rotateEulerAboutWorldZ(target.rotation, theta)
+            : eulerFromMat(mulMat3(turn, oldMatrix)),
         };
       }),
     );
@@ -275,7 +299,8 @@ export const arrayPolar = defineCommand({
     return changed(
       document,
       `Polar array of ${target.kind} ${id}: created ${newIds.length} copies ` +
-        `over ${angleDeg}° around center [${center[0]}, ${center[1]}]. New ids: ${newIds.join(', ')}.`,
+        `over ${angleDeg}° about axis [${unitAxis.map((c) => +c.toFixed(6)).join(', ')}] through ` +
+        `[${center.join(', ')}]. New ids: ${newIds.join(', ')}.`,
       newIds,
     );
   },

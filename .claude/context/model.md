@@ -16,7 +16,7 @@ type DocumentUnit = (typeof DOCUMENT_UNITS)[number];  // 'mm' | 'cm' | 'm' | 'in
 type SolidKind = (typeof SOLID_KINDS)[number];  // 'box' | 'cylinder' | 'sphere' | 'extrusion'
                // | 'mesh' | 'cone' | 'torus' | 'wedge' | 'pyramid' | 'revolution' | 'sweep'
 type Shape2DKind = (typeof SHAPE2D_KINDS)[number];  // 'line' | 'polyline' | 'arc' | 'circle'
-               // | 'rectangle' | 'point' | 'ellipse' | 'spline' | 'text' | 'dimension'
+               // | 'rectangle' | 'point' | 'ellipse' | 'spline' | 'text' | 'dimension' | 'image'
 type EntityKind = SolidKind | Shape2DKind | 'instance';
 ```
 
@@ -56,6 +56,7 @@ EllipseEntity    'ellipse'    center: Vec2; radiusX; radiusY
 SplineEntity     'spline'     points: Vec2[]; closed
 TextEntity       'text'       content; height; anchor?
 DimensionEntity  'dimension'  dimensionKind: 'linear'|'aligned'|'radial'|'angular'; entityIds; offset?; precision?; label?
+ImageEntity      'image'      dataUrl (png/jpeg base64); pixelWidth/Height; width/height (units, lower-left at position); opacity; locked — raster underlay, pixel (0,0) = top-left (geometry/imageUnderlay.ts)
 // CurveSegment<P> (model/curve.ts): {type:'line', points:[a,b]} | {type:'arc', points:[start,through,end]} | {type:'bezier', points:[p0,p1,p2,p3]}
 // Assembly
 InstanceEntity   'instance'   componentId; scale?: Vec3

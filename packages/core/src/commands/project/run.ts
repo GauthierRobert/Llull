@@ -1,13 +1,14 @@
 import type { CadDocument } from '../../model/types';
 import type { CommandResult } from '../types';
-import { report } from '../noop';
-import { getCommand } from '../commandTable';
-import { executeRecorded } from '../history/record';
+import { currentContext } from '../context';
 import { computeSceneSnapshot } from '../inspect/scene';
 import { MAX_PROJECT_ACTIONS, MAX_PROJECT_STEPS } from '../limits';
-import { type ActionItem, type BuildProjectParams, type StepReport } from './types';
+import { type ActionItem, type BuildProjectParams } from './types';
+import { execStep, failStep, type PlanRun } from './exec';
+import { runLoopItem } from './loop';
+import { isLoopNode } from './loopHeader';
+import { validatePlan } from './validate';
 import {
-  findUndefinedRef,
   isPlanAction,
   isRepeatStep,
   isForEachStep,
@@ -16,64 +17,7 @@ import {
   buildEnv,
   resolveCount,
   resolveForEachValues,
-  resolveExprInParam,
-  recordableParams,
-  STEP_PARAM_COMMANDS,
 } from './resolve';
-
-interface PlanRun {
-  current: CadDocument;
-  readonly bindings: Record<string, string[]>;
-  readonly steps: StepReport[];
-  readonly allAffected: string[];
-  readonly onError: 'abort' | 'continue';
-  executedSteps: number;
-}
-
-/** Records a failed control-flow step; true when the run must abort. */
-function failStep(run: PlanRun, index: number, command: string, summary: string): boolean {
-  run.steps.push({ index, command, ok: false, summary, affected: [] });
-  return run.onError === 'abort';
-}
-
-/** Runs one command; `label` (loop bodies only) prefixes the step summaries. */
-function execStep(
-  run: PlanRun,
-  index: number,
-  command: string,
-  params: Record<string, unknown>,
-  bindings: Record<string, string[]>,
-  env: Record<string, number>,
-  label?: string,
-): { ok: boolean; affected: string[] } {
-  const report = (
-    ok: boolean,
-    summary: string,
-    affected: string[] = [],
-  ): { ok: boolean; affected: string[] } => {
-    run.steps.push({ index, command, ok, summary, affected });
-    return { ok, affected };
-  };
-  if (!getCommand(command))
-    return report(false, `Unknown command: ${command}${label ? ` (${label})` : ''}`);
-  const resolved = resolveExprInParam(params, bindings, env);
-  if (resolved.error)
-    return report(false, `Param error${label ? ` in ${label}` : ''}: ${resolved.error}`);
-  const recorded = recordableParams(params, resolved.value, run.current.parameters);
-  const result = executeRecorded(
-    run.current,
-    command,
-    STEP_PARAM_COMMANDS.has(command) ? recorded : resolved.value,
-    recorded,
-  );
-  // A graceful no-op (no change + nothing affected) is a soft failure for a plan step.
-  const ok = result.affected.length > 0 || result.document !== run.current;
-  report(ok, label ? `${label}: ${result.summary}` : result.summary, result.affected);
-  if (!ok) return { ok, affected: [] };
-  run.current = result.document;
-  run.allAffected.push(...result.affected);
-  return { ok, affected: result.affected };
-}
 
 /** Runs a loop body `count` times; true when the run must abort. */
 function runLoop(
@@ -114,6 +58,7 @@ function runLoop(
 
 /** Runs one top-level action item; true when the run must abort. */
 function runAction(run: PlanRun, raw: ActionItem, index: number): boolean {
+  if (isLoopNode(raw)) return runLoopItem(run, index, raw);
   if (isRepeatStep(raw)) {
     const countResult = resolveCount(raw.repeat.count, run.current);
     if (countResult.error !== null) return failStep(run, index, 'repeat', countResult.error);
@@ -146,44 +91,6 @@ function runAction(run: PlanRun, raw: ActionItem, index: number): boolean {
     return false;
   }
   return run.onError === 'abort';
-}
-
-/** Static plan check: structure, command names, required params, undefined `$alias` refs. */
-function validatePlan(doc: CadDocument, actions: ActionItem[]): CommandResult {
-  const defined = new Set<string>();
-  const issues: string[] = [];
-  actions.forEach((raw, i) => {
-    if (isRepeatStep(raw) || isForEachStep(raw)) {
-      // Inner step expressions are validated at run time.
-      defined.add(isRepeatStep(raw) ? (raw.repeat.as ?? '') : raw.for_each.as);
-      return;
-    }
-    if (!isPlanAction(raw)) {
-      issues.push(`step ${i}: not a valid action (needs a string "command")`);
-      return;
-    }
-    const def = getCommand(raw.command);
-    const params = raw.params ?? {};
-    if (!def) {
-      issues.push(`step ${i} (${raw.command}): unknown command`);
-      return;
-    }
-    for (const req of def.paramsSchema.required) {
-      if (!(req in params))
-        issues.push(`step ${i} (${raw.command}): missing required param "${req}"`);
-    }
-    const refErr = findUndefinedRef(params, defined);
-    if (refErr) issues.push(`step ${i} (${raw.command}): ${refErr}`);
-    if (raw.as) defined.add(raw.as);
-  });
-  const ok = issues.length === 0;
-  return report(
-    doc,
-    ok
-      ? `Plan valid: ${actions.length} step(s) ready.`
-      : `Plan invalid: ${issues.length} issue(s) — ${issues.join('; ')}.`,
-    { ok, validated: true, stepCount: actions.length, steps: [], failedAt: null, issues },
-  );
 }
 
 /** Upper-bound count of executed commands a plan expands to (repeat/for_each multiply). */
@@ -234,6 +141,10 @@ export function runProject(
     allAffected: [],
     onError,
     executedSteps: 0,
+    loopIterations: 0,
+    startedSteps: 0,
+    totalSteps: estimatedSteps,
+    onStep: currentContext().onStep,
   };
   const { steps } = run;
   let failedAt: number | null = null;
@@ -254,11 +165,12 @@ export function runProject(
   const finalDoc = aborted ? doc : run.current;
   const affected = aborted ? [] : run.allAffected;
   const allOk = !aborted && steps.every((s) => s.ok);
-  const scene = computeSceneSnapshot(finalDoc);
+  // Replaying a recorded plan step (inside a running step) needs no snapshot.
+  const scene = currentContext().stepKey === undefined ? computeSceneSnapshot(finalDoc) : undefined;
 
   let summary: string;
   if (failedAt !== null) {
-    const f = steps.find((x) => x.summary.startsWith('step budget exceeded')) ?? steps[failedAt];
+    const f = steps.find((x) => x.summary.startsWith('step budget exceeded')) ?? steps.at(-1);
     summary = `Plan aborted at step ${failedAt} (${f?.command ?? '?'}): ${f?.summary ?? ''} — rolled back, document unchanged.`;
   } else {
     // Plan steps are the input actions; a repeat/for_each action expands to many executed commands.
@@ -272,6 +184,13 @@ export function runProject(
     document: finalDoc,
     summary,
     affected,
-    data: { ok: allOk, validated: false, stepCount: actions.length, steps, failedAt, scene },
+    data: {
+      ok: allOk,
+      validated: false,
+      stepCount: actions.length,
+      steps,
+      failedAt,
+      ...(scene ? { scene } : {}),
+    },
   };
 }

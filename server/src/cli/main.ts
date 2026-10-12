@@ -37,6 +37,8 @@ import {
   type CatalogEntry,
 } from './catalog';
 import { planText, resultJson, resultText, type PrintableResult } from './output';
+import { createStepObserver, type StepObserver } from './progress';
+import { resolveImageRefs } from './imageParams';
 import { saveDataFiles, withoutPayloads } from './saveFiles';
 import { llullHome, readDesktopDiscovery } from './desktopDiscovery';
 import { exchangeTool, withFileContent } from './exchange';
@@ -56,6 +58,10 @@ export interface CliIo {
   readonly exchangeOptions?: () => ExchangeOptions;
   /** Injected for tests of `--server`; the global `fetch` otherwise. */
   readonly fetchImpl?: (url: string, init: RequestInit) => Promise<Response>;
+  /** Millisecond clock for step timing and `--timeout`; `Date.now` otherwise. */
+  readonly now?: () => number;
+  /** stderr is a terminal: stream per-step progress without `--progress`. */
+  readonly stderrIsTty?: boolean;
 }
 
 /** Exit codes: 0 success, 1 the command failed or changed nothing (`withOutcome`), 2 bad usage / unreadable input. */
@@ -75,6 +81,44 @@ function docPathOf(args: ParsedArgv, io: CliIo): string {
 function serverOf(args: ParsedArgv, io: CliIo): string | undefined {
   if (booleanFlag(args, 'app')) return APP_SERVER;
   return stringFlag(args, 'server') ?? io.env['LLULL_SERVER'];
+}
+
+/** `--timeout <seconds>`: a positive number, or undefined when absent. */
+function timeoutOf(args: ParsedArgv): number | undefined {
+  const raw = stringFlag(args, 'timeout');
+  if (raw === undefined) return undefined;
+  const seconds = Number(raw);
+  if (!Number.isFinite(seconds) || seconds <= 0)
+    throw new UsageError(`--timeout needs a positive number of seconds (got "${raw}").`);
+  return seconds;
+}
+
+/** Progress/timing/deadline observer of a local run; a `--server` run is the server's to execute. */
+function observerOf(args: ParsedArgv, io: CliIo): StepObserver | undefined {
+  if (serverOf(args, io) !== undefined) {
+    if (booleanFlag(args, 'progress'))
+      io.stderr('llull: --progress has no effect with --server (the server runs the plan).');
+    return undefined;
+  }
+  const timeoutSeconds = timeoutOf(args);
+  return createStepObserver({
+    now: io.now ?? Date.now,
+    print: io.stderr,
+    progress: booleanFlag(args, 'progress') || io.stderrIsTty === true,
+    ...(timeoutSeconds !== undefined ? { timeoutSeconds } : {}),
+  });
+}
+
+/** A run stopped by its `--timeout` deadline is a failure with a clear message, never a partial result. */
+function withTimeout(observer: StepObserver | undefined, result: CliRunResult): CliRunResult {
+  const stop = observer?.timeout();
+  if (stop === undefined) return result;
+  return {
+    summary: `llull: timed out after ${stop.seconds}s (--timeout) before step ${stop.ordinal}/${stop.total} (${stop.command}); stopped, nothing was saved.`,
+    affected: [],
+    isError: true,
+    changed: false,
+  };
 }
 
 /** `--app` / `--server app`: the running desktop app, from its discovery file. */
@@ -99,20 +143,27 @@ function remoteTargetOf(
   return { url: app.url, token: flagToken ?? app.token };
 }
 
-async function backendOf(args: ParsedArgv, io: CliIo): Promise<CliBackend> {
+async function backendOf(
+  args: ParsedArgv,
+  io: CliIo,
+  observer?: StepObserver,
+): Promise<CliBackend> {
   const server = serverOf(args, io);
   if (server !== undefined) {
     if (booleanFlag(args, 'dry-run'))
       throw new UsageError('--dry-run works on a local --doc only; the server applies every call.');
     const target = remoteTargetOf(server, args, io);
+    const timeoutSeconds = timeoutOf(args);
     return createRemoteBackend(target.url, {
       token: target.token,
+      ...(timeoutSeconds !== undefined ? { timeoutSeconds } : {}),
       ...(io.fetchImpl !== undefined ? { fetchImpl: io.fetchImpl } : {}),
     });
   }
   await io.prepareKernel();
   return createLocalBackend(docPathOf(args, io), {
     dryRun: booleanFlag(args, 'dry-run'),
+    ...(observer !== undefined ? { observer } : {}),
     exchangeOptions: io.exchangeOptions ?? (() => exchangeOptionsWithDwg({ ...io.env })),
   });
 }
@@ -145,7 +196,26 @@ function stringParamKeys(name: string): ReadonlySet<string> {
   );
 }
 
+function readImageBytes(source: string): Buffer {
+  try {
+    return fs.readFileSync(source);
+  } catch (error) {
+    throw new UsageError(`cannot read ${source}: ${errorMessage(error)}`);
+  }
+}
+
+/** Params of `name`, with `@img:<path>` values loaded as image data URLs. */
 async function paramsOf(name: string, tokens: readonly string[], io: CliIo): Promise<unknown> {
+  const params = await rawParamsOf(name, tokens, io);
+  try {
+    return resolveImageRefs(params, readImageBytes);
+  } catch (error) {
+    if (error instanceof UsageError) throw error;
+    throw new UsageError(errorMessage(error));
+  }
+}
+
+async function rawParamsOf(name: string, tokens: readonly string[], io: CliIo): Promise<unknown> {
   let source: ReturnType<typeof paramsSource>;
   try {
     source = paramsSource(tokens, stringParamKeys(name));
@@ -240,11 +310,12 @@ async function runExec(args: ParsedArgv, io: CliIo): Promise<number> {
   } catch (error) {
     throw new UsageError(errorMessage(error));
   }
-  const backend = await backendOf(args, io);
+  const observer = observerOf(args, io);
+  const backend = await backendOf(args, io, observer);
   const result = isExchange
     ? await backend.exchange(name, params)
     : await backend.run(name, params);
-  return finish(withOutcome(name, result), args, io);
+  return finish(withTimeout(observer, withOutcome(name, result)), args, io);
 }
 
 async function runPlan(args: ParsedArgv, io: CliIo): Promise<number> {
@@ -259,9 +330,10 @@ async function runPlan(args: ParsedArgv, io: CliIo): Promise<number> {
     ...(booleanFlag(args, 'validate') ? { validate: true } : {}),
     ...(booleanFlag(args, 'continue') ? { onError: 'continue' } : {}),
   };
-  const backend = await backendOf(args, io);
+  const observer = observerOf(args, io);
+  const backend = await backendOf(args, io, observer);
   return finish(
-    withOutcome('build_project', await backend.run('build_project', params)),
+    withTimeout(observer, withOutcome('build_project', await backend.run('build_project', params))),
     args,
     io,
     planText,

@@ -5,6 +5,7 @@ import {
   type EvalResult,
   evaluateExpression,
   extractReferences,
+  isBuiltinConstant,
   parameterValues,
 } from '../parametric/expression';
 import { MAX_PROJECT_STEPS } from '../limits';
@@ -19,14 +20,14 @@ import {
 } from './types';
 
 /** `$alias` or `$alias[N]` — references the affected ids bound by an earlier step. */
-const REF = /^\$([A-Za-z_]\w*)(?:\[(\d+)\])?$/;
+export const REF = /^\$([A-Za-z_]\w*)(?:\[(\d+)\])?$/;
 
-interface Resolved {
+export interface Resolved {
   value: unknown;
   error: string | null;
 }
 
-function resolveRef(text: string, bindings: Record<string, string[]>): Resolved {
+export function resolveRef(text: string, bindings: Record<string, string[]>): Resolved {
   const m = REF.exec(text);
   if (!m || m[1] === undefined) return { value: text, error: null };
   const name = m[1];
@@ -102,6 +103,26 @@ export function buildEnv(doc: CadDocument, extras: Record<string, number>): Reco
   return { ...parameterValues(doc.parameters), ...extras };
 }
 
+/**
+ * Fill `{expr}` placeholders (loop variables / parameters, any expression) with their integer or
+ * decimal value: `piston{i}` with i=3 -> `piston3`.
+ */
+export function interpolate(
+  text: string,
+  env: Record<string, number>,
+): { text: string; error: string | null } {
+  let error: string | null = null;
+  const filled = text.replace(/\{([^{}]*)\}/g, (_, body: string) => {
+    const r = evaluateExpression(body, env);
+    if (!r.ok) {
+      error ??= `placeholder "{${body}}": ${r.error}`;
+      return '';
+    }
+    return String(r.value);
+  });
+  return { text: filled, error };
+}
+
 /** Evaluate a plan expression (leading `=` optional) over the document parameters. */
 function evaluateOverParameters(raw: string, doc: CadDocument): EvalResult {
   return evaluateExpression(raw.startsWith('=') ? raw.slice(1) : raw, buildEnv(doc, {}));
@@ -141,6 +162,14 @@ export function resolveExprInParam(
   let firstError: string | null = null;
   const resolved = mapStringLeaves(value, (text) => {
     if (firstError !== null) return text;
+    if (text.startsWith('$') && text.includes('{')) {
+      const filled = interpolate(text, env);
+      if (filled.error !== null) {
+        firstError = filled.error;
+        return undefined;
+      }
+      text = filled.text;
+    }
     if (REF.test(text)) {
       const ref = resolveRef(text, bindings);
       firstError = ref.error;
@@ -183,7 +212,9 @@ export function recordableParams(
 ): unknown {
   if (typeof raw === 'string' && raw.startsWith('=') && !raw.includes('$')) {
     const refs = extractReferences(raw.slice(1));
-    return [...refs].every((name) => name in parameters) ? raw : resolved;
+    return [...refs].every((name) => name in parameters || isBuiltinConstant(name))
+      ? raw
+      : resolved;
   }
   if (Array.isArray(raw) && Array.isArray(resolved))
     return raw.map((item, i) => recordableParams(item, resolved[i], parameters));

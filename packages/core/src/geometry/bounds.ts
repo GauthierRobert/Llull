@@ -173,6 +173,7 @@ export function localBounds(e: Entity): Bounds {
         [e.center[0] + e.radius, e.center[1] + e.radius, 0],
       );
     case 'rectangle':
+    case 'image':
       // Origin at lower-left; extends +X (width), +Y (height).
       return bounds(ORIGIN, [e.width, e.height, 0]);
     case 'ellipse':
