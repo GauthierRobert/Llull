@@ -17,6 +17,7 @@ import { memberFacts } from './memberFacts';
 import { EquipmentEditor } from './EquipmentEditor';
 import { SteelMemberEditor } from './SteelMemberEditor';
 import { WallEditor } from './WallEditor';
+import { contentKey } from '@ui/contentKey';
 
 function levelNameOf(building: BuildingModel, element: BuildingElement): string | null {
   return 'levelId' in element ? (building.levels[element.levelId]?.name ?? element.levelId) : null;
@@ -32,11 +33,11 @@ function ElementEditor({
   const levels = orderedValues(building.levelOrder, building.levels);
   switch (element.category) {
     case 'member':
-      return <SteelMemberEditor key={JSON.stringify(element)} member={element} />;
+      return <SteelMemberEditor key={contentKey(element)} member={element} />;
     case 'equipment':
-      return <EquipmentEditor key={JSON.stringify(element)} element={element} levels={levels} />;
+      return <EquipmentEditor key={contentKey(element)} element={element} levels={levels} />;
     case 'wall':
-      return <WallEditor key={JSON.stringify(element)} wall={element} />;
+      return <WallEditor key={contentKey(element)} wall={element} />;
     default:
       return null;
   }

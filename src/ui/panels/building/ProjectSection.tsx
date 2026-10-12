@@ -10,6 +10,7 @@ import { useStore } from '@ui/store';
 import { createEmptyBuilding, type ProjectInfo } from '@core/model/building';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { LabeledInput } from './LabeledInput';
+import { contentKey } from '@ui/contentKey';
 
 const FIELDS: ReadonlyArray<readonly [keyof ProjectInfo, string]> = [
   ['name', 'Project'],
@@ -69,7 +70,7 @@ export function ProjectSection(): React.ReactElement {
   // Remount the form when the stored project changes (load / undo / MCP edit).
   return (
     <PanelSection title="Project" collapsible testId="building-project">
-      <ProjectForm key={JSON.stringify(project)} project={project} />
+      <ProjectForm key={contentKey(project)} project={project} />
     </PanelSection>
   );
 }

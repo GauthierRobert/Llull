@@ -1,0 +1,17 @@
+{
+  "$comment": "Service-worker caching policy (read by viteServiceWorker.ts at build time). Predictable by design: the app shell is precached per build, content-hashed /assets/ files are cache-first, every other request (server API, live stream, MCP, samples, WASM) goes straight to the network. One cache per build; activating a new build deletes the old ones.",
+  "precache": {
+    "shell": ["index.html", "favicon.svg"],
+    "include": "^assets/[^/]+\\.(js|css)$",
+    "exclude": "occt|opencascade|\\.wasm$",
+    "maxEntryBytes": 2000000
+  },
+  "runtime": {
+    "cacheFirst": "^/assets/",
+    "exclude": "\\.wasm$"
+  },
+  "navigation": {
+    "fallback": "/index.html",
+    "bypass": "^/(live|mcp|command|undo|redo|export|import|license|admin|samples)(/|$)"
+  }
+}
