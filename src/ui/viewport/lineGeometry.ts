@@ -29,10 +29,24 @@ export function chainSegments(points: ReadonlyArray<Vec2>): Vec2[] {
   });
 }
 
+/** `points` with the first point repeated at the end (a closed chain); empty stays empty. */
+export function closeLoop<P>(points: ReadonlyArray<P>): P[] {
+  return [...points, ...points.slice(0, 1)];
+}
+
 /** Segment vertex pairs tracing `points` as a closed loop. */
 export function loopSegments(points: ReadonlyArray<Vec2>): Vec2[] {
-  const [first] = points;
-  return chainSegments(first ? [...points, first] : points);
+  return chainSegments(closeLoop(points));
+}
+
+/** Corners of a `width` x `height` rectangle with its lower-left at the origin (CCW). */
+export function rectangleCorners(width: number, height: number): Vec2[] {
+  return [
+    [0, 0],
+    [width, 0],
+    [width, height],
+    [0, height],
+  ];
 }
 
 /** Segment vertex pairs approximating an axis-aligned ellipse outline. */

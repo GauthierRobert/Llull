@@ -9,7 +9,7 @@
 import { useMemo } from 'react';
 import type { SubdivisionEntity } from '@core/model/types';
 import { subdivisionTriangles } from '@core/geometry/subdivision';
-import { buildMeshSolidGeometry } from './meshSolidGeometry';
+import { buildTriangleSoupGeometry } from './meshSolidGeometry';
 import { SolidMeshShell, type SolidMeshKindProps, type SolidSurface } from './SolidMeshShell';
 
 const SUBDIVISION_SURFACE: SolidSurface = { roughness: 0.45, metalness: 0.1, envMapIntensity: 0.9 };
@@ -20,10 +20,7 @@ export function SubdivisionMesh({
 }: SolidMeshKindProps<SubdivisionEntity>): React.ReactElement | null {
   const { vertices, faces, creases, levels } = entity;
   const geometry = useMemo(() => {
-    const positions = subdivisionTriangles({ vertices, faces, creases, levels }).flat(2);
-    if (positions.length === 0) return null;
-    const indices = Array.from({ length: positions.length / 3 }, (_, corner) => corner);
-    return buildMeshSolidGeometry({ positions, indices });
+    return buildTriangleSoupGeometry(subdivisionTriangles({ vertices, faces, creases, levels }));
   }, [vertices, faces, creases, levels]);
 
   if (geometry === null) return null;

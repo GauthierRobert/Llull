@@ -9,6 +9,7 @@ import type { Entity, Vec2 } from '@core/model/types';
 import { projectOntoSegment } from '@lib/polygon';
 import { wrapAngle } from '@lib/angle';
 import type { SnapPoint } from './types';
+import { closeLoop, rectangleCorners } from '../../lineGeometry';
 
 /** Line segment as [x1, y1, x2, y2]. */
 export type Segment = [number, number, number, number];
@@ -72,35 +73,22 @@ export function entityToSegments(entity: Entity): Segment[] {
     ...localToWorld2D(entity, a[0], a[1]),
     ...localToWorld2D(entity, b[0], b[1]),
   ];
+  const chain = (points: ReadonlyArray<Vec2>, closed: boolean): Segment[] => {
+    const path = closed && points.length >= 2 ? closeLoop(points) : points;
+    return path.flatMap((a, index) => {
+      const b = path[index + 1];
+      return b ? [segmentBetween(a, b)] : [];
+    });
+  };
 
   switch (entity.kind) {
     case 'line': {
       return [segmentBetween(entity.start, entity.end)];
     }
-    case 'polyline': {
-      const segs: Segment[] = [];
-      const pts = entity.points;
-      for (let i = 0; i < pts.length - 1; i++) {
-        const a = pts[i];
-        const b = pts[i + 1];
-        if (a && b) segs.push(segmentBetween(a, b));
-      }
-      const first = pts[0];
-      const last = pts[pts.length - 1];
-      if (entity.closed && first && last && pts.length >= 2) {
-        segs.push(segmentBetween(last, first));
-      }
-      return segs;
-    }
-    case 'rectangle': {
-      const { width, height } = entity;
-      return [
-        segmentBetween([0, 0], [width, 0]),
-        segmentBetween([width, 0], [width, height]),
-        segmentBetween([width, height], [0, height]),
-        segmentBetween([0, height], [0, 0]),
-      ];
-    }
+    case 'polyline':
+      return chain(entity.points, entity.closed);
+    case 'rectangle':
+      return chain(rectangleCorners(entity.width, entity.height), true);
     default:
       return [];
   }

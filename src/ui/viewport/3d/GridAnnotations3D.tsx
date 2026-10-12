@@ -12,14 +12,14 @@ import type { CadDocument, Entity, Vec3 } from '@core/model/types';
 import { circlePoints } from '@core/geometry/tessellation';
 import { useViewportStore } from '@ui/store';
 import { TEXT_FONT_URL } from '@ui/viewport/textFont';
+import { closeLoop } from '@ui/viewport/lineGeometry';
 import { collectGridAnnotations, GRID_LAYER_NAME } from './gridAnnotations';
 
 const CIRCLE_SEGMENTS = 40;
 
 /** Closed bubble outline (first point repeated). */
 function bubbleOutline(radius: number): Vec3[] {
-  const ring = circlePoints(0, 0, 0, radius, CIRCLE_SEGMENTS);
-  return [...ring, ...ring.slice(0, 1)];
+  return closeLoop(circlePoints(0, 0, 0, radius, CIRCLE_SEGMENTS));
 }
 
 export function GridAnnotations3D({ document }: { document: CadDocument }): React.ReactElement {

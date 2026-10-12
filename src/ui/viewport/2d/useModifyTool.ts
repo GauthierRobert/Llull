@@ -20,10 +20,11 @@
  * - Keyboard shortcut keys (O/F/K/T/X/E) activate the matching tool.
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import type { Vec2 } from '@core/model/types';
 import { type ModifyToolKind, useStore, useToolStore } from '@ui/store';
 import { isEditingKeyEvent } from '@ui/hooks/useKeyboardShortcuts';
+import { useCaptureKeydown } from '@ui/hooks/useCaptureKeydown';
 import { nearestVertex, signedOffsetDistance } from './modifyHelpers';
 
 /** Describes what the user should do next for the active modify tool. */
@@ -208,8 +209,8 @@ export function useModifyTool(): UseModifyToolResult {
 
   // Keyboard: Esc cancels the pick in progress, then disarms; Enter commits (value phase);
   // O/F/K/T/X/E activate tools. Keys typed into fields or dialogs are never consumed.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
+  const onKey = useCallback(
+    (e: KeyboardEvent): void => {
       if (isEditingKeyEvent(e)) return;
       if (e.key === 'Escape') {
         if (activeTool === 'none') return;
@@ -225,11 +226,10 @@ export function useModifyTool(): UseModifyToolResult {
           setActiveTool(activeTool === tool ? 'none' : tool);
         }
       }
-    };
-    // Capture phase: runs before the global shortcut handler, which skips consumed (prevented) keys.
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [activeTool, cancel, commitValue, phase, setActiveTool]);
+    },
+    [activeTool, cancel, commitValue, phase, setActiveTool],
+  );
+  useCaptureKeydown(onKey);
 
   return {
     activeTool,
