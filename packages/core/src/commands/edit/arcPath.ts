@@ -7,7 +7,7 @@
 
 import type { CurveSegment } from '../../model/curve';
 import type { Vec3 } from '../../model/types';
-import { add3, cross3, dot3, len3, normalize3, scale3, sub3 } from '../../lib/vec3';
+import { add3, cross3, dot3, isVec3, len3, normalize3, scale3, sub3 } from '../../lib/vec3';
 
 export interface ArcSpec {
   readonly center: readonly number[];
@@ -16,9 +16,6 @@ export interface ArcSpec {
   readonly startAngle: number;
   readonly endAngle: number;
 }
-
-const isTriple = (value: readonly number[]): value is Vec3 =>
-  value.length === 3 && value.every(Number.isFinite);
 
 /** Unit vector perpendicular to `n`: the arc plane's local +X (angle origin). */
 function inPlaneX(n: Vec3): Vec3 {
@@ -32,8 +29,8 @@ function inPlaneX(n: Vec3): Vec3 {
  */
 export function arcPath(arc: ArcSpec): CurveSegment<Vec3>[] | string {
   const { center, normal, radius, startAngle, endAngle } = arc;
-  if (!isTriple(center)) return 'arc center must be a finite [x, y, z] triple';
-  if (!isTriple(normal) || len3(normal) < 1e-10) return 'arc normal must be a non-zero vector';
+  if (!isVec3(center)) return 'arc center must be a finite [x, y, z] triple';
+  if (!isVec3(normal) || len3(normal) < 1e-10) return 'arc normal must be a non-zero vector';
   if (!(radius > 0)) return `arc radius must be > 0 (got ${radius})`;
   if (!Number.isFinite(startAngle) || !Number.isFinite(endAngle))
     return 'arc angles must be finite numbers';

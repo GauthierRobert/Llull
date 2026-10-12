@@ -2,7 +2,7 @@ import { type CadDocument, type SubdivisionEntity, type Vec3 } from '../../model
 import type { CommandResult } from '../types';
 import { colorField, defineCommand, vec3, z, layerIdField, nameField } from '../schema';
 import { noop } from '../noop';
-import { add3, distance3, scale3, sub3 } from '../../lib/vec3';
+import { centroid3, distance3, sub3 } from '../../lib/vec3';
 import { newEntity } from '../entity/newEntity';
 import {
   DEFAULT_SOLID_COLOR,
@@ -107,10 +107,7 @@ export const surfaceFromCurves = defineCommand({
     if (typeof cage === 'string') return fail(cage);
     const problem = sizeProblem(cage, levels) ?? cageProblem(cage);
     if (problem !== null) return fail(problem);
-    const origin = scale3(
-      cage.vertices.reduce<Vec3>((sum, p) => add3(sum, p), [0, 0, 0]),
-      1 / cage.vertices.length,
-    );
+    const origin = centroid3(cage.vertices);
     const id = explicitIdOrNext(explicitId, 'subd');
     const entity = newEntity(
       'subdivision',

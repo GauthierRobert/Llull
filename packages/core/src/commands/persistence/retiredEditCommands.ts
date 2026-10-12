@@ -8,12 +8,9 @@
 
 import type { RetiredCommandRewrite } from '../types';
 import type { Vec3 } from '../../model/types';
-import { distance3 } from '../../lib/vec3';
+import { distance3, isVec3 } from '../../lib/vec3';
 
 type Params = Record<string, unknown>;
-
-const isTriple = (value: unknown): value is [number, number, number] =>
-  Array.isArray(value) && value.length === 3 && value.every(Number.isFinite);
 
 /** `{ name, params }` with the entries of `entries` whose value is defined. */
 function call(name: string, entries: Params): ReturnType<RetiredCommandRewrite> {
@@ -28,7 +25,7 @@ const singleId = (id: unknown): unknown[] => (id === undefined ? [] : [id]);
 
 /** Polyline length of a point list, or null when any point is not a finite triple. */
 function polylineLength(path: unknown): number | null {
-  if (!Array.isArray(path) || !path.every(isTriple)) return null;
+  if (!Array.isArray(path) || !path.every(isVec3)) return null;
   const points: Vec3[] = path;
   return points.reduce(
     (total, point, i) => total + (i === 0 ? 0 : distance3(point, points[i - 1] ?? point)),
@@ -96,7 +93,7 @@ export const RETIRED_EDIT_COMMANDS: Readonly<Record<string, RetiredCommandRewrit
 
   /** A cylinder centred on the midpoint of p1..p2 with its axis along p2 - p1. */
   make_tube_between: ({ p1, p2, radius, color }) => {
-    const valid = isTriple(p1) && isTriple(p2);
+    const valid = isVec3(p1) && isVec3(p2);
     return call('add_cylinder', {
       radius,
       height: valid ? distance3(p1, p2) : 0,

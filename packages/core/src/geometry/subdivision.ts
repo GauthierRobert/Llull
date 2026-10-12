@@ -8,7 +8,8 @@
  */
 
 import type { SubdivisionEntity, Vec3 } from '../model/types';
-import { add3, scale3 } from '../lib/vec3';
+import { add3, centroid3, scale3 } from '../lib/vec3';
+import type { Triangle } from './triangles';
 
 /** Deepest refinement accepted (each level multiplies the face count by 4). */
 export const MAX_SUBDIVISION_LEVELS = 4;
@@ -20,16 +21,8 @@ export interface Cage {
   readonly creases: ReadonlyArray<readonly [number, number]>;
 }
 
-type Triangle = readonly [Vec3, Vec3, Vec3];
-
 /** Order-independent key of the edge a–b. */
 export const edgeKey = (a: number, b: number): string => (a < b ? `${a}:${b}` : `${b}:${a}`);
-
-const average = (points: readonly Vec3[]): Vec3 =>
-  scale3(
-    points.reduce<Vec3>((sum, p) => add3(sum, p), [0, 0, 0]),
-    1 / points.length,
-  );
 
 /**
  * First vertex whose faces do not form one fan (closed manifold assumed edge-wise): walking from
@@ -121,14 +114,14 @@ export function subdivideOnce(cage: Cage): Cage {
       edges.set(key, edge);
     }),
   );
-  const facePoints = faces.map((face) => average(face.map((v) => vertices[v] as Vec3)));
+  const facePoints = faces.map((face) => centroid3(face.map((v) => vertices[v] as Vec3)));
   const edgeList = [...edges.values()];
   const edgeIndex = new Map(edgeList.map((edge, i) => [edgeKey(edge.a, edge.b), i]));
   const edgePoints = edgeList.map((edge) => {
     const ends = [vertices[edge.a] as Vec3, vertices[edge.b] as Vec3];
     return edge.sharp
-      ? average(ends)
-      : average([...ends, ...edge.faces.map((f) => facePoints[f] as Vec3)]);
+      ? centroid3(ends)
+      : centroid3([...ends, ...edge.faces.map((f) => facePoints[f] as Vec3)]);
   });
   const incident = vertices.map((): EdgeInfo[] => []);
   const adjacentFaces = vertices.map((): number[] => []);
@@ -146,9 +139,9 @@ export function subdivideOnce(cage: Cage): Cage {
       return scale3(add3(add3(scale3(p, 6), first as Vec3), second as Vec3), 1 / 8);
     }
     const n = around.length;
-    const q = average((adjacentFaces[v] as number[]).map((f) => facePoints[f] as Vec3));
-    const r = average(
-      around.map((edge) => average([vertices[edge.a] as Vec3, vertices[edge.b] as Vec3])),
+    const q = centroid3((adjacentFaces[v] as number[]).map((f) => facePoints[f] as Vec3));
+    const r = centroid3(
+      around.map((edge) => centroid3([vertices[edge.a] as Vec3, vertices[edge.b] as Vec3])),
     );
     return scale3(add3(add3(q, scale3(r, 2)), scale3(p, n - 3)), 1 / n);
   });

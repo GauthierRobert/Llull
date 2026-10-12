@@ -2,7 +2,7 @@ import type { CadDocument, Vec2, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { colorField, defineCommand, vec3, z, layerIdField } from '../schema';
 import { noop } from '../noop';
-import { add3, distance3, dot3, scale3, sub3 } from '../../lib/vec3';
+import { add3, centroid3, distance3, dot3, sub3 } from '../../lib/vec3';
 import { applyEulerXYZ } from '../../lib/eulerRotation';
 import { newEntity } from '../entity/newEntity';
 import {
@@ -55,12 +55,6 @@ function placedSections(
   return placed;
 }
 
-const centroid = (ring: readonly Vec3[]): Vec3 =>
-  scale3(
-    ring.reduce<Vec3>((sum, p) => add3(sum, p), [0, 0, 0]),
-    1 / ring.length,
-  );
-
 /**
  * World rings: resampled, wound counter-clockwise about the direction of travel and cyclically
  * aligned to their predecessor (no twist); or an error message.
@@ -71,7 +65,7 @@ function loftRingsOf(placed: readonly PlacedSection[]): Vec3[][] | string {
       add3(applyEulerXYZ([x, y, 0], [0, 0, 0], rotation), origin),
     ),
   );
-  const centres = raw.map(centroid);
+  const centres = raw.map((ring) => centroid3(ring));
   for (let i = 1; i < centres.length; i++) {
     if (distance3(centres[i] as Vec3, centres[i - 1] as Vec3) < 1e-6)
       return `sections ${i - 1} and ${i} share the same centre; space them along the loft`;
@@ -148,13 +142,13 @@ export const loftSections = defineCommand({
     if (typeof placed === 'string') return fail(placed);
     const world = loftRingsOf(placed);
     if (typeof world === 'string') return fail(world);
-    const origin = centroid(world[0] as Vec3[]);
+    const origin = centroid3(world[0] as Vec3[]);
     const rings = world.map((ring) => ring.map((p) => sub3(p, origin)));
     const id = explicitIdOrNext(explicitId, 'loft');
     const entity = newEntity('loft', id, { rings, ruled }, origin, color, {
       layerId: existingLayerOrDefault(doc, layerId),
     });
-    const span = distance3(origin, centroid(world[world.length - 1] as Vec3[]));
+    const span = distance3(origin, centroid3(world[world.length - 1] as Vec3[]));
     return commitSolid(
       doc,
       entity,

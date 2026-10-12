@@ -1,5 +1,5 @@
-import type { CadDocument, Entity, ImageEntity, Vec3 } from '../../model/types';
-import { ORIGIN, add3 } from '../../lib/vec3';
+import type { CadDocument, Entity, ImageEntity } from '../../model/types';
+import { ORIGIN, centroid3 } from '../../lib/vec3';
 import { computeSceneSnapshot } from '../inspect/scene';
 import { boundsCenter, boundsRadius } from '../../geometry/bounds';
 import type { PreDepthPolygon, Polygon3D, RenderOptions, RenderViewData } from './types';
@@ -19,12 +19,6 @@ function drawableEntities(doc: CadDocument, e: Entity, depth = 0): Entity[] {
   const component = doc.components[e.componentId];
   if (!component || depth >= MAX_INSTANCE_DEPTH) return [];
   return expandInstance(e, component).flatMap((child) => drawableEntities(doc, child, depth + 1));
-}
-
-function centroid3(verts: Vec3[]): Vec3 {
-  if (verts.length === 0) return [0, 0, 0];
-  const sum = verts.reduce((acc, v) => add3(acc, v), ORIGIN);
-  return [sum[0] / verts.length, sum[1] / verts.length, sum[2] / verts.length];
 }
 
 /** Z-up orthographic SVG render of every entity in `doc.order`. @pure */

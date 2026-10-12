@@ -7,16 +7,9 @@
  */
 
 import type { Vec3 } from '../../model/types';
-import { add3, dot3, normalize3, scale3, sub3 } from '../../lib/vec3';
+import { dot3, normalize3, sub3 } from '../../lib/vec3';
 import type { CutSpec, PreDepthPolygon } from './types';
-
-/** Unit-normal plane; `signed(p) > 0` is the removed (cut) side. */
-export interface UnitPlane {
-  normal: Vec3;
-  offset: number;
-}
-
-const signed = (plane: UnitPlane, p: Vec3): number => dot3(plane.normal, p) - plane.offset;
+import { type UnitPlane, edgeCrossing, forEachEdge } from '../../geometry/planeEdges';
 
 /** True when every plane has a finite, non-zero normal and a finite offset. */
 export function isValidCut(cut: CutSpec): boolean {
@@ -39,30 +32,13 @@ export function unitPlanes(cut: CutSpec): UnitPlane[] {
   });
 }
 
-/** Visit each edge `a→b` of the closed polygon `verts` with both ends' signed plane distances. */
-function forEachEdge(
-  verts: readonly Vec3[],
-  plane: UnitPlane,
-  visit: (a: Vec3, b: Vec3, sa: number, sb: number) => void,
-): void {
-  for (let i = 0; i < verts.length; i++) {
-    const a = verts[i] as Vec3;
-    const b = verts[(i + 1) % verts.length] as Vec3;
-    visit(a, b, signed(plane, a), signed(plane, b));
-  }
-}
-
-/** Where edge `a→b` (signed distances `sa`, `sb` of opposite sides) meets the plane. */
-const crossing = (a: Vec3, b: Vec3, sa: number, sb: number): Vec3 =>
-  add3(a, scale3(sub3(b, a), sa / (sa - sb)));
-
 /** Sutherland–Hodgman clip of a polygon to one side of `plane` (`keepCut` ⇒ the cut side). */
 export function clipToSide(verts: Vec3[], plane: UnitPlane, keepCut: boolean): Vec3[] {
   const out: Vec3[] = [];
   const inside = (s: number): boolean => (keepCut ? s > 0 : s <= 0);
   forEachEdge(verts, plane, (a, b, sa, sb) => {
     if (inside(sa)) out.push(a);
-    if (inside(sa) !== inside(sb)) out.push(crossing(a, b, sa, sb));
+    if (inside(sa) !== inside(sb)) out.push(edgeCrossing(a, b, sa, sb));
   });
   return out.length >= 3 ? out : [];
 }
@@ -95,7 +71,7 @@ function chords(polygons: readonly PreDepthPolygon[], plane: UnitPlane): [Vec3, 
   for (const { verts } of polygons) {
     const hits: Vec3[] = [];
     forEachEdge(verts, plane, (a, b, sa, sb) => {
-      if (sa > 0 !== sb > 0) hits.push(crossing(a, b, sa, sb));
+      if (sa > 0 !== sb > 0) hits.push(edgeCrossing(a, b, sa, sb));
     });
     // Pair crossings along the plane (convex faces have exactly two).
     if (hits.length === 2) segments.push([hits[0] as Vec3, hits[1] as Vec3]);
