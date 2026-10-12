@@ -82,10 +82,6 @@ function entryOf(tool: CatalogTool): CatalogEntry {
   };
 }
 
-export function isToolsetName(value: string): value is ToolsetName {
-  return (TOOLSET_NAMES as readonly string[]).includes(value);
-}
-
 /** Every callable tool (optionally one toolset), sorted by toolset order then name. */
 export function listCatalog(toolset?: ToolsetName): CatalogEntry[] {
   const order = (name: ToolsetName): number => TOOLSET_NAMES.indexOf(name);

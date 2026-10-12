@@ -211,7 +211,8 @@ interface ParsedToolsets {
   readonly unknown: readonly string[];
 }
 
-function isToolsetName(value: string): value is ToolsetName {
+/** `value` names a toolset. */
+export function isToolsetName(value: string): value is ToolsetName {
   return (TOOLSET_NAMES as readonly string[]).includes(value);
 }
 
