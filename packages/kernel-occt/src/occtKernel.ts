@@ -20,8 +20,8 @@ import { entityToOccShape, placementTransform, transformedCopy } from './occtSha
 import { extractMeshData } from './occtMesh';
 import { shapeTopology, uniqueSubShapes } from './occtTopology';
 import { writeStep } from './occtStep';
+import { release, withOwned } from '@core/geometry/nativeObject';
 import {
-  release,
   type OccApi,
   type OccBuilder,
   type OccFilletMaker,
@@ -112,20 +112,11 @@ function guarded<T>(
   operation: OperationClass,
   body: (own: <H extends OccHandle | null>(handle: H) => H) => T | null,
 ): T | null {
-  const owned: Array<OccHandle | null> = [];
-  try {
-    return body((handle) => {
-      owned.push(handle);
-      return handle;
-    });
-  } catch (error) {
+  return withOwned(body, (error) => {
     if (degradesModule(error, operation)) nativeFailures++;
     if (error instanceof Error)
       console.warn(`[occtKernel] OCC operation failed: ${errorMessage(error)}`);
-    return null;
-  } finally {
-    owned.forEach(release);
-  }
+  });
 }
 
 let nativeFailures = 0;

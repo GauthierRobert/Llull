@@ -13,14 +13,8 @@ import type {
   ShapeTopology,
 } from '@core/geometry/kernel';
 import type { Vec3 } from '@core/model/types';
-import {
-  explorer,
-  release,
-  type OccApi,
-  type OccHandle,
-  type OccPoint,
-  type OccShape,
-} from './occtTypes';
+import { release } from '@core/geometry/nativeObject';
+import { explorer, type OccApi, type OccHandle, type OccPoint, type OccShape } from './occtTypes';
 
 type SubShapeKind = 'TopAbs_SOLID' | 'TopAbs_FACE' | 'TopAbs_EDGE' | 'TopAbs_VERTEX';
 
