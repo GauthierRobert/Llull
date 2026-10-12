@@ -7,6 +7,7 @@
  */
 
 import type { Vec2 } from '@core/model/types';
+import { circleOutline } from '@lib/gearOutline';
 import { round } from '../shared/numeric';
 
 type ProfileShape = 'I' | 'U' | 'C' | 'SHS' | 'RHS' | 'CHS' | 'L';
@@ -275,14 +276,6 @@ interface ProfileOutline {
   readonly holes: Vec2[][];
 }
 
-/** Counter-clockwise polygon of `segments` vertices on a circle of `radius` centred on the origin. */
-export function circleOutline(radius: number, segments: number): Vec2[] {
-  return Array.from({ length: segments }, (_, index): Vec2 => {
-    const angle = (index / segments) * Math.PI * 2;
-    return [radius * Math.cos(angle), radius * Math.sin(angle)];
-  });
-}
-
 const CIRCLE_SEGMENTS = 20;
 
 function circle(radius: number, clockwise: boolean): Vec2[] {
@@ -305,6 +298,13 @@ function rectangle(width: number, height: number, clockwise = false): Vec2[] {
 export function profileOutline(profile: SteelProfile): ProfileOutline {
   const { h, b, tw, tf, lip } = profile;
   const [x, y] = [b / 2, h / 2];
+  /** Bottom flange and web foot shared by the U and L outlines (web on the left). */
+  const footed: Vec2[] = [
+    [-x, -y],
+    [x, -y],
+    [x, -y + tf],
+    [-x + tw, -y + tf],
+  ];
   switch (profile.shape) {
     case 'I':
       return {
@@ -326,16 +326,7 @@ export function profileOutline(profile: SteelProfile): ProfileOutline {
       };
     case 'U':
       return {
-        outer: [
-          [-x, -y],
-          [x, -y],
-          [x, -y + tf],
-          [-x + tw, -y + tf],
-          [-x + tw, y - tf],
-          [x, y - tf],
-          [x, y],
-          [-x, y],
-        ],
+        outer: [...footed, [-x + tw, y - tf], [x, y - tf], [x, y], [-x, y]],
         holes: [],
       };
     case 'C':
@@ -358,14 +349,7 @@ export function profileOutline(profile: SteelProfile): ProfileOutline {
       };
     case 'L':
       return {
-        outer: [
-          [-x, -y],
-          [x, -y],
-          [x, -y + tf],
-          [-x + tw, -y + tf],
-          [-x + tw, y],
-          [-x, y],
-        ],
+        outer: [...footed, [-x + tw, y], [-x, y]],
         holes: [],
       };
     case 'SHS':
