@@ -113,7 +113,6 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'add_spline_shaft',
     'add_keyed_shaft',
     'pattern_along_path',
-    'instantiate_template',
     'create_material',
     'assign_material',
     'add_decal',

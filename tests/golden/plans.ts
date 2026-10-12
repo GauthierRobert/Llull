@@ -637,31 +637,6 @@ export const plans: Record<string, GoldenAction[]> = {
       },
     },
   ],
-  templates: [
-    {
-      command: 'instantiate_template',
-      params: {
-        template: 'bolt_hole_pattern',
-        params: { count: 6, boltCircleRadius: 10, holeRadius: 1 },
-      },
-    },
-    {
-      command: 'instantiate_template',
-      params: {
-        template: 'rectangular_plate_with_holes',
-        params: {
-          width: 40,
-          height: 20,
-          holeRows: 2,
-          holeCols: 3,
-          holeRadius: 2,
-          marginX: 5,
-          marginY: 5,
-        },
-        position: [0, 30, 0],
-      },
-    },
-  ],
   distribute_align_stack: [
     { command: 'add_box', params: { size: [1, 1, 1], position: [0, 0, 0] }, as: 'a' },
     { command: 'add_box', params: { size: [1, 1, 1], position: [7, 2, 0] }, as: 'b' },

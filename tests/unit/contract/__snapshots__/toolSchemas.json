@@ -6711,44 +6711,6 @@
     "name": "instantiate_recipe"
   },
   {
-    "description": "Create a common parametric CAD part in a single call. template selects which generator to use; params are the template dimensions. Returns all created entity ids in a deterministic order. Templates: \"bolt_hole_pattern\" — N equally-spaced circles on a bolt circle (params: count, boltCircleRadius, holeRadius); \"flange\" — outer circle + bore circle + bolt-hole ring (params: outerRadius, boreRadius, boltCount, boltCircleRadius, holeRadius); \"rectangular_plate_with_holes\" — rectangle plate + grid of circles (params: width, height, holeRows, holeCols, holeRadius, marginX, marginY).",
-    "input_schema": {
-      "properties": {
-        "color": {
-          "description": "Hex color string for all created entities, e.g. \"#4a90d9\". Defaults to \"#4a90d9\".",
-          "type": "string"
-        },
-        "params": {
-          "description": "Template-specific dimension parameters as a JSON object. bolt_hole_pattern: { count: number, boltCircleRadius: number, holeRadius: number }. flange: { outerRadius, boreRadius, boltCount, boltCircleRadius, holeRadius }. rectangular_plate_with_holes: { width, height, holeRows, holeCols, holeRadius, marginX, marginY }.",
-          "properties": {},
-          "type": "object"
-        },
-        "position": {
-          "description": "World-space [x, y, z] position of the work-plane origin for the template. Defaults to [0, 0, 0]. Format [x, y, z]; [x, y] is accepted and placed at z=0.",
-          "items": {
-            "type": "number"
-          },
-          "type": "array"
-        },
-        "template": {
-          "description": "Which template to instantiate. Must be one of: \"bolt_hole_pattern\", \"flange\", \"rectangular_plate_with_holes\".",
-          "enum": [
-            "bolt_hole_pattern",
-            "flange",
-            "rectangular_plate_with_holes"
-          ],
-          "type": "string"
-        }
-      },
-      "required": [
-        "template",
-        "params"
-      ],
-      "type": "object"
-    },
-    "name": "instantiate_template"
-  },
-  {
     "annotations": {
       "idempotentHint": true,
       "readOnlyHint": true

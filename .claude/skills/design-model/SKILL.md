@@ -41,7 +41,7 @@ verify and refine.
 | Modify 3D           | `fillet_edge` `chamfer_edge`                                                                                                         |
 | Place/replicate     | `move_entities` `rotate_entity` `scale_entity` `mirror_entity` `array_linear` `array_polar` `duplicate_entities`                         |
 | Organize            | `group_entities` `ungroup_entities` `set_entity_name` `set_entity_layer` `assign_material`                                           |
-| Reuse               | `instantiate_template` (`bolt_hole_pattern`, `flange`, `rectangular_plate_with_holes`), `instantiate_recipe`, `create_configuration` |
+| Reuse               | `instantiate_recipe`, `create_configuration` |
 | Annotate            | `add_text` `add_dimension`                                                                                                           |
 | Inspect (read-only) | `describe_scene` `find_entities` `check_model`                                                                                       |
 | Measure (read-only) | `measure_distance` `measure_angle` `measure_area` `measure_perimeter` `measure_bounding_box` `mass_properties` (volume, +mass with density)      |
@@ -116,8 +116,8 @@ for the dependency to be tracked; the legacy `{ repeat, step }` / `{ for_each, s
 (single step, not nestable) still work but are frozen to values per iteration.
 `validate: true` expands loops and reports issues by path, e.g. `step 4 › iter 2 › step 1 (add_box): ...`.
 
-Reuse beats hand-drafting: prefer `instantiate_template` for bolt patterns/flanges/plates
-and `instantiate_recipe`/`array_*` for repetition before drawing primitives one by one.
+Reuse beats hand-drafting: prefer a `repeat` loop (e.g. bolt circles via `=r*cos(2*pi*i/n)`),
+`instantiate_recipe` or `array_*` for repetition before drawing primitives one by one.
 
 ### 3. Validate (dry run) before applying
 
