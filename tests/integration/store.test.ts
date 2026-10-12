@@ -68,7 +68,7 @@ function offlineMoveBesideAgentBox(): {
   useStore.setState({ liveStatus: 'disconnected' });
   getState().dispatch('add_box', { size: [1, 1, 1] });
   const localBoxId = getState().document.order[0]!;
-  getState().dispatch('move_entity', { id: localBoxId, delta: [5, 0, 0] });
+  getState().dispatch('move_entities', { ids: [localBoxId], delta: [5, 0, 0] });
   const server = simulatedServer();
   const agentBoxId = server.inject('add_box', { size: [2, 2, 2] })[0]!;
   return { server, agentBoxId, localBoxId };
@@ -388,7 +388,7 @@ describe('CadStore — offline fallback', () => {
 
   it('offline no-op command pushes no history', () => {
     useStore.setState({ liveStatus: 'disconnected' });
-    getState().dispatch('delete_entity', { id: 'missing' });
+    getState().dispatch('delete_entities', { ids: ['missing'] });
     expect(getState().localUndoStack).toHaveLength(0);
     expect(getState().hasUnsyncedLocalEdits).toBe(false);
   });

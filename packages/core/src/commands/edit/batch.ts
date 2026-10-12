@@ -6,7 +6,7 @@
 
 import type { CadDocument, Entity } from '../../model/types';
 import type { CommandResult } from '../types';
-import { defineCommand, vec3, z } from '../schema';
+import { defineCommand, looseVec3, vec3, z } from '../schema';
 import { MAX_BATCH_IDS } from '../limits';
 import { referenceSuffix, withEntities, withoutEntities } from '../entity/entityOps';
 import { nextId } from '../../lib/id';
@@ -60,8 +60,7 @@ export const deleteEntities = defineCommand({
   name: 'delete_entities',
   annotations: { destructive: true },
   description:
-    'Permanently remove several entities in one step (one undo). Same semantics as delete_entity ' +
-    'applied to each id: entities are also removed from groups, and groups left with fewer than ' +
+    'Permanently remove several entities in one step (one undo). Entities are also removed from groups, and groups left with fewer than ' +
     '2 members are dissolved. Ids that do not exist are skipped and listed in the summary; ' +
     'if none exist nothing changes.',
   params: z.object({
@@ -108,8 +107,7 @@ export const deleteEntities = defineCommand({
 export const moveEntities = defineCommand({
   name: 'move_entities',
   description:
-    'Translate several entities by the same delta in one step (one undo). Same semantics as ' +
-    'move_entity applied to each id. Ids that do not exist are skipped and listed in the summary; ' +
+    'Translate several entities by the same delta in one step (one undo). Ids that do not exist are skipped and listed in the summary; ' +
     'if none exist nothing changes.',
   params: z.object({
     ids: z
@@ -149,7 +147,7 @@ export const duplicateEntities = defineCommand({
   name: 'duplicate_entities',
   description:
     'Clone several entities in one step (one undo), placing each copy at original.position + offset. ' +
-    'Same semantics as duplicate_entity applied to each id; group membership is not copied. ' +
+    'Group membership is not copied. ' +
     'Ids that do not exist are skipped and listed in the summary; if none exist nothing changes. ' +
     'Returns the new entity ids in affected, in the order of the (de-duplicated) input ids.',
   params: z.object({
@@ -158,7 +156,7 @@ export const duplicateEntities = defineCommand({
       .describe(
         `Entity ids to duplicate (non-empty, at most ${MAX_BATCH_IDS}). Missing ids are skipped.`,
       ),
-    offset: vec3(
+    offset: looseVec3(
       'Optional [dx, dy, dz] offset applied to every copy. Defaults to [0, 0, 0] (exact overlap).',
     ).optional(),
   }),

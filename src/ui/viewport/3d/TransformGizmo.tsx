@@ -5,7 +5,7 @@
  *
  * drei <TransformControls> attaches to a sibling <group> that is a real scene-graph node (so the
  * "attached object must be part of the scene graph" error never fires). On drag END the delta vs
- * the pre-drag baseline is dispatched as move_entity | rotate_entity | scale_entity — the gizmo
+ * the pre-drag baseline is dispatched as move_entities | rotate_entity | scale_entity — the gizmo
  * NEVER mutates the entity itself (PRIME DIRECTIVE / R1).
  *
  * Feedback-loop prevention: the target group is synced FROM the entity only when the entity or the
@@ -23,7 +23,7 @@
  * Demand frameloop: during a drag TransformControls invalidates on every pointer move; when idle
  * this component never invalidates, so the loop quiesces.
  *
- * @affects dispatches move_entity | rotate_entity | scale_entity on drag end
+ * @affects dispatches move_entities | rotate_entity | scale_entity on drag end
  */
 
 import { useEffect, useRef, useCallback, useState, type MutableRefObject } from 'react';

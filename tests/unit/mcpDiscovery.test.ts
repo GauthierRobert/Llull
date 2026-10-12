@@ -49,7 +49,7 @@ describe('search_tools on natural phrasing', () => {
     ['bevel the edges', 'chamfer_edge'],
     ['how heavy is it', 'mass_properties'],
     ['take a picture', 'render_view'],
-    ['copy an entity many times in a row', 'duplicate_entity'],
+    ['copy an entity many times in a row', 'duplicate_entities'],
     ['export to STEP', 'export_step'],
     ['measure distance between two points', 'measure_distance'],
   ])('"%s" finds %s in the top results', (query, expected) => {

@@ -12,7 +12,7 @@
  *   already-snapped world coords.
  * - Esc cancels the current in-progress shape; Esc with nothing in progress returns to Select.
  * - Enter or double-click finishes a polyline, wall chain or spline in progress.
- * - 'move' translates the current selection by (second click - first click) via move_entity.
+ * - 'move' translates the current selection by (second click - first click) via move_entities.
  * - The hook is purely React state + callbacks — no three.js here.
  */
 

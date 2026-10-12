@@ -38,7 +38,7 @@ export interface CommandResult {
 export interface CommandAnnotations {
   /** Never mutates the document: returns the SAME document, `affected: []`, results in `data`. */
   readonly readOnly?: boolean;
-  /** Removes or irreversibly destroys document content (e.g. delete_entity, delete_layer). */
+  /** Removes or irreversibly destroys document content (e.g. delete_entities, delete_layer). */
   readonly destructive?: boolean;
   /** Calling twice with the same params gives the same end state as once (setter semantics). */
   readonly idempotent?: boolean;

@@ -18,7 +18,7 @@ describe('render_view draws component instances', () => {
   });
 
   it('a scaled instance covers more of the view than the unit-scale one', () => {
-    const scaled = execute(doc, 'move_entity', { id: instanceId, delta: [0, 0, 0] }).document;
+    const scaled = execute(doc, 'move_entities', { ids: [instanceId], delta: [0, 0, 0] }).document;
     const bigger: CadDocument = {
       ...scaled,
       entities: {

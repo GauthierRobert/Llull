@@ -239,8 +239,8 @@ describe('building integrity guard', () => {
   it('rejects generic commands that edit generated building geometry', () => {
     const doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [4000, 0] });
     for (const [name, params] of [
-      ['delete_entity', { id: 'wall-1:body-0' }],
-      ['move_entity', { id: 'wall-1:body-0', delta: [100, 0, 0] }],
+      ['delete_entities', { ids: ['wall-1:body-0'] }],
+      ['move_entities', { ids: ['wall-1:body-0'], delta: [100, 0, 0] }],
       ['delete_entities', { ids: ['wall-1:body-0'] }],
       ['delete_layer', { id: 'layer-A-WALL' }],
     ] as const) {
@@ -256,7 +256,9 @@ describe('building integrity guard', () => {
     let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [4000, 0] });
     doc = run(doc, 'add_box', { size: [1, 1, 1] });
     const boxId = doc.order[doc.order.length - 1]!;
-    expect(execute(doc, 'move_entity', { id: boxId, delta: [1, 0, 0] }).document).not.toBe(doc);
+    expect(execute(doc, 'move_entities', { ids: [boxId], delta: [1, 0, 0] }).document).not.toBe(
+      doc,
+    );
     expect(execute(doc, 'update_wall', { wallId: 'wall-1', thickness: 300 }).document).not.toBe(
       doc,
     );

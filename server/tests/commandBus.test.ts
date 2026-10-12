@@ -114,8 +114,8 @@ describe('applyCommand — query command (measure_volume)', () => {
 
 describe('applyCommand — no-op (bad params)', () => {
   it('does not push history when the document is unchanged', () => {
-    // delete_entity with a non-existent id is a graceful no-op.
-    const result = applyCommand('delete_entity', { id: 'nonexistent-id' });
+    // delete_entities with a non-existent id is a graceful no-op.
+    const result = applyCommand('delete_entities', { ids: ['nonexistent-id'] });
 
     expect(result.isError).toBe(false);
     expect(getLiveDoc()).toBeDefined();

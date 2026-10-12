@@ -53,7 +53,7 @@ office? Click **Civil site starter** on the empty app for a complete sample site
 ```
 Document (recipe + evaluated)   ← feature history, parameters, entities, layers, ...
         ▲
-Command Layer (pure functions)  ← add_box, extrude_sketch, move_entity, ... + plugins
+Command Layer (pure functions)  ← add_box, extrude_sketch, move_entities, ... + plugins
         ▲                  ▲
    React UI  ◄── /live ──  MCP Server (Claude / any MCP agent)
 ```

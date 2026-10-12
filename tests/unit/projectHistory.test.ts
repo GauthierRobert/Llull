@@ -64,10 +64,10 @@ describe('build_project feature history', () => {
   it('records resolved ids (not $alias) for cross-step references', () => {
     const built = project(createEmptyDocument(), [
       { command: 'add_box', as: 'b', params: { size: [1, 1, 1] } },
-      { command: 'move_entity', params: { id: '$b', delta: [1, 0, 0] } },
+      { command: 'move_entities', params: { ids: ['$b'], delta: [1, 0, 0] } },
     ]);
-    const move = built.document.featureHistory[1]!.params as { id: string };
-    expect(move.id).toBe(built.affected[0]);
+    const move = built.document.featureHistory[1]!.params as { ids: string[] };
+    expect(move.ids).toEqual([built.affected[0]]);
   });
 
   describe('recordableParams', () => {

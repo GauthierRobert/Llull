@@ -15,12 +15,13 @@
  * geometry math is introduced here.
  */
 
-import type { Entity, Vec3 } from '../../model/types';
+import type { Entity } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { changed, noop } from '../noop';
 import { entityBoundsInDoc } from '../../geometry/bounds';
 import { replaceEntitiesById, replaceEntity } from '../entity/entityOps';
+import { translated } from '../solids/shared';
 
 type AxisIndex = 0 | 1 | 2;
 
@@ -28,13 +29,11 @@ const axisIndexOf = (axis: 'x' | 'y' | 'z'): AxisIndex => (axis === 'x' ? 0 : ax
 
 /** Copy of `e` translated by `delta` along one axis. */
 function shiftAlong(e: Entity, axisIndex: AxisIndex, delta: number): Entity {
-  const [x, y, z] = e.position;
-  const position: Vec3 = [
-    x + (axisIndex === 0 ? delta : 0),
-    y + (axisIndex === 1 ? delta : 0),
-    z + (axisIndex === 2 ? delta : 0),
-  ];
-  return { ...e, position };
+  return translated(e, [
+    axisIndex === 0 ? delta : 0,
+    axisIndex === 1 ? delta : 0,
+    axisIndex === 2 ? delta : 0,
+  ]);
 }
 
 const plural = (n: number): string => (n === 1 ? 'y' : 'ies');

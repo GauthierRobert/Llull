@@ -156,7 +156,7 @@ describe('history lowering', () => {
     const [boxId, cylinderId] = doc.order as [string, string];
     doc = run(doc, 'boolean_subtract', { a: boxId, b: cylinderId });
     const cutId = doc.order[0]!;
-    doc = run(doc, 'move_entity', { id: cutId, delta: [1, 2, 3] });
+    doc = run(doc, 'move_entities', { ids: [cutId], delta: [1, 2, 3] });
     doc = run(doc, 'set_entity_name', { id: cutId, name: 'Block' });
     const p = program(doc);
     expect(p.source).toBe('history');
@@ -172,7 +172,7 @@ describe('history lowering', () => {
       'add_box',
       'add_cylinder',
       'boolean_subtract',
-      'move_entity',
+      'move_entities',
       'set_entity_name',
     ]);
     const boolean = p.features[2] as Extract<Feature, { op: 'boolean' }>;
@@ -238,19 +238,19 @@ describe('history lowering', () => {
     expect(last.rotation[2].value).toBeCloseTo(Math.PI / 2, 9);
   });
 
-  it('lowers delete_entity as a remove and drops the solid from the outputs', () => {
+  it('lowers delete_entities as a remove and drops the solid from the outputs', () => {
     let doc = run(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });
     doc = run(doc, 'add_sphere', { radius: 1 });
-    doc = run(doc, 'delete_entity', { id: doc.order[0] });
+    doc = run(doc, 'delete_entities', { ids: [doc.order[0]] });
     const p = program(doc);
     expect(p.features.map((f) => f.op)).toEqual(['solid', 'solid', 'remove']);
     expect(p.features[2]?.variable).toBe('box_1');
     expect(p.outputs.map((o) => o.variable)).toEqual(['sphere_1']);
   });
 
-  it('lowers move_entity as a translate with its numeric delta', () => {
+  it('lowers move_entities as a translate with its numeric delta', () => {
     let doc = run(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });
-    doc = run(doc, 'move_entity', { id: doc.order[0], delta: [1, 0, 0] });
+    doc = run(doc, 'move_entities', { ids: [doc.order[0]], delta: [1, 0, 0] });
     const move = program(doc).features[1] as Extract<Feature, { op: 'translate' }>;
     expect(move.op).toBe('translate');
     expect(move.delta.map((d) => d.value)).toEqual([1, 0, 0]);
@@ -260,7 +260,7 @@ describe('history lowering', () => {
     const doc = project(createEmptyDocument(), [
       { command: 'set_parameter', params: { name: 'dx', expression: '7' } },
       { command: 'add_box', as: 'b', params: { size: [1, 1, 1] } },
-      { command: 'move_entity', params: { id: '$b', delta: ['=dx', 0, 0] } },
+      { command: 'move_entities', params: { ids: ['$b'], delta: ['=dx', 0, 0] } },
     ]);
     const move = program(doc).features[1] as Extract<Feature, { op: 'translate' }>;
     expect(move.delta[0]).toEqual({ value: 7, expression: 'dx' });
@@ -403,11 +403,11 @@ function handProgram(rotation: readonly [Term, Term, Term]): FeatureProgram {
     {
       op: 'translate',
       step: 23,
-      command: 'move_entity',
+      command: 'move_entities',
       variable: 's4',
       delta: [t(1, 'w'), t(0), t(0)],
     },
-    { op: 'remove', step: 24, command: 'delete_entity', variable: 's5' },
+    { op: 'remove', step: 24, command: 'delete_entities', variable: 's5' },
     { op: 'label', step: 25, command: 'set_entity_name', variable: 's6', name: 'L' },
   );
   return {

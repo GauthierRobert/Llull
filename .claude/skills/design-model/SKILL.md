@@ -37,9 +37,9 @@ verify and refine.
 | 2D edit             | `offset_2d` `trim` `extend` `fillet_2d` `chamfer_2d` `explode_polyline`                                                              |
 | 2D→3D               | `extrude_sketch` `extrude_profile` `revolve_profile`                                                                                 |
 | Primitives          | `add_box` `add_cylinder` `add_sphere` `add_cone` `add_torus` `add_wedge` `add_pyramid`                                               |
-| Combine             | `boolean_union` `boolean_subtract` `boolean_intersect` `make_tube_between`                                                           |
+| Combine             | `boolean_union` `boolean_subtract` `boolean_intersect`                                                           |
 | Modify 3D           | `fillet_edge` `chamfer_edge`                                                                                                         |
-| Place/replicate     | `move_entity` `rotate_entity` `scale_entity` `mirror_entity` `array_linear` `array_polar` `duplicate_entity`                         |
+| Place/replicate     | `move_entities` `rotate_entity` `scale_entity` `mirror_entity` `array_linear` `array_polar` `duplicate_entities`                         |
 | Organize            | `group_entities` `ungroup_entities` `set_entity_name` `set_entity_layer` `assign_material`                                           |
 | Reuse               | `instantiate_template` (`bolt_hole_pattern`, `flange`, `rectangular_plate_with_holes`), `instantiate_recipe`, `create_configuration` |
 | Annotate            | `add_text` `add_dimension`                                                                                                           |
@@ -102,7 +102,7 @@ pow hypot mod min max`.
         },
       ],
     },
-    { "command": "move_entity", "params": { "id": "$piston3", "delta": [0, 0, 5] } },
+    { "command": "move_entities", "params": { "ids": ["$piston3"], "delta": [0, 0, 5] } },
   ],
 }
 ```
@@ -159,7 +159,7 @@ and design variants with `create_configuration` / `activate_configuration`.
 
 - One `build_project` per coherent sub-assembly; alias its top entity, then `group_entities`
   and `set_entity_name` so later plans reference it by name via `find_entities`.
-- Place sub-assemblies with `move_entity`/`rotate_entity`; replicate with `array_linear`/
+- Place sub-assemblies with `move_entities`/`rotate_entity`; replicate with `array_linear`/
   `array_polar` rather than re-authoring identical parts.
 - Use `add_layer` + `set_entity_layer` to keep large models navigable; `assign_material`
   per part so `mass_properties` and `render_view` are meaningful.

@@ -65,7 +65,7 @@ describe('CommandDefinition.annotations — readOnly commands', () => {
 });
 
 describe('CommandDefinition.annotations — destructive commands', () => {
-  const DESTRUCTIVE_NAMES = ['delete_entity', 'delete_layer', 'delete_parameter'] as const;
+  const DESTRUCTIVE_NAMES = ['delete_entities', 'delete_layer', 'delete_parameter'] as const;
 
   for (const name of DESTRUCTIVE_NAMES) {
     it(`${name} has annotations.destructive === true`, () => {
@@ -106,8 +106,8 @@ describe('CommandDefinition.annotations — unannotated command', () => {
     expect(cmd.annotations).toBeUndefined();
   });
 
-  it('move_entity has no annotations field', () => {
-    const cmd = findCommand('move_entity');
+  it('move_entities has no annotations field', () => {
+    const cmd = findCommand('move_entities');
     expect(cmd.annotations).toBeUndefined();
   });
 });
@@ -131,13 +131,13 @@ describe('toToolSchemas() — annotations on readOnly command', () => {
 });
 
 describe('toToolSchemas() — annotations on destructive command', () => {
-  it('delete_entity schema has annotations.destructiveHint === true', () => {
-    const schema = findSchema('delete_entity');
+  it('delete_entities schema has annotations.destructiveHint === true', () => {
+    const schema = findSchema('delete_entities');
     expect(schema.annotations?.destructiveHint).toBe(true);
   });
 
-  it('delete_entity schema does not have readOnlyHint', () => {
-    expect(findSchema('delete_entity').annotations?.readOnlyHint).toBeUndefined();
+  it('delete_entities schema does not have readOnlyHint', () => {
+    expect(findSchema('delete_entities').annotations?.readOnlyHint).toBeUndefined();
   });
 
   it('delete_layer schema has annotations.destructiveHint === true', () => {
@@ -180,8 +180,8 @@ describe('buildMcpTools() — annotations on readOnly command', () => {
 });
 
 describe('buildMcpTools() — annotations on destructive command', () => {
-  it('delete_entity tool has annotations.destructiveHint === true', () => {
-    expect(findTool('delete_entity').annotations?.destructiveHint).toBe(true);
+  it('delete_entities tool has annotations.destructiveHint === true', () => {
+    expect(findTool('delete_entities').annotations?.destructiveHint).toBe(true);
   });
 
   it('delete_parameter tool has annotations.destructiveHint === true', () => {

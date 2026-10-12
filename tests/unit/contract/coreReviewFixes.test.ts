@@ -284,13 +284,13 @@ describe('add_box size length', () => {
   });
 });
 
-describe('move_entity', () => {
+describe('move_entities', () => {
   it('requires a 3-component delta', () => {
     const base = run(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
     const id = base.order[0] as string;
-    const bad = run(base, 'move_entity', { id, delta: [1, 2] });
+    const bad = run(base, 'move_entities', { ids: [id], delta: [1, 2] });
     expect(bad.document).toBe(base);
-    const good = run(base, 'move_entity', { id, delta: [1, 2, 3] });
+    const good = run(base, 'move_entities', { ids: [id], delta: [1, 2, 3] });
     expect((good.document.entities[id] as Entity).position).toEqual([1, 2, 3]);
   });
 });
@@ -361,9 +361,9 @@ describe('deleting entities prunes constraints, joints and drives', () => {
     };
   };
 
-  it('delete_entity removes dependent records and reports them', () => {
+  it('delete_entities removes dependent records and reports them', () => {
     const doc = build();
-    const result = run(doc, 'delete_entity', { id: doc.order[0] });
+    const result = run(doc, 'delete_entities', { ids: [doc.order[0]] });
     expect(result.document.constraintOrder).toEqual([]);
     expect(result.document.constraints).toEqual({});
     expect(result.document.jointOrder).toEqual([]);
@@ -434,12 +434,12 @@ describe('execute marks refusals as rejected', () => {
     const doc = createEmptyDocument();
     expect(run(doc, 'no_such_tool', {}).rejected).toBe(true);
     expect(run(doc, 'add_box', { size: 'big' }).rejected).toBe(true);
-    expect(run(doc, 'delete_entity', { id: 'constructor' }).rejected).toBe(true);
+    expect(run(doc, 'delete_entities', { ids: ['constructor'] }).rejected).toBe(true);
   });
 
   it('a command-level no-op and a success are not rejected', () => {
     const doc = createEmptyDocument();
-    expect(run(doc, 'delete_entity', { id: 'ghost' }).rejected).toBeUndefined();
+    expect(run(doc, 'delete_entities', { ids: ['ghost'] }).rejected).toBeUndefined();
     expect(run(doc, 'add_box', { size: [1, 1, 1] }).rejected).toBeUndefined();
   });
 

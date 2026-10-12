@@ -896,9 +896,9 @@ describe('add_box — dimension guard branches', () => {
   });
 });
 
-// delete_entity on doc where groups is undefined
+// delete_entities on doc where groups is undefined
 
-describe('delete_entity — doc.groups null-safety', () => {
+describe('delete_entities — doc.groups null-safety', () => {
   it('deletes an entity safely when doc.groups is undefined', () => {
     let doc = createEmptyDocument();
     const created = execute(doc, 'add_box', { size: [1, 1, 1] });
@@ -909,7 +909,7 @@ describe('delete_entity — doc.groups null-safety', () => {
     const docWithoutGroups = { ...doc } as Partial<CadDocument> & Omit<CadDocument, 'groups'>;
     delete (docWithoutGroups as Record<string, unknown>)['groups'];
 
-    const result = execute(docWithoutGroups as CadDocument, 'delete_entity', { id });
+    const result = execute(docWithoutGroups as CadDocument, 'delete_entities', { ids: [id] });
     expect(result.document.entities[id]).toBeUndefined();
     expect(result.document.order).not.toContain(id);
     expect(result.affected).toEqual([id]);

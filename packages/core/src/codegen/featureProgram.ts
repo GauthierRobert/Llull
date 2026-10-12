@@ -446,7 +446,7 @@ function lowerStep(
     const variable = variables.get(current.id);
     if (variable === undefined) continue;
     const delta = child(event.params, 'delta');
-    if (step.name === 'move_entity' && isPureTranslation(previous, current, delta)) {
+    if (step.name === 'move_entities' && isPureTranslation(previous, current, delta)) {
       features.push({
         ...base(variable),
         op: 'translate',

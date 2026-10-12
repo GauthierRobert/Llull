@@ -73,9 +73,11 @@
       },
       {
         "id": "#4",
-        "name": "move_entity",
+        "name": "move_entities",
         "params": {
-          "id": "#1",
+          "ids": [
+            "#1"
+          ],
           "delta": [
             3,
             2,

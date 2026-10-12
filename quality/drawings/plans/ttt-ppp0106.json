@@ -380,9 +380,9 @@
   "as": "t20"
  },
  {
-  "command": "move_entity",
+  "command": "move_entities",
   "params": {
-   "id": "$t20",
+   "ids": ["$t20"],
    "delta": [
     0,
     -21.9,

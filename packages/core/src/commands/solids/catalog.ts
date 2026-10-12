@@ -10,7 +10,6 @@ import { loftSections } from './loft';
 import { addSubdivisionSolid } from './subdivision';
 import { editSubdivisionCage } from './subdivisionCage';
 import { surfaceFromCurves } from './surfaceFromCurves';
-import { makeTubeBetween } from './composite';
 import { addSpurGear } from './gears';
 import { addHelixSpring } from './helixSpring';
 import { addBearing } from './bearings';
@@ -35,7 +34,6 @@ export const solidsCommands = commandCatalog(
   addSubdivisionSolid,
   editSubdivisionCage,
   surfaceFromCurves,
-  makeTubeBetween,
   addSpurGear,
   addHelixSpring,
   addBearing,

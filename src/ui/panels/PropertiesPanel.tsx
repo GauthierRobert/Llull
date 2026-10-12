@@ -1,7 +1,7 @@
 /**
  * @layer ui/panels
  * Right-docked entity inspector. Name, position and (3D only) rotation are editable; each
- * committed field dispatches set_entity_name / move_entity / rotate_entity with the delta from
+ * committed field dispatches set_entity_name / move_entities / rotate_entity with the delta from
  * the stored value.
  */
 
@@ -94,8 +94,8 @@ function EntityDetail({ entity }: { entity: Entity }): React.ReactElement {
             values={entity.position}
             label="Position"
             onAxisCommit={(axisIndex, value) =>
-              dispatch('move_entity', {
-                id: entity.id,
+              dispatch('move_entities', {
+                ids: [entity.id],
                 delta: axisDelta(entity.position, axisIndex, value),
               })
             }

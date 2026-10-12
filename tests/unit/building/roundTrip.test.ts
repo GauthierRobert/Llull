@@ -87,11 +87,11 @@ describe('derivation guard on every generated entity kind', () => {
     expect(categories.size).toBeGreaterThanOrEqual(15);
     expect(generated.length).toBeGreaterThan(50);
     const attempts: Array<(id: string) => [string, Record<string, unknown>]> = [
-      (id) => ['move_entity', { id, delta: [10, 0, 0] }],
+      (id) => ['move_entities', { ids: [id], delta: [10, 0, 0] }],
       (id) => ['rotate_entity', { id, delta: [0, 0, 0.1] }],
       (id) => ['scale_entity', { id, factor: 2 }],
       (id) => ['mirror_entity', { id, axis: 'x' }],
-      (id) => ['delete_entity', { id }],
+      (id) => ['delete_entities', { ids: [id] }],
     ];
     for (const id of generated) {
       for (const attempt of attempts) {

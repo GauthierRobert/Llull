@@ -21,44 +21,44 @@ describe('command layer', () => {
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 
-  it('move_entity translates an existing entity', () => {
+  it('move_entities translates an existing entity', () => {
     let doc = createEmptyDocument();
     const created = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
     doc = created.document;
     const id = created.affected[0]!;
 
-    const moved = execute(doc, 'move_entity', { id, delta: [5, 0, -2] });
+    const moved = execute(doc, 'move_entities', { ids: [id], delta: [5, 0, -2] });
     expect(moved.document.entities[id]!.position).toEqual([5, 0, -2]);
   });
 
-  it('move_entity on a missing id is a safe no-op', () => {
+  it('move_entities on a missing id is a safe no-op', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'move_entity', { id: 'nope', delta: [1, 1, 1] });
+    const result = execute(doc, 'move_entities', { ids: ['nope'], delta: [1, 1, 1] });
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
   });
 
-  it('delete_entity removes from entities, order, and selection', () => {
+  it('delete_entities removes from entities, order, and selection', () => {
     let doc = createEmptyDocument();
     const created = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = { ...created.document, selection: created.affected };
     const id = created.affected[0]!;
 
-    const result = execute(doc, 'delete_entity', { id });
+    const result = execute(doc, 'delete_entities', { ids: [id] });
     expect(result.document.entities[id]).toBeUndefined();
     expect(result.document.order).not.toContain(id);
     expect(result.document.selection).not.toContain(id);
   });
 
-  it('delete_entity on a missing id is a safe no-op', () => {
+  it('delete_entities on a missing id is a safe no-op', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'delete_entity', { id: 'ghost' });
+    const result = execute(doc, 'delete_entities', { ids: ['ghost'] });
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
     expect(result.summary).toContain('ghost');
   });
 
-  it('delete_entity removes deleted id from group memberIds and dissolves group when < 2 members remain', () => {
+  it('delete_entities removes deleted id from group memberIds and dissolves group when < 2 members remain', () => {
     let doc = createEmptyDocument();
     const a = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = a.document;
@@ -74,14 +74,14 @@ describe('command layer', () => {
     expect(doc.groups[groupId]!.memberIds).toEqual([idA, idB]);
 
     // Delete one member — group drops to 1 member and must be dissolved.
-    const result = execute(doc, 'delete_entity', { id: idA });
+    const result = execute(doc, 'delete_entities', { ids: [idA] });
     expect(result.document.entities[idA]).toBeUndefined();
     expect(result.document.order).not.toContain(idA);
     expect(result.document.groups[groupId]).toBeUndefined();
     expect(result.summary).toContain(groupId);
   });
 
-  it('delete_entity removes deleted id from group memberIds but keeps group when >= 2 members remain', () => {
+  it('delete_entities removes deleted id from group memberIds but keeps group when >= 2 members remain', () => {
     let doc = createEmptyDocument();
     const a = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = a.document;
@@ -99,7 +99,7 @@ describe('command layer', () => {
     const groupId = grouped.affected[0]!;
 
     // Delete one member — group drops to 2 members, must survive without deleted id.
-    const result = execute(doc, 'delete_entity', { id: idA });
+    const result = execute(doc, 'delete_entities', { ids: [idA] });
     expect(result.document.entities[idA]).toBeUndefined();
     const surviving = result.document.groups[groupId];
     expect(surviving).toBeDefined();
@@ -107,7 +107,7 @@ describe('command layer', () => {
     expect(surviving!.memberIds).toEqual([idB, idC]);
   });
 
-  it('delete_entity on an ungrouped entity leaves groups unchanged', () => {
+  it('delete_entities on an ungrouped entity leaves groups unchanged', () => {
     let doc = createEmptyDocument();
     const a = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = a.document;
@@ -126,14 +126,14 @@ describe('command layer', () => {
     const groupsBefore = JSON.stringify(doc.groups);
 
     // Delete the ungrouped entity.
-    const result = execute(doc, 'delete_entity', { id: idExtra });
+    const result = execute(doc, 'delete_entities', { ids: [idExtra] });
     expect(result.document.entities[idExtra]).toBeUndefined();
     // groups must be identical in shape
     expect(JSON.stringify(result.document.groups)).toBe(groupsBefore);
     expect(result.document.groups[groupId]!.memberIds).toEqual([idA, idB]);
   });
 
-  it('delete_entity group pruning is pure — input doc is not mutated', () => {
+  it('delete_entities group pruning is pure — input doc is not mutated', () => {
     let doc = createEmptyDocument();
     const a = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = a.document;
@@ -143,7 +143,7 @@ describe('command layer', () => {
     doc = grouped.document;
 
     const snapshot = JSON.stringify(doc);
-    execute(doc, 'delete_entity', { id: a.affected[0]! });
+    execute(doc, 'delete_entities', { ids: [a.affected[0]!] });
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 
@@ -3249,7 +3249,7 @@ describe('add_dimension', () => {
       entityIds: [pointId1, pointId2],
     });
     // Delete one of the referenced entities
-    const afterDelete = execute(dimCreated.document, 'delete_entity', { id: pointId1 });
+    const afterDelete = execute(dimCreated.document, 'delete_entities', { ids: [pointId1] });
     // Check model
     const checkResult = execute(afterDelete.document, 'check_model', {});
     const data = checkResult.data as import('@core/commands/inspect/checkModel').CheckResult;
@@ -3298,8 +3298,8 @@ describe('add_dimension', () => {
 
   it('featureHistory — failed command (no-op) does NOT append a step', () => {
     const doc = createEmptyDocument();
-    // move_entity on missing id returns same doc ref => no step
-    const result = execute(doc, 'move_entity', { id: 'ghost', delta: [1, 0, 0] });
+    // move_entities on missing id returns same doc ref => no step
+    const result = execute(doc, 'move_entities', { ids: ['ghost'], delta: [1, 0, 0] });
     expect(result.document.featureHistory).toHaveLength(0);
     expect(result.document).toBe(doc);
   });
@@ -3609,7 +3609,7 @@ describe('add_dimension', () => {
     doc = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] }).document;
     const boxEntityId = doc.order[0]!;
     // Step 1: move that box
-    doc = execute(doc, 'move_entity', { id: boxEntityId, delta: [5, 0, 0] }).document;
+    doc = execute(doc, 'move_entities', { ids: [boxEntityId], delta: [5, 0, 0] }).document;
     expect(doc.featureHistory).toHaveLength(2);
 
     // Now suppress step 0 — box is no longer created, move becomes a no-op
@@ -4561,7 +4561,7 @@ describe('=expr param resolution in replay_history', () => {
 describe('Q4 — replayHistory id-remapping', () => {
   // ── AC1: move + assign_material + delete all survive replay ─────────────
 
-  it('AC1: move_entity applied to a replayed entity lands at the correct position', () => {
+  it('AC1: move_entities applied to a replayed entity lands at the correct position', () => {
     let doc = createEmptyDocument();
     // Step 1: create box
     const r1 = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
@@ -4569,7 +4569,7 @@ describe('Q4 — replayHistory id-remapping', () => {
     const originalId = r1.affected[0]!;
 
     // Step 2: move it
-    doc = execute(doc, 'move_entity', { id: originalId, delta: [5, 0, 0] }).document;
+    doc = execute(doc, 'move_entities', { ids: [originalId], delta: [5, 0, 0] }).document;
 
     // Replay: the box gets a new id, but move must be remapped to the new id.
     const replayed = execute(doc, 'replay_history', {});
@@ -4607,7 +4607,7 @@ describe('Q4 — replayHistory id-remapping', () => {
     expect(entities[0]!.materialId).toBe('steel');
   });
 
-  it('AC1: delete_entity step is faithfully replayed — entity is absent after replay', () => {
+  it('AC1: delete_entities step is faithfully replayed — entity is absent after replay', () => {
     let doc = createEmptyDocument();
     // Create two boxes
     const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
@@ -4617,7 +4617,7 @@ describe('Q4 — replayHistory id-remapping', () => {
     const idToDelete = r1.affected[0]!;
 
     // Delete the first box
-    doc = execute(doc, 'delete_entity', { id: idToDelete }).document;
+    doc = execute(doc, 'delete_entities', { ids: [idToDelete] }).document;
     expect(Object.keys(doc.entities)).toHaveLength(1);
 
     // Replay: only 1 entity should remain (the deletion is faithfully applied)
@@ -4646,14 +4646,14 @@ describe('Q4 — replayHistory id-remapping', () => {
     doc = rB.document;
     const idB = rB.affected[0]!;
     // Move box A
-    doc = execute(doc, 'move_entity', { id: idA, delta: [3, 3, 0] }).document;
+    doc = execute(doc, 'move_entities', { ids: [idA], delta: [3, 3, 0] }).document;
     // Assign material to box A
     doc = execute(doc, 'assign_material', {
       materialName: 'aluminium',
       entityIds: [idA],
     }).document;
     // Delete box B
-    doc = execute(doc, 'delete_entity', { id: idB }).document;
+    doc = execute(doc, 'delete_entities', { ids: [idB] }).document;
 
     // Live doc assertions
     expect(Object.keys(doc.entities)).toHaveLength(1);
@@ -4668,20 +4668,20 @@ describe('Q4 — replayHistory id-remapping', () => {
     expect(replayedEntities[0]!.materialId).toBe('aluminium');
   });
 
-  // ── AC2: multi-id creation step (duplicate_entity) survives ─────────────
+  // ── AC2: multi-id creation step (duplicate_entities) survives ─────────────
 
-  it('AC2: duplicate_entity — subsequent move of the duplicate survives replay', () => {
+  it('AC2: duplicate_entities — subsequent move of the duplicate survives replay', () => {
     let doc = createEmptyDocument();
     // Create original
     const r1 = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
     doc = r1.document;
     const originalId = r1.affected[0]!;
     // Duplicate it
-    const rDup = execute(doc, 'duplicate_entity', { id: originalId, offset: [5, 0, 0] });
+    const rDup = execute(doc, 'duplicate_entities', { ids: [originalId], offset: [5, 0, 0] });
     doc = rDup.document;
     const dupId = rDup.affected[0]!;
     // Move the duplicate
-    doc = execute(doc, 'move_entity', { id: dupId, delta: [0, 3, 0] }).document;
+    doc = execute(doc, 'move_entities', { ids: [dupId], delta: [0, 3, 0] }).document;
 
     // Live doc: duplicate should be at [5, 3, 0]
     expect(doc.entities[dupId]!.position).toEqual([5, 3, 0]);
@@ -4777,14 +4777,14 @@ describe('Q4 — replayHistory id-remapping', () => {
     expect(step.affected).toEqual(result.affected);
   });
 
-  it('execute() stores affected for move_entity (single entity mutation)', () => {
+  it('execute() stores affected for move_entities (single entity mutation)', () => {
     let doc = createEmptyDocument();
     const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = r1.document;
     const id = r1.affected[0]!;
-    const result = execute(doc, 'move_entity', { id, delta: [1, 0, 0] });
+    const result = execute(doc, 'move_entities', { ids: [id], delta: [1, 0, 0] });
     const moveStep = result.document.featureHistory[1]!;
-    expect(moveStep.name).toBe('move_entity');
+    expect(moveStep.name).toBe('move_entities');
     expect(moveStep.affected).toEqual([id]);
   });
 
@@ -4799,7 +4799,7 @@ describe('Q4 — replayHistory id-remapping', () => {
     expect(rArr.affected.length).toBeGreaterThanOrEqual(2);
     const secondCopyId = rArr.affected[1]!; // a specific copy by position in `affected`
     // Move exactly that copy up in Y.
-    doc = execute(doc, 'move_entity', { id: secondCopyId, delta: [0, 7, 0] }).document;
+    doc = execute(doc, 'move_entities', { ids: [secondCopyId], delta: [0, 7, 0] }).document;
     const liveY = doc.entities[secondCopyId]!.position[1];
     expect(liveY).toBe(7);
 
@@ -5595,14 +5595,14 @@ describe('export_stl', () => {
       expect(result.summary).toContain('1 step');
     });
 
-    it('happy path: 2-step recipe (add_box + move_entity) correctly remaps ids', () => {
+    it('happy path: 2-step recipe (add_box + move_entities) correctly remaps ids', () => {
       let doc = createEmptyDocument();
       // Step 1: create a box.
       const boxResult = execute(doc, 'add_box', { size: [1, 1, 1] });
       doc = boxResult.document;
       const originalBoxId = boxResult.affected[0]!;
       // Step 2: move the box — references the original box id.
-      doc = execute(doc, 'move_entity', { id: originalBoxId, delta: [5, 0, 0] }).document;
+      doc = execute(doc, 'move_entities', { ids: [originalBoxId], delta: [5, 0, 0] }).document;
       expect(doc.featureHistory).toHaveLength(2);
 
       // Save the recipe then instantiate onto a clean doc.
@@ -5611,7 +5611,7 @@ describe('export_stl', () => {
       targetDoc = { ...targetDoc, recipes: doc.recipes };
 
       const result = execute(targetDoc, 'instantiate_recipe', { name: 'box_with_move' });
-      expect(result.affected).toHaveLength(1); // move_entity doesn't add a new entity
+      expect(result.affected).toHaveLength(1); // move_entities doesn't add a new entity
       expect(result.document.order).toHaveLength(1);
       const newId = result.affected[0]!;
       // The box should be at position [5, 0, 0] (moved) — proves id remapping worked.
@@ -7254,259 +7254,6 @@ describe('stack_on', () => {
   });
 });
 
-// array_along_path
-
-describe('array_along_path', () => {
-  it('places count=5 copies of a box along a straight path', () => {
-    let doc = createEmptyDocument();
-    const srcR = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    doc = srcR.document;
-    const srcId = srcR.affected[0]!;
-
-    const path = [
-      [0, 0, 0],
-      [20, 0, 0],
-    ] as [number, number, number][];
-    const result = execute(doc, 'array_along_path', { sourceId: srcId, path, count: 5 });
-    expect(result.affected).toHaveLength(5);
-    expect(result.document.order).toHaveLength(6); // original + 5 copies
-
-    // First copy at x=0, last at x=20
-    const firstId = result.affected[0]!;
-    const lastId = result.affected[4]!;
-    expect(result.document.entities[firstId]!.position[0]).toBeCloseTo(0);
-    expect(result.document.entities[lastId]!.position[0]).toBeCloseTo(20);
-  });
-
-  it('places copies along a multi-segment polyline', () => {
-    let doc = createEmptyDocument();
-    const srcR = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    doc = srcR.document;
-    const srcId = srcR.affected[0]!;
-
-    // L-shaped path: (0,0,0)→(10,0,0)→(10,10,0); total length = 20
-    const path = [
-      [0, 0, 0],
-      [10, 0, 0],
-      [10, 10, 0],
-    ] as [number, number, number][];
-    const result = execute(doc, 'array_along_path', { sourceId: srcId, path, count: 3 });
-    expect(result.affected).toHaveLength(3);
-
-    // First at (0,0,0), second at midpoint arc-length=10 → (10,0,0), third at (10,10,0)
-    const positions = result.affected.map((id) => result.document.entities[id]!.position);
-    expect(positions[0]![0]).toBeCloseTo(0);
-    expect(positions[1]![0]).toBeCloseTo(10);
-    expect(positions[1]![1]).toBeCloseTo(0);
-    expect(positions[2]![0]).toBeCloseTo(10);
-    expect(positions[2]![1]).toBeCloseTo(10);
-  });
-
-  it('places a single copy at the midpoint when count=1', () => {
-    let doc = createEmptyDocument();
-    const srcR = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    doc = srcR.document;
-    const result = execute(doc, 'array_along_path', {
-      sourceId: srcR.affected[0]!,
-      path: [
-        [0, 0, 0],
-        [10, 0, 0],
-      ],
-      count: 1,
-    });
-    expect(result.affected).toHaveLength(1);
-    expect(result.document.entities[result.affected[0]!]!.position[0]).toBeCloseTo(5);
-  });
-
-  it('returns affected:[] when source entity is missing', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'array_along_path', {
-      sourceId: 'ghost',
-      path: [
-        [0, 0, 0],
-        [10, 0, 0],
-      ],
-      count: 3,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('ghost');
-  });
-
-  it('returns affected:[] when path has fewer than 2 points', () => {
-    let doc = createEmptyDocument();
-    const srcR = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = srcR.document;
-    const result = execute(doc, 'array_along_path', {
-      sourceId: srcR.affected[0]!,
-      path: [[0, 0, 0]],
-      count: 3,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('2 points');
-  });
-
-  it('returns affected:[] when count < 1', () => {
-    let doc = createEmptyDocument();
-    const srcR = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = srcR.document;
-    const result = execute(doc, 'array_along_path', {
-      sourceId: srcR.affected[0]!,
-      path: [
-        [0, 0, 0],
-        [10, 0, 0],
-      ],
-      count: 0,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('count');
-  });
-
-  it('is pure — input document is not mutated', () => {
-    let doc = createEmptyDocument();
-    const srcR = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = srcR.document;
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'array_along_path', {
-      sourceId: srcR.affected[0]!,
-      path: [
-        [0, 0, 0],
-        [10, 0, 0],
-      ],
-      count: 3,
-    });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-});
-
-// distribute_on_arc
-
-describe('distribute_on_arc', () => {
-  it('places count=4 copies around a full circle in XY plane', () => {
-    let doc = createEmptyDocument();
-    const srcR = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    doc = srcR.document;
-    const srcId = srcR.affected[0]!;
-
-    const result = execute(doc, 'distribute_on_arc', {
-      sourceId: srcId,
-      center: [0, 0, 0],
-      normal: [0, 0, 1],
-      radius: 5,
-      startAngle: 0,
-      endAngle: Math.PI * 2,
-      count: 4,
-    });
-    expect(result.affected).toHaveLength(4);
-
-    // All copies should be at distance ≈ 5 from center in XY.
-    for (const id of result.affected) {
-      const pos = result.document.entities[id]!.position;
-      const dist = Math.sqrt(pos[0] ** 2 + pos[1] ** 2);
-      expect(dist).toBeCloseTo(5, 3);
-    }
-
-    // Angles should be 0, π/2, π, 3π/2.
-    const angles = result.affected.map((id) => {
-      const pos = result.document.entities[id]!.position;
-      return Math.atan2(pos[1], pos[0]);
-    });
-    expect(angles[0]).toBeCloseTo(0, 3);
-    expect(angles[1]).toBeCloseTo(Math.PI / 2, 3);
-  });
-
-  it('places count=1 copy at mid-arc angle', () => {
-    let doc = createEmptyDocument();
-    const srcR = execute(doc, 'add_sphere', { radius: 1 });
-    doc = srcR.document;
-
-    const result = execute(doc, 'distribute_on_arc', {
-      sourceId: srcR.affected[0]!,
-      center: [0, 0, 0],
-      normal: [0, 0, 1],
-      radius: 10,
-      startAngle: 0,
-      endAngle: Math.PI,
-      count: 1,
-    });
-    expect(result.affected).toHaveLength(1);
-    // Mid-arc angle = π/2; position ≈ (0, 10, 0)
-    const pos = result.document.entities[result.affected[0]!]!.position;
-    expect(pos[0]).toBeCloseTo(0, 3);
-    expect(pos[1]).toBeCloseTo(10, 3);
-  });
-
-  it('returns affected:[] when source entity is missing', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'distribute_on_arc', {
-      sourceId: 'ghost',
-      center: [0, 0, 0],
-      normal: [0, 0, 1],
-      radius: 5,
-      startAngle: 0,
-      endAngle: Math.PI * 2,
-      count: 4,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('returns affected:[] when radius <= 0', () => {
-    let doc = createEmptyDocument();
-    const srcR = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = srcR.document;
-    const result = execute(doc, 'distribute_on_arc', {
-      sourceId: srcR.affected[0]!,
-      center: [0, 0, 0],
-      normal: [0, 0, 1],
-      radius: 0,
-      startAngle: 0,
-      endAngle: Math.PI * 2,
-      count: 4,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('radius');
-  });
-
-  it('returns affected:[] when count < 1', () => {
-    let doc = createEmptyDocument();
-    const srcR = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = srcR.document;
-    const result = execute(doc, 'distribute_on_arc', {
-      sourceId: srcR.affected[0]!,
-      center: [0, 0, 0],
-      normal: [0, 0, 1],
-      radius: 5,
-      startAngle: 0,
-      endAngle: Math.PI * 2,
-      count: 0,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('count');
-  });
-
-  it('is pure — input document is not mutated', () => {
-    let doc = createEmptyDocument();
-    const srcR = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = srcR.document;
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'distribute_on_arc', {
-      sourceId: srcR.affected[0]!,
-      center: [0, 0, 0],
-      normal: [0, 0, 1],
-      radius: 5,
-      startAngle: 0,
-      endAngle: Math.PI * 2,
-      count: 4,
-    });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-});
-
 // build_project — repeat / for_each control-flow
 
 describe('build_project repeat/for_each', () => {
@@ -8126,7 +7873,7 @@ describe('build_project repeat/for_each', () => {
     const instA = compA.affected[0]!;
 
     // Move instance A to [2, 0, 0]
-    doc = execute(doc, 'move_entity', { id: instA, delta: [2, 0, 0] }).document;
+    doc = execute(doc, 'move_entities', { ids: [instA], delta: [2, 0, 0] }).document;
 
     const boxB = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
     doc = boxB.document;
@@ -8138,7 +7885,7 @@ describe('build_project repeat/for_each', () => {
     const instB = compB.affected[0]!;
 
     // Move instance B to [8, 0, 0]
-    doc = execute(doc, 'move_entity', { id: instB, delta: [8, 0, 0] }).document;
+    doc = execute(doc, 'move_entities', { ids: [instB], delta: [8, 0, 0] }).document;
 
     // Verify they start apart
     expect(doc.entities[instA]!.position[0]).toBe(2);
@@ -8188,8 +7935,8 @@ describe('build_project repeat/for_each', () => {
     const instB = compB.affected[0]!;
 
     // Start them far apart
-    doc = execute(doc, 'move_entity', { id: instA, delta: [0, 0, 0] }).document;
-    doc = execute(doc, 'move_entity', { id: instB, delta: [20, 0, 0] }).document;
+    doc = execute(doc, 'move_entities', { ids: [instA], delta: [0, 0, 0] }).document;
+    doc = execute(doc, 'move_entities', { ids: [instB], delta: [20, 0, 0] }).document;
 
     const mateResult = execute(doc, 'add_mate', {
       kind: 'distance',
@@ -8761,7 +8508,7 @@ describe('guardCommand contract', () => {
   it('id-like params equal to a prototype key are a no-op', () => {
     const doc = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
     for (const id of ['constructor', '__proto__', 'toString']) {
-      const r = execute(doc, 'delete_entity', { id });
+      const r = execute(doc, 'delete_entities', { ids: [id] });
       expect(r.document).toBe(doc);
       expect(r.affected).toEqual([]);
     }
