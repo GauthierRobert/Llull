@@ -7,7 +7,7 @@
  */
 
 import type { CadDocument } from '../model/types';
-import type { CommandDefinition } from '../commands/types';
+import type { CommandDefinition, RetiredCommandRewrite } from '../commands/types';
 import type { DerivationGuard } from '../commands/derivation';
 
 /** A plugin's slice of the document: validation of its data and re-derivation of its geometry. */
@@ -31,4 +31,6 @@ export interface CadPlugin {
   readonly commands: ReadonlyArray<CommandDefinition<unknown>>;
   readonly guards?: ReadonlyArray<DerivationGuard>;
   readonly document?: DocumentExtension;
+  /** Retired command name -> rewrite onto its replacement (saved steps are migrated on load). */
+  readonly retiredCommands?: Readonly<Record<string, RetiredCommandRewrite>>;
 }

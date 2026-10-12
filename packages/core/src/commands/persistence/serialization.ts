@@ -15,6 +15,7 @@ import { errorMessage } from '../../lib/errorMessage';
 import { isRecord } from '../../lib/isRecord';
 import { derivedEntityIds, documentExtensions } from '../../plugins/host';
 import { validateDocumentShape, validateDocumentValues } from './validation';
+import { migrateRetiredCommands } from './retiredCommands';
 
 interface DocumentEnvelope {
   format: 'llull-document';
@@ -161,7 +162,9 @@ export function deserializeDocument(json: string): CadDocument {
     );
   }
 
-  const migratedDoc = withSafeStepCounter(restoreDerivedEntities(migrate(rawDoc)));
+  const migratedDoc = withSafeStepCounter(
+    restoreDerivedEntities(migrateRetiredCommands(migrate(rawDoc))),
+  );
 
   const valueErrors = validateDocumentValues(migratedDoc);
   if (valueErrors.length > 0) {

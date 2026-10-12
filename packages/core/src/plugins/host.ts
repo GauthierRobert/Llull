@@ -7,6 +7,7 @@
 
 import type { CadPlugin, DocumentExtension } from './plugin';
 import type { DerivationGuard } from '../commands/derivation';
+import type { RetiredCommandRewrite } from '../commands/types';
 import type { CadDocument } from '../model/types';
 
 const installed: CadPlugin[] = [];
@@ -35,6 +36,10 @@ export function onPluginInstalled(listener: (plugin: CadPlugin) => void): void {
 
 export function pluginGuards(): DerivationGuard[] {
   return installed.flatMap((plugin) => plugin.guards ?? []);
+}
+
+export function pluginRetiredCommands(): Record<string, RetiredCommandRewrite> {
+  return Object.assign({}, ...installed.map((plugin) => plugin.retiredCommands ?? {}));
 }
 
 export function documentExtensions(): DocumentExtension[] {
