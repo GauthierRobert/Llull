@@ -23,8 +23,10 @@ import { execute } from '@core/commands/registry';
 import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
 import { nonEmptyString } from '@lib/nonEmptyString';
+import { safeFileName } from '@lib/safeFileName';
 import type { McpToolDefinition } from './tools';
 import { shapeToolCallContent, type McpShapedResult } from './dispatch';
+import type { CommandOutcome } from './restProtocol';
 
 export interface ProgramRun {
   /** LLULL_TRACE of a llull-runtime script, or an import_mesh trace for any other script. */
@@ -57,12 +59,8 @@ export interface DwgConverterPort {
   readExchangeFile?(path: string): Promise<string>;
 }
 
-export interface ExchangeCommandResult {
-  summary: string;
-  affected: string[];
-  isError: boolean;
-  data?: unknown;
-}
+/** What an exchange tool needs from a command run: a `CommandOutcome` without `changed`. */
+export type ExchangeCommandResult = Omit<CommandOutcome, 'changed'>;
 
 export interface ExchangeDeps {
   /** null when Python/CadQuery is not configured; tools then explain how to enable it. */
@@ -233,6 +231,27 @@ interface StepFile {
   readonly savedTo?: string;
 }
 
+const NO_STEP_BACKEND =
+  'STEP export needs the Python bridge (LLULL_PYTHON is off) or the exact OCC kernel (LLULL_KERNEL=occt).';
+
+/** Without the Python bridge: the exact B-rep kernel writes the STEP itself (`export_step_exact`). */
+function exportStepExact(getDoc: () => CadDocument, name?: string): StepFile | { error: string } {
+  const exact = execute(getDoc(), 'export_step_exact', {});
+  const data = exact.data as { step?: string; solidCount?: number } | undefined;
+  if (data?.step === undefined)
+    return { error: `${NO_STEP_BACKEND} Kernel export: ${exact.summary}` };
+  const fileName = `${safeFileName(name, 'model')}.step`;
+  const bytes = data.step.length;
+  return {
+    stepBase64: btoa(data.step),
+    fileName,
+    bytes,
+    summary:
+      `export_step: ${data.solidCount ?? 0} solid(s) → ${fileName} ` +
+      `(${bytes} bytes, exact B-rep via the OCC kernel); returned as data.stepBase64.`,
+  };
+}
+
 /**
  * Generate the model's STEP file: export_code → Python port → exact B-rep. Shared by the
  * export_step tool and the server's GET /export/step route.
@@ -240,9 +259,10 @@ interface StepFile {
  */
 export async function exportStepFile(
   getDoc: () => CadDocument,
-  port: CadExchangePort,
+  port: CadExchangePort | null,
   options: { name?: string; language?: unknown; save?: boolean },
 ): Promise<StepFile | { error: string }> {
+  if (port === null) return exportStepExact(getDoc, options.name);
   const language = pythonLanguage(options.language);
   if (language === null)
     return { error: 'export_step: language must be "cadquery" or "build123d".' };
@@ -279,7 +299,7 @@ export async function exportStepFile(
 
 async function exportStep(
   deps: ExchangeDeps,
-  port: CadExchangePort,
+  port: CadExchangePort | null,
   args: Record<string, unknown>,
 ): Promise<McpShapedResult> {
   const name = nonEmptyString(args['name']);
@@ -395,7 +415,6 @@ async function importCode(
 }
 
 const EXCHANGE_HANDLERS = new Map([
-  ['export_step', exportStep],
   ['import_step', importStep],
   ['import_code', importCode],
 ]);
@@ -418,11 +437,14 @@ export async function applyExchangeToolCall(
       return failure(`import_dwg failed: ${errorMessage(error)}`);
     }
   }
+  const args = isRecord(rawArgs) ? rawArgs : {};
   const handler = EXCHANGE_HANDLERS.get(toolName);
-  if (handler === undefined) return null;
-  if (deps.port === null) return failure(`${toolName} ${NO_PYTHON}`);
+  if (handler === undefined && toolName !== 'export_step') return null;
+  if (deps.port === null && handler !== undefined) return failure(`${toolName} ${NO_PYTHON}`);
   try {
-    return await handler(deps, deps.port, isRecord(rawArgs) ? rawArgs : {});
+    return handler === undefined || deps.port === null
+      ? await exportStep(deps, deps.port, args)
+      : await handler(deps, deps.port, args);
   } catch (error) {
     return failure(`${toolName} failed: ${errorMessage(error)}`);
   }

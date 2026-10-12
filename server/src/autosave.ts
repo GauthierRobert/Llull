@@ -4,12 +4,13 @@
  * Debounced, atomic autosave writer. Transport/state glue only (architecture L6).
  *
  * - `schedule(doc)` coalesces bursts of mutations into one write after `debounceMs`.
- * - Writes go to `<path>.tmp-<pid>` then `rename` (atomic on POSIX) so a crash never leaves a
+ * - Writes go to `<path>.<pid>.tmp` then `rename` (atomic on POSIX) so a crash never leaves a
  *   truncated autosave.
  * - `flush()` writes any pending document synchronously (call on shutdown).
  */
 
 import fs from 'fs';
+import { writeFileAtomic } from './writeFileAtomic';
 import path from 'path';
 import { errorMessage } from '@lib/errorMessage';
 import type { CadDocument } from '@core/model/types';
@@ -34,18 +35,11 @@ export function createAutosaver(options: AutosaverOptions): Autosaver {
   let stopped = false;
 
   const writeAtomic = (doc: CadDocument): void => {
-    const tempPath = `${filePath}.tmp-${process.pid}`;
     try {
       fs.mkdirSync(path.dirname(filePath), { recursive: true });
-      fs.writeFileSync(tempPath, serialize(doc), 'utf8');
-      fs.renameSync(tempPath, filePath);
+      writeFileAtomic(filePath, serialize(doc));
     } catch (err) {
       console.warn(`[autosave] write failed: ${errorMessage(err)}`);
-      try {
-        fs.rmSync(tempPath, { force: true });
-      } catch {
-        // best effort
-      }
     }
   };
 

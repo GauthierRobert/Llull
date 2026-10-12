@@ -4,6 +4,8 @@
  * @pure
  */
 
+import { DEFAULT_DOCUMENT_PATH } from '@mcp/documentFiles';
+
 /** Flags that never take a value (`--json`, not `--json yes`). */
 const BOOLEAN_FLAGS: ReadonlySet<string> = new Set([
   'json',
@@ -143,4 +145,32 @@ export function paramsSource(
     params[key] = stringKeys.has(key) ? raw : scalarValue(raw);
   }
   return { kind: 'pairs', params };
+}
+
+/** `--app` / `--server app`: the running desktop app, resolved from its discovery file. */
+export const APP_SERVER = 'app';
+
+export interface CliTarget {
+  /** A server URL, `APP_SERVER`, or undefined for a local document file. */
+  readonly server: string | undefined;
+  /** The local document path (`--doc`, `$LLULL_DOC`, else the default file). */
+  readonly doc: string;
+}
+
+/**
+ * Where a CLI invocation acts: `--app`, then `--server`, then `$LLULL_SERVER` choose a server;
+ * otherwise the `--doc` file. The one resolution used by the supervisor, the CLI and its commands.
+ * @pure
+ */
+export function cliTarget(
+  parsed: ParsedArgv,
+  env: Readonly<Record<string, string | undefined>>,
+): CliTarget {
+  const server = booleanFlag(parsed, 'app')
+    ? APP_SERVER
+    : (stringFlag(parsed, 'server') ?? env['LLULL_SERVER']);
+  return {
+    server,
+    doc: stringFlag(parsed, 'doc') ?? env['LLULL_DOC'] ?? DEFAULT_DOCUMENT_PATH,
+  };
 }

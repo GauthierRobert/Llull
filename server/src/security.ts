@@ -8,7 +8,8 @@
 import crypto from 'crypto';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import rateLimit from 'express-rate-limit';
-import { isUserMode, requireRole, type Role } from './users';
+import { UNAUTHORIZED_BODY, isUserMode, requireRole, sha256Digest, type Role } from './users';
+import { positiveInteger } from './env';
 
 const DEFAULT_ALLOWED_ORIGINS: readonly string[] = [
   'http://localhost:5173',
@@ -26,11 +27,6 @@ export function getAllowedOrigins(): string[] {
     .filter((origin) => origin.length > 0);
 }
 
-/** JSON body of every 401 (REST mutation guard and `/mcp` bearer auth). */
-export const UNAUTHORIZED_BODY = { error: 'Unauthorized — valid Bearer token required.' };
-
-const sha256 = (value: string): Buffer => crypto.createHash('sha256').update(value).digest();
-
 /** Constant-time `Authorization: Bearer <token>` check (digest compare: no length leak; scheme case-insensitive). */
 export function hasValidBearer(req: Request, token: string): boolean {
   const header = req.headers['authorization'];
@@ -38,14 +34,14 @@ export function hasValidBearer(req: Request, token: string): boolean {
   const match = /^bearer +(.+)$/i.exec(header);
   const presented = match?.[1];
   if (presented === undefined) return false;
-  return crypto.timingSafeEqual(sha256(presented), sha256(token));
+  return crypto.timingSafeEqual(sha256Digest(presented), sha256Digest(token));
 }
 
 /** Constant-time check of the `?access_token=` query parameter (EventSource cannot set headers). */
 function hasValidAccessToken(req: Request, token: string): boolean {
   const presented = req.query['access_token'];
   if (typeof presented !== 'string' || presented.length === 0) return false;
-  return crypto.timingSafeEqual(sha256(presented), sha256(token));
+  return crypto.timingSafeEqual(sha256Digest(presented), sha256Digest(token));
 }
 
 /** True for 127.0.0.0/8, ::1, ::ffff:127.*, and `localhost`. */
@@ -218,8 +214,8 @@ function buildGuard(acceptQueryToken: boolean, role: Role): RequestHandler {
  */
 export function buildRateLimiter(maxVariable: string, windowVariable: string): RequestHandler {
   return rateLimit({
-    windowMs: Number.parseInt(process.env[windowVariable] ?? '', 10) || 60_000,
-    max: Number.parseInt(process.env[maxVariable] ?? '', 10) || 600,
+    windowMs: positiveInteger(process.env[windowVariable], 60_000),
+    max: positiveInteger(process.env[maxVariable], 600),
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests — please slow down.' },

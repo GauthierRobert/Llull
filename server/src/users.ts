@@ -25,11 +25,14 @@ export interface NamedUser {
   readonly tokenSha256: string;
 }
 
-/** JSON body of every 401 (shared with the single-token guard). */
-const UNAUTHORIZED = { error: 'Unauthorized — valid Bearer token required.' };
+/** JSON body of every 401 (REST mutation guard, `/mcp` bearer auth, named-user guard). */
+export const UNAUTHORIZED_BODY = { error: 'Unauthorized — valid Bearer token required.' };
 
 export const sha256Hex = (value: string): string =>
   crypto.createHash('sha256').update(value).digest('hex');
+
+/** The digest bytes of `value` (compared with `timingSafeEqual`: no length leak). */
+export const sha256Digest = (value: string): Buffer => Buffer.from(sha256Hex(value), 'hex');
 
 function isRole(value: unknown): value is Role {
   return value === 'viewer' || value === 'editor' || value === 'admin';
@@ -100,7 +103,7 @@ export function licensedUserIds(users: readonly NamedUser[], seats: number): Set
 
 /** Constant-time lookup of the user owning `token` (compares every hash, no early exit). */
 export function authenticateToken(token: string): NamedUser | null {
-  const presented = crypto.createHash('sha256').update(token).digest();
+  const presented = sha256Digest(token);
   let found: NamedUser | null = null;
   for (const user of loadUsers()) {
     if (crypto.timingSafeEqual(presented, Buffer.from(user.tokenSha256, 'hex'))) found = user;
@@ -143,7 +146,7 @@ export function requireRole(required: Role, allowQuery: boolean): RequestHandler
     const token = presentedToken(req, allowQuery);
     const user = token === undefined ? null : authenticateToken(token);
     if (user === null) {
-      res.status(401).json(UNAUTHORIZED);
+      res.status(401).json(UNAUTHORIZED_BODY);
       return;
     }
     const license = getLicense();

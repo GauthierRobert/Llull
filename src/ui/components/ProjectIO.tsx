@@ -18,6 +18,7 @@ import { serializeDocument } from '@core/commands/persistence/serialization';
 import { Icon } from '@ui/components/Icon';
 import { downloadBlob } from '@ui/download';
 import { readChosenFile } from '@ui/chosenFile';
+import { DOCUMENT_ACCEPT } from '@mcp/documentFiles';
 
 function timestamp(): string {
   const d = new Date();
@@ -124,7 +125,7 @@ export function ProjectIO(): React.ReactElement {
       <input
         ref={fileInputRef}
         type="file"
-        accept="application/json,.json"
+        accept={DOCUMENT_ACCEPT}
         onChange={handleFileChange}
         style={{ display: 'none' }}
         aria-hidden="true"

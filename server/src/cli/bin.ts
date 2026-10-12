@@ -7,7 +7,7 @@
  */
 
 import { spawn } from 'node:child_process';
-import { parseArgv, stringFlag } from './argv';
+import { cliTarget, parseArgv, stringFlag } from './argv';
 
 /** Set in the supervised child so it runs the CLI instead of supervising again. */
 const CHILD_ENV = 'LLULL_CLI_CHILD';
@@ -26,8 +26,7 @@ function graceSeconds(env: NodeJS.ProcessEnv): number {
 function supervisedTimeout(argv: readonly string[], env: NodeJS.ProcessEnv): number | undefined {
   if (env[CHILD_ENV] !== undefined) return undefined;
   const args = parseArgv(argv);
-  if (stringFlag(args, 'server') !== undefined || env['LLULL_SERVER'] !== undefined)
-    return undefined;
+  if (cliTarget(args, env).server !== undefined) return undefined;
   const seconds = Number(stringFlag(args, 'timeout'));
   return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined;
 }

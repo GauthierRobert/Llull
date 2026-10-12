@@ -8,9 +8,7 @@
 import { Router, type RequestHandler } from 'express';
 import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
-import { unshapeExchangeResult } from './exchangeResult';
-import { applyLiveExchangeToolCall } from './liveExchange';
-import { getLiveDoc } from './liveDocument';
+import { runLiveExchangeTool } from './liveExchange';
 import type { ExchangeOptions } from './pythonExchange';
 import { guardMutation } from './security';
 import { actorOf } from './audit';
@@ -28,16 +26,13 @@ export function buildExchangeRouter(
       return;
     }
     const actor = actorOf(res, 'rest');
-    const before = getLiveDoc();
-    applyLiveExchangeToolCall(name, isRecord(body) ? body['params'] : undefined, exchange, actor)
-      .then((shaped) => {
-        if (shaped === null) {
+    runLiveExchangeTool(name, isRecord(body) ? body['params'] : undefined, exchange, actor)
+      .then((outcome) => {
+        if (outcome === null) {
           res.status(404).json({ error: `"${name}" is not an exchange tool; use POST /command.` });
           return;
         }
-        res
-          .status(200)
-          .json({ ...unshapeExchangeResult(shaped), changed: getLiveDoc() !== before });
+        res.status(200).json(outcome);
       })
       .catch((error: unknown) => {
         res.status(500).json({ error: errorMessage(error) });

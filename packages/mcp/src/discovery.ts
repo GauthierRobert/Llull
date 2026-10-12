@@ -265,6 +265,21 @@ export function closestToolNames(name: string, limit: number): string[] {
     .map(({ name: toolName }) => toolName);
 }
 
+/**
+ * "Did you mean" names for an unknown tool: typo matches first, else keyword search of the name
+ * (`foo_bar` -> "foo bar") within the enabled toolsets.
+ */
+export function suggestToolNames(
+  name: string,
+  limit: number,
+  enabledToolsets: ReadonlySet<ToolsetName>,
+): string[] {
+  const typoMatches = closestToolNames(name, limit);
+  return typoMatches.length > 0
+    ? typoMatches
+    : searchTools(name.replace(/_/g, ' '), limit, enabledToolsets).map((r) => r.name);
+}
+
 function outcome(
   summary: string,
   isError: boolean,

@@ -8,12 +8,12 @@
 
 import fs from 'fs';
 import type { CadDocument } from '@core/model/types';
-import { applyExchangeToolCall, buildExchangeToolDefinitions } from '@mcp/index';
+import { buildExchangeToolDefinitions } from '@mcp/index';
 import type { McpToolDefinition } from '@mcp/tools';
 import { isRecord } from '@lib/isRecord';
-import { unshapeExchangeResult } from '../exchangeResult';
+import { runExchangeTool } from '../exchangeResult';
 import type { ExchangeOptions } from '../pythonExchange';
-import type { CliRunResult } from './result';
+import type { CommandOutcome } from '@mcp/restProtocol';
 
 let definitions: readonly McpToolDefinition[] | null = null;
 
@@ -50,7 +50,7 @@ interface LocalExchangeContext {
   readonly options: ExchangeOptions;
   readonly getDoc: () => CadDocument;
   /** Runs a registry command on the local document (tracks + saves it like any CLI command). */
-  readonly runCommand: (name: string, params: unknown) => CliRunResult;
+  readonly runCommand: (name: string, params: unknown) => CommandOutcome;
 }
 
 /** Run an exchange tool in-process against a local document. */
@@ -58,23 +58,11 @@ export async function runLocalExchange(
   name: string,
   params: unknown,
   context: LocalExchangeContext,
-): Promise<CliRunResult> {
-  const before = context.getDoc();
-  const shaped = await applyExchangeToolCall(name, params, {
-    port: context.options.port,
-    dwg: context.options.dwg ?? null,
+): Promise<CommandOutcome> {
+  const outcome = await runExchangeTool(name, params, context.options, {
     getDoc: context.getDoc,
-    applyCommand: (commandName, commandParams) => {
-      const result = context.runCommand(commandName, commandParams);
-      return {
-        summary: result.summary,
-        affected: [...result.affected],
-        isError: result.isError,
-        ...(result.data !== undefined ? { data: result.data } : {}),
-      };
-    },
-    allowCodeExecution: context.options.allowCodeExecution,
+    applyCommand: context.runCommand,
   });
-  if (shaped === null) throw new Error(`${name} is not an exchange tool.`);
-  return { ...unshapeExchangeResult(shaped), changed: context.getDoc() !== before };
+  if (outcome === null) throw new Error(`${name} is not an exchange tool.`);
+  return outcome;
 }

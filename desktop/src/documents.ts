@@ -9,12 +9,12 @@
 
 import fs from 'fs';
 import path from 'path';
-import { serializeDocument } from '@core/commands/persistence/serialization';
 import type { CadDocument } from '@core/model/types';
 import { isRecord } from '@lib/isRecord';
-import { writeFileAtomic } from '@server/writeFileAtomic';
-
-type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
+import { outcomeIsFailure } from '@mcp/commandOutcome';
+import { parseCommandResponse } from '@mcp/restProtocol';
+import { requestJson, type FetchLike } from '@server/restClient';
+import { writeDocumentFile } from '@server/documentFile';
 
 interface Snapshot {
   readonly stateHash: string;
@@ -38,47 +38,30 @@ interface SessionOptions {
   readonly fetchImpl?: FetchLike;
 }
 
-/** The JSON body, or null for a non-JSON answer (proxy error page, crash): callers report the status. */
-async function jsonOf(response: Response): Promise<unknown> {
-  try {
-    return (await response.json()) as unknown;
-  } catch {
-    return null;
-  }
-}
-
 export function createDocumentSession(options: SessionOptions): DocumentSession {
-  const fetchImpl: FetchLike = options.fetchImpl ?? ((url, init) => fetch(url, init));
-  const auth = { Authorization: `Bearer ${options.token}` };
   let currentPath: string | null = null;
   let savedHash: string | null = null;
 
   const snapshot = async (): Promise<Snapshot> => {
-    const response = await fetchImpl(`${options.url}/live/snapshot`, { headers: auth });
-    const body = await jsonOf(response);
-    if (!response.ok || !isRecord(body) || typeof body['stateHash'] !== 'string')
-      throw new Error(`cannot read the document from the backend (HTTP ${response.status})`);
+    const { ok, status, body } = await requestJson(`${options.url}/live/snapshot`, {
+      token: options.token,
+      fetchImpl: options.fetchImpl,
+    });
+    if (!ok || !isRecord(body) || typeof body['stateHash'] !== 'string')
+      throw new Error(`cannot read the document from the backend (HTTP ${status})`);
     return { stateHash: body['stateHash'], document: body['document'] as CadDocument };
   };
 
   /** POST /command; `mayNoop`: a command that changes nothing is fine (clearing an empty doc). */
   const command = async (name: string, params: unknown, mayNoop = false): Promise<void> => {
-    const response = await fetchImpl(`${options.url}/command`, {
-      method: 'POST',
-      headers: { ...auth, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, params }),
+    const { status, body } = await requestJson(`${options.url}/command`, {
+      body: { name, params },
+      token: options.token,
+      fetchImpl: options.fetchImpl,
     });
-    const body = await jsonOf(response);
-    const summary = isRecord(body) && typeof body['summary'] === 'string' ? body['summary'] : '';
-    if (
-      !response.ok ||
-      !isRecord(body) ||
-      body['isError'] === true ||
-      (!mayNoop && body['changed'] === false)
-    ) {
-      const error = isRecord(body) && typeof body['error'] === 'string' ? body['error'] : summary;
-      throw new Error(error !== '' ? error : `${name} failed (HTTP ${response.status})`);
-    }
+    const outcome = parseCommandResponse(body, status);
+    if (outcomeIsFailure(name, outcome, mayNoop))
+      throw new Error(outcome.summary !== '' ? outcome.summary : `${name} failed (HTTP ${status})`);
   };
 
   return {
@@ -93,8 +76,7 @@ export function createDocumentSession(options: SessionOptions): DocumentSession 
       const target = filePath !== undefined ? path.resolve(filePath) : currentPath;
       if (target === null) throw new Error('no file chosen for this document (use Save As)');
       const current = await snapshot();
-      fs.mkdirSync(path.dirname(target), { recursive: true });
-      writeFileAtomic(target, serializeDocument(current.document));
+      writeDocumentFile(target, current.document);
       currentPath = target;
       savedHash = current.stateHash;
       return target;

@@ -4,6 +4,7 @@
  */
 
 import type { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { positiveInteger } from '../env';
 
 interface SessionEntry {
   transport: StreamableHTTPServerTransport;
@@ -20,14 +21,9 @@ const DEFAULT_TTL_MS = 30 * 60_000;
 const DEFAULT_SWEEP_MS = 60_000;
 const DEFAULT_MAX_SESSIONS = 256;
 
-function parsePosInt(value: string | undefined, fallback: number): number {
-  const n = parseInt(value ?? '', 10);
-  return Number.isFinite(n) && n > 0 ? n : fallback;
-}
-
 /** `MCP_MAX_SESSIONS` (default 256): a new session evicts the least recently used one when full. */
 function maxSessions(): number {
-  return parsePosInt(process.env['MCP_MAX_SESSIONS'], DEFAULT_MAX_SESSIONS);
+  return positiveInteger(process.env['MCP_MAX_SESSIONS'], DEFAULT_MAX_SESSIONS);
 }
 
 /** Make room for one more session by closing the oldest-idle ones while at/over the cap. */
@@ -61,8 +57,8 @@ export function startSessionSweep(): void {
   if (sweepStarted) return;
   sweepStarted = true;
 
-  const ttlMs = parsePosInt(process.env['MCP_SESSION_TTL_MS'], DEFAULT_TTL_MS);
-  const sweepMs = parsePosInt(process.env['MCP_SESSION_SWEEP_MS'], DEFAULT_SWEEP_MS);
+  const ttlMs = positiveInteger(process.env['MCP_SESSION_TTL_MS'], DEFAULT_TTL_MS);
+  const sweepMs = positiveInteger(process.env['MCP_SESSION_SWEEP_MS'], DEFAULT_SWEEP_MS);
   console.warn(`[mcp] session sweep started — TTL ${ttlMs} ms, sweep every ${sweepMs} ms`);
 
   setInterval(() => {

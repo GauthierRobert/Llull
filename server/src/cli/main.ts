@@ -17,6 +17,8 @@ import {
   booleanFlag,
   missingValueFlag,
   paramsSource,
+  APP_SERVER,
+  cliTarget,
   parseArgv,
   stringFlag,
   type ParsedArgv,
@@ -24,7 +26,7 @@ import {
 import {
   createLocalBackend,
   createRemoteBackend,
-  writeDocumentFile,
+  saveDocumentWithBackup,
   type CliBackend,
 } from './backend';
 import {
@@ -42,7 +44,9 @@ import { resolveImageRefs } from './imageParams';
 import { saveDataFiles, withoutPayloads } from './saveFiles';
 import { llullHome, readDesktopDiscovery } from './desktopDiscovery';
 import { exchangeTool, withFileContent } from './exchange';
-import type { CliRunResult } from './result';
+import type { CommandOutcome } from '@mcp/restProtocol';
+import { isHealthy } from '../restClient';
+import { outcomeIsFailure } from '@mcp/commandOutcome';
 import { exchangeOptionsWithDwg } from '../dwgConvert';
 import type { ExchangeOptions } from '../pythonExchange';
 import { USAGE } from './usage';
@@ -69,18 +73,16 @@ export const EXIT_OK = 0;
 export const EXIT_COMMAND_ERROR = 1;
 export const EXIT_USAGE = 2;
 
-const DEFAULT_DOC = 'model.llull.json';
 const DEFAULT_SEARCH_LIMIT = 10;
 
 class UsageError extends Error {}
 
 function docPathOf(args: ParsedArgv, io: CliIo): string {
-  return stringFlag(args, 'doc') ?? io.env['LLULL_DOC'] ?? DEFAULT_DOC;
+  return cliTarget(args, io.env).doc;
 }
 
 function serverOf(args: ParsedArgv, io: CliIo): string | undefined {
-  if (booleanFlag(args, 'app')) return APP_SERVER;
-  return stringFlag(args, 'server') ?? io.env['LLULL_SERVER'];
+  return cliTarget(args, io.env).server;
 }
 
 /** `--timeout <seconds>`: a positive number, or undefined when absent. */
@@ -110,7 +112,7 @@ function observerOf(args: ParsedArgv, io: CliIo): StepObserver | undefined {
 }
 
 /** A run stopped by its `--timeout` deadline is a failure with a clear message, never a partial result. */
-function withTimeout(observer: StepObserver | undefined, result: CliRunResult): CliRunResult {
+function withTimeout(observer: StepObserver | undefined, result: CommandOutcome): CommandOutcome {
   const stop = observer?.timeout();
   if (stop === undefined) return result;
   return {
@@ -120,9 +122,6 @@ function withTimeout(observer: StepObserver | undefined, result: CliRunResult): 
     changed: false,
   };
 }
-
-/** `--app` / `--server app`: the running desktop app, from its discovery file. */
-const APP_SERVER = 'app';
 
 function remoteTargetOf(
   server: string,
@@ -279,22 +278,9 @@ function printEntries(entries: readonly CatalogEntry[], args: ParsedArgv, io: Cl
   return EXIT_OK;
 }
 
-/**
- * A result whose exit status a script can trust: besides a rejection, a failed plan (`data.ok`
- * false) and a mutating command that changed nothing (a graceful no-op such as "add_box failed: …")
- * are errors — except setters (`idempotent`) and history meta-commands, which may change nothing.
- */
-function withOutcome(name: string, result: CliRunResult): CliRunResult {
-  if (result.isError) return result;
-  const failedReport = isRecord(result.data) && result.data['ok'] === false;
-  const annotations = getCommand(name)?.annotations;
-  // Setters (`idempotent`) and history meta-commands may legitimately change nothing.
-  const mayNoop =
-    annotations?.readOnly === true ||
-    annotations?.idempotent === true ||
-    annotations?.metaHistory === true;
-  const noop = !mayNoop && !result.changed && result.data === undefined;
-  return failedReport || noop ? { ...result, isError: true } : result;
+/** A result whose exit status a script can trust (`outcomeIsFailure`). */
+function withOutcome(name: string, result: CommandOutcome): CommandOutcome {
+  return !result.isError && outcomeIsFailure(name, result) ? { ...result, isError: true } : result;
 }
 
 async function runExec(args: ParsedArgv, io: CliIo): Promise<number> {
@@ -346,7 +332,7 @@ function runNew(args: ParsedArgv, io: CliIo): number {
   const docPath = docPathOf(args, io);
   if (fs.existsSync(docPath) && !booleanFlag(args, 'force'))
     throw new UsageError(`${docPath} exists; pass --force to replace it with an empty document.`);
-  writeDocumentFile(docPath, createEmptyDocument());
+  saveDocumentWithBackup(docPath, createEmptyDocument());
   io.stdout(`Created empty document ${docPath}.`);
   return EXIT_OK;
 }
@@ -396,17 +382,8 @@ function runToolsets(args: ParsedArgv, io: CliIo): number {
   return EXIT_OK;
 }
 
-/** Where commands would go: the desktop app (if running) and the local document fallback. */
 /** The app answers `/health` (its pid may have been reused after a crash). */
-async function appReachable(url: string, io: CliIo): Promise<boolean> {
-  const fetchImpl = io.fetchImpl ?? ((target: string, init: RequestInit) => fetch(target, init));
-  try {
-    const response = await fetchImpl(`${url}/health`, { signal: AbortSignal.timeout(2_000) });
-    return response.ok;
-  } catch {
-    return false;
-  }
-}
+const appReachable = (url: string, io: CliIo): Promise<boolean> => isHealthy(url, io.fetchImpl);
 
 async function runStatus(args: ParsedArgv, io: CliIo): Promise<number> {
   const found = readDesktopDiscovery(llullHome(io.env));

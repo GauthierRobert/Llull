@@ -7,24 +7,36 @@
  */
 
 import { applyExchangeToolCall } from '@mcp/index';
+import type { CommandOutcome } from '@mcp/restProtocol';
+import { exchangeDepsOf, runExchangeTool, type ExchangeHost } from './exchangeResult';
 import { applyCommand } from './commandBus';
 import { getLiveDoc } from './liveDocument';
 import type { ExchangeOptions } from './pythonExchange';
 import type { Actor } from './audit';
 
-/** Run an exchange tool against the live document; its commands go through the command bus. */
+/** The live document + the command bus (undo, live sync, audit attributed to `actor`). */
+const liveHost = (actor: Actor): ExchangeHost => ({
+  getDoc: getLiveDoc,
+  applyCommand: (commandName, commandParams) =>
+    applyCommand(commandName, commandParams, undefined, actor),
+});
+
+/** Run an exchange tool against the live document (MCP tools/call); commands go through the bus. */
 export function applyLiveExchangeToolCall(
   name: string,
   params: unknown,
   exchange: ExchangeOptions,
   actor: Actor,
 ): ReturnType<typeof applyExchangeToolCall> {
-  return applyExchangeToolCall(name, params, {
-    port: exchange.port,
-    dwg: exchange.dwg ?? null,
-    getDoc: getLiveDoc,
-    applyCommand: (commandName, commandParams) =>
-      applyCommand(commandName, commandParams, undefined, actor),
-    allowCodeExecution: exchange.allowCodeExecution,
-  });
+  return applyExchangeToolCall(name, params, exchangeDepsOf(exchange, liveHost(actor)));
+}
+
+/** The same call answered in the command-bus shape (REST `POST /exchange`). */
+export function runLiveExchangeTool(
+  name: string,
+  params: unknown,
+  exchange: ExchangeOptions,
+  actor: Actor,
+): Promise<CommandOutcome | null> {
+  return runExchangeTool(name, params, exchange, liveHost(actor));
 }
