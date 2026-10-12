@@ -10,8 +10,10 @@ import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
 import type { Material } from '@core/model/types';
 import { PanelEmpty, PanelHeader } from '@ui/panels/PanelParts';
-import { useIsMounted } from '@ui/hooks/useIsMounted';
+import { useDispatchThen } from '@ui/hooks/useDispatchThen';
 import { materialDraftOf } from '@ui/panels/materialRules';
+import { LabeledInput } from '@ui/panels/LabeledInput';
+import { parseNumber } from '@ui/numberText';
 import { significantNumber } from '@lib/compactNumber';
 
 /** 3 significant digits without exponent notation for ordinary magnitudes (7850, not "7.85e+3"). */
@@ -100,26 +102,21 @@ const SLIDERS = [
 ] as const;
 
 function CreateMaterialForm(): React.ReactElement {
-  const dispatch = useStore((s) => s.dispatch);
   const [form, setForm] = useState(EMPTY_FORM);
   const { name, density, color } = form;
   const setField =
     (field: keyof typeof EMPTY_FORM) =>
-    (e: React.ChangeEvent<HTMLInputElement>): void =>
-      setForm((previous) => ({ ...previous, [field]: e.target.value }));
+    (value: string): void =>
+      setForm((previous) => ({ ...previous, [field]: value }));
 
-  const isMounted = useIsMounted();
+  const dispatchThen = useDispatchThen();
   const draft = materialDraftOf(form);
 
   const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
     if (draft === null) return;
-    dispatch('create_material', draft, {
-      // A rejected create (e.g. duplicate name) keeps the typed values for correction.
-      onResult: ({ changed }) => {
-        if (changed && isMounted()) setForm(EMPTY_FORM);
-      },
-    });
+    // A rejected create (e.g. duplicate name) keeps the typed values for correction.
+    dispatchThen('create_material', draft, () => setForm(EMPTY_FORM));
   };
 
   return (
@@ -132,77 +129,61 @@ function CreateMaterialForm(): React.ReactElement {
       <span className="panel__form-title" aria-hidden="true">
         New material
       </span>
-      <div className="field">
-        <label className="field__label" htmlFor="material-create-name">
-          Name
-        </label>
-        <input
-          id="material-create-name"
-          type="text"
-          className="material-create-input"
-          value={name}
-          onChange={setField('name')}
-          placeholder="e.g. steel, pla"
-          aria-label="New material name"
-          autoComplete="off"
-        />
-      </div>
-
-      <div className="field">
-        <label className="field__label" htmlFor="material-create-density">
-          Density
-        </label>
-        <input
-          id="material-create-density"
-          type="number"
-          step="any"
-          min="0"
-          className="material-create-input"
-          value={density}
-          onChange={setField('density')}
-          placeholder="e.g. 0.00785"
-          aria-label="Material density (g/mm³)"
-          autoComplete="off"
-        />
-      </div>
-
-      <div className="field material-create-row--color">
-        <label className="field__label" htmlFor="material-create-color">
-          Color
-        </label>
-        <input
-          id="material-create-color"
-          type="color"
-          className="material-create-color-picker"
-          value={color}
-          onChange={setField('color')}
-          aria-label="Material color"
-        />
+      <LabeledInput
+        label="Name"
+        type="text"
+        value={name}
+        onChange={setField('name')}
+        placeholder="e.g. steel, pla"
+        ariaLabel="New material name"
+        inputProps={{ className: 'material-create-input', autoComplete: 'off' }}
+      />
+      <LabeledInput
+        label="Density"
+        type="number"
+        value={density}
+        onChange={setField('density')}
+        placeholder="e.g. 0.00785"
+        ariaLabel="Material density (g/mm³)"
+        inputProps={{
+          step: 'any',
+          min: '0',
+          className: 'material-create-input',
+          autoComplete: 'off',
+        }}
+      />
+      <LabeledInput
+        label="Color"
+        type="color"
+        value={color}
+        onChange={setField('color')}
+        ariaLabel="Material color"
+        className="material-create-row--color"
+        inputProps={{ className: 'material-create-color-picker' }}
+      >
         <span className="material-create-color-hex" aria-hidden="true">
           {color}
         </span>
-      </div>
-
+      </LabeledInput>
       {SLIDERS.map(({ field, title }) => (
-        <div className="field" key={field}>
-          <label className="field__label" htmlFor={`material-create-${field}`}>
-            {title}
-          </label>
-          <input
-            id={`material-create-${field}`}
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            className="material-create-range"
-            value={form[field]}
-            onChange={setField(field)}
-            aria-label={`Material ${field} (0 to 1)`}
-            aria-valuemin={0}
-            aria-valuemax={1}
-          />
-          <span className="field__value">{parseFloat(form[field]).toFixed(2)}</span>
-        </div>
+        <LabeledInput
+          key={field}
+          label={title}
+          type="range"
+          value={form[field]}
+          onChange={setField(field)}
+          ariaLabel={`Material ${field} (0 to 1)`}
+          inputProps={{
+            min: '0',
+            max: '1',
+            step: '0.01',
+            className: 'material-create-range',
+            'aria-valuemin': 0,
+            'aria-valuemax': 1,
+          }}
+        >
+          <span className="field__value">{(parseNumber(form[field]) ?? 0).toFixed(2)}</span>
+        </LabeledInput>
       ))}
 
       <button

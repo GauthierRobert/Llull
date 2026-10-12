@@ -10,7 +10,8 @@ import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
 import type { Configuration } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
-import { useIsMounted } from '@ui/hooks/useIsMounted';
+import { useDispatchThen } from '@ui/hooks/useDispatchThen';
+import { LabeledInput } from '@ui/panels/LabeledInput';
 import { configurationDraftOf, isConfigurationActive } from '@ui/panels/configurationRules';
 import { PanelEmpty, PanelHeader, IconButton } from '@ui/panels/PanelParts';
 
@@ -134,7 +135,6 @@ function ParameterValueRow({
 const emptyRow = (rowId: number): PvEntry => ({ rowId, paramName: '', expression: '' });
 
 function CreateConfigurationForm(): React.ReactElement {
-  const dispatch = useStore((s) => s.dispatch);
   const [configName, setConfigName] = useState('');
   const nextRowId = useRef(1);
   const newRow = (): PvEntry => emptyRow(nextRowId.current++);
@@ -146,18 +146,15 @@ function CreateConfigurationForm(): React.ReactElement {
   const handleRemoveRow = (index: number): void =>
     setPvRows((prev) => prev.filter((_, i) => i !== index));
 
-  const isMounted = useIsMounted();
+  const dispatchThen = useDispatchThen();
   const draft = configurationDraftOf(configName, pvRows);
 
   const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
     if (draft === null) return;
-    dispatch('create_configuration', draft, {
-      onResult: ({ changed }) => {
-        if (!changed || !isMounted()) return;
-        setConfigName('');
-        setPvRows([newRow()]);
-      },
+    dispatchThen('create_configuration', draft, () => {
+      setConfigName('');
+      setPvRows([newRow()]);
     });
   };
 
@@ -171,20 +168,14 @@ function CreateConfigurationForm(): React.ReactElement {
       <span className="panel__form-title" aria-hidden="true">
         New configuration
       </span>
-      <div className="field">
-        <label className="field__label" htmlFor="config-create-name">
-          Configuration name
-        </label>
-        <input
-          id="config-create-name"
-          type="text"
-          className="config-create-name-input"
-          value={configName}
-          onChange={(e) => setConfigName(e.target.value)}
-          placeholder="e.g. small, production_v2"
-          autoComplete="off"
-        />
-      </div>
+      <LabeledInput
+        label="Configuration name"
+        type="text"
+        value={configName}
+        onChange={setConfigName}
+        placeholder="e.g. small, production_v2"
+        inputProps={{ className: 'config-create-name-input', autoComplete: 'off' }}
+      />
 
       <div className="config-create-pv-section">
         <span className="panel__form-title" aria-hidden="true">

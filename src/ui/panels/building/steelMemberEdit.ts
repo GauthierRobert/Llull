@@ -5,6 +5,7 @@
  */
 
 import type { SteelMemberElement } from '@core/model/building';
+import { changedFields, changedText } from '@ui/panels/changedParams';
 
 export type SteelMemberEditKey =
   | 'profile'
@@ -52,13 +53,12 @@ export function buildSteelMemberUpdate(
   /** A new section keeps the top of steel (horizontal members; the command ignores it otherwise). */
   keepTopOfSteel = false,
 ): Record<string, unknown> | null {
-  const changes: Record<string, unknown> = {};
+  // A blank joint / fixity / grade means "default": the command cannot express that, so skip it.
+  const changes: Record<string, unknown> = {
+    ...changedFields(initial, values, ['note']),
+  };
   for (const key of EDIT_KEYS) {
-    if (values[key] === initial[key]) continue;
-    const text = values[key].trim();
-    // A blank joint / fixity / grade means "default": the command cannot express that, so skip.
-    if (text === '' && key !== 'note') continue;
-    changes[key] = key === 'note' ? values[key] : text;
+    if (key !== 'note') Object.assign(changes, changedText(key, values[key], initial[key]));
   }
   if (Object.keys(changes).length === 0) return null;
   return {

@@ -9,7 +9,7 @@ import { execute } from '@core/commands/registry';
 import type { CommandResult } from '@core/commands/types';
 import { useStore } from '@ui/store';
 import { downloadText } from '@ui/download';
-import { stringFields } from '@ui/resultData';
+import { isCsvData, stringFields } from '@ui/resultData';
 
 /** Runs a read-only command on the current store document. */
 export function runQuery(command: string, params: Record<string, unknown> = {}): CommandResult {
@@ -35,4 +35,19 @@ export function downloadQuery(
   const fileName = data?.['fileName'] ?? data?.['filename'] ?? fallbackName;
   if (content !== undefined && fileName !== null) downloadText(content, fileName, mimeType);
   return result.summary;
+}
+
+/**
+ * Runs `command` and downloads its `csv` payload as `fileName`.
+ * @returns the command summary and whether a file was downloaded (false: the command refused).
+ */
+export function downloadCsvQuery(
+  command: string,
+  params: Record<string, unknown>,
+  fileName: string,
+): { summary: string; downloaded: boolean } {
+  const result = runQuery(command, params);
+  const downloaded = isCsvData(result.data);
+  if (isCsvData(result.data)) downloadText(result.data.csv, fileName, 'text/csv');
+  return { summary: result.summary, downloaded };
 }

@@ -7,7 +7,7 @@
 
 import React, { useState } from 'react';
 import type { CivilObject } from '@core/model/civil';
-import { CivilObjectRow, NumberField } from './CivilParts';
+import { CivilObjectRow, NumberTextField } from './CivilParts';
 import { useCivilReport } from './civilQuery';
 
 interface CivilReportRowProps {
@@ -33,7 +33,7 @@ export function CivilReportRow({
   const detail = useCivilReport(report.command, report.idKey, object.id);
   return (
     <CivilObjectRow object={object} detail={detail}>
-      <NumberField value={text} set={setText} hint={field.hint} label={field.label} />
+      <NumberTextField value={text} set={setText} hint={field.hint} label={field.label} />
       <button
         type="button"
         className="btn btn--ghost btn--sm"

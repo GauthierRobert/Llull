@@ -13,9 +13,9 @@ import type { Parameter } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
 import { significantNumber } from '@lib/compactNumber';
 import { CommitInput } from '@ui/panels/propertyFields';
-import { useIsMounted } from '@ui/hooks/useIsMounted';
+import { useDispatchThen } from '@ui/hooks/useDispatchThen';
 import { isParameterNameValid, parameterDraftOf } from '@ui/panels/parameterRules';
-import { PanelEmpty, PanelHeader, IconButton } from '@ui/panels/PanelParts';
+import { PanelEmpty, PanelHeader, DeleteButton } from '@ui/panels/PanelParts';
 
 interface ParameterRowProps {
   param: Parameter;
@@ -56,13 +56,10 @@ function ParameterRow({ param }: ParameterRowProps): React.ReactElement {
         {hasError ? '—' : significantNumber(param.value, 6)}
       </span>
 
-      <IconButton
-        icon="trash"
-        danger
+      <DeleteButton
         className="param-delete-btn"
-        onClick={() => dispatch('delete_parameter', { name: param.name })}
+        onDelete={() => dispatch('delete_parameter', { name: param.name })}
         label={`Delete parameter ${param.name}`}
-        title={`Delete parameter ${param.name}`}
       />
 
       {hasError && (
@@ -80,23 +77,19 @@ function ParameterRow({ param }: ParameterRowProps): React.ReactElement {
 }
 
 function AddParameterRow(): React.ReactElement {
-  const dispatch = useStore((s) => s.dispatch);
   const [name, setName] = useState('');
   const [expression, setExpression] = useState('');
 
-  const isMounted = useIsMounted();
+  const dispatchThen = useDispatchThen();
   const draft = parameterDraftOf(name, expression);
   const nameValid = isParameterNameValid(name);
 
   const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
     if (draft === null) return;
-    dispatch('set_parameter', draft, {
-      onResult: ({ changed }) => {
-        if (!changed || !isMounted()) return;
-        setName('');
-        setExpression('');
-      },
+    dispatchThen('set_parameter', draft, () => {
+      setName('');
+      setExpression('');
     });
   };
 

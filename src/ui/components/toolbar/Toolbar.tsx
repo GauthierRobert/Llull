@@ -121,6 +121,7 @@ function SelectTransformGroup(): React.ReactElement {
   const drawTool = useToolStore((s) => s.drawTool);
   const gizmoMode = useToolStore((s) => s.gizmoMode);
   const setDrawTool = useToolStore((s) => s.setDrawTool);
+  const toggleDrawTool = useToolStore((s) => s.toggleDrawTool);
   const setGizmoMode = useToolStore((s) => s.setGizmoMode);
   const selectionCount = useStore((s) => s.document.selection.length);
   const nothingSelected = selectionCount === 0;
@@ -154,7 +155,7 @@ function SelectTransformGroup(): React.ReactElement {
               shortcut={isMove ? DRAW_TOOL_KEYS.move : undefined}
               pressed={isMove && drawTool === 'move'}
               disabled={!isMove || (nothingSelected && drawTool !== 'move')}
-              onClick={() => setDrawTool(drawTool === 'move' ? 'none' : 'move')}
+              onClick={() => toggleDrawTool('move')}
             />
           );
         }

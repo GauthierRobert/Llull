@@ -1,7 +1,7 @@
 /**
- * @layer ui/panels/building
- * Controlled form state shared by the building forms: field values, one inline error that clears
- * on every edit.
+ * @layer ui/panels
+ * Controlled form state shared by the panel forms: field values, one inline error that clears on
+ * every edit.
  */
 
 import { useState } from 'react';
@@ -11,6 +11,8 @@ interface FormValues<V extends Readonly<Record<string, string>>> {
   error: string;
   setError: (message: string) => void;
   change: (key: keyof V & string, value: string) => void;
+  /** `{ value, set }` of one field, ready to spread on a text / number field. */
+  field: (key: keyof V & string) => { value: string; set: (value: string) => void };
 }
 
 export function useFormValues<V extends Readonly<Record<string, string>>>(
@@ -22,5 +24,9 @@ export function useFormValues<V extends Readonly<Record<string, string>>>(
     setValues((previous) => ({ ...previous, [key]: value }));
     setError('');
   };
-  return { values, error, setError, change };
+  const field = (key: keyof V & string): { value: string; set: (value: string) => void } => ({
+    value: values[key] ?? '',
+    set: (value) => change(key, value),
+  });
+  return { values, error, setError, change, field };
 }

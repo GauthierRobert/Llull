@@ -8,6 +8,7 @@
 import React from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore, useViewportStore } from '@ui/store';
+import { useSoleSelectedEntity } from '@ui/store/selectionHooks';
 import { deleteSelection, duplicateSelection } from '@ui/actions/selectionActions';
 import { type Entity, is2D } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
@@ -145,9 +146,7 @@ function PropertiesBody(): React.ReactElement {
   const entities = useStore((s) => s.document.entities);
   const building = useStore((s) => s.document.building);
   const document = building === undefined ? { entities } : { entities, building };
-  const [selectedId] = selection;
-  const entity =
-    selection.length === 1 && selectedId !== undefined ? entities[selectedId] : undefined;
+  const entity = useSoleSelectedEntity();
   const elementIds = new Set<string>();
   for (const id of selection) {
     const elementId = buildingElementOf(document, id);

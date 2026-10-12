@@ -7,8 +7,9 @@
 
 import React, { memo, useMemo } from 'react';
 import { useStore } from '@ui/store';
+import { useSelectionSet } from '@ui/store/selectionHooks';
 import type { BuildingElement } from '@core/model/building';
-import { PanelSection, IconButton } from '@ui/panels/PanelParts';
+import { DeleteButton, ListRow, PanelSection } from '@ui/panels/PanelParts';
 import { CATEGORY_LABEL, describe } from './describeElement';
 import { elementsOnActiveLevel, isElementSelected } from './elementListRules';
 
@@ -24,39 +25,33 @@ const ElementRow = memo(function ElementRow({
   const dispatch = useStore((s) => s.dispatch);
   const select = useStore((s) => s.select);
   const units = useStore((s) => s.document.units);
+  const typeLabel = CATEGORY_LABEL[element.category];
   return (
-    <li
-      className={`panel__row${selected ? ' panel__row--selected' : ''}`}
-      data-testid={`element-row-${element.id}`}
-    >
-      <button
-        type="button"
-        className="building-row-btn"
-        onClick={() => select(element.entityIds)}
-        aria-label={`Select ${CATEGORY_LABEL[element.category]} ${element.mark}`}
-      >
-        <span className="chip">{CATEGORY_LABEL[element.category]}</span>
-        <span className="panel__row-main">{element.mark}</span>
-        <span className="panel__row-meta">{describe(element, units)}</span>
-      </button>
-      <span className="panel__row-actions">
-        <IconButton
+    <ListRow
+      selected={selected}
+      testId={`element-row-${element.id}`}
+      label={`Select ${typeLabel} ${element.mark}`}
+      onSelect={() => select(element.entityIds)}
+      actions={
+        <DeleteButton
           icon="close"
-          danger
           size={12}
-          label={`Delete ${CATEGORY_LABEL[element.category]} ${element.mark}`}
-          onClick={() => dispatch('delete_building_element', { elementIds: [element.id] })}
+          label={`Delete ${typeLabel} ${element.mark}`}
+          onDelete={() => dispatch('delete_building_element', { elementIds: [element.id] })}
         />
-      </span>
-    </li>
+      }
+    >
+      <span className="chip">{typeLabel}</span>
+      <span className="panel__row-main">{element.mark}</span>
+      <span className="panel__row-meta">{describe(element, units)}</span>
+    </ListRow>
   );
 });
 
 export function ElementListSection(): React.ReactElement {
   const building = useStore((s) => s.document.building);
-  const selection = useStore((s) => s.document.selection);
   const elements = useMemo(() => elementsOnActiveLevel(building), [building]);
-  const selected = useMemo(() => new Set(selection), [selection]);
+  const selected = useSelectionSet();
   const activeName = building?.activeLevelId
     ? building.levels[building.activeLevelId]?.name
     : undefined;

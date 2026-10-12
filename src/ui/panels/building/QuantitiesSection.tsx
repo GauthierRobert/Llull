@@ -8,13 +8,12 @@
 
 import React, { useMemo, useState } from 'react';
 import { useStore } from '@ui/store';
-import { runQuery } from '@ui/services/localQuery';
+import { downloadCsvQuery, runQuery } from '@ui/services/localQuery';
 import type { CostLine } from '@aec/index';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { OptionSelect } from '@ui/panels/OptionSelect';
 import { capitalize } from '@ui/panels/capitalize';
-import { downloadText } from '@ui/download';
-import { isCsvData, isEstimateData } from '@ui/resultData';
+import { isEstimateData } from '@ui/resultData';
 import { parseNumber } from '@ui/numberText';
 
 const UNIT_LABEL: Readonly<Record<string, string>> = {
@@ -159,9 +158,8 @@ export function QuantitiesSection(): React.ReactElement {
     params: Record<string, unknown>,
     fileName: string,
   ): void => {
-    const result = runQuery(command, params);
-    if (isCsvData(result.data)) downloadText(result.data.csv, fileName, 'text/csv');
-    else setStatus(result.summary);
+    const { summary, downloaded } = downloadCsvQuery(command, params, fileName);
+    if (!downloaded) setStatus(summary);
   };
   const downloadTakeoff = (): void => downloadCsv('quantity_takeoff', {}, 'quantity-takeoff.csv');
   const downloadEstimate = (): void => downloadCsv('estimate_cost', {}, 'cost-estimate.csv');

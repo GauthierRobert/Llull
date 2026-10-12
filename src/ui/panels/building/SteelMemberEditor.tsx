@@ -18,42 +18,10 @@ import {
   BASE_OPTIONS,
   JOINT_OPTIONS,
   MEMBER_ROLE_OPTIONS,
-  type SelectOption,
 } from './steelProfileOptions';
-import { OptionSelect } from '@ui/panels/OptionSelect';
-import { LabeledInput } from './LabeledInput';
-
-interface SelectFieldProps {
-  label: string;
-  value: string;
-  options: ReadonlyArray<SelectOption>;
-  blankLabel?: string;
-  onChange: (value: string) => void;
-}
-
-function SelectField({
-  label,
-  value,
-  options,
-  blankLabel,
-  onChange,
-}: SelectFieldProps): React.ReactElement {
-  const values = [...(blankLabel !== undefined ? [''] : []), ...options.map(([v]) => v)];
-  const textOf = (optionValue: string): string =>
-    optionValue === '' ? (blankLabel ?? '') : (options.find(([v]) => v === optionValue)?.[1] ?? '');
-  return (
-    <label className="field">
-      <span className="field__label">{label}</span>
-      <OptionSelect
-        value={value}
-        options={values}
-        label={label}
-        optionLabel={textOf}
-        onChange={onChange}
-      />
-    </label>
-  );
-}
+import { CommandForm } from '@ui/panels/CommandForm';
+import { LabeledInput } from '@ui/panels/LabeledInput';
+import { LabeledSelect } from '@ui/panels/LabeledSelect';
 
 export function SteelMemberEditor({ member }: { member: SteelMemberElement }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
@@ -66,20 +34,20 @@ export function SteelMemberEditor({ member }: { member: SteelMemberElement }): R
     (value: string): void =>
       setValues((previous) => ({ ...previous, [key]: value }));
 
-  const handleSubmit = (event: React.FormEvent): void => {
-    event.preventDefault();
+  const handleSubmit = (): void => {
     const params = buildSteelMemberUpdate(member.id, initial, values, horizontal && keepTopOfSteel);
     if (params !== null) dispatch('update_steel_member', params);
   };
 
   return (
-    <form
-      className="panel__form building-form"
+    <CommandForm
+      ariaLabel={`Steel member ${member.mark} properties`}
+      testId="steel-member-editor"
+      submitLabel="Save member"
+      submitTestId="member-save"
       onSubmit={handleSubmit}
-      aria-label={`Steel member ${member.mark} properties`}
-      data-testid="steel-member-editor"
     >
-      <SelectField
+      <LabeledSelect
         label="Profile"
         value={values.profile}
         options={ALL_PROFILES}
@@ -97,7 +65,7 @@ export function SteelMemberEditor({ member }: { member: SteelMemberElement }): R
         </label>
       )}
       <LabeledInput label="Grade" type="text" value={values.material} onChange={set('material')} />
-      <SelectField
+      <LabeledSelect
         label="Role"
         value={values.role}
         options={MEMBER_ROLE_OPTIONS}
@@ -105,14 +73,14 @@ export function SteelMemberEditor({ member }: { member: SteelMemberElement }): R
       />
       {values.role === 'beam' && (
         <>
-          <SelectField
+          <LabeledSelect
             label="Start joint"
             value={values.startJoint}
             options={JOINT_OPTIONS}
             blankLabel="Default (pinned)"
             onChange={set('startJoint')}
           />
-          <SelectField
+          <LabeledSelect
             label="End joint"
             value={values.endJoint}
             options={JOINT_OPTIONS}
@@ -122,7 +90,7 @@ export function SteelMemberEditor({ member }: { member: SteelMemberElement }): R
         </>
       )}
       {values.role === 'column' && (
-        <SelectField
+        <LabeledSelect
           label="Base fixity"
           value={values.baseFixity}
           options={BASE_OPTIONS}
@@ -131,9 +99,6 @@ export function SteelMemberEditor({ member }: { member: SteelMemberElement }): R
         />
       )}
       <LabeledInput label="Note" type="text" value={values.note} onChange={set('note')} />
-      <button type="submit" className="btn btn--primary btn--sm" data-testid="member-save">
-        Save member
-      </button>
-    </form>
+    </CommandForm>
   );
 }

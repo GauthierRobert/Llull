@@ -1,6 +1,7 @@
 /** @layer ui/panels Presentational field primitives for the properties inspector. */
 
 import React, { useRef, useState } from 'react';
+import { parseNumber } from '@ui/numberText';
 
 const AXES = ['x', 'y', 'z'] as const;
 
@@ -163,8 +164,8 @@ export function AxisFields({ values, label, onAxisCommit }: AxisFieldsProps): Re
               value={text}
               inputMode="decimal"
               onCommit={(raw) => {
-                const parsed = Number.parseFloat(raw);
-                if (Number.isFinite(parsed)) onAxisCommit(i, parsed);
+                const parsed = parseNumber(raw);
+                if (parsed !== undefined) onAxisCommit(i, parsed);
               }}
             />
           </label>

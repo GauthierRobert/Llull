@@ -11,26 +11,20 @@ import type { BuildingElement, BuildingModel } from '@core/model/building';
 import { Icon } from '@ui/components/Icon';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { PropRow } from '@ui/panels/propertyFields';
-import { orderedValues } from '@ui/panels/orderedValues';
 import { CATEGORY_LABEL, describe } from './describeElement';
 import { memberFacts } from './memberFacts';
 import { EquipmentEditor } from './EquipmentEditor';
 import { SteelMemberEditor } from './SteelMemberEditor';
 import { WallEditor } from './WallEditor';
+import { useBuildingLevels } from './useBuildingLevels';
 import { contentKey } from '@ui/contentKey';
 
 function levelNameOf(building: BuildingModel, element: BuildingElement): string | null {
   return 'levelId' in element ? (building.levels[element.levelId]?.name ?? element.levelId) : null;
 }
 
-function ElementEditor({
-  element,
-  building,
-}: {
-  element: BuildingElement;
-  building: BuildingModel;
-}): React.ReactElement | null {
-  const levels = orderedValues(building.levelOrder, building.levels);
+function ElementEditor({ element }: { element: BuildingElement }): React.ReactElement | null {
+  const levels = useBuildingLevels();
   switch (element.category) {
     case 'member':
       return <SteelMemberEditor key={contentKey(element)} member={element} />;
@@ -87,7 +81,7 @@ export function ElementInspector({ elementId }: ElementInspectorProps): React.Re
           </PropRow>
         )}
       </PanelSection>
-      <ElementEditor element={element} building={building} />
+      <ElementEditor element={element} />
       <div className="props-actions">
         <button
           type="button"

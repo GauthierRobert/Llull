@@ -7,15 +7,17 @@
 import React from 'react';
 import { useStore } from '@ui/store';
 import type { BuildingLevel, EquipmentElement } from '@core/model/building';
-import { BuildingForm } from './BuildingForm';
-import { useFormValues } from './useFormValues';
+import { CommandForm } from '@ui/panels/CommandForm';
+import { useFormValues } from '@ui/panels/useFormValues';
+import { LabeledInput } from '@ui/panels/LabeledInput';
+import { LabeledSelect } from '@ui/panels/LabeledSelect';
+import { LevelSelect } from './LevelSelect';
 import {
   EQUIPMENT_EDIT_FIELDS,
   buildEquipmentUpdate,
   equipmentValues,
   type EquipmentEditValues,
 } from './equipmentEdit';
-import { LabeledInput } from './LabeledInput';
 import { EQUIPMENT_SHAPE_OPTIONS } from './industrialTools';
 
 interface EquipmentEditorProps {
@@ -38,7 +40,7 @@ export function EquipmentEditor({ element, levels }: EquipmentEditorProps): Reac
   };
 
   return (
-    <BuildingForm
+    <CommandForm
       ariaLabel={`Equipment ${element.mark} properties`}
       error={error}
       submitLabel="Save equipment"
@@ -56,34 +58,21 @@ export function EquipmentEditor({ element, levels }: EquipmentEditorProps): Reac
           testId={`equipment-edit-${field.key}`}
         />
       ))}
-      <label className="field">
-        <span className="field__label">Shape</span>
-        <select
-          value={values.shape}
-          onChange={(event) => change('shape', event.target.value)}
-          data-testid="equipment-edit-shape"
-        >
-          {EQUIPMENT_SHAPE_OPTIONS.map(([shape, text]) => (
-            <option key={shape} value={shape}>
-              {text}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="field">
-        <span className="field__label">Level</span>
-        <select
-          value={values.levelId}
-          onChange={(event) => change('levelId', event.target.value)}
-          data-testid="equipment-edit-levelId"
-        >
-          {levels.map((level) => (
-            <option key={level.id} value={level.id}>
-              {level.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <LabeledSelect
+        label="Shape"
+        value={values.shape}
+        options={EQUIPMENT_SHAPE_OPTIONS}
+        testId="equipment-edit-shape"
+        onChange={(value) => change('shape', value)}
+      />
+      <LevelSelect
+        showLabel
+        label="Level"
+        levels={levels}
+        value={values.levelId}
+        testId="equipment-edit-levelId"
+        onChange={(levelId) => change('levelId', levelId)}
+      />
       <button
         type="button"
         className="btn btn--ghost btn--sm"
@@ -93,6 +82,6 @@ export function EquipmentEditor({ element, levels }: EquipmentEditorProps): Reac
       >
         Cut floor openings
       </button>
-    </BuildingForm>
+    </CommandForm>
   );
 }

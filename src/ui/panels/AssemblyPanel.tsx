@@ -9,6 +9,7 @@
 import React from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
+import { useSelectionSet } from '@ui/store/selectionHooks';
 import type { Component, InstanceEntity } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
 import { PanelEmpty, PanelHeader, PanelSection } from '@ui/panels/PanelParts';
@@ -118,7 +119,6 @@ export function AssemblyPanel({ className }: AssemblyPanelProps): React.ReactEle
   const components = useStore((s) => s.document.components);
   const entities = useStore((s) => s.document.entities);
   const order = useStore((s) => s.document.order);
-  const selection = useStore((s) => s.document.selection);
 
   const componentList = Object.values(components);
 
@@ -126,7 +126,7 @@ export function AssemblyPanel({ className }: AssemblyPanelProps): React.ReactEle
     (entity): entity is InstanceEntity => entity.kind === 'instance',
   );
 
-  const selectionSet = new Set(selection);
+  const selectionSet = useSelectionSet();
 
   return (
     <aside className={classNames('panel assembly-panel', className)} aria-label="Assembly">

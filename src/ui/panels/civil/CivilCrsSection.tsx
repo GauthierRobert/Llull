@@ -8,36 +8,41 @@
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import { PanelSection } from '@ui/panels/PanelParts';
-import { optionalNumber, parseNumber, optionalText } from '@ui/numberText';
+import { optionalNumber, optionalText } from '@ui/numberText';
 import { parsePoints } from './civilInput';
-import { NumberField, TextField } from './CivilParts';
+import { NumberTextField, TextField } from './CivilParts';
+import { useFormValues } from '@ui/panels/useFormValues';
+
+const CRS_FORM = {
+  name: '',
+  epsg: '',
+  datum: '',
+  localOrigin: '',
+  gridOrigin: '',
+  rotation: '',
+  scale: '',
+};
 
 export function CivilCrsSection(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const crs = useStore((s) => s.document.civil?.crs);
-  const [name, setName] = useState('');
-  const [epsg, setEpsg] = useState('');
-  const [datum, setDatum] = useState('');
-  const [localOrigin, setLocalOrigin] = useState('');
-  const [gridOrigin, setGridOrigin] = useState('');
-  const [rotation, setRotation] = useState('');
-  const [scale, setScale] = useState('');
+  const { values, field } = useFormValues(() => CRS_FORM);
   const [status, setStatus] = useState('');
 
   const applyCrs = (event: React.FormEvent): void => {
     event.preventDefault();
-    if (name.trim() === '') return;
+    if (values.name.trim() === '') return;
     dispatch('set_coordinate_system', {
-      name: name.trim(),
-      ...optionalNumber('epsg', epsg),
-      ...optionalText('verticalDatum', datum),
+      name: values.name.trim(),
+      ...optionalNumber('epsg', values.epsg),
+      ...optionalText('verticalDatum', values.datum),
     });
   };
 
   const applyCalibration = (event: React.FormEvent): void => {
     event.preventDefault();
-    const local = parsePoints(localOrigin);
-    const grid = parsePoints(gridOrigin);
+    const local = parsePoints(values.localOrigin);
+    const grid = parsePoints(values.gridOrigin);
     if (local?.length !== 1 || grid?.length !== 1) {
       setStatus('Calibration: local and grid origin are each one "x, y" point.');
       return;
@@ -45,8 +50,8 @@ export function CivilCrsSection(): React.ReactElement {
     dispatch('set_site_calibration', {
       localOrigin: local[0],
       gridOrigin: grid[0],
-      ...optionalNumber('rotationDeg', rotation),
-      ...(parseNumber(scale) !== undefined ? optionalNumber('scaleFactor', scale) : {}),
+      ...optionalNumber('rotationDeg', values.rotation),
+      ...optionalNumber('scaleFactor', values.scale),
     });
     setStatus('');
   };
@@ -61,25 +66,24 @@ export function CivilCrsSection(): React.ReactElement {
     >
       <form className="civil-form" onSubmit={applyCrs} aria-label="Coordinate system">
         <div className="building-inline-form">
-          <TextField value={name} set={setName} hint="CRS name" label="CRS name" />
-          <NumberField value={epsg} set={setEpsg} hint="EPSG" label="EPSG code" />
-          <TextField value={datum} set={setDatum} hint="Vertical datum" label="Vertical datum" />
-          <button type="submit" className="btn btn--primary btn--sm" disabled={name.trim() === ''}>
+          <TextField {...field('name')} hint="CRS name" label="CRS name" />
+          <NumberTextField {...field('epsg')} hint="EPSG" label="EPSG code" />
+          <TextField {...field('datum')} hint="Vertical datum" label="Vertical datum" />
+          <button
+            type="submit"
+            className="btn btn--primary btn--sm"
+            disabled={values.name.trim() === ''}
+          >
             Set CRS
           </button>
         </div>
       </form>
       <form className="civil-form" onSubmit={applyCalibration} aria-label="Site calibration">
         <div className="building-inline-form">
-          <TextField
-            value={localOrigin}
-            set={setLocalOrigin}
-            hint="Local x, y"
-            label="Local origin"
-          />
-          <TextField value={gridOrigin} set={setGridOrigin} hint="Grid E, N" label="Grid origin" />
-          <NumberField value={rotation} set={setRotation} hint="Rotation deg" label="Rotation" />
-          <NumberField value={scale} set={setScale} hint="Scale factor" label="Scale factor" />
+          <TextField {...field('localOrigin')} hint="Local x, y" label="Local origin" />
+          <TextField {...field('gridOrigin')} hint="Grid E, N" label="Grid origin" />
+          <NumberTextField {...field('rotation')} hint="Rotation deg" label="Rotation" />
+          <NumberTextField {...field('scale')} hint="Scale factor" label="Scale factor" />
           <button type="submit" className="btn btn--primary btn--sm">
             Calibrate
           </button>

@@ -10,7 +10,10 @@ import { useStore } from '@ui/store';
 import type { BuildingLevel } from '@core/model/building';
 import { COPYABLE } from '@aec/building/elements/elements';
 import { toggledInList } from '@ui/toggleMember';
-import { changedNumber, LabeledInput } from './LabeledInput';
+import { CheckboxGroup } from '@ui/panels/CheckboxGroup';
+import { CommandForm } from '@ui/panels/CommandForm';
+import { LabeledInput } from '@ui/panels/LabeledInput';
+import { changedNumber, changedText } from '@ui/panels/changedParams';
 
 const CATEGORY_LABELS: Record<(typeof COPYABLE)[number], string> = {
   wall: 'Walls',
@@ -45,25 +48,22 @@ export function LevelEditForm({ level, units, onDone }: LevelEditFormProps): Rea
   const [elevation, setElevation] = useState(String(level.elevation));
   const [height, setHeight] = useState(String(level.height));
 
-  const handleSubmit = (event: React.FormEvent): void => {
-    event.preventDefault();
-    const changes: Record<string, unknown> = {};
-    if (name.trim() !== '' && name.trim() !== level.name) changes['name'] = name.trim();
-    Object.assign(
-      changes,
-      changedNumber('elevation', elevation, level.elevation),
-      changedNumber('height', height, level.height),
-    );
+  const handleSubmit = (): void => {
+    const changes = {
+      ...changedText('name', name, level.name),
+      ...changedNumber('elevation', elevation, level.elevation),
+      ...changedNumber('height', height, level.height),
+    };
     if (Object.keys(changes).length > 0)
       dispatch('update_level', { levelId: level.id, ...changes });
     onDone();
   };
 
   return (
-    <form
-      className="panel__form building-form"
+    <CommandForm
+      ariaLabel={`Edit level ${level.name}`}
+      submitLabel="Save level"
       onSubmit={handleSubmit}
-      aria-label={`Edit level ${level.name}`}
     >
       <LabeledInput label="Level name" type="text" value={name} onChange={setName} />
       <LabeledInput
@@ -78,10 +78,7 @@ export function LevelEditForm({ level, units, onDone }: LevelEditFormProps): Rea
         value={height}
         onChange={setHeight}
       />
-      <button type="submit" className="btn btn--primary btn--sm">
-        Save level
-      </button>
-    </form>
+    </CommandForm>
   );
 }
 
@@ -96,8 +93,7 @@ export function CopyLevelForm({ source, targets, onDone }: CopyLevelFormProps): 
   const [targetIds, setTargetIds] = useState<string[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
 
-  const handleSubmit = (event: React.FormEvent): void => {
-    event.preventDefault();
+  const handleSubmit = (): void => {
     if (targetIds.length === 0) return;
     dispatch('copy_level_elements', {
       sourceLevelId: source.id,
@@ -108,40 +104,24 @@ export function CopyLevelForm({ source, targets, onDone }: CopyLevelFormProps): 
   };
 
   return (
-    <form
-      className="panel__form building-form"
+    <CommandForm
+      ariaLabel={`Copy level ${source.name}`}
+      submitLabel="Copy elements"
+      submitDisabled={targetIds.length === 0}
       onSubmit={handleSubmit}
-      aria-label={`Copy level ${source.name}`}
     >
-      <fieldset className="field">
-        <legend className="field__label">Copy to levels</legend>
-        {targets.map((level) => (
-          <label key={level.id} className="field">
-            <input
-              type="checkbox"
-              checked={targetIds.includes(level.id)}
-              onChange={() => setTargetIds((previous) => toggledInList(previous, level.id))}
-            />
-            <span>{level.name}</span>
-          </label>
-        ))}
-      </fieldset>
-      <fieldset className="field">
-        <legend className="field__label">Categories (none ticked = all)</legend>
-        {COPYABLE_CATEGORIES.map(([category, label]) => (
-          <label key={category} className="field">
-            <input
-              type="checkbox"
-              checked={categories.includes(category)}
-              onChange={() => setCategories((previous) => toggledInList(previous, category))}
-            />
-            <span>{label}</span>
-          </label>
-        ))}
-      </fieldset>
-      <button type="submit" className="btn btn--primary btn--sm" disabled={targetIds.length === 0}>
-        Copy elements
-      </button>
-    </form>
+      <CheckboxGroup
+        legend="Copy to levels"
+        options={targets.map((level): readonly [string, string] => [level.id, level.name])}
+        selected={targetIds}
+        onToggle={(id) => setTargetIds((previous) => toggledInList(previous, id))}
+      />
+      <CheckboxGroup
+        legend="Categories (none ticked = all)"
+        options={COPYABLE_CATEGORIES}
+        selected={categories}
+        onToggle={(category) => setCategories((previous) => toggledInList(previous, category))}
+      />
+    </CommandForm>
   );
 }

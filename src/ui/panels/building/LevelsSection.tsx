@@ -8,12 +8,10 @@
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import type { BuildingLevel } from '@core/model/building';
-import { PanelSection, IconButton } from '@ui/panels/PanelParts';
-import { orderedValues } from '@ui/panels/orderedValues';
+import { DeleteButton, IconButton, ListRow, PanelSection } from '@ui/panels/PanelParts';
 import { optionalNumber, optionalText } from '@ui/numberText';
 import { CopyLevelForm, LevelEditForm } from './LevelEditors';
-
-const EMPTY_LEVELS: ReadonlyArray<BuildingLevel> = [];
+import { useBuildingLevels } from './useBuildingLevels';
 
 interface LevelRowProps {
   level: BuildingLevel;
@@ -30,50 +28,46 @@ function LevelRow({ level, active, units, levels }: LevelRowProps): React.ReactE
   const toggle = (next: Exclude<RowMode, null>): void => setMode(mode === next ? null : next);
   return (
     <>
-      <li
-        className={`panel__row${active ? ' panel__row--selected' : ''}`}
-        data-testid={`level-row-${level.id}`}
-        aria-current={active ? 'true' : undefined}
+      <ListRow
+        selected={active}
+        current={active}
+        testId={`level-row-${level.id}`}
+        onSelect={() => dispatch('set_active_level', { levelId: level.id })}
+        actions={
+          <>
+            <IconButton
+              icon="parameters"
+              size={12}
+              label={`Edit level ${level.name}`}
+              title="Edit name, elevation, height"
+              pressed={mode === 'edit'}
+              onClick={() => toggle('edit')}
+            />
+            <IconButton
+              icon="copy"
+              size={12}
+              label={`Copy level ${level.name} to levels`}
+              title="Copy this level's elements to other levels"
+              pressed={mode === 'copy'}
+              onClick={() => toggle('copy')}
+            />
+            <DeleteButton
+              icon="close"
+              size={12}
+              label={`Delete level ${level.name}`}
+              title="Delete level (and its elements)"
+              onDelete={() => dispatch('delete_level', { levelId: level.id, deleteElements: true })}
+            />
+          </>
+        }
       >
-        <button
-          type="button"
-          className="building-row-btn"
-          onClick={() => dispatch('set_active_level', { levelId: level.id })}
-        >
-          {/* The accessible name is the visible text plus this prefix (WCAG label-in-name). */}
-          <span className="visually-hidden">Activate level</span>{' '}
-          <span className="panel__row-main">{level.name}</span>{' '}
-          <span className="panel__row-meta">
-            +{level.elevation} {units} · h {level.height}
-          </span>
-        </button>
-        <span className="panel__row-actions">
-          <IconButton
-            icon="parameters"
-            size={12}
-            label={`Edit level ${level.name}`}
-            title="Edit name, elevation, height"
-            pressed={mode === 'edit'}
-            onClick={() => toggle('edit')}
-          />
-          <IconButton
-            icon="copy"
-            size={12}
-            label={`Copy level ${level.name} to levels`}
-            title="Copy this level's elements to other levels"
-            pressed={mode === 'copy'}
-            onClick={() => toggle('copy')}
-          />
-          <IconButton
-            icon="close"
-            danger
-            size={12}
-            label={`Delete level ${level.name}`}
-            title="Delete level (and its elements)"
-            onClick={() => dispatch('delete_level', { levelId: level.id, deleteElements: true })}
-          />
+        {/* The accessible name is the visible text plus this prefix (WCAG label-in-name). */}
+        <span className="visually-hidden">Activate level</span>{' '}
+        <span className="panel__row-main">{level.name}</span>{' '}
+        <span className="panel__row-meta">
+          +{level.elevation} {units} · h {level.height}
         </span>
-      </li>
+      </ListRow>
       {mode === 'edit' && (
         <li>
           <LevelEditForm level={level} units={units} onDone={() => setMode(null)} />
@@ -136,9 +130,9 @@ function AddLevelForm(): React.ReactElement {
 }
 
 export function LevelsSection(): React.ReactElement {
-  const building = useStore((s) => s.document.building);
+  const activeLevelId = useStore((s) => s.document.building?.activeLevelId);
   const units = useStore((s) => s.document.units);
-  const levels = building ? orderedValues(building.levelOrder, building.levels) : EMPTY_LEVELS;
+  const levels = useBuildingLevels();
   return (
     <PanelSection
       title="Levels"
@@ -153,7 +147,7 @@ export function LevelsSection(): React.ReactElement {
           <LevelRow
             key={level.id}
             level={level}
-            active={level.id === building?.activeLevelId}
+            active={level.id === activeLevelId}
             units={units}
             levels={levels}
           />

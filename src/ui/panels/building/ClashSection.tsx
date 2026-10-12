@@ -11,7 +11,7 @@ import { runQuery } from '@ui/services/localQuery';
 import type { Clash } from '@aec/industrial/clash/clash';
 import { toMetres } from '@core/model/units';
 import type { BuildingModel } from '@core/model/building';
-import { PanelSection } from '@ui/panels/PanelParts';
+import { ListRow, PanelSection, StatusLine } from '@ui/panels/PanelParts';
 import { isClashData } from '@ui/resultData';
 
 interface ClashReport {
@@ -61,28 +61,28 @@ export function ClashSection(): React.ReactElement {
       </div>
       {report !== null && (
         <>
-          <p className="building-summary" role="status" data-testid="clash-summary">
-            {report.clashes.length === 0
-              ? report.summary
-              : `${report.clashes.filter((clash) => clash.kind === 'hard').length} hard, ${report.clashes.filter((clash) => clash.kind === 'clearance').length} clearance`}
-          </p>
+          <StatusLine
+            text={
+              report.clashes.length === 0
+                ? report.summary
+                : `${report.clashes.filter((clash) => clash.kind === 'hard').length} hard, ${report.clashes.filter((clash) => clash.kind === 'clearance').length} clearance`
+            }
+            testId="clash-summary"
+          />
           {report.clashes.length > 0 && (
             <ul className="panel__list" aria-label="Clashes">
               {report.clashes.map((clash) => (
-                <li key={`${clash.kind}:${clash.a}:${clash.b}`} className="panel__row">
-                  <button
-                    type="button"
-                    className="building-row-btn"
-                    onClick={() => select(entitiesOf(clash))}
-                    data-testid="clash-row"
-                  >
-                    <span className="chip">{clash.kind === 'hard' ? 'Hard' : 'Clearance'}</span>
-                    <span className="panel__row-main">
-                      {markOf(clash.a)} × {markOf(clash.b)}
-                    </span>
-                    <span className="panel__row-meta">{millimetres(clash.depth)} mm</span>
-                  </button>
-                </li>
+                <ListRow
+                  key={`${clash.kind}:${clash.a}:${clash.b}`}
+                  buttonTestId="clash-row"
+                  onSelect={() => select(entitiesOf(clash))}
+                >
+                  <span className="chip">{clash.kind === 'hard' ? 'Hard' : 'Clearance'}</span>
+                  <span className="panel__row-main">
+                    {markOf(clash.a)} × {markOf(clash.b)}
+                  </span>
+                  <span className="panel__row-meta">{millimetres(clash.depth)} mm</span>
+                </ListRow>
               ))}
             </ul>
           )}

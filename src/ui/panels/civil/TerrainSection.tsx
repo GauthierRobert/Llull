@@ -5,12 +5,15 @@
  * `surface_report` statistics and a contour-interval edit (`update_surface`).
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import type { SurfaceObject } from '@core/model/civil';
 import { useStore } from '@ui/store';
 import { PanelSection } from '@ui/panels/PanelParts';
-import { useCivilObjects, NumberField, TextField } from './CivilParts';
+import { useCivilObjects, NumberTextField, TextField } from './CivilParts';
 import { CivilReportRow } from './CivilReportRow';
+import { useFormValues } from '@ui/panels/useFormValues';
+
+const SURFACE_FORM = { name: '', interval: '', majorEvery: '', maxEdge: '' };
 import { optionalNumber, parseNumber, optionalText } from '@ui/numberText';
 
 function SurfaceRow({ surface }: { surface: SurfaceObject }): React.ReactElement {
@@ -41,20 +44,17 @@ export function TerrainSection(): React.ReactElement {
   const units = useStore((s) => s.document.units);
   const groups = useCivilObjects('pointGroup');
   const surfaces = useCivilObjects('surface');
-  const [name, setName] = useState('');
-  const [interval, setIntervalText] = useState('');
-  const [majorEvery, setMajorEvery] = useState('');
-  const [maxEdge, setMaxEdge] = useState('');
+  const { values, field, change } = useFormValues(() => SURFACE_FORM);
 
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
     dispatch('create_surface', {
-      ...optionalText('name', name),
-      ...optionalNumber('contourInterval', interval),
-      ...optionalNumber('majorEvery', majorEvery),
-      ...optionalNumber('maxEdgeLength', maxEdge),
+      ...optionalText('name', values.name),
+      ...optionalNumber('contourInterval', values.interval),
+      ...optionalNumber('majorEvery', values.majorEvery),
+      ...optionalNumber('maxEdgeLength', values.maxEdge),
     });
-    setName('');
+    change('name', '');
   };
 
   return (
@@ -68,22 +68,11 @@ export function TerrainSection(): React.ReactElement {
       testId="civil-terrain"
     >
       <form className="building-inline-form" onSubmit={handleSubmit} aria-label="Create surface">
-        <TextField value={name} set={setName} hint="Surface name" label="Surface name" />
-        <NumberField
-          value={interval}
-          set={setIntervalText}
-          hint="Contour interval"
-          label="Contour interval"
-        />
-        <NumberField
-          value={majorEvery}
-          set={setMajorEvery}
-          hint="Major every"
-          label="Major contour every"
-        />
-        <NumberField
-          value={maxEdge}
-          set={setMaxEdge}
+        <TextField {...field('name')} hint="Surface name" label="Surface name" />
+        <NumberTextField {...field('interval')} hint="Contour interval" label="Contour interval" />
+        <NumberTextField {...field('majorEvery')} hint="Major every" label="Major contour every" />
+        <NumberTextField
+          {...field('maxEdge')}
           hint="Max edge (optional)"
           label="Maximum triangle edge"
         />
