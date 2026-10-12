@@ -8,6 +8,7 @@ import type { CadDocument, Entity, EntityGroup, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z, looseVec3 as vec3, colorField } from '../schema';
 import { nextId } from '../../lib/id';
+import { MM_PER_UNIT } from '../../model/units';
 import { ORIGIN } from '../../lib/vec3';
 import {
   applyMat3,
@@ -22,14 +23,6 @@ import { positionField } from './shared';
 import { newEntity } from '../entity/newEntity';
 import { noop } from '../noop';
 import { BEARING_TABLE, BEARING_TYPES, lookupBearing, type BearingType } from './bearingTable';
-
-const MM_TO_DOCUMENT_UNIT: Record<CadDocument['units'], number> = {
-  mm: 1,
-  cm: 0.1,
-  m: 0.001,
-  in: 1 / 25.4,
-  ft: 1 / 304.8,
-};
 
 const TAPER_ANGLE = (12 * Math.PI) / 180;
 const MAX_ROLLING_ELEMENTS = 40;
@@ -151,7 +144,7 @@ function resolveSection(
     if (p.type !== undefined && p.type !== entry.type) {
       return { error: `designation ${p.designation} is a ${entry.type} bearing, not ${p.type}` };
     }
-    const f = MM_TO_DOCUMENT_UNIT[doc.units] ?? 1;
+    const f = 1 / (MM_PER_UNIT[doc.units] ?? 1);
     return {
       designation: p.designation.trim().toUpperCase(),
       section: {

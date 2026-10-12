@@ -7,7 +7,8 @@ import type { BuildingModel, MomentConnectionElement } from '@core/model/buildin
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { elementAffected, existingLevelId, fromMm, getBuilding, toMm } from '../../building/model';
+import { fromMm, toMm } from '@core/model/units';
+import { elementAffected, existingLevelId, getBuilding } from '../../building/model';
 import { noop } from '@core/commands/noop';
 import { regenerateBuilding } from '../../building/evaluate/evaluateElements';
 import { findProfile, STEEL_DENSITY_KG_PER_M3 } from '../../steel/profiles';

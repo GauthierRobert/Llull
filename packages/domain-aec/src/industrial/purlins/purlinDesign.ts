@@ -9,13 +9,8 @@ import type { CadDocument, Vec3 } from '@core/model/types';
 import { PURLIN_LOAD_SHAPE } from './purlinLoadParams';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import {
-  elementAffected,
-  elementsOf,
-  fromMm,
-  getBuilding,
-  withElement,
-} from '../../building/model';
+import { fromMm } from '@core/model/units';
+import { elementAffected, elementsOf, getBuilding, withElement } from '../../building/model';
 import { noop } from '@core/commands/noop';
 import { add3, scale3 } from '@lib/vec3';
 import { regenerateBuilding } from '../../building/evaluate/evaluateElements';

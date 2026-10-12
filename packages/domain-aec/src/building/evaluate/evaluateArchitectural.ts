@@ -31,7 +31,7 @@ import type {
   WallElement,
 } from '@core/model/building';
 import { polygonArea, polygonCentroid, toCounterClockwise } from '@lib/polygon';
-import { fromMm, toMetres } from '../model';
+import { fromMm, toMetres } from '@core/model/units';
 import { prismMesh } from '../../shared/mesh';
 import { base, CATEGORY_LAYER, colorForMaterial, meshEntity, orientedBox } from './entities';
 import { curvedBandBetween } from '../geometry/curvedWallGeometry';

@@ -8,6 +8,7 @@ import type { BuildingElement, BuildingModel, RoomElement } from '@core/model/bu
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
 import { isValidPolygon, polygonArea } from '@lib/polygon';
+import { toMetres } from '@core/model/units';
 import {
   getBuilding,
   hostOf,
@@ -16,7 +17,6 @@ import {
   orderedElements,
   elementsOf,
   resolveLevel,
-  toMetres,
   withElement,
   elementAffected,
   followLevelHeight,

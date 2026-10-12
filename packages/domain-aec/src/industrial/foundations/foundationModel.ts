@@ -2,7 +2,7 @@ import type { FootingElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import type { BaseReaction } from '../frames/frameModelSolve';
 import type { LoadCase } from '../frames/frameModelTypes';
-import { toMetres } from '../../building/model';
+import { toMetres } from '@core/model/units';
 
 export interface FoundationRow {
   /** Column mark. */

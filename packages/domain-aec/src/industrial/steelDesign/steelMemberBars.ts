@@ -7,7 +7,8 @@
 
 import type { CadDocument, Vec3 } from '@core/model/types';
 import type { BaseFixity, BuildingModel, JointFixity, MemberRole } from '@core/model/building';
-import { elementsOf, fromMm, getBuilding } from '../../building/model';
+import { fromMm } from '@core/model/units';
+import { elementsOf, getBuilding } from '../../building/model';
 import { GRAVITY } from '../../shared/numeric';
 import { findProfile, sectionProperties, type SteelProfile } from '../../steel/profiles';
 import { yieldStrength } from './steelDesign';

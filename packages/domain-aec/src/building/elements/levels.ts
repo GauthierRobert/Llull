@@ -6,10 +6,10 @@
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import type { BuildingLevel, BuildingModel, ProjectInfo } from '@core/model/building';
+import { fromMm } from '@core/model/units';
 import {
   elementsOnLevel,
   followLevelHeight,
-  fromMm,
   getBuilding,
   nextLevelId,
   orderedElements,

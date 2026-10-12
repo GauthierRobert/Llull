@@ -5,7 +5,8 @@
  */
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { elementAffected, getBuilding, withElement, fromMm } from '../../building/model';
+import { fromMm } from '@core/model/units';
+import { elementAffected, getBuilding, withElement } from '../../building/model';
 import { noop } from '@core/commands/noop';
 import { regenerateBuilding } from '../../building/evaluate/evaluateElements';
 import { refitPlates } from '../connections/plateSupport';

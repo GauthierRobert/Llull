@@ -7,7 +7,8 @@
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
 import type { BuildingModel, FootingElement, PanelElement } from '@core/model/building';
 import { distance } from '@lib/polygon';
-import { fromMm, nextElementId, nextMark, toVec2, withElement } from '../../building/model';
+import { fromMm } from '@core/model/units';
+import { nextElementId, nextMark, toVec2, withElement } from '../../building/model';
 import { panelFrame } from '../evaluate';
 
 /** Upper bound on members one generator call may create (keeps agents from hanging the host). */

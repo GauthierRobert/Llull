@@ -15,7 +15,7 @@ import type {
   SurfaceObject,
 } from '@core/model/civil';
 import { escapeXml } from '@lib/escapeXml';
-import { toMetres } from '../../building/model';
+import { toMetres } from '@core/model/units';
 import { civilObjectsOf, getCivil } from '../model';
 import { surfaceTin } from '../surface/surfaceTin';
 import { alignmentsXml, metres, northEast } from './landxmlAlignments';

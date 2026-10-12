@@ -9,13 +9,8 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
 import { isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
-import {
-  fromMm,
-  nextElementId,
-  nextMark,
-  elementAffected,
-  withElement,
-} from '../../building/model';
+import { fromMm } from '@core/model/units';
+import { nextElementId, nextMark, elementAffected, withElement } from '../../building/model';
 import { regenerateBuilding } from '../../building/evaluate/evaluateElements';
 import { toVec3 } from '../common/memberSupport';
 import { modelUnits, collectSteelBars } from '../steelDesign/steelMemberBars';

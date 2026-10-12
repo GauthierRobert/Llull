@@ -19,7 +19,7 @@ import {
   type PaperSize,
   type Viewport,
 } from '../../shared/sheetFrame';
-import { toMetres, toMm } from '../../building/model';
+import { toMetres, toMm } from '@core/model/units';
 import { niceStep } from '../road/roadSvg';
 import { clipPolyline, insideRect } from './planClip';
 import { gridToLocal, localToGrid } from '../crs/crs';

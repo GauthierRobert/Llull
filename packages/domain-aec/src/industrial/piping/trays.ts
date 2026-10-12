@@ -6,14 +6,13 @@
 import type { CableTrayElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
+import { fromMm, toMetres } from '@core/model/units';
 import {
   elementAffected,
-  fromMm,
   getBuilding,
   nextElementId,
   nextMark,
   resolveLevel,
-  toMetres,
   withElement,
 } from '../../building/model';
 import { noop } from '@core/commands/noop';

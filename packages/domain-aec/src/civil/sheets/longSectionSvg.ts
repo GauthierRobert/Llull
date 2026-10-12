@@ -29,7 +29,7 @@ import {
   svgRect,
   svgText,
 } from '../road/roadSvg';
-import { toMetres } from '../../building/model';
+import { toMetres } from '@core/model/units';
 
 export const LONG_SECTION_LEFT = 90;
 const LEFT = LONG_SECTION_LEFT;

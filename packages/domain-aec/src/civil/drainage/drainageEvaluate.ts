@@ -8,7 +8,7 @@ import type { Entity, MeshData, Vec2, Vec3 } from '@core/model/types';
 import type { ManholeObject, PipeObject } from '@core/model/civil';
 import { circlePolygon } from '@lib/arc';
 import { cross3 } from '@lib/vec3';
-import { toMm } from '../../building/model';
+import { toMm } from '@core/model/units';
 import { civilLine, civilMesh, civilPolyline, civilText } from '../entities';
 import { labelHeight, type CivilContext } from '../context';
 import { civilObject } from '../model';

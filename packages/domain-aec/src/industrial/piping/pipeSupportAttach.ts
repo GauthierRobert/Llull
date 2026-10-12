@@ -8,7 +8,8 @@
 
 import type { BuildingModel, PipeSupportElement } from '@core/model/building';
 import type { CadDocument, Vec3 } from '@core/model/types';
-import { elementsOf, fromMm } from '../../building/model';
+import { fromMm } from '@core/model/units';
+import { elementsOf } from '../../building/model';
 import { collectSteelBars, modelUnits, type SteelBar } from '../steelDesign/steelMemberBars';
 import { nearestOnRoute, RISER_SLOPE } from './routeSupport';
 import { absolutePointMm, pipeRunOf } from './pipeSupportLayout';

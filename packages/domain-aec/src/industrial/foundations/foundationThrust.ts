@@ -6,7 +6,8 @@
 
 import type { BuildingModel } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
-import { getBuilding, toMetres } from '../../building/model';
+import { toMetres } from '@core/model/units';
+import { getBuilding } from '../../building/model';
 import { polygonArea } from '@lib/polygon';
 import type { BaseReaction } from '../frames/frameModelSolve';
 import { CONCRETE_UNIT_WEIGHT, type Factors } from './foundationModel';

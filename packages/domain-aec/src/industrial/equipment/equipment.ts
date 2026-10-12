@@ -6,15 +6,14 @@
 import type { EquipmentElement, PipeElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, looseVec2, vec3, z } from '@core/commands/schema';
+import { fromMm, toMetres } from '@core/model/units';
 import {
   elementAffected,
-  fromMm,
   getBuilding,
   isVec2,
   nextElementId,
   nextMark,
   resolveLevel,
-  toMetres,
   toVec2,
   withElement,
 } from '../../building/model';
