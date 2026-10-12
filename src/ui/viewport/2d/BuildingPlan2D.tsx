@@ -17,6 +17,7 @@ import { useThemeStore } from '@ui/store/themeStore';
 import { TEXT_FONT_URL } from '@ui/viewport/textFont';
 import { planAnchor } from './planAnchor';
 import { useMinScreenSize } from './useMinScreenSize';
+import { positiveSweep } from '@lib/angle';
 
 const ARC_SEGMENTS = 32;
 const DIMENSION_COLOR = '#d6a243';
@@ -80,7 +81,7 @@ function shapeOf(points: ReadonlyArray<Vec2>, anchor: Vec2): THREE.Shape {
 }
 
 function arcPoints(center: Vec2, radius: number, start: number, end: number): Vec2[] {
-  const sweep = end > start ? end - start : end - start + Math.PI * 2;
+  const sweep = positiveSweep(end - start);
   return Array.from({ length: ARC_SEGMENTS + 1 }, (_, index): Vec2 => {
     const angle = start + (sweep * index) / ARC_SEGMENTS;
     return [center[0] + radius * Math.cos(angle), center[1] + radius * Math.sin(angle)];

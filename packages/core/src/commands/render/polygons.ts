@@ -50,6 +50,7 @@ import {
   wedgeCorners,
 } from '../../geometry/tessellation';
 import type { PreDepthPolygon } from './types';
+import { positiveSweep } from '../../lib/angle';
 
 // 3D solids
 
@@ -253,8 +254,7 @@ function tessellate2DPolyline(e: PolylineEntity): PreDepthPolygon[] {
 }
 
 function tessellate2DArc(e: ArcEntity): PreDepthPolygon[] {
-  let span = e.endAngle - e.startAngle;
-  if (span <= 0) span += 2 * Math.PI;
+  const span = positiveSweep(e.endAngle - e.startAngle);
   return strokeEllipseArc(e, e.radius, e.radius, e.startAngle, span);
 }
 
