@@ -105,7 +105,9 @@ describe('second review regressions', () => {
         [4000, 0],
       ],
     }).document;
-    expect(execute(doc, 'duplicate_entity', { id: 'wall-1:body-0' }).summary).toMatch(/rejected/);
+    expect(execute(doc, 'duplicate_entities', { ids: ['wall-1:body-0'] }).summary).toMatch(
+      /rejected/,
+    );
     expect(buildingElementOf(doc, 'wall-1:body-0')).toBe('wall-1');
     const forged = {
       ...doc,

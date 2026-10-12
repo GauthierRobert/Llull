@@ -414,7 +414,7 @@ export const plans: Record<string, GoldenAction[]> = {
   ],
   transforms_move_rotate_scale_mirror: [
     { command: 'add_box', params: { size: [1, 1, 1] }, as: 'b' },
-    { command: 'move_entity', params: { id: '$b', delta: [3, 2, 1] } },
+    { command: 'move_entities', params: { ids: ['$b'], delta: [3, 2, 1] } },
     { command: 'rotate_entity', params: { id: '$b', delta: [0, 0, Math.PI / 4] } },
     { command: 'scale_entity', params: { id: '$b', factor: 2 } },
     { command: 'mirror_entity', params: { id: '$b', axis: 'x' } },
@@ -427,7 +427,7 @@ export const plans: Record<string, GoldenAction[]> = {
   ],
   duplicate_group_ungroup: [
     { command: 'add_box', params: { size: [1, 2, 3] }, as: 'b' },
-    { command: 'duplicate_entity', params: { id: '$b', offset: [5, 0, 0] }, as: 'dup' },
+    { command: 'duplicate_entities', params: { ids: ['$b'], offset: [5, 0, 0] }, as: 'dup' },
     { command: 'group_entities', params: { ids: ['$b', '$dup'], name: 'pair' }, as: 'g' },
     { command: 'set_entity_name', params: { id: '$b', name: 'original', tags: ['a', 'b'] } },
   ],
@@ -482,7 +482,7 @@ export const plans: Record<string, GoldenAction[]> = {
         },
       ],
     },
-    { command: 'move_entity', params: { id: '$piston0', delta: [0, 0, 5] } },
+    { command: 'move_entities', params: { ids: ['$piston0'], delta: [0, 0, 5] } },
   ],
   configurations: [
     { command: 'set_parameter', params: { name: 'w', expression: '10' } },

@@ -229,7 +229,7 @@ describe('drainage commands', () => {
 
   it('refuses to delete generated entities and survives a save/load round trip', () => {
     const doc = network();
-    const refused = run(doc, 'delete_entity', { id: 'manhole-1:body' });
+    const refused = run(doc, 'delete_entities', { ids: ['manhole-1:body'] });
     expect(refused.document.entities['manhole-1:body']).toBeDefined();
     expect(refused.affected).toEqual([]);
     const loaded = deserializeDocument(serializeDocument(doc));

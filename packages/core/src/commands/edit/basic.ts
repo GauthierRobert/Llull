@@ -1,50 +1,15 @@
 /**
- * Edit commands: duplicate, group, and ungroup operations.
+ * Edit commands: group, ungroup and rename operations.
  *
  * @layer core/commands
  */
 
 import type { EntityGroup } from '../../model/types';
 import type { CommandResult } from '../types';
-import { defineCommand, z, looseVec3 as vec3 } from '../schema';
+import { defineCommand, z } from '../schema';
 import { nextId } from '../../lib/id';
-import { ORIGIN } from '../../lib/vec3';
 import { changed, noop } from '../noop';
-import { commitEntity } from '../entity/commitEntity';
 import { replaceEntity } from '../entity/entityOps';
-import { translated } from '../solids/shared';
-
-/**
- * @command duplicate_entity
- * @pure
- * @layer core/commands
- * @affects creates 1 new entity with copied geometry at original.position + offset
- * @invariant new entity has a distinct id; original entity is unchanged
- * @failure missing id -> no-op, affected:[]
- */
-export const duplicateEntity = defineCommand({
-  name: 'duplicate_entity',
-  description:
-    'Clone an existing entity to a new id, placing the copy at original.position + offset. ' +
-    'Returns the new entity id in affected. Original is untouched.',
-  params: z.object({
-    id: z.string().describe('Id of the entity to duplicate.'),
-    offset: vec3(
-      'Optional [dx, dy, dz] offset applied to the copy position. Defaults to [0, 0, 0] (exact overlap).',
-    ).optional(),
-  }),
-  run: (doc, { id, offset = ORIGIN }): CommandResult => {
-    const source = doc.entities[id];
-    if (!source) return noop(doc, `No entity ${id} to duplicate.`);
-
-    const newId = nextId(source.kind);
-    return commitEntity(
-      doc,
-      { ...translated(source, offset), id: newId },
-      `Duplicated ${id} → ${newId} at offset [${offset.join(', ')}].`,
-    );
-  },
-});
 
 /**
  * @command group_entities

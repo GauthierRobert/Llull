@@ -93,7 +93,7 @@ wildly unexpected orientation. Always use radians.
    kinds, positions, and the current scene bounds.
 
 2. **Create / edit** — call the appropriate command(s) (e.g. \`add_box\`,
-   \`move_entity\`, \`scale_entity\`). Commands return the new entity id in
+   \`move_entities\`, \`scale_entity\`). Commands return the new entity id in
    \`affected\` and a factual \`summary\`.
 
 3. **SEE it** — call \`render_view\` with \`showAxes: true\` (default) and
@@ -108,7 +108,7 @@ wildly unexpected orientation. Always use radians.
    dimensions, or other document issues.
 
 5. **Iterate** — if render_view shows the object is misplaced, use
-   \`move_entity\` or re-create it with corrected params.
+   \`move_entities\` or re-create it with corrected params.
 
 ---
 
@@ -159,8 +159,8 @@ wildly unexpected orientation. Always use radians.
 | \`edit_subdivision_cage\` | Sculpt it: move/scale cage regions, crease edges |
 | \`surface_from_curves\` | Shell part spanning 2 or 4 boundary curves (hoods, panels) |
 | \`revolve_profile\` | Turned part from a profile or a sketched spline loop |
-| \`move_entity\`     | Translate an entity by a delta vector              |
-| \`delete_entity\`   | Remove an entity by id                             |
+| \`move_entities\`   | Translate entities by a delta vector               |
+| \`delete_entities\` | Remove entities by id                              |
 | \`set_entity_name\` | Assign a human-readable name to an entity          |
 | \`export_code\`     | Model as CadQuery/build123d/OpenSCAD/FreeCAD source |
 | \`import_code\`     | Rebuild the model from edited CadQuery/build123d   |

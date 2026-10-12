@@ -33,7 +33,7 @@ describe('writeBatchInstances', () => {
     writeBatchInstances(mesh, onlyBatch(), new Set());
     expect(mesh.boundingSphere?.center.x).toBeCloseTo(0);
 
-    localDispatch('move_entity', { id, delta: [100, 0, 0] });
+    localDispatch('move_entities', { ids: [id], delta: [100, 0, 0] });
     writeBatchInstances(mesh, onlyBatch(), new Set());
     expect(mesh.boundingSphere?.center.x).toBeCloseTo(100);
   });

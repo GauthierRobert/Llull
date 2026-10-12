@@ -225,9 +225,9 @@
   "as": "hr"
  },
  {
-  "command": "move_entity",
+  "command": "move_entities",
   "params": {
-   "id": "$h",
+   "ids": ["$h"],
    "delta": [
     0,
     -35.25339228446359,

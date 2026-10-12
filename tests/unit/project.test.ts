@@ -57,7 +57,7 @@ describe('build_project — happy path', () => {
   it("resolves a $alias reference to an earlier step's created id", () => {
     const { result, data } = build([
       { command: 'add_box', params: { size: [1, 1, 1], position: [0, 0, 0] }, as: 'base' },
-      { command: 'move_entity', params: { id: '$base', delta: [5, 0, 0] } },
+      { command: 'move_entities', params: { ids: ['$base'], delta: [5, 0, 0] } },
     ]);
 
     expect(data.ok).toBe(true);
@@ -79,7 +79,7 @@ describe('build_project — happy path', () => {
   it('supports $alias[N] indexing into affected ids', () => {
     const { result, data } = build([
       { command: 'add_box', params: { size: [1, 1, 1] }, as: 'b' },
-      { command: 'move_entity', params: { id: '$b[0]', delta: [0, 2, 0] } },
+      { command: 'move_entities', params: { ids: ['$b[0]'], delta: [0, 2, 0] } },
     ]);
     expect(data.ok).toBe(true);
     const boxId = data.steps[0]!.affected[0]!;
@@ -100,7 +100,7 @@ describe('build_project — abort (default) rolls back', () => {
   it('aborts on the first failing step and returns the input document unchanged', () => {
     const { doc, result, data } = build([
       { command: 'add_box', params: { size: [1, 1, 1] } },
-      { command: 'move_entity', params: { id: 'ghost', delta: [1, 0, 0] } }, // no-op → soft fail
+      { command: 'move_entities', params: { ids: ['ghost'], delta: [1, 0, 0] } }, // no-op → soft fail
       { command: 'add_sphere', params: { radius: 1 } },
     ]);
 
@@ -126,7 +126,7 @@ describe('build_project — abort (default) rolls back', () => {
   it('aborts on an unresolvable alias reference', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'build_project', {
-      actions: [{ command: 'move_entity', params: { id: '$missing', delta: [1, 0, 0] } }],
+      actions: [{ command: 'move_entities', params: { ids: ['$missing'], delta: [1, 0, 0] } }],
     });
     const data = result.data as BuildData;
     expect(data.failedAt).toBe(0);
@@ -137,7 +137,7 @@ describe('build_project — abort (default) rolls back', () => {
   it('aborts on an out-of-range alias index', () => {
     const { doc, result, data } = build([
       { command: 'add_box', params: { size: [1, 1, 1] }, as: 'b' },
-      { command: 'move_entity', params: { id: '$b[3]', delta: [1, 0, 0] } },
+      { command: 'move_entities', params: { ids: ['$b[3]'], delta: [1, 0, 0] } },
     ]);
     expect(data.failedAt).toBe(1);
     expect(data.steps[1]!.summary).toMatch(/no id at index 3/);
@@ -158,7 +158,7 @@ describe('build_project — continue mode', () => {
     const { result, data } = build(
       [
         { command: 'add_box', params: { size: [1, 1, 1] } },
-        { command: 'move_entity', params: { id: 'ghost', delta: [1, 0, 0] } }, // soft fail
+        { command: 'move_entities', params: { ids: ['ghost'], delta: [1, 0, 0] } }, // soft fail
         { command: 'add_sphere', params: { radius: 2 } },
       ],
       { onError: 'continue' },
@@ -183,7 +183,7 @@ describe('build_project — continue mode', () => {
   it('continues past an unresolvable alias', () => {
     const { result, data } = build(
       [
-        { command: 'move_entity', params: { id: '$ghost', delta: [1, 0, 0] } },
+        { command: 'move_entities', params: { ids: ['$ghost'], delta: [1, 0, 0] } },
         { command: 'add_box', params: { size: [1, 1, 1] } },
       ],
       { onError: 'continue' },
@@ -200,7 +200,7 @@ describe('build_project — validate (dry run)', () => {
       validate: true,
       actions: [
         { command: 'add_box', params: { size: [1, 1, 1] }, as: 'b' },
-        { command: 'move_entity', params: { id: '$b', delta: [1, 0, 0] } },
+        { command: 'move_entities', params: { ids: ['$b'], delta: [1, 0, 0] } },
       ],
     });
     const data = result.data as BuildData;
@@ -217,7 +217,7 @@ describe('build_project — validate (dry run)', () => {
       actions: [
         { command: 'nope', params: {} },
         { command: 'add_box', params: {} }, // missing required "size"
-        { command: 'move_entity', params: { id: '$later', delta: [0, 0, 0] } }, // ref before defined
+        { command: 'move_entities', params: { ids: ['$later'], delta: [0, 0, 0] } }, // ref before defined
         { command: 'add_sphere', params: { radius: 1 }, as: 'later' },
       ],
     });

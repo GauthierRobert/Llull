@@ -44,16 +44,16 @@ describe('point-count limits', () => {
     expect(refused.summary).toContain('MAX_PROFILE_POINTS');
   });
 
-  it('array_along_path refuses an oversized path', () => {
+  it('pattern_along_path refuses an oversized path', () => {
     const box = execute(empty, 'add_box', { size: [1, 1, 1] });
     const path = Array.from({ length: MAX_PROFILE_POINTS + 1 }, (_, i) => [i, 0, 0]);
-    const refused = execute(box.document, 'array_along_path', {
+    const refused = execute(box.document, 'pattern_along_path', {
       sourceId: box.affected[0]!,
       path,
       count: 2,
     });
     expect(refused.document).toBe(box.document);
-    expect(refused.summary).toContain('MAX_PROFILE_POINTS');
+    expect(refused.summary).toContain(`2..${MAX_PROFILE_POINTS}`);
   });
 });
 

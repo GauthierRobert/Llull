@@ -10,6 +10,7 @@ import type { RetiredCommandRewrite } from '../types';
 import { isRecord } from '../../lib/isRecord';
 import { stepKeyOf } from '../../lib/id';
 import { pluginRetiredCommands } from '../../plugins/host';
+import { RETIRED_EDIT_COMMANDS } from './retiredEditCommands';
 
 /** Core commands folded into a more general one: old name -> rewrite onto the replacement. */
 const CORE_RETIRED_COMMANDS: Readonly<Record<string, RetiredCommandRewrite>> = {
@@ -28,6 +29,7 @@ const CORE_RETIRED_COMMANDS: Readonly<Record<string, RetiredCommandRewrite>> = {
       ...(id !== undefined ? { id } : step ? { id: `mate-${stepKeyOf(step.id)}.1` } : {}),
     },
   }),
+  ...RETIRED_EDIT_COMMANDS,
 };
 
 type RewriteTable = Readonly<Record<string, RetiredCommandRewrite>>;

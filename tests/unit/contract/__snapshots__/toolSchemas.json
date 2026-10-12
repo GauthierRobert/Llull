@@ -3213,39 +3213,6 @@
     "name": "apply_code_trace"
   },
   {
-    "description": "Duplicate sourceId at evenly-spaced positions along the polyline defined by path (array of [x,y,z] points). count is the number of copies to place (including one at the start and one at the end when count >= 2). mode=\"place\" (default): creates independent copies. mode=\"instance\": future — currently treated as \"place\". The source entity is not removed. Returns affected: ids of all newly created entities.",
-    "input_schema": {
-      "properties": {
-        "count": {
-          "description": "Number of copies to place. Must be an integer >= 1.",
-          "type": "integer"
-        },
-        "mode": {
-          "description": "\"place\" (default): independent copies. \"instance\": treated as place in the current version.",
-          "type": "string"
-        },
-        "path": {
-          "description": "Polyline path as an array of [x,y,z] points. Minimum 2 points. Copies are placed at evenly-spaced arc-length positions from the first to the last point.",
-          "items": {
-            "type": "array"
-          },
-          "type": "array"
-        },
-        "sourceId": {
-          "description": "Id of the entity to duplicate along the path.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "sourceId",
-        "path",
-        "count"
-      ],
-      "type": "object"
-    },
-    "name": "array_along_path"
-  },
-  {
     "description": "Duplicate an entity into a linear pattern. Creates count-1 new copies spaced by offset (a world-space vector [dx,dy,dz]). The original stays at instance 0; copy k is placed at original.position + k*offset (k = 1..count-1). count must be an integer >= 2.",
     "input_schema": {
       "properties": {
@@ -4557,7 +4524,7 @@
     "annotations": {
       "destructiveHint": true
     },
-    "description": "Permanently remove several entities in one step (one undo). Same semantics as delete_entity applied to each id: entities are also removed from groups, and groups left with fewer than 2 members are dissolved. Ids that do not exist are skipped and listed in the summary; if none exist nothing changes.",
+    "description": "Permanently remove several entities in one step (one undo). Entities are also removed from groups, and groups left with fewer than 2 members are dissolved. Ids that do not exist are skipped and listed in the summary; if none exist nothing changes.",
     "input_schema": {
       "properties": {
         "ids": {
@@ -4574,25 +4541,6 @@
       "type": "object"
     },
     "name": "delete_entities"
-  },
-  {
-    "annotations": {
-      "destructiveHint": true
-    },
-    "description": "Permanently remove an entity from the document, including from any groups it belongs to. Groups that drop below 2 members are dissolved automatically.",
-    "input_schema": {
-      "properties": {
-        "id": {
-          "description": "Target entity id to delete.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object"
-    },
-    "name": "delete_entity"
   },
   {
     "annotations": {
@@ -4997,100 +4945,6 @@
       "type": "object"
     },
     "name": "distribute"
-  },
-  {
-    "description": "Place count instances of an existing Component at evenly-spaced positions along a 2D path entity (polyline or spline). pathId must be an existing polyline or spline entity with at least 2 points. componentId must exist in doc.components (use create_component to define one). count must be a positive integer (>= 1). tangentAlign (default true) rotates each instance so its local +X aligns with the path tangent at that position (Z rotation = atan2(ty, tx)). startOffset and endOffset (default 0) trim the usable length from both ends; ignored/adapted for closed paths. name (optional) sets a prefix for instance names: \"link_0\", \"link_1\", … defaults to the component name. Returns affected: ids of all newly created instance entities in placement order.",
-    "input_schema": {
-      "properties": {
-        "componentId": {
-          "description": "Id of an existing Component in doc.components. Obtain one via create_component.",
-          "type": "string"
-        },
-        "count": {
-          "description": "Number of instances to create. Must be a positive integer (>= 1).",
-          "type": "integer"
-        },
-        "endOffset": {
-          "description": "Distance back from the path end where the last instance is placed. Ignored on closed paths. Default: 0. Must be finite and non-negative.",
-          "type": "number"
-        },
-        "name": {
-          "description": "Optional name prefix for created instances. Instances are named \"<name>_0\", \"<name>_1\", etc. Defaults to the component name when omitted.",
-          "type": "string"
-        },
-        "pathId": {
-          "description": "Id of an existing polyline or spline entity to distribute instances along. Must have >= 2 points.",
-          "type": "string"
-        },
-        "startOffset": {
-          "description": "Distance along the path from its start where instance 0 is placed. For closed paths this shifts the whole pattern around the loop; endOffset is ignored. Default: 0. Must be finite and non-negative.",
-          "type": "number"
-        },
-        "tangentAlign": {
-          "description": "When true (default), each instance is rotated so its local +X axis aligns with the path tangent (rotation[2] = atan2(ty, tx)). When false, all instances have rotation [0, 0, 0].",
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "pathId",
-        "componentId",
-        "count"
-      ],
-      "type": "object"
-    },
-    "name": "distribute_along_path"
-  },
-  {
-    "description": "Duplicate sourceId at evenly-spaced angular positions along a circular arc. center is the [x,y,z] arc center; normal is the arc plane normal (unit vector, e.g. [0,0,1] for XY-plane arc); radius is the arc radius (must be > 0); startAngle and endAngle are the sweep range in radians (e.g. 0 to 2π for a full circle); count is the number of copies (must be >= 1). Each copy is rotated so that its local +X axis points radially outward from the center. The source entity is not removed. Returns affected: ids of all newly created entities.",
-    "input_schema": {
-      "properties": {
-        "center": {
-          "description": "World-space [x,y,z] center of the arc.",
-          "items": {
-            "type": "number"
-          },
-          "type": "array"
-        },
-        "count": {
-          "description": "Number of copies to place. Must be an integer >= 1.",
-          "type": "integer"
-        },
-        "endAngle": {
-          "description": "End angle of the arc sweep in radians.",
-          "type": "number"
-        },
-        "normal": {
-          "description": "Unit normal of the arc plane, e.g. [0,0,1] for arcs in the XY plane.",
-          "items": {
-            "type": "number"
-          },
-          "type": "array"
-        },
-        "radius": {
-          "description": "Radius of the arc. Must be > 0.",
-          "type": "number"
-        },
-        "sourceId": {
-          "description": "Id of the entity to distribute around the arc.",
-          "type": "string"
-        },
-        "startAngle": {
-          "description": "Start angle of the arc sweep in radians (measured from the plane's local +X axis).",
-          "type": "number"
-        }
-      },
-      "required": [
-        "sourceId",
-        "center",
-        "normal",
-        "radius",
-        "startAngle",
-        "endAngle",
-        "count"
-      ],
-      "type": "object"
-    },
-    "name": "distribute_on_arc"
   },
   {
     "annotations": {
@@ -5533,7 +5387,7 @@
     "name": "draw_walls"
   },
   {
-    "description": "Clone several entities in one step (one undo), placing each copy at original.position + offset. Same semantics as duplicate_entity applied to each id; group membership is not copied. Ids that do not exist are skipped and listed in the summary; if none exist nothing changes. Returns the new entity ids in affected, in the order of the (de-duplicated) input ids.",
+    "description": "Clone several entities in one step (one undo), placing each copy at original.position + offset. Group membership is not copied. Ids that do not exist are skipped and listed in the summary; if none exist nothing changes. Returns the new entity ids in affected, in the order of the (de-duplicated) input ids.",
     "input_schema": {
       "properties": {
         "ids": {
@@ -5557,29 +5411,6 @@
       "type": "object"
     },
     "name": "duplicate_entities"
-  },
-  {
-    "description": "Clone an existing entity to a new id, placing the copy at original.position + offset. Returns the new entity id in affected. Original is untouched.",
-    "input_schema": {
-      "properties": {
-        "id": {
-          "description": "Id of the entity to duplicate.",
-          "type": "string"
-        },
-        "offset": {
-          "description": "Optional [dx, dy, dz] offset applied to the copy position. Defaults to [0, 0, 0] (exact overlap).",
-          "items": {
-            "type": "number"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object"
-    },
-    "name": "duplicate_entity"
   },
   {
     "annotations": {
@@ -7206,42 +7037,6 @@
     "name": "look_at"
   },
   {
-    "description": "Create a cylinder (tube) that spans exactly from world point p1 to world point p2. Automatically computes the orientation so the cylinder axis runs from p1 to p2 in any plane — eliminates the need to manually derive Euler angles. p1 and p2 are [x, y, z] world coordinates. radius is the tube cross-section radius (> 0). The returned entity id is the only affected id. Fails gracefully (no-op) when radius <= 0 or p1 equals p2 (degenerate tube).",
-    "input_schema": {
-      "properties": {
-        "color": {
-          "description": "Hex color string, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
-          "type": "string"
-        },
-        "p1": {
-          "description": "Start point of the tube in world space [x, y, z]. The cylinder base center is placed here.",
-          "items": {
-            "type": "number"
-          },
-          "type": "array"
-        },
-        "p2": {
-          "description": "End point of the tube in world space [x, y, z]. The cylinder top center is placed here.",
-          "items": {
-            "type": "number"
-          },
-          "type": "array"
-        },
-        "radius": {
-          "description": "Cross-section radius of the tube. Must be greater than 0.",
-          "type": "number"
-        }
-      },
-      "required": [
-        "p1",
-        "p2",
-        "radius"
-      ],
-      "type": "object"
-    },
-    "name": "make_tube_between"
-  },
-  {
     "annotations": {
       "readOnlyHint": true
     },
@@ -7512,7 +7307,7 @@
     "name": "move_building_element"
   },
   {
-    "description": "Translate several entities by the same delta in one step (one undo). Same semantics as move_entity applied to each id. Ids that do not exist are skipped and listed in the summary; if none exist nothing changes.",
+    "description": "Translate several entities by the same delta in one step (one undo). Ids that do not exist are skipped and listed in the summary; if none exist nothing changes.",
     "input_schema": {
       "properties": {
         "delta": {
@@ -7539,30 +7334,6 @@
     "name": "move_entities"
   },
   {
-    "description": "Translate one entity by a relative [dx, dy, dz] vector in document units (see set_units); its position becomes position + delta and its rotation/geometry are unchanged. Right-handed frame, +Z up; works on 2D shapes and 3D solids alike. If the id does not exist the document is left unchanged and nothing is affected.",
-    "input_schema": {
-      "properties": {
-        "delta": {
-          "description": "Relative translation [dx, dy, dz] in document units, e.g. [10, 0, 0] moves +X by 10.",
-          "items": {
-            "type": "number"
-          },
-          "type": "array"
-        },
-        "id": {
-          "description": "Target entity id",
-          "type": "string"
-        }
-      },
-      "required": [
-        "id",
-        "delta"
-      ],
-      "type": "object"
-    },
-    "name": "move_entity"
-  },
-  {
     "description": "Create a parallel-offset copy of a 2D shape at the given distance. Supported kinds: line (offset perpendicular to direction, positive=left of start→end), polyline (each segment offset then joined at miter intersections), circle (concentric: positive=larger, negative=smaller), rectangle (all sides expand/shrink: positive=outward, negative=inward). The original entity is unchanged; a new entity is added. No-op for unsupported kinds or if the resulting shape would be degenerate (e.g. negative circle radius).",
     "input_schema": {
       "properties": {
@@ -7584,16 +7355,67 @@
     "name": "offset_2d"
   },
   {
-    "description": "Lay copies of an entity along a curve, each ORIENTED by the curve: chain links round a chainring and cassette loop, tyre tread blocks round a tyre, sprocket / gear teeth, cable clips, rivets, fence posts. Model the source at the world origin in its \"along the path\" pose: its local +X follows the path tangent, +Y the path normal, +Z the binormal (≈ world up on a horizontal path); copies rotate about their position. rollStep adds an extra roll about the tangent per copy (π/2 alternates chain plates). Path: `pathId` (a 2D sketch curve: line, arc, polyline, spline, circle, ellipse, rectangle; open or closed) or `path` points (straight runs, or smooth: true for a spline; closed: true loops back). Open paths put copies at both ends; closed loops space count copies evenly all round. The source is kept.",
+    "description": "Lay copies of an entity along a curve: chain links round a chainring and cassette loop, tyre tread blocks round a tyre, sprocket / gear teeth, cable clips, rivets, fence posts, parts fanned on an arc. By default each copy is ORIENTED by the curve: model the source at the world origin in its \"along the path\" pose: its local +X follows the path tangent, +Y the path normal, +Z the binormal (≈ world up on a horizontal path); copies rotate about their position. orient:false keeps the source rotation instead (plain spacing along a path). rollStep adds an extra roll about the tangent per copy (π/2 alternates chain plates). Source: `sourceId` (an entity to copy) or `componentId` (fresh instances of a component from create_component). Path, give exactly one: `pathId` (a 2D sketch curve: line, arc, polyline, spline, circle, ellipse, rectangle; open or closed), `path` points (straight runs, or smooth: true for a spline; closed: true loops back) or `arc` (centre, normal, radius and angle sweep in radians; a full 2π sweep is a closed loop). Open paths put copies at both ends (a single copy sits at the start); closed loops space count copies evenly all round. startOffset / endOffset trim the open path from both ends (on a closed loop startOffset shifts the pattern). The source entity is kept.",
     "input_schema": {
       "properties": {
+        "arc": {
+          "description": "Alternative to pathId / path: a circular arc to follow.",
+          "properties": {
+            "center": {
+              "description": "World-space [x, y, z] centre of the arc.",
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "endAngle": {
+              "description": "Sweep end in radians (counter-clockwise about normal).",
+              "type": "number"
+            },
+            "normal": {
+              "description": "Normal of the arc plane (non-zero), e.g. [0, 0, 1] for an XY arc.",
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "radius": {
+              "description": "Arc radius, > 0.",
+              "type": "number"
+            },
+            "startAngle": {
+              "description": "Sweep start in radians from the plane's local +X axis.",
+              "type": "number"
+            }
+          },
+          "required": [
+            "center",
+            "normal",
+            "radius",
+            "startAngle",
+            "endAngle"
+          ],
+          "type": "object"
+        },
         "closed": {
           "description": "With path points: loop back from the last point to the first.",
           "type": "boolean"
         },
+        "componentId": {
+          "description": "Alternative to sourceId: id of a component; each copy is a new instance of it.",
+          "type": "string"
+        },
         "count": {
           "description": "Number of copies, 1..10000.",
           "type": "integer"
+        },
+        "endOffset": {
+          "description": "Path length skipped at the end (default 0, >= 0). Ignored on closed loops.",
+          "type": "number"
+        },
+        "orient": {
+          "description": "Rotate each copy to the path frame (default true); false keeps the source rotation.",
+          "type": "boolean"
         },
         "path": {
           "description": "World [x, y, z] points of the path (>= 2). Alternative to pathId.",
@@ -7614,10 +7436,13 @@
         "sourceId": {
           "description": "Id of the entity to copy (2D or 3D).",
           "type": "string"
+        },
+        "startOffset": {
+          "description": "Path length skipped at the start (default 0, >= 0). On a closed loop: pattern shift.",
+          "type": "number"
         }
       },
       "required": [
-        "sourceId",
         "count"
       ],
       "type": "object"

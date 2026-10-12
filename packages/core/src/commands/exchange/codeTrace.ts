@@ -53,8 +53,8 @@ const TRACE_COMMANDS: ReadonlySet<string> = new Set([
   'fillet_edge',
   'chamfer_edge',
   'shell_solid',
-  'move_entity',
-  'delete_entity',
+  'move_entities',
+  'delete_entities',
   'set_entity_name',
 ]);
 

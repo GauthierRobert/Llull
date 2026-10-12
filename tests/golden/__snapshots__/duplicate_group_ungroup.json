@@ -109,9 +109,11 @@
       },
       {
         "id": "#6",
-        "name": "duplicate_entity",
+        "name": "duplicate_entities",
         "params": {
-          "id": "#1",
+          "ids": [
+            "#1"
+          ],
           "offset": [
             5,
             0,

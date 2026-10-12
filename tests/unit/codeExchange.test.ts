@@ -43,7 +43,7 @@ function buildRichDoc(): CadDocument {
       },
       { command: 'boolean_subtract', as: 'cutPlate', params: { a: '$plate', b: '$hole' } },
       { command: 'set_entity_name', params: { id: '$cutPlate', name: 'Plate' } },
-      { command: 'move_entity', params: { id: '$cutPlate', delta: ['=width', 0, 0] } },
+      { command: 'move_entities', params: { ids: ['$cutPlate'], delta: ['=width', 0, 0] } },
       { command: 'add_cone', params: { radius: 3, height: 4, rotation: [0.5, 0, '=len'] } },
       { command: 'add_torus', params: { ringRadius: 10, tubeRadius: 2 } },
       { command: 'add_wedge', params: { size: [1, 2, 3] } },
@@ -181,7 +181,7 @@ describe('export_code', () => {
     let doc = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
     const id = doc.order[0]!;
     doc = execute(doc, 'add_sphere', { radius: 1 }).document;
-    doc = execute(doc, 'delete_entity', { id }).document;
+    doc = execute(doc, 'delete_entities', { ids: [id] }).document;
     const data = codeOf(doc, 'cadquery');
     expect(data.solidCount).toBe(1);
     expect(data.text).toContain('remove(box_1)');
@@ -457,10 +457,10 @@ describe('apply_code_trace', () => {
           },
           { command: 'add_sphere', ref: 'f2', params: { radius: { value: 1 } } },
           {
-            command: 'move_entity',
-            params: { id: { ref: 'f2' }, delta: [{ value: 1 }, { value: 0 }, { value: 0 }] },
+            command: 'move_entities',
+            params: { ids: [{ ref: 'f2' }], delta: [{ value: 1 }, { value: 0 }, { value: 0 }] },
           },
-          { command: 'delete_entity', params: { id: { ref: 'f2' } } },
+          { command: 'delete_entities', params: { ids: [{ ref: 'f2' }] } },
         ],
       },
     });
@@ -582,7 +582,7 @@ describe('apply_code_trace', () => {
       expectAbort(
         {
           parameters: [],
-          features: [{ command: 'delete_entity', params: { id: { ref: 'f9' } } }],
+          features: [{ command: 'delete_entities', params: { ids: [{ ref: 'f9' }] } }],
         },
         'unknown solid reference "f9"',
       );

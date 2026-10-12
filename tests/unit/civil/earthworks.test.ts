@@ -496,7 +496,7 @@ describe('platform persistence and guards', () => {
 
   it('refuses to delete derived platform entities', () => {
     const doc = withPad(flat());
-    const result = execute(doc, 'delete_entity', { ids: ['platform-1:pad'] });
+    const result = execute(doc, 'delete_entities', { ids: ['platform-1:pad'] });
     expect(result.document.entities['platform-1:pad']).toBeDefined();
   });
 

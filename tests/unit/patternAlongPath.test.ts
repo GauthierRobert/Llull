@@ -147,7 +147,7 @@ describe('pattern_along_path', () => {
       },
       'count must be',
     ],
-    ['no path', { sourceId: 'link', count: 2 }, 'exactly one of path or pathId'],
+    ['no path', { sourceId: 'link', count: 2 }, 'exactly one of path, pathId or arc'],
     [
       'bad point',
       {
@@ -178,6 +178,129 @@ describe('pattern_along_path', () => {
     const doc = withLink();
     const sourceId = params.sourceId === 'link' ? linkId(doc) : params.sourceId;
     expectNoOp(execute(doc, 'pattern_along_path', { ...params, sourceId }), doc, text);
+  });
+
+  it('orient:false keeps the source rotation and spaces copies by arc length', () => {
+    const doc = withLink();
+    const path = [
+      [0, 0, 0],
+      [10, 0, 0],
+      [10, 10, 0],
+    ];
+    const result = execute(doc, 'pattern_along_path', {
+      sourceId: linkId(doc),
+      count: 3,
+      path,
+      orient: false,
+    });
+    const copies = result.affected.map((id) => result.document.entities[id] as Entity);
+    expect(copies.map((copy) => copy.rotation)).toEqual([ORIGIN, ORIGIN, ORIGIN]);
+    expect(copies[1]!.position[0]).toBeCloseTo(10, 6);
+    expect(copies[1]!.position[1]).toBeCloseTo(0, 6);
+    expect(result.summary).not.toContain('oriented');
+  });
+
+  it('startOffset / endOffset trim an open path; startOffset alone places a single copy', () => {
+    const doc = withLink();
+    const path = [
+      [0, 0, 0],
+      [20, 0, 0],
+    ];
+    const trimmed = execute(doc, 'pattern_along_path', {
+      sourceId: linkId(doc),
+      count: 3,
+      path,
+      startOffset: 2,
+      endOffset: 2,
+    });
+    const xs = trimmed.affected.map((id) => trimmed.document.entities[id]!.position[0]);
+    expect(xs[0]).toBeCloseTo(2, 6);
+    expect(xs[2]).toBeCloseTo(18, 6);
+    const single = execute(doc, 'pattern_along_path', {
+      sourceId: linkId(doc),
+      count: 1,
+      path,
+      startOffset: 10,
+    });
+    expect(single.document.entities[single.affected[0] as string]!.position[0]).toBeCloseTo(10, 6);
+    expectNoOp(
+      execute(doc, 'pattern_along_path', {
+        sourceId: linkId(doc),
+        count: 2,
+        path,
+        startOffset: 12,
+        endOffset: 12,
+      }),
+      doc,
+      'offsets',
+    );
+  });
+
+  it('arc places copies on the circle: full turn spaces them evenly, one copy sits mid-sweep', () => {
+    const doc = withLink();
+    const arc = {
+      center: [0, 0, 0],
+      normal: [0, 0, 1],
+      radius: 5,
+      startAngle: 0,
+      endAngle: 2 * Math.PI,
+    };
+    const full = execute(doc, 'pattern_along_path', {
+      sourceId: linkId(doc),
+      count: 4,
+      arc,
+      orient: false,
+    });
+    const angles = full.affected.map((id) => {
+      const [x, y] = full.document.entities[id]!.position;
+      expect(Math.hypot(x, y)).toBeCloseTo(5, 3);
+      return Math.atan2(y, x);
+    });
+    expect(angles[0]).toBeCloseTo(0, 3);
+    expect(angles[1]).toBeCloseTo(Math.PI / 2, 3);
+    expect(Math.abs(angles[2]!)).toBeCloseTo(Math.PI, 3);
+    const half = execute(doc, 'pattern_along_path', {
+      sourceId: linkId(doc),
+      count: 1,
+      arc: { ...arc, endAngle: Math.PI },
+      startOffset: (5 * Math.PI) / 2,
+    });
+    const mid = half.document.entities[half.affected[0] as string]!.position;
+    expect(mid[0]).toBeCloseTo(0, 3);
+    expect(mid[1]).toBeCloseTo(5, 3);
+  });
+
+  it.each([
+    ['zero normal', { normal: [0, 0, 0] }, 'non-zero'],
+    ['radius <= 0', { radius: 0 }, 'radius'],
+    ['bad center', { center: [0, 0] }, 'center'],
+  ])('arc with %s is a no-op', (_label, override, text) => {
+    const doc = withLink();
+    const arc = { center: [0, 0, 0], normal: [0, 0, 1], radius: 5, startAngle: 0, endAngle: 3 };
+    expectNoOp(
+      execute(doc, 'pattern_along_path', {
+        sourceId: linkId(doc),
+        count: 3,
+        arc: { ...arc, ...override },
+      }),
+      doc,
+      text,
+    );
+  });
+
+  it('refuses both an arc and a path, or neither source / both sources', () => {
+    const doc = withLink();
+    const arc = { center: [0, 0, 0], normal: [0, 0, 1], radius: 5, startAngle: 0, endAngle: 3 };
+    const path = [
+      [0, 0, 0],
+      [1, 0, 0],
+    ];
+    expectNoOp(
+      execute(doc, 'pattern_along_path', { sourceId: linkId(doc), count: 2, arc, path }),
+      doc,
+      'exactly one',
+    );
+    expectNoOp(execute(doc, 'pattern_along_path', { count: 2, path }), doc, 'exactly one');
   });
 
   it('is pure', () => {

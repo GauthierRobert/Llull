@@ -155,9 +155,9 @@
   "as": "lugA"
  },
  {
-  "command": "duplicate_entity",
+  "command": "duplicate_entities",
   "params": {
-   "id": "$lugA",
+   "ids": ["$lugA"],
    "offset": [
     0,
     -38,

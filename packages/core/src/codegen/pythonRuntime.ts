@@ -247,14 +247,14 @@ def shell(solid, thickness):
 
 
 def translate(solid, delta):
-    _record("move_entity", {"id": {"ref": solid.ref}, "delta": _terms(delta)})
+    _record("move_entities", {"ids": [{"ref": solid.ref}], "delta": _terms(delta)})
     moved = Solid(solid.ref, _translate(solid.shape, [float(d) for d in delta]), solid.color, solid.name)
     LLULL_LIVE[solid.ref] = moved
     return moved
 
 
 def remove(solid):
-    _record("delete_entity", {"id": {"ref": solid.ref}})
+    _record("delete_entities", {"ids": [{"ref": solid.ref}]})
     LLULL_LIVE.pop(solid.ref, None)
 
 

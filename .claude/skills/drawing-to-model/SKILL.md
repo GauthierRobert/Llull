@@ -48,8 +48,8 @@ official mass; `npm run quality:drawings` replays them).
   PLACES" corners in a view prefer a rounded-rectangle prism intersect. A concave fillet against a
   cylinder or a corner where several blends meet is fragile: llull refuses it with a reason —
   build it instead: revolved arc ring, (disc − torus) ∩ box, or arcs in the profile.
-- Booleans consume operands (`duplicate_entity` first; THRU tools overshoot); `rotate_entity`
-  pivots about the entity `position` (a sweep: its path start) — compensate with `move_entity`.
+- Booleans consume operands (`duplicate_entities` first; THRU tools overshoot); `rotate_entity`
+  pivots about the entity `position` (a sweep: its path start) — compensate with `move_entities`.
   `loft_sections` resamples by arc length: a stadium→stadium loft twists (−8 %); build it as
   oblique circle-lofts ∪ trapezoid-prism ∩ trapezoid-prism.
 - Don't leave variant tools in the document: `export_stl` exports every solid.

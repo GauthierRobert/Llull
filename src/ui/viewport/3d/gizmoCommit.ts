@@ -35,8 +35,8 @@ export interface GizmoTransform {
 
 export type GizmoCommit =
   | {
-      readonly name: 'move_entity';
-      readonly params: { id: string; delta: [number, number, number] };
+      readonly name: 'move_entities';
+      readonly params: { ids: string[]; delta: [number, number, number] };
     }
   | {
       readonly name: 'rotate_entity';
@@ -70,7 +70,7 @@ export function gizmoDragCommit(
 ): GizmoCommit | null {
   if (mode === 'translate') {
     const delta = computeDelta(start.position, end.position);
-    return isNegligible(delta) ? null : { name: 'move_entity', params: { id, delta } };
+    return isNegligible(delta) ? null : { name: 'move_entities', params: { ids: [id], delta } };
   }
   if (mode === 'rotate') {
     const delta = computeDelta(start.rotation, end.rotation);

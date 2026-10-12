@@ -56,5 +56,5 @@ A "reference defect" is proved, not assumed: a variant built the reference's way
   current OCP.
 
 Open (not fixed here): `loft_sections` resamples by arc length (stadium → stadium lofts twist,
-−8 % volume); no elliptical-arc sketch piece; no sheet-metal commands; `move_entity` `delta` vs `duplicate_entity` `offset`; `rotate_entity`
+−8 % volume); no elliptical-arc sketch piece; no sheet-metal commands; `move_entities` `delta` vs `duplicate_entities` `offset`; `rotate_entity`
 pivots about `position` (a sweep's path start).
