@@ -10,6 +10,7 @@ import type {
 } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import { toMetres } from '@core/model/units';
+import { elementsOf } from '../../building/model';
 import { type BaseReaction } from '../frames/frameModelSolve';
 import { WIND_CASES, WIND_PRESSURE_CASES, type LoadCase } from '../frames/frameModelTypes';
 import { type Combination, type Factors, TOLERANCE_METRES } from './foundationModel';
@@ -153,10 +154,7 @@ export function findFooting(
 }
 
 export function findPlate(building: BuildingModel, columnId: string): BasePlateElement | null {
-  for (const element of Object.values(building.elements)) {
-    if (element.category === 'plate' && element.memberId === columnId) return element;
-  }
-  return null;
+  return elementsOf(building, 'plate').find((plate) => plate.memberId === columnId) ?? null;
 }
 
 export interface Candidate {

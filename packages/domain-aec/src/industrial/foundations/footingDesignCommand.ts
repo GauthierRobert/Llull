@@ -15,6 +15,7 @@ import { COVER_MM, type FootingDesignRow } from './footingModel';
 import { designFootingRow, isResized } from './footingDesignRow';
 import { sizeText } from './footingSizing';
 import { round } from '../../shared/numeric';
+import { briefList } from '../common/utilisation';
 
 const footingDesignParams = z.object({
   ...FRAME_LOAD_SHAPE,
@@ -126,7 +127,7 @@ export const designFootings = defineCommand({
       document,
       summary:
         `Designed ${designed.length} of ${rows.length} footing(s) on level '${levelId}' (${describeLoads(loads)}, soil ${soilBearing} kPa, C25/30 B500, cover ${COVER_MM} mm, ${allowShrink ? 'sizes may shrink' : 'sizes only grow'}; sizes B×L×h mm): ` +
-        `${designed.length > 0 ? designed.slice(0, 8).map(format).join('; ') + (designed.length > 8 ? '; …' : '') : 'none'}. ` +
+        `${designed.length > 0 ? briefList(designed, format, 8, '; ') : 'none'}. ` +
         (failed.length > 0
           ? `${failed.length} not sized — left unchanged: ${failed
               .slice(0, 8)

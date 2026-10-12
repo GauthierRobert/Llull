@@ -94,11 +94,7 @@ export function columnsWithoutPlates(
   levelId: string | null,
   memberIds: ReadonlySet<string> | null,
 ): SteelMemberElement[] {
-  const plated = new Set(
-    Object.values(building.elements).flatMap((element) =>
-      element.category === 'plate' ? [element.memberId] : [],
-    ),
-  );
+  const plated = new Set(elementsOf(building, 'plate').map((plate) => plate.memberId));
   return elementsOf(building, 'member').filter(
     (element) =>
       element.role === 'column' &&

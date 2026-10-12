@@ -20,6 +20,10 @@ import { elevationAt } from '../surface/tin';
 import type { ReportRow } from '../road/roadReport';
 import { stationText } from '../model';
 import {
+  PLOT_LEFT,
+  PLOT_MAX_WIDTH,
+  PLOT_ROW_HEIGHT,
+  PLOT_TOP,
   levelFrame,
   niceStep,
   pushLevelGrid,
@@ -32,11 +36,11 @@ import {
 } from '../road/roadSvg';
 import { toMetres } from '@core/model/units';
 
-export const LONG_SECTION_LEFT = 90;
-const LEFT = LONG_SECTION_LEFT;
-const TOP = 60;
-const ROW_HEIGHT = 16;
-const MAX_PLOT_WIDTH = 1000;
+export const LONG_SECTION_LEFT = PLOT_LEFT;
+const LEFT = PLOT_LEFT;
+const TOP = PLOT_TOP;
+const ROW_HEIGHT = PLOT_ROW_HEIGHT;
+const MAX_PLOT_WIDTH = PLOT_MAX_WIDTH;
 const MAX_PLOT_HEIGHT = 480;
 
 type Pair = readonly [number, number];

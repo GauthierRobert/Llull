@@ -6,7 +6,7 @@ import type { BuildingModel, SteelMemberElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import type { FrameNode } from '@lib/frame2d';
 import { toMm } from '@core/model/units';
-import { levelElementsOf } from '../../building/model';
+import { elementsOf, levelElementsOf } from '../../building/model';
 import { weightKnPerMetre } from '../../shared/numeric';
 import { findProfile, sectionProperties } from '../../steel/profiles';
 import { E_STEEL } from '../steelDesign/steelDesign';
@@ -83,8 +83,8 @@ export function framesOf(
     const free: FrameNode['restraint'] = [false, false, false];
     const purlins = purlinXs(y);
     const fixedColumns = new Set(
-      Object.values(building.elements).flatMap((element) =>
-        element.category === 'plate' && element.fixity === 'fixed' ? [element.memberId] : [],
+      elementsOf(building, 'plate').flatMap((plate) =>
+        plate.fixity === 'fixed' ? [plate.memberId] : [],
       ),
     );
     const valleys = valleyLines(

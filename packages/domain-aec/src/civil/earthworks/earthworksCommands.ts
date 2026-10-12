@@ -32,14 +32,12 @@ import {
 } from './earthworksMath';
 import { daylightPoints } from './platformDaylight';
 import { toMetres } from '@core/model/units';
-import { round as roundDigits } from '../../shared/numeric';
+import { round } from '../../shared/numeric';
 
 const DEFAULT_CUT_SLOPE = 1.5;
 const DEFAULT_FILL_SLOPE = 2;
 const MAX_BOUNDARY_VERTICES = 2000;
 const BALANCE_ITERATIONS = 60;
-
-const round = (value: number, digits = 3): number => roundDigits(value, digits);
 
 const slopeOf = (name: string, value: number): string | null =>
   value > 0 && Number.isFinite(value) ? null : `${name} must be > 0 (horizontal per 1 vertical).`;
@@ -82,15 +80,15 @@ function platformProblem(platform: PlatformObject, tin: Tin): string | null {
 function worksData(doc: CadDocument, works: Earthworks): Record<string, number> {
   const k = toMetres(doc, 1);
   return {
-    cutM3: round(works.cutVolume * k ** 3),
-    fillM3: round(works.fillVolume * k ** 3),
-    netM3: round((works.cutVolume - works.fillVolume) * k ** 3),
-    cutAreaM2: round(works.cutArea * k ** 2),
-    fillAreaM2: round(works.fillArea * k ** 2),
-    padAreaM2: round(works.padArea * k ** 2),
-    maxCutDepthM: round(works.maxCutDepth * k),
-    maxFillDepthM: round(works.maxFillDepth * k),
-    gridSpacingM: round(works.spacing * k),
+    cutM3: round(works.cutVolume * k ** 3, 3),
+    fillM3: round(works.fillVolume * k ** 3, 3),
+    netM3: round((works.cutVolume - works.fillVolume) * k ** 3, 3),
+    cutAreaM2: round(works.cutArea * k ** 2, 3),
+    fillAreaM2: round(works.fillArea * k ** 2, 3),
+    padAreaM2: round(works.padArea * k ** 2, 3),
+    maxCutDepthM: round(works.maxCutDepth * k, 3),
+    maxFillDepthM: round(works.maxFillDepth * k, 3),
+    gridSpacingM: round(works.spacing * k, 3),
     samples: works.samples,
     samplesOutsideTin: works.outsideTin,
   };
@@ -441,13 +439,13 @@ export const compareSurfaces = defineCommand({
     const data = {
       baseSurfaceId,
       comparisonSurfaceId,
-      cutM3: round(result.cutVolume * k ** 3),
-      fillM3: round(result.fillVolume * k ** 3),
-      netM3: round((result.cutVolume - result.fillVolume) * k ** 3),
-      cutAreaM2: round(result.cutArea * k ** 2),
-      fillAreaM2: round(result.fillArea * k ** 2),
-      areaM2: round(result.area * k ** 2),
-      gridSpacingM: round(result.spacing * k),
+      cutM3: round(result.cutVolume * k ** 3, 3),
+      fillM3: round(result.fillVolume * k ** 3, 3),
+      netM3: round((result.cutVolume - result.fillVolume) * k ** 3, 3),
+      cutAreaM2: round(result.cutArea * k ** 2, 3),
+      fillAreaM2: round(result.fillArea * k ** 2, 3),
+      areaM2: round(result.area * k ** 2, 3),
+      gridSpacingM: round(result.spacing * k, 3),
       samples: result.samples,
       samplesOutsideTin: result.outsideTin,
     };

@@ -10,9 +10,7 @@ import { civilObjectOrFailure, getCivil } from '../model';
 import { surfaceTin } from './surfaceTin';
 import { corners, elevationAt, slopeAt, tinBounds, tinPlanArea, triangleCount } from './tin';
 import { toMetres } from '@core/model/units';
-import { round as roundDigits } from '../../shared/numeric';
-
-const round = (value: number, digits = 3): number => roundDigits(value, digits);
+import { round } from '../../shared/numeric';
 
 /**
  * @command surface_elevation
@@ -40,7 +38,7 @@ export const surfaceElevation = defineCommand({
       const slope = slopeAt(tin, at);
       return {
         at,
-        elevation: elevation === null ? null : round(elevation),
+        elevation: elevation === null ? null : round(elevation, 3),
         slopePercent: slope === null ? null : round(slope * 100, 2),
       };
     });
@@ -106,9 +104,9 @@ export const surfaceReport = defineCommand({
       points: tin.points.length,
       triangles: triangleCount(tin),
       planAreaM2: round(area, 2),
-      minElevationM: bounds ? round(metres(bounds.min[2])) : null,
-      maxElevationM: bounds ? round(metres(bounds.max[2])) : null,
-      meanElevationM: areaSum > 0 ? round(metres(weighted / areaSum)) : null,
+      minElevationM: bounds ? round(metres(bounds.min[2]), 3) : null,
+      maxElevationM: bounds ? round(metres(bounds.max[2]), 3) : null,
+      meanElevationM: areaSum > 0 ? round(metres(weighted / areaSum), 3) : null,
       meanSlopePercent: areaSum > 0 ? round((slopeSum / areaSum) * 100, 2) : null,
     };
     return report(

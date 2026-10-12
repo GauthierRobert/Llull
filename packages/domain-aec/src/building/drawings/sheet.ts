@@ -12,7 +12,6 @@ import { fileSlug, getBuilding } from '../model';
 import { noop, report } from '@core/commands/noop';
 import { type PlanDrawing, type PlanPrimitive } from './planModel';
 import { buildPlanDrawing } from './planDrawing';
-import { escapeXml } from '@lib/escapeXml';
 import { wrapAngle } from '@lib/angle';
 import {
   composeSheetSvg,
@@ -23,6 +22,7 @@ import {
   PAPER_MM,
   PAPER_SIZES,
   sheetDrawingArea,
+  svgText,
   type PaperSize,
   type Viewport,
 } from '../../shared/sheetFrame';
@@ -63,12 +63,7 @@ class SheetPainter {
   }
 
   text(at: Vec2, sizeMm: number, content: string, rotationDeg = 0): void {
-    const [x, y] = at;
-    const transform =
-      rotationDeg !== 0 ? ` transform="rotate(${n(rotationDeg)} ${n(x)} ${n(y)})"` : '';
-    this.parts.push(
-      `<text x="${n(x)}" y="${n(y)}" font-size="${n(sizeMm)}" text-anchor="middle"${transform}>${escapeXml(content)}</text>`,
-    );
+    this.parts.push(svgText(at[0], at[1], sizeMm, 'middle', content, rotationDeg));
   }
 
   paint(primitive: PlanPrimitive): void {

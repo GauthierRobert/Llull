@@ -24,7 +24,9 @@ import {
   analysedRow,
   beamSection,
   columnSection,
+  deflectionCheckLine,
   metres,
+  shearCheckLine,
   skippedRow,
   ULS_COMBINATION,
   type CheckLine,
@@ -164,12 +166,16 @@ function beamRow(
       combination,
       detail: `${profile.name} class ${resistance.sectionClass}: M ${mega(Math.max(diagram.hogging, diagram.sagging)).toFixed(1)} kNm ≤ Mc,Rd ${mega(hogResistance.moment).toFixed(1)} kNm${hogResistance.reduced ? ' (reduced for shear, §6.2.8)' : ''} with N ${kilo(compression).toFixed(1)} kN`,
     });
-    shearLine = worstOf(shearLine, {
-      name: 'shear (§6.2.6)',
-      utilisation: diagram.shear / resistance.shear,
-      combination,
-      detail: `${profile.name}: V ${kilo(diagram.shear).toFixed(1)} kN ≤ Vpl,Rd ${kilo(resistance.shear).toFixed(0)} kN`,
-    });
+    shearLine = worstOf(
+      shearLine,
+      shearCheckLine(
+        profile.name,
+        combination,
+        diagram.shear / resistance.shear,
+        kilo(diagram.shear),
+        kilo(resistance.shear),
+      ),
+    );
     maxMoment = Math.max(maxMoment, diagram.sagging, diagram.hogging);
     maxShear = Math.max(maxShear, diagram.shear);
     maxCompression = Math.max(maxCompression, compression);
@@ -216,12 +222,7 @@ function deflectionLine(
   const label = cantilever ? `cantilever 2L/${ratio}` : `L/${ratio}`;
   return {
     value,
-    line: {
-      name: `deflection (${label})`,
-      utilisation: value / limit,
-      combination: 'SLS G + Q',
-      detail: `${bar.profileName} L ${metres(bar.length)} m: δ ${value.toFixed(1)} mm ≤ ${label} = ${limit.toFixed(1)} mm`,
-    },
+    line: deflectionCheckLine(`${bar.profileName} L ${metres(bar.length)} m`, label, value, limit),
   };
 }
 
@@ -286,12 +287,16 @@ function columnRow(bar: SteelBar, layout: BarLayout, input: FrameCheckInput): Me
         combination,
         detail: `${profile.name} class ${sectionClass} (${axisText}), ${zText}: N ${kilo(maxAxial).toFixed(0)} kN ≤ Npl,Rd ${kilo(resistance.axial).toFixed(0)} kN with M ${mega(moment).toFixed(1)} kNm ≤ M${axis === 'strong' ? '' : 'z'},Rd ${mega(bending.moment).toFixed(1)} kNm`,
       });
-      shearLine = worstOf(shearLine, {
-        name: 'shear (§6.2.6)',
-        utilisation: shear / bending.shear,
-        combination,
-        detail: `${profile.name} (${axisText}) ${zText}: V ${kilo(shear).toFixed(1)} kN ≤ Vpl,Rd ${kilo(bending.shear).toFixed(0)} kN`,
-      });
+      shearLine = worstOf(
+        shearLine,
+        shearCheckLine(
+          `${profile.name} (${axisText}) ${zText}`,
+          combination,
+          shear / bending.shear,
+          kilo(shear),
+          kilo(bending.shear),
+        ),
+      );
       maxMoment = Math.max(maxMoment, moment);
       maxCompression = Math.max(maxCompression, compression);
       maxShear = Math.max(maxShear, shear);

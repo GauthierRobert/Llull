@@ -16,6 +16,8 @@ import {
   beamSection,
   metres,
   ULS_COMBINATION,
+  deflectionCheckLine,
+  shearCheckLine,
   type CheckLine,
   type MemberRow,
 } from './steelMemberRows';
@@ -66,20 +68,23 @@ export function checkBeam(
       combination: ULS_COMBINATION,
       detail: `${profile.name} ${lengthText}, ${restraint}${elastic}: M ${momentEd.toFixed(1)} kNm ≤ ${restrained ? 'Mc,Rd' : `Mb,Rd (χLT ${chiLateral.toFixed(2)})`} ${(chiLateral * momentResistance).toFixed(1)} kNm${reduction}`,
     },
-    {
-      name: 'shear (§6.2.6)',
-      utilisation: shearEd / shearResistance,
-      combination: ULS_COMBINATION,
-      detail: `${profile.name}: V ${shearEd.toFixed(1)} kN ≤ Vpl,Rd ${shearResistance.toFixed(0)} kN`,
-    },
+    shearCheckLine(
+      profile.name,
+      ULS_COMBINATION,
+      shearEd / shearResistance,
+      shearEd,
+      shearResistance,
+    ),
   ];
   const limit = lengthMm / deflectionRatio;
-  lines.push({
-    name: `deflection (L/${deflectionRatio})`,
-    utilisation: result.sls.deflection / limit,
-    combination: 'SLS G + Q',
-    detail: `${profile.name} ${lengthText}: δ ${result.sls.deflection.toFixed(1)} mm ≤ L/${deflectionRatio} = ${limit.toFixed(1)} mm`,
-  });
+  lines.push(
+    deflectionCheckLine(
+      `${profile.name} ${lengthText}`,
+      `L/${deflectionRatio}`,
+      result.sls.deflection,
+      limit,
+    ),
+  );
   if (strut && strut.force > 0) {
     const buckling = memberBuckling(profile, bar.fy, strut.force * 1000, momentEd * 1e6, {
       major: lengthMm,

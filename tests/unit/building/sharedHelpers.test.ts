@@ -9,6 +9,9 @@ import { getBuilding, levelElementsOf } from '@aec/building/model';
 import { batterLevel } from '@aec/civil/earthworks/batter';
 import { entityPlanPoint } from '@aec/civil/entities';
 import { stationText } from '@aec/civil/model';
+import { planAreaM2 } from '@aec/shared/planArea';
+import { svgText } from '@aec/shared/sheetFrame';
+import { deflectionCheckLine, shearCheckLine } from '@aec/industrial/steelDesign/steelMemberRows';
 import { run } from './runFixtures';
 
 describe('utilisation reductions', () => {
@@ -93,5 +96,34 @@ describe('civil helpers', () => {
 
   it('stationText formats a document-unit station', () => {
     expect(stationText({ units: 'mm' }, 1_234_500)).toBe('1+234.50');
+  });
+});
+
+describe('second-pass shared helpers', () => {
+  it('planAreaM2 converts a document-unit outline to m²', () => {
+    const square: Array<[number, number]> = [
+      [0, 0],
+      [2000, 0],
+      [2000, 3000],
+      [0, 3000],
+    ];
+    expect(planAreaM2(createEmptyDocument(), square)).toBeCloseTo(6);
+    expect(planAreaM2(createEmptyDocument(), [])).toBe(0);
+  });
+
+  it('svgText escapes content and rotates only when asked', () => {
+    expect(svgText(1, 2, 3, 'middle', 'a<b')).toBe(
+      '<text x="1" y="2" font-size="3" text-anchor="middle">a&lt;b</text>',
+    );
+    expect(svgText(1, 2, 3, 'start', 'x', 90)).toContain('transform="rotate(90 1 2)"');
+  });
+
+  it('shear and deflection check lines carry utilisation and detail', () => {
+    const shear = shearCheckLine('B1', 'ULS 1', 0.5, 50, 100);
+    expect(shear).toMatchObject({ name: 'shear (§6.2.6)', utilisation: 0.5, combination: 'ULS 1' });
+    expect(shear.detail).toBe('B1: V 50.0 kN ≤ Vpl,Rd 100 kN');
+    const deflection = deflectionCheckLine('B1', 'L/250', 30, 20);
+    expect(deflection).toMatchObject({ name: 'deflection (L/250)', utilisation: 1.5 });
+    expect(deflection.detail).toBe('B1: δ 30.0 mm ≤ L/250 = 20.0 mm');
   });
 });

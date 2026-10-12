@@ -43,6 +43,20 @@ export function sheetDrawingArea(width: number, height: number): Viewport {
 /** SVG number text: two decimals, no trailing zeros. */
 export const n = (value: number): string => String(round(value));
 
+/** SVG `<text>` at paper point (`x`, `y`), content XML-escaped; optional rotation about the anchor point. */
+export const svgText = (
+  x: number,
+  y: number,
+  size: number,
+  anchor: 'start' | 'middle' | 'end',
+  content: string,
+  rotationDeg = 0,
+): string => {
+  const transform =
+    rotationDeg !== 0 ? ` transform="rotate(${n(rotationDeg)} ${n(x)} ${n(y)})"` : '';
+  return `<text x="${n(x)}" y="${n(y)}" font-size="${n(size)}" text-anchor="${anchor}"${transform}>${escapeXml(content)}</text>`;
+};
+
 export interface Viewport {
   readonly x: number;
   readonly y: number;

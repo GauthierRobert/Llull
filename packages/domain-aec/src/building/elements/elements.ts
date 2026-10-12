@@ -7,8 +7,8 @@ import type { Vec2, Vec3 } from '@core/model/types';
 import type { BuildingElement, BuildingModel, RoomElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
-import { isValidPolygon, polygonArea } from '@lib/polygon';
-import { toMetres } from '@core/model/units';
+import { isValidPolygon } from '@lib/polygon';
+import { planAreaM2 } from '../../shared/planArea';
 import {
   getBuilding,
   hostOf,
@@ -94,7 +94,7 @@ export const addRoom = defineCommand({
       name: name.trim(),
       boundary: outline,
     };
-    const squareMetres = polygonArea(outline) * toMetres(doc, 1) ** 2;
+    const squareMetres = planAreaM2(doc, outline);
     return commitBuilding(
       doc,
       withElement(resolution.building, room),

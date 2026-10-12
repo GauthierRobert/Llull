@@ -3,9 +3,8 @@
  */
 
 import type { Vec2 } from '@core/model/types';
-import { escapeXml } from '@lib/escapeXml';
 import { distance } from '@lib/polygon';
-import { n, type Viewport } from '../../shared/sheetFrame';
+import { n, svgText, type Viewport } from '../../shared/sheetFrame';
 import { ROW_HEIGHT } from './anchorPlanLayout';
 
 export class PlanCanvas {
@@ -34,12 +33,14 @@ export class PlanCanvas {
     );
   }
 
-  text(at: Vec2, size: number, content: string, anchor = 'middle', rotation = 0): void {
-    const transform =
-      rotation !== 0 ? ` transform="rotate(${n(rotation)} ${n(at[0])} ${n(at[1])})"` : '';
-    this.parts.push(
-      `<text x="${n(at[0])}" y="${n(at[1])}" font-size="${n(size)}" text-anchor="${anchor}"${transform}>${escapeXml(content)}</text>`,
-    );
+  text(
+    at: Vec2,
+    size: number,
+    content: string,
+    anchor: 'start' | 'middle' | 'end' = 'middle',
+    rotation = 0,
+  ): void {
+    this.parts.push(svgText(at[0], at[1], size, anchor, content, rotation));
   }
 
   /** Aligned dimension between two model points, drawn `side` paper-mm off the measured line. */
@@ -88,9 +89,7 @@ export function scheduleTable(
   const widths = [14, 14, 20, 14, 14, 26, 18];
   const headers = ['Plate', 'Grid', 'Bolts', 'Embed.', 'Proj.', 'Plate mm', 'TOC / grout'];
   const parts = [`<g id="bolt-schedule">`];
-  parts.push(
-    `<text x="${n(x)}" y="${n(y)}" font-size="3" text-anchor="start">Anchor bolt schedule (mm)</text>`,
-  );
+  parts.push(svgText(x, y, 3, 'start', 'Anchor bolt schedule (mm)'));
   const all = [headers, ...rows];
   all.forEach((row, rowIndex) => {
     const top = y + 2 + rowIndex * ROW_HEIGHT;
@@ -100,7 +99,7 @@ export function scheduleTable(
       const cssClass = rowIndex === 0 ? 'frame' : 'frame-thin';
       parts.push(
         `<rect x="${n(left)}" y="${n(top)}" width="${cellWidth}" height="${ROW_HEIGHT}" class="${cssClass}"/>`,
-        `<text x="${n(left + 1)}" y="${n(top + 2.8)}" font-size="2" text-anchor="start">${escapeXml(cell)}</text>`,
+        svgText(left + 1, top + 2.8, 2, 'start', cell),
       );
       left += cellWidth;
     });

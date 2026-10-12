@@ -12,6 +12,7 @@ import { getBuilding } from '../../building/model';
 import { noop, report } from '@core/commands/noop';
 import { dot3, scale3, sub3 } from '@lib/vec3';
 import { atLevel } from '../evaluate';
+import { briefList } from '../common/utilisation';
 import { type OrientedBox, boxOverlap, elementBoxes } from './clashBoxes';
 import { slabPenetrations } from './clashSlabs';
 
@@ -232,7 +233,7 @@ export const checkClashes = defineCommand({
       doc,
       clashes.length === 0
         ? 'No clashes found.'
-        : `${hard} hard clash(es), ${clashes.length - hard} clearance violation(s): ${clashes.slice(0, 10).map(describe).join('; ')}${clashes.length > 10 ? '; …' : ''}.`,
+        : `${hard} hard clash(es), ${clashes.length - hard} clearance violation(s): ${briefList(clashes, describe, 10, '; ')}.`,
       { clashes },
     );
   },

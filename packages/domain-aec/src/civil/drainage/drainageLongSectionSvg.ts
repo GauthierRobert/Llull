@@ -6,6 +6,10 @@
  */
 
 import {
+  PLOT_LEFT,
+  PLOT_MAX_WIDTH,
+  PLOT_ROW_HEIGHT,
+  PLOT_TOP,
   levelFrame,
   pushLevelGrid,
   pushTableLabels,
@@ -42,10 +46,10 @@ export interface RunSegment {
   readonly surcharged: boolean;
 }
 
-const LEFT = 90;
-const TOP = 60;
-const ROW_HEIGHT = 16;
-const MAX_PLOT_WIDTH = 1000;
+const LEFT = PLOT_LEFT;
+const TOP = PLOT_TOP;
+const ROW_HEIGHT = PLOT_ROW_HEIGHT;
+const MAX_PLOT_WIDTH = PLOT_MAX_WIDTH;
 const MAX_PLOT_HEIGHT = 420;
 const TABLE_LABELS = ['Chainage', 'Rim', 'Invert', 'Pipe', 'HGL'];
 

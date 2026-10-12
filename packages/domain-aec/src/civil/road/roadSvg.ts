@@ -9,6 +9,12 @@ import { round } from '../../shared/numeric';
 
 type Point = readonly [number, number];
 
+/** Long-section plot frame shared by road and drainage profiles (SVG user units). */
+export const PLOT_LEFT = 90;
+export const PLOT_TOP = 60;
+export const PLOT_ROW_HEIGHT = 16;
+export const PLOT_MAX_WIDTH = 1000;
+
 export const num = (value: number): string => String(round(value));
 
 export interface TextStyle {

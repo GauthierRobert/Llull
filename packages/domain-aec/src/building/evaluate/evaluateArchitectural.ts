@@ -30,8 +30,9 @@ import type {
   StairElement,
   WallElement,
 } from '@core/model/building';
-import { polygonArea, polygonCentroid, toCounterClockwise } from '@lib/polygon';
-import { fromMm, toMetres } from '@core/model/units';
+import { polygonCentroid, toCounterClockwise } from '@lib/polygon';
+import { fromMm } from '@core/model/units';
+import { planAreaM2 } from '../../shared/planArea';
 import { prismMesh } from '../../shared/mesh';
 import { base, CATEGORY_LAYER, colorForMaterial, meshEntity, orientedBox } from './entities';
 import { curvedBandBetween } from '../geometry/curvedWallGeometry';
@@ -234,7 +235,7 @@ export function evaluateRoom(
   const color = CATEGORY_LAYER.room.color;
   const [cx, cy] = polygonCentroid(room.boundary);
   const textHeight = fromMm(context.doc, 250);
-  const areaSquareMetres = polygonArea(room.boundary) * toMetres(context.doc, 1) ** 2;
+  const areaSquareMetres = planAreaM2(context.doc, room.boundary);
   const outline: PolylineEntity = {
     ...base(
       room,

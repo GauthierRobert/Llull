@@ -14,8 +14,9 @@ import type {
 } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
-import { distance, isValidPolygon, offsetPolygon, polygonArea } from '@lib/polygon';
-import { fromMm, toMetres, toMm } from '@core/model/units';
+import { distance, isValidPolygon, offsetPolygon } from '@lib/polygon';
+import { fromMm, toMm } from '@core/model/units';
+import { planAreaM2 } from '../../shared/planArea';
 import {
   getBuilding,
   isVec2List,
@@ -220,7 +221,7 @@ export const addSlab = defineCommand({
       doc,
       withElement(resolution.building, slab),
       [slab.id],
-      `Added ${slab.role} slab ${slab.mark} (${slab.id}) on ${resolution.level.name}: area ${(polygonArea(outline) * toMetres(doc, 1) ** 2).toFixed(2)} m², thickness ${resolvedThickness} ${doc.units}.`,
+      `Added ${slab.role} slab ${slab.mark} (${slab.id}) on ${resolution.level.name}: area ${planAreaM2(doc, outline).toFixed(2)} m², thickness ${resolvedThickness} ${doc.units}.`,
       { elementId: slab.id },
     );
   },
