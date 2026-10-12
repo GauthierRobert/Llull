@@ -49,6 +49,20 @@ export default tseslint.config(
     rules: { 'max-lines': ['error', { max: 500, skipBlankLines: true, skipComments: true }] },
   },
   {
+    // server/ and desktop/ ship as CommonJS bundles (esbuild --format=cjs) but type-check with
+    // bundler resolution, so tsc would not flag ESM-only syntax.
+    files: ['server/src/**/*.ts', 'desktop/src/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "MetaProperty[meta.name='import']",
+          message: 'import.meta does not exist in the CommonJS server/desktop bundles.',
+        },
+      ],
+    },
+  },
+  {
     // Plain-JS Node scripts (quality/*.mjs) cannot declare return types.
     files: ['**/*.mjs', '**/*.js'],
     rules: { '@typescript-eslint/explicit-function-return-type': 'off' },
