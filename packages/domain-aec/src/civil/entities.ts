@@ -18,16 +18,6 @@ import type {
 } from '@core/model/types';
 import type { CivilObject } from '@core/model/civil';
 
-/** Plan (x, y) of an entity-local point: rotated about Z by `rotation[2]`, then translated by `position`. */
-export function entityPlanPoint(
-  entity: { readonly position: Vec3; readonly rotation: Vec3 },
-  [x, y]: Vec2,
-): Vec2 {
-  const cos = Math.cos(entity.rotation[2]);
-  const sin = Math.sin(entity.rotation[2]);
-  return [entity.position[0] + x * cos - y * sin, entity.position[1] + x * sin + y * cos];
-}
-
 /** Civil layer name -> colour (NCS discipline C). */
 export const CIVIL_LAYERS = {
   points: { name: 'C-TOPO-PNTS', color: '#c8553d' },

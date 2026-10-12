@@ -11,7 +11,7 @@ import { DxfWriter } from '../../building/exchange/dxfWriter';
 import type { SiteCalibration } from '@core/model/civil';
 import { assembleDxf } from '../../building/exchange/dxfExport';
 import { localToGrid, resolveFrame, type CoordinateFrame } from '../crs/crs';
-import { entityPlanPoint } from '../entities';
+import { entityPlanPoint } from '../../shared/planPoint';
 
 export interface CivilDxf {
   readonly text: string;

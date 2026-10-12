@@ -2,29 +2,22 @@
  * @layer domain-aec
  */
 
-import { type CadDocument, type Entity, type Vec2, is2D } from '@core/model/types';
+import { type CadDocument, type Vec2, is2D } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { fromMm } from '@core/model/units';
 import { fileSlug, getBuilding } from '../model';
 import { noop, report } from '@core/commands/noop';
 import { buildPlanDrawing } from '../drawings/planDrawing';
+import { entityPlanPoint } from '../../shared/planPoint';
 import { DxfWriter, HIDDEN_LAYERS, INSUNITS, fmt, writePrimitive } from './dxfWriter';
-
-/** Places a local 2D point of `entity` in world plan coordinates (position + Z rotation). */
-function toWorld(entity: Entity, [x, y]: Vec2): Vec2 {
-  const angle = entity.rotation[2];
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  return [entity.position[0] + x * cos - y * sin, entity.position[1] + x * sin + y * cos];
-}
 
 function writeDrafting(writer: DxfWriter, doc: CadDocument): void {
   for (const id of doc.order) {
     const entity = doc.entities[id];
     if (!entity || !is2D(entity) || entity.tags?.includes('bim')) continue;
     const layer = doc.layers[entity.layerId]?.name ?? '0';
-    const world = (point: Vec2): Vec2 => toWorld(entity, point);
+    const world = (point: Vec2): Vec2 => entityPlanPoint(entity, point);
     switch (entity.kind) {
       case 'line':
         writer.line(layer, world(entity.start), world(entity.end));

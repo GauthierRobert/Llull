@@ -7,7 +7,7 @@ import { GAMMA_CRANE } from '@aec/shared/loadFactors';
 import { commitBuilding } from '@aec/building/evaluate/evaluateElements';
 import { getBuilding, levelElementsOf } from '@aec/building/model';
 import { batterLevel } from '@aec/civil/earthworks/batter';
-import { entityPlanPoint } from '@aec/civil/entities';
+import { entityPlanPoint } from '@aec/shared/planPoint';
 import { stationText } from '@aec/civil/model';
 import { planAreaM2 } from '@aec/shared/planArea';
 import { svgText } from '@aec/shared/sheetFrame';

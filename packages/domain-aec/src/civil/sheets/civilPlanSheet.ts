@@ -23,7 +23,7 @@ import { toMetres, toMm } from '@core/model/units';
 import { niceStep } from '../road/roadSvg';
 import { clipPolyline, insideRect } from './planClip';
 import { gridToLocal, localToGrid } from '../crs/crs';
-import { entityPlanPoint } from '../entities';
+import { entityPlanPoint } from '../../shared/planPoint';
 
 export interface CivilSheetOptions {
   readonly paper: PaperSize;
