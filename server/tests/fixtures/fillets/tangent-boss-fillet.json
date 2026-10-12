@@ -1,0 +1,285 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    -15,
+    15
+   ],
+   "end": [
+    15,
+    15
+   ],
+   "position": [
+    0,
+    36,
+    0
+   ]
+  },
+  "as": "t1"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    15,
+    15
+   ],
+   "end": [
+    15,
+    "=64-22*sqrt(2)"
+   ],
+   "position": [
+    0,
+    36,
+    0
+   ]
+  },
+  "as": "t2"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    27,
+    "=64-22*sqrt(2)"
+   ],
+   "radius": 12,
+   "startAngle": "=3*pi/4",
+   "endAngle": "=pi",
+   "position": [
+    0,
+    36,
+    0
+   ]
+  },
+  "as": "t3"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    "=27-6*sqrt(2)",
+    "=64-16*sqrt(2)"
+   ],
+   "end": [
+    "=22+5*sqrt(2)",
+    "=59-5*sqrt(2)"
+   ],
+   "position": [
+    0,
+    36,
+    0
+   ]
+  },
+  "as": "t4"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    22,
+    59
+   ],
+   "radius": 10,
+   "startAngle": "=-pi/4",
+   "endAngle": "=pi/2",
+   "position": [
+    0,
+    36,
+    0
+   ]
+  },
+  "as": "t5"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    22,
+    69
+   ],
+   "end": [
+    -22,
+    69
+   ],
+   "position": [
+    0,
+    36,
+    0
+   ]
+  },
+  "as": "t6"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    -22,
+    59
+   ],
+   "radius": 10,
+   "startAngle": "=pi/2",
+   "endAngle": "=5*pi/4",
+   "position": [
+    0,
+    36,
+    0
+   ]
+  },
+  "as": "t7"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    "=-(22+5*sqrt(2))",
+    "=59-5*sqrt(2)"
+   ],
+   "end": [
+    "=-(27-6*sqrt(2))",
+    "=64-16*sqrt(2)"
+   ],
+   "position": [
+    0,
+    36,
+    0
+   ]
+  },
+  "as": "t8"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    -27,
+    "=64-22*sqrt(2)"
+   ],
+   "radius": 12,
+   "startAngle": 0,
+   "endAngle": "=pi/4",
+   "position": [
+    0,
+    36,
+    0
+   ]
+  },
+  "as": "t9"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    -15,
+    "=64-22*sqrt(2)"
+   ],
+   "end": [
+    -15,
+    15
+   ],
+   "position": [
+    0,
+    36,
+    0
+   ]
+  },
+  "as": "t10"
+ },
+ {
+  "command": "extrude_sketch",
+  "params": {
+   "ids": [
+    "$t1",
+    "$t2",
+    "$t3",
+    "$t4",
+    "$t5",
+    "$t6",
+    "$t7",
+    "$t8",
+    "$t9",
+    "$t10"
+   ],
+   "depth": 22,
+   "rotation": [
+    "=pi/2",
+    0,
+    0
+   ]
+  },
+  "as": "t11"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 15,
+   "height": 36,
+   "position": [
+    0,
+    18,
+    15
+   ],
+   "axis": [
+    0,
+    1,
+    0
+   ]
+  },
+  "as": "t12"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$t11",
+   "b": "$t12"
+  },
+  "as": "t13"
+ },
+ {
+  "command": "fillet_edge",
+  "params": {
+   "id": "$t13",
+   "radius": 6,
+   "edgesNear": [
+    [
+     0,
+     14,
+     30
+    ]
+   ]
+  },
+  "as": "t23"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 6,
+   "height": 50,
+   "position": [
+    0,
+    18,
+    15
+   ],
+   "axis": [
+    0,
+    1,
+    0
+   ]
+  },
+  "as": "t24"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$t23",
+   "b": "$t24"
+  },
+  "as": "t25"
+ }
+]

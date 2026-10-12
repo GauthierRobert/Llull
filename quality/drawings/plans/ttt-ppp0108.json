@@ -1,0 +1,423 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    188,
+    124,
+    16
+   ],
+   "anchor": "min",
+   "position": [
+    -94,
+    -62,
+    0
+   ]
+  },
+  "as": "t1"
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    122,
+    162,
+    16
+   ],
+   "anchor": "min",
+   "position": [
+    -61,
+    -81,
+    0
+   ]
+  },
+  "as": "t2"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$t1",
+   "b": "$t2"
+  },
+  "as": "t3"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 33,
+   "height": 16,
+   "anchor": "base-center",
+   "position": [
+    61,
+    62,
+    0
+   ]
+  },
+  "as": "t4"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$t3",
+   "b": "$t4"
+  },
+  "as": "t5"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 33,
+   "height": 16,
+   "anchor": "base-center",
+   "position": [
+    61,
+    -62,
+    0
+   ]
+  },
+  "as": "t6"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$t5",
+   "b": "$t6"
+  },
+  "as": "t7"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 33,
+   "height": 16,
+   "anchor": "base-center",
+   "position": [
+    -61,
+    62,
+    0
+   ]
+  },
+  "as": "t8"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$t7",
+   "b": "$t8"
+  },
+  "as": "t9"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 33,
+   "height": 16,
+   "anchor": "base-center",
+   "position": [
+    -61,
+    -62,
+    0
+   ]
+  },
+  "as": "t10"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$t9",
+   "b": "$t10"
+  },
+  "as": "t11"
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    40,
+    20,
+    30
+   ],
+   "anchor": "min",
+   "position": [
+    85,
+    -10,
+    -19
+   ]
+  },
+  "as": "t12"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$t11",
+   "b": "$t12"
+  },
+  "as": "t13"
+ },
+ {
+  "command": "extrude_profile",
+  "params": {
+   "profile": [
+    [
+     44,
+     0.5
+    ],
+    [
+     85,
+     0.5
+    ],
+    [
+     85,
+     -19
+    ]
+   ],
+   "depth": 8,
+   "position": [
+    0,
+    4,
+    0
+   ],
+   "rotation": [
+    "=pi/2",
+    0,
+    0
+   ]
+  },
+  "as": "t14"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$t13",
+   "b": "$t14"
+  },
+  "as": "t15"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 5.5,
+   "height": 40,
+   "position": [
+    111,
+    0,
+    -5
+   ],
+   "axis": [
+    0,
+    1,
+    0
+   ]
+  },
+  "as": "t16"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$t15",
+   "b": "$t16"
+  },
+  "as": "t17"
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    40,
+    20,
+    30
+   ],
+   "anchor": "min",
+   "position": [
+    -125,
+    -10,
+    -19
+   ]
+  },
+  "as": "t18"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$t17",
+   "b": "$t18"
+  },
+  "as": "t19"
+ },
+ {
+  "command": "extrude_profile",
+  "params": {
+   "profile": [
+    [
+     -85,
+     -19
+    ],
+    [
+     -85,
+     0.5
+    ],
+    [
+     -44,
+     0.5
+    ]
+   ],
+   "depth": 8,
+   "position": [
+    0,
+    4,
+    0
+   ],
+   "rotation": [
+    "=pi/2",
+    0,
+    0
+   ]
+  },
+  "as": "t20"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$t19",
+   "b": "$t20"
+  },
+  "as": "t21"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 5.5,
+   "height": 40,
+   "position": [
+    -111,
+    0,
+    -5
+   ],
+   "axis": [
+    0,
+    1,
+    0
+   ]
+  },
+  "as": "t22"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$t21",
+   "b": "$t22"
+  },
+  "as": "t23"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 14.5,
+   "height": 40,
+   "position": [
+    61,
+    62,
+    8
+   ]
+  },
+  "as": "t24"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$t23",
+   "b": "$t24"
+  },
+  "as": "t25"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 14.5,
+   "height": 40,
+   "position": [
+    61,
+    -62,
+    8
+   ]
+  },
+  "as": "t26"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$t25",
+   "b": "$t26"
+  },
+  "as": "t27"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 14.5,
+   "height": 40,
+   "position": [
+    -61,
+    62,
+    8
+   ]
+  },
+  "as": "t28"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$t27",
+   "b": "$t28"
+  },
+  "as": "t29"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 14.5,
+   "height": 40,
+   "position": [
+    -61,
+    -62,
+    8
+   ]
+  },
+  "as": "t30"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$t29",
+   "b": "$t30"
+  },
+  "as": "t31"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 42,
+   "height": 40,
+   "position": [
+    0,
+    0,
+    8
+   ]
+  },
+  "as": "t32"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$t31",
+   "b": "$t32"
+  },
+  "as": "t33"
+ }
+]

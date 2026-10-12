@@ -10,6 +10,7 @@ import { isRecord } from '@lib/isRecord';
 import type { CliRunResult } from './result';
 import { formatDuration } from './progress';
 import type { SavedFile } from './saveFiles';
+import { aliasLine, type PlanAliases } from './aliases';
 
 /** Affected ids printed per plan step in text mode. */
 const STEP_IDS_SHOWN = 4;
@@ -19,6 +20,8 @@ const STEP_DURATION_SHOWN_MS = 1000;
 
 export interface PrintableResult extends CliRunResult {
   readonly saved?: readonly SavedFile[];
+  /** `run` only: the plan's `as` aliases that survive in the final document. */
+  readonly planAliases?: PlanAliases;
 }
 
 /** The full result as one JSON object (`--json`). */
@@ -30,6 +33,9 @@ export function resultJson(result: PrintableResult): string {
     changed: result.changed,
     ...(result.data !== undefined ? { data: result.data } : {}),
     ...(result.saved !== undefined ? { saved: result.saved } : {}),
+    ...(result.planAliases !== undefined
+      ? { aliases: result.planAliases.aliases, consumedAliases: result.planAliases.consumed }
+      : {}),
   });
 }
 
@@ -73,5 +79,8 @@ export function planText(result: PrintableResult): string {
     result.summary,
     ...data['steps'].map(stepLine).filter((line): line is string => line !== null),
     ...issues,
+    ...(result.planAliases !== undefined ? [aliasLine(result.planAliases) ?? ''] : []).filter(
+      Boolean,
+    ),
   ].join('\n');
 }

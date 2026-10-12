@@ -1,0 +1,823 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    36.5,
+    0
+   ],
+   "end": [
+    65,
+    0
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "t1"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    65,
+    0
+   ],
+   "end": [
+    65,
+    5
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "t2"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    62,
+    5
+   ],
+   "radius": 3,
+   "startAngle": 0,
+   "endAngle": "=pi/2",
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "t3"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    62,
+    8
+   ],
+   "end": [
+    45,
+    8
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "t4"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    45,
+    11
+   ],
+   "radius": 3,
+   "startAngle": "=pi",
+   "endAngle": "=1.5*pi",
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "t5"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    42,
+    11
+   ],
+   "end": [
+    42,
+    22
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "t6"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    39,
+    22
+   ],
+   "radius": 3,
+   "startAngle": 0,
+   "endAngle": "=pi/2",
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "t7"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    39,
+    25
+   ],
+   "end": [
+    20.5,
+    25
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "t8"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    20.5,
+    28
+   ],
+   "radius": 3,
+   "startAngle": "=pi",
+   "endAngle": "=1.5*pi",
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "t9"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    17.5,
+    28
+   ],
+   "end": [
+    17.5,
+    52
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "t10"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    17.5,
+    52
+   ],
+   "end": [
+    10,
+    52
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "t11"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    10,
+    52
+   ],
+   "end": [
+    10,
+    18
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "t12"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    10,
+    18
+   ],
+   "end": [
+    33.5,
+    18
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "t13"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    33.5,
+    15
+   ],
+   "radius": 3,
+   "startAngle": 0,
+   "endAngle": "=pi/2",
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "t14"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    36.5,
+    15
+   ],
+   "end": [
+    36.5,
+    0
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "t15"
+ },
+ {
+  "command": "revolve_profile",
+  "params": {
+   "profileIds": [
+    "$t1",
+    "$t2",
+    "$t3",
+    "$t4",
+    "$t5",
+    "$t6",
+    "$t7",
+    "$t8",
+    "$t9",
+    "$t10",
+    "$t11",
+    "$t12",
+    "$t13",
+    "$t14",
+    "$t15"
+   ],
+   "axis": "z",
+   "segments": 128
+  },
+  "as": "t16"
+ },
+ {
+  "command": "extrude_profile",
+  "params": {
+   "profile": [
+    [
+     15,
+     44
+    ],
+    [
+     34,
+     25
+    ],
+    [
+     34,
+     22
+    ],
+    [
+     15,
+     22
+    ]
+   ],
+   "depth": 20,
+   "position": [
+    0.0,
+    10.0,
+    0.0
+   ],
+   "rotation": [
+    1.5707963267948963,
+    0.0,
+    0.0
+   ]
+  },
+  "as": "t17"
+ },
+ {
+  "command": "extrude_profile",
+  "params": {
+   "profile": [
+    [
+     -1.5,
+     0
+    ],
+    [
+     1.5,
+     0
+    ],
+    [
+     6.789809421253949,
+     -30
+    ],
+    [
+     -6.789809421253949,
+     -30
+    ]
+   ],
+   "depth": 60,
+   "position": [
+    4.536796564403577,
+    0.0,
+    54.46320343559643
+   ],
+   "rotation": [
+    3.141592653589793,
+    0.7853981633974487,
+    -1.5707963267948968
+   ]
+  },
+  "as": "t18"
+ },
+ {
+  "command": "boolean_intersect",
+  "params": {
+   "a": "$t17",
+   "b": "$t18"
+  },
+  "as": "t19"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$t16",
+   "b": "$t19"
+  },
+  "as": "t20"
+ },
+ {
+  "command": "extrude_profile",
+  "params": {
+   "profile": [
+    [
+     15,
+     44
+    ],
+    [
+     34,
+     25
+    ],
+    [
+     34,
+     22
+    ],
+    [
+     15,
+     22
+    ]
+   ],
+   "depth": 20,
+   "position": [
+    -8.660254037844387,
+    -4.999999999999998,
+    0.0
+   ],
+   "rotation": [
+    -1.5707963267948961,
+    1.0471975511965983,
+    3.1415926535897927
+   ]
+  },
+  "as": "t21"
+ },
+ {
+  "command": "extrude_profile",
+  "params": {
+   "profile": [
+    [
+     -1.5,
+     0
+    ],
+    [
+     1.5,
+     0
+    ],
+    [
+     6.789809421253949,
+     -30
+    ],
+    [
+     -6.789809421253949,
+     -30
+    ]
+   ],
+   "depth": 60,
+   "position": [
+    -2.2683982822017876,
+    3.9289810765754623,
+    54.46320343559643
+   ],
+   "rotation": [
+    -2.4278682746450273,
+    -0.36136712390670733,
+    2.7539959669346126
+   ]
+  },
+  "as": "t22"
+ },
+ {
+  "command": "boolean_intersect",
+  "params": {
+   "a": "$t21",
+   "b": "$t22"
+  },
+  "as": "t23"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$t20",
+   "b": "$t23"
+  },
+  "as": "t24"
+ },
+ {
+  "command": "extrude_profile",
+  "params": {
+   "profile": [
+    [
+     15,
+     44
+    ],
+    [
+     34,
+     25
+    ],
+    [
+     34,
+     22
+    ],
+    [
+     15,
+     22
+    ]
+   ],
+   "depth": 20,
+   "position": [
+    8.660254037844384,
+    -5.000000000000004,
+    0.0
+   ],
+   "rotation": [
+    -1.5707963267948961,
+    -1.047197551196597,
+    -3.1415926535897927
+   ]
+  },
+  "as": "t25"
+ },
+ {
+  "command": "extrude_profile",
+  "params": {
+   "profile": [
+    [
+     -1.5,
+     0
+    ],
+    [
+     1.5,
+     0
+    ],
+    [
+     6.789809421253949,
+     -30
+    ],
+    [
+     -6.789809421253949,
+     -30
+    ]
+   ],
+   "depth": 60,
+   "position": [
+    -2.2683982822017907,
+    -3.9289810765754605,
+    54.46320343559643
+   ],
+   "rotation": [
+    2.4278682746450277,
+    -0.36136712390670844,
+    0.387596686655181
+   ]
+  },
+  "as": "t26"
+ },
+ {
+  "command": "boolean_intersect",
+  "params": {
+   "a": "$t25",
+   "b": "$t26"
+  },
+  "as": "t27"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$t24",
+   "b": "$t27"
+  },
+  "as": "t28"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 3,
+   "height": 30,
+   "position": [
+    53.975,
+    0.0,
+    4
+   ]
+  },
+  "as": "t29"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$t28",
+   "b": "$t29"
+  },
+  "as": "t30"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 6.5,
+   "height": 10,
+   "position": [
+    53.975,
+    0.0,
+    9
+   ]
+  },
+  "as": "t31"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$t30",
+   "b": "$t31"
+  },
+  "as": "t32"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 3,
+   "height": 30,
+   "position": [
+    26.987500000000008,
+    46.74372116926507,
+    4
+   ]
+  },
+  "as": "t33"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$t32",
+   "b": "$t33"
+  },
+  "as": "t34"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 6.5,
+   "height": 10,
+   "position": [
+    26.987500000000008,
+    46.74372116926507,
+    9
+   ]
+  },
+  "as": "t35"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$t34",
+   "b": "$t35"
+  },
+  "as": "t36"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 3,
+   "height": 30,
+   "position": [
+    -26.98749999999999,
+    46.74372116926508,
+    4
+   ]
+  },
+  "as": "t37"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$t36",
+   "b": "$t37"
+  },
+  "as": "t38"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 6.5,
+   "height": 10,
+   "position": [
+    -26.98749999999999,
+    46.74372116926508,
+    9
+   ]
+  },
+  "as": "t39"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$t38",
+   "b": "$t39"
+  },
+  "as": "t40"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 3,
+   "height": 30,
+   "position": [
+    -53.975,
+    6.610031098397839e-15,
+    4
+   ]
+  },
+  "as": "t41"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$t40",
+   "b": "$t41"
+  },
+  "as": "t42"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 6.5,
+   "height": 10,
+   "position": [
+    -53.975,
+    6.610031098397839e-15,
+    9
+   ]
+  },
+  "as": "t43"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$t42",
+   "b": "$t43"
+  },
+  "as": "t44"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 3,
+   "height": 30,
+   "position": [
+    -26.987500000000026,
+    -46.743721169265065,
+    4
+   ]
+  },
+  "as": "t45"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$t44",
+   "b": "$t45"
+  },
+  "as": "t46"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 6.5,
+   "height": 10,
+   "position": [
+    -26.987500000000026,
+    -46.743721169265065,
+    9
+   ]
+  },
+  "as": "t47"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$t46",
+   "b": "$t47"
+  },
+  "as": "t48"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 3,
+   "height": 30,
+   "position": [
+    26.987500000000008,
+    -46.74372116926507,
+    4
+   ]
+  },
+  "as": "t49"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$t48",
+   "b": "$t49"
+  },
+  "as": "t50"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 6.5,
+   "height": 10,
+   "position": [
+    26.987500000000008,
+    -46.74372116926507,
+    9
+   ]
+  },
+  "as": "t51"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$t50",
+   "b": "$t51"
+  },
+  "as": "t52"
+ }
+]

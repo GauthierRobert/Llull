@@ -1,0 +1,368 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "loft_sections",
+  "params": {
+   "sections": [
+    {
+     "center": [
+      3.5,
+      0,
+      0
+     ],
+     "radius": 22
+    },
+    {
+     "center": [
+      3.5,
+      0,
+      30
+     ],
+     "radius": 22
+    },
+    {
+     "center": [
+      28,
+      0,
+      133
+     ],
+     "radius": 5
+    }
+   ],
+   "ruled": true
+  },
+  "as": "locr"
+ },
+ {
+  "command": "loft_sections",
+  "params": {
+   "sections": [
+    {
+     "center": [
+      -3.5,
+      0,
+      0
+     ],
+     "radius": 22
+    },
+    {
+     "center": [
+      -3.5,
+      0,
+      30
+     ],
+     "radius": 22
+    },
+    {
+     "center": [
+      -28,
+      0,
+      133
+     ],
+     "radius": 5
+    }
+   ],
+   "ruled": true
+  },
+  "as": "locl"
+ },
+ {
+  "command": "extrude_profile",
+  "params": {
+   "profile": [
+    [
+     -28,
+     133
+    ],
+    [
+     -3.5,
+     30
+    ],
+    [
+     -3.5,
+     0
+    ],
+    [
+     3.5,
+     0
+    ],
+    [
+     3.5,
+     30
+    ],
+    [
+     28,
+     133
+    ]
+   ],
+   "depth": 80,
+   "position": [
+    0,
+    40,
+    0
+   ],
+   "rotation": [
+    1.5707963267948966,
+    0,
+    0
+   ]
+  },
+  "as": "lopx"
+ },
+ {
+  "command": "extrude_profile",
+  "params": {
+   "profile": [
+    [
+     -5,
+     133
+    ],
+    [
+     -22,
+     30
+    ],
+    [
+     -22,
+     0
+    ],
+    [
+     22,
+     0
+    ],
+    [
+     22,
+     30
+    ],
+    [
+     5,
+     133
+    ]
+   ],
+   "depth": 80,
+   "position": [
+    -40,
+    0,
+    0
+   ],
+   "rotation": [
+    1.5707963267948966,
+    1.5707963267948966,
+    0
+   ]
+  },
+  "as": "lopy"
+ },
+ {
+  "command": "boolean_intersect",
+  "params": {
+   "a": "$lopx",
+   "b": "$lopy"
+  },
+  "as": "lohx"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$lohx",
+   "b": "$locr"
+  },
+  "as": "lou"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$lou",
+   "b": "$locl"
+  },
+  "as": "lo"
+ },
+ {
+  "command": "loft_sections",
+  "params": {
+   "sections": [
+    {
+     "center": [
+      3.5,
+      0,
+      -1
+     ],
+     "radius": 19
+    },
+    {
+     "center": [
+      3.5,
+      0,
+      30
+     ],
+     "radius": 19
+    },
+    {
+     "center": [
+      28.237864077669904,
+      0,
+      134
+     ],
+     "radius": 1.8349514563106801
+    }
+   ],
+   "ruled": true
+  },
+  "as": "licr"
+ },
+ {
+  "command": "loft_sections",
+  "params": {
+   "sections": [
+    {
+     "center": [
+      -3.5,
+      0,
+      -1
+     ],
+     "radius": 19
+    },
+    {
+     "center": [
+      -3.5,
+      0,
+      30
+     ],
+     "radius": 19
+    },
+    {
+     "center": [
+      -28.237864077669904,
+      0,
+      134
+     ],
+     "radius": 1.8349514563106801
+    }
+   ],
+   "ruled": true
+  },
+  "as": "licl"
+ },
+ {
+  "command": "extrude_profile",
+  "params": {
+   "profile": [
+    [
+     -28.237864077669904,
+     134
+    ],
+    [
+     -3.5,
+     30
+    ],
+    [
+     -3.5,
+     -1
+    ],
+    [
+     3.5,
+     -1
+    ],
+    [
+     3.5,
+     30
+    ],
+    [
+     28.237864077669904,
+     134
+    ]
+   ],
+   "depth": 80,
+   "position": [
+    0,
+    40,
+    0
+   ],
+   "rotation": [
+    1.5707963267948966,
+    0,
+    0
+   ]
+  },
+  "as": "lipx"
+ },
+ {
+  "command": "extrude_profile",
+  "params": {
+   "profile": [
+    [
+     -1.8349514563106801,
+     134
+    ],
+    [
+     -19,
+     30
+    ],
+    [
+     -19,
+     -1
+    ],
+    [
+     19,
+     -1
+    ],
+    [
+     19,
+     30
+    ],
+    [
+     1.8349514563106801,
+     134
+    ]
+   ],
+   "depth": 80,
+   "position": [
+    -40,
+    0,
+    0
+   ],
+   "rotation": [
+    1.5707963267948966,
+    1.5707963267948966,
+    0
+   ]
+  },
+  "as": "lipy"
+ },
+ {
+  "command": "boolean_intersect",
+  "params": {
+   "a": "$lipx",
+   "b": "$lipy"
+  },
+  "as": "lihx"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$lihx",
+   "b": "$licr"
+  },
+  "as": "liu"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$liu",
+   "b": "$licl"
+  },
+  "as": "li"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$lo",
+   "b": "$li"
+  },
+  "as": "part"
+ }
+]

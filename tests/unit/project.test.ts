@@ -255,3 +255,32 @@ describe('build_project — empty / invalid input', () => {
     expect(result.summary).toContain('build_project rejected: invalid params');
   });
 });
+
+describe('build_project read-only steps', () => {
+  it('a query that answers does not abort the plan', () => {
+    const result = execute(createEmptyDocument(), 'build_project', {
+      actions: [
+        { command: 'add_box', params: { size: [10, 10, 10] }, as: 'b' },
+        { command: 'measure_volume', params: { entityId: '$b' } },
+        { command: 'add_box', params: { size: [1, 1, 1] } },
+      ],
+    });
+    const data = result.data as BuildData;
+    expect(data.ok).toBe(true);
+    expect(data.steps[1]).toMatchObject({ ok: true, affected: [] });
+    expect(data.steps[1]?.summary).toContain('1000');
+    expect(result.document.order).toHaveLength(2);
+  });
+
+  it('a query that fails still aborts the plan', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'build_project', {
+      actions: [
+        { command: 'add_box', params: { size: [10, 10, 10] } },
+        { command: 'measure_volume', params: { entityId: 'missing' } },
+      ],
+    });
+    expect((result.data as BuildData).failedAt).toBe(1);
+    expect(result.document.order).toHaveLength(0);
+  });
+});

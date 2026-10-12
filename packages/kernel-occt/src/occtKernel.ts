@@ -27,6 +27,7 @@ import {
   type OccFilletMaker,
   type OccFuse,
   type OccUnifier,
+  type OccValidity,
   type OccShapeList,
   type OccHandle,
   type OccOffsetMaker,
@@ -170,8 +171,23 @@ function roundEdges(
       }
     }
     maker.Build();
-    return maker.IsDone() ? maker.Shape() : null;
+    return maker.IsDone() ? validOrNull(api, maker.Shape(), own) : null;
   });
+}
+
+/**
+ * `shape` when BRepCheck finds it valid, else null. OCC fillets/chamfers can report done yet
+ * return a broken solid (a negative-area face, a self-intersecting blend where a fillet meets a
+ * tangent cylinder): its tessellation has holes and every later boolean on it can hang, so it is
+ * refused like any other failed fillet.
+ */
+function validOrNull(
+  api: OccApi,
+  shape: OccShape,
+  own: <H extends OccHandle | null>(handle: H) => H,
+): OccShape | null {
+  const check = own(new api.BRepCheck_Analyzer(shape, true) as OccValidity);
+  return check.IsValid_2() ? shape : null;
 }
 
 /** Fillet `edges` of `solid` in one builder (`shape`: ChFi3d section type); null when not done. */

@@ -17,6 +17,14 @@ import { appendBeforeClose } from './svg';
 import { renderNotes, resolveRenderOptions } from './options';
 import { buildTurntableSvg, buildIsolateSvg, buildSectionSvg } from './multiPass';
 import { report } from '../noop';
+import { is2D } from '../../model/types';
+import type { CadDocument } from '../../model/types';
+
+/** `doc` without its 2D entities (read-only view for rendering; the input is untouched). */
+function withoutEntities2D(doc: CadDocument): CadDocument {
+  const entities = Object.fromEntries(Object.entries(doc.entities).filter(([, e]) => !is2D(e)));
+  return { ...doc, entities, order: doc.order.filter((id) => id in entities) };
+}
 
 const clampPixels = (value: number | undefined, fallback: number): number =>
   Math.max(64, Math.min(2000, Math.round(value ?? fallback)));
@@ -184,6 +192,13 @@ export const renderView = defineCommand({
         'When true (default), overlay a faint ground grid on the Z=0 plane so you can judge ' +
           'object placement relative to the world origin. Set to false to suppress.',
       ),
+    hide2D: z
+      .boolean()
+      .optional()
+      .describe(
+        'When true, 2D sketch entities (lines, arcs, circles, polylines, rectangles, text, dimensions...) are neither drawn nor counted in the framing/bounds, ' +
+          'so leftover construction sketches used for extrusions do not shrink the 3D part in the frame. Default: false (2D shapes are drawn and framed).',
+      ),
     showLabels: z
       .boolean()
       .optional()
@@ -196,7 +211,8 @@ export const renderView = defineCommand({
       ),
   }),
   run: (doc, params): CommandResult => {
-    const resolved = resolveRenderOptions(doc, params);
+    const scene = params.hide2D === true ? withoutEntities2D(doc) : doc;
+    const resolved = resolveRenderOptions(scene, params);
     if ('error' in resolved) {
       return { document: doc, summary: `render_view rejected: ${resolved.error}.`, affected: [] };
     }
@@ -204,7 +220,7 @@ export const renderView = defineCommand({
     const view: ViewName = options.direction ? 'custom' : (params.view ?? 'iso');
     const width = clampPixels(params.width, 800);
     const height = clampPixels(params.height, 600);
-    const base = renderDocument(doc, view, width, height, options);
+    const base = renderDocument(scene, view, width, height, options);
     const notes = renderNotes(base, options.cut);
     const withNotes = (text: string): string => (notes === '' ? text : `${text} ${notes}`);
     const decorate = (svg: string): string => {
@@ -221,7 +237,7 @@ export const renderView = defineCommand({
 
     if (params.turntable) {
       const frames = Math.max(1, Math.min(12, params.turntable.frames));
-      const strip = buildTurntableSvg(doc, frames, view, width, height, options);
+      const strip = buildTurntableSvg(scene, frames, view, width, height, options);
       return report(
         doc,
         withNotes(`Rendered turntable strip: ${frames} frame(s), ${strip.width}×${height}.`),
@@ -234,14 +250,14 @@ export const renderView = defineCommand({
     let summary = `Rendered ${view} view: ${base.entityCount} entit${plural}, ${width}×${height}.`;
     if (params.isolate !== undefined) {
       const ids = typeof params.isolate === 'string' ? [params.isolate] : params.isolate;
-      svg = buildIsolateSvg(doc, ids, view, width, height, options);
+      svg = buildIsolateSvg(scene, ids, view, width, height, options);
       summary = `Rendered isolated view: ${ids.length} entity/entities highlighted, ${width}×${height}.`;
     } else if (params.section) {
       const { axis, offset } = params.section;
-      svg = buildSectionSvg(doc, axis, offset, view, width, height, options);
+      svg = buildSectionSvg(scene, axis, offset, view, width, height, options);
       summary = `Rendered section view: cut at ${axis}=${offset}, ${width}×${height}.`;
     }
-    svg = composeOverlays(svg, base, doc, {
+    svg = composeOverlays(svg, base, scene, {
       showDimensions: params.showDimensions === true,
       showAxes: params.showAxes !== false,
       showGrid: params.showGrid !== false,

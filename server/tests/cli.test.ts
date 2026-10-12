@@ -224,6 +224,26 @@ describe('llull CLI — local document', () => {
     expect(await runCli(['run', '-', ...docFlag()], notAPlan.io)).toBe(EXIT_USAGE);
   });
 
+  it('ends a run report with the plan aliases that survive in the document', async () => {
+    const plan = [
+      { command: 'add_box', params: { size: [20, 20, 20] }, as: 'body' },
+      { command: 'add_cylinder', params: { radius: 4, height: 30 }, as: 'hole' },
+      { command: 'boolean_subtract', params: { a: '$body', b: '$hole' }, as: 'part' },
+    ];
+    const text = capture({ stdin: JSON.stringify(plan) });
+    expect(await runCli(['run', '-', ...docFlag()], text.io)).toBe(EXIT_OK);
+    expect(text.out[0]).toMatch(/\nAliases: part=mesh-3\.1\nConsumed: body, hole$/);
+
+    const json = capture({ stdin: JSON.stringify(plan) });
+    await runCli(['run', '-', '--json', '--force', ...docFlag()], json.io);
+    const report = JSON.parse(json.out[0] ?? '') as {
+      aliases: Record<string, string[]>;
+      consumedAliases: string[];
+    };
+    expect(report.aliases).toEqual({ part: expect.any(Array) });
+    expect(report.consumedAliases).toEqual(['body', 'hole']);
+  });
+
   it('prints the per-step report with issues for an invalid plan', async () => {
     const c = capture({ stdin: '[{"command":"no_such_command"}]' });
     expect(await runCli(['run', '-', '--validate', ...docFlag()], c.io)).toBe(EXIT_COMMAND_ERROR);

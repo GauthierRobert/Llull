@@ -5,55 +5,88 @@ description: Rebuild a part in llull from a 2D technical drawing (PDF/PNG/scan w
 
 # Skill: drawing-to-model
 
-Drawing → llull plan → **verify in layers** → fix the reading, not just the numbers. Building the
-plan is `design-model` + `llull-cli`; this skill is the reading discipline and the verification
-loop. Corpus of 21 verified parts: `quality/drawings/` (`npm run quality:drawings`).
+Drawing → llull plan → **verify in layers** → fix the *reading*, not just the numbers. Running
+plans is `llull-cli`; composing commands is `design-model`. This skill is the reading discipline
+and the verification loop, distilled from 21 real drawings (`quality/drawings/`, all within the
+official mass; `npm run quality:drawings` replays them).
 
-## 1. Read the drawing (before any command)
+## 1. Read the drawing before any command
 
-- Title block: units (MMGS vs IPS → model in mm, 25.4), material/density, the asked quantity
-  (mass ± tol = your strongest single check). Projection (1st/3rd angle) decides which view is
-  where; the iso render on the sheet settles doubts.
-- Build a **feature table**: feature, view it is dimensioned in, dimensions, "THRU"/depth,
-  count ("(4) PLACES", "6X"), symmetry (CL SYM). Parenthesised dims are reference = derived —
-  use them as checks. Hidden (dashed) lines = internal features; every one must be explained.
-- Pick the frame: top view = XY, front view = XZ (Z up), right view = YZ; origin at a datum the
-  drawing dimensions from (or the symmetry centre).
-- Undimensioned geometry: read by scale (pixels / a known dimension), and say so in the report.
+- **Title block**: units (MMGS vs IPS → model in mm, ×25.4), material/density, the asked
+  quantity. "Mass ± tol" is the strongest single check you will get — compute it.
+- **Feature table** (write it down): feature · view it is dimensioned in · dimensions ·
+  THRU/depth · count ("(4) PLACES", "6X") · symmetry (CL SYM). Every dashed (hidden) line must be
+  explained by a feature — or it is a fillet's tangent edge (dashed arcs often are).
+- **Parenthesised dims are reference = derived**: use them to *check* a reading (they fixed a
+  flange angle, a bend side, where a taper starts). Small dims can run from a hole edge, not its
+  centre; an inch "1.0"/".75" pair can be two ends of an asymmetric arc.
+- **Undimensioned geometry**: measure px/mm from a known dimension on the original image and
+  pixel-scan (row/column line positions) instead of eyeballing; on a 1:1 sheet read everything so.
+  Unknown overall scale (hand sketch) → take it from one known extent/volume and say so.
+- **Before modelling, hand-compute the expected volume** (prisms, Pappus for revolves,
+  frustums, fillet corner terms). Agreement with mass ÷ density within ~0.1 % confirms the reading
+  before any comparison run; a gap of one feature's volume names the feature.
 
 ## 2. Plan (llull specifics that bite)
 
-- Exact curves: sketch pieces (`draw_line` + `draw_arc`) → `extrude_sketch {ids}`; avoid
-  sampled polygons (they lose exactness and volume).
-- Sketch-plane rotations (three.js XYZ Euler) for `extrude_sketch` / `extrude_profile`:
-  XY `[0,0,0]` (+Z) · XZ `["=pi/2",0,0]` (local y→Z, extrudes −Y) · YZ `["=pi/2","=pi/2",0]`
-  (local x→Y, y→Z, extrudes +X). Prefer `rotation` over `axis` for sketches (axis fixes only
-  the normal). Check the AABB in every step summary.
-- Booleans consume operands (`duplicate_entity` first); tools for THRU features overshoot.
-- Fillets: `--kernel occt`, `fillet_edge edgesNear` = any point on the edge. OCC propagates a
-  fillet along tangent-continuous chains, so "R in the top view, N places" corners are cleaner as
-  `boolean_intersect` with a rounded-rectangle prism.
-- Mass: `mass_properties` (OCC → exact B-rep volume, `data.method: 'exact'`).
+- **Generate the plan with a small Python script** (helpers for line/arc loops, mirror, polar,
+  booleans; exact tangent points / fillet centres in closed form; A/B variants by flag) and
+  write JSON — never hand-type 200 steps. Normalise arc angles to [0, 2π) with end > start
+  (`draw_arc` rejects sweeps > 2π).
+- **Exact curves**: `draw_line` + `draw_arc` pieces → `extrude_sketch {ids}` /
+  `revolve_profile {profileIds}`. Polygon profiles lose volume. No elliptical arc piece: use a
+  dense `draw_spline` (mass error negligible) or a revolved/clipped `draw_ellipse`.
+- **Sketch planes** (three.js XYZ Euler on `extrude_sketch` / `extrude_profile`): XY `[0,0,0]`
+  (+Z) · XZ `["=pi/2",0,0]` (local y→Z, extrudes −Y) · YZ `["=pi/2","=pi/2",0]` (local x→Y,
+  y→Z, extrudes +X). Tilted cutters: sketch in the face's own (s, w) frame, then
+  `rotation [0, θ, 0]`. Prefer `rotation` to `axis` for sketches. Check every step's AABB.
+- **Trim, don't build**: extrude the main outline full width, then `boolean_intersect` with one
+  trim prism per other view (rounded ends, tapers, top-view corner radii). Avoid coplanar
+  boolean junctions (overlap tools by ≥ 0.5; build multi-section lofts as one solid).
+- **Fillets**: OCC (`--kernel occt`), `fillet_edge edgesNear` = any point on the edge (use the
+  mid point from `inspect_topology`). OCC propagates along tangent chains, so for "R…, N
+  PLACES" corners in a view prefer a rounded-rectangle prism intersect. A concave fillet against a
+  cylinder or a corner where several blends meet is fragile: llull refuses it with a reason —
+  build it instead: revolved arc ring, (disc − torus) ∩ box, or arcs in the profile.
+- Booleans consume operands (`duplicate_entity` first; THRU tools overshoot); `rotate_entity`
+  pivots about the entity `position` (a sweep: its path start) — compensate with `move_entity`.
+  `loft_sections` resamples by arc length: a stadium→stadium loft twists (−8 %); build it as
+  oblique circle-lofts ∪ trapezoid-prism ∩ trapezoid-prism.
+- Don't leave variant tools in the document: `export_stl` exports every solid.
 
-## 3. Verify in layers (cheap → strong); every layer that fails names a feature
+## 3. Verify in layers (cheap → strong); every failing layer names a feature
 
-1. **Mass / volume** vs the title-block answer (± tol). Wrong by a round feature's volume ⇒
-   that feature is missing/extra.
-2. **Extents**: `measure_bounding_box` vs the overall dims.
-3. **2D views vs the drawing**: `llull render_view view=front|top|right showGrid=false --save`
-   and read them next to the drawing view; add `cut` (section) for hidden-line features (holes,
-   pockets, counterbores) and compare with the dashed lines.
-4. **Real 3D (when available)**: export STL and run
+1. **Mass / volume**: `mass_properties` / `measure_volume` (OCC: exact B-rep,
+   `data.method: "exact"`) vs the title block. Never judge mass from the STL (display mesh, up to
+   0.4 % low on small curved parts).
+2. **Extents**: `measure_bounding_box entityId=<solid>` vs the overall dims (whole-document bounds
+   include leftover sketch pieces).
+3. **llull's 2D views vs the drawing views**:
+   `llull render_view view=front|top|right hide2D=true showGrid=false --save v.png` next to the
+   drawing view; add `cut` for sections where the drawing shows hidden lines / section views.
+4. **Real 3D, when one exists** (STEP/STL, or CAD code →
+   `python -I .claude/skills/drawing-to-model/scripts/make_reference.py ref.py ref` needs
+   `build123d`): `llull export_stl format=binary --save ours.stl`, then
    `python -I .claude/skills/drawing-to-model/scripts/compare_meshes.py ours.stl ref.stl --out diff/`
-   (`pip install manifold3d trimesh pillow numpy`). Prints volume ratio, exact 3D IoU (best of 24
-   orientations), silhouette and mid-section IoU per view; images: grey both, **red = missing
-   material**, **blue = extra material**. Targets: volume ±0.3 %, IoU ≥ 0.99, views ≥ 0.98.
-   A STEP reference → convert to STL first (CadQuery / build123d `export_stl`).
-5. Diagnose from the image, re-read the drawing at that spot, fix the plan, re-run. A residual
-   difference is either a reading error, a reference defect (prove it from the drawing) or a
-   llull limitation (write the repro, then `fix-bug`).
+   (`pip install manifold3d trimesh pillow numpy scipy`). Exact 3D IoU (best of 24
+   orientations), silhouette + mid-section IoU per view; images: grey both, **red = material you
+   miss**, **blue = extra material**. Targets: IoU ≥ 0.99, views ≥ 0.98; volume via layer 1.
+5. **Read the diff images numerically** (px/mm = 800 / (span + 2)): a constant-width band along an
+   edge = an offset/tangency error (check signs); a quarter-circle at a corner = a missing fillet
+   (r ≈ √(area / (1 − π/4))); a red/white/blue lens = a hole moved or resized; a fully blue
+   feature = the reference lacks it. Rounded corners in `view_top` = vertical edges filleted.
+   Good 2D scores but a volume gap → the difference is off every mid-plane: probe with
+   `--no-rotate` by filling/adding candidate regions.
 
-## Lessons from the corpus
+## 4. When the reference disagrees
 
-See `quality/drawings/README.md` (per-part findings) — keep it updated when a part teaches
-something new.
+The reference can be wrong (5 of 21 here). Build the reference's reading as a variant: if it
+jumps to IoU ≥ 0.998, the defect is proved; keep the drawing-faithful plan and let the official
+mass decide. A thin feature cut by a mid-plane section can tank that one section score — say so
+rather than chase it.
+
+## 5. Close the loop
+
+A residual that is neither a reading error nor a reference defect is a llull bug: reproduce it
+as a minimal plan, then `fix-bug`. Add the part to `quality/drawings/` (plan + manifest entry with
+pinned drawing/reference URLs + README row) so `npm run quality:drawings` guards it.

@@ -18,6 +18,7 @@
     "agent:example": "tsx examples/mcp-agent.ts",
     "demo:factory": "tsx examples/factory-demo.mts",
     "quality:step": "vitest run --config vitest.quality.config.ts",
+    "quality:drawings": "vitest run --config vitest.quality.config.ts tests/quality/drawingCorpus.gate.ts",
     "production:scripted": "vitest run --config vitest.production.config.ts tests/production/scripted.gate.ts",
     "production:agent": "vitest run --config vitest.production.config.ts tests/production/agent.gate.ts",
     "cli": "node bin/llull.cjs"

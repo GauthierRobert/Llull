@@ -5262,7 +5262,7 @@
     "name": "drainage_schedule"
   },
   {
-    "description": "Draw a circular arc in the local 2D work plane, defined by center, radius, and start/end angles in radians. Angles are measured counter-clockwise from the +X axis. radius must be > 0.",
+    "description": "Draw a circular arc in the local 2D work plane, defined by center, radius, and start/end angles in radians. Angles are measured counter-clockwise from the +X axis. radius must be > 0. The arc sweeps CCW from startAngle to endAngle (endAngle < startAngle wraps around CCW); a sweep larger than 2π is wrapped into (0, 2π] and the summary says so. For a full circle use draw_circle.",
     "input_schema": {
       "properties": {
         "center": {
@@ -7931,6 +7931,10 @@
         "height": {
           "description": "Output image height in pixels. Clamped to [64, 2000]. Default: 600.",
           "type": "number"
+        },
+        "hide2D": {
+          "description": "When true, 2D sketch entities (lines, arcs, circles, polylines, rectangles, text, dimensions...) are neither drawn nor counted in the framing/bounds, so leftover construction sketches used for extrusions do not shrink the 3D part in the frame. Default: false (2D shapes are drawn and framed).",
+          "type": "boolean"
         },
         "isolate": {
           "description": "Entity id (or array of ids) to highlight. All other entities are rendered dimmed/desaturated; the specified id(s) are shown at full color.",

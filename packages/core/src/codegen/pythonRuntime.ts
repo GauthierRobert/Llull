@@ -304,11 +304,16 @@ def _unique_edges(topods):
     from OCP.TopAbs import TopAbs_EDGE
     from OCP.TopExp import TopExp
     from OCP.TopoDS import TopoDS
-    from OCP.TopTools import TopTools_IndexedMapOfShape
 
-    edges = TopTools_IndexedMapOfShape()
+    try:
+        from OCP.TopTools import TopTools_IndexedMapOfShape as IndexedShapeMap
+    except ImportError:  # OCP >= 7.8 exposes the map only as a template instance
+        from OCP.collections import IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher as IndexedShapeMap
+
+    edges = IndexedShapeMap()
     TopExp.MapShapes_s(topods, TopAbs_EDGE, edges)
-    return [TopoDS.Edge_s(edges.FindKey(i)) for i in range(1, edges.Extent() + 1)]
+    as_edge = getattr(TopoDS, "Edge_s", None) or TopoDS.Edge  # renamed in OCP >= 7.8
+    return [as_edge(edges.FindKey(i)) for i in range(1, edges.Extent() + 1)]
 
 
 def _edge_mid(edge):
