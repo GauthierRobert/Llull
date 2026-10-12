@@ -4,10 +4,10 @@
  * Param-gathering only: dispatch is spied, command math is unit-tested elsewhere.
  */
 
+import { resetStore } from '../helpers/componentEntities';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
 import { PropertiesPanel } from '@ui/panels/PropertiesPanel';
 import { BuildingPanel } from '@ui/panels/building/BuildingPanel';
 import { localDispatch, spyDispatch } from '../helpers/storeTestHelpers';
@@ -27,7 +27,7 @@ vi.mock('@core/commands/registry', async (importOriginal) => {
 });
 
 beforeEach(() => {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
+  resetStore();
   localDispatch('add_level', {});
 });
 

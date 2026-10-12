@@ -16,9 +16,10 @@
  * observable behavior, not internals).
  */
 
+import { resetStore } from '../helpers/componentEntities';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '@ui/store';
-import { type Entity, createEmptyDocument } from '@core/model/types';
+import { type Entity } from '@core/model/types';
 import { localDispatch } from '../helpers/storeTestHelpers';
 import {
   groupEntitiesForInstancing,
@@ -27,10 +28,6 @@ import {
   type InstanceBatch,
 } from '../../src/ui/viewport/3d/grouping';
 import { makeMaterialArgs } from '@ui/viewport/3d/InstancedRenderer';
-
-function resetStore(): void {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
-}
 
 function getVisibleEntities(): Entity[] {
   const { entities, order } = useStore.getState().document;

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { textOf } from '../helpers/applyToolCall';
 import { createEmptyDocument } from '@core/model/types';
 import {
   applyExchangeToolCall,
@@ -30,9 +31,6 @@ const converter: DwgConverterPort = {
   convertDwg: (base64) => Promise.resolve(`DXF(${base64})`),
   readExchangeFile: () => Promise.resolve('RklMRQ=='),
 };
-
-const textOf = (r: { content: Array<{ text: string }> } | null): string =>
-  r === null ? '' : r.content.map((c) => c.text).join('\n');
 
 describe('import_dwg tool', () => {
   it('is registered in the exchange toolset and the served tool list', () => {

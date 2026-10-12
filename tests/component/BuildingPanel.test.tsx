@@ -3,15 +3,15 @@
  * Geometry/quantity math is unit-tested in tests/unit/building.
  */
 
+import { resetStore } from '../helpers/componentEntities';
 import { describe, it, expect, beforeEach, vi, type MockInstance } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useStore, useViewportStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
 import { BuildingPanel } from '@ui/panels/building/BuildingPanel';
 import { localDispatch, spyDispatch } from '../helpers/storeTestHelpers';
 
 beforeEach(() => {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
+  resetStore();
 });
 
 /** Stubs object URLs and anchor clicks so exports run without a browser download. */

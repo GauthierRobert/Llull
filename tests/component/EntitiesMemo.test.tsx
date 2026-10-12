@@ -2,10 +2,10 @@
  * Entities re-render discipline: a selection change must not re-render per-entity mesh branches
  * of entities whose own props did not change (R7 hot path).
  */
+import { resetStore } from '../helpers/componentEntities';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { act, render } from '@testing-library/react';
 import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
 import { localDispatch } from '../helpers/storeTestHelpers';
 
 const coneRenders = vi.hoisted(() => ({ byId: new Map<string, number>() }));
@@ -24,7 +24,7 @@ import { Entities } from '@ui/viewport/3d/Entities';
 describe('Entities memoization', () => {
   beforeEach(() => {
     coneRenders.byId.clear();
-    useStore.setState({ document: createEmptyDocument(), lastSummary: null });
+    resetStore();
   });
 
   it('selecting one cone does not re-render an unrelated cone', () => {

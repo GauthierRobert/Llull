@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { applied as run } from '../../helpers/runFixtures';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import type { BuildingElement } from '@core/model/building';
@@ -12,12 +13,6 @@ import { serializeDocument } from '@core/commands/persistence/serialization';
 import { buildingErrors } from '@aec/building/validate';
 import { polygonArea } from '@lib/polygon';
 import { rawBuilding } from './elementEdits';
-
-function run(doc: CadDocument, name: string, params: unknown): CadDocument {
-  const result = execute(doc, name, params);
-  expect(result.affected.length, result.summary).toBeGreaterThan(0);
-  return result.document;
-}
 
 function element(doc: CadDocument, id: string): BuildingElement {
   const found = doc.building?.elements[id];

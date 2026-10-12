@@ -3,7 +3,7 @@ import { createEmptyDocument, type BoxEntity, type CadDocument } from '@core/mod
 import { execute } from '@core/commands/registry';
 import { endAdjustment, wallPieces } from '@aec/building/geometry/wallGeometry';
 import type { WallElement } from '@core/model/building';
-import { run } from './runFixtures';
+import { run } from '../../helpers/runFixtures';
 
 function box(doc: CadDocument, id: string): BoxEntity {
   const entity = doc.entities[id];

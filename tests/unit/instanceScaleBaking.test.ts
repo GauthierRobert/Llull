@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { volumeOf } from '../helpers/fixtureDocument';
 import { createEmptyDocument } from '@core/model/types';
 import type {
   BoxEntity,
@@ -75,11 +76,6 @@ function extents(points: readonly Vec3[]): { min: Vec3; max: Vec3 } {
 
 function expectVecClose(actual: Vec3, expected: Vec3): void {
   actual.forEach((value, k) => expect(value).toBeCloseTo(expected[k]!, 9));
-}
-
-function volumeOf(doc: CadDocument, entityId: string): number {
-  const result = execute(doc, 'mass_properties', { entityId });
-  return (result.data as { volume: number }).volume;
 }
 
 describe('explode_instance bakes the instance scale into the geometry', () => {

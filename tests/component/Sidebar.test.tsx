@@ -7,10 +7,10 @@
  *   - Rail badges reflect document counts; every rail icon has a visible caption.
  */
 
+import { resetStore } from '../helpers/componentEntities';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { useLayoutStore, useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
+import { useLayoutStore } from '@ui/store';
 import { Sidebar } from '@ui/components/Sidebar';
 
 const TAB_LABELS = [
@@ -26,7 +26,7 @@ const TAB_LABELS = [
 
 describe('Sidebar', () => {
   beforeEach(() => {
-    useStore.setState({ document: createEmptyDocument(), lastSummary: null });
+    resetStore();
     useLayoutStore.setState({ sidebarTab: 'layers', sidebarOpen: true });
   });
 
@@ -80,7 +80,7 @@ describe('Sidebar', () => {
 
 describe('Sidebar — keyboard', () => {
   beforeEach(() => {
-    useStore.setState({ document: createEmptyDocument(), lastSummary: null });
+    resetStore();
     useLayoutStore.setState({ sidebarTab: 'layers', sidebarOpen: true });
   });
 

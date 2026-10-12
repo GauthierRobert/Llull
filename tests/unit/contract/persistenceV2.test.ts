@@ -1,4 +1,5 @@
 /** File format v2: definition stored, building geometry re-derived on load. */
+import { portalHall } from '../../helpers/portalHall';
 import { describe, it, expect } from 'vitest';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
@@ -7,13 +8,10 @@ import { derivedEntityIds } from '@core/plugins/host';
 
 function hall(): CadDocument {
   let doc = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
-  doc = execute(doc, 'add_portal_frame_building', {
-    span: 18000,
-    length: 30000,
-    baySpacing: 6000,
-    eaveHeight: 6000,
-    roofPitch: 6,
-  }).document;
+  doc = portalHall(
+    { span: 18000, length: 30000, baySpacing: 6000, eaveHeight: 6000, roofPitch: 6 },
+    doc,
+  );
   return execute(doc, 'add_sphere', { radius: 1 }).document;
 }
 

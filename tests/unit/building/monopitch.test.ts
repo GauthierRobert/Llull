@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { portalHall } from '../../helpers/portalHall';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type {
   BuildingElement,
@@ -12,6 +13,7 @@ import { baseReactions } from '@aec/industrial/frames/frameModelSolve';
 import type { PurlinRow, ZoneSummary } from '@aec/industrial/purlins/purlinModel';
 import type { ElevationSheet } from '@aec/building/drawings/elevation';
 import type { IfcExport } from '@aec/building/exchange/ifcBuild';
+import { membersOf } from './elementEdits';
 
 const HALL = { span: 24000, length: 30000 };
 const PITCH = (6 * Math.PI) / 180;
@@ -19,20 +21,10 @@ const RISE = HALL.span * Math.tan(PITCH);
 const LOADS = { deadLoad: 0.5, snowLoad: 0.8, windPressure: 1 };
 
 function hall(params: Record<string, unknown> = {}): CadDocument {
-  return execute(createEmptyDocument(), 'add_portal_frame_building', {
-    ...HALL,
-    roofType: 'monopitch',
-    ...params,
-  }).document;
+  return portalHall({ ...HALL, roofType: 'monopitch', ...params });
 }
 
 const elementsOf = (doc: CadDocument): BuildingElement[] => Object.values(doc.building!.elements);
-
-const membersOf = (doc: CadDocument, role: SteelMemberElement['role']): SteelMemberElement[] =>
-  elementsOf(doc).filter(
-    (element): element is SteelMemberElement =>
-      element.category === 'member' && element.role === role,
-  );
 
 const topOf = (member: SteelMemberElement): number => Math.max(member.start[2], member.end[2]);
 

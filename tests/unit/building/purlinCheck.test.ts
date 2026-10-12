@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { portalHall } from '../../helpers/portalHall';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { findProfile } from '@aec/steel/profiles';
@@ -16,8 +17,7 @@ interface PurlinData {
 }
 
 function hall(params: Record<string, unknown> = {}, base = createEmptyDocument()): CadDocument {
-  return execute(base, 'add_portal_frame_building', { span: 24000, length: 30000, ...params })
-    .document;
+  return portalHall({ span: 24000, length: 30000, ...params }, base);
 }
 
 function check(doc: CadDocument, params: Record<string, unknown> = {}): PurlinData {

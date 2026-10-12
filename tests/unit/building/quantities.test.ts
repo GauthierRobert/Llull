@@ -4,7 +4,7 @@ import { execute } from '@core/commands/registry';
 import { type TakeoffLine } from '@aec/building/quantities/takeoffBasics';
 import { toCsv } from '@aec/shared/csv';
 import { rateFor, type CostLine } from '@aec/building/quantities/costing';
-import { drawHouseWalls, run } from './runFixtures';
+import { drawHouseWalls, run } from '../../helpers/runFixtures';
 
 /** A 10 m × 8 m single-storey house shell. */
 function house(): CadDocument {

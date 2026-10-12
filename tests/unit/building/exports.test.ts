@@ -11,7 +11,7 @@ import type { PlanSheet } from '@aec/building/drawings/sheet';
 import { type IfcExport } from '@aec/building/exchange/ifcBuild';
 import { ifcGuid, ifcReal, ifcString } from '@aec/building/exchange/ifcStep';
 import { fileSlug } from '@aec/building/model';
-import { drawHouseWalls, run } from './runFixtures';
+import { drawHouseWalls, run } from '../../helpers/runFixtures';
 
 /** True for code points XML 1.0 forbids (C0 controls other than tab, LF, CR; U+FFFE; U+FFFF). */
 function isIllegalXmlCharacter(character: string): boolean {

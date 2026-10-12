@@ -21,3 +21,8 @@ export function applyToolCall(
     ...(result.data !== undefined ? { data: result.data } : {}),
   };
 }
+
+/** Text of an MCP tool result (all content blocks joined), or '' for a null result. */
+export function textOf(result: { content: Array<{ text: string }> } | null): string {
+  return result === null ? '' : result.content.map((c) => c.text).join('\n');
+}

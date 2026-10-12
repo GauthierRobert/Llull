@@ -19,7 +19,7 @@ import {
   subdivisionTriangles,
 } from '@core/geometry/subdivision';
 import { expectNoOp } from '../helpers/expectNoOp';
-import { isWatertight } from '../helpers/fixtureDocument';
+import { isWatertight, createdIn, volumeOf } from '../helpers/fixtureDocument';
 
 const empty = createEmptyDocument();
 
@@ -28,14 +28,7 @@ function run(doc: CadDocument, name: string, params: object): ReturnType<typeof 
 }
 
 function created(doc: CadDocument, params: object): { doc: CadDocument; e: SubdivisionEntity } {
-  const result = run(doc, 'add_subdivision_solid', params);
-  expect(result.affected, result.summary).toHaveLength(1);
-  const id = result.affected[0] as string;
-  return { doc: result.document, e: result.document.entities[id] as SubdivisionEntity };
-}
-
-function volumeOf(doc: CadDocument, id: string): number {
-  return (run(doc, 'mass_properties', { entityId: id }).data as { volume: number }).volume;
+  return createdIn<SubdivisionEntity>(doc, 'add_subdivision_solid', params);
 }
 
 const cubeEdges = (cage: ReturnType<typeof boxCage>): Array<[number, number]> => {

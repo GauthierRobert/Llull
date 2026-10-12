@@ -1,8 +1,8 @@
 /** Fillet/chamfer vertex pick must stay on the polyline chosen in the first pick. */
+import { resetStore } from '../helpers/componentEntities';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useStore, useToolStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
+import { useToolStore } from '@ui/store';
 import { useModifyTool } from '../../src/ui/viewport/2d/useModifyTool';
 
 const POLY: Array<[number, number]> = [
@@ -14,7 +14,7 @@ const POLY: Array<[number, number]> = [
 describe('useModifyTool — vertex pick', () => {
   beforeEach(() => {
     useToolStore.setState({ viewMode: '2d', drawTool: 'none', modifyTool: 'none' });
-    useStore.setState({ document: createEmptyDocument(), lastSummary: null });
+    resetStore();
   });
 
   it('ignores a vertex-phase click that lands on a different entity', () => {

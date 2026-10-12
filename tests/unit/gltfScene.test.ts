@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { parsedGltf } from '../helpers/gltfExport';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { creasedNormals, linearColorFactor } from '@core/commands/exchange/gltfScene';
@@ -27,10 +28,8 @@ function build(
   return result.document;
 }
 
-function gltfOf(doc: CadDocument, params: Record<string, unknown> = {}): GltfJson {
-  const data = execute(doc, 'export_gltf', params).data as { text: string };
-  return JSON.parse(data.text) as GltfJson;
-}
+const gltfOf = (doc: CadDocument, params: Record<string, unknown> = {}): GltfJson =>
+  parsedGltf<GltfJson>(doc, params);
 
 const scene = (): CadDocument =>
   build([

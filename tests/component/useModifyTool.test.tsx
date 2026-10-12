@@ -5,17 +5,13 @@
  * shortcut activation — not geometry math (W3/R11).
  */
 
+import { resetStore } from '../helpers/componentEntities';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useStore, useToolStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
+import { useToolStore } from '@ui/store';
 import { useModifyTool } from '../../src/ui/viewport/2d/useModifyTool';
 
 // Store reset helpers
-
-function resetStore(): void {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
-}
 
 // Tests
 

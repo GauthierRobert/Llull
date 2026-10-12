@@ -18,11 +18,11 @@
  * camera object state, or localStorage contents.
  */
 
+import { resetStore } from '../helpers/componentEntities';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useNamedViewStore } from '@ui/store';
 import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
 import { NamedViewsOverlay } from '@ui/viewport/3d/NamedViews';
 import type { NamedViewCamera } from '@ui/store';
 
@@ -39,7 +39,7 @@ const MOCK_CAMERA_B: NamedViewCamera = {
 };
 
 function resetStores(): void {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
+  resetStore();
   useNamedViewStore.setState({ namedViews: [] });
 }
 

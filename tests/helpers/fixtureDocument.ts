@@ -31,6 +31,17 @@ export function createdEntity<T extends Entity>(doc: CadDocument, name: string, 
   return result.document.entities[result.affected[0] as string] as T;
 }
 
+/** Runs a command that must create exactly one entity; returns the new document and that entity. */
+export function createdIn<T extends Entity>(
+  doc: CadDocument,
+  name: string,
+  params: object,
+): { doc: CadDocument; e: T } {
+  const result = execute(doc, name, params as Record<string, unknown>);
+  expect(result.affected, result.summary).toHaveLength(1);
+  return { doc: result.document, e: result.document.entities[result.affected[0] as string] as T };
+}
+
 /** `mass_properties` volume of `entityId` in `doc`, or of a lone entity. */
 export function volumeOf(docOrEntity: CadDocument | Entity, entityId?: string): number {
   const doc =

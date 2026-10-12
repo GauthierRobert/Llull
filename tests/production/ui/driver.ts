@@ -1,3 +1,4 @@
+import { toDegrees } from '@lib/angle';
 import type { ToolCall } from '../contract';
 import { BuildingPanel } from './panel';
 import { runViaPalette } from './palette';
@@ -23,7 +24,7 @@ const GAP = {
 
 const asNumbers = (value: unknown): number[] => (Array.isArray(value) ? value.map(Number) : []);
 const text = (value: unknown): string => String(value);
-const degrees = (radians: number): string => String((radians * 180) / Math.PI);
+const degrees = (radians: number): string => String(toDegrees(radians));
 /** The form fields of a boundary given by its first and third points (opposite corners). */
 const rectangleFields = (boundary: unknown): Record<string, string> => {
   const [first, , third] = (Array.isArray(boundary) ? boundary : []).map(asNumbers);

@@ -1,6 +1,5 @@
+import { resetStore } from './componentEntities';
 import { beforeEach, vi } from 'vitest';
-import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
 import { downloadText } from '@ui/download';
 import { localDispatch } from './storeTestHelpers';
 
@@ -11,7 +10,7 @@ export { localDispatch, spyDispatch } from './storeTestHelpers';
 /** Before each test: fresh document, no summary, cleared `downloadText` mock (the file mocks `@ui/download`). */
 export function setupCivilStore(): void {
   beforeEach(() => {
-    useStore.setState({ document: createEmptyDocument(), lastSummary: null });
+    resetStore();
     vi.mocked(downloadText).mockClear();
   });
 }

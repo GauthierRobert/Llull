@@ -18,14 +18,11 @@
  * @layer tests/component
  */
 
+import { resetStore } from '../helpers/componentEntities';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '@ui/store';
-import { type TextEntity, createEmptyDocument } from '@core/model/types';
+import { type TextEntity } from '@core/model/types';
 import { localDispatch } from '../helpers/storeTestHelpers';
-
-function resetStore(): void {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
-}
 
 // 1. Basic render shape — content and fontSize (height)
 

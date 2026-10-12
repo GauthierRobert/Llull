@@ -15,3 +15,12 @@ export function mockFetch(response: ServerCommandResponse): ReturnType<typeof vi
   vi.stubGlobal('fetch', spy);
   return spy;
 }
+
+/** A failed HTTP response (`!ok`, `status`, empty JSON body). */
+export function httpFail(status: number): {
+  ok: false;
+  status: number;
+  json: () => Promise<object>;
+} {
+  return { ok: false, status, json: () => Promise.resolve({}) };
+}

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { run } from '../helpers/runFixtures';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute, getCommand } from '@core/commands/registry';
 import { buildFeatureProgram } from '@core/codegen/featureProgram';
@@ -17,10 +18,6 @@ import {
 import { TETRA, fakeKernel, installKernelPerTest } from '../helpers/fakeKernel';
 
 installKernelPerTest(fakeKernel({ boolean: TETRA }));
-
-function run(doc: CadDocument, name: string, params: unknown): CadDocument {
-  return execute(doc, name, params).document;
-}
 
 function project(doc: CadDocument, actions: unknown[]): CadDocument {
   return execute(doc, 'build_project', { actions }).document;

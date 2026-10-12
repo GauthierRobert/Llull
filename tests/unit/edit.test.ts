@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { expectPure } from '../helpers/expectNoOp';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 
@@ -36,10 +37,8 @@ function expectMissingNoOp(
   expect(result.summary).toContain(summaryPart);
 }
 
-function expectPure(doc: CadDocument, cmd: string, params: Record<string, unknown>): void {
-  const snapshot = JSON.stringify(doc);
-  execute(doc, cmd, params);
-  expect(JSON.stringify(doc)).toBe(snapshot);
+function expectPureCommand(doc: CadDocument, cmd: string, params: Record<string, unknown>): void {
+  expectPure(doc, () => execute(doc, cmd, params));
 }
 
 describe('edit commands', () => {
@@ -94,7 +93,7 @@ describe('edit commands', () => {
 
     it('is pure — input document is not mutated', () => {
       const { doc, sourceId } = singleBox();
-      expectPure(doc, 'duplicate_entities', { ids: [sourceId] });
+      expectPureCommand(doc, 'duplicate_entities', { ids: [sourceId] });
     });
   });
 
@@ -143,7 +142,7 @@ describe('edit commands', () => {
 
     it('is pure — input document is not mutated', () => {
       const { doc, id1, id2 } = twoBoxes();
-      expectPure(doc, 'group_entities', { ids: [id1, id2] });
+      expectPureCommand(doc, 'group_entities', { ids: [id1, id2] });
     });
   });
 
@@ -174,7 +173,7 @@ describe('edit commands', () => {
 
     it('is pure — input document is not mutated', () => {
       const { doc, groupId } = groupedBoxes();
-      expectPure(doc, 'ungroup_entities', { groupId });
+      expectPureCommand(doc, 'ungroup_entities', { groupId });
     });
   });
 });

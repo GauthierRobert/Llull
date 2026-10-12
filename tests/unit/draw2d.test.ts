@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { expectPure } from '../helpers/expectNoOp';
 import { createEmptyDocument, is2D, is3D } from '@core/model/types';
 import type {
   LineEntity,
@@ -10,11 +11,9 @@ import type {
 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 
-function expectPure(name: string, params: unknown): void {
+function expectPureCommand(name: string, params: unknown): void {
   const doc = createEmptyDocument();
-  const snapshot = JSON.stringify(doc);
-  execute(doc, name, params);
-  expect(JSON.stringify(doc)).toBe(snapshot);
+  expectPure(doc, () => execute(doc, name, params));
 }
 
 describe('2D draw commands', () => {
@@ -105,7 +104,7 @@ describe('2D draw commands', () => {
     });
 
     it('is pure — input document is not mutated', () => {
-      expectPure('draw_polyline', {
+      expectPureCommand('draw_polyline', {
         points: [
           [0, 0],
           [1, 1],
@@ -166,7 +165,7 @@ describe('2D draw commands', () => {
     });
 
     it('is pure — input document is not mutated', () => {
-      expectPure('draw_polyline', {
+      expectPureCommand('draw_polyline', {
         points: [
           [0, 0],
           [1, 1],
@@ -260,7 +259,7 @@ describe('2D draw commands', () => {
     });
 
     it('is pure — input document is not mutated', () => {
-      expectPure('draw_arc', { center: [0, 0], radius: 3, startAngle: 0, endAngle: 1 });
+      expectPureCommand('draw_arc', { center: [0, 0], radius: 3, startAngle: 0, endAngle: 1 });
     });
   });
 
@@ -304,7 +303,7 @@ describe('2D draw commands', () => {
     });
 
     it('is pure — input document is not mutated', () => {
-      expectPure('draw_arc', { center: [0, 0], radius: 5 });
+      expectPureCommand('draw_arc', { center: [0, 0], radius: 5 });
     });
   });
 
@@ -340,7 +339,7 @@ describe('2D draw commands', () => {
     });
 
     it('is pure — input document is not mutated', () => {
-      expectPure('draw_rectangle', { width: 4, height: 3 });
+      expectPureCommand('draw_rectangle', { width: 4, height: 3 });
     });
   });
 
@@ -368,7 +367,7 @@ describe('2D draw commands', () => {
     });
 
     it('is pure — input document is not mutated', () => {
-      expectPure('draw_point', { position: [0, 0, 0] });
+      expectPureCommand('draw_point', { position: [0, 0, 0] });
     });
   });
 

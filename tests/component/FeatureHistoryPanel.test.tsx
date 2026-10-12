@@ -14,18 +14,16 @@
  * No geometry math or internals — behavioral testing only.
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { useStore } from '@ui/store';
 import { type FeatureStep, createEmptyDocument } from '@core/model/types';
 import { FeatureHistoryPanel } from '@ui/panels/FeatureHistoryPanel';
-import { localDispatch, liveSnapshot } from '../helpers/storeTestHelpers';
+import { localDispatch, liveSnapshot, spyDispatch } from '../helpers/storeTestHelpers';
 
 // Helpers
 
-/** The store's real dispatch, captured before any test swaps in a spy via `patchDispatch`. */
+/** The store's real dispatch, captured before any test swaps in a spy via `spyDispatch`. */
 const realDispatch = useStore.getState().dispatch;
 
 function resetStore(): void {
@@ -52,11 +50,6 @@ function makeStep(id: string, name: string, suppressed?: boolean, label?: string
     ...(suppressed !== undefined ? { suppressed } : {}),
     ...(label !== undefined ? { label } : {}),
   };
-}
-
-/** Patch the dispatch action on the store for spy purposes. Tests-only. */
-function patchDispatch(spy: ReturnType<typeof vi.fn>): void {
-  useStore.setState({ dispatch: spy } as any);
 }
 
 // Tests
@@ -124,8 +117,7 @@ describe('FeatureHistoryPanel — toggle suppress', () => {
 
   it('dispatches set_step_suppressed with suppressed=true when active step is clicked', () => {
     setHistory([makeStep('step-abc', 'add_box', false)]);
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
+    const dispatchSpy = spyDispatch();
 
     render(<FeatureHistoryPanel />);
     const suppressBtn = screen.getByRole('button', { name: /suppress step add_box/i });
@@ -139,8 +131,7 @@ describe('FeatureHistoryPanel — toggle suppress', () => {
 
   it('dispatches set_step_suppressed with suppressed=false when suppressed step is clicked', () => {
     setHistory([makeStep('step-xyz', 'add_cylinder', true)]);
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
+    const dispatchSpy = spyDispatch();
 
     render(<FeatureHistoryPanel />);
     const restoreBtn = screen.getByRole('button', { name: /restore step add_cylinder/i });
@@ -163,8 +154,7 @@ describe('FeatureHistoryPanel — reorder', () => {
     ['newIndex=1 when move-down clicked on index 0', 's0', /move step add_box down/i, 1],
   ])('dispatches reorder_step with %s', (_title, stepId, buttonName, newIndex) => {
     setHistory([makeStep('s0', 'add_box'), makeStep('s1', 'add_sphere')]);
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
+    const dispatchSpy = spyDispatch();
 
     render(<FeatureHistoryPanel />);
     const row = screen.getByTestId(`history-step-${stepId}`);
@@ -203,8 +193,7 @@ describe('FeatureHistoryPanel — delete step', () => {
 
   it('dispatches delete_step with the correct stepId', () => {
     setHistory([makeStep('del-me', 'add_box')]);
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
+    const dispatchSpy = spyDispatch();
 
     render(<FeatureHistoryPanel />);
     const row = screen.getByTestId('history-step-del-me');
@@ -222,8 +211,7 @@ describe('FeatureHistoryPanel — replay', () => {
 
   it('dispatches replay_history when Replay button is clicked', () => {
     setHistory([makeStep('s1', 'add_box')]);
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
+    const dispatchSpy = spyDispatch();
 
     render(<FeatureHistoryPanel />);
     const replayBtn = screen.getByRole('button', { name: /replay feature history/i });

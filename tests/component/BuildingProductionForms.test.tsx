@@ -4,10 +4,10 @@
  * list data, level-explicit placement and the export level picker (param-gathering → dispatch).
  */
 
+import { resetStore } from '../helpers/componentEntities';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
 import { BuildingPanel } from '@ui/panels/building/BuildingPanel';
 import { downloadText } from '@ui/download';
 import { localDispatch, spyDispatch } from '../helpers/storeTestHelpers';
@@ -16,7 +16,7 @@ import { pickTool, setField } from '../helpers/buildingForm';
 vi.mock('@ui/download', () => ({ downloadText: vi.fn(), downloadBlob: vi.fn() }));
 
 beforeEach(() => {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
+  resetStore();
   vi.mocked(downloadText).mockClear();
 });
 

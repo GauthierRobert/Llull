@@ -13,15 +13,16 @@
  * @layer tests/component
  */
 
+import { resetStore } from '../helpers/componentEntities';
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { useStore } from '@ui/store';
 import { useViewportStore } from '@ui/store';
-import { type Constraint, type Joint, createEmptyDocument } from '@core/model/types';
+import { type Constraint, type Joint } from '@core/model/types';
 import { localDispatch } from '../helpers/storeTestHelpers';
 
-function resetStore(): void {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
+function resetStores(): void {
+  resetStore();
   useViewportStore.setState({ mechanismSelection: null });
 }
 
@@ -38,7 +39,7 @@ function addConstraint(kind: 'coincident' | 'parallel'): string {
 
 describe('MechanismOverlay — constraint line geometry', () => {
   beforeEach(() => {
-    resetStore();
+    resetStores();
   });
 
   it('a BufferGeometry for a constraint line has vertex count > 0 (2 positions)', () => {
@@ -89,7 +90,7 @@ describe('MechanismOverlay — constraint line geometry', () => {
 
 describe('MechanismOverlay — joint arrow', () => {
   beforeEach(() => {
-    resetStore();
+    resetStores();
   });
 
   function buildJoint(kind: 'revolute' | 'prismatic'): { jointId: string; instanceId: string } {
