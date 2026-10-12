@@ -1,0 +1,101 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    0,
+    -14.5
+   ],
+   "end": [
+    50.5,
+    -14.5
+   ]
+  },
+  "as": "s1"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    50.5,
+    0
+   ],
+   "radius": 14.5,
+   "startAngle": -1.5707963267948966,
+   "endAngle": 1.5707963267948966
+  },
+  "as": "s2"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    50.5,
+    14.5
+   ],
+   "end": [
+    0,
+    14.5
+   ]
+  },
+  "as": "s3"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    0,
+    14.5
+   ],
+   "end": [
+    0,
+    -14.5
+   ]
+  },
+  "as": "s4"
+ },
+ {
+  "command": "extrude_sketch",
+  "params": {
+   "ids": [
+    "$s1",
+    "$s2",
+    "$s3",
+    "$s4"
+   ],
+   "depth": 15
+  },
+  "as": "base"
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    30,
+    29,
+    62
+   ],
+   "anchor": "min",
+   "position": [
+    0,
+    -14.5,
+    0
+   ]
+  },
+  "as": "up"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$base",
+   "b": "$up"
+  },
+  "as": "part"
+ }
+]

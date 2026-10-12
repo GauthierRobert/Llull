@@ -28,8 +28,9 @@ async function makeFakeKernel(): Promise<Fake> {
     function (): object {
       return handle(fields);
     };
-  const oneShotExplorer = function (): object {
-    let visited = false;
+  // Walks one face / edge; the fake shapes hold no solid, so the one-triangle mesh may stay open.
+  const oneShotExplorer = function (_shape: unknown, kind: unknown): object {
+    let visited = kind === 'solid';
     return handle({
       More: (): boolean => !visited,
       Current: () => handle({ HashCode: (): number => 1, IsSame: (): boolean => true }),
@@ -65,7 +66,12 @@ async function makeFakeKernel(): Promise<Fake> {
       });
     };
   const api = {
-    TopAbs_ShapeEnum: { TopAbs_FACE: 'face', TopAbs_EDGE: 'edge', TopAbs_SHAPE: 'shape' },
+    TopAbs_ShapeEnum: {
+      TopAbs_FACE: 'face',
+      TopAbs_EDGE: 'edge',
+      TopAbs_SOLID: 'solid',
+      TopAbs_SHAPE: 'shape',
+    },
     TopAbs_Orientation: { TopAbs_REVERSED: { value: 1 } },
     ChFi3d_FilletShape: { ChFi3d_Rational: 0 },
     gp_Pnt_3: construct(),
@@ -94,6 +100,7 @@ async function makeFakeKernel(): Promise<Fake> {
     Handle_Message_ProgressIndicator_1: construct(),
     BRepBuilderAPI_MakeSolid_1: builder({ Add: (): void => undefined }),
     BRepFilletAPI_MakeFillet: builder(),
+    BRepCheck_Analyzer: construct({ IsValid_2: (): boolean => true }),
   };
   const factory: OcctFactory = () => Promise.resolve(api as never);
   const kernel = await createOcctKernel({ factory });

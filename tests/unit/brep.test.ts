@@ -133,9 +133,12 @@ describe('kernel results keep their exact construction', () => {
     ).toHaveLength(1);
   });
 
-  it('edgesNear picks the roundable edge with the nearest mid point and merges with indices', () => {
+  it('edgesNear picks the nearest roundable edge and merges with indices', () => {
     const { doc, a } = twoBoxes();
-    const near = TOPOLOGY.edges.map((edge, index) => ({ ...edge, mid: [index, 0, 0] as const }));
+    const near = TOPOLOGY.edges.map((edge, index) => {
+      const at = [index, 0, 0] as const;
+      return { ...edge, start: at, mid: at, end: at };
+    });
     const kernel = fakeKernel({ fillet: TETRA, topology: { ...TOPOLOGY, edges: near } });
     const result = run(
       doc,
@@ -162,6 +165,36 @@ describe('kernel results keep their exact construction', () => {
         [40, 0, 0],
       ],
     });
+  });
+
+  it('edgesNear measures the distance to the edge, not to its mid point', () => {
+    const { doc, a } = twoBoxes();
+    const edges = [
+      // A long vertical edge (0,0,0)-(0,0,40) and a short horizontal one whose mid point is closer
+      // to (0,0,30) than the long edge's mid point (0,0,20).
+      { ...TOPOLOGY.edges[1]!, index: 0, start: [0, 0, 0], mid: [0, 0, 20], end: [0, 0, 40] },
+      { ...TOPOLOGY.edges[1]!, index: 1, start: [0, 5, 28], mid: [0, 7, 28], end: [0, 9, 28] },
+      // A sampled quarter arc of radius 10 about the origin in the XY plane, far from its chord.
+      {
+        ...TOPOLOGY.edges[0]!,
+        index: 2,
+        start: [50, 0, 0],
+        mid: [50 + 10 * Math.cos(Math.PI / 4), 10 * Math.sin(Math.PI / 4), 0],
+        end: [50, 10, 0],
+        samples: Array.from({ length: 9 }, (_, k) => {
+          const angle = ((Math.PI / 2) * k) / 8;
+          return [50 + 10 * Math.cos(angle), 10 * Math.sin(angle), 0] as const;
+        }),
+      },
+      { ...TOPOLOGY.edges[1]!, index: 3, start: [50, 0, 0], mid: [55, 5, 0], end: [50, 10, 0] },
+    ] as ShapeTopology['edges'];
+    const kernel = fakeKernel({ fillet: TETRA, topology: { ...TOPOLOGY, edges } });
+    const pick = (point: [number, number, number]): string =>
+      run(doc, 'fillet_edge', { id: a, edgesNear: [point], radius: 0.1 }, kernel).summary;
+    expect(pick([0, 0, 30])).toContain('edgesNear selected edges 0.');
+    expect(pick([0, 0, 0.5])).toContain('edgesNear selected edges 0.');
+    expect(pick([59.9, 1.5, 0])).toContain('edgesNear selected edges 2.');
+    expect(pick([52, 5, 0])).toContain('edgesNear selected edges 3.');
   });
 
   it('edgesNear needs exact topology and a roundable edge', () => {

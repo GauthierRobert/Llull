@@ -71,6 +71,16 @@ describe('export_code of exact kernel results', () => {
     expect(summary).not.toMatch(/triangle mesh/);
   });
 
+  it('edge enumeration does not need OCP.TopTools.TopTools_IndexedMapOfShape (OCP >= 7.8)', () => {
+    for (const language of ['cadquery', 'build123d'] as const) {
+      const { text } = code(model(), language);
+      expect(text).toMatch(
+        /try:\n\s+from OCP\.TopTools import TopTools_IndexedMapOfShape as IndexedShapeMap/,
+      );
+      expect(text).toMatch(/except ImportError:.*\n\s+from OCP\.collections import IndexedMap_/);
+    }
+  });
+
   it('snapshot (no history): a brep recipe is rebuilt node by node', () => {
     const doc = model();
     const snapshot = { ...doc, featureHistory: [] };

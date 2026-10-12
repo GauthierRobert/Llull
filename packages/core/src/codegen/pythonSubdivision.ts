@@ -186,7 +186,7 @@ def _make_subdivision(vertices, faces, creases, levels):
     shells = TopExp_Explorer(sewing.SewedShape(), TopAbs_SHELL)
     maker, count = BRepBuilderAPI_MakeSolid(), 0
     while shells.More():
-        maker.Add(TopoDS.Shell_s(shells.Current()))
+        maker.Add((getattr(TopoDS, "Shell_s", None) or TopoDS.Shell)(shells.Current()))
         count += 1
         shells.Next()
     if count == 1 and sewing.NbFreeEdges() == 0:

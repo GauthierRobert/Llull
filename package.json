@@ -21,6 +21,7 @@
     "test:e2e": "playwright test",
     "quality:fetch": "node quality/fetchCorpus.mjs",
     "quality:step": "npm --prefix server run quality:step",
+    "quality:drawings": "npm --prefix server run quality:drawings",
     "quality:display": "playwright test --config playwright.quality.config.ts",
     "quality": "npm run quality:fetch && npm run quality:generate && npm run quality:step && npm run quality:display",
     "quality:generate": "python3 quality/synthetic_step.py",

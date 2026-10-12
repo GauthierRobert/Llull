@@ -36,6 +36,7 @@ import {
   toolsetCounts,
   type CatalogEntry,
 } from './catalog';
+import { planAliases } from './aliases';
 import { planText, resultJson, resultText, type PrintableResult } from './output';
 import { createStepObserver, type StepObserver } from './progress';
 import { resolveImageRefs } from './imageParams';
@@ -332,12 +333,12 @@ async function runPlan(args: ParsedArgv, io: CliIo): Promise<number> {
   };
   const observer = observerOf(args, io);
   const backend = await backendOf(args, io, observer);
-  return finish(
-    withTimeout(observer, withOutcome('build_project', await backend.run('build_project', params))),
-    args,
-    io,
-    planText,
+  const result = withTimeout(
+    observer,
+    withOutcome('build_project', await backend.run('build_project', params)),
   );
+  const found = planAliases(base['actions'], result.data);
+  return finish(found === null ? result : { ...result, planAliases: found }, args, io, planText);
 }
 
 function runNew(args: ParsedArgv, io: CliIo): number {

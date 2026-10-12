@@ -16,6 +16,7 @@ import type { ExecutionContext } from '../types';
 import { kernelUnavailable } from '../kernelRefusal';
 import { commitKernelResult, evaluateRecipe, operandRecipe } from './kernelShape';
 import { noop } from '../noop';
+import type { GeometryKernel } from '../../geometry/kernel';
 
 /** Surface-neutral pointer to the B-rep kernel (browser URL flag or server env var). */
 export const OCC_KERNEL_HINT =
@@ -51,10 +52,37 @@ interface EdgeModification {
   readonly id: string;
   /** Selected unique-edge indices (fillet / chamfer); checked against the exact topology. */
   readonly edges?: readonly number[];
-  /** Points naming edges by their nearest mid point (`edgesNear`), resolved on the current solid. */
+  /** Points naming edges by their nearest edge (`edgesNear`), resolved on the current solid. */
   readonly near?: readonly Vec3[];
   /** The modification node over the operand's exact recipe and the resolved edges. */
   readonly recipe: (source: ShapeRecipe, edges: readonly number[]) => ShapeRecipe;
+}
+
+/** Why the kernel gave no usable result: an unsupported op, a failed / invalid solid, or an open mesh. */
+function modifyFailure(
+  command: string,
+  kernel: GeometryKernel,
+  modified: ShapeRecipe,
+  result: 'refused' | 'empty',
+): string {
+  if (!kernel.supports(modified.op))
+    return `${command}: kernel does not support ${command} for this operand (returned null). Use ${OCC_KERNEL_HINT} or a different operand.`;
+  if (result === 'empty')
+    return (
+      `${command}: the result could not be tessellated into a closed mesh (typically a corner where ` +
+      'several rounded edges meet); document unchanged. Round fewer edges per call, or clip the corners ' +
+      'with boolean_intersect (e.g. a rounded-rectangle prism) instead.'
+    );
+  if (command === 'shell_solid')
+    return (
+      'shell_solid: the kernel could not hollow this solid into a valid one (returned null: thickness too ' +
+      'large for a feature, or a self-intersecting offset); document unchanged. Try a smaller thickness.'
+    );
+  return (
+    `${command}: the kernel could not round these edges into a valid solid (returned null: size too large ` +
+    'for a neighbouring face, or a blend meeting a tangent face); document unchanged. Try a smaller size, ' +
+    'fewer edges per call, or build the round from sketch arcs + booleans.'
+  );
 }
 
 /**
@@ -84,13 +112,10 @@ function modifyEdges(
   const selection = selectEdges(kernel.topology(sourceShape), edges, near);
   if ('problem' in selection)
     return noop(doc, `${command}: ${selection.problem} on '${id}'; document unchanged.`);
-  const result = evaluateRecipe(kernel, recipe(source, selection.edges));
-  if (typeof result === 'string') {
-    return noop(
-      doc,
-      `${command}: kernel does not support ${command} for this operand (returned null). Use ${OCC_KERNEL_HINT} or a different operand.`,
-    );
-  }
+  const modified = recipe(source, selection.edges);
+  const result = evaluateRecipe(kernel, modified);
+  if (typeof result === 'string')
+    return noop(doc, modifyFailure(command, kernel, modified, result));
 
   const picked = near.length > 0 ? ` edgesNear selected edges ${selection.edges.join(', ')}.` : '';
   return commitKernelResult(
@@ -141,7 +166,7 @@ export const filletEdge = defineCommand({
         ),
       )
       .describe(
-        'Select edges by location: each point picks the roundable edge whose mid point is nearest. ' +
+        'Select edges by location: each point picks the roundable edge nearest to it (distance to the edge curve, so any point on an edge, e.g. its visible corner on a drawing, selects it). ' +
           'Prefer this in parametric models: the feature history keeps the points, so the same edge is ' +
           're-selected after an upstream edit renumbers edges. Combines with edgeIndices.',
       )
@@ -213,7 +238,7 @@ export const chamferEdge = defineCommand({
         ),
       )
       .describe(
-        'Select edges by location: each point picks the roundable edge whose mid point is nearest. ' +
+        'Select edges by location: each point picks the roundable edge nearest to it (distance to the edge curve, so any point on an edge, e.g. its visible corner on a drawing, selects it). ' +
           'Prefer this in parametric models: the feature history keeps the points, so the same edge is ' +
           're-selected after an upstream edit renumbers edges. Combines with edgeIndices.',
       )

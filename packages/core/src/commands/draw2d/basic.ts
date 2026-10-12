@@ -88,14 +88,17 @@ export const drawPolyline = defineCommand({
  * @pure
  * @layer core/commands
  * @affects creates 1 arc entity
- * @invariant radius > 0
- * @failure radius <= 0 -> no-op, affected:[]
+ * @invariant radius > 0; a sweep |endAngle - startAngle| > 2π is stored wrapped into (0, 2π] (the
+ *   CCW sweep every consumer — render, measure, extrude — reads)
+ * @failure radius <= 0 or non-finite angles -> no-op, affected:[]
  */
 export const drawArc = defineCommand({
   name: 'draw_arc',
   description:
     'Draw a circular arc in the local 2D work plane, defined by center, radius, and start/end angles in radians. ' +
-    'Angles are measured counter-clockwise from the +X axis. radius must be > 0.',
+    'Angles are measured counter-clockwise from the +X axis. radius must be > 0. ' +
+    'The arc sweeps CCW from startAngle to endAngle (endAngle < startAngle wraps around CCW); a sweep larger ' +
+    'than 2π is wrapped into (0, 2π] and the summary says so. For a full circle use draw_circle.',
   params: z.object({
     center: vec2('Center point [x, y] of the arc in local 2D work-plane coordinates.'),
     radius: z.number().describe('Arc radius. Must be greater than 0.'),
@@ -117,19 +120,30 @@ export const drawArc = defineCommand({
     { center, radius, startAngle, endAngle, position = ORIGIN, color = DEFAULT_DRAW_COLOR },
   ): CommandResult => {
     if (radius <= 0) return noop(doc, `draw_arc: radius must be > 0 (got ${radius}).`);
+    if (!Number.isFinite(startAngle) || !Number.isFinite(endAngle))
+      return noop(doc, 'draw_arc: startAngle and endAngle must be finite numbers.');
+    const tau = 2 * Math.PI;
+    const span = endAngle - startAngle;
+    const wrapped = Math.abs(span) > tau + 1e-9;
+    const rest = ((span % tau) + tau) % tau;
+    // A whole number of turns (up to float noise) is a full circle, never a near-zero sliver.
+    const end = wrapped ? startAngle + (rest < 1e-6 || tau - rest < 1e-6 ? tau : rest) : endAngle;
     const id = nextId('arc');
     const safeCenter: Vec2 = [center[0], center[1]];
     const entity = newEntity(
       'arc',
       id,
-      { center: safeCenter, radius, startAngle, endAngle },
+      { center: safeCenter, radius, startAngle, endAngle: end },
       position,
       color,
     );
     return commitEntity(
       doc,
       entity,
-      `Drew arc ${id} center [${safeCenter.join(', ')}] radius ${radius} from ${startAngle.toFixed(3)} to ${endAngle.toFixed(3)} rad.`,
+      `Drew arc ${id} center [${safeCenter.join(', ')}] radius ${radius} from ${startAngle.toFixed(3)} to ${end.toFixed(3)} rad.` +
+        (wrapped
+          ? ` The requested sweep ${span.toFixed(3)} rad exceeded 2π: wrapped to ${(end - startAngle).toFixed(3)} rad CCW.`
+          : ''),
     );
   },
 });

@@ -44,8 +44,15 @@ describe('shell_solid', () => {
     expect(result.summary).toContain('shelled');
   });
 
-  it('is a no-op when the kernel cannot shell (e.g. Manifold)', () => {
+  it('is a no-op when the kernel refuses this shell (invalid offset)', () => {
     setGeometryKernel(fakeKernel({ shell: null }));
+    const result = execute(doc, 'shell_solid', { id, thickness: 0.5 });
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('could not hollow this solid');
+  });
+
+  it('is a no-op when the kernel cannot shell (e.g. Manifold)', () => {
+    setGeometryKernel(fakeKernel({ unsupported: ['shell'] }));
     const result = execute(doc, 'shell_solid', { id, thickness: 0.5 });
     expect(result.document).toBe(doc);
     expect(result.affected).toEqual([]);

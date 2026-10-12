@@ -1,0 +1,739 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    0,
+    45
+   ],
+   "end": [
+    69,
+    45
+   ],
+   "position": [
+    0,
+    37.5,
+    0
+   ]
+  },
+  "as": "k1"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    69,
+    45
+   ],
+   "end": [
+    114,
+    0
+   ],
+   "position": [
+    0,
+    37.5,
+    0
+   ]
+  },
+  "as": "k2"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    114,
+    0
+   ],
+   "end": [
+    118.24264068711929,
+    4.242640687119285
+   ],
+   "position": [
+    0,
+    37.5,
+    0
+   ]
+  },
+  "as": "k3"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    118.24264068711929,
+    4.242640687119285
+   ],
+   "end": [
+    73.68629150101523,
+    48.79898987322333
+   ],
+   "position": [
+    0,
+    37.5,
+    0
+   ]
+  },
+  "as": "k4"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    85,
+    60.11269837220809
+   ],
+   "radius": 16,
+   "startAngle": 3.141592653589793,
+   "endAngle": 3.9269908169872414,
+   "position": [
+    0,
+    37.5,
+    0
+   ]
+  },
+  "as": "k5"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    69,
+    60.11269837220809
+   ],
+   "end": [
+    69,
+    105
+   ],
+   "position": [
+    0,
+    37.5,
+    0
+   ]
+  },
+  "as": "k6"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    69,
+    105
+   ],
+   "end": [
+    56,
+    105
+   ],
+   "position": [
+    0,
+    37.5,
+    0
+   ]
+  },
+  "as": "k7"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    56,
+    105
+   ],
+   "end": [
+    56,
+    58
+   ],
+   "position": [
+    0,
+    37.5,
+    0
+   ]
+  },
+  "as": "k8"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    56,
+    58
+   ],
+   "end": [
+    0,
+    58
+   ],
+   "position": [
+    0,
+    37.5,
+    0
+   ]
+  },
+  "as": "k9"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    0,
+    58
+   ],
+   "end": [
+    0,
+    45
+   ],
+   "position": [
+    0,
+    37.5,
+    0
+   ]
+  },
+  "as": "k10"
+ },
+ {
+  "command": "extrude_sketch",
+  "params": {
+   "ids": [
+    "$k1",
+    "$k2",
+    "$k3",
+    "$k4",
+    "$k5",
+    "$k6",
+    "$k7",
+    "$k8",
+    "$k9",
+    "$k10"
+   ],
+   "depth": 75,
+   "rotation": [
+    "=pi/2",
+    0,
+    0
+   ]
+  },
+  "as": "front"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    -200,
+    -37.5
+   ],
+   "end": [
+    26.13961030678928,
+    -37.5
+   ],
+   "position": [
+    -1.7106781186547408,
+    0,
+    -25.71067811865474
+   ]
+  },
+  "as": "k11"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    26.13961030678928,
+    0
+   ],
+   "radius": 37.5,
+   "startAngle": -1.5707963267948966,
+   "endAngle": 1.5707963267948966,
+   "position": [
+    -1.7106781186547408,
+    0,
+    -25.71067811865474
+   ]
+  },
+  "as": "k12"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    26.13961030678928,
+    37.5
+   ],
+   "end": [
+    -200,
+    37.5
+   ],
+   "position": [
+    -1.7106781186547408,
+    0,
+    -25.71067811865474
+   ]
+  },
+  "as": "k13"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    -200,
+    37.5
+   ],
+   "end": [
+    -200,
+    -37.5
+   ],
+   "position": [
+    -1.7106781186547408,
+    0,
+    -25.71067811865474
+   ]
+  },
+  "as": "k14"
+ },
+ {
+  "command": "extrude_sketch",
+  "params": {
+   "ids": [
+    "$k11",
+    "$k12",
+    "$k13",
+    "$k14"
+   ],
+   "depth": 200,
+   "rotation": [
+    0,
+    "=pi/4",
+    0
+   ]
+  },
+  "as": "legT"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    -37.5,
+    -10
+   ],
+   "end": [
+    37.5,
+    -10
+   ],
+   "position": [
+    -10,
+    0,
+    0
+   ]
+  },
+  "as": "k15"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    37.5,
+    -10
+   ],
+   "end": [
+    37.5,
+    65.7692429940235
+   ],
+   "position": [
+    -10,
+    0,
+    0
+   ]
+  },
+  "as": "k16"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    37.5,
+    65.7692429940235
+   ],
+   "end": [
+    11.900300104368528,
+    99.1314214351308
+   ],
+   "position": [
+    -10,
+    0,
+    0
+   ]
+  },
+  "as": "k17"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    0,
+    90
+   ],
+   "radius": 15,
+   "startAngle": 0.6544984694978736,
+   "endAngle": 2.4870941840919194,
+   "position": [
+    -10,
+    0,
+    0
+   ]
+  },
+  "as": "k18"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    -11.900300104368528,
+    99.1314214351308
+   ],
+   "end": [
+    -37.5,
+    65.7692429940235
+   ],
+   "position": [
+    -10,
+    0,
+    0
+   ]
+  },
+  "as": "k19"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    -37.5,
+    65.7692429940235
+   ],
+   "end": [
+    -37.5,
+    -10
+   ],
+   "position": [
+    -10,
+    0,
+    0
+   ]
+  },
+  "as": "k20"
+ },
+ {
+  "command": "extrude_sketch",
+  "params": {
+   "ids": [
+    "$k15",
+    "$k16",
+    "$k17",
+    "$k18",
+    "$k19",
+    "$k20"
+   ],
+   "depth": 200,
+   "rotation": [
+    "=pi/2",
+    "=pi/2",
+    0
+   ]
+  },
+  "as": "wallT"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    17,
+    -37.5
+   ],
+   "end": [
+    300,
+    -37.5
+   ],
+   "position": [
+    0,
+    0,
+    -10
+   ]
+  },
+  "as": "k21"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    300,
+    -37.5
+   ],
+   "end": [
+    300,
+    37.5
+   ],
+   "position": [
+    0,
+    0,
+    -10
+   ]
+  },
+  "as": "k22"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    300,
+    37.5
+   ],
+   "end": [
+    17,
+    37.5
+   ],
+   "position": [
+    0,
+    0,
+    -10
+   ]
+  },
+  "as": "k23"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    17,
+    20.5
+   ],
+   "radius": 17,
+   "startAngle": 1.5707963267948966,
+   "endAngle": 3.141592653589793,
+   "position": [
+    0,
+    0,
+    -10
+   ]
+  },
+  "as": "k24"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    0,
+    20.5
+   ],
+   "end": [
+    0,
+    -20.5
+   ],
+   "position": [
+    0,
+    0,
+    -10
+   ]
+  },
+  "as": "k25"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    17,
+    -20.5
+   ],
+   "radius": 17,
+   "startAngle": 3.141592653589793,
+   "endAngle": 4.71238898038469,
+   "position": [
+    0,
+    0,
+    -10
+   ]
+  },
+  "as": "k26"
+ },
+ {
+  "command": "extrude_sketch",
+  "params": {
+   "ids": [
+    "$k21",
+    "$k22",
+    "$k23",
+    "$k24",
+    "$k25",
+    "$k26"
+   ],
+   "depth": 200,
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "plateT"
+ },
+ {
+  "command": "boolean_intersect",
+  "params": {
+   "a": "$front",
+   "b": "$legT"
+  },
+  "as": "i27"
+ },
+ {
+  "command": "boolean_intersect",
+  "params": {
+   "a": "$i27",
+   "b": "$wallT"
+  },
+  "as": "i28"
+ },
+ {
+  "command": "boolean_intersect",
+  "params": {
+   "a": "$i28",
+   "b": "$plateT"
+  },
+  "as": "i29"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 4,
+   "height": 100,
+   "position": [
+    17,
+    20.5,
+    50
+   ]
+  },
+  "as": "c30"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$i29",
+   "b": "$c30"
+  },
+  "as": "s31"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 7.5,
+   "height": 16,
+   "position": [
+    17,
+    20.5,
+    62
+   ]
+  },
+  "as": "c32"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$s31",
+   "b": "$c32"
+  },
+  "as": "s33"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 4,
+   "height": 100,
+   "position": [
+    17,
+    -20.5,
+    50
+   ]
+  },
+  "as": "c34"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$s33",
+   "b": "$c34"
+  },
+  "as": "s35"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 7.5,
+   "height": 16,
+   "position": [
+    17,
+    -20.5,
+    62
+   ]
+  },
+  "as": "c36"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$s35",
+   "b": "$c36"
+  },
+  "as": "s37"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 6,
+   "height": 40,
+   "position": [
+    62.5,
+    0,
+    90
+   ],
+   "axis": [
+    1,
+    0,
+    0
+   ]
+  },
+  "as": "c38"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$s37",
+   "b": "$c38"
+  },
+  "as": "s39"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 16.5,
+   "height": 40,
+   "position": [
+    87.48349570550447,
+    0,
+    26.516504294495533
+   ],
+   "axis": [
+    1,
+    0,
+    1
+   ]
+  },
+  "as": "c40"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$s39",
+   "b": "$c40"
+  },
+  "as": "part"
+ }
+]

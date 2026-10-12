@@ -57,6 +57,16 @@ export interface OccBuilder extends OccHandle {
   Shape(): OccShape;
 }
 
+export interface OccValidity extends OccHandle {
+  IsValid_2(): boolean;
+}
+
+export interface OccUnifier extends OccHandle {
+  AllowInternalEdges(allow: boolean): void;
+  Build(): void;
+  Shape(): OccShape;
+}
+
 export interface OccOffsetMaker extends OccHandle {
   PerformByJoin(...args: readonly unknown[]): void;
   IsDone(): boolean;

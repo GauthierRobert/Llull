@@ -156,6 +156,43 @@ describe('2D draw commands', () => {
       expect(result.summary).toContain('5');
     });
 
+    it('wraps a sweep larger than 2π into (0, 2π] and keeps CCW wrap and full sweeps', () => {
+      const doc = createEmptyDocument();
+      const base = { center: [0, 0], radius: 2 };
+      const arcOf = (result: ReturnType<typeof execute>): ArcEntity =>
+        result.document.entities[result.affected[0]!] as ArcEntity;
+      const over = execute(doc, 'draw_arc', { ...base, startAngle: -2.04, endAngle: 4.71 });
+      expect(arcOf(over).endAngle - arcOf(over).startAngle).toBeCloseTo(6.75 - 2 * Math.PI, 9);
+      expect(over.summary).toContain('wrapped');
+      const overNeg = execute(doc, 'draw_arc', { ...base, startAngle: 4.71, endAngle: -2.04 });
+      expect(arcOf(overNeg).endAngle - arcOf(overNeg).startAngle).toBeCloseTo(
+        4 * Math.PI - 6.75,
+        9,
+      );
+      const wrap = execute(doc, 'draw_arc', { ...base, startAngle: 5, endAngle: 1 });
+      expect(arcOf(wrap)).toMatchObject({ startAngle: 5, endAngle: 1 });
+      expect(wrap.summary).not.toContain('wrapped');
+      const full = execute(doc, 'draw_arc', { ...base, startAngle: 0, endAngle: 2 * Math.PI });
+      expect(arcOf(full).endAngle).toBeCloseTo(2 * Math.PI, 12);
+      for (const turns of [2, 5]) {
+        const s0 = 5.886628178167261;
+        const whole = execute(doc, 'draw_arc', {
+          ...base,
+          startAngle: s0,
+          endAngle: s0 + turns * 2 * Math.PI,
+        });
+        expect(arcOf(whole).endAngle - arcOf(whole).startAngle).toBeCloseTo(2 * Math.PI, 9);
+      }
+      const justOver = execute(doc, 'draw_arc', {
+        ...base,
+        startAngle: 1,
+        endAngle: 1 + 2 * Math.PI + 2e-9,
+      });
+      expect(arcOf(justOver).endAngle - arcOf(justOver).startAngle).toBeCloseTo(2 * Math.PI, 9);
+      const nan = execute(doc, 'draw_arc', { ...base, startAngle: 0, endAngle: Number.NaN });
+      expect(nan.affected).toEqual([]);
+    });
+
     it('is a no-op when radius <= 0', () => {
       const doc = createEmptyDocument();
       const zero = execute(doc, 'draw_arc', {

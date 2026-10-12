@@ -5,21 +5,70 @@
  */
 
 import type { MeshData } from '@core/model/types';
+import { isClosedMesh } from './meshClosure';
 import {
   explorer,
   release,
   type OccApi,
   type OccHandle,
+  type OccExplorer,
   type OccShape,
   type OccTopoDS,
   type OccTriangulation,
 } from './occtTypes';
 
+/** Display deflections: linear (document units), angular (radians). */
+const DISPLAY_DEFLECTION = [0.1, 0.5] as const;
+
+/**
+ * Display mesh of `shape`, or null. BRepMesh can leave a face without triangles, or a solid's mesh
+ * open (a corner where several fillet blends meet); a closed solid is then refused rather than
+ * shown and exported as a holed shell (re-meshing finer does not close those, and can overflow the
+ * WASM stack). Surface parts and compounds with free faces keep the old, lenient behaviour.
+ */
 export function extractMeshData(api: OccApi, shape: OccShape): MeshData | null {
-  const mesher = new api.BRepMesh_IncrementalMesh_2(shape, 0.1, false, 0.5, false) as OccHandle & {
+  const { mesh, missingFaces } = triangulate(api, shape, DISPLAY_DEFLECTION);
+  if (!isClosedSolid(api, shape)) return mesh;
+  return missingFaces === 0 && isClosedMesh(mesh) ? mesh : null;
+}
+
+interface Triangulated {
+  readonly mesh: MeshData | null;
+  readonly missingFaces: number;
+}
+
+/** Whether `shape` holds a solid and no face outside a solid (explorer: faces, avoiding solids). */
+function isClosedSolid(api: OccApi, shape: OccShape): boolean {
+  const solids = explorer(api, shape, 'TopAbs_SOLID');
+  const freeFaces = new api.TopExp_Explorer_2(
+    shape,
+    api.TopAbs_ShapeEnum.TopAbs_FACE,
+    api.TopAbs_ShapeEnum.TopAbs_SOLID,
+  ) as OccExplorer;
+  try {
+    return solids.More() === true && freeFaces.More() !== true;
+  } finally {
+    solids.delete();
+    freeFaces.delete();
+  }
+}
+
+function triangulate(
+  api: OccApi,
+  shape: OccShape,
+  [linear, angular]: readonly [number, number],
+): Triangulated {
+  const mesher = new api.BRepMesh_IncrementalMesh_2(
+    shape,
+    linear,
+    false,
+    angular,
+    false,
+  ) as OccHandle & {
     Perform(): void;
   };
   mesher.Perform();
+  let missingFaces = 0;
 
   const positions: number[] = [];
   const indices: number[] = [];
@@ -64,6 +113,8 @@ export function extractMeshData(api: OccApi, shape: OccShape): MeshData | null {
         }
 
         vertexOffset += nNodes;
+      } else {
+        missingFaces++;
       }
 
       release(triangulation);
@@ -77,6 +128,5 @@ export function extractMeshData(api: OccApi, shape: OccShape): MeshData | null {
     mesher.delete();
   }
 
-  if (positions.length === 0) return null;
-  return { positions, indices };
+  return { mesh: positions.length === 0 ? null : { positions, indices }, missingFaces };
 }

@@ -1,0 +1,310 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    0,
+    20
+   ],
+   "end": [
+    0,
+    32
+   ],
+   "position": [
+    0,
+    9,
+    0
+   ]
+  },
+  "as": "k1"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    0,
+    32
+   ],
+   "end": [
+    14,
+    32
+   ],
+   "position": [
+    0,
+    9,
+    0
+   ]
+  },
+  "as": "k2"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    14,
+    32
+   ],
+   "end": [
+    14,
+    23
+   ],
+   "position": [
+    0,
+    9,
+    0
+   ]
+  },
+  "as": "k3"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    21,
+    23
+   ],
+   "radius": 7,
+   "startAngle": 3.141592653589793,
+   "endAngle": 4.71238898038469,
+   "position": [
+    0,
+    9,
+    0
+   ]
+  },
+  "as": "k4"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    21,
+    16
+   ],
+   "end": [
+    75,
+    16
+   ],
+   "position": [
+    0,
+    9,
+    0
+   ]
+  },
+  "as": "k5"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    75,
+    23
+   ],
+   "radius": 7,
+   "startAngle": 4.71238898038469,
+   "endAngle": 6.283185307179586,
+   "position": [
+    0,
+    9,
+    0
+   ]
+  },
+  "as": "k6"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    82,
+    23
+   ],
+   "end": [
+    82,
+    41
+   ],
+   "position": [
+    0,
+    9,
+    0
+   ]
+  },
+  "as": "k7"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    82,
+    41
+   ],
+   "end": [
+    98,
+    41
+   ],
+   "position": [
+    0,
+    9,
+    0
+   ]
+  },
+  "as": "k8"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    98,
+    41
+   ],
+   "end": [
+    98,
+    20
+   ],
+   "position": [
+    0,
+    9,
+    0
+   ]
+  },
+  "as": "k9"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    78,
+    20
+   ],
+   "radius": 20,
+   "startAngle": 4.71238898038469,
+   "endAngle": 6.283185307179586,
+   "position": [
+    0,
+    9,
+    0
+   ]
+  },
+  "as": "k10"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    78,
+    0
+   ],
+   "end": [
+    20,
+    0
+   ],
+   "position": [
+    0,
+    9,
+    0
+   ]
+  },
+  "as": "k11"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    20,
+    20
+   ],
+   "radius": 20,
+   "startAngle": 3.141592653589793,
+   "endAngle": 4.71238898038469,
+   "position": [
+    0,
+    9,
+    0
+   ]
+  },
+  "as": "k12"
+ },
+ {
+  "command": "extrude_sketch",
+  "params": {
+   "ids": [
+    "$k1",
+    "$k2",
+    "$k3",
+    "$k4",
+    "$k5",
+    "$k6",
+    "$k7",
+    "$k8",
+    "$k9",
+    "$k10",
+    "$k11",
+    "$k12"
+   ],
+   "depth": 18,
+   "rotation": [
+    1.5707963267948966,
+    0,
+    0
+   ]
+  },
+  "as": "u"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 9,
+   "height": 25,
+   "position": [
+    1.5,
+    0,
+    32
+   ],
+   "axis": [
+    1,
+    0,
+    0
+   ]
+  },
+  "as": "boss"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$u",
+   "b": "$boss"
+  },
+  "as": "b1"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 4,
+   "height": 27,
+   "position": [
+    1.5,
+    0,
+    32
+   ],
+   "axis": [
+    1,
+    0,
+    0
+   ]
+  },
+  "as": "hole"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$b1",
+   "b": "$hole"
+  },
+  "as": "final"
+ }
+]

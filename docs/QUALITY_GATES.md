@@ -11,6 +11,7 @@ npm run quality:fetch     # download the pinned corpus → .cache/quality-corpus
 npm run quality:generate  # build the synthetic STEP cases + their analytic ground truth (CadQuery)
 npm run quality:step      # STEP import gate   (needs CadQuery: pip install -r server/python/requirements.txt)
 npm run quality:display   # display gate       (Playwright + Chromium, runs after quality:step)
+npm run quality:drawings  # drawing gate: 21 parts rebuilt from 2D drawings (OCC only, no download, ≈ 1 min)
 npm run quality           # all four
 QUALITY_TIER=smoke|full|stress npm run quality   # default: full (≈ 15 min); stress adds the giants
 ```
@@ -183,3 +184,11 @@ two gates above.
 
 Gates 1–4 can reuse this corpus and the Playwright harness as they are. A nightly CI job running
 `npm run quality` (the repo has no CI workflow yet) is what turns these from tools into gates.
+
+## Drawing gate — `quality/drawings/`
+
+21 parts modelled in llull from published 2D technical drawings (Too Tall Toby, build123d) and
+verified against the real part (official mass, reference solid, exact 3D IoU) with the
+`drawing-to-model` skill. `npm run quality:drawings` replays each plan on the live OCC kernel and
+checks the exact B-rep volume and the extents (`quality/drawings/manifest.json`). Results, proved
+reference defects and the llull fixes it drove: `quality/drawings/README.md`.

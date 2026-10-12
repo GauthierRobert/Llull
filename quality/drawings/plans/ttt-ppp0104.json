@@ -1,0 +1,413 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    19,
+    23
+   ],
+   "end": [
+    65,
+    23
+   ],
+   "position": [
+    0,
+    19,
+    0
+   ]
+  },
+  "as": "s1"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    65,
+    18
+   ],
+   "radius": 5,
+   "startAngle": 0,
+   "endAngle": 1.5707963267948966,
+   "position": [
+    0,
+    19,
+    0
+   ]
+  },
+  "as": "s2"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    70,
+    18
+   ],
+   "end": [
+    70,
+    0
+   ],
+   "position": [
+    0,
+    19,
+    0
+   ]
+  },
+  "as": "s3"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    70,
+    0
+   ],
+   "end": [
+    80,
+    0
+   ],
+   "position": [
+    0,
+    19,
+    0
+   ]
+  },
+  "as": "s4"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    80,
+    0
+   ],
+   "end": [
+    80,
+    20
+   ],
+   "position": [
+    0,
+    19,
+    0
+   ]
+  },
+  "as": "s5"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    70,
+    20
+   ],
+   "radius": 10,
+   "startAngle": 0,
+   "endAngle": 1.5707963267948966,
+   "position": [
+    0,
+    19,
+    0
+   ]
+  },
+  "as": "s6"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    70,
+    30
+   ],
+   "end": [
+    19,
+    30
+   ],
+   "position": [
+    0,
+    19,
+    0
+   ]
+  },
+  "as": "s7"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    19,
+    30
+   ],
+   "end": [
+    19,
+    23
+   ],
+   "position": [
+    0,
+    19,
+    0
+   ]
+  },
+  "as": "s8"
+ },
+ {
+  "command": "extrude_sketch",
+  "params": {
+   "ids": [
+    "$s1",
+    "$s2",
+    "$s3",
+    "$s4",
+    "$s5",
+    "$s6",
+    "$s7",
+    "$s8"
+   ],
+   "depth": 38,
+   "rotation": [
+    1.5707963267948966,
+    0,
+    0
+   ]
+  },
+  "as": "arm"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 19,
+   "height": 20,
+   "position": [
+    19,
+    0,
+    23
+   ],
+   "anchor": "base-center"
+  },
+  "as": "cyl"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$cyl",
+   "b": "$arm"
+  },
+  "as": "u1"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 23,
+   "height": 5,
+   "position": [
+    19,
+    0,
+    29
+   ],
+   "anchor": "base-center"
+  },
+  "as": "fd"
+ },
+ {
+  "command": "add_torus",
+  "params": {
+   "ringRadius": 23,
+   "tubeRadius": 4,
+   "position": [
+    19,
+    0,
+    34
+   ]
+  },
+  "as": "ft"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$fd",
+   "b": "$ft"
+  },
+  "as": "fr"
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    27,
+    38,
+    5
+   ],
+   "anchor": "min",
+   "position": [
+    19,
+    -19,
+    29
+   ]
+  },
+  "as": "fb"
+ },
+ {
+  "command": "boolean_intersect",
+  "params": {
+   "a": "$fr",
+   "b": "$fb"
+  },
+  "as": "fil"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$u1",
+   "b": "$fil"
+  },
+  "as": "f1"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 13,
+   "height": 9,
+   "position": [
+    19,
+    0,
+    42
+   ],
+   "anchor": "base-center"
+  },
+  "as": "boss"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$f1",
+   "b": "$boss"
+  },
+  "as": "u2"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 8,
+   "height": 40,
+   "position": [
+    19,
+    0,
+    37
+   ]
+  },
+  "as": "hole"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$u2",
+   "b": "$hole"
+  },
+  "as": "u3"
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    12,
+    12,
+    9
+   ],
+   "position": [
+    75,
+    0,
+    3.5
+   ]
+  },
+  "as": "sb"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$u3",
+   "b": "$sb"
+  },
+  "as": "u4"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 6,
+   "height": 12,
+   "position": [
+    75,
+    0,
+    8
+   ],
+   "axis": [
+    1,
+    0,
+    0
+   ]
+  },
+  "as": "sc"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$u4",
+   "b": "$sc"
+  },
+  "as": "u5"
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    6,
+    18,
+    9
+   ],
+   "position": [
+    78,
+    0,
+    3.5
+   ]
+  },
+  "as": "cb"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$u5",
+   "b": "$cb"
+  },
+  "as": "u6"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 9,
+   "height": 6,
+   "position": [
+    78,
+    0,
+    8
+   ],
+   "axis": [
+    1,
+    0,
+    0
+   ]
+  },
+  "as": "cc"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$u6",
+   "b": "$cc"
+  },
+  "as": "part"
+ }
+]

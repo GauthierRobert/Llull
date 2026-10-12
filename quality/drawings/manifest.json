@@ -1,0 +1,381 @@
+{
+ "description": "Parts modelled in llull from published 2D technical drawings and verified against the real 3D part (see README.md). Drawings and reference solids are linked, never committed.",
+ "parts": [
+  {
+   "id": "ttt-ppp0101",
+   "title": "PPP0101 bearing bracket",
+   "drawing": [
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0101.png",
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0101_object.png"
+   ],
+   "reference3d": "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0101.py",
+   "volume": 102198.718,
+   "volumeBasis": "official mass 797.15 g \u00b1 1 g at 7800 kg/m\u00b3",
+   "volumeTolerance": 0.00125,
+   "extents": [
+    50.0,
+    68,
+    115
+   ],
+   "referenceVolume": 102198.223
+  },
+  {
+   "id": "ttt-ppp0102",
+   "title": "PPP0102 post cap",
+   "drawing": [
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0102.png",
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0102_object.png"
+   ],
+   "reference3d": "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0102.py",
+   "volume": 42245.098,
+   "volumeBasis": "official mass 43.09 g \u00b1 1 g at 1020 kg/m\u00b3",
+   "volumeTolerance": 0.02321,
+   "extents": [
+    48,
+    48.903,
+    58.456
+   ],
+   "referenceVolume": 42847.432
+  },
+  {
+   "id": "ttt-ppp0103",
+   "title": "PPP0103 C clamp base",
+   "drawing": [
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0103.png",
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0103_object.png"
+   ],
+   "reference3d": "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0103.py",
+   "volume": 35603.704,
+   "volumeBasis": "official mass 96.13 g \u00b1 1 g at 2700 kg/m\u00b3",
+   "volumeTolerance": 0.0104,
+   "extents": [
+    16.0,
+    41.956,
+    104
+   ],
+   "referenceVolume": 35605.547
+  },
+  {
+   "id": "ttt-ppp0104",
+   "title": "PPP0104 angle bracket",
+   "drawing": [
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0104.png",
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0104_object.png"
+   ],
+   "reference3d": "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0104.py",
+   "volume": 39743.59,
+   "volumeBasis": "official mass 310.0 g \u00b1 1 g at 7800 kg/m\u00b3",
+   "volumeTolerance": 0.00323,
+   "extents": [
+    38.0,
+    51,
+    80
+   ],
+   "referenceVolume": 39743.211
+  },
+  {
+   "id": "ttt-ppp0105",
+   "title": "PPP0105 paste sleeve",
+   "drawing": [
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0105.png",
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0105_object.png"
+   ],
+   "reference3d": "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0105.py",
+   "volume": 55960.784,
+   "volumeBasis": "official mass 57.08 g \u00b1 1 g at 1020 kg/m\u00b3",
+   "volumeTolerance": 0.01752,
+   "extents": [
+    44,
+    66,
+    133.0
+   ],
+   "referenceVolume": 55617.528
+  },
+  {
+   "id": "ttt-ppp0106",
+   "title": "PPP0106 bearing jig",
+   "drawing": [
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0106.png",
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0106_object.png"
+   ],
+   "reference3d": "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0106.py",
+   "volume": 42053.846,
+   "volumeBasis": "official mass 328.02 g \u00b1 1 g at 7800 kg/m\u00b3",
+   "volumeTolerance": 0.00305,
+   "extents": [
+    36.0,
+    64,
+    69
+   ],
+   "referenceVolume": 42053.828
+  },
+  {
+   "id": "ttt-ppp0107",
+   "title": "PPP0107 flanged hub",
+   "drawing": [
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0107.png",
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0107_object.png"
+   ],
+   "reference3d": "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0107.py",
+   "volume": 138144.444,
+   "volumeBasis": "official mass 372.99 g \u00b1 1 g at 2700 kg/m\u00b3",
+   "volumeTolerance": 0.00268,
+   "extents": [
+    52,
+    129.951,
+    129.976
+   ],
+   "referenceVolume": 136399.105
+  },
+  {
+   "id": "ttt-ppp0108",
+   "title": "PPP0108 tie plate",
+   "drawing": [
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0108.png",
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0108_object.png"
+   ],
+   "reference3d": "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0108.py",
+   "volume": 434238.462,
+   "volumeBasis": "official mass 3387.06 g \u00b1 1 g at 7800 kg/m\u00b3",
+   "volumeTolerance": 0.001,
+   "extents": [
+    35,
+    189.966,
+    250
+   ],
+   "referenceVolume": 434238.267
+  },
+  {
+   "id": "ttt-ppp0109",
+   "title": "PPP0109 corner tie",
+   "drawing": [
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0109.png",
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0109_object.png"
+   ],
+   "reference3d": "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0109.py",
+   "volume": 113788.889,
+   "volumeBasis": "official mass 307.23 g \u00b1 1 g at 2700 kg/m\u00b3",
+   "volumeTolerance": 0.00325,
+   "extents": [
+    75,
+    104.966,
+    118.209
+   ],
+   "referenceVolume": 113789.264
+  },
+  {
+   "id": "ttt-ppp0110",
+   "title": "PPP0110 light cap",
+   "drawing": [
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0110.png",
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0110_object.png"
+   ],
+   "reference3d": "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-ppp0110.py",
+   "volume": 207156.863,
+   "volumeBasis": "official mass 211.3 g \u00b1 1 g at 1020 kg/m\u00b3",
+   "volumeTolerance": 0.00473,
+   "extents": [
+    46.0,
+    84.0,
+    183.905
+   ],
+   "referenceVolume": 207159.364
+  },
+  {
+   "id": "ttt-23-02-02-sm_hanger",
+   "title": "23-02-02 sheet-metal hanger",
+   "drawing": [
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-23-02-02-sm_hanger.png",
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-23-02-02-sm_hanger_object.png"
+   ],
+   "reference3d": "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-23-02-02-sm_hanger.py",
+   "volume": 131794.872,
+   "volumeBasis": "official mass 1028 g \u00b1 10 g at 7800 kg/m\u00b3",
+   "volumeTolerance": 0.00973,
+   "extents": [
+    88,
+    112.52,
+    233.256
+   ],
+   "referenceVolume": 131756.35
+  },
+  {
+   "id": "ttt-23-t-24-curved_support",
+   "title": "23-T-24 curved support",
+   "drawing": [
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-23-t-24-curved_support.png",
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-23-t-24-curved_support_object.png"
+   ],
+   "reference3d": "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-23-t-24-curved_support.py",
+   "volume": 165897.436,
+   "volumeBasis": "official mass 1294 g \u00b1 3 g at 7800 kg/m\u00b3",
+   "volumeTolerance": 0.00232,
+   "extents": [
+    54.995,
+    60,
+    167.499
+   ],
+   "referenceVolume": 165914.072
+  },
+  {
+   "id": "ttt-24-SPO-06-Buffer_Stand",
+   "title": "24-SPO-06 buffer stand (inch)",
+   "drawing": [
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-24-SPO-06-Buffer_Stand.png",
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-24-SPO-06-Buffer_Stand_object.png"
+   ],
+   "reference3d": "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/ttt/ttt-24-SPO-06-Buffer_Stand.py",
+   "volume": 228133.701,
+   "volumeBasis": "official mass 3.923 lb at 7800 kg/m\u00b3",
+   "volumeTolerance": 0.005,
+   "extents": [
+    63.5,
+    101.6,
+    139.7
+   ],
+   "referenceVolume": 228130.556
+  },
+  {
+   "id": "tier01-24-01-01",
+   "title": "24-01-01 L bracket",
+   "drawing": [
+    "https://raw.githubusercontent.com/partcad/partcad-examples-competition-tootalltoby/a633e213057e4cde1f6ccf1376e00dc281982df9/input-24-01-01-blueprint.png",
+    "https://raw.githubusercontent.com/partcad/partcad-examples-competition-tootalltoby/a633e213057e4cde1f6ccf1376e00dc281982df9/input-24-01-01.jpg"
+   ],
+   "reference3d": "https://raw.githubusercontent.com/partcad/partcad-examples-competition-tootalltoby/a633e213057e4cde1f6ccf1376e00dc281982df9/tier01-24-01-01.py",
+   "volume": 67811.399,
+   "volumeBasis": "reference solid volume",
+   "volumeTolerance": 0.002,
+   "extents": [
+    29,
+    62,
+    64.95
+   ],
+   "referenceVolume": 67811.399
+  },
+  {
+   "id": "tier04-24-01-02",
+   "title": "24-01-02 bearing bracket",
+   "drawing": [
+    "https://raw.githubusercontent.com/partcad/partcad-examples-competition-tootalltoby/a633e213057e4cde1f6ccf1376e00dc281982df9/input-24-01-02-blueprint.png",
+    "https://raw.githubusercontent.com/partcad/partcad-examples-competition-tootalltoby/a633e213057e4cde1f6ccf1376e00dc281982df9/input-24-01-02.jpg"
+   ],
+   "reference3d": "https://raw.githubusercontent.com/partcad/partcad-examples-competition-tootalltoby/a633e213057e4cde1f6ccf1376e00dc281982df9/tier04-24-01-02.py",
+   "volume": 114534.339,
+   "volumeBasis": "this model (the reference solid deviates from the drawing, see README)",
+   "volumeTolerance": 0.001,
+   "extents": [
+    54.0,
+    69.475,
+    118
+   ],
+   "referenceVolume": 115466.057
+  },
+  {
+   "id": "tier03-24-01-03",
+   "title": "24-01-03 mug cap",
+   "drawing": [
+    "https://raw.githubusercontent.com/partcad/partcad-examples-competition-tootalltoby/a633e213057e4cde1f6ccf1376e00dc281982df9/input-24-01-03-blueprint.png",
+    "https://raw.githubusercontent.com/partcad/partcad-examples-competition-tootalltoby/a633e213057e4cde1f6ccf1376e00dc281982df9/input-24-01-03.jpg"
+   ],
+   "reference3d": "https://raw.githubusercontent.com/partcad/partcad-examples-competition-tootalltoby/a633e213057e4cde1f6ccf1376e00dc281982df9/tier03-24-01-03.py",
+   "volume": 53446.599,
+   "volumeBasis": "reference solid volume",
+   "volumeTolerance": 0.002,
+   "extents": [
+    49.901,
+    55,
+    59
+   ],
+   "referenceVolume": 53446.599
+  },
+  {
+   "id": "tier03-24-01-04",
+   "title": "24-01-04 clamp base",
+   "drawing": [
+    "https://raw.githubusercontent.com/partcad/partcad-examples-competition-tootalltoby/a633e213057e4cde1f6ccf1376e00dc281982df9/input-24-01-04-blueprint.png",
+    "https://raw.githubusercontent.com/partcad/partcad-examples-competition-tootalltoby/a633e213057e4cde1f6ccf1376e00dc281982df9/input-24-01-04.jpg"
+   ],
+   "reference3d": "https://raw.githubusercontent.com/partcad/partcad-examples-competition-tootalltoby/a633e213057e4cde1f6ccf1376e00dc281982df9/tier03-24-01-04.py",
+   "volume": 40068.096,
+   "volumeBasis": "this model (the reference solid deviates from the drawing, see README)",
+   "volumeTolerance": 0.001,
+   "extents": [
+    18.0,
+    41,
+    109
+   ],
+   "referenceVolume": 40554.813
+  },
+  {
+   "id": "tier01-24-04-02",
+   "title": "24-04-02 plumb bob (inch)",
+   "drawing": [
+    "https://raw.githubusercontent.com/partcad/partcad-examples-competition-tootalltoby/a633e213057e4cde1f6ccf1376e00dc281982df9/input-24-04-02-blueprint.png",
+    "https://raw.githubusercontent.com/partcad/partcad-examples-competition-tootalltoby/a633e213057e4cde1f6ccf1376e00dc281982df9/input-24-04-02.jpg"
+   ],
+   "reference3d": "https://raw.githubusercontent.com/partcad/partcad-examples-competition-tootalltoby/a633e213057e4cde1f6ccf1376e00dc281982df9/tier01-24-04-02.py",
+   "volume": 64088.082,
+   "volumeBasis": "reference solid volume",
+   "volumeTolerance": 0.002,
+   "extents": [
+    38.1,
+    38.1,
+    88.9
+   ],
+   "referenceVolume": 64088.082
+  },
+  {
+   "id": "tier01-24-04-04",
+   "title": "24-04-04 cab handle (inch)",
+   "drawing": [
+    "https://raw.githubusercontent.com/partcad/partcad-examples-competition-tootalltoby/a633e213057e4cde1f6ccf1376e00dc281982df9/input-24-04-04-blueprint.png",
+    "https://raw.githubusercontent.com/partcad/partcad-examples-competition-tootalltoby/a633e213057e4cde1f6ccf1376e00dc281982df9/input-24-04-04.jpg"
+   ],
+   "reference3d": "https://raw.githubusercontent.com/partcad/partcad-examples-competition-tootalltoby/a633e213057e4cde1f6ccf1376e00dc281982df9/tier01-24-04-04.py",
+   "volume": 114015.755,
+   "volumeBasis": "reference solid volume",
+   "volumeTolerance": 0.002,
+   "extents": [
+    19.05,
+    40.364,
+    254
+   ],
+   "referenceVolume": 114015.755
+  },
+  {
+   "id": "b123d-bracket-tutorial",
+   "title": "build123d design-tutorial bracket (hand sketch)",
+   "drawing": [
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/bracket_hand_drawing.jpg"
+   ],
+   "reference3d": "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/tutorial_design.rst",
+   "volume": 6412.653,
+   "volumeBasis": "reference solid volume",
+   "volumeTolerance": 0.002,
+   "extents": [
+    25.0,
+    25,
+    50
+   ],
+   "referenceVolume": 6412.653
+  },
+  {
+   "id": "b123d-nema23-stepper",
+   "title": "NEMA 23 stepper (multi-view drawing)",
+   "drawing": [
+    "https://raw.githubusercontent.com/gumyr/build123d/f5cca68a7500ec452759a463010aced0cbbd278f/docs/assets/stepper_drawing.svg"
+   ],
+   "reference3d": "bd_warehouse.open_builds.StepperMotor(\"Nema23\")",
+   "volume": 160962.756,
+   "volumeBasis": "reference solid volume",
+   "volumeTolerance": 0.002,
+   "extents": [
+    56.4,
+    56.4,
+    76.6
+   ],
+   "referenceVolume": 160962.756
+  }
+ ]
+}

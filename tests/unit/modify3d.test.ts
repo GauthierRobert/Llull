@@ -251,8 +251,25 @@ describe('modify3d commands', () => {
       const result = run(doc, boxId);
       expectSourceKept(result, doc, boxId);
       expect(result.summary).toContain('returned null');
-      expect(result.summary).toContain('LLULL_KERNEL=occt on the server');
+      expect(result.summary).toContain('could not round these edges into a valid solid');
       expect(result.summary).not.toContain('Try ?kernel=occt');
+    });
+
+    it('no-op when the result has no closed mesh; source not pruned', () => {
+      setGeometryKernel((fake = freshKernel({ [op]: { positions: [], indices: [] } })));
+      const { doc, boxId } = docWithBox();
+      const result = run(doc, boxId);
+      expectSourceKept(result, doc, boxId);
+      expect(result.summary).toContain('could not be tessellated into a closed mesh');
+    });
+
+    it('no-op naming the OCC kernel when this kernel lacks the op; source not pruned', () => {
+      setGeometryKernel((fake = freshKernel({ unsupported: [op], [op]: null })));
+      const { doc, boxId } = docWithBox();
+      const result = run(doc, boxId);
+      expectSourceKept(result, doc, boxId);
+      expect(result.summary).toContain(`does not support`);
+      expect(result.summary).toContain('LLULL_KERNEL=occt on the server');
     });
 
     it('is pure — input doc not mutated on success', () => {

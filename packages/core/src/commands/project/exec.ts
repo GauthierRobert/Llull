@@ -67,8 +67,10 @@ export function execStep(
     STEP_PARAM_COMMANDS.has(command) ? recorded : resolved.value,
     recorded,
   );
-  // A graceful no-op (no change + nothing affected) is a soft failure for a plan step.
-  const ok = result.affected.length > 0 || result.document !== run.current;
+  // A graceful no-op (no change + nothing affected) is a soft failure for a plan step; a read-only
+  // query that answered (measure_volume, inspect_topology, …) is a success that changes nothing.
+  const answered = getCommand(command)?.annotations?.readOnly === true && result.data !== undefined;
+  const ok = result.affected.length > 0 || result.document !== run.current || answered;
   report(ok, label ? `${label}: ${result.summary}` : result.summary, result.affected);
   run.onStep?.({ phase: 'end', ...event, ok, stepPosition: run.steps.length - 1 });
   if (!ok) return { ok, affected: [] };

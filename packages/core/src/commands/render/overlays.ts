@@ -121,9 +121,8 @@ function worldAxesLines(
 ): string[] {
   const { width, height } = data;
   const origin = project([0, 0, 0]);
-  const xTip = project([axisLength, 0, 0]);
   const axes = [
-    { label: 'X', color: '#ff4444', tip: xTip },
+    { label: 'X', color: '#ff4444', tip: project([axisLength, 0, 0]) },
     { label: 'Y', color: '#44dd44', tip: project([0, axisLength, 0]) },
     { label: 'Z', color: '#4488ff', tip: project([0, 0, axisLength]) },
   ];
@@ -151,7 +150,10 @@ function worldAxesLines(
       ]
     : [];
 
-  const scalePx = Math.sqrt(Math.pow(xTip[0] - origin[0], 2) + Math.pow(xTip[1] - origin[1], 2));
+  // Orthographic: every axis has the same world length, so the longest projection is the visible scale.
+  const scalePx = Math.max(
+    ...axes.map(({ tip }) => Math.hypot(tip[0] - origin[0], tip[1] - origin[1])),
+  );
   const scaleLabel = `${r2(axisLength)} ${units} = ${r2(scalePx)} px`;
   lines.push(
     `  <text x="8" y="${height - 8}" font-family="monospace" font-size="10" ` +

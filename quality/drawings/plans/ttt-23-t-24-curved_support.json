@@ -1,0 +1,311 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 27.5,
+   "height": 60,
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "anchor": "base-center"
+  },
+  "as": "big"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 15,
+   "height": 32,
+   "position": [
+    0,
+    125,
+    0
+   ],
+   "anchor": "base-center"
+  },
+  "as": "small"
+ },
+ {
+  "command": "extrude_profile",
+  "params": {
+   "profile": [
+    [
+     27.36215452043205,
+     2.75
+    ],
+    [
+     14.9248115565993,
+     126.5
+    ],
+    [
+     -14.9248115565993,
+     126.5
+    ],
+    [
+     -27.36215452043205,
+     2.75
+    ]
+   ],
+   "depth": 11,
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "plate"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    0,
+    0
+   ],
+   "end": [
+    0,
+    50
+   ],
+   "position": [
+    -5.5,
+    0,
+    0
+   ]
+  },
+  "as": "k1"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    0,
+    50
+   ],
+   "end": [
+    27.5,
+    50
+   ],
+   "position": [
+    -5.5,
+    0,
+    0
+   ]
+  },
+  "as": "k2"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    27.5,
+    50
+   ],
+   "end": [
+    53.675193028801964,
+    46.32131652323596
+   ],
+   "position": [
+    -5.5,
+    0,
+    0
+   ]
+  },
+  "as": "k3"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    49.5,
+    16.613274460988848
+   ],
+   "radius": 30,
+   "startAngle": 1.0117822181132912,
+   "endAngle": 1.4311699866353502,
+   "position": [
+    -5.5,
+    0,
+    0
+   ]
+  },
+  "as": "k4"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    100.41366129083303,
+    98
+   ],
+   "radius": 66,
+   "startAngle": 4.153374871703084,
+   "endAngle": 4.71238898038469,
+   "position": [
+    -5.5,
+    0,
+    0
+   ]
+  },
+  "as": "k5"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    100.41366129083303,
+    32
+   ],
+   "end": [
+    125,
+    32
+   ],
+   "position": [
+    -5.5,
+    0,
+    0
+   ]
+  },
+  "as": "k6"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    125,
+    32
+   ],
+   "end": [
+    125,
+    0
+   ],
+   "position": [
+    -5.5,
+    0,
+    0
+   ]
+  },
+  "as": "k7"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    125,
+    0
+   ],
+   "end": [
+    0,
+    0
+   ],
+   "position": [
+    -5.5,
+    0,
+    0
+   ]
+  },
+  "as": "k8"
+ },
+ {
+  "command": "extrude_sketch",
+  "params": {
+   "ids": [
+    "$k1",
+    "$k2",
+    "$k3",
+    "$k4",
+    "$k5",
+    "$k6",
+    "$k7",
+    "$k8"
+   ],
+   "depth": 11,
+   "rotation": [
+    1.5707963267948966,
+    1.5707963267948966,
+    0
+   ]
+  },
+  "as": "rib"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$big",
+   "b": "$small"
+  },
+  "as": "u1"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$u1",
+   "b": "$plate"
+  },
+  "as": "u2"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$u2",
+   "b": "$rib"
+  },
+  "as": "u3"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 17.5,
+   "height": 100,
+   "position": [
+    0,
+    0,
+    -10
+   ],
+   "anchor": "base-center"
+  },
+  "as": "h1"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$u3",
+   "b": "$h1"
+  },
+  "as": "s1"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 10,
+   "height": 100,
+   "position": [
+    0,
+    125,
+    -10
+   ],
+   "anchor": "base-center"
+  },
+  "as": "h2"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$s1",
+   "b": "$h2"
+  },
+  "as": "s2"
+ }
+]

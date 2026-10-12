@@ -117,6 +117,9 @@ function adjacentFaceCounts(
   return facesOf.map((set) => set.size);
 }
 
+/** Samples per curved edge (`ShapeEdge.samples`): enough for `edgesNear` to tell arcs apart. */
+const EDGE_SAMPLES = 16;
+
 function edgeInfo(api: OccApi, shape: OccShape, index: number, faceCount: number): ShapeEdge {
   const edge = api.TopoDS.Edge_1(shape) as OccShape;
   const degenerate = api.BRep_Tool.Degenerated(edge) === true;
@@ -145,13 +148,21 @@ function edgeInfo(api: OccApi, shape: OccShape, index: number, faceCount: number
   const [first, last] = [adaptor.FirstParameter(), adaptor.LastParameter()];
   const props = new api.GProp_GProps_1() as GProps;
   api.BRepGProp.LinearProperties(edge, props, false, false);
+  const curve = classify(api.GeomAbs_CurveType, CURVES, adaptor.GetType(), 'other');
   const info: ShapeEdge = {
     index,
-    curve: classify(api.GeomAbs_CurveType, CURVES, adaptor.GetType(), 'other'),
+    curve,
     length: props.Mass(),
     start: pointAt(adaptor, first),
     end: pointAt(adaptor, last),
     mid: pointAt(adaptor, (first + last) / 2),
+    ...(curve === 'line'
+      ? {}
+      : {
+          samples: Array.from({ length: EDGE_SAMPLES + 1 }, (_, k) =>
+            pointAt(adaptor, first + ((last - first) * k) / EDGE_SAMPLES),
+          ),
+        }),
     seam: faceCount === 1,
     degenerate,
   };

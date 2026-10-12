@@ -212,3 +212,26 @@ describe('render_view label markers and axes (ported from server enrichment test
     expect(svg).toContain('SECTION Z=10');
   });
 });
+
+describe('render_view hide2D and scale label', () => {
+  it('hide2D drops 2D entities from drawing, count and framing; default keeps them', () => {
+    const { doc } = boxDoc();
+    const sketched = execute(doc, 'draw_line', { start: [100, 100], end: [200, 200] }).document;
+    const shown = render(sketched, bare);
+    expect(shown.entityCount).toBe(2);
+    expect(shown.bounds?.max[0]).toBeGreaterThan(50);
+    const hidden = render(sketched, { ...bare, hide2D: true });
+    expect(hidden.entityCount).toBe(1);
+    expect(hidden.bounds?.max).toEqual([1, 1, 1]);
+    expect(Object.keys(sketched.entities)).toHaveLength(2);
+  });
+
+  it.each(['left', 'right', 'front', 'top'] as const)(
+    'scale label shows a non-zero pixel length in the %s view',
+    (view) => {
+      const { doc } = boxDoc();
+      const match = /mm = ([\d.]+) px/.exec(render(doc, { view }).svg);
+      expect(Number(match?.[1])).toBeGreaterThan(0);
+    },
+  );
+});

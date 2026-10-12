@@ -1,0 +1,553 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    115,
+    50,
+    15
+   ],
+   "anchor": "min",
+   "position": [
+    0,
+    -25,
+    0
+   ]
+  },
+  "as": "base"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    0,
+    0
+   ],
+   "end": [
+    0,
+    42
+   ],
+   "position": [
+    0,
+    25,
+    0
+   ]
+  },
+  "as": "l1"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    26,
+    42
+   ],
+   "radius": 26,
+   "startAngle": 0,
+   "endAngle": "=pi",
+   "position": [
+    0,
+    25,
+    0
+   ]
+  },
+  "as": "a1"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    52,
+    42
+   ],
+   "end": [
+    52,
+    24
+   ],
+   "position": [
+    0,
+    25,
+    0
+   ]
+  },
+  "as": "l2"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    61,
+    24
+   ],
+   "radius": 9,
+   "startAngle": "=pi",
+   "endAngle": "=1.5*pi",
+   "position": [
+    0,
+    25,
+    0
+   ]
+  },
+  "as": "a2"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    61,
+    15
+   ],
+   "end": [
+    61,
+    0
+   ],
+   "position": [
+    0,
+    25,
+    0
+   ]
+  },
+  "as": "l3"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    61,
+    0
+   ],
+   "end": [
+    0,
+    0
+   ],
+   "position": [
+    0,
+    25,
+    0
+   ]
+  },
+  "as": "l4"
+ },
+ {
+  "command": "extrude_sketch",
+  "params": {
+   "ids": [
+    "$l1",
+    "$a1",
+    "$l2",
+    "$a2",
+    "$l3",
+    "$l4"
+   ],
+   "depth": 12,
+   "rotation": [
+    "=pi/2",
+    0,
+    0
+   ]
+  },
+  "as": "lugA"
+ },
+ {
+  "command": "duplicate_entity",
+  "params": {
+   "id": "$lugA",
+   "offset": [
+    0,
+    -38,
+    0
+   ]
+  },
+  "as": "lugB"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$base",
+   "b": "$lugA"
+  },
+  "as": "u1"
+ },
+ {
+  "command": "boolean_union",
+  "params": {
+   "a": "$u1",
+   "b": "$lugB"
+  },
+  "as": "u2"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    6,
+    -25
+   ],
+   "end": [
+    109,
+    -25
+   ],
+   "position": [
+    0,
+    0,
+    -1
+   ]
+  },
+  "as": "rr0"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    109,
+    -19
+   ],
+   "radius": 6,
+   "startAngle": "=1.5*pi",
+   "endAngle": "=2*pi",
+   "position": [
+    0,
+    0,
+    -1
+   ]
+  },
+  "as": "rr1"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    115,
+    -19
+   ],
+   "end": [
+    115,
+    19
+   ],
+   "position": [
+    0,
+    0,
+    -1
+   ]
+  },
+  "as": "rr2"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    109,
+    19
+   ],
+   "radius": 6,
+   "startAngle": 0,
+   "endAngle": "=pi/2",
+   "position": [
+    0,
+    0,
+    -1
+   ]
+  },
+  "as": "rr3"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    109,
+    25
+   ],
+   "end": [
+    6,
+    25
+   ],
+   "position": [
+    0,
+    0,
+    -1
+   ]
+  },
+  "as": "rr4"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    6,
+    19
+   ],
+   "radius": 6,
+   "startAngle": "=pi/2",
+   "endAngle": "=pi",
+   "position": [
+    0,
+    0,
+    -1
+   ]
+  },
+  "as": "rr5"
+ },
+ {
+  "command": "draw_line",
+  "params": {
+   "start": [
+    0,
+    19
+   ],
+   "end": [
+    0,
+    -19
+   ],
+   "position": [
+    0,
+    0,
+    -1
+   ]
+  },
+  "as": "rr6"
+ },
+ {
+  "command": "draw_arc",
+  "params": {
+   "center": [
+    6,
+    -19
+   ],
+   "radius": 6,
+   "startAngle": "=pi",
+   "endAngle": "=1.5*pi",
+   "position": [
+    0,
+    0,
+    -1
+   ]
+  },
+  "as": "rr7"
+ },
+ {
+  "command": "extrude_sketch",
+  "params": {
+   "ids": [
+    "$rr0",
+    "$rr1",
+    "$rr2",
+    "$rr3",
+    "$rr4",
+    "$rr5",
+    "$rr6",
+    "$rr7"
+   ],
+   "depth": 90
+  },
+  "as": "rrPrism"
+ },
+ {
+  "command": "boolean_intersect",
+  "params": {
+   "a": "$u2",
+   "b": "$rrPrism"
+  },
+  "as": "u3"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 12,
+   "height": 60,
+   "position": [
+    26,
+    0,
+    42
+   ],
+   "axis": [
+    0,
+    1,
+    0
+   ]
+  },
+  "as": "bore"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$u3",
+   "b": "$bore"
+  },
+  "as": "s1"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 17,
+   "height": 8,
+   "position": [
+    26,
+    25,
+    42
+   ],
+   "axis": [
+    0,
+    1,
+    0
+   ]
+  },
+  "as": "cbA"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$s1",
+   "b": "$cbA"
+  },
+  "as": "s2"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 17,
+   "height": 8,
+   "position": [
+    26,
+    -25,
+    42
+   ],
+   "axis": [
+    0,
+    1,
+    0
+   ]
+  },
+  "as": "cbB"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$s2",
+   "b": "$cbB"
+  },
+  "as": "s3"
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    78,
+    12,
+    40
+   ],
+   "position": [
+    60,
+    0,
+    7.5
+   ]
+  },
+  "as": "slotBox"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$s3",
+   "b": "$slotBox"
+  },
+  "as": "s4"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 6,
+   "height": 40,
+   "position": [
+    21,
+    0,
+    7.5
+   ]
+  },
+  "as": "slotEndA"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$s4",
+   "b": "$slotEndA"
+  },
+  "as": "s5"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 6,
+   "height": 40,
+   "position": [
+    99,
+    0,
+    7.5
+   ]
+  },
+  "as": "slotEndB"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$s5",
+   "b": "$slotEndB"
+  },
+  "as": "s6"
+ },
+ {
+  "command": "extrude_profile",
+  "params": {
+   "profile": [
+    [
+     -9,
+     -1
+    ],
+    [
+     9,
+     -1
+    ],
+    [
+     9,
+     0
+    ],
+    [
+     "=9+8/tan(pi/3)",
+     8
+    ],
+    [
+     "=-9-8/tan(pi/3)",
+     8
+    ],
+    [
+     -9,
+     0
+    ]
+   ],
+   "depth": 130,
+   "position": [
+    -5,
+    0,
+    0
+   ],
+   "rotation": [
+    "=pi/2",
+    "=pi/2",
+    0
+   ]
+  },
+  "as": "dove"
+ },
+ {
+  "command": "boolean_subtract",
+  "params": {
+   "a": "$s6",
+   "b": "$dove"
+  },
+  "as": "part"
+ }
+]
