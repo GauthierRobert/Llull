@@ -19,7 +19,7 @@ This is the whole design. Protect it.
 
 | Concern    | Choice                                  |
 | ---------- | --------------------------------------- |
-| UI         | React 18 + TypeScript (strict) + Vite   |
+| UI         | React 19 + TypeScript (strict) + Vite   |
 | 3D viewport| three.js + @react-three/fiber + drei (perspective) |
 | 2D viewport| same three.js scene, orthographic top-down; Line/Shape geometry |
 | State      | Zustand (single store, `dispatch`)      |

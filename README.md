@@ -39,7 +39,7 @@ office? Click **Civil site starter** on the empty app for a complete sample site
 
 | Concern        | Choice                                   | Why |
 | -------------- | ---------------------------------------- | --- |
-| UI             | React 18 + TypeScript + Vite             | Lightweight, best-in-class 3D ecosystem |
+| UI             | React 19 + TypeScript + Vite             | Lightweight, best-in-class 3D ecosystem |
 | 3D viewport    | three.js + @react-three/fiber + drei     | Mature, declarative Three.js |
 | State          | Zustand                                  | One store, no boilerplate, easy to drive externally |
 | Schemas        | zod                                      | One schema per command: TS type, MCP JSON Schema and runtime validation |

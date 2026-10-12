@@ -3,7 +3,7 @@ paths:
   - 'src/ui/**'
 ---
 
-# RULE: react (React 18 + TS + r3f + Zustand best practices)
+# RULE: react (React 19 + TS + r3f + Zustand best practices)
 
 Applies to `src/ui/` ONLY. `packages/*` have no React (architecture L2). Components are presentation +
 param-gathering; the document changes ONLY via `dispatch` → `execute` (PRIME DIRECTIVE).
@@ -14,8 +14,9 @@ handler's job is: gather params → `store.dispatch(name, params)`. Never build 
 inline (architecture L4).
 
 ## R2 — Function components + hooks only
-No class components. Extract reusable logic into `useThing` hooks (conventions C3). One hook =
-one behavior (SRP). Custom hooks over copy-pasted effect logic.
+No class components (error boundaries excepted). React 19: `ref` is a plain prop — no
+`forwardRef`. Extract reusable logic into `useThing` hooks (conventions C3). One hook = one
+behavior (SRP). Custom hooks over copy-pasted effect logic.
 
 ## R3 — State: single store, narrow selectors
 Zustand is the single source of truth. Subscribe to the **narrowest slice** you need

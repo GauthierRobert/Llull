@@ -4,10 +4,11 @@
  * NumberField — `<input type="number">` for a numeric value owned elsewhere (a store field). It
  * keeps the typed text locally so intermediate input ("0.", "-", "1e-") is never rewritten, and
  * reports only finite parsed numbers through `onValueChange`. An external change of `value`
- * replaces the text unless it already parses to that value. Forwards its ref to the `<input>`.
+ * replaces the text unless it already parses to that value. Its `ref` (a React 19 prop) reaches the
+ * `<input>`.
  */
 
-import React, { forwardRef, useState } from 'react';
+import React, { useState } from 'react';
 import { parseNumber } from '@ui/numberText';
 
 type NativeInputProps = Omit<
@@ -18,12 +19,15 @@ type NativeInputProps = Omit<
 interface NumberFieldProps extends NativeInputProps {
   value: number;
   onValueChange: (value: number) => void;
+  ref?: React.Ref<HTMLInputElement>;
 }
 
-export const NumberField = forwardRef<HTMLInputElement, NumberFieldProps>(function NumberField(
-  { value, onValueChange, ...inputProps },
+export function NumberField({
+  value,
+  onValueChange,
   ref,
-): React.ReactElement {
+  ...inputProps
+}: NumberFieldProps): React.ReactElement {
   const [text, setText] = useState(String(value));
   const [seenValue, setSeenValue] = useState(value);
   if (value !== seenValue) {
@@ -46,4 +50,4 @@ export const NumberField = forwardRef<HTMLInputElement, NumberFieldProps>(functi
       }}
     />
   );
-});
+}
