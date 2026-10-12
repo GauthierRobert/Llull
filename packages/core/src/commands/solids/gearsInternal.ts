@@ -16,7 +16,7 @@ import { MAX_GEAR_TEETH } from '../limits';
 import { rotatedEntityBounds } from '../../geometry/rotatedBounds';
 import { commitEntity } from '../entity/commitEntity';
 import { boundsText, positionField, rotationField } from './shared';
-import { placedMeshEntity } from './gearSolid';
+import { faceWidthProblem, placedMeshEntity, pressureAngleProblem } from './gearSolid';
 import { noop } from '../noop';
 
 /** Minimum radial wall (in modules) between the tooth-space roots and the rim. */
@@ -105,12 +105,8 @@ export const addInternalGear = defineCommand({
     if (!(teethInt >= 12 && teethInt <= MAX_GEAR_TEETH)) {
       return fail(`teeth must be an integer in [12, ${MAX_GEAR_TEETH}], got ${String(teeth)}.`);
     }
-    if (!(pressureAngle > 0 && pressureAngle < Math.PI / 2)) {
-      return fail(`pressureAngle must be in (0, π/2), got ${String(pressureAngle)}.`);
-    }
-    if (!(faceWidth > 0 && Number.isFinite(faceWidth))) {
-      return fail(`faceWidth must be finite and > 0, got ${String(faceWidth)}.`);
-    }
+    const shapeProblem = pressureAngleProblem(pressureAngle) ?? faceWidthProblem(faceWidth);
+    if (shapeProblem !== null) return fail(shapeProblem);
     const minRim = minRingOuterRadius(mod, teethInt);
     if (!(outerRadius >= minRim && Number.isFinite(outerRadius))) {
       return fail(

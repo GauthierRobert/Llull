@@ -29,7 +29,7 @@ import { rotatedEntityBounds } from '../../geometry/rotatedBounds';
 import { commitEntity } from '../entity/commitEntity';
 import { withEntity } from '../entity/entityOps';
 import { boundsText, positionField, rotationField } from './shared';
-import { AXIS_ROTATION, meshGearEntity } from './gearSolid';
+import { AXIS_ROTATION, meshGearEntity, pressureAngleProblem } from './gearSolid';
 import { noop } from '../noop';
 
 const ORIGIN: Vec3 = [0, 0, 0];
@@ -125,9 +125,8 @@ function checkBevel(input: BevelInputs): string | BevelGeometry {
   if (pitchAngle !== undefined && !(pitchAngle > 0 && pitchAngle < Math.PI / 2)) {
     return `pitchAngle must be in (0, π/2) radians, got ${String(pitchAngle)}.`;
   }
-  if (!(pressureAngle > 0 && pressureAngle < Math.PI / 2)) {
-    return `pressureAngle must be in (0, π/2), got ${String(pressureAngle)}.`;
-  }
+  const angleProblem = pressureAngleProblem(pressureAngle);
+  if (angleProblem !== null) return angleProblem;
   const geometry = bevelGeometry(mod, teeth, matingTeeth, shaftAngle, pitchAngle);
   if (!(faceWidth > 0 && faceWidth <= MAX_FACE_FRACTION * geometry.coneDistance)) {
     return (
