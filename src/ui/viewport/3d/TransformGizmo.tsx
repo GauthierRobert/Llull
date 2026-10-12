@@ -92,7 +92,7 @@ export function TransformGizmo({
   const controlsRef = useRef<TransformControlsImpl>(null);
 
   const isDraggingRef = useRef(false);
-  // Snap candidates: rebuilt when the selection changes and at drag start.
+  // Snap candidates: rebuilt when the selection or entities change.
   const snapCandidatesRef = useRef<ReadonlyArray<SnapPoint3D>>([]);
   // Current snap result — updated per-frame, read at drag-end for dispatch.
   const activeSnapRef = useRef<{ x: number; y: number; z: number; type: Snap3DType } | null>(null);
@@ -115,9 +115,16 @@ export function TransformGizmo({
     setIndicator(next);
   }, []);
 
-  // Rebuild snap candidates (excluding the selected entity) when the selection changes.
+  // Rebuild snap candidates (excluding the selected entity) when the selection or the entities
+  // change; subscribed outside React so a document change does not re-render the gizmo.
   useEffect(() => {
-    snapCandidatesRef.current = collectSnapCandidates3D(useStore.getState().document, selectedId);
+    const rebuild = (): void => {
+      snapCandidatesRef.current = collectSnapCandidates3D(useStore.getState().document, selectedId);
+    };
+    rebuild();
+    return useStore.subscribe((state, previous) => {
+      if (state.document.entities !== previous.document.entities) rebuild();
+    });
   }, [selectedId]);
 
   // Sync the target group from the entity (new selection, or the store update after a dispatch).

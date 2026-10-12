@@ -20,7 +20,7 @@ import type { Vec2 } from '@core/model/types';
 import type { DrawToolKind } from '@ui/store';
 import { useZoomSnap } from './useSnap';
 import { DrawPreview, CollectedPointMarkers } from './DrawPreview';
-import { CHAIN_DRAW_TOOLS } from './drawHelpers';
+import { isChainTool } from './drawToolTable';
 import { GroundPlane, toDocumentPoint } from './GroundPlane';
 
 interface DrawInteractionProps {
@@ -74,7 +74,7 @@ export function DrawInteraction({
           onClickPoint(snappedCursor ?? toDocumentPoint(e.point));
         }}
         onDoubleClick={(e) => {
-          if (!CHAIN_DRAW_TOOLS.has(activeTool)) return;
+          if (!isChainTool(activeTool)) return;
           e.stopPropagation();
           onDoubleClick();
         }}

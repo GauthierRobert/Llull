@@ -6,11 +6,11 @@
  * Presentational only: changes go through dispatch.
  */
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useMemo, useState } from 'react';
 // First among the three.js imports: its three-mesh-bvh typings must win over drei's older copy.
 import { ensureBvhSetup } from './bvhSetup';
 import { VIEWPORT_FOV_DEGREES } from '@core/model/viewport';
-import { Canvas, useThree } from '@react-three/fiber';
+import { Canvas } from '@react-three/fiber';
 import {
   OrbitControls,
   Grid,
@@ -19,7 +19,7 @@ import {
   PerspectiveCamera,
 } from '@react-three/drei';
 import * as THREE from 'three';
-import { type GizmoMode, useStore, useToolStore, useViewportStore } from '@ui/store';
+import { type GizmoMode, useStore, useToolStore } from '@ui/store';
 import { Entities } from './Entities';
 import { TransformGizmo } from './TransformGizmo';
 import { RenderOriginSyncer } from '../RenderOriginSyncer';
@@ -34,36 +34,10 @@ import { AdaptiveClipping, CameraReactor, sphericalToCartesian } from './CameraR
 import { GROUND_PLANE_ROTATION, SceneLighting } from './SceneLighting';
 import { MechanismOverlay } from './MechanismOverlay';
 import { useViewportPalette } from '@ui/viewport/viewportPalette';
-import { StoreInvalidator } from '../StoreInvalidator';
+import { StoreInvalidator, ViewportStoreInvalidator } from '../StoreInvalidator';
 
 // Engage BVH prototype patch once at module load — idempotent, safe under StrictMode.
 ensureBvhSetup();
-
-/**
- * Subscribes to the viewport store (displayMode, clipPlane, hiddenEntityIds, qualityOverride)
- * and calls r3f invalidate() on any change so the Canvas repaints under
- * frameloop="demand". Pattern mirrors StoreInvalidator.
- */
-function ViewportStoreInvalidator(): null {
-  const invalidate = useThree((s) => s.invalidate);
-
-  useEffect(
-    () =>
-      useViewportStore.subscribe((state, previous) => {
-        if (
-          state.displayMode !== previous.displayMode ||
-          state.clipPlane !== previous.clipPlane ||
-          state.hiddenEntityIds !== previous.hiddenEntityIds ||
-          state.qualityOverride !== previous.qualityOverride
-        ) {
-          invalidate();
-        }
-      }),
-    [invalidate],
-  );
-
-  return null;
-}
 
 interface SceneContentsProps {
   /** When false, OrbitControls is disabled (gizmo drag in progress). */

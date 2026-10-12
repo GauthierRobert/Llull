@@ -11,8 +11,7 @@
  */
 
 import type { Vec3 } from '@core/model/types';
-import { anchoredGeometry } from '../lineGeometry';
-import { useEffect, useMemo } from 'react';
+import { useAnchoredGeometry } from '../useDisposable';
 import { useBoundingBoxMeasure } from '../useBoundingBoxMeasure';
 import { useOverlayMaterial } from '../useOverlayMaterial';
 
@@ -23,20 +22,16 @@ function RectLines2D({ min, max }: { min: Vec3; max: Vec3 }): React.ReactElement
   const [x0, y0] = min;
   const [x1, y1] = max;
 
-  const anchored = useMemo(
-    () =>
-      anchoredGeometry(
-        [
-          [x0, y0],
-          [x1, y0],
-          [x1, y1],
-          [x0, y1],
-        ],
-        RECT_Z,
-      ),
+  const anchored = useAnchoredGeometry(
+    () => [
+      [x0, y0],
+      [x1, y0],
+      [x1, y1],
+      [x0, y1],
+    ],
+    RECT_Z,
     [x0, y0, x1, y1],
   );
-  useEffect(() => () => anchored.geometry.dispose(), [anchored]);
   const material = useOverlayMaterial('#60a5fa', 0.9);
 
   // lineLoop closes the last→first segment automatically.
