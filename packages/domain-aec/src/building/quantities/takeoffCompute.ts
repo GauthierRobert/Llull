@@ -29,26 +29,34 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
   const building = getBuilding(doc);
   const scale = scaleFor(doc);
   const takeoff = new TakeoffAccumulator();
+  const addWall = (material: string, rows: Parameters<TakeoffAccumulator['add']>[3]): void =>
+    takeoff.add('wall', material, `Walls, ${material}`, rows);
+  const lengthRow = (length: number): ['m', string, number] => [
+    'm',
+    'length',
+    scale.length(length),
+  ];
+  const faceRows = (netArea: number, volume: number): Parameters<TakeoffAccumulator['add']>[3] => [
+    ['m2', 'net face area', scale.area(netArea)],
+    ['m3', 'volume', scale.volume(volume)],
+  ];
   for (const wall of elementsOf(building, 'wall')) {
     const quantities = wallQuantities(building, wall);
-    takeoff.add('wall', wall.material, `Walls, ${wall.material}`, [
-      ['m', 'length', scale.length(quantities.length)],
-    ]);
+    addWall(wall.material, [lengthRow(quantities.length)]);
     for (const layer of wall.layers ?? [
       { material: wall.material, thickness: wall.thickness, function: 'structure' },
     ]) {
-      takeoff.add('wall', layer.material, `Walls, ${layer.material}`, [
-        ['m2', 'net face area', scale.area(quantities.netArea)],
-        ['m3', 'volume', scale.volume((quantities.volume * layer.thickness) / wall.thickness)],
-      ]);
+      addWall(
+        layer.material,
+        faceRows(quantities.netArea, (quantities.volume * layer.thickness) / wall.thickness),
+      );
     }
   }
   for (const wall of elementsOf(building, 'curvedWall')) {
     const quantities = wallQuantities(building, wall);
-    takeoff.add('wall', wall.material, `Walls, ${wall.material}`, [
-      ['m', 'length', scale.length(quantities.length)],
-      ['m2', 'net face area', scale.area(quantities.netArea)],
-      ['m3', 'volume', scale.volume(quantities.volume)],
+    addWall(wall.material, [
+      lengthRow(quantities.length),
+      ...faceRows(quantities.netArea, quantities.volume),
     ]);
   }
   for (const category of ['door', 'window'] as const) {

@@ -124,7 +124,7 @@
           "type": "array"
         },
         "levelId": {
-          "description": "Level id. Default: active level (a \"Level 0\" is created if none).",
+          "description": "Level id. Default: the active level (a \"Level 0\" is created if none).",
           "type": "string"
         },
         "material": {
@@ -484,7 +484,7 @@
           "type": "number"
         },
         "levelId": {
-          "description": "Level id. Default: active level (a \"Level 0\" is created if none).",
+          "description": "Level id. Default: the active level (a \"Level 0\" is created if none).",
           "type": "string"
         },
         "location": {
@@ -2387,7 +2387,7 @@
           "type": "array"
         },
         "levelId": {
-          "description": "Level id. Default: active level (a \"Level 0\" is created if none).",
+          "description": "Level id. Default: the active level (a \"Level 0\" is created if none).",
           "type": "string"
         },
         "material": {
@@ -2629,7 +2629,7 @@
           "type": "number"
         },
         "levelId": {
-          "description": "Level id. Default: active level (a \"Level 0\" is created if none).",
+          "description": "Level id. Default: the active level (a \"Level 0\" is created if none).",
           "type": "string"
         },
         "material": {
