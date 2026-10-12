@@ -80,8 +80,10 @@ export function CommitInput({
 }): React.ReactElement {
   const [draft, setDraft] = useState(value);
   const [seenValue, setSeenValue] = useState(value);
+  const [focused, setFocused] = useState(false);
   const cancelledRef = useRef(false);
-  if (value !== seenValue) {
+  // An external change (undo, live sync, an agent) replaces the draft — unless the user is typing.
+  if (value !== seenValue && !focused) {
     setSeenValue(value);
     setDraft(value);
   }
@@ -97,7 +99,9 @@ export function CommitInput({
       spellCheck={false}
       autoFocus={autoFocus}
       onChange={(e) => setDraft(e.target.value)}
+      onFocus={() => setFocused(true)}
       onBlur={() => {
+        setFocused(false);
         // Escape sets the flag before blurring: the blur handler would otherwise still see the
         // typed draft in its closure and commit it.
         const cancelled = cancelledRef.current;

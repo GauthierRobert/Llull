@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { useState } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { CommitInput } from '@ui/panels/propertyFields';
 
 function Harness(): React.ReactElement {
@@ -54,5 +54,17 @@ describe('CommitInput', () => {
     fireEvent.keyDown(input(), { key: 'Escape' });
     expect(screen.getByLabelText('stored').textContent).toBe('2');
     expect(input().value).toBe('2');
+  });
+
+  it('keeps the typed draft while focused when the value changes externally', () => {
+    const { rerender } = render(
+      <CommitInput className="x" label="size" value="2" onCommit={() => undefined} />,
+    );
+    act(() => input().focus());
+    fireEvent.change(input(), { target: { value: '7' } });
+    rerender(<CommitInput className="x" label="size" value="3" onCommit={() => undefined} />);
+    expect(input().value).toBe('7');
+    fireEvent.keyDown(input(), { key: 'Escape' });
+    expect(input().value).toBe('3');
   });
 });

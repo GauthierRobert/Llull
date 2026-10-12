@@ -24,7 +24,10 @@ export function readChosenFile(
 ): void {
   const file = takeChosenFile(event);
   if (!file) return;
-  void file.text().then((text) => onText(text, file.name));
+  file
+    .text()
+    .then((text) => onText(text, file.name))
+    .catch(() => undefined);
 }
 
 /** Reads a file as a `data:` URL (images embedded in the document). */

@@ -42,7 +42,7 @@ export function BuildingExportsSection(): React.ReactElement {
     params: Record<string, unknown>,
     field: string,
     mimeType: string,
-  ): void => setStatus(downloadQuery(command, params, field, `${command}.${field}`, mimeType));
+  ): void => setStatus(downloadQuery(command, params, field, null, mimeType));
 
   const exportNcFiles = (): void => {
     const result = runQuery('export_nc_files');

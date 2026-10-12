@@ -18,21 +18,21 @@ export function runQuery(command: string, params: Record<string, unknown> = {}):
 
 /**
  * Runs `command` and downloads `data[field]` as the file name the command reports (civil commands
- * return `fileName`, building exporters `filename`) or `fallbackName`.
+ * return `fileName`, building exporters `filename`) or `fallbackName`; with a null fallback and no
+ * reported name nothing is downloaded.
  * @returns the command summary (shown as status).
  */
 export function downloadQuery(
   command: string,
   params: Record<string, unknown>,
   field: string,
-  fallbackName: string,
+  fallbackName: string | null,
   mimeType: string,
 ): string {
   const result = runQuery(command, params);
   const data = stringFields(result.data);
   const content = data?.[field];
-  if (content !== undefined) {
-    downloadText(content, data?.['fileName'] ?? data?.['filename'] ?? fallbackName, mimeType);
-  }
+  const fileName = data?.['fileName'] ?? data?.['filename'] ?? fallbackName;
+  if (content !== undefined && fileName !== null) downloadText(content, fileName, mimeType);
   return result.summary;
 }
