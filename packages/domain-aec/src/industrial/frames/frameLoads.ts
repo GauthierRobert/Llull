@@ -4,6 +4,7 @@
  * @layer domain-aec
  * @pure
  */
+import { toDegrees } from '@lib/angle';
 import type { SteelMemberElement } from '@core/model/building';
 import { FLAT_ROOF_LIMIT, frameRoofAverage } from '../common/windCoefficients';
 import {
@@ -129,7 +130,7 @@ export function frameRoofWind(
    */
   const roofCpe = (rafter: SteelMemberElement, windCase: WindCase): number => {
     const { x0, z0, x1, z1 } = rafterEnds(rafter);
-    const pitchDegrees = (Math.atan2(Math.abs(z1 - z0), Math.abs(x1 - x0)) * 180) / Math.PI;
+    const pitchDegrees = toDegrees(Math.atan2(Math.abs(z1 - z0), Math.abs(x1 - x0)));
     const fromLeft = windCase.from === 'left';
     const apex = hasApex(rafter);
     if (pitchDegrees < FLAT_ROOF_LIMIT) {

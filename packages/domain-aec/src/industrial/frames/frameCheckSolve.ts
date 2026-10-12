@@ -2,6 +2,8 @@
  * @layer domain-aec
  */
 
+import { clamp } from '@lib/clamp';
+import { toRadians } from '@lib/angle';
 import type { BuildingModel, MomentConnectionElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import { solveFrame, type FrameResult } from '@lib/frame2d';
@@ -120,7 +122,7 @@ interface UltimateResult {
   readonly amplification: number;
 }
 
-const HORNE_MAX_SLOPE = Math.tan((26 * Math.PI) / 180);
+const HORNE_MAX_SLOPE = Math.tan(toRadians(26));
 
 /**
  * One ULS combination with sway imperfections (5.3.2) and amplified moments (5.2.2(5)).
@@ -151,7 +153,7 @@ export function solveUltimate(frame: FrameModel, combination: Combination): Ulti
     if (increment > 0) entering.set(piece.member.geometry.b, increment);
   }
   const tallest = Math.max(...frame.columnTops.map((top) => top.height), 1) / 1000;
-  const alphaH = Math.min(1, Math.max(2 / 3, 2 / Math.sqrt(tallest)));
+  const alphaH = clamp(2 / Math.sqrt(tallest), 2 / 3, 1);
   const loaded = frame.columnTops.filter((top) =>
     pieces.some((piece) => piece.member.elementId === top.elementId && piece.compression > 0),
   ).length;

@@ -5,6 +5,7 @@
  * corrected-Frenet, i.e. twist-minimizing, trihedron). Callers own (release) returned shapes.
  */
 
+import { clamp } from '@lib/clamp';
 import type { CurveSegment } from '@core/model/curve';
 import type { Entity, Vec2, Vec3 } from '@core/model/types';
 import { frameAtFraction, stationRingAt, sweepStartAxes } from '@core/geometry/sweep';
@@ -179,7 +180,7 @@ const SKIN_SECTIONS_PER_SEGMENT = 8;
  */
 function stationSweep(api: OccApi, entity: Extract<Entity, { kind: 'sweep' }>): OccShape | null {
   const stations = entity.stations ?? [];
-  const count = Math.min(64, Math.max(8, entity.path.length * SKIN_SECTIONS_PER_SEGMENT));
+  const count = clamp(entity.path.length * SKIN_SECTIONS_PER_SEGMENT, 8, 64);
   const fractions = [
     ...new Set([
       ...Array.from({ length: count + 1 }, (_, k) => k / count),

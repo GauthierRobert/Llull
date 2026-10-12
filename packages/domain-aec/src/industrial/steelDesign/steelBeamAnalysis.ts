@@ -6,6 +6,8 @@
  * @pure
  */
 
+import { clamp } from '@lib/clamp';
+
 /** A uniform load `from`–`to` (m from the start), split into permanent and imposed parts. */
 export interface LinePiece {
   readonly from: number;
@@ -124,17 +126,16 @@ export function analyseSimpleBeam(
   factors: LoadFactors,
   flexuralRigidity = 0,
 ): BeamResponse {
-  const clamp = (value: number): number => Math.min(length, Math.max(0, value));
   const lines: Line[] = pieces
     .map((piece) => ({
-      from: clamp(piece.from),
-      to: clamp(piece.to),
+      from: clamp(piece.from, 0, length),
+      to: clamp(piece.to, 0, length),
       q: factors.permanent * piece.permanent + factors.imposed * piece.imposed,
     }))
     .filter((line) => line.to - line.from > EPSILON && line.q !== 0);
   const concentrated: Point[] = points
     .map((point) => ({
-      at: clamp(point.at),
+      at: clamp(point.at, 0, length),
       force: factors.permanent * point.permanent + factors.imposed * point.imposed,
     }))
     .filter((point) => point.force !== 0);

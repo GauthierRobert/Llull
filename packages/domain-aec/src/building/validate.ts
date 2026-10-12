@@ -4,6 +4,7 @@
  * @pure
  */
 
+import { isStringArray } from '@lib/isStringArray';
 import { isFiniteNumber, isPositiveNumber } from '@lib/isFiniteNumber';
 import { isVec3 } from '@lib/vec3';
 import { isRecord } from '@lib/isRecord';
@@ -73,9 +74,6 @@ const isPoint = (value: unknown): boolean =>
 
 const isPolygon = (value: unknown): boolean =>
   Array.isArray(value) && value.length >= 3 && value.every(isPoint);
-
-const isStringArray = (value: unknown): boolean =>
-  Array.isArray(value) && value.every((item) => typeof item === 'string');
 
 type Elements = Record<string, unknown>;
 

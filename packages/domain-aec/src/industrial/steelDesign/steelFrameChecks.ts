@@ -7,6 +7,7 @@
  * @pure
  */
 
+import { toDegrees } from '@lib/angle';
 import type { FrameResult } from '@lib/frame2d';
 import { memberBuckling } from './steelDesign';
 import type { MomentFrame } from './steelFrameDetect';
@@ -234,7 +235,7 @@ function columnRow(bar: SteelBar, layout: BarLayout, input: FrameCheckInput): Me
   if (axis === null) {
     return skippedRow(
       bar,
-      `${profile.name}: roll ${((bar.roll * 180) / Math.PI).toFixed(0)}° lies between the principal axes — set roll 0 or π/2 so the frame plane bends one principal axis`,
+      `${profile.name}: roll ${toDegrees(bar.roll).toFixed(0)}° lies between the principal axes — set roll 0 or π/2 so the frame plane bends one principal axis`,
     );
   }
   const { solutions, system } = input;

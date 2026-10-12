@@ -4,6 +4,7 @@
  * @layer domain-aec
  */
 
+import { toRadians } from '@lib/angle';
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
 import { type Triangle } from '@core/geometry/triangles';
 import { entityToTriangles } from '@core/geometry/entityTriangles';
@@ -53,7 +54,7 @@ interface ElevationDrawing {
   readonly projection: Projection;
 }
 
-const FEATURE_COS = Math.cos((25 * Math.PI) / 180);
+const FEATURE_COS = Math.cos(toRadians(25));
 
 const lerp = (a: Vec3, b: Vec3, t: number): Vec3 => [
   a[0] + (b[0] - a[0]) * t,

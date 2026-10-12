@@ -3,6 +3,7 @@
  * @layer domain-aec
  */
 
+import { clamp01 } from '@lib/clamp';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import type { BimCategory, BuildingElement, BuildingModel } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
@@ -76,7 +77,7 @@ function distanceToPolyline(point: Vec3, polyline: ReadonlyArray<Vec3>): number 
     const [a, b] = [polyline[index] as Vec3, polyline[index + 1] as Vec3];
     const ab = sub3(b, a);
     const ap = sub3(point, a);
-    const t = Math.max(0, Math.min(1, dot3(ap, ab) / (dot3(ab, ab) || 1)));
+    const t = clamp01(dot3(ap, ab) / (dot3(ab, ab) || 1));
     best = Math.min(best, Math.hypot(...sub3(ap, scale3(ab, t))));
   }
   return best;

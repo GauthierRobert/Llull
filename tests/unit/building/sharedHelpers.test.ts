@@ -7,12 +7,12 @@ import { GAMMA_CRANE } from '@aec/shared/loadFactors';
 import { commitBuilding } from '@aec/building/evaluate/evaluateElements';
 import { getBuilding, levelElementsOf } from '@aec/building/model';
 import { batterLevel } from '@aec/civil/earthworks/batter';
-import { entityPlanPoint } from '@aec/shared/planPoint';
+import { entityPlanPoint } from '@core/geometry/entityFrame';
 import { stationText } from '@aec/civil/model';
 import { planAreaM2 } from '@aec/shared/planArea';
 import { svgText } from '@aec/shared/sheetFrame';
 import { deflectionCheckLine, shearCheckLine } from '@aec/industrial/steelDesign/steelMemberRows';
-import { run } from './runFixtures';
+import { run } from '../../helpers/runFixtures';
 
 describe('utilisation reductions', () => {
   it('maxUtilisation is the largest value, 0 when empty', () => {

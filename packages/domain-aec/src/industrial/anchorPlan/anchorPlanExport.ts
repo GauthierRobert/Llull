@@ -2,10 +2,10 @@
  * @layer domain-aec
  */
 
+import { unitsToMm } from '../../shared/numeric';
 import type { Vec2 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { toMetres } from '@core/model/units';
 import { elementsOf, existingLevelId, fileSlug, getBuilding } from '../../building/model';
 import { noop, report } from '@core/commands/noop';
 import { distance } from '@lib/polygon';
@@ -115,7 +115,7 @@ export const exportAnchorPlan = defineCommand({
         `export_anchor_plan failed: no such level${levelId !== undefined ? ` '${levelId}'` : ''} (add_level / add_portal_frame_building first).`,
       );
     }
-    const mm = (value: number): number => toMetres(doc, value) * 1000;
+    const mm = unitsToMm(doc);
     const plates = placePlates(doc, level, mm);
     if (plates.length === 0) {
       return noop(

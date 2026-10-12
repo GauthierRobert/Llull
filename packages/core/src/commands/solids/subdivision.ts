@@ -230,9 +230,7 @@ export function cageData(entity: {
   };
 }
 
-const round = (value: number): number => roundTo(value, 6);
-
 /** World coordinates of a cage point. */
 export function worldOf(p: Vec3, entity: { position: Vec3; rotation: Vec3 }): Vec3 {
-  return map3(entityLocalToWorld(entity, p), round);
+  return map3(entityLocalToWorld(entity, p), (value) => roundTo(value, 6));
 }

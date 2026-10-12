@@ -167,13 +167,18 @@ async function backendOf(
   });
 }
 
-async function readSource(source: string, io: CliIo): Promise<string> {
-  if (source === '-') return io.readStdin();
+/** `read(source)`, with any failure rethrown as a `UsageError`. */
+function readOrUsageError<T>(source: string, read: (path: string) => T): T {
   try {
-    return fs.readFileSync(source, 'utf8');
+    return read(source);
   } catch (error) {
     throw new UsageError(`cannot read ${source}: ${errorMessage(error)}`);
   }
+}
+
+async function readSource(source: string, io: CliIo): Promise<string> {
+  if (source === '-') return io.readStdin();
+  return readOrUsageError(source, (path) => fs.readFileSync(path, 'utf8'));
 }
 
 function parseJson(text: string, origin: string): unknown {
@@ -196,11 +201,7 @@ function stringParamKeys(name: string): ReadonlySet<string> {
 }
 
 function readImageBytes(source: string): Buffer {
-  try {
-    return fs.readFileSync(source);
-  } catch (error) {
-    throw new UsageError(`cannot read ${source}: ${errorMessage(error)}`);
-  }
+  return readOrUsageError(source, (path) => fs.readFileSync(path));
 }
 
 /** Params of `name`, with `@img:<path>` values loaded as image data URLs. */

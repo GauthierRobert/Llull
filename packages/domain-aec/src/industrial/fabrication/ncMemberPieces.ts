@@ -4,6 +4,7 @@
  * @pure
  */
 
+import { toDegrees } from '@lib/angle';
 import type {
   BuildingLevel,
   MomentConnectionElement,
@@ -67,7 +68,7 @@ function pitchCut(member: SteelMemberElement): number {
   const [dx, dy, dz] = sub3(member.end, member.start);
   const horizontal = Math.hypot(dx, dy);
   if (horizontal <= 0.2 * Math.hypot(dx, dy, dz)) return 0;
-  return round((Math.atan2(Math.abs(dz), horizontal) * 180) / Math.PI);
+  return round(toDegrees(Math.atan2(Math.abs(dz), horizontal)));
 }
 
 /** The moment connections of a building with the members and levels they reference. */

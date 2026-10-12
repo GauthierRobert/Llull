@@ -29,7 +29,7 @@ import { evaluatePipeSupport } from '../../industrial/piping/evaluateSupports';
 import { reconcilePipeSupports } from '../../industrial/piping/pipeSupportAttach';
 import { BUILDING_LAYER_COLOR } from './entities';
 import { regenerateOwned } from '../../shared/derived';
-import { elementAffected } from '../model';
+import { elementAffected, orderedElements } from '../model';
 import { openingsOf } from '../geometry/wallGeometry';
 import {
   type EvaluationContext,
@@ -128,7 +128,7 @@ export function regenerateBuilding(doc: CadDocument, edited: BuildingModel): Cad
   const { parts, owners } = regenerateOwned(
     doc,
     Object.values(doc.building?.elements ?? {}),
-    building.elementOrder.flatMap((id) => building.elements[id] ?? []),
+    orderedElements(building),
     (element) => evaluateElement(context, element),
     BUILDING_LAYER_COLOR,
   );

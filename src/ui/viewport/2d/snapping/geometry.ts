@@ -7,6 +7,7 @@
 
 import { clamp } from '@lib/clamp';
 import type { Entity, Vec2 } from '@core/model/types';
+import { entityPlanPoint } from '@core/geometry/entityFrame';
 import { projectOntoSegment } from '@lib/polygon';
 import { wrapAngle } from '@lib/angle';
 import type { SnapPoint } from './types';
@@ -30,10 +31,8 @@ export function mid(ax: number, ay: number, bx: number, by: number): [number, nu
 
 /** Entity-local 2D point -> world XY: rotated about the entity origin by rotation[2], then offset by position. */
 export function localToWorld2D(entity: Entity, lx: number, ly: number): [number, number] {
-  const rz = entity.rotation[2] ?? 0;
-  const cos = Math.cos(rz);
-  const sin = Math.sin(rz);
-  return [entity.position[0] + lx * cos - ly * sin, entity.position[1] + lx * sin + ly * cos];
+  const [x, y] = entityPlanPoint(entity, [lx, ly]);
+  return [x, y];
 }
 
 /**

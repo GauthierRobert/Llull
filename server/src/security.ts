@@ -27,6 +27,11 @@ export function getAllowedOrigins(): string[] {
     .filter((origin) => origin.length > 0);
 }
 
+/** Constant-time equality of two tokens (compares SHA-256 digests: no length leak). */
+function tokensMatch(presented: string, token: string): boolean {
+  return crypto.timingSafeEqual(sha256Digest(presented), sha256Digest(token));
+}
+
 /** Constant-time `Authorization: Bearer <token>` check (digest compare: no length leak; scheme case-insensitive). */
 export function hasValidBearer(req: Request, token: string): boolean {
   const header = req.headers['authorization'];
@@ -34,14 +39,14 @@ export function hasValidBearer(req: Request, token: string): boolean {
   const match = /^bearer +(.+)$/i.exec(header);
   const presented = match?.[1];
   if (presented === undefined) return false;
-  return crypto.timingSafeEqual(sha256Digest(presented), sha256Digest(token));
+  return tokensMatch(presented, token);
 }
 
 /** Constant-time check of the `?access_token=` query parameter (EventSource cannot set headers). */
 function hasValidAccessToken(req: Request, token: string): boolean {
   const presented = req.query['access_token'];
   if (typeof presented !== 'string' || presented.length === 0) return false;
-  return crypto.timingSafeEqual(sha256Digest(presented), sha256Digest(token));
+  return tokensMatch(presented, token);
 }
 
 /** True for 127.0.0.0/8, ::1, ::ffff:127.*, and `localhost`. */

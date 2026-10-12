@@ -6,6 +6,7 @@
  * @pure
  */
 
+import { compactNumber, fixedNumber } from '@lib/compactNumber';
 import type { CadDocument } from '@core/model/types';
 import type {
   CivilModel,
@@ -117,7 +118,7 @@ function structXml(
       `${attr('elevRim', metres(doc, manhole.rimElevation))}` +
       `${attr('elevSump', metres(doc, manhole.invertElevation))}>`,
     `          <Center>${northEast(doc, manhole.position)}</Center>`,
-    `          <CircStruct${attr('diameter', String(Number((toMetres(doc, manhole.diameter) * 1000).toFixed(1))))}/>`,
+    `          <CircStruct${attr('diameter', fixedNumber(toMetres(doc, manhole.diameter) * 1000, 1))}/>`,
     ...inverts,
     '        </Struct>',
   ];
@@ -141,8 +142,8 @@ function pipeXml(
     `        <Pipe${attr('name', names.get(pipe.id) ?? pipe.id)}` +
       `${attr('refStart', names.get(pipe.fromId) ?? pipe.fromId)}` +
       `${attr('refEnd', names.get(pipe.toId) ?? pipe.toId)}` +
-      `${attr('length', metres(doc, planLength))}${attr('slope', String(Number(slopePercent.toFixed(4))))}>`,
-    `          <CircPipe${attr('diameter', String(Number((toMetres(doc, pipe.diameter) * 1000).toFixed(1))))}` +
+      `${attr('length', metres(doc, planLength))}${attr('slope', compactNumber(slopePercent))}>`,
+    `          <CircPipe${attr('diameter', fixedNumber(toMetres(doc, pipe.diameter) * 1000, 1))}` +
       `${attr('material', pipe.material)}${attr('mannings', String(pipe.manningN))}/>`,
     '        </Pipe>',
   ];

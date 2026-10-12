@@ -2,6 +2,7 @@
  * @layer domain-aec
  */
 
+import { unitsToMm } from '../../shared/numeric';
 import type { FootingElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import { fromMm, toMetres } from '@core/model/units';
@@ -28,7 +29,7 @@ export function geometryOf(
   footing: FootingElement,
   face: { x: number; y: number },
 ): Geometry {
-  const toMm = (value: number): number => toMetres(doc, value) * 1000;
+  const toMm = unitsToMm(doc);
   return {
     widthMm: toMm(footing.width),
     lengthMm: toMm(footing.length),

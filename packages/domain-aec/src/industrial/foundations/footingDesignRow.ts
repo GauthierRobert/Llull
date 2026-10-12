@@ -5,8 +5,8 @@
  */
 
 import type { BuildingModel, FootingElement, SteelMemberElement } from '@core/model/building';
-import { fromMm, toMetres } from '@core/model/units';
-import { round } from '../../shared/numeric';
+import { fromMm } from '@core/model/units';
+import { round, unitsToMm } from '../../shared/numeric';
 import { findProfile } from '../../steel/profiles';
 import { findPlate, hasCase, ultimateCombinations } from './foundationCombinations';
 import {
@@ -57,7 +57,7 @@ interface FootingDesignInputs extends Omit<SizingContext, 'face' | 'crane'> {
 export function designFootingRow(inputs: FootingDesignInputs): FootingDesignOutcome {
   const { building, column, allowShrink, ...sizing } = inputs;
   const { doc, footing, reaction, wind } = sizing;
-  const toMm = (value: number): number => toMetres(doc, value) * 1000;
+  const toMm = unitsToMm(doc);
   const plate = findPlate(building, column.id);
   const profile = findProfile(column.profile);
   const face = plate

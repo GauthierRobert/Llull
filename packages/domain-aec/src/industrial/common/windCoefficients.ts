@@ -9,6 +9,8 @@
  * @pure
  */
 
+import { clamp } from '@lib/clamp';
+
 export type RoofType = 'flat' | 'duopitch' | 'monopitch';
 
 /**
@@ -115,7 +117,7 @@ function zonesOf(
 function interpolate(rows: readonly Row[], pitchDeg: number): RoofCoefficients {
   const first = rows[0] as Row;
   const last = rows[rows.length - 1] as Row;
-  const pitch = Math.min(Math.max(pitchDeg, first.pitch), last.pitch);
+  const pitch = clamp(pitchDeg, first.pitch, last.pitch);
   const upperIndex = Math.max(
     1,
     rows.findIndex((row) => row.pitch >= pitch),

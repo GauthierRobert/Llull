@@ -4,6 +4,7 @@
  * @layer domain-aec
  */
 
+import { clamp } from '@lib/clamp';
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
@@ -18,6 +19,9 @@ import {
   fitScale,
   MARGIN,
   n,
+  paperMap,
+  readableDimensionLabel,
+  svgPoints,
   northArrow,
   PAPER_MM,
   PAPER_SIZES,
@@ -38,16 +42,15 @@ class SheetPainter {
 
   map([x, y]: Vec2): Vec2 {
     const [minX, minY, maxX, maxY] = this.drawing.bounds;
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
-    return [
-      this.viewport.x + this.viewport.width / 2 + (x - cx) * this.paperPerUnit,
-      this.viewport.y + this.viewport.height / 2 - (y - cy) * this.paperPerUnit,
-    ];
+    return paperMap(
+      this.viewport,
+      [(minX + maxX) / 2, (minY + maxY) / 2],
+      this.paperPerUnit,
+    )([x, y]);
   }
 
   private points(points: ReadonlyArray<Vec2>): string {
-    return points.map((point) => this.map(point).map(n).join(',')).join(' ');
+    return svgPoints(points.map((point) => this.map(point)));
   }
 
   private styleOf(style: PlanPrimitive['style'], filled: boolean): string {
@@ -138,7 +141,7 @@ class SheetPainter {
     if (length === 0) return;
     // Model "right of a→b" becomes "left of a→b" once Y is flipped on paper.
     const normal: Vec2 = [dy / length, -dx / length];
-    const gap = Math.min(Math.max(primitive.offset * this.paperPerUnit, 6), 14);
+    const gap = clamp(primitive.offset * this.paperPerUnit, 6, 14);
     const along = (point: Vec2, distance: number): Vec2 => [
       point[0] - normal[0] * distance,
       point[1] - normal[1] * distance,
@@ -154,13 +157,7 @@ class SheetPainter {
     );
     for (const end of [da, db])
       this.parts.push(line([end[0] - 1, end[1] + 1], [end[0] + 1, end[1] - 1]));
-    let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
-    if (angle > 90 || angle <= -90) angle += 180;
-    const radians = (angle * Math.PI) / 180;
-    const middle: Vec2 = [
-      (da[0] + db[0]) / 2 + Math.sin(radians) * 1.2,
-      (da[1] + db[1]) / 2 - Math.cos(radians) * 1.2,
-    ];
+    const { angle, middle } = readableDimensionLabel(da, db, dx, dy);
     this.text(middle, 2.5, primitive.label, angle);
   }
 }

@@ -6,12 +6,13 @@
  * @pure
  */
 
+import { toRadians } from '@lib/angle';
 import type { CadDocument, Entity, Vec2, Vec3 } from '@core/model/types';
 import { DxfWriter } from '../../building/exchange/dxfWriter';
 import type { SiteCalibration } from '@core/model/civil';
 import { assembleDxf } from '../../building/exchange/dxfExport';
 import { localToGrid, resolveFrame, type CoordinateFrame } from '../crs/crs';
-import { entityPlanPoint } from '../../shared/planPoint';
+import { entityPlanPoint } from '@core/geometry/entityFrame';
 
 export interface CivilDxf {
   readonly text: string;
@@ -84,7 +85,7 @@ function writeEntity(
         entity.height,
         entity.content,
         entity.anchor ?? 'left',
-        entity.rotation[2] + (rotationDeg * Math.PI) / 180,
+        entity.rotation[2] + toRadians(rotationDeg),
         z,
       );
       return;

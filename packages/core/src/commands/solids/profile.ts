@@ -16,7 +16,7 @@ import { noop } from '../noop';
 import { MAX_PROFILE_POINTS, MAX_REVOLVE_SEGMENTS } from '../limits';
 import { newEntity } from '../entity/newEntity';
 import { nextId } from '../../lib/id';
-import { compactNumber } from '../../lib/compactNumber';
+import { compactNumber, fixedNumber } from '../../lib/compactNumber';
 import {
   DEFAULT_SOLID_COLOR,
   EXTRUSION_COLOR,
@@ -412,7 +412,7 @@ export const revolveProfile = defineCommand({
     const axisLabel =
       rawAxis === 'x' || rawAxis === 'y' || rawAxis === 'z'
         ? rawAxis
-        : `[${axis.map((v) => parseFloat(v.toFixed(3))).join(', ')}]`;
+        : `[${axis.map((v) => fixedNumber(v, 3)).join(', ')}]`;
     return commitSolid(
       doc,
       entity,

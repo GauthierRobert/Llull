@@ -2,6 +2,7 @@
  * Pre-engineered steel hall generator (portal frames) and crane runways.
  * @layer domain-aec
  */
+import { toRadians } from '@lib/angle';
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { BuildingModel, SlabElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
@@ -160,7 +161,7 @@ export const addPortalFrameBuilding = defineCommand({
 
     const bays = Math.max(1, Math.round(hallLength / targetBay));
     const bay = hallLength / bays;
-    const pitch = (pitchDegrees * Math.PI) / 180;
+    const pitch = toRadians(pitchDegrees);
     const estimatedMembers =
       bays *
       (6 * spanCount +

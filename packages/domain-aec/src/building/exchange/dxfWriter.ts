@@ -2,6 +2,7 @@
  * @layer domain-aec
  */
 
+import { toDegrees } from '@lib/angle';
 import type { DocumentUnit, Vec2, Vec3 } from '@core/model/types';
 import { hatchSegments } from '@lib/hatch';
 import { triangulatePolygon } from '@lib/triangulate';
@@ -49,10 +50,7 @@ export function dxfText(content: string): string {
     .join('');
 }
 
-export const fmt = (value: number): string => {
-  const rounded = round(value, 6);
-  return Object.is(rounded, -0) ? '0' : String(rounded);
-};
+export const fmt = (value: number): string => String(round(value, 6));
 
 export class DxfWriter {
   readonly lines: string[] = [];
@@ -123,8 +121,8 @@ export class DxfWriter {
     this.start('ARC', layer);
     this.point(10, center);
     this.pair(40, radius);
-    this.pair(50, (startAngle * 180) / Math.PI);
-    this.pair(51, (endAngle * 180) / Math.PI);
+    this.pair(50, toDegrees(startAngle));
+    this.pair(51, toDegrees(endAngle));
   }
 
   text(
@@ -140,7 +138,7 @@ export class DxfWriter {
     this.point(10, at, z);
     this.pair(40, height);
     this.pair(1, dxfText(content));
-    if (rotation !== 0) this.pair(50, (rotation * 180) / Math.PI);
+    if (rotation !== 0) this.pair(50, toDegrees(rotation));
     if (align !== 'left') {
       this.pair(72, align === 'center' ? 1 : 2);
       this.point(11, at, z);

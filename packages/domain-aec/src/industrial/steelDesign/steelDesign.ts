@@ -5,6 +5,7 @@
  * @pure
  */
 
+import { clamp } from '@lib/clamp';
 import { sectionProperties, type SteelProfile } from '../../steel/profiles';
 
 export const E_STEEL = 210000; // N/mm²
@@ -242,7 +243,7 @@ export function memberBuckling(
   // Annex B Tab. B.1 — class 1–2: Cm (1 + (λ̄ − 0.2) n) ≤ Cm (1 + 0.8 n);
   // class 3: Cm (1 + 0.6 λ̄ n) ≤ Cm (1 + 0.6 n).
   const kyy = plastic
-    ? 0.9 * (1 + Math.min(Math.max(lambdaMajor - 0.2, 0), 0.8) * n)
+    ? 0.9 * (1 + clamp(lambdaMajor - 0.2, 0, 0.8) * n)
     : 0.9 * (1 + 0.6 * Math.min(lambdaMajor, 1) * n);
   // Tab. B.2 (CmLT = 0.9): kzy = 1 − c λ̄z nz / (CmLT − 0.25), λ̄z clamped to 1; c = 0.1 / 0.05.
   const factor = plastic ? 0.1 : 0.05;

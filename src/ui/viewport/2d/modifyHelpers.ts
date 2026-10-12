@@ -9,6 +9,7 @@
  * @pure
  */
 
+import { ellipsePoint } from '@lib/arc';
 import { distance, pointInPolygon, projectOntoSegment } from '@lib/polygon';
 import type * as THREE from 'three';
 import type {
@@ -168,7 +169,7 @@ export function entityDistSq(entity: Entity, worldPick: Vec2): number {
       const { center, radiusX, radiusY } = entity;
       const samples = Array.from({ length: ELLIPSE_PICK_SAMPLES + 1 }, (_, i): Vec2 => {
         const t = (i / ELLIPSE_PICK_SAMPLES) * 2 * Math.PI;
-        return [center[0] + radiusX * Math.cos(t), center[1] + radiusY * Math.sin(t)];
+        return ellipsePoint(center, radiusX, radiusY, t);
       });
       return chainDistSq(pick, samples, false);
     }

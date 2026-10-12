@@ -14,6 +14,16 @@ export function polar(
   return [center[0] + radius * Math.cos(angle), center[1] + radius * Math.sin(angle)];
 }
 
+/** The point at parametric `angle` (radians) on the axis-aligned ellipse of `radiusX` × `radiusY` about `center`. */
+export function ellipsePoint(
+  center: readonly [number, number],
+  radiusX: number,
+  radiusY: number,
+  angle: number,
+): [number, number] {
+  return [center[0] + radiusX * Math.cos(angle), center[1] + radiusY * Math.sin(angle)];
+}
+
 /**
  * `segments + 1` points from `startAngle` to `startAngle + sweep` inclusive (radians, CCW for a
  * positive sweep), evenly spaced in angle.

@@ -18,10 +18,6 @@ import type { CurveSegment } from '../../model/curve';
 import { isVec2 } from '../../lib/vec2';
 import { MAX_IMAGE_DATA_URL_LENGTH } from '../limits';
 
-export function isStringArray(v: unknown): v is string[] {
-  return Array.isArray(v) && v.every((x) => typeof x === 'string');
-}
-
 /** Fields that must be finite and > 0, per entity kind. */
 const POSITIVE_FIELDS: Readonly<Record<string, readonly string[]>> = {
   cylinder: ['radius', 'height'],

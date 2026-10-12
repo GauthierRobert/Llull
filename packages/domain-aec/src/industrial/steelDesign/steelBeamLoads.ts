@@ -3,6 +3,7 @@
  * @layer domain-aec
  */
 
+import { clamp } from '@lib/clamp';
 import type { LinePiece, PointLoad } from './steelBeamAnalysis';
 import { selfWeightPerMetre, topOfSteel, type SteelBar } from './steelMemberBars';
 
@@ -56,7 +57,7 @@ export function createBeamLoads(bar: SteelBar): BeamLoads {
 /** Add an area-load share (kN) landing `at` mm from the beam start. */
 export function depositArea(beam: BeamLoads, at: number, permanent: number, imposed: number): void {
   const bins = beam.binsPermanent.length;
-  const index = Math.min(bins - 1, Math.max(0, Math.floor(at / 1000 / (beam.lengthM / bins))));
+  const index = clamp(Math.floor(at / 1000 / (beam.lengthM / bins)), 0, bins - 1);
   beam.binsPermanent[index] = (beam.binsPermanent[index] ?? 0) + permanent;
   beam.binsImposed[index] = (beam.binsImposed[index] ?? 0) + imposed;
   beam.directPermanent += permanent;
@@ -71,7 +72,7 @@ export function addPointLoad(
   imposed: number,
   direct: boolean,
 ): void {
-  beam.points.push({ at: Math.min(beam.lengthM, Math.max(0, at / 1000)), permanent, imposed });
+  beam.points.push({ at: clamp(at / 1000, 0, beam.lengthM), permanent, imposed });
   if (direct) {
     beam.directPermanent += permanent;
     beam.directImposed += imposed;

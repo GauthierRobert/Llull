@@ -20,6 +20,17 @@ export function dot2(a: Vec2, b: Vec2): number {
   return a[0] * b[0] + a[1] * b[1];
 }
 
+/** @pure `center + R(angle)·[u, v]`: (u, v) rotated counter-clockwise by `angle`, then offset by `center` (x, y). */
+export function planPoint(
+  center: readonly [number, number, ...number[]],
+  angle: number,
+  [u, v]: Vec2,
+): Vec2 {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  return [center[0] + u * cos - v * sin, center[1] + u * sin + v * cos];
+}
+
 /** @pure z-component of a × b; > 0 when b is counter-clockwise from a */
 export function cross2(a: Vec2, b: Vec2): number {
   return a[0] * b[1] - a[1] * b[0];

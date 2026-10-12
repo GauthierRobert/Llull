@@ -2,6 +2,7 @@
  * @layer domain-aec
  */
 
+import { clamp } from '@lib/clamp';
 import type { SteelMemberElement } from '@core/model/building';
 import type { FrameMember, FrameNode } from '@lib/frame2d';
 import type { CoefficientSet } from '../common/windCoefficients';
@@ -252,7 +253,7 @@ export function craneActions(
   const hoist = capacityTonnes * GRAVITY * 1000;
   const self =
     model.craneSelfWeight !== undefined ? model.craneSelfWeight * 1000 : 0.5 * hoist + 20000;
-  const approach = Math.min(Math.max(0, (model.minHookApproach ?? 1) * 1000), span);
+  const approach = clamp((model.minHookApproach ?? 1) * 1000, 0, span);
   const wheelBase = model.wheelBase ?? 3000;
   const nearShare = (span - approach) / span;
   const farShare = approach / span;

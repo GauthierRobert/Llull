@@ -9,7 +9,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import { noop, report } from '@core/commands/noop';
 import { isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
 import { getBuilding } from '../../building/model';
-import { round } from '../../shared/numeric';
+import { round, roundedMetres } from '../../shared/numeric';
 import { metres as shown } from '../steelDesign/steelMemberRows';
 import { toCsv } from '../../shared/csv';
 import { briefList } from '../common/utilisation';
@@ -91,7 +91,6 @@ function rowOf(
         : 'none';
   const limit = pipeSpanLimit(element.dn, run.diameterMm);
   const allowed = limit.spanM * spanFactor;
-  const metres = (millimetres: number): number => round(millimetres / 1000, 2);
   const length = spanCoordinate(run.points, run.lengthMm);
   const spans = arcs.map((arc) => spanCoordinate(run.points, arc));
   const stretch = [...(carriers[0] ? [0] : []), ...spans, ...(carriers[1] ? [length] : [])];
@@ -144,13 +143,13 @@ function rowOf(
     mark: element.mark,
     line: element.line ?? '',
     dn: limit.dn,
-    lengthM: metres(run.lengthMm),
+    lengthM: roundedMetres(run.lengthMm),
     maxSpanM: limit.spanM,
     allowedSpanM: round(allowed, 2),
-    largestSpanM: metres(largest),
+    largestSpanM: roundedMetres(largest),
     overhangM: {
-      start: overhang.start === null ? null : metres(overhang.start),
-      end: overhang.end === null ? null : metres(overhang.end),
+      start: overhang.start === null ? null : roundedMetres(overhang.start),
+      end: overhang.end === null ? null : roundedMetres(overhang.end),
     },
     supports: arcs.length,
     unattached: unattached.length,

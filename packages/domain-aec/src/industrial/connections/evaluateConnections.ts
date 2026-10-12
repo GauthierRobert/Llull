@@ -4,6 +4,7 @@
  * @pure
  */
 
+import { planPoint } from '@lib/vec2';
 import type { CadDocument, CylinderEntity, Entity, Vec2, Vec3 } from '@core/model/types';
 import type {
   BasePlateElement,
@@ -44,7 +45,6 @@ export function plateLayout(
   const frame = sweepFrame(start, end, member.roll);
   if (!frame) return null;
   const angle = Math.atan2(frame.v[1], frame.v[0]);
-  const [cos, sin] = [Math.cos(angle), Math.sin(angle)];
   const edge = Math.max(2 * plate.boltDiameter, fromMm(doc, 40));
   const columns = Math.max(1, plate.boltCount / 2);
   const bolts: Vec2[] = [];
@@ -55,7 +55,7 @@ export function plateLayout(
           ? 0
           : -plate.length / 2 + edge + ((plate.length - 2 * edge) * index) / (columns - 1);
       const across = side * (plate.width / 2 - edge);
-      bolts.push([foot[0] + along * cos - across * sin, foot[1] + along * sin + across * cos]);
+      bolts.push(planPoint(foot, angle, [along, across]));
     }
   }
   return {

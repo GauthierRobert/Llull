@@ -2,6 +2,7 @@
  * @layer domain-aec
  */
 
+import { planPoint } from '@lib/vec2';
 import { shapeOf } from '../../industrial/equipment/equipmentShape';
 import type { Vec2 } from '@core/model/types';
 import type { BuildingElement, BuildingLevel } from '@core/model/building';
@@ -51,7 +52,6 @@ function rectangleAt(
   hy: number,
   angle = 0,
 ): Vec2[] {
-  const [cos, sin] = [Math.cos(angle), Math.sin(angle)];
   return (
     [
       [-hx, -hy],
@@ -59,7 +59,7 @@ function rectangleAt(
       [hx, hy],
       [-hx, hy],
     ] as const
-  ).map(([x, y]): Vec2 => [center[0] + x * cos - y * sin, center[1] + x * sin + y * cos]);
+  ).map(([x, y]): Vec2 => planPoint(center, angle, [x, y]));
 }
 
 /** Plan symbols of industrial elements (cut at `cutHeight` above the level). */

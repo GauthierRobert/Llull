@@ -6,6 +6,7 @@
  * @pure
  */
 
+import { toRadians } from '@lib/angle';
 import type { SteelProfile } from '../../steel/profiles';
 import { eulerForce, memberBuckling, sectionResistance } from './steelDesign';
 import type { FrameDirection } from './steelFrameDetect';
@@ -13,7 +14,7 @@ import { sectionOf } from './steelMemberBars';
 
 type BendingAxis = 'strong' | 'weak';
 
-const ALIGNMENT = (5 * Math.PI) / 180;
+const ALIGNMENT = toRadians(5);
 
 /** |cos| of the angle between the section depth axis of a vertical column and the frame's in-plane direction. */
 const depthAlignment = (roll: number, direction: FrameDirection): number =>

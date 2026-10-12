@@ -3,6 +3,7 @@
  * @layer domain-aec
  */
 
+import { toDegrees } from '@lib/angle';
 import type { CurvedWallElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
@@ -79,7 +80,7 @@ export const addCurvedWall = defineCommand({
       doc,
       withElement(resolution.building, wall),
       [wall.id],
-      `Added curved wall ${wall.mark} (${wall.id}): radius ${arc.radius.toFixed(1)}, ${((Math.abs(arc.sweep) * 180) / Math.PI).toFixed(1)}°, length ${toMetres(doc, curvedWallLength(wall)).toFixed(2)} m, ${thickness} thick, ${height} high.`,
+      `Added curved wall ${wall.mark} (${wall.id}): radius ${arc.radius.toFixed(1)}, ${toDegrees(Math.abs(arc.sweep)).toFixed(1)}°, length ${toMetres(doc, curvedWallLength(wall)).toFixed(2)} m, ${thickness} thick, ${height} high.`,
       { elementId: wall.id, radius: arc.radius },
     );
   },

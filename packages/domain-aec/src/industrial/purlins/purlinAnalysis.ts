@@ -4,6 +4,7 @@
  * @pure
  */
 
+import { toDegrees } from '@lib/angle';
 import type { CadDocument } from '@core/model/types';
 import { levelMembersInMm } from '../common/memberSupport';
 import { GAMMA_G, GAMMA_Q } from '../../shared/loadFactors';
@@ -179,7 +180,7 @@ export function analysePurlins(
         const dead = (roofDeadLoad * trib + selfWeight) * cosine;
         const snow = snowLoad * trib * cosine * cosine;
 
-        const pitchDegrees = (pitch * 180) / Math.PI;
+        const pitchDegrees = toDegrees(pitch);
         const { zone, direction, cpe, pressureOption } = purlinWind({
           purlin,
           eavesEnd,
@@ -242,7 +243,7 @@ export function analysePurlins(
           zone,
           span: purlin.length / 1000,
           ...worst,
-          check: `${worst.check} ${purlin.member.profile}, tributary ${tributary.toFixed(0)} mm, pitch ${((pitch * 180) / Math.PI).toFixed(1)}°`,
+          check: `${worst.check} ${purlin.member.profile}, tributary ${tributary.toFixed(0)} mm, pitch ${toDegrees(pitch).toFixed(1)}°`,
           upliftUtilisation: (uplift[0] as Verdict).utilisation,
         });
         record('roof', zone, cpe, worst.utilisation);

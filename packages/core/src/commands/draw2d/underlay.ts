@@ -27,9 +27,8 @@ const PIXEL_CONVENTION =
   'Image pixel coordinates [px, py]: origin at the TOP-left corner of the picture, +px right, ' +
   '+py DOWN (as read off the image); fractional values are fine.';
 
-const round = (value: number): number => roundTo(value, 6);
-
-const formatPoint = (point: readonly number[]): string => `[${point.map(round).join(', ')}]`;
+const formatPoint = (point: readonly number[]): string =>
+  `[${point.map((value) => roundTo(value, 6)).join(', ')}]`;
 
 /** The image entity `id`, or a no-op result explaining why there is none. */
 function underlayOf(doc: CadDocument, id: string, command: string): ImageEntity | CommandResult {
@@ -144,7 +143,7 @@ export const addImageUnderlay = defineCommand({
       doc,
       entity,
       `Added ${parsed.mime} underlay ${id} (${pixelWidth}×${pixelHeight} px) as ` +
-        `${round(entity.width)}×${round(entity.height)} units (${round(unitsPerPixel)} units/px) ` +
+        `${roundTo(entity.width, 6)}×${roundTo(entity.height, 6)} units (${roundTo(unitsPerPixel, 6)} units/px) ` +
         `at ${formatPoint(position)}, opacity ${opacity}${locked ? ', locked' : ''}.`,
     );
   },
@@ -204,11 +203,11 @@ export const calibrateUnderlayCommand = defineCommand({
     const turned =
       placement.rotation[2] === image.rotation[2]
         ? ''
-        : `, rotated in-plane to ${round(toDegrees(placement.rotation[2]))}°`;
+        : `, rotated in-plane to ${roundTo(toDegrees(placement.rotation[2]), 6)}°`;
     return changed(
       replaceEntity(doc, calibrated),
-      `Calibrated underlay ${id}: ${round(pixelDistance)} px = ${distance} units → ` +
-        `${round(unitsPerPixel)} units/px; size ${round(placement.width)}×${round(placement.height)}, ` +
+      `Calibrated underlay ${id}: ${roundTo(pixelDistance, 6)} px = ${distance} units → ` +
+        `${roundTo(unitsPerPixel, 6)} units/px; size ${roundTo(placement.width, 6)}×${roundTo(placement.height, 6)}, ` +
         `lower-left at ${formatPoint(placement.position)}${turned}.`,
       [id],
     );
@@ -286,10 +285,10 @@ export const imageToWorld = defineCommand({
       );
     const world = points.map((pixel): Vec3 => {
       const [x, y, z] = pixelToWorld(image, pixel);
-      return [round(x), round(y), round(z)];
+      return [roundTo(x, 6), roundTo(y, 6), roundTo(z, 6)];
     });
     const xy = world.map(([x, y]) => [x, y]);
-    const unitsPerPixel = round(image.width / image.pixelWidth);
+    const unitsPerPixel = roundTo(image.width / image.pixelWidth, 6);
     return report(
       doc,
       `image_to_world: ${points.length} point(s) on ${id} (${unitsPerPixel} units/px); first ` +

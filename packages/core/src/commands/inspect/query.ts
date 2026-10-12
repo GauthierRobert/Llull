@@ -171,18 +171,17 @@ export const findEntities = defineCommand({
       tagFuzzy,
     } = params;
 
-    const fail = (summary: string): CommandResult => noop(doc, summary);
     if ((bboxMin === undefined) !== (bboxMax === undefined))
-      return fail('find_entities: bboxMin and bboxMax must both be provided or both omitted.');
+      return noop(doc, 'find_entities: bboxMin and bboxMax must both be provided or both omitted.');
     if (nearPoint !== undefined && nearPoint.radius <= 0)
-      return fail('find_entities: nearPoint.radius must be a finite number > 0.');
+      return noop(doc, 'find_entities: nearPoint.radius must be a finite number > 0.');
     if (insideBBox !== undefined && isInverted(insideBBox[0], insideBBox[1]))
-      return fail('find_entities: insideBBox min must be <= max on every axis.');
+      return noop(doc, 'find_entities: insideBBox min must be <= max on every axis.');
     if (overlapsBBox !== undefined && isInverted(overlapsBBox[0], overlapsBBox[1]))
-      return fail('find_entities: overlapsBBox min must be <= max on every axis.');
+      return noop(doc, 'find_entities: overlapsBBox min must be <= max on every axis.');
     const touchingRef = touchingId !== undefined ? doc.entities[touchingId] : undefined;
     if (touchingId !== undefined && !touchingRef)
-      return fail(`find_entities: touchingId "${touchingId}" does not exist in the document.`);
+      return noop(doc, `find_entities: touchingId "${touchingId}" does not exist in the document.`);
     const touchingBounds = touchingRef ? entityBoundsInDoc(doc, touchingRef) : null;
     const nearRadiusSq = nearPoint ? nearPoint.radius * nearPoint.radius : 0;
     const nameLc = name?.toLowerCase();

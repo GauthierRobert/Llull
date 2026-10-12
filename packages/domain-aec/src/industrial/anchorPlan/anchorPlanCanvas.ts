@@ -4,7 +4,13 @@
 
 import type { Vec2 } from '@core/model/types';
 import { distance } from '@lib/polygon';
-import { n, svgText, type Viewport } from '../../shared/sheetFrame';
+import {
+  n,
+  readableDimensionLabel,
+  svgPoints,
+  svgText,
+  type Viewport,
+} from '../../shared/sheetFrame';
 import { ROW_HEIGHT } from './anchorPlanLayout';
 
 export class PlanCanvas {
@@ -57,24 +63,13 @@ export class PlanCanvas {
     this.line(da, db, 'dim');
     for (const end of [da, db])
       this.line([end[0] - 1, end[1] + 1], [end[0] + 1, end[1] - 1], 'dim');
-    let angle = (Math.atan2(pb[1] - pa[1], pb[0] - pa[0]) * 180) / Math.PI;
-    if (angle > 90 || angle <= -90) angle += 180;
-    const radians = (angle * Math.PI) / 180;
-    this.text(
-      [
-        (da[0] + db[0]) / 2 + Math.sin(radians) * 1.2,
-        (da[1] + db[1]) / 2 - Math.cos(radians) * 1.2,
-      ],
-      2.2,
-      label,
-      'middle',
-      angle,
-    );
+    const { angle, middle } = readableDimensionLabel(da, db, pb[0] - pa[0], pb[1] - pa[1]);
+    this.text(middle, 2.2, label, 'middle', angle);
   }
 
   polygon(points: ReadonlyArray<Vec2>, cssClass: string): void {
     this.parts.push(
-      `<polygon points="${points.map((point) => this.map(point).map(n).join(',')).join(' ')}" class="${cssClass}"/>`,
+      `<polygon points="${svgPoints(points.map((point) => this.map(point)))}" class="${cssClass}"/>`,
     );
   }
 }

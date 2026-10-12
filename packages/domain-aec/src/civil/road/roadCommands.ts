@@ -4,6 +4,7 @@
  * @layer domain-aec/civil
  */
 
+import { compactNumber } from '@lib/compactNumber';
 import type { CadDocument } from '@core/model/types';
 import type { AlignmentObject, ProfilePvi, RoadSection } from '@core/model/civil';
 import type { CommandResult } from '@core/commands/types';
@@ -274,7 +275,7 @@ export const setAlignmentProfile = defineCommand({
     if (first.station < start - 1e-6 || last.station > end + 1e-6) {
       return noop(
         doc,
-        `set_alignment_profile failed: PVIs span ${first.station} to ${last.station} but the alignment runs ${start} to ${Number(end.toFixed(4))}.`,
+        `set_alignment_profile failed: PVIs span ${first.station} to ${last.station} but the alignment runs ${start} to ${compactNumber(end)}.`,
       );
     }
     return commitCivil(

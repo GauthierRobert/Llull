@@ -1,11 +1,11 @@
 import { type Component, type JointKind, CONSTRAINT_KINDS } from '../../model/types';
+import { isStringArray } from '../../lib/isStringArray';
 import { findComponentCycle } from '../assembly/assemblies';
 import { isRecord } from '../../lib/isRecord';
 import { isFiniteNumber } from '../../lib/isFiniteNumber';
 import { isVec3 } from '../../lib/vec3';
 import { documentExtensions } from '../../plugins/host';
 import {
-  isStringArray,
   validateCamera,
   validateLayer,
   validateEntityValue,

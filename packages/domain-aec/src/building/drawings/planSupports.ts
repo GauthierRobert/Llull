@@ -6,6 +6,7 @@
  * @pure
  */
 
+import { planPoint } from '@lib/vec2';
 import type { Vec2 } from '@core/model/types';
 import type { BuildingModel, PipeSupportElement } from '@core/model/building';
 import { fromMm } from '@core/model/units';
@@ -29,13 +30,9 @@ export function supportPrimitives(
 ): PlanPrimitive[] {
   const pipe = building.elements[support.pipeId];
   const angle = pipe?.category === 'pipe' ? pipeAngle(pipe, support.position) : 0;
-  const [cos, sin] = [Math.cos(angle), Math.sin(angle)];
   const half = fromMm(doc, SYMBOL_SIZE) / 2;
   const centre: Vec2 = [support.position[0], support.position[1]];
-  const at = (along: number, across: number): Vec2 => [
-    centre[0] + along * cos - across * sin,
-    centre[1] + along * sin + across * cos,
-  ];
+  const at = (along: number, across: number): Vec2 => planPoint(centre, angle, [along, across]);
   const layer = layerName('pipeSupport');
   const line = (a: Vec2, b: Vec2): PlanPrimitive => thinLine(layer, a, b);
   const square: Vec2[] = [at(-half, -half), at(half, -half), at(half, half), at(-half, half)];

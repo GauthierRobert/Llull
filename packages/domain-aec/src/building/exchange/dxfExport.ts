@@ -2,6 +2,7 @@
  * @layer domain-aec
  */
 
+import { ellipsePoint } from '@lib/arc';
 import { type CadDocument, type Vec2, is2D } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
@@ -9,7 +10,7 @@ import { fromMm } from '@core/model/units';
 import { fileSlug, getBuilding } from '../model';
 import { noop, report } from '@core/commands/noop';
 import { buildPlanDrawing } from '../drawings/planDrawing';
-import { entityPlanPoint } from '../../shared/planPoint';
+import { entityPlanPoint } from '@core/geometry/entityFrame';
 import { DxfWriter, HIDDEN_LAYERS, INSUNITS, fmt, writePrimitive } from './dxfWriter';
 
 function writeDrafting(writer: DxfWriter, doc: CadDocument): void {
@@ -53,10 +54,7 @@ function writeDrafting(writer: DxfWriter, doc: CadDocument): void {
       case 'ellipse': {
         const samples = Array.from({ length: 64 }, (_, index): Vec2 => {
           const t = (index / 64) * Math.PI * 2;
-          return world([
-            entity.center[0] + entity.radiusX * Math.cos(t),
-            entity.center[1] + entity.radiusY * Math.sin(t),
-          ]);
+          return world(ellipsePoint(entity.center, entity.radiusX, entity.radiusY, t));
         });
         writer.polyline(layer, samples, true);
         break;

@@ -6,6 +6,7 @@
  * @pure
  */
 
+import { clamp } from '@lib/clamp';
 import type { CableTrayElement, PipeElement } from '@core/model/building';
 import { orderedElements } from '../../building/model';
 import { GRAVITY, round } from '../../shared/numeric';
@@ -167,7 +168,7 @@ function supportsOf(
           supports.push({
             s,
             beam,
-            at: Math.min(beamLength, Math.max(0, t * beamLength)),
+            at: clamp(t * beamLength, 0, beamLength),
           });
         }
       }
