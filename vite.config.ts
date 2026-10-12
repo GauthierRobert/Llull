@@ -62,6 +62,9 @@ export default defineConfig(({ command }) => ({
     globals: true,
     environment: 'jsdom',
     setupFiles: './tests/setup.ts',
+    // Domain suites run whole engineering solves (portal-frame design, golden plans) that take
+    // several seconds, more under coverage instrumentation.
+    testTimeout: 30_000,
     // Isolated agent worktrees (continue-working skill) live under the repo root
     // and contain full repo copies; never scan them for tests.
     // `server/**` has its own node-env vitest config — keep it out of the app

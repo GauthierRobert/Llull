@@ -195,7 +195,7 @@ describe('fixed column bases in the frame analysis', () => {
     expect(fixed.tonnes).toBeLessThan(pinned.tonnes);
     expect(`${fixed.column}/${fixed.rafter}`).toBe('HEA400/IPE450');
     expect(`${pinned.column}/${pinned.rafter}`).not.toBe(`${fixed.column}/${fixed.rafter}`);
-  }, 20_000); // two full portal-frame designs: ~5 s, over the default budget
+  });
 });
 
 describe('footing eccentricity and overturning with a base moment', () => {
