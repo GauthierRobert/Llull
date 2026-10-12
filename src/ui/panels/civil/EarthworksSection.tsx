@@ -11,7 +11,6 @@ import type { PlatformObject } from '@core/model/civil';
 import { useStore } from '@ui/store';
 import { PanelSection, FormError } from '@ui/panels/PanelParts';
 import {
-  CivilObjectRow,
   CivilObjectSelect,
   CivilStatus,
   useCivilObjects,
@@ -22,34 +21,28 @@ import {
 } from './CivilParts';
 import { optionalNumber, parseNumber, optionalText } from '@ui/numberText';
 import { parsePoints } from './civilInput';
-import { runQuery, useCivilReport } from './civilQuery';
+import { runQuery } from '@ui/services/localQuery';
+import { CivilReportRow } from './CivilReportRow';
 
 function PlatformRow({ platform }: { platform: PlatformObject }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
-  const [swell, setSwell] = useState('');
-  const volumes = useCivilReport('platform_earthworks', 'platformId', platform.id);
   return (
-    <CivilObjectRow object={platform} detail={volumes}>
-      <NumberField
-        value={swell}
-        set={setSwell}
-        hint="Swell factor"
-        label={`Swell factor of ${platform.name}`}
-      />
-      <button
-        type="button"
-        className="btn btn--ghost btn--sm"
-        title="Set the pad level so that cut and fill balance"
-        onClick={() =>
+    <CivilReportRow
+      object={platform}
+      report={{ command: 'platform_earthworks', idKey: 'platformId' }}
+      field={{ hint: 'Swell factor', label: `Swell factor of ${platform.name}` }}
+      action={{
+        label: 'Balance',
+        title: 'Set the pad level so that cut and fill balance',
+        run: (text) => {
           dispatch('balance_platform', {
             platformId: platform.id,
-            ...optionalNumber('swellFactor', swell),
-          })
-        }
-      >
-        Balance
-      </button>
-    </CivilObjectRow>
+            ...optionalNumber('swellFactor', text),
+          });
+          return false;
+        },
+      }}
+    />
   );
 }
 

@@ -7,11 +7,12 @@
  * can draw a cue in the 3D viewport.
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore, useViewportStore } from '@ui/store';
 import type { Constraint, Joint, DriveRelation } from '@core/model/types';
 import { PanelEmpty, PanelHeader, PanelSection, IconButton } from '@ui/panels/PanelParts';
+import { CommitInput } from '@ui/panels/propertyFields';
 import { orderedValues } from '@ui/panels/orderedValues';
 
 type ChipTone = 'accent' | 'success' | 'warning' | 'danger' | 'agent';
@@ -163,7 +164,6 @@ const radiansToDegrees = (radians: number): number =>
   Math.round(((radians * 180) / Math.PI) * 1e6) / 1e6;
 const degreesToRadians = (degrees: number): number => (degrees * Math.PI) / 180;
 
-/** Remounted (see `key`) whenever the document value changes, so the draft never goes stale. */
 function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
 
@@ -172,12 +172,10 @@ function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.Rea
   // Presentation only: revolute angles are shown in degrees (like Properties); the command
   // keeps radians.
   const currentValue = revolute ? radiansToDegrees(joint.angle) : joint.displacement;
-  const [inputValue, setInputValue] = useState<string>(String(currentValue));
 
-  const commitInput = (): void => {
-    const parsed = parseFloat(inputValue);
-    if (isNaN(parsed)) setInputValue(String(currentValue));
-    else if (parsed !== currentValue) {
+  const commitInput = (text: string): void => {
+    const parsed = parseFloat(text);
+    if (!isNaN(parsed) && parsed !== currentValue) {
       dispatch('set_joint_value', {
         id: joint.id,
         value: revolute ? degreesToRadians(parsed) : parsed,
@@ -200,19 +198,16 @@ function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.Rea
       info={`${joint.a.instanceId.slice(-6)} → ${joint.b.instanceId.slice(-6)} · axis ${axisLabel}`}
       inline={
         <>
-          <input
-            type="number"
+          <CommitInput
             className="mechanisms-joint-input"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onBlur={commitInput}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') commitInput();
-              else if (e.key === 'Escape') setInputValue(String(currentValue));
+            value={String(currentValue)}
+            label={`Joint value for ${joint.id} (${unit})`}
+            onCommit={commitInput}
+            testId={`joint-value-${joint.id}`}
+            inputProps={{
+              type: 'number',
+              title: `Current ${revolute ? 'angle' : 'displacement'} in ${unit}`,
             }}
-            aria-label={`Joint value for ${joint.id} (${unit})`}
-            data-testid={`joint-value-${joint.id}`}
-            title={`Current ${joint.kind === 'revolute' ? 'angle' : 'displacement'} in ${unit}`}
           />
           <span className="panel__row-meta">{unit}</span>
         </>
@@ -354,7 +349,7 @@ export function MechanismsPanel({ className }: MechanismsPanelProps): React.Reac
         listLabel="Joint list"
         rows={orderedValues(jointOrder, joints).map((joint) => (
           <JointRow
-            key={`${joint.id}:${joint.kind === 'revolute' ? joint.angle : joint.displacement}`}
+            key={joint.id}
             joint={joint}
             highlighted={isHighlighted('joint', joint.id)}
             onHighlight={highlight('joint')}

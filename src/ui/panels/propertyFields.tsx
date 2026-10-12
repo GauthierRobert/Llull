@@ -59,6 +59,8 @@ export function CommitInput({
   autoFocus = false,
   onCommit,
   onFinish,
+  testId,
+  inputProps,
 }: {
   value: string;
   label: string;
@@ -69,6 +71,12 @@ export function CommitInput({
   onCommit: (text: string) => void;
   /** Called after every blur (committed, unchanged or cancelled) so a caller can close the editor. */
   onFinish?: () => void;
+  testId?: string;
+  /** Extra native attributes (type, title, aria-*); the editing handlers stay ours. */
+  inputProps?: Omit<
+    React.InputHTMLAttributes<HTMLInputElement>,
+    'value' | 'onChange' | 'onBlur' | 'onKeyDown' | 'className' | 'placeholder' | 'inputMode'
+  >;
 }): React.ReactElement {
   const [draft, setDraft] = useState(value);
   const [seenValue, setSeenValue] = useState(value);
@@ -79,6 +87,8 @@ export function CommitInput({
   }
   return (
     <input
+      {...inputProps}
+      data-testid={testId}
       className={className}
       aria-label={label}
       value={draft}

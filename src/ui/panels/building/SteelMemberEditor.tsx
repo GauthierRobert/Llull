@@ -20,6 +20,7 @@ import {
   MEMBER_ROLE_OPTIONS,
   type SelectOption,
 } from './steelProfileOptions';
+import { OptionSelect } from '@ui/panels/OptionSelect';
 import { LabeledInput } from './LabeledInput';
 
 interface SelectFieldProps {
@@ -37,17 +38,19 @@ function SelectField({
   blankLabel,
   onChange,
 }: SelectFieldProps): React.ReactElement {
+  const values = [...(blankLabel !== undefined ? [''] : []), ...options.map(([v]) => v)];
+  const textOf = (optionValue: string): string =>
+    optionValue === '' ? (blankLabel ?? '') : (options.find(([v]) => v === optionValue)?.[1] ?? '');
   return (
     <label className="field">
       <span className="field__label">{label}</span>
-      <select value={value} onChange={(event) => onChange(event.target.value)}>
-        {blankLabel !== undefined && <option value="">{blankLabel}</option>}
-        {options.map(([optionValue, text]) => (
-          <option key={optionValue} value={optionValue}>
-            {text}
-          </option>
-        ))}
-      </select>
+      <OptionSelect
+        value={value}
+        options={values}
+        label={label}
+        optionLabel={textOf}
+        onChange={onChange}
+      />
     </label>
   );
 }

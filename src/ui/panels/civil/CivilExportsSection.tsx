@@ -10,7 +10,7 @@ import { PAPER_SIZES, type PaperSize } from '@aec/shared/sheetFrame';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { OptionSelect } from '@ui/panels/OptionSelect';
 import { CivilStatus, NumberField } from './CivilParts';
-import { downloadQuery } from './civilQuery';
+import { downloadQuery } from '@ui/services/localQuery';
 import { optionalNumber } from '@ui/numberText';
 
 export function CivilExportsSection(): React.ReactElement {

@@ -16,6 +16,7 @@ import {
   type EquipmentEditValues,
 } from './equipmentEdit';
 import { LabeledInput } from './LabeledInput';
+import { EQUIPMENT_SHAPE_OPTIONS } from './industrialTools';
 
 interface EquipmentEditorProps {
   element: EquipmentElement;
@@ -62,9 +63,11 @@ export function EquipmentEditor({ element, levels }: EquipmentEditorProps): Reac
           onChange={(event) => change('shape', event.target.value)}
           data-testid="equipment-edit-shape"
         >
-          <option value="box">Box / machine</option>
-          <option value="vertical_vessel">Vertical vessel</option>
-          <option value="horizontal_vessel">Horizontal vessel</option>
+          {EQUIPMENT_SHAPE_OPTIONS.map(([shape, text]) => (
+            <option key={shape} value={shape}>
+              {text}
+            </option>
+          ))}
         </select>
       </label>
       <label className="field">

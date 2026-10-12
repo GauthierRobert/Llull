@@ -7,8 +7,7 @@
  */
 
 import React, { useState } from 'react';
-import { useStore } from '@ui/store';
-import { execute } from '@core/commands/registry';
+import { runQuery } from '@ui/services/localQuery';
 import { downloadBlob as download } from '@ui/download';
 import { isCodeExportData } from '@ui/resultData';
 import { fetchStepExport } from '@ui/services/serverFiles';
@@ -28,10 +27,7 @@ export function ModelExport(): React.ReactElement {
   const [status, setStatus] = useState('');
 
   const exportCode = (language: Exclude<ExportFormat, 'step'>): void => {
-    const result = execute(useStore.getState().document, 'export_code', {
-      language,
-      name: 'model',
-    });
+    const result = runQuery('export_code', { language, name: 'model' });
     if (!isCodeExportData(result.data)) {
       setStatus(result.summary);
       return;

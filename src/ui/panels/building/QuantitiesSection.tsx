@@ -8,7 +8,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { useStore } from '@ui/store';
-import { execute } from '@core/commands/registry';
+import { runQuery } from '@ui/services/localQuery';
 import type { CostLine } from '@aec/index';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { OptionSelect } from '@ui/panels/OptionSelect';
@@ -87,14 +87,13 @@ function RateForm({ lines }: { lines: ReadonlyArray<CostLine> }): React.ReactEle
   );
 }
 
-export function QuantitiesSection(): React.ReactElement {
+/** Mounted only while the section is open: the cost estimate is not computed when collapsed. */
+function EstimateTable(): React.ReactElement {
   // The takeoff reads only the building model and the document units: re-run on those alone.
   const building = useStore((s) => s.document.building);
   const units = useStore((s) => s.document.units);
-  const [schedule, setSchedule] = useState<(typeof SCHEDULES)[number]>('wall');
-  const [status, setStatus] = useState('');
   const estimateResult = useMemo(
-    () => execute(useStore.getState().document, 'estimate_cost', {}),
+    () => runQuery('estimate_cost'),
     // building + units are the only document slices the takeoff reads.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [building, units],
@@ -102,26 +101,8 @@ export function QuantitiesSection(): React.ReactElement {
   const estimate = isEstimateData(estimateResult.data) ? estimateResult.data : null;
   const priced = estimate?.lines.filter((line) => line.amount !== null) ?? [];
 
-  const downloadCsv = (command: string, params: object, fileName: string): void => {
-    const result = execute(useStore.getState().document, command, params);
-    if (isCsvData(result.data)) downloadText(result.data.csv, fileName, 'text/csv');
-    else setStatus(result.summary);
-  };
-  const downloadTakeoff = (): void => downloadCsv('quantity_takeoff', {}, 'quantity-takeoff.csv');
-  const downloadEstimate = (): void => {
-    if (estimate !== null) downloadText(estimate.csv, 'cost-estimate.csv', 'text/csv');
-  };
-  const downloadSchedule = (): void =>
-    downloadCsv('building_schedule', { kind: schedule }, `${schedule}-schedule.csv`);
-
   return (
-    <PanelSection
-      title="Quantities & cost"
-      step={4}
-      hint="Material take-off (steel tonnage, concrete, areas) and schedules, as CSV for Excel."
-      collapsible
-      testId="building-quantities"
-    >
+    <>
       {estimate === null ? (
         <p className="panel__empty-hint" role="status">
           {estimateResult.summary}
@@ -165,6 +146,37 @@ export function QuantitiesSection(): React.ReactElement {
           <RateForm lines={estimate.lines} />
         </>
       )}
+    </>
+  );
+}
+
+export function QuantitiesSection(): React.ReactElement {
+  const [schedule, setSchedule] = useState<(typeof SCHEDULES)[number]>('wall');
+  const [status, setStatus] = useState('');
+
+  const downloadCsv = (
+    command: string,
+    params: Record<string, unknown>,
+    fileName: string,
+  ): void => {
+    const result = runQuery(command, params);
+    if (isCsvData(result.data)) downloadText(result.data.csv, fileName, 'text/csv');
+    else setStatus(result.summary);
+  };
+  const downloadTakeoff = (): void => downloadCsv('quantity_takeoff', {}, 'quantity-takeoff.csv');
+  const downloadEstimate = (): void => downloadCsv('estimate_cost', {}, 'cost-estimate.csv');
+  const downloadSchedule = (): void =>
+    downloadCsv('building_schedule', { kind: schedule }, `${schedule}-schedule.csv`);
+
+  return (
+    <PanelSection
+      title="Quantities & cost"
+      step={4}
+      hint="Material take-off (steel tonnage, concrete, areas) and schedules, as CSV for Excel."
+      collapsible
+      testId="building-quantities"
+    >
+      <EstimateTable />
       <div className="building-actions">
         <button type="button" className="btn btn--ghost btn--sm" onClick={downloadTakeoff}>
           Takeoff CSV

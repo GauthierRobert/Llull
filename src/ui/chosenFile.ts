@@ -26,3 +26,13 @@ export function readChosenFile(
   if (!file) return;
   void file.text().then((text) => onText(text, file.name));
 }
+
+/** Reads a file as a `data:` URL (images embedded in the document). */
+export function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error(`cannot read ${file.name}`));
+    reader.readAsDataURL(file);
+  });
+}

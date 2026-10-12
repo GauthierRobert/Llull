@@ -5,12 +5,13 @@
  * (create_material) and assigns them to the selection (assign_material).
  */
 
-import React, { useState } from 'react';
+import React, { memo, useCallback, useState } from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
 import type { Material } from '@core/model/types';
 import { PanelEmpty, PanelHeader } from '@ui/panels/PanelParts';
-import { isHexColor } from '@lib/isHexColor';
+import { useIsMounted } from '@ui/hooks/useIsMounted';
+import { materialDraftOf } from '@ui/panels/materialRules';
 import { significantNumber } from '@lib/compactNumber';
 
 /** 3 significant digits without exponent notation for ordinary magnitudes (7850, not "7.85e+3"). */
@@ -20,22 +21,23 @@ function formatDensity(density: number): string {
 
 interface MaterialRowProps {
   material: Material;
-  selectedEntityIds: string[];
   isSelected: boolean;
   onSelect: (name: string) => void;
 }
 
-function MaterialRow({
+const MaterialRow = memo(function MaterialRow({
   material,
-  selectedEntityIds,
   isSelected,
   onSelect,
 }: MaterialRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
+  // A count (not the id array) keeps rows from re-rendering on every selection change.
+  const selectedCount = useStore((s) => s.document.selection.length);
 
   const handleAssign = (): void => {
-    if (selectedEntityIds.length === 0) return;
-    dispatch('assign_material', { materialName: material.name, entityIds: selectedEntityIds });
+    const entityIds = useStore.getState().document.selection;
+    if (entityIds.length === 0) return;
+    dispatch('assign_material', { materialName: material.name, entityIds });
   };
 
   return (
@@ -70,19 +72,19 @@ function MaterialRow({
         type="button"
         className="material-assign-btn"
         onClick={handleAssign}
-        disabled={selectedEntityIds.length === 0}
+        disabled={selectedCount === 0}
         aria-label={`Assign material ${material.name} to selected entities`}
         title={
-          selectedEntityIds.length === 0
+          selectedCount === 0
             ? 'Select entities in the viewport first'
-            : `Assign "${material.name}" to ${selectedEntityIds.length} selected entity`
+            : `Assign "${material.name}" to ${selectedCount} selected entity`
         }
       >
         Assign
       </button>
     </li>
   );
-}
+});
 
 const EMPTY_FORM = {
   name: '',
@@ -97,48 +99,27 @@ const SLIDERS = [
   { field: 'roughness', title: 'Roughness' },
 ] as const;
 
-/** NaN is outside the interval. */
-const isUnitInterval = (value: number): boolean => value >= 0 && value <= 1;
-
 function CreateMaterialForm(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const [form, setForm] = useState(EMPTY_FORM);
-  const { name, density, color, metalness, roughness } = form;
+  const { name, density, color } = form;
   const setField =
     (field: keyof typeof EMPTY_FORM) =>
     (e: React.ChangeEvent<HTMLInputElement>): void =>
       setForm((previous) => ({ ...previous, [field]: e.target.value }));
 
-  const densityNum = parseFloat(density);
-  const metalnessNum = parseFloat(metalness);
-  const roughnessNum = parseFloat(roughness);
-
-  const isValid =
-    name.trim() !== '' &&
-    densityNum > 0 &&
-    isHexColor(color) &&
-    isUnitInterval(metalnessNum) &&
-    isUnitInterval(roughnessNum);
+  const isMounted = useIsMounted();
+  const draft = materialDraftOf(form);
 
   const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
-    if (!isValid) return;
-    dispatch(
-      'create_material',
-      {
-        name: name.trim(),
-        density: densityNum,
-        color,
-        metalness: metalnessNum,
-        roughness: roughnessNum,
+    if (draft === null) return;
+    dispatch('create_material', draft, {
+      // A rejected create (e.g. duplicate name) keeps the typed values for correction.
+      onResult: ({ changed }) => {
+        if (changed && isMounted()) setForm(EMPTY_FORM);
       },
-      {
-        // A rejected create (e.g. duplicate name) keeps the typed values for correction.
-        onResult: ({ changed }) => {
-          if (changed) setForm(EMPTY_FORM);
-        },
-      },
-    );
+    });
   };
 
   return (
@@ -227,7 +208,7 @@ function CreateMaterialForm(): React.ReactElement {
       <button
         type="submit"
         className="btn btn--primary btn--block"
-        disabled={!isValid}
+        disabled={draft === null}
         aria-label="Create material"
         title="Create material"
       >
@@ -243,13 +224,14 @@ interface MaterialsPanelProps {
 
 export function MaterialsPanel({ className }: MaterialsPanelProps): React.ReactElement {
   const materials = useStore((s) => s.document.materials);
-  const selection = useStore((s) => s.document.selection);
   const materialList = Object.values(materials);
 
   const [activeMaterialName, setActiveMaterialName] = useState<string | null>(null);
 
-  const handleMaterialSelect = (name: string): void =>
-    setActiveMaterialName((prev) => (prev === name ? null : name));
+  const handleMaterialSelect = useCallback(
+    (name: string): void => setActiveMaterialName((prev) => (prev === name ? null : name)),
+    [],
+  );
 
   return (
     <aside className={classNames('panel materials-panel', className)} aria-label="Materials">
@@ -271,7 +253,6 @@ export function MaterialsPanel({ className }: MaterialsPanelProps): React.ReactE
             <MaterialRow
               key={material.name}
               material={material}
-              selectedEntityIds={selection}
               isSelected={activeMaterialName === material.name}
               onSelect={handleMaterialSelect}
             />

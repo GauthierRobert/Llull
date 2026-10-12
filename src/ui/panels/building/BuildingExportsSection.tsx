@@ -8,8 +8,8 @@
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
-import { execute } from '@core/commands/registry';
-import { isNcFilesData, stringFields } from '@ui/resultData';
+import { isNcFilesData } from '@ui/resultData';
+import { downloadQuery, runQuery } from '@ui/services/localQuery';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { OptionSelect } from '@ui/panels/OptionSelect';
 import { capitalize } from '@ui/panels/capitalize';
@@ -42,17 +42,10 @@ export function BuildingExportsSection(): React.ReactElement {
     params: Record<string, unknown>,
     field: string,
     mimeType: string,
-  ): void => {
-    const result = execute(useStore.getState().document, command, params);
-    const data = stringFields(result.data);
-    const content = data?.[field];
-    const fileName = data?.['filename'];
-    if (content !== undefined && fileName !== undefined) downloadText(content, fileName, mimeType);
-    setStatus(result.summary);
-  };
+  ): void => setStatus(downloadQuery(command, params, field, `${command}.${field}`, mimeType));
 
   const exportNcFiles = (): void => {
-    const result = execute(useStore.getState().document, 'export_nc_files', {});
+    const result = runQuery('export_nc_files');
     const files = isNcFilesData(result.data) ? result.data.files : [];
     for (const file of files) downloadText(file.content, file.name, 'text/plain');
     setStatus(result.summary);

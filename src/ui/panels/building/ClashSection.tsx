@@ -7,7 +7,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
-import { execute } from '@core/commands/registry';
+import { runQuery } from '@ui/services/localQuery';
 import type { Clash } from '@aec/industrial/clash/clash';
 import { toMetres } from '@core/model/units';
 import type { BuildingModel } from '@core/model/building';
@@ -29,8 +29,7 @@ export function ClashSection(): React.ReactElement {
   const report = computed !== null && computed.building === building ? computed : null;
 
   const runCheck = (): void => {
-    const document = useStore.getState().document;
-    const result = execute(document, 'check_clashes', {});
+    const result = runQuery('check_clashes');
     const clashes = isClashData(result.data) ? result.data.clashes : [];
     setReport({ summary: result.summary, clashes, building });
   };

@@ -10,19 +10,20 @@ import type { DocumentUnit } from '@core/model/types';
 import type { DwgImportTarget } from '@mcp/restProtocol';
 import { useStore } from '@ui/store';
 import { fileStem, readChosenFile, takeChosenFile } from '@ui/chosenFile';
+import { useIsMounted } from '@ui/hooks/useIsMounted';
 import { uploadDwg } from '@ui/services/serverFiles';
 
 export function DxfImports({ unit }: { unit: DocumentUnit }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const [dwgStatus, setDwgStatus] = useState('');
-  const importDwg = (
-    event: React.ChangeEvent<HTMLInputElement>,
-    target: DwgImportTarget,
-  ): void => {
+  const isMounted = useIsMounted();
+  const importDwg = (event: React.ChangeEvent<HTMLInputElement>, target: DwgImportTarget): void => {
     const file = takeChosenFile(event);
     if (!file) return;
     setDwgStatus(`Converting ${file.name}…`);
-    void uploadDwg(file, target, unit).then(setDwgStatus);
+    void uploadDwg(file, target, unit).then((status) => {
+      if (isMounted()) setDwgStatus(status);
+    });
   };
   return (
     <div className="building-inline-form" aria-label="DXF import">

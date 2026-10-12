@@ -14,7 +14,7 @@ import { OptionSelect } from '@ui/panels/OptionSelect';
 import { CivilObjectRow, CivilStatus, NumberField } from './CivilParts';
 import { optionalNumber, parseNumber } from '@ui/numberText';
 import { parsePvis } from './civilInput';
-import { downloadQuery } from './civilQuery';
+import { downloadQuery } from '@ui/services/localQuery';
 
 const SECTION_FIELDS = [
   ['laneWidth', 'Lane width'],

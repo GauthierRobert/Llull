@@ -16,8 +16,7 @@ import {
   TextField,
   useChosenId,
 } from './CivilParts';
-import { optionalNumber, parseNumberList, optionalText } from '@ui/numberText';
-import { parsePoints } from './civilInput';
+import { alignmentParamsOf } from './civilRules';
 import { AlignmentEditor } from './AlignmentEditor';
 
 export function RoadsSection(): React.ReactElement {
@@ -34,29 +33,12 @@ export function RoadsSection(): React.ReactElement {
 
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
-    const parsed = parsePoints(points);
-    const radiusList = parseNumberList(radii);
-    const spiralList = parseNumberList(spirals);
-    if (parsed === null || parsed.length < 2) {
-      setError('Points: at least 2 points "x,y; x,y".');
+    const gathered = alignmentParamsOf({ points, radii, spirals, surfaceId, interval, name });
+    if (!gathered.ok) {
+      setError(gathered.error);
       return;
     }
-    if (radiusList === null) {
-      setError('Radii: numbers separated by commas, one per interior point.');
-      return;
-    }
-    if (spiralList === null) {
-      setError('Spirals: lengths separated by commas, one per interior point (0 = none).');
-      return;
-    }
-    dispatch('add_alignment', {
-      points: parsed,
-      ...(radiusList.length > 0 ? { radii: radiusList } : {}),
-      ...(spiralList.length > 0 ? { spirals: spiralList } : {}),
-      ...(surfaceId !== '' ? { surfaceId } : {}),
-      ...optionalNumber('stationInterval', interval),
-      ...optionalText('name', name),
-    });
+    dispatch('add_alignment', gathered.params);
     setError('');
   };
 

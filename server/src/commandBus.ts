@@ -47,7 +47,9 @@ const history: Record<HistoryDirection, CadDocument[]> = { undo: [], redo: [] };
 const pushCapped = (stack: CadDocument[], doc: CadDocument): CadDocument[] =>
   [...stack, doc].slice(-MAX_UNDO_DEPTH);
 
-function withHistoryFlags(result: Omit<CommandResponseBody, 'canUndo' | 'canRedo'>): CommandResponseBody {
+function withHistoryFlags(
+  result: Omit<CommandResponseBody, 'canUndo' | 'canRedo'>,
+): CommandResponseBody {
   return { ...result, canUndo: canUndo(), canRedo: canRedo() };
 }
 

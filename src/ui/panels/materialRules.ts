@@ -1,0 +1,37 @@
+/** @layer ui/panels Pure validation/parsing of the "new material" form (no document access). */
+
+import { isHexColor } from '@lib/isHexColor';
+
+export interface MaterialForm {
+  readonly name: string;
+  readonly density: string;
+  readonly color: string;
+  readonly metalness: string;
+  readonly roughness: string;
+}
+
+export interface MaterialDraft {
+  readonly name: string;
+  readonly density: number;
+  readonly color: string;
+  readonly metalness: number;
+  readonly roughness: number;
+}
+
+/** NaN is outside the interval. */
+const isUnitInterval = (value: number): boolean => value >= 0 && value <= 1;
+
+/** The `create_material` params, or null while the form is incomplete / out of range. */
+export function materialDraftOf(form: MaterialForm): MaterialDraft | null {
+  const name = form.name.trim();
+  const density = parseFloat(form.density);
+  const metalness = parseFloat(form.metalness);
+  const roughness = parseFloat(form.roughness);
+  const valid =
+    name !== '' &&
+    density > 0 &&
+    isHexColor(form.color) &&
+    isUnitInterval(metalness) &&
+    isUnitInterval(roughness);
+  return valid ? { name, density, color: form.color, metalness, roughness } : null;
+}

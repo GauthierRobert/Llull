@@ -5,19 +5,22 @@
  * entities in the viewport; the delete button dispatches delete_building_element.
  */
 
-import React from 'react';
+import React, { memo, useMemo } from 'react';
 import { useStore } from '@ui/store';
 import type { BuildingElement } from '@core/model/building';
 import { PanelSection, IconButton } from '@ui/panels/PanelParts';
-import { orderedValues } from '@ui/panels/orderedValues';
 import { CATEGORY_LABEL, describe } from './describeElement';
+import { elementsOnActiveLevel, isElementSelected } from './elementListRules';
 
 interface ElementRowProps {
   element: BuildingElement;
   selected: boolean;
 }
 
-function ElementRow({ element, selected }: ElementRowProps): React.ReactElement {
+const ElementRow = memo(function ElementRow({
+  element,
+  selected,
+}: ElementRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const select = useStore((s) => s.select);
   const units = useStore((s) => s.document.units);
@@ -47,19 +50,13 @@ function ElementRow({ element, selected }: ElementRowProps): React.ReactElement 
       </span>
     </li>
   );
-}
+});
 
 export function ElementListSection(): React.ReactElement {
   const building = useStore((s) => s.document.building);
   const selection = useStore((s) => s.document.selection);
-  const elements = building
-    ? orderedValues(building.elementOrder, building.elements).filter((element) => {
-        const host = 'hostId' in element ? building.elements[element.hostId] : undefined;
-        const levelId =
-          'levelId' in element ? element.levelId : host && 'levelId' in host ? host.levelId : null;
-        return levelId === null || levelId === building.activeLevelId;
-      })
-    : [];
+  const elements = useMemo(() => elementsOnActiveLevel(building), [building]);
+  const selected = useMemo(() => new Set(selection), [selection]);
   const activeName = building?.activeLevelId
     ? building.levels[building.activeLevelId]?.name
     : undefined;
@@ -76,10 +73,7 @@ export function ElementListSection(): React.ReactElement {
           <ElementRow
             key={element.id}
             element={element}
-            selected={
-              element.entityIds.length > 0 &&
-              element.entityIds.every((id) => selection.includes(id))
-            }
+            selected={isElementSelected(element, selected)}
           />
         ))}
       </ul>

@@ -9,16 +9,7 @@
 import React, { useRef } from 'react';
 import { useStore } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
-import { takeChosenFile } from '@ui/chosenFile';
-
-function readAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error ?? new Error(`cannot read ${file.name}`));
-    reader.readAsDataURL(file);
-  });
-}
+import { readAsDataUrl, takeChosenFile } from '@ui/chosenFile';
 
 export function ImageUnderlayImport(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
