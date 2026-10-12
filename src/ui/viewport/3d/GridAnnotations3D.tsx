@@ -8,18 +8,18 @@
 
 import { useMemo } from 'react';
 import { Billboard, Line, Text } from '@react-three/drei';
-import type { CadDocument, Entity } from '@core/model/types';
+import type { CadDocument, Entity, Vec3 } from '@core/model/types';
+import { circlePoints } from '@core/geometry/tessellation';
 import { useViewportStore } from '@ui/store';
 import { TEXT_FONT_URL } from '@ui/viewport/textFont';
 import { collectGridAnnotations, GRID_LAYER_NAME } from './gridAnnotations';
 
 const CIRCLE_SEGMENTS = 40;
 
-function circlePoints(radius: number): [number, number, number][] {
-  return Array.from({ length: CIRCLE_SEGMENTS + 1 }, (_, index): [number, number, number] => {
-    const angle = (index / CIRCLE_SEGMENTS) * Math.PI * 2;
-    return [radius * Math.cos(angle), radius * Math.sin(angle), 0];
-  });
+/** Closed bubble outline (first point repeated). */
+function bubbleOutline(radius: number): Vec3[] {
+  const ring = circlePoints(0, 0, 0, radius, CIRCLE_SEGMENTS);
+  return [...ring, ...ring.slice(0, 1)];
 }
 
 export function GridAnnotations3D({ document }: { document: CadDocument }): React.ReactElement {
@@ -41,7 +41,7 @@ export function GridAnnotations3D({ document }: { document: CadDocument }): Reac
   // One outline per bubble radius (R9: no geometry rebuilt every render).
   const outlines = useMemo(
     () =>
-      new Map(annotations.bubbles.map((bubble) => [bubble.radius, circlePoints(bubble.radius)])),
+      new Map(annotations.bubbles.map((bubble) => [bubble.radius, bubbleOutline(bubble.radius)])),
     [annotations],
   );
 
@@ -64,7 +64,7 @@ export function GridAnnotations3D({ document }: { document: CadDocument }): Reac
           position={[bubble.center[0], bubble.center[1], bubble.center[2] + bubble.radius]}
         >
           <Line
-            points={outlines.get(bubble.radius) ?? circlePoints(bubble.radius)}
+            points={outlines.get(bubble.radius) ?? bubbleOutline(bubble.radius)}
             color={bubble.color}
             lineWidth={2}
             depthTest={false}

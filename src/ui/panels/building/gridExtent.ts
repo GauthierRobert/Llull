@@ -6,6 +6,7 @@
  */
 
 import type { BuildingModel, GridElement } from '@core/model/building';
+import { pointsExtent } from '@core/geometry/bounds';
 import { crossGridLines } from '@aec/industrial/framing/gridFraming';
 import type { PlanExtent } from './elementToolForm';
 
@@ -13,9 +14,8 @@ import type { PlanExtent } from './elementToolForm';
 const RELATIVE_CROSSING_TOLERANCE = 1e-6;
 
 function boundsOf(points: ReadonlyArray<readonly [number, number]>): PlanExtent {
-  const xs = points.map((point) => point[0]);
-  const ys = points.map((point) => point[1]);
-  return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+  const { minX, minY, maxX, maxY } = pointsExtent(points);
+  return [minX, minY, maxX, maxY];
 }
 
 export function gridExtent(building: BuildingModel | undefined): PlanExtent | null {

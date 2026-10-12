@@ -20,7 +20,7 @@ import { withEntity } from '../entity/entityOps';
 import { commitEntity } from '../entity/commitEntity';
 import { newEntity } from '../entity/newEntity';
 import { boundsText, positionField, rotationField } from './shared';
-import { placedMeshEntity } from './gearSolid';
+import { placedMeshEntity, pressureAngleProblem } from './gearSolid';
 import { noop } from '../noop';
 
 const SHAFT_SEGMENTS = 64;
@@ -90,9 +90,8 @@ export const addSplineShaft = defineCommand({
     }
     if (!(length > 0 && Number.isFinite(length)))
       return fail(`length must be finite and > 0, got ${String(length)}.`);
-    if (!(pressureAngle > 0 && pressureAngle < Math.PI / 2)) {
-      return fail(`pressureAngle must be in (0, π/2), got ${String(pressureAngle)}.`);
-    }
+    const angleProblem = pressureAngleProblem(pressureAngle);
+    if (angleProblem !== null) return fail(angleProblem);
     const referenceRadius = referenceDiameter / 2;
     const tipRadius = referenceRadius - 0.1 * mod;
     const rootRadius = tipRadius - 0.9 * mod;

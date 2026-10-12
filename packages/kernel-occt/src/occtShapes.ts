@@ -10,9 +10,9 @@ import { type Entity, type Vec3, createEmptyDocument } from '@core/model/types';
 import { entityTrianglePositions } from '@core/geometry/entityTriangles';
 import { cross3, dot3, sub3 } from '@lib/vec3';
 import { isValidPolygon, toCounterClockwise } from '@lib/polygon';
+import { release } from '@core/geometry/nativeObject';
 import {
   explorer,
-  release,
   type OccApi,
   type OccHandle,
   type OccMakeFace,

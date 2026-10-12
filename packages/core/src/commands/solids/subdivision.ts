@@ -4,15 +4,22 @@
  * derived (geometry/subdivision).
  */
 
-import { type SubdivisionEntity, type Vec3, DEFAULT_LAYER_ID } from '../../model/types';
+import type { SubdivisionEntity, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { colorField, defineCommand, vec3, z } from '../schema';
 import { noop } from '../noop';
-import { nextId } from '../../lib/id';
 import { add3, finiteVec3OrZero } from '../../lib/vec3';
 import { applyEulerXYZ } from '../../lib/eulerRotation';
 import { newEntity } from '../entity/newEntity';
-import { DEFAULT_SOLID_COLOR, commitSolid, rotationField } from './shared';
+import {
+  DEFAULT_SOLID_COLOR,
+  commitSolid,
+  rotationField,
+  existingLayerOrDefault,
+  explicitIdField,
+  explicitIdOrNext,
+  explicitIdTaken,
+} from './shared';
 import {
   type Cage,
   edgeKey,
@@ -177,27 +184,19 @@ export const addSubdivisionSolid = defineCommand({
       .optional(),
     color: colorField(DEFAULT_SOLID_COLOR),
     name: z.string().describe('Optional display name.').optional(),
-    id: z
-      .string()
-      .describe('Optional explicit entity id. If omitted a unique id is generated.')
-      .optional(),
+    id: explicitIdField(),
   }),
   run: (doc, params): CommandResult => {
     const fail = (why: string): CommandResult => noop(doc, `add_subdivision_solid: ${why}; no-op.`);
     const { levels = 3, creases = [], position = [0, 0, 0], rotation, layerId, name } = params;
     const explicitId = params.id;
-    if (
-      explicitId !== undefined &&
-      explicitId.length > 0 &&
-      Object.hasOwn(doc.entities, explicitId)
-    )
-      return fail(`entity id "${explicitId}" already exists`);
+    if (explicitIdTaken(doc, explicitId)) return fail(`entity id "${explicitId}" already exists`);
     const base = cageOf(params.box, params.cylinder, params.vertices, params.faces);
     if (typeof base === 'string') return fail(base);
     const cage: Cage = { ...base, creases: uniqueEdges(creases) };
     const problem = sizeProblem(cage, levels) ?? cageProblem(cage);
     if (problem !== null) return fail(problem);
-    const id = explicitId !== undefined && explicitId.length > 0 ? explicitId : nextId('subd');
+    const id = explicitIdOrNext(explicitId, 'subd');
     const entity: SubdivisionEntity = newEntity(
       'subdivision',
       id,
@@ -207,8 +206,7 @@ export const addSubdivisionSolid = defineCommand({
       {
         rotation: finiteVec3OrZero(rotation),
         name,
-        layerId:
-          layerId !== undefined && Object.hasOwn(doc.layers, layerId) ? layerId : DEFAULT_LAYER_ID,
+        layerId: existingLayerOrDefault(doc, layerId),
       },
     ) as SubdivisionEntity;
     const result = commitSolid(

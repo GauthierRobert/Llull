@@ -127,12 +127,3 @@ export function explorer(api: OccApi, shape: OccShape, kind: string): OccExplore
     api.TopAbs_ShapeEnum.TopAbs_SHAPE,
   ) as OccExplorer;
 }
-
-/** Free a WASM heap object; OCC may already have released it, so failures are ignored. */
-export function release(handle: OccHandle | null): void {
-  try {
-    handle?.delete();
-  } catch {
-    /* already released */
-  }
-}

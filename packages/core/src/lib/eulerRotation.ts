@@ -6,6 +6,8 @@
  * @pure
  */
 
+import { eulerFromMat, mulMat3, type Mat3 } from './axisRotation';
+
 type Vec3 = readonly [number, number, number];
 
 /** Rotate `v` by `euler` about `origin`. */
@@ -31,63 +33,33 @@ export function isZeroRotation(euler: Vec3): boolean {
   return euler[0] === 0 && euler[1] === 0 && euler[2] === 0;
 }
 
-type Matrix3 = readonly [
-  readonly [number, number, number],
-  readonly [number, number, number],
-  readonly [number, number, number],
-];
-
-function multiply3(a: Matrix3, b: Matrix3): Matrix3 {
-  const cell = (row: 0 | 1 | 2, col: 0 | 1 | 2): number =>
-    a[row][0] * b[0][col] + a[row][1] * b[1][col] + a[row][2] * b[2][col];
-  return [
-    [cell(0, 0), cell(0, 1), cell(0, 2)],
-    [cell(1, 0), cell(1, 1), cell(1, 2)],
-    [cell(2, 0), cell(2, 1), cell(2, 2)],
+/** Rx · Ry · Rz as an explicit product (its signed zeros pick the ±π branch of `matrixToEuler`). */
+function eulerToMatrix([rx, ry, rz]: Vec3): Mat3 {
+  const [cx, sx, cy, sy, cz, sz] = [rx, ry, rz].flatMap((a) => [Math.cos(a), Math.sin(a)]) as [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
   ];
+  const rotationX: Mat3 = [1, 0, 0, 0, cx, -sx, 0, sx, cx];
+  const rotationY: Mat3 = [cy, 0, sy, 0, 1, 0, -sy, 0, cy];
+  const rotationZ: Mat3 = [cz, -sz, 0, sz, cz, 0, 0, 0, 1];
+  return mulMat3(mulMat3(rotationX, rotationY), rotationZ);
 }
 
-function eulerToMatrix([rx, ry, rz]: Vec3): Matrix3 {
-  const [cx, sx, cy, sy, cz, sz] = [
-    Math.cos(rx),
-    Math.sin(rx),
-    Math.cos(ry),
-    Math.sin(ry),
-    Math.cos(rz),
-    Math.sin(rz),
-  ];
-  const rotationX: Matrix3 = [
-    [1, 0, 0],
-    [0, cx, -sx],
-    [0, sx, cx],
-  ];
-  const rotationY: Matrix3 = [
-    [cy, 0, sy],
-    [0, 1, 0],
-    [-sy, 0, cy],
-  ];
-  const rotationZ: Matrix3 = [
-    [cz, -sz, 0],
-    [sz, cz, 0],
-    [0, 0, 1],
-  ];
-  return multiply3(multiply3(rotationX, rotationY), rotationZ);
-}
-
-/** three.js `Euler.setFromRotationMatrix(m, 'XYZ')`. */
-function matrixToEuler(m: Matrix3): [number, number, number] {
-  // `+ 0` normalizes -0 (atan2(-0, 1)) to 0.
-  const y = Math.asin(Math.max(-1, Math.min(1, m[0][2]))) + 0;
-  if (Math.abs(m[0][2]) < 0.9999999)
-    return [Math.atan2(-m[1][2], m[2][2]) + 0, y, Math.atan2(-m[0][1], m[0][0]) + 0];
-  return [Math.atan2(m[2][1], m[1][1]) + 0, y, 0];
+/** three.js `Euler.setFromRotationMatrix(m, 'XYZ')`, with -0 normalized to 0. */
+function matrixToEuler(m: Mat3): [number, number, number] {
+  const [x, y, z] = eulerFromMat(m);
+  return [x + 0, y + 0, z + 0];
 }
 
 /** Rotation of `inner` followed by a WORLD-frame rotation `outer`, as intrinsic XYZ Euler angles. */
 export function composeEulerXYZ(outer: Vec3, inner: Vec3): [number, number, number] {
   if (isZeroRotation(inner)) return [outer[0], outer[1], outer[2]];
   if (isZeroRotation(outer)) return [inner[0], inner[1], inner[2]];
-  return matrixToEuler(multiply3(eulerToMatrix(outer), eulerToMatrix(inner)));
+  return matrixToEuler(mulMat3(eulerToMatrix(outer), eulerToMatrix(inner)));
 }
 
 /** `euler` after an extra rotation of `angle` radians about the WORLD Z axis. */
@@ -97,11 +69,7 @@ export function rotateEulerAboutWorldZ(euler: Vec3, angle: number): [number, num
 
 /** Intrinsic XYZ Euler angles of the rotation taking world X/Y/Z onto the orthonormal `x`/`y`/`z`. */
 export function eulerFromAxes(x: Vec3, y: Vec3, z: Vec3): [number, number, number] {
-  return matrixToEuler([
-    [x[0], y[0], z[0]],
-    [x[1], y[1], z[1]],
-    [x[2], y[2], z[2]],
-  ]);
+  return matrixToEuler([x[0], y[0], z[0], x[1], y[1], z[1], x[2], y[2], z[2]]);
 }
 
 /** `v` rotated by the inverse of `euler` ((Rx·Ry·Rz)⁻¹ = Rz⁻¹·Ry⁻¹·Rx⁻¹), about the origin. */

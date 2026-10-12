@@ -10,7 +10,7 @@
 import fs from 'fs';
 import { getCommand } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
-import { CONVENTIONS_GUIDE } from '@mcp/index';
+import { CONVENTIONS_GUIDE, isToolsetName } from '@mcp/index';
 import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
 import {
@@ -29,7 +29,6 @@ import {
 } from './backend';
 import {
   describeCommand,
-  isToolsetName,
   listCatalog,
   searchCatalog,
   suggestNames,

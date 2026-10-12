@@ -6,9 +6,9 @@
 
 import type { MeshData } from '@core/model/types';
 import { isClosedMesh } from './meshClosure';
+import { release } from '@core/geometry/nativeObject';
 import {
   explorer,
-  release,
   type OccApi,
   type OccHandle,
   type OccExplorer,

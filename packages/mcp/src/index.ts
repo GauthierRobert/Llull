@@ -38,6 +38,7 @@ export {
   TOOLSET_NAMES,
   TOOLSETS,
   parseToolsets,
+  isToolsetName,
   toolsetOf,
   isToolEnabled,
   isPromptEnabled,

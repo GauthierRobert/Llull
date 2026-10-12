@@ -6,7 +6,8 @@
  * @failure transfer or write not done -> null
  */
 
-import { release, type OccApi, type OccHandle, type OccShape } from './occtTypes';
+import { release } from '@core/geometry/nativeObject';
+import { type OccApi, type OccHandle, type OccShape } from './occtTypes';
 
 interface StepWriter extends OccHandle {
   Transfer(shape: OccShape, mode: unknown, compgraph: boolean): unknown;
