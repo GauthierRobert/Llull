@@ -86,13 +86,10 @@ type WallBuild =
       readonly ok: true;
       readonly building: BuildingModel;
       readonly wallIds: string[];
-      /** Ids of the existing walls that segments were skipped as duplicates of (skip mode). */
+      /** Ids of the existing walls that segments were skipped as duplicates of. */
       readonly skippedAs: string[];
     }
   | { readonly ok: false; readonly reason: string };
-
-/** 'refuse': a duplicate segment fails the build. 'skip': it is left out (refused only if all are). */
-type DuplicatePolicy = 'refuse' | 'skip';
 
 const segmentLabel = ([start, end]: readonly [Vec2, Vec2]): string =>
   `[${start.join(', ')}]→[${end.join(', ')}]`;
@@ -101,7 +98,6 @@ function buildWalls(
   doc: CadDocument,
   segments: ReadonlyArray<readonly [Vec2, Vec2]>,
   options: WallOptions,
-  duplicates: DuplicatePolicy,
 ): WallBuild {
   const thickness = options.thickness ?? fromMm(doc, 200);
   const baseOffset = options.baseOffset ?? 0;
@@ -125,15 +121,9 @@ function buildWalls(
       (element) =>
         element.baseOffset === baseOffset && sameSegment(element.start, element.end, start, end),
     );
-    if (twin && duplicates === 'skip') {
+    if (twin) {
       skippedAs.push(twin.id);
       continue;
-    }
-    if (twin) {
-      return {
-        ok: false,
-        reason: `segment ${segmentLabel([start, end])} duplicates wall ${twin.id} on ${resolution.level.id} (use update_wall to change it)`,
-      };
     }
     const wall: WallElement = {
       id: nextElementId(building, 'wall'),
@@ -189,30 +179,6 @@ function wallResult(doc: CadDocument, build: Extract<WallBuild, { ok: true }>): 
   };
 }
 
-/**
- * @command add_wall
- * @pure
- * @affects creates 1 wall element (evaluated into box pieces on layer A-WALL)
- * @failure zero length / thickness <= 0 / unknown level / duplicate of an existing wall -> no-op
- */
-export const addWall = defineCommand({
-  name: 'add_wall',
-  description:
-    'Add a straight wall along its plan centerline from start to end ([x, y], document units) on a ' +
-    'building level. Walls meeting at endpoints (L/T/X corners) are joined automatically. Doors and ' +
-    'windows are then hosted with add_door / add_window. Refused if a wall with the same end points ' +
-    '(either direction) and base offset already exists on the level.',
-  params: z.object({
-    start: vec2('Centerline start [x, y].'),
-    end: vec2('Centerline end [x, y].'),
-    ...WALL_OPTION_SHAPE,
-  }),
-  run: (doc, { start, end, ...options }): CommandResult => {
-    const build = buildWalls(doc, [[start, end]], options, 'refuse');
-    return build.ok ? wallResult(doc, build) : noop(doc, `add_wall failed: ${build.reason}.`);
-  },
-});
-
 const MAX_WALL_POINTS = 500;
 
 /**
@@ -225,7 +191,9 @@ export const drawWalls = defineCommand({
   name: 'draw_walls',
   description:
     'Draw a chain of joined walls through plan points ([[x, y], …]); closed: true adds the closing ' +
-    'wall (e.g. a building perimeter). Same options as add_wall. A segment that duplicates an ' +
+    'wall (e.g. a building perimeter); two points make one straight wall. Walls meeting at endpoints ' +
+    '(L/T/X corners) are joined automatically; doors and windows are then hosted with add_door / ' +
+    'add_window. A segment that duplicates an ' +
     'existing wall (same end points either way, same base offset, same level) is skipped and ' +
     'reported, so adjacent rooms can each be drawn as a closed loop sharing an edge; refused only ' +
     'if every segment is a duplicate.',
@@ -255,7 +223,7 @@ export const drawWalls = defineCommand({
       segments.push([points[index] as Vec2, points[index + 1] as Vec2]);
     }
     if (closed) segments.push([points[points.length - 1] as Vec2, points[0] as Vec2]);
-    const build = buildWalls(doc, segments, options, 'skip');
+    const build = buildWalls(doc, segments, options);
     return build.ok ? wallResult(doc, build) : noop(doc, `draw_walls failed: ${build.reason}.`);
   },
 });

@@ -130,15 +130,19 @@ async function main(): Promise<void> {
       { material: 'gypsum', thickness: 15, function: 'finish' },
     ],
   });
-  const corridor = await call('add_wall', {
-    start: [-13000, 15000],
-    end: [-1000, 15000],
+  const corridor = await call('draw_walls', {
+    points: [
+      [-13000, 15000],
+      [-1000, 15000],
+    ],
     thickness: 120,
     material: 'gypsum',
   });
-  const partition = await call('add_wall', {
-    start: [-7000, 6000],
-    end: [-7000, 15000],
+  const partition = await call('draw_walls', {
+    points: [
+      [-7000, 6000],
+      [-7000, 15000],
+    ],
     thickness: 120,
     material: 'gypsum',
   });

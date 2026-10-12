@@ -73,7 +73,7 @@ describe('isToolEnabled() / toolsetOf()', () => {
     expect(isToolEnabled('add_box', coreAnd3d)).toBe(true);
     expect(isToolEnabled('describe_scene', coreAnd3d)).toBe(true);
     expect(isToolEnabled('draw_line', coreAnd3d)).toBe(false);
-    expect(isToolEnabled('add_wall', coreAnd3d)).toBe(false);
+    expect(isToolEnabled('draw_walls', coreAnd3d)).toBe(false);
   });
 
   it('keeps a tool no toolset lists enabled', () => {
@@ -82,7 +82,7 @@ describe('isToolEnabled() / toolsetOf()', () => {
   });
 
   it('places building commands in the building toolset', () => {
-    expect(toolsetOf('add_wall')).toBe('building');
+    expect(toolsetOf('draw_walls')).toBe('building');
     expect(toolsetOf('import_step')).toBe('exchange');
   });
 });

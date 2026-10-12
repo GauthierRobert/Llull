@@ -10,7 +10,7 @@ import { elementAffected, fromMm, getBuilding } from './model';
 import { noop } from '@core/commands/noop';
 import { addLevel, setProjectInfo } from './elements/levels';
 import { addGridSystem } from './elements/grid';
-import { addWall, drawWalls } from './elements/walls';
+import { drawWalls } from './elements/walls';
 import { addDoor, addWindow } from './elements/openings';
 import { addBeam, addColumn, addSlab, addStair } from './elements/structure';
 import { addRoom, copyLevelElements, deleteBuildingElement } from './elements/elements';
@@ -88,9 +88,8 @@ function steps(
           material: 'masonry',
         }),
       (d) =>
-        addWall.run(d, {
-          start: at(5000, 0),
-          end: at(5000, 8000),
+        drawWalls.run(d, {
+          points: [at(5000, 0), at(5000, 8000)],
           thickness: mm(100),
           material: 'gypsum',
         }),

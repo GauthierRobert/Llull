@@ -671,10 +671,42 @@ export const plans: Record<string, GoldenAction[]> = {
   building_walls_openings_slab: [
     { command: 'set_units', params: { units: 'mm' } },
     { command: 'add_grid_system', params: { xSpacings: [5000, 5000], ySpacings: [4000] } },
-    { command: 'add_wall', params: { start: [0, 0], end: [10000, 0] } },
-    { command: 'add_wall', params: { start: [10000, 0], end: [10000, 8000] } },
-    { command: 'add_wall', params: { start: [10000, 8000], end: [0, 8000] } },
-    { command: 'add_wall', params: { start: [0, 8000], end: [0, 0] } },
+    {
+      command: 'draw_walls',
+      params: {
+        points: [
+          [0, 0],
+          [10000, 0],
+        ],
+      },
+    },
+    {
+      command: 'draw_walls',
+      params: {
+        points: [
+          [10000, 0],
+          [10000, 8000],
+        ],
+      },
+    },
+    {
+      command: 'draw_walls',
+      params: {
+        points: [
+          [10000, 8000],
+          [0, 8000],
+        ],
+      },
+    },
+    {
+      command: 'draw_walls',
+      params: {
+        points: [
+          [0, 8000],
+          [0, 0],
+        ],
+      },
+    },
     { command: 'add_door', params: { wallId: 'wall-1', offset: 1500 } },
     { command: 'add_window', params: { wallId: 'wall-2', offset: 3000 } },
     { command: 'add_slab', params: { wallIds: ['wall-1', 'wall-2', 'wall-3', 'wall-4'] } },

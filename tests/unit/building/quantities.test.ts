@@ -56,7 +56,12 @@ describe('quantity_takeoff', () => {
   it('reports an empty model and converts from metre documents', () => {
     expect(execute(createEmptyDocument(), 'quantity_takeoff', {}).summary).toMatch(/empty/);
     let doc = run(createEmptyDocument(), 'set_units', { units: 'm' });
-    doc = run(doc, 'add_wall', { start: [0, 0], end: [5, 0] });
+    doc = run(doc, 'draw_walls', {
+      points: [
+        [0, 0],
+        [5, 0],
+      ],
+    });
     const lines = (execute(doc, 'quantity_takeoff', {}).data as { lines: TakeoffLine[] }).lines;
     expect(line(lines, 'wall.concrete.m3').quantity).toBeCloseTo(5 * 3 * 0.2);
   });

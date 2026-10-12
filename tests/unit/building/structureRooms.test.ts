@@ -66,8 +66,20 @@ describe('add_slab', () => {
 
   it('add_slab from all level walls ignores T-joined partitions', () => {
     let doc = perimeter();
-    doc = run(doc, 'add_wall', { start: [3000, 0], end: [3000, 4000], thickness: 100 });
-    doc = run(doc, 'add_wall', { start: [3000, 2000], end: [6000, 2000], thickness: 100 });
+    doc = run(doc, 'draw_walls', {
+      points: [
+        [3000, 0],
+        [3000, 4000],
+      ],
+      thickness: 100,
+    });
+    doc = run(doc, 'draw_walls', {
+      points: [
+        [3000, 2000],
+        [6000, 2000],
+      ],
+      thickness: 100,
+    });
     const result = execute(doc, 'add_slab', {
       wallIds: ['wall-1', 'wall-2', 'wall-3', 'wall-4', 'wall-5', 'wall-6'],
     });
@@ -224,7 +236,12 @@ describe('rooms and element edits', () => {
   });
 
   it('move_building_element translates every kind; openings follow their wall', () => {
-    let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [4000, 0] });
+    let doc = run(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
+    });
     doc = run(doc, 'add_door', { wallId: 'wall-1' });
     doc = run(doc, 'add_slab', { boundary: SQUARE });
     doc = run(doc, 'add_column', { location: [0, 0] });
@@ -323,7 +340,13 @@ describe('level-aware edits', () => {
     expect(room.document.building!.elements['room-1']).toMatchObject({ levelId: 'level-2' });
     const slab = execute(doc, 'add_slab', { wallIds: walls });
     expect(slab.document.building!.elements['slab-1']).toMatchObject({ levelId: 'level-2' });
-    doc = run(doc, 'add_wall', { start: [0, 0], end: [1000, 0], levelId: 'level-1' });
+    doc = run(doc, 'draw_walls', {
+      points: [
+        [0, 0],
+        [1000, 0],
+      ],
+      levelId: 'level-1',
+    });
     expect(
       execute(doc, 'add_room', { name: 'X', wallIds: ['wall-5', 'wall-2', 'wall-3'] }).summary,
     ).toMatch(/different levels/);
@@ -334,8 +357,19 @@ describe('level-aware edits', () => {
 
   it('full-height walls, columns and stairs follow a level height change and copies', () => {
     let doc = run(createEmptyDocument(), 'add_level', {});
-    doc = run(doc, 'add_wall', { start: [0, 0], end: [4000, 0] });
-    doc = run(doc, 'add_wall', { start: [0, 2000], end: [4000, 2000], height: 1200 });
+    doc = run(doc, 'draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
+    });
+    doc = run(doc, 'draw_walls', {
+      points: [
+        [0, 2000],
+        [4000, 2000],
+      ],
+      height: 1200,
+    });
     doc = run(doc, 'add_column', { location: [0, 1000] });
     doc = run(doc, 'add_stair', { start: [500, 500] });
     const raised = execute(doc, 'update_level', { levelId: 'level-1', height: 3600 }).document;
@@ -357,7 +391,12 @@ describe('level-aware edits', () => {
 
 describe('review follow-ups', () => {
   it('refuses to move a hosted opening on its own', () => {
-    let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [4000, 0] });
+    let doc = run(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
+    });
     doc = run(doc, 'add_door', { wallId: 'wall-1' });
     expect(
       execute(doc, 'move_building_element', { elementIds: ['door-1'], delta: [1, 0] }).summary,

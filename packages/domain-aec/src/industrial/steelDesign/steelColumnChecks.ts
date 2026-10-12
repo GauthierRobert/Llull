@@ -7,7 +7,8 @@
  */
 
 import { memberBuckling } from './steelDesign';
-import { GAMMA_IMPOSED, GAMMA_PERMANENT, type ColumnNode } from './steelFraming';
+import { GAMMA_G, GAMMA_Q } from '../../shared/loadFactors';
+import { type ColumnNode } from './steelFraming';
 import { selfWeightPerMetre, type SteelBar } from './steelMemberBars';
 import {
   analysedRow,
@@ -51,10 +52,7 @@ export function columnSegments(
   }
   const levels = groups.map((group) => ({
     z: group.reduce((sum, node) => sum + node.zAxis, 0) / group.length,
-    load: group.reduce(
-      (sum, node) => sum + GAMMA_PERMANENT * node.permanent + GAMMA_IMPOSED * node.imposed,
-      0,
-    ),
+    load: group.reduce((sum, node) => sum + GAMMA_G * node.permanent + GAMMA_Q * node.imposed, 0),
   }));
   const inside = levels.map((level) => ({ ...level, z: Math.min(high, Math.max(low, level.z)) }));
   const boundaries = [low, ...inside.map((level) => level.z), high].filter(
@@ -70,7 +68,7 @@ export function columnSegments(
     segments.push({
       from,
       to,
-      axial: above + (GAMMA_PERMANENT * weightPerMetre * (high - from)) / 1000,
+      axial: above + (GAMMA_G * weightPerMetre * (high - from)) / 1000,
       weight: (weightPerMetre * (to - from)) / 1000,
     });
   }

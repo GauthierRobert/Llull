@@ -6,12 +6,8 @@
 
 import type { CadDocument } from '@core/model/types';
 import { levelMembersInMm } from '../common/memberSupport';
-import {
-  GAMMA_G,
-  GAMMA_Q,
-  ROOF_PRESSURE_CASE_MIN_CPE,
-  valleyLines,
-} from '../frames/frameModelTypes';
+import { GAMMA_G, GAMMA_Q } from '../../shared/loadFactors';
+import { ROOF_PRESSURE_CASE_MIN_CPE, valleyLines } from '../frames/frameModelTypes';
 import { purlinWind } from './purlinWind';
 import { yieldStrength } from '../steelDesign/steelDesign';
 import {

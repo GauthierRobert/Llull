@@ -10,8 +10,9 @@ import { civilObject, getCivil } from '../model';
 import { surfaceTin } from './surfaceTin';
 import { corners, elevationAt, slopeAt, tinBounds, tinPlanArea, triangleCount } from './tin';
 import { toMetres } from '../../building/model';
+import { round as roundDigits } from '../../shared/numeric';
 
-const round = (value: number, digits = 3): number => Number(value.toFixed(digits));
+const round = (value: number, digits = 3): number => roundDigits(value, digits);
 
 /**
  * @command surface_elevation

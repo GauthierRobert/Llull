@@ -153,9 +153,8 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
-      return result(reader, 'add_wall', {
-        start: reader.point('x1', 'y1'),
-        end: reader.point('x2', 'y2'),
+      return result(reader, 'draw_walls', {
+        points: [reader.point('x1', 'y1'), reader.point('x2', 'y2')],
         ...wallSection(reader),
         ...onLevel(context),
       });

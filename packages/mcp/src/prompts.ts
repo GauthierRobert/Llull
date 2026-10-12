@@ -315,7 +315,7 @@ const designBuilding: PromptTemplate = {
         `1. \`set_project_info\` (name, client, address, author, drawingNumber) — fills title blocks and IFC.\n` +
         `2. \`add_level\` per storey (elevation stacks automatically; height = floor-to-floor).\n` +
         `3. \`add_grid_system\` { xSpacings, ySpacings } — numbered / lettered axes.\n` +
-        `4. \`draw_walls\` { points, closed: true, thickness, material } for the envelope; \`add_wall\` for partitions ` +
+        `4. \`draw_walls\` { points, closed: true, thickness, material } for the envelope; \`draw_walls\` with two points for a partition ` +
         `(endpoints on another wall join automatically); \`add_curved_wall\` { start, through, end } for arcs; \`set_wall_layers\` for build-ups (render + insulation + structure + lining).\n` +
         `5. \`add_door\` / \`add_window\` { wallId, offset | at, width, height, sillHeight } — hosted; refused if they do not fit.\n` +
         `6. \`add_slab\` { wallIds } (or boundary), \`add_column\` { atGridIntersections: true }, \`add_beam\`, \`add_stair\` ` +

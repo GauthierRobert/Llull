@@ -13,7 +13,7 @@ import {
   describeBuilding,
 } from './building/elements/levels';
 import { addGridLine, addGridSystem } from './building/elements/grid';
-import { addWall, drawWalls, updateWall } from './building/elements/walls';
+import { drawWalls, updateWall } from './building/elements/walls';
 import { addDoor, addWindow, updateOpening } from './building/elements/openings';
 import { addSlab, addColumn, addBeam, addStair } from './building/elements/structure';
 import {
@@ -76,7 +76,6 @@ export const buildingCommands = commandCatalog(
   describeBuilding,
   addGridLine,
   addGridSystem,
-  addWall,
   drawWalls,
   updateWall,
   addDoor,

@@ -70,7 +70,12 @@ describe('BuildingPanel', () => {
   it('lists levels and elements of the active level, with activate / select / delete', () => {
     localDispatch('add_level', { name: 'Ground' });
     localDispatch('add_level', { name: 'Upper', makeActive: false });
-    localDispatch('add_wall', { start: [0, 0], end: [4000, 0] });
+    localDispatch('draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
+    });
     const dispatch = spyDispatch();
     render(<BuildingPanel />);
     expect(screen.getByTestId('level-row-level-1')).toHaveAttribute('aria-current', 'true');
@@ -94,7 +99,12 @@ describe('BuildingPanel', () => {
 
   it('element tools gather params and dispatch one command; invalid input shows an error', () => {
     localDispatch('add_level', {});
-    localDispatch('add_wall', { start: [0, 0], end: [4000, 0] });
+    localDispatch('draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
+    });
     const dispatch = spyDispatch();
     render(<BuildingPanel />);
     fireEvent.click(screen.getByTestId('tool-submit'));
@@ -145,7 +155,12 @@ describe('BuildingPanel', () => {
   });
 
   it('shows the live takeoff and sets a unit rate', () => {
-    localDispatch('add_wall', { start: [0, 0], end: [5000, 0] });
+    localDispatch('draw_walls', {
+      points: [
+        [0, 0],
+        [5000, 0],
+      ],
+    });
     const dispatch = spyDispatch();
     render(<BuildingPanel />);
     expect(screen.getByTestId('takeoff-wall.concrete.m3')).toHaveTextContent('3 m³');
@@ -157,7 +172,12 @@ describe('BuildingPanel', () => {
   });
 
   it('export buttons report the exporter summary', () => {
-    localDispatch('add_wall', { start: [0, 0], end: [5000, 0] });
+    localDispatch('draw_walls', {
+      points: [
+        [0, 0],
+        [5000, 0],
+      ],
+    });
     const { createObjectURL, click } = stubDownloads();
     render(<BuildingPanel />);
     fireEvent.click(screen.getByRole('button', { name: 'DXF (AutoCAD)' }));
