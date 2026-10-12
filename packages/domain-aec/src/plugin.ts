@@ -11,6 +11,7 @@ import type { CadPlugin, DocumentExtension } from '@core/plugins/plugin';
 import { buildingCommands, industrialCommands } from './index';
 import { buildingDerivationGuard } from './building/evaluate/integrity';
 import { mergeRestored } from './shared/derived';
+import { aecRetiredCommands } from './retired';
 import { buildingErrors } from './building/validate';
 import { regenerateBuilding } from './building/evaluate/evaluateElements';
 
@@ -57,6 +58,7 @@ export const buildingPlugin: CadPlugin = {
   commands: buildingCommands,
   guards: [buildingDerivationGuard],
   document: buildingDocument,
+  retiredCommands: aecRetiredCommands,
 };
 
 export const industrialPlugin: CadPlugin = {

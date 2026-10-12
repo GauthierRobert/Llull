@@ -47,9 +47,11 @@ describe('arcThrough', () => {
 
 describe('add_curved_wall', () => {
   it('creates a curved wall mesh with length, marks shared with straight walls', () => {
-    let doc = execute(createEmptyDocument(), 'add_wall', {
-      start: [0, -2000],
-      end: [4000, -2000],
+    let doc = execute(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, -2000],
+        [4000, -2000],
+      ],
     }).document;
     const before = JSON.stringify(doc);
     const result = execute(doc, 'add_curved_wall', HALF);
@@ -269,7 +271,13 @@ describe('straight walls joining curved walls', () => {
   it('extends a straight wall over a curved wall end (L corner)', async () => {
     const { wallExtent } = await import('@aec/building/geometry/wallGeometry');
     let doc = execute(createEmptyDocument(), 'add_curved_wall', HALF).document;
-    doc = execute(doc, 'add_wall', { start: [-5000, 0], end: [-9000, 0], thickness: 200 }).document;
+    doc = execute(doc, 'draw_walls', {
+      points: [
+        [-5000, 0],
+        [-9000, 0],
+      ],
+      thickness: 200,
+    }).document;
     const wall = doc.building!.elements['wall-1']!;
     expect(wall.category === 'wall' && wallExtent(doc.building!, wall)).toEqual({
       start: -150,
@@ -280,7 +288,13 @@ describe('straight walls joining curved walls', () => {
   it('stops a straight wall at the face of an arc (T junction)', async () => {
     const { wallExtent } = await import('@aec/building/geometry/wallGeometry');
     let doc = execute(createEmptyDocument(), 'add_curved_wall', HALF).document;
-    doc = execute(doc, 'add_wall', { start: [0, 9000], end: [0, 5000], thickness: 200 }).document;
+    doc = execute(doc, 'draw_walls', {
+      points: [
+        [0, 9000],
+        [0, 5000],
+      ],
+      thickness: 200,
+    }).document;
     const wall = doc.building!.elements['wall-1']!;
     const extent = wall.category === 'wall' ? wallExtent(doc.building!, wall) : null;
     expect(extent?.start).toBe(0);
@@ -298,7 +312,13 @@ describe('curved / straight corner review regressions', () => {
       end: [5, 0],
       thickness: 0.3,
     }).document;
-    doc = execute(doc, 'add_wall', { start: [5, 0], end: [9, 0], thickness: 0.2 }).document;
+    doc = execute(doc, 'draw_walls', {
+      points: [
+        [5, 0],
+        [9, 0],
+      ],
+      thickness: 0.2,
+    }).document;
     const wall = doc.building!.elements['wall-1']!;
     const extent = wall.category === 'wall' ? wallExtent(doc.building!, wall) : null;
     expect(extent?.start).toBeCloseTo(-0.15, 9);
@@ -308,7 +328,13 @@ describe('curved / straight corner review regressions', () => {
     const { curvedWallExtent, curvedWallLength } =
       await import('@aec/building/geometry/curvedWallGeometry');
     let doc = execute(createEmptyDocument(), 'add_curved_wall', HALF).document;
-    doc = execute(doc, 'add_wall', { start: [-5000, 0], end: [-9000, 0], thickness: 200 }).document;
+    doc = execute(doc, 'draw_walls', {
+      points: [
+        [-5000, 0],
+        [-9000, 0],
+      ],
+      thickness: 200,
+    }).document;
     const extent = curvedWallExtent(doc.building!, wallOf(doc));
     expect(extent.start).toBeCloseTo(100, 6);
     expect(extent.end).toBeCloseTo(curvedWallLength(wallOf(doc)), 6);

@@ -35,7 +35,12 @@ describe('add_level / update_level / delete_level / set_active_level', () => {
 
   it('update_level moves the walls on it', () => {
     let doc = run(createEmptyDocument(), 'add_level', {});
-    doc = run(doc, 'add_wall', { start: [0, 0], end: [4000, 0] });
+    doc = run(doc, 'draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
+    });
     const before = doc.entities['wall-1:body-0']!.position[2];
     const result = execute(doc, 'update_level', {
       levelId: 'level-1',
@@ -64,7 +69,12 @@ describe('add_level / update_level / delete_level / set_active_level', () => {
       ...base,
       building: { ...base.building!, activeLevelId: 'level-99' },
     };
-    const result = execute(doc, 'add_wall', { start: [0, 0], end: [3000, 0] });
+    const result = execute(doc, 'draw_walls', {
+      points: [
+        [0, 0],
+        [3000, 0],
+      ],
+    });
     expect(Object.keys(result.document.building!.levels)).toEqual(['level-1']);
     expect(result.document.building!.elements['wall-1']).toMatchObject({ levelId: 'level-1' });
     expect(execute(doc, 'check_clashes', {}).summary).toBe('No clashes found.');
@@ -80,7 +90,12 @@ describe('add_level / update_level / delete_level / set_active_level', () => {
 
   it('delete_level refuses when occupied unless deleteElements, then removes hosted openings', () => {
     let doc = run(createEmptyDocument(), 'add_level', {});
-    doc = run(doc, 'add_wall', { start: [0, 0], end: [5000, 0] });
+    doc = run(doc, 'draw_walls', {
+      points: [
+        [0, 0],
+        [5000, 0],
+      ],
+    });
     doc = run(doc, 'add_door', { wallId: 'wall-1' });
     expect(execute(doc, 'delete_level', { levelId: 'level-1' }).summary).toMatch(/refused/);
     const result = execute(doc, 'delete_level', { levelId: 'level-1', deleteElements: true });
@@ -204,7 +219,12 @@ describe('structural grid', () => {
 
 describe('integration with document-level commands', () => {
   it('clear_document removes the building model', () => {
-    const doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [1000, 0] });
+    const doc = run(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [1000, 0],
+      ],
+    });
     const cleared = execute(doc, 'clear_document', {});
     expect(cleared.document.building).toBeUndefined();
     expect(doc.building).toBeDefined();
@@ -226,7 +246,12 @@ describe('integration with document-level commands', () => {
   });
 
   it('undo-style history replay regenerates the same building', () => {
-    let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [4000, 0] });
+    let doc = run(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
+    });
     doc = run(doc, 'add_door', { wallId: 'wall-1' });
     const replayed = execute(doc, 'replay_history', {});
     expect(replayed.document.building?.elements['door-1']).toEqual(
@@ -237,7 +262,12 @@ describe('integration with document-level commands', () => {
 
 describe('building integrity guard', () => {
   it('rejects generic commands that edit generated building geometry', () => {
-    const doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [4000, 0] });
+    const doc = run(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
+    });
     for (const [name, params] of [
       ['delete_entity', { id: 'wall-1:body-0' }],
       ['move_entity', { id: 'wall-1:body-0', delta: [100, 0, 0] }],
@@ -253,7 +283,12 @@ describe('building integrity guard', () => {
   });
 
   it('still allows unrelated edits and building commands', () => {
-    let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [4000, 0] });
+    let doc = run(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
+    });
     doc = run(doc, 'add_box', { size: [1, 1, 1] });
     const boxId = doc.order[doc.order.length - 1]!;
     expect(execute(doc, 'move_entity', { id: boxId, delta: [1, 0, 0] }).document).not.toBe(doc);

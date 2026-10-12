@@ -19,9 +19,11 @@ describe('derivationViolation', () => {
   });
 
   it('execute rejects a direct edit of building-generated geometry', () => {
-    const doc = execute(createEmptyDocument(), 'add_wall', {
-      start: [0, 0],
-      end: [5000, 0],
+    const doc = execute(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [5000, 0],
+      ],
     }).document;
     const generatedId = doc.order[0] ?? '';
     const moved = execute(doc, 'move_entity', { id: generatedId, delta: [10, 0, 0] });

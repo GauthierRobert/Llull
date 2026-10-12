@@ -86,7 +86,7 @@ describe('MCP tool discovery (default core-only exposure)', () => {
     expect(names).toContain('enable_toolset');
     expect(names).toContain('describe_scene');
     expect(names).not.toContain('add_box');
-    expect(names).not.toContain('add_wall');
+    expect(names).not.toContain('draw_walls');
     for (const name of names) expect(TOOLSETS.core).toContain(name);
   });
 
@@ -100,7 +100,7 @@ describe('MCP tool discovery (default core-only exposure)', () => {
       structuredContent: { results: { name: string; toolset: string; enabled: boolean }[] };
     };
     expect(result.isError).toBe(false);
-    const wall = result.structuredContent.results.find((r) => r.name === 'add_wall');
+    const wall = result.structuredContent.results.find((r) => r.name === 'draw_walls');
     expect(wall).toMatchObject({ toolset: 'building', enabled: false });
   });
 
@@ -113,9 +113,9 @@ describe('MCP tool discovery (default core-only exposure)', () => {
     })) as { isError?: boolean };
     expect(result.isError).toBe(false);
     expect(notify).toHaveBeenCalledTimes(1);
-    expect(await listNames(sessionId)).toContain('add_wall');
+    expect(await listNames(sessionId)).toContain('draw_walls');
     // Another session is unaffected.
-    expect(await listNames(await openCoreSession())).not.toContain('add_wall');
+    expect(await listNames(await openCoreSession())).not.toContain('draw_walls');
     // Re-enabling is a no-op: no second notification.
     await coreRpc(sessionId, 'tools/call', {
       name: 'enable_toolset',
@@ -175,7 +175,7 @@ describe('MCP toolsets', () => {
     expect(names).toContain('add_box');
     expect(names).toContain('describe_scene');
     expect(names).not.toContain('draw_line');
-    expect(names).not.toContain('add_wall');
+    expect(names).not.toContain('draw_walls');
     expect(names).not.toContain('import_step');
   });
 

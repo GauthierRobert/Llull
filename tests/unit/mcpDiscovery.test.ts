@@ -71,7 +71,7 @@ describe('search_tools', () => {
   it('ranks name matches first and reports toolset + enabled', () => {
     const results = searchTools('wall', 5, coreOnly());
     expect(results[0]?.name).toMatch(/wall/);
-    const wall = results.find((r) => r.name === 'add_wall');
+    const wall = results.find((r) => r.name === 'draw_walls');
     expect(wall).toMatchObject({ toolset: 'building', enabled: false });
     expect(wall?.description.length).toBeGreaterThan(0);
   });
@@ -107,7 +107,7 @@ describe('search_tools', () => {
   it('summary lists names and points disabled tools at enable_toolset', () => {
     const outcome = applyDiscoveryToolCall('search_tools', { query: 'wall' }, coreOnly());
     const summary = outcome?.result.content[0]?.text ?? '';
-    expect(summary).toContain('add_wall');
+    expect(summary).toContain('draw_walls');
     expect(summary).toContain('enable_toolset');
     expect(outcome?.toolsListChanged).toBe(false);
   });

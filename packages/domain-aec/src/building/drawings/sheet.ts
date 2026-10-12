@@ -412,7 +412,7 @@ export const exportPlanSheet = defineCommand({
     if (!sheet) {
       return noop(
         doc,
-        'export_plan_sheet failed: no such level (add_level / add_wall first) or invalid scale (must be > 0).',
+        'export_plan_sheet failed: no such level (add_level / draw_walls first) or invalid scale (must be > 0).',
       );
     }
     return {

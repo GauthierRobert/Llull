@@ -24,11 +24,11 @@ const echoPlugin: CadPlugin = {
 
 describe('plugins', () => {
   it('the composition root installed building and industrial', () => {
-    expect(getCommand('add_wall')).toBeDefined();
+    expect(getCommand('draw_walls')).toBeDefined();
     expect(getCommand('add_portal_frame_building')).toBeDefined();
-    expect(TOOLSETS.building).toContain('add_wall');
+    expect(TOOLSETS.building).toContain('draw_walls');
     expect(TOOLSETS.building).toContain('check_portal_frames');
-    expect(toolsetOf('add_wall')).toBe('building');
+    expect(toolsetOf('draw_walls')).toBe('building');
   });
 
   it('installing a plugin registers its guarded commands once', () => {

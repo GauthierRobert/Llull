@@ -713,7 +713,7 @@
     "name": "add_crane_runway"
   },
   {
-    "description": "Add a curved (arc) wall on a level: its centreline is the circular arc from start through a point on the arc to end (all [x, y]). Thickness, height (default: level height), base offset and material as for add_wall. Counted with the walls in quantities and schedules. Hosts doors and windows (add_door / add_window with its id; offset = distance along the arc). Refused if the same arc (either direction) and base offset already exists on the level.",
+    "description": "Add a curved (arc) wall on a level: its centreline is the circular arc from start through a point on the arc to end (all [x, y]). Thickness, height (default: level height), base offset and material as for draw_walls. Counted with the walls in quantities and schedules. Hosts doors and windows (add_door / add_window with its id; offset = distance along the arc). Refused if the same arc (either direction) and base offset already exists on the level.",
     "input_schema": {
       "properties": {
         "baseOffset": {
@@ -3052,53 +3052,6 @@
       "type": "object"
     },
     "name": "add_torus"
-  },
-  {
-    "description": "Add a straight wall along its plan centerline from start to end ([x, y], document units) on a building level. Walls meeting at endpoints (L/T/X corners) are joined automatically. Doors and windows are then hosted with add_door / add_window. Refused if a wall with the same end points (either direction) and base offset already exists on the level.",
-    "input_schema": {
-      "properties": {
-        "baseOffset": {
-          "description": "Base offset above the level elevation, in document units. Default 0.",
-          "type": "number"
-        },
-        "end": {
-          "description": "Centerline end [x, y].",
-          "items": {
-            "type": "number"
-          },
-          "type": "array"
-        },
-        "height": {
-          "description": "Wall height above its base (document units, > 0). Default: the level height.",
-          "type": "number"
-        },
-        "levelId": {
-          "description": "Level to place the wall on. Default: active level (a \"Level 0\" is created if none).",
-          "type": "string"
-        },
-        "material": {
-          "description": "Material name used by quantities/cost: concrete (default), masonry, brick, block, timber, steel, gypsum…",
-          "type": "string"
-        },
-        "start": {
-          "description": "Centerline start [x, y].",
-          "items": {
-            "type": "number"
-          },
-          "type": "array"
-        },
-        "thickness": {
-          "description": "Wall thickness (document units, > 0). Default 200 mm.",
-          "type": "number"
-        }
-      },
-      "required": [
-        "start",
-        "end"
-      ],
-      "type": "object"
-    },
-    "name": "add_wall"
   },
   {
     "description": "Create a wedge solid — a right-triangular prism (ramp shape). Right-handed world frame, +Z up. size is [width, height, depth]: width = X extent; height = full height of the front face; depth = Z extent (ramp direction). The slope cuts the top-rear corner: front face is a full rectangle, back edge tapers to zero height. All size components must be > 0. anchor controls which point the position refers to: \"min\" (default) = lower-front-left corner of the bounding box (min-XYZ); \"center\" = geometric center of the AABB; \"base-center\" = center of the bottom face (mid X/Y, min Z). The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.",
@@ -5643,7 +5596,7 @@
     "name": "draw_spline"
   },
   {
-    "description": "Draw a chain of joined walls through plan points ([[x, y], …]); closed: true adds the closing wall (e.g. a building perimeter). Same options as add_wall. A segment that duplicates an existing wall (same end points either way, same base offset, same level) is skipped and reported, so adjacent rooms can each be drawn as a closed loop sharing an edge; refused only if every segment is a duplicate.",
+    "description": "Draw a chain of joined walls through plan points ([[x, y], …]); closed: true adds the closing wall (e.g. a building perimeter); two points make one straight wall. Walls meeting at endpoints (L/T/X corners) are joined automatically; doors and windows are then hosted with add_door / add_window. A segment that duplicates an existing wall (same end points either way, same base offset, same level) is skipped and reported, so adjacent rooms can each be drawn as a closed loop sharing an edge; refused only if every segment is a duplicate.",
     "input_schema": {
       "properties": {
         "baseOffset": {

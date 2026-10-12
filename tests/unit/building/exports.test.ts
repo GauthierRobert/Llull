@@ -91,7 +91,12 @@ describe('plan drawing', () => {
     expect(boundsOf([])).toEqual([0, 0, 0, 0]);
     let metres = run(createEmptyDocument(), 'set_units', { units: 'm' });
     expect(dimensionLabel(metres, 2.45)).toBe('2450');
-    metres = run(metres, 'add_wall', { start: [0, 0], end: [4, 0] });
+    metres = run(metres, 'draw_walls', {
+      points: [
+        [0, 0],
+        [4, 0],
+      ],
+    });
     expect(
       buildPlanDrawing(metres, undefined)!.primitives.flatMap((p) =>
         p.type === 'dimension' ? [p.label] : [],
@@ -278,8 +283,18 @@ describe('export_ifc', () => {
 
 describe('identity', () => {
   it('two projects never share IFC GlobalIds; one project keeps them stable', () => {
-    const a = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [1000, 0] });
-    const b = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [1000, 0] });
+    const a = run(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [1000, 0],
+      ],
+    });
+    const b = run(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [1000, 0],
+      ],
+    });
     const guids = (doc: CadDocument): string[] =>
       [
         ...(execute(doc, 'export_ifc', {}).data as IfcExport).ifc.matchAll(
@@ -292,10 +307,25 @@ describe('identity', () => {
   });
 
   it('element and level numbers are never reused after a delete', () => {
-    let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [1000, 0] });
-    doc = run(doc, 'add_wall', { start: [0, 500], end: [1000, 500] });
+    let doc = run(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [1000, 0],
+      ],
+    });
+    doc = run(doc, 'draw_walls', {
+      points: [
+        [0, 500],
+        [1000, 500],
+      ],
+    });
     doc = run(doc, 'delete_building_element', { elementIds: ['wall-2'] });
-    doc = run(doc, 'add_wall', { start: [0, 900], end: [1000, 900] });
+    doc = run(doc, 'draw_walls', {
+      points: [
+        [0, 900],
+        [1000, 900],
+      ],
+    });
     expect(Object.keys(doc.building!.elements)).toEqual(['wall-1', 'wall-3']);
     doc = run(doc, 'add_level', {});
     doc = run(doc, 'delete_level', { levelId: 'level-2' });
@@ -310,7 +340,12 @@ describe('identity', () => {
 
 describe('DXF drafting text and extents', () => {
   it('keeps text rotation / alignment and covers drafting in $EXTMAX', () => {
-    let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [1000, 0] });
+    let doc = run(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [1000, 0],
+      ],
+    });
     doc = run(doc, 'add_text', {
       content: 'Far note',
       position: [50000, 20000, 0],
@@ -413,7 +448,13 @@ describe('extreme model sizes', () => {
 
   it('DXF hatch density is capped for a 500 km wall', () => {
     let doc = run(createEmptyDocument(), 'add_level', { name: 'L' });
-    doc = run(doc, 'add_wall', { start: [0, 0], end: [500_000_000, 0], thickness: 10_000_000 });
+    doc = run(doc, 'draw_walls', {
+      points: [
+        [0, 0],
+        [500_000_000, 0],
+      ],
+      thickness: 10_000_000,
+    });
     const data = execute(doc, 'export_dxf', {}).data as DxfExport;
     expect(data.entityCount).toBeLessThan(5000);
   });

@@ -20,8 +20,13 @@ describe('S2: replay cache never shares a minted building uid between documents'
   it('two fresh documents inserting the same wall get different uids', () => {
     const insert = (): CadDocument =>
       execute(createEmptyDocument(), 'insert_step', {
-        name: 'add_wall',
-        params: { start: [0, 0], end: [5000, 0] },
+        name: 'draw_walls',
+        params: {
+          points: [
+            [0, 0],
+            [5000, 0],
+          ],
+        },
       }).document;
     const a = insert();
     const b = insert();

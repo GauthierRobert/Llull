@@ -265,7 +265,13 @@ describe('export level picker', () => {
   it('prints the chosen level without changing the active one', () => {
     localDispatch('add_level', { name: 'Ground' });
     localDispatch('add_level', { name: 'Upper', makeActive: false });
-    localDispatch('add_wall', { start: [0, 0], end: [4000, 0], levelId: 'level-2' });
+    localDispatch('draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
+      levelId: 'level-2',
+    });
     render(<BuildingPanel />);
     fireEvent.change(screen.getByLabelText('Export level'), { target: { value: 'level-2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Plan sheet' }));

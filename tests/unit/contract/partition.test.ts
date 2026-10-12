@@ -8,7 +8,12 @@ describe('document partition', () => {
   it('lists building-generated entities as derived, plain entities as not', () => {
     let doc = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
     const boxId = doc.order[0] ?? '';
-    doc = execute(doc, 'add_wall', { start: [0, 0], end: [5000, 0] }).document;
+    doc = execute(doc, 'draw_walls', {
+      points: [
+        [0, 0],
+        [5000, 0],
+      ],
+    }).document;
     const derived = derivedEntityIds(doc);
     expect(derived.size).toBeGreaterThan(0);
     expect(derived.has(boxId)).toBe(false);

@@ -17,11 +17,16 @@ function wall(doc: CadDocument, id: string): WallElement {
   return element;
 }
 
-describe('add_wall', () => {
+describe('draw_walls: a single straight wall', () => {
   it('creates a wall on an auto-created level with default 200 mm × level height', () => {
     const doc = createEmptyDocument();
     const snapshot = structuredClone(doc);
-    const result = execute(doc, 'add_wall', { start: [0, 0], end: [5000, 0] });
+    const result = execute(doc, 'draw_walls', {
+      points: [
+        [0, 0],
+        [5000, 0],
+      ],
+    });
     expect(doc).toEqual(snapshot);
     const piece = box(result.document, 'wall-1:body-0');
     expect(piece.size).toEqual([5000, 200, 3000]);
@@ -34,9 +39,11 @@ describe('add_wall', () => {
   });
 
   it('rotates the wall body to follow a diagonal centerline', () => {
-    const doc = run(createEmptyDocument(), 'add_wall', {
-      start: [0, 0],
-      end: [3000, 3000],
+    const doc = run(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [3000, 3000],
+      ],
       material: 'brick',
     });
     const piece = box(doc, 'wall-1:body-0');
@@ -47,19 +54,50 @@ describe('add_wall', () => {
 
   it('failure paths leave the document untouched', () => {
     const doc = createEmptyDocument();
-    expect(execute(doc, 'add_wall', { start: [0, 0], end: [0, 0] }).document).toBe(doc);
-    expect(execute(doc, 'add_wall', { start: [0], end: [1, 1] }).document).toBe(doc);
-    expect(execute(doc, 'add_wall', { start: [0, 0], end: [1, 1], thickness: 0 }).summary).toMatch(
-      /thickness/,
-    );
-    expect(execute(doc, 'add_wall', { start: [0, 0], end: [1, 1], height: -2 }).summary).toMatch(
-      /height/,
-    );
     expect(
-      execute(doc, 'add_wall', { start: [0, 0], end: [1, 1], baseOffset: Number.NaN }).document,
+      execute(doc, 'draw_walls', {
+        points: [
+          [0, 0],
+          [0, 0],
+        ],
+      }).document,
+    ).toBe(doc);
+    expect(execute(doc, 'draw_walls', { points: [[0], [1, 1]] }).document).toBe(doc);
+    expect(
+      execute(doc, 'draw_walls', {
+        points: [
+          [0, 0],
+          [1, 1],
+        ],
+        thickness: 0,
+      }).summary,
+    ).toMatch(/thickness/);
+    expect(
+      execute(doc, 'draw_walls', {
+        points: [
+          [0, 0],
+          [1, 1],
+        ],
+        height: -2,
+      }).summary,
+    ).toMatch(/height/);
+    expect(
+      execute(doc, 'draw_walls', {
+        points: [
+          [0, 0],
+          [1, 1],
+        ],
+        baseOffset: Number.NaN,
+      }).document,
     ).toBe(doc);
     expect(
-      execute(doc, 'add_wall', { start: [0, 0], end: [1, 1], levelId: 'level-9' }).summary,
+      execute(doc, 'draw_walls', {
+        points: [
+          [0, 0],
+          [1, 1],
+        ],
+        levelId: 'level-9',
+      }).summary,
     ).toMatch(/unknown level/);
   });
 });
@@ -86,9 +124,25 @@ describe('draw_walls and corner joins', () => {
   });
 
   it('retracts an abutting wall at a T junction and ignores collinear continuations', () => {
-    let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [6000, 0] });
-    doc = run(doc, 'add_wall', { start: [3000, 0], end: [3000, 3000], thickness: 100 });
-    doc = run(doc, 'add_wall', { start: [6000, 0], end: [9000, 0] });
+    let doc = run(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [6000, 0],
+      ],
+    });
+    doc = run(doc, 'draw_walls', {
+      points: [
+        [3000, 0],
+        [3000, 3000],
+      ],
+      thickness: 100,
+    });
+    doc = run(doc, 'draw_walls', {
+      points: [
+        [6000, 0],
+        [9000, 0],
+      ],
+    });
     expect(endAdjustment(doc.building!, wall(doc, 'wall-2'), 'start')).toBeCloseTo(-100);
     expect(endAdjustment(doc.building!, wall(doc, 'wall-3'), 'start')).toBe(0);
     expect(box(doc, 'wall-2:body-0').size[0]).toBeCloseTo(2900);
@@ -119,7 +173,12 @@ describe('draw_walls and corner joins', () => {
 
 describe('add_door / add_window', () => {
   function oneWall(): CadDocument {
-    return run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [5000, 0] });
+    return run(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [5000, 0],
+      ],
+    });
   }
 
   it('a door cuts the wall into side pieces + lintel and draws a swing', () => {
@@ -208,7 +267,12 @@ describe('add_door / add_window', () => {
 
 describe('update_wall', () => {
   it('lengthens a wall and keeps hosted openings', () => {
-    let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [4000, 0] });
+    let doc = run(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
+    });
     doc = run(doc, 'add_door', { wallId: 'wall-1', offset: 1000 });
     const result = execute(doc, 'update_wall', {
       wallId: 'wall-1',
@@ -225,7 +289,12 @@ describe('update_wall', () => {
   });
 
   it('refuses changes that would orphan an opening and other invalid edits', () => {
-    let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [4000, 0] });
+    let doc = run(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
+    });
     doc = run(doc, 'add_window', { wallId: 'wall-1', offset: 3000 });
     expect(execute(doc, 'update_wall', { wallId: 'wall-1', end: [2000, 0] }).summary).toMatch(
       /refused/,
@@ -291,8 +360,18 @@ describe('wallPieces', () => {
 
 describe('feature-history replay keeps hosts linked', () => {
   it('suppressing an earlier wall re-links a later window to its renumbered host', () => {
-    let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [4000, 0] });
-    doc = run(doc, 'add_wall', { start: [0, 3000], end: [4000, 3000] });
+    let doc = run(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
+    });
+    doc = run(doc, 'draw_walls', {
+      points: [
+        [0, 3000],
+        [4000, 3000],
+      ],
+    });
     doc = run(doc, 'add_window', { wallId: 'wall-2', offset: 2000 });
     doc = run(doc, 'add_door', { wallId: 'wall-2', offset: 600 });
     const firstWallStep = doc.featureHistory[0]!.id;
@@ -308,14 +387,34 @@ describe('feature-history replay keeps hosts linked', () => {
 describe('built wall extents', () => {
   it('quantities measure the abutting wall body at a T joint', async () => {
     const { wallQuantities } = await import('@aec/building/quantities/takeoffBasics');
-    let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [8000, 0] });
-    doc = run(doc, 'add_wall', { start: [4000, 0], end: [4000, 5000] });
+    let doc = run(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [8000, 0],
+      ],
+    });
+    doc = run(doc, 'draw_walls', {
+      points: [
+        [4000, 0],
+        [4000, 5000],
+      ],
+    });
     expect(wallQuantities(doc.building!, wall(doc, 'wall-2')).length).toBeCloseTo(4900);
   });
 
   it('refuses an opening that would reach into the through wall', () => {
-    let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [8000, 0] });
-    doc = run(doc, 'add_wall', { start: [4000, 0], end: [4000, 5000] });
+    let doc = run(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [8000, 0],
+      ],
+    });
+    doc = run(doc, 'draw_walls', {
+      points: [
+        [4000, 0],
+        [4000, 5000],
+      ],
+    });
     expect(execute(doc, 'add_door', { wallId: 'wall-2', offset: 450 }).summary).toMatch(
       /built from 100\.000 to 5000\.000/,
     );
@@ -324,10 +423,17 @@ describe('built wall extents', () => {
 
   it.each([120, 150, 170])('extends the outer edge only at a %i° joint (no spikes)', (degrees) => {
     const turn = Math.PI - (degrees * Math.PI) / 180;
-    let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [4000, 0] });
-    doc = run(doc, 'add_wall', {
-      start: [4000, 0],
-      end: [4000 + 3000 * Math.cos(turn), 3000 * Math.sin(turn)],
+    let doc = run(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
+    });
+    doc = run(doc, 'draw_walls', {
+      points: [
+        [4000, 0],
+        [4000 + 3000 * Math.cos(turn), 3000 * Math.sin(turn)],
+      ],
     });
     const phi = (degrees * Math.PI) / 180;
     // Equal 200 mm walls: the earlier wall reaches (t/2)·cot(φ/2) past the joint.
@@ -340,10 +446,17 @@ describe('built wall extents', () => {
   });
 
   it('acute joints reach the far face', () => {
-    let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [4000, 0] });
-    doc = run(doc, 'add_wall', {
-      start: [4000, 0],
-      end: [4000 - 3000 * Math.cos(Math.PI / 3), 3000 * Math.sin(Math.PI / 3)],
+    let doc = run(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
+    });
+    doc = run(doc, 'draw_walls', {
+      points: [
+        [4000, 0],
+        [4000 - 3000 * Math.cos(Math.PI / 3), 3000 * Math.sin(Math.PI / 3)],
+      ],
     });
     const phi = Math.PI / 3;
     expect(endAdjustment(doc.building!, wall(doc, 'wall-1'), 'end')).toBeCloseTo(

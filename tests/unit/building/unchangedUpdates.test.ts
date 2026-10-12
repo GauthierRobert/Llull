@@ -41,9 +41,11 @@ const expectTwinRefused = (
 
 describe('update_* / set_* commands with unchanged values are no-ops', () => {
   it('update_wall', () => {
-    const doc = execute(createEmptyDocument(), 'add_wall', {
-      start: [0, 0],
-      end: [4000, 0],
+    const doc = execute(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
       thickness: 200,
     }).document;
     expectNoOp(doc, 'update_wall', { wallId: 'wall-1' });
@@ -69,9 +71,11 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
   });
 
   it('move_building_element: zero delta no-op, duplicates counted once, unknown ids reported', () => {
-    const doc = execute(createEmptyDocument(), 'add_wall', {
-      start: [0, 0],
-      end: [4000, 0],
+    const doc = execute(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
     }).document;
     expectNoOp(doc, 'move_building_element', { elementIds: ['wall-1'], delta: [0, 0] });
     const moved = execute(doc, 'move_building_element', {
@@ -89,10 +93,12 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
     );
   });
 
-  it('add_wall refuses a duplicate of an existing wall (either direction)', () => {
-    const doc = execute(createEmptyDocument(), 'add_wall', {
-      start: [0, 0],
-      end: [4000, 0],
+  it('draw_walls refuses a lone segment duplicating an existing wall (either direction)', () => {
+    const doc = execute(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
     }).document;
     for (const [start, end] of [
       [
@@ -104,18 +110,28 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
         [0, 0],
       ],
     ]) {
-      const again = execute(doc, 'add_wall', { start, end });
+      const again = execute(doc, 'draw_walls', { points: [start, end] });
       expect(again.document).toBe(doc);
-      expect(again.summary).toMatch(/duplicates wall wall-1 on level-1/);
+      expect(again.summary).toMatch(
+        /every segment duplicates an existing wall on level-1 \(wall-1\)/,
+      );
     }
-    const elsewhere = execute(doc, 'add_wall', { start: [0, 0], end: [4000, 0], baseOffset: 100 });
+    const elsewhere = execute(doc, 'draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
+      baseOffset: 100,
+    });
     expect(elsewhere.affected.length).toBeGreaterThan(0);
   });
 
   it('draw_walls skips a segment duplicating an existing wall and builds the rest', () => {
-    const doc = execute(createEmptyDocument(), 'add_wall', {
-      start: [0, 0],
-      end: [4000, 0],
+    const doc = execute(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
     }).document;
     const before = structuredClone(doc);
     const chain = execute(doc, 'draw_walls', {
@@ -330,9 +346,11 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
   });
 
   it('door / window marks stay unique per kind on add and update', () => {
-    let doc = execute(createEmptyDocument(), 'add_wall', {
-      start: [0, 0],
-      end: [10000, 0],
+    let doc = execute(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [10000, 0],
+      ],
     }).document;
     doc = execute(doc, 'add_door', { wallId: 'wall-1', offset: 1500, mark: 'D-A' }).document;
     const dup = execute(doc, 'add_door', { wallId: 'wall-1', offset: 5000, mark: 'D-A' });
