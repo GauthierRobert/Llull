@@ -20,6 +20,7 @@ import { elevationAt } from '../surface/tin';
 import type { ReportRow } from '../road/roadReport';
 import { formatStation } from '../model';
 import {
+  levelFrame,
   niceStep,
   pushLevelGrid,
   pushTableLabels,
@@ -82,17 +83,13 @@ export function longSectionSvg(
   const startM = toMetres(doc, alignment.startStation);
   const lengthM = toMetres(doc, endStation(alignment)) - startM;
   const all = [...ground, ...design].map((p) => p[1]);
-  const gridMin = Math.min(...all);
-  const gridMax = Math.max(...all);
-  const pad = Math.max((gridMax - gridMin) * 0.1, 0.5);
-  const rangeM = gridMax - gridMin + 2 * pad;
+  const { rangeM, zTop } = levelFrame(all);
   const hScale =
     horizontalScale ??
     Math.min(MAX_PLOT_WIDTH / lengthM, MAX_PLOT_HEIGHT / (rangeM * verticalExaggeration));
   const vScale = hScale * verticalExaggeration;
   const plotWidth = lengthM * hScale;
   const plotHeight = rangeM * vScale;
-  const zTop = gridMax + pad;
   const x = (stationM: number): number => LEFT + (stationM - startM) * hScale;
   const y = (z: number): number => TOP + (zTop - z) * vScale;
   const body: string[] = [];

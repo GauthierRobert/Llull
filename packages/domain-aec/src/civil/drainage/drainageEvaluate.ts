@@ -9,6 +9,7 @@ import type { ManholeObject, PipeObject } from '@core/model/civil';
 import { circlePolygon } from '@lib/arc';
 import { cross3 } from '@lib/vec3';
 import { toMm } from '@core/model/units';
+import { normalize } from '../../shared/vec3';
 import { civilLine, civilMesh, civilPolyline, civilText } from '../entities';
 import { labelHeight, type CivilContext } from '../context';
 import { civilObject } from '../model';
@@ -16,16 +17,11 @@ import { civilObject } from '../model';
 const MANHOLE_SIDES = 16;
 const PIPE_SIDES = 12;
 
-function normalized(v: Vec3): Vec3 {
-  const length = Math.hypot(v[0], v[1], v[2]) || 1;
-  return [v[0] / length, v[1] / length, v[2] / length];
-}
-
 /** Closed prism of `sides` facets and `radius` about the axis `bottom` -> `top` (outward normals). */
-function prismMesh(bottom: Vec3, top: Vec3, radius: number, sides: number): MeshData {
-  const axis = normalized([top[0] - bottom[0], top[1] - bottom[1], top[2] - bottom[2]]);
+function axisPrismMesh(bottom: Vec3, top: Vec3, radius: number, sides: number): MeshData {
+  const axis = normalize([top[0] - bottom[0], top[1] - bottom[1], top[2] - bottom[2]]);
   const reference: Vec3 = Math.abs(axis[2]) > 0.9 ? [1, 0, 0] : [0, 0, 1];
-  const u = normalized(cross3(axis, reference));
+  const u = normalize(cross3(axis, reference));
   const v = cross3(axis, u);
   const positions: number[] = [];
   for (const centre of [bottom, top]) {
@@ -68,7 +64,7 @@ export function evaluateManhole(context: CivilContext, manhole: ManholeObject): 
       'body',
       manhole.name,
       'structures',
-      prismMesh(bottom, top, radius, MANHOLE_SIDES),
+      axisPrismMesh(bottom, top, radius, MANHOLE_SIDES),
     ),
     civilPolyline(
       manhole,
@@ -100,7 +96,7 @@ export function evaluatePipe(context: CivilContext, pipe: PipeObject): Entity[] 
   const end: Vec3 = [to.position[0], to.position[1], pipe.invertTo + radius];
   const middle: Vec3 = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2, (start[2] + end[2]) / 2];
   return [
-    civilMesh(pipe, 'body', pipe.name, 'pipes', prismMesh(start, end, radius, PIPE_SIDES)),
+    civilMesh(pipe, 'body', pipe.name, 'pipes', axisPrismMesh(start, end, radius, PIPE_SIDES)),
     civilLine(pipe, 'plan', `${pipe.name} plan`, 'pipes', from.position, to.position, middle[2]),
     civilText(
       pipe,

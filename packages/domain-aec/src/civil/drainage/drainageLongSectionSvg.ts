@@ -6,6 +6,7 @@
  */
 
 import {
+  levelFrame,
   pushLevelGrid,
   pushTableLabels,
   svgDocument,
@@ -58,15 +59,11 @@ export function drainageLongSectionSvg(
     ...stations.flatMap((s) => [s.rimM, s.invertM, s.hglM]),
     ...segments.flatMap((s) => [s.invertUpM, s.invertDownM, s.hglUpM, s.hglDownM]),
   ];
-  const gridMin = Math.min(...levels);
-  const gridMax = Math.max(...levels);
-  const pad = Math.max((gridMax - gridMin) * 0.1, 0.5);
-  const rangeM = gridMax - gridMin + 2 * pad;
+  const { rangeM, zTop } = levelFrame(levels);
   const hScale = Math.min(MAX_PLOT_WIDTH / lengthM, MAX_PLOT_HEIGHT / rangeM);
   const vScale = Math.min(MAX_PLOT_HEIGHT / rangeM, hScale * 10);
   const plotWidth = lengthM * hScale;
   const plotHeight = rangeM * vScale;
-  const zTop = gridMax + pad;
   const x = (chainage: number): number => LEFT + chainage * hScale;
   const y = (z: number): number => TOP + (zTop - z) * vScale;
   const body: string[] = [

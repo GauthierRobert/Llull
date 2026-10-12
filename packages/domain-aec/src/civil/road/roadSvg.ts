@@ -76,6 +76,14 @@ export function niceStep(minimum: number): number {
   );
 }
 
+/** Vertical extent of a long-section plot: `rangeM` of `levels` padded 10% (min 0.5 m) each side, and the top level `zTop`. */
+export function levelFrame(levels: readonly number[]): { rangeM: number; zTop: number } {
+  const gridMin = Math.min(...levels);
+  const gridMax = Math.max(...levels);
+  const pad = Math.max((gridMax - gridMin) * 0.1, 0.5);
+  return { rangeM: gridMax - gridMin + 2 * pad, zTop: gridMax + pad };
+}
+
 /** Horizontal level gridlines with right-aligned level labels, appended to `body`. */
 export function pushLevelGrid(
   body: string[],

@@ -214,6 +214,9 @@ export function compressionClass(profile: SteelProfile, fy: number): 1 | 2 | 3 |
   }
 }
 
+/** Beams whose top of steel differs by less than this are one floor level, mm. */
+export const LEVEL_TOLERANCE = 150;
+
 /** Means of the groups of `values` whose neighbours (sorted) lie within `tolerance`: the levels they stand at. */
 export const clusterMeans = (values: ReadonlyArray<number>, tolerance: number): number[] => {
   const groups: number[][] = [];
