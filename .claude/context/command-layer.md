@@ -106,9 +106,9 @@ toToolSchemas(): Array<{ name; description; input_schema: ParamsSchema;
 
 Registration: core — list the const in its feature folder's `catalog.ts`
 (`commandCatalog(...)`); `registry.ts` registers every catalog (a contract test fails on an
-exported command no catalog lists). Domain — add it to the plugin's `commands` (`packages/domain-aec/src/index.ts` lists feed
-`buildingPlugin` / `industrialPlugin` in `plugin.ts`); `installPlugin` appends them (name clash
-throws). `toToolSchemas()` length MUST equal `listCommands()` length (test-guarded), and its
+exported command no catalog lists). Domain — list it in its domain's `catalog.ts` (`packages/domain-aec/src/<domain>/catalog.ts`,
+consumed by that domain's `plugin.ts`; `index.ts` exports the plugins); `installPlugin` appends
+them (name clash throws). `toToolSchemas()` length MUST equal `listCommands()` length (test-guarded), and its
 output is snapshotted (`tests/unit/contract/__snapshots__`).
 
 ## Plugins (`plugins/plugin.ts`, `plugins/host.ts`)

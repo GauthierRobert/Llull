@@ -50,8 +50,9 @@ packages/core/src/          @core  Framework-agnostic brain. NO react / DOM / wi
   plugins/                         plugin.ts (CadPlugin) · host.ts (installPlugin, derivedEntityIds)
   codegen/                         CadQuery / build123d / OpenSCAD / FreeCAD emitters
 packages/mcp/src/           @mcp   MCP tools/resources/prompts/toolsets/discovery/liveSync over the registry
-packages/domain-aec/src/    @aec   plugins: building/ (elements, geometry, evaluate, drawings, exchange,
-                                   quantities) · industrial/<discipline>/ · civil/<topic>/ · steel/ · shared/
+packages/domain-aec/src/    @aec   plugins, each `<domain>/{catalog,plugin}.ts`: building/ (elements, geometry,
+                                   evaluate, drawings, exchange, quantities) · industrial/<discipline>/ ·
+                                   civil/<topic>/ · steel/ · shared/ · index.ts (public API)
 packages/kernel-manifold/src/ @kernel-manifold   Manifold GeometryKernel
 packages/kernel-occt/src/   @kernel-occt       OpenCascade GeometryKernel
 src/app/                    @app   Composition root: installDefaultPlugins()

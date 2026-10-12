@@ -6,8 +6,7 @@
  */
 
 import { installPlugin } from '@core/plugins/host';
-import { buildingPlugin, industrialPlugin } from '@aec/plugin';
-import { civilPlugin } from '@aec/civil/plugin';
+import { buildingPlugin, civilPlugin, industrialPlugin } from '@aec/index';
 
 /** Install every default domain plugin (idempotent). */
 export function installDefaultPlugins(): void {
