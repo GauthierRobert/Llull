@@ -7,7 +7,7 @@
 
 import type { CadDocument } from '@core/model/types';
 import type { CivilModel, ManholeObject, PipeObject } from '@core/model/civil';
-import { toMetres, toMm } from '../../building/model';
+import { toMetres, toMm } from '@core/model/units';
 import { round } from '../../shared/numeric';
 import { civilObjectsOf, civilObject } from '../model';
 import { manningFullFlow, rationalFlowLps, solvePartialFlow } from './hydraulics';

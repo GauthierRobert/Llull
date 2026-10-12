@@ -7,7 +7,7 @@
 
 import type { CadDocument } from '@core/model/types';
 import type { CivilModel } from '@core/model/civil';
-import { fromMm } from '../../building/model';
+import { fromMm } from '@core/model/units';
 import { civilObjectsOf, withObject } from '../model';
 import { solvePartialFlow } from './hydraulics';
 import type { DrainageCriteria } from './drainageCriteria';

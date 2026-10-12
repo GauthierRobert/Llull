@@ -7,7 +7,8 @@
 
 import type { BuildingModel, MomentConnectionElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
-import { fromMm, toMm, withElement } from '../../building/model';
+import { fromMm, toMm } from '@core/model/units';
+import { withElement } from '../../building/model';
 import { buildingConnectionSolids } from './evaluateConnections';
 import { connectionCheck, type CheckRow } from '../frames/frameCheckSolve';
 

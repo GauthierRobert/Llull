@@ -11,7 +11,7 @@ import type {
   WallElement,
 } from '@core/model/building';
 import { polygonArea } from '@lib/polygon';
-import { toMetres } from '../model';
+import { toMetres } from '@core/model/units';
 import { round } from '../../shared/numeric';
 import { builtExtent, openingsOf } from '../geometry/wallGeometry';
 

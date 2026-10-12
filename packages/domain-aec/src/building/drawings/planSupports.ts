@@ -8,7 +8,7 @@
 
 import type { Vec2 } from '@core/model/types';
 import type { BuildingModel, PipeSupportElement } from '@core/model/building';
-import { fromMm } from '../model';
+import { fromMm } from '@core/model/units';
 import {
   type PlanPrimitive,
   type PlanSource,

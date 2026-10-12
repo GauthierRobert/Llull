@@ -7,8 +7,8 @@ import type { CadDocument, Vec2 } from '@core/model/types';
 import type { BuildingModel, OpeningElement, WallElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
+import { fromMm } from '@core/model/units';
 import {
-  fromMm,
   getBuilding,
   isVec2List,
   nextElementId,

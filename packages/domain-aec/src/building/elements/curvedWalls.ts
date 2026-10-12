@@ -6,15 +6,8 @@
 import type { CurvedWallElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
-import {
-  fromMm,
-  getBuilding,
-  nextElementId,
-  nextMark,
-  resolveLevel,
-  toMetres,
-  withElement,
-} from '../model';
+import { fromMm, toMetres } from '@core/model/units';
+import { getBuilding, nextElementId, nextMark, resolveLevel, withElement } from '../model';
 import { noop } from '@core/commands/noop';
 import { duplicateSummary, findTwin, samePoint, sameSegment } from '../../shared/duplicates';
 import { commitBuilding } from '../evaluate/evaluateElements';

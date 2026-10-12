@@ -6,7 +6,7 @@
 
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
 import type { BuildingElement, BuildingLevel, BuildingModel } from '@core/model/building';
-import { fromMm } from '../../building/model';
+import { fromMm } from '@core/model/units';
 import { sweepFrame } from '../../shared/mesh';
 import { distance } from '@lib/polygon';
 import { cross3, dot3, scale3, sub3 } from '@lib/vec3';

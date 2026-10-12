@@ -10,7 +10,7 @@ import type {
   SteelMemberElement,
 } from '@core/model/building';
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
-import { toMm } from '../../building/model';
+import { toMm } from '@core/model/units';
 import { round } from '../../shared/numeric';
 import { sweepFrame, type SweepFrame } from '../../shared/mesh';
 import { add3, distanceSq3, dot3, scale3, sub3 } from '@lib/vec3';

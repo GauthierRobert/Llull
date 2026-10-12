@@ -8,7 +8,7 @@ import type { ManholeObject } from '@core/model/civil';
 import type { CommandResult } from '@core/commands/types';
 import { commandCatalog, defineCommand, z, vec2 } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
-import { fromMm } from '../../building/model';
+import { fromMm } from '@core/model/units';
 import {
   civilObject,
   civilObjectsOf,

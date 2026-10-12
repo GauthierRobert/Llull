@@ -6,7 +6,7 @@
 
 import type { BasePlateElement, BuildingModel } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
-import { toMetres } from '../../building/model';
+import { toMetres } from '@core/model/units';
 import { findProfile } from '../../steel/profiles';
 import type { BaseReaction } from '../frames/frameModelSolve';
 import { anchorBoltResistance, yieldStrength } from '../steelDesign/steelDesign';

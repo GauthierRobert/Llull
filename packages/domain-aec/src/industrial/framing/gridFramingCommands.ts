@@ -7,14 +7,8 @@ import type { BuildingModel, GridElement, SteelMemberElement } from '@core/model
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
-import {
-  elementAffected,
-  elementsOf,
-  fromMm,
-  getBuilding,
-  resolveLevel,
-  toMetres,
-} from '../../building/model';
+import { fromMm, toMetres } from '@core/model/units';
+import { elementAffected, elementsOf, getBuilding, resolveLevel } from '../../building/model';
 import { regenerateBuilding } from '../../building/evaluate/evaluateElements';
 import { findProfile } from '../../steel/profiles';
 import {

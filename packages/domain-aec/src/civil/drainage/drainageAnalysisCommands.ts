@@ -6,7 +6,7 @@
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
-import { toMetres } from '../../building/model';
+import { toMetres } from '@core/model/units';
 import { civilAffected, civilObjectsOf, getCivil } from '../model';
 import { regenerateCivil } from '../evaluate';
 import { csvLines } from '../../shared/csv';

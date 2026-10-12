@@ -25,7 +25,7 @@ import {
 import { commitCivil } from '../evaluate';
 import { roadReportCommands } from './roadReportCommands';
 import { setSuperelevation } from './roadSuperelevationCommand';
-import { toMetres } from '../../building/model';
+import { toMetres } from '@core/model/units';
 import { alignmentIdParam } from './roadParams';
 
 function pointsInput(): z.ZodArray<z.ZodTuple<[z.ZodNumber, z.ZodNumber], null>> {

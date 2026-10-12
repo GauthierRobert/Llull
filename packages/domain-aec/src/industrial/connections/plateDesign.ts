@@ -5,7 +5,8 @@
 
 import type { BasePlateElement, BuildingModel } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
-import { elementsOf, fromMm, withElement } from '../../building/model';
+import { fromMm } from '@core/model/units';
+import { elementsOf, withElement } from '../../building/model';
 import { findProfile } from '../../steel/profiles';
 import { sizeBasePlate, type PlateDemand } from './basePlateMN';
 import { plateDemands } from '../foundations/foundationCombinations';

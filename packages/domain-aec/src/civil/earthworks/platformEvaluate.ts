@@ -12,7 +12,7 @@ import { civilMesh, civilPolyline, civilText } from '../entities';
 import { labelHeight, type CivilContext } from '../context';
 import { daylightPoints, type DaylightPoint } from './platformDaylight';
 import { surfaceTinById } from '../surface/surfaceTin';
-import { toMetres } from '../../building/model';
+import { toMetres } from '@core/model/units';
 
 const CUT_COLOR = '#c0794a';
 const FILL_COLOR = '#8fae6b';

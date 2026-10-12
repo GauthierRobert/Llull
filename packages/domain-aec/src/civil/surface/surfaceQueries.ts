@@ -9,7 +9,7 @@ import { noop } from '@core/commands/noop';
 import { civilObjectOrFailure, getCivil } from '../model';
 import { surfaceTin } from './surfaceTin';
 import { corners, elevationAt, slopeAt, tinBounds, tinPlanArea, triangleCount } from './tin';
-import { toMetres } from '../../building/model';
+import { toMetres } from '@core/model/units';
 import { round as roundDigits } from '../../shared/numeric';
 
 const round = (value: number, digits = 3): number => roundDigits(value, digits);

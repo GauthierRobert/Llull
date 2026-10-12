@@ -5,7 +5,8 @@
 import type { SteelMemberElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { existingLevelId, getBuilding, toMm } from '../../building/model';
+import { toMm } from '@core/model/units';
+import { existingLevelId, getBuilding } from '../../building/model';
 import { noop } from '@core/commands/noop';
 import { isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
 import { craneCapacityOf, type CraneModel } from '../frames/frameModelTypes';

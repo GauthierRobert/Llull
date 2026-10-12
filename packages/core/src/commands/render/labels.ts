@@ -38,7 +38,20 @@ function entityCategory(e: Entity): EntityCategory {
     case 'dimension':
     case 'image':
       return 'annotation';
-    default:
+    case 'box':
+    case 'cylinder':
+    case 'sphere':
+    case 'extrusion':
+    case 'mesh':
+    case 'cone':
+    case 'torus':
+    case 'wedge':
+    case 'pyramid':
+    case 'revolution':
+    case 'sweep':
+    case 'loft':
+    case 'subdivision':
+    case 'instance':
       return 'solid3d';
   }
 }
@@ -92,7 +105,19 @@ function entityKeyPoints(e: Entity): Vec3[] {
       return [lift(0, 0), lift(e.width, 0), lift(e.width, e.height), lift(0, e.height)];
     case 'instance':
       return [pos]; // its component's extent needs the document; anchor the label at its origin
-    default:
+    case 'box':
+    case 'cylinder':
+    case 'sphere':
+    case 'extrusion':
+    case 'mesh':
+    case 'cone':
+    case 'torus':
+    case 'wedge':
+    case 'pyramid':
+    case 'revolution':
+    case 'sweep':
+    case 'loft':
+    case 'subdivision':
       return boundsCorners(entityBounds(e));
   }
 }

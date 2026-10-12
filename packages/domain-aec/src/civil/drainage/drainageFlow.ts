@@ -8,7 +8,7 @@
 
 import type { CadDocument } from '@core/model/types';
 import type { CivilModel, PipeObject } from '@core/model/civil';
-import { toMetres } from '../../building/model';
+import { toMetres } from '@core/model/units';
 import { civilObjectsOf } from '../model';
 import { fullArea, manningFullFlow, rationalFlowLps, solvePartialFlow } from './hydraulics';
 import { DEFAULT_ENTRY_TIME_MIN, intensityAt, type DrainageCriteria } from './drainageCriteria';

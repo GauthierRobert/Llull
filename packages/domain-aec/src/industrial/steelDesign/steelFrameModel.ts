@@ -14,6 +14,7 @@ import { inPlaneInertia } from './steelFrameSection';
 import type { BeamResult, ColumnNode } from './steelFraming';
 import {
   clusterMeans,
+  LEVEL_TOLERANCE,
   nearestIndex,
   sectionOf,
   selfWeightPerMetre,
@@ -71,7 +72,6 @@ export interface FrameSystem {
   readonly invalid: Map<string, string>;
 }
 
-const LEVEL_TOLERANCE = 150;
 const SNAP_TOLERANCE = 300;
 const SAME_POINT = 1;
 const MIN_STATIONS = 8;

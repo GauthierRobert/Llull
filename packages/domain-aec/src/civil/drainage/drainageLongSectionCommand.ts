@@ -8,7 +8,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
 import { safeFileName } from '@lib/safeFileName';
-import { toMetres, toMm } from '../../building/model';
+import { toMetres, toMm } from '@core/model/units';
 import { civilObject, civilObjectsOf, getCivil } from '../model';
 import { criteriaFrom, idfField, intensityField } from './drainageAnalysisCommands';
 import { computeFlows } from './drainageFlow';

@@ -13,7 +13,8 @@ import type {
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
 import { projectOntoSegment } from '@lib/polygon';
-import { fromMm, getBuilding, nextElementId, nextMark, withElement } from '../model';
+import { fromMm } from '@core/model/units';
+import { getBuilding, nextElementId, nextMark, withElement } from '../model';
 import { commitBuilding } from '../evaluate/evaluateElements';
 import { noop } from '@core/commands/noop';
 import { builtExtent, openingsOf, wallFrame } from '../geometry/wallGeometry';

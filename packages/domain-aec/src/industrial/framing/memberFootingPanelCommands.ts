@@ -5,7 +5,8 @@
 import type { Vec3 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, vec2, z } from '@core/commands/schema';
-import { elementAffected, fromMm, getBuilding, resolveLevel } from '../../building/model';
+import { fromMm } from '@core/model/units';
+import { elementAffected, getBuilding, resolveLevel } from '../../building/model';
 import { noop } from '@core/commands/noop';
 import { regenerateBuilding } from '../../building/evaluate/evaluateElements';
 import {

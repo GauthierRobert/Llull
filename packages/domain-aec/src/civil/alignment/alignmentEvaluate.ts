@@ -18,7 +18,7 @@ import {
 import { evaluateCorridor } from '../road/corridorMesh';
 import { formatStation } from '../model';
 import { labelHeight, type CivilContext } from '../context';
-import { toMetres } from '../../building/model';
+import { toMetres } from '@core/model/units';
 
 /** Station ticks drawn per alignment at most; the tick spacing grows to stay under it. */
 export const MAX_STATION_TICKS = 500;

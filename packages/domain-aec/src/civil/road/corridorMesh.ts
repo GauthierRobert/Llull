@@ -18,7 +18,7 @@ import { crossSectionAt, type RoadCrossSection, type SectionNode } from './roadS
 import { superelevationStations } from '../alignment/superelevation';
 import { surfaceTinById } from '../surface/surfaceTin';
 import type { CivilContext } from '../context';
-import { toMetres } from '../../building/model';
+import { toMetres } from '@core/model/units';
 
 interface MeshBuffers {
   readonly positions: number[];

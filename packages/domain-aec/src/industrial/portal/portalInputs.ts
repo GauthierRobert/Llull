@@ -5,7 +5,7 @@
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
-import { fromMm } from '../../building/model';
+import { fromMm } from '@core/model/units';
 import { findProfile, type SteelProfile } from '../../steel/profiles';
 import type { PortalProfiles } from './portalGeometry';
 import type { portalFrameParams } from './portalParams';

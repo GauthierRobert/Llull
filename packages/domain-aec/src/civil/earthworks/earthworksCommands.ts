@@ -31,7 +31,7 @@ import {
   type Earthworks,
 } from './earthworksMath';
 import { daylightPoints } from './platformDaylight';
-import { toMetres } from '../../building/model';
+import { toMetres } from '@core/model/units';
 import { round as roundDigits } from '../../shared/numeric';
 
 const DEFAULT_CUT_SLOPE = 1.5;

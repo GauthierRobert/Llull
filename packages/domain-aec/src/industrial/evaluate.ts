@@ -16,7 +16,7 @@ import type {
   PipeElement,
   SteelMemberElement,
 } from '@core/model/building';
-import { fromMm, toMm } from '../building/model';
+import { fromMm, toMm } from '@core/model/units';
 import {
   base,
   colorForMaterial,

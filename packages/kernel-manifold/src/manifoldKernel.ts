@@ -203,7 +203,27 @@ function primitiveOf(m: ManifoldModule, entity: Entity): ManifoldShape | null {
       section.delete();
       return prim;
     }
-    default:
+    case 'mesh':
+    case 'cone':
+    case 'torus':
+    case 'wedge':
+    case 'pyramid':
+    case 'revolution':
+    case 'sweep':
+    case 'loft':
+    case 'subdivision':
+    case 'line':
+    case 'polyline':
+    case 'arc':
+    case 'circle':
+    case 'rectangle':
+    case 'point':
+    case 'ellipse':
+    case 'spline':
+    case 'text':
+    case 'dimension':
+    case 'image':
+    case 'instance':
       return null;
   }
 }
@@ -233,7 +253,18 @@ function entityToManifold(m: ManifoldModule, entity: Entity): ManifoldShape | nu
         prim.delete();
       }
     }
-    default:
+    case 'line':
+    case 'polyline':
+    case 'arc':
+    case 'circle':
+    case 'rectangle':
+    case 'point':
+    case 'ellipse':
+    case 'spline':
+    case 'text':
+    case 'dimension':
+    case 'image':
+    case 'instance':
       return null;
   }
 }

@@ -37,7 +37,7 @@ import { loftTriangles } from '../../geometry/loft';
 import { subdivisionTriangles } from '../../geometry/subdivision';
 import {
   SEG_CIRCLE,
-  boxExtents,
+  boxFaces,
   extrusionRings,
   facetNormal,
   meshTriangles,
@@ -47,7 +47,7 @@ import {
   sideQuads,
   sphereQuads,
   torusQuads,
-  wedgeCorners,
+  wedgeFaces,
 } from '../../geometry/tessellation';
 import type { PreDepthPolygon } from './types';
 import { positiveSweep } from '../../lib/angle';
@@ -71,49 +71,7 @@ function prism(bottom: Vec3[], top: Vec3[], color: string): PreDepthPolygon[] {
 }
 
 function tessellateBox(e: BoxEntity): PreDepthPolygon[] {
-  const { x0, x1, y0, y1, z0, z1 } = boxExtents(e.position, e.size);
-  // 6 quads (CCW when viewed from outside, Z-up): bottom, top, front, back, left, right.
-  return makePolygons(
-    [
-      [
-        [x0, y0, z0],
-        [x1, y0, z0],
-        [x1, y1, z0],
-        [x0, y1, z0],
-      ],
-      [
-        [x0, y0, z1],
-        [x0, y1, z1],
-        [x1, y1, z1],
-        [x1, y0, z1],
-      ],
-      [
-        [x0, y0, z0],
-        [x0, y0, z1],
-        [x1, y0, z1],
-        [x1, y0, z0],
-      ],
-      [
-        [x0, y1, z0],
-        [x1, y1, z0],
-        [x1, y1, z1],
-        [x0, y1, z1],
-      ],
-      [
-        [x0, y0, z0],
-        [x0, y1, z0],
-        [x0, y1, z1],
-        [x0, y0, z1],
-      ],
-      [
-        [x1, y0, z0],
-        [x1, y0, z1],
-        [x1, y1, z1],
-        [x1, y1, z0],
-      ],
-    ],
-    e.color,
-  );
+  return makePolygons(boxFaces(e.position, e.size), e.color);
 }
 
 /** Z-up cylinder: axis along Z, centered at position. */
@@ -140,17 +98,7 @@ function tessellateTorus(e: TorusEntity): PreDepthPolygon[] {
 
 /** Wedge: lower-front-left corner at position; the back edge is degenerate, so there is no back face. */
 function tessellateWedge(e: WedgeEntity): PreDepthPolygon[] {
-  const { f00, f10, f11, f01, b00, b10 } = wedgeCorners(e.position, e.size);
-  return makePolygons(
-    [
-      [f00, f10, f11, f01], // front
-      [f00, b00, b10, f10], // bottom
-      [f00, f01, b00], // left triangle
-      [f10, b10, f11], // right triangle
-      [f01, f11, b10, b00], // top slope
-    ],
-    e.color,
-  );
+  return makePolygons(wedgeFaces(e.position, e.size), e.color);
 }
 
 /** Pyramid: rectangular base centered at position in XY, apex at position+[0,0,height]. */
