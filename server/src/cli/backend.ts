@@ -16,6 +16,7 @@ import { isRecord } from '@lib/isRecord';
 import type { StepObserver } from './progress';
 import type { ExchangeOptions } from '../pythonExchange';
 import { runLocalExchange } from './exchange';
+import { writeFileAtomic } from '../writeFileAtomic';
 import type { CliRunResult } from './result';
 
 export interface CliBackend {
@@ -35,12 +36,6 @@ export function backupPathOf(docPath: string): string {
   return `${docPath}.bak`;
 }
 
-function writeAtomic(filePath: string, text: string): void {
-  const temporary = `${filePath}.${process.pid}.tmp`;
-  fs.writeFileSync(temporary, text, 'utf8');
-  fs.renameSync(temporary, filePath);
-}
-
 /** The document stored at `docPath`; an empty document when the file does not exist yet. */
 export function readDocumentFile(docPath: string): CadDocument {
   if (!fs.existsSync(docPath)) return createEmptyDocument();
@@ -51,7 +46,7 @@ export function readDocumentFile(docPath: string): CadDocument {
 export function writeDocumentFile(docPath: string, doc: CadDocument): void {
   fs.mkdirSync(path.dirname(path.resolve(docPath)), { recursive: true });
   if (fs.existsSync(docPath)) fs.copyFileSync(docPath, backupPathOf(docPath));
-  writeAtomic(docPath, serializeDocument(doc));
+  writeFileAtomic(docPath, serializeDocument(doc));
 }
 
 interface LocalOptions {
