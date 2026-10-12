@@ -109,7 +109,7 @@ export function meshTriangles(mesh: {
 }
 
 /** Axis-aligned extents of a box centred at `position`. */
-export function boxExtents(
+function boxExtents(
   position: Vec3,
   size: Vec3,
 ): { x0: number; x1: number; y0: number; y1: number; z0: number; z1: number } {
@@ -126,7 +126,7 @@ export function boxExtents(
 }
 
 /** The six corners of a wedge whose lower-front-left corner is at `position` (size = [w, h, d]). */
-export function wedgeCorners(
+function wedgeCorners(
   position: Vec3,
   size: Vec3,
 ): { f00: Vec3; f10: Vec3; f11: Vec3; f01: Vec3; b00: Vec3; b10: Vec3 } {
