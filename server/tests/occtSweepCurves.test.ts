@@ -76,7 +76,7 @@ describe('sweep_profile on the live kernels', () => {
   it('round pipe along a bent path: exact pipe wall 2π r L, meshes match π r² L', () => {
     const pipe = created(empty, 'sweep_profile', { path: L_PATH, radius: 1.5, bendRadius: 5 });
     const exact = (
-      execute({ ...empty, entities: { [pipe.id]: pipe } }, 'measure_volume', { entityId: pipe.id })
+      execute({ ...empty, entities: { [pipe.id]: pipe } }, 'mass_properties', { entityId: pipe.id })
         .data as { volume: number }
     ).volume;
     const { occt, manifold } = volumes(pipe);
@@ -99,7 +99,7 @@ describe('sweep_profile on the live kernels', () => {
       bendRadius: 6,
     });
     const exact = (
-      execute({ ...empty, entities: { [tube.id]: tube } }, 'measure_volume', {
+      execute({ ...empty, entities: { [tube.id]: tube } }, 'mass_properties', {
         entityId: tube.id,
       }).data as { volume: number }
     ).volume;
@@ -159,9 +159,9 @@ describe('sweep section roll', () => {
 });
 
 describe('exact profile curves on the live OCC kernel', () => {
-  it('extrude_sketch of a circle builds a true cylinder face (STEP has CIRCLE)', () => {
+  it('extrude_profile of a circle builds a true cylinder face (STEP has CIRCLE)', () => {
     const doc = sketch({ id: 'c', kind: 'circle', center: [0, 0], radius: 5 });
-    const ext = created(doc, 'extrude_sketch', { id: 'c', depth: 4 });
+    const ext = created(doc, 'extrude_profile', { id: 'c', depth: 4 });
     const wall = topologyOf(ext).faces.filter((face) => face.surface === 'cylinder');
     expect(wall.reduce((sum, face) => sum + face.area, 0) / (2 * Math.PI * 5 * 4)).toBeCloseTo(
       1,

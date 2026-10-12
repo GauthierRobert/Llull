@@ -10,8 +10,8 @@
  *   2. Calls tools/list (core + discovery tools by default), then enable_toolset for 2d + 3d.
  *   3. Builds a small scene in sequence:
  *        add_box        → 2×2×2 box at origin
- *        draw_circle    → circle with radius 1 at center [0,0]
- *        extrude_sketch → extrudes the circle into a 3-unit solid
+ *        draw_arc    → circle with radius 1 at center [0,0]
+ *        extrude_profile → extrudes the circle into a 3-unit solid
  *   4. Prints the summary text and affected entity ids for each call.
  *   5. Closes the client cleanly.
  *
@@ -135,16 +135,16 @@ async function main(): Promise<void> {
   });
   printStep(1, 'add_box', boxResult);
 
-  const circleResult = await callAndParse(client, 'draw_circle', { center: [0, 0], radius: 1 });
-  printStep(2, 'draw_circle', circleResult);
+  const circleResult = await callAndParse(client, 'draw_arc', { center: [0, 0], radius: 1 });
+  printStep(2, 'draw_arc', circleResult);
 
-  // extrude_sketch uses the circle id from step 2.
+  // extrude_profile uses the circle id from step 2.
   const circleId = circleResult.affected[0];
   if (!circleId) {
-    console.error('\nCould not find circle entity id in step 2 result — skipping extrude_sketch.');
+    console.error('\nCould not find circle entity id in step 2 result — skipping extrude_profile.');
   } else {
-    const extrudeResult = await callAndParse(client, 'extrude_sketch', { id: circleId, depth: 3 });
-    printStep(3, `extrude_sketch (source: ${circleId})`, extrudeResult);
+    const extrudeResult = await callAndParse(client, 'extrude_profile', { id: circleId, depth: 3 });
+    printStep(3, `extrude_profile (source: ${circleId})`, extrudeResult);
   }
 
   await client.close();

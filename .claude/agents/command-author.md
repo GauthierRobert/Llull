@@ -1,6 +1,6 @@
 ---
 name: command-author
-description: Use to add or modify a CAD operation in packages/core/src/commands (or a domain plugin such as packages/domain-aec) — the most common change in llull. Adding one command gives both the UI and the MCP server the capability at once. Handles the command definition, registration, and its unit tests. Covers both 2D drafting commands (draw_line, draw_arc, add_dimension, ...) and 3D solid commands. Use PROACTIVELY whenever a task implies a new document operation ("add a way to ...", "draw a ...", "the AI should be able to ...", "support cylinders/booleans/...").
+description: Use to add or modify a CAD operation in packages/core/src/commands (or a domain plugin such as packages/domain-aec) — the most common change in llull. Adding one command gives both the UI and the MCP server the capability at once. Handles the command definition, registration, and its unit tests. Covers both 2D drafting commands (draw_polyline, draw_arc, add_dimension, ...) and 3D solid commands. Use PROACTIVELY whenever a task implies a new document operation ("add a way to ...", "draw a ...", "the AI should be able to ...", "support cylinders/booleans/...").
 tools: Read, Edit, Write, Grep, Glob, Bash
 model: sonnet
 ---

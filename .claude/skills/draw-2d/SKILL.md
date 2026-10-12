@@ -24,8 +24,8 @@ interface in `packages/core/src/model/types.ts` (Vec2 geometry in the entity's l
 
 ### 2. Drawing command(s) — command-author / add-command skill
 Each draw op is a pure `defineCommand`, snake_case, drafting-verb named, in
-`packages/core/src/commands/draw2d/` / `modify2d/` (`draw_line`,
-`draw_polyline`, `draw_arc`, `draw_circle`, `draw_rectangle`, `draw_ellipse`, `draw_spline`,
+`packages/core/src/commands/draw2d/` / `modify2d/` (`draw_polyline`,
+`draw_arc`, `draw_rectangle`, `draw_ellipse`, `draw_spline`,
 `add_dimension`, `offset_2d`, `trim`, …). Points: `vec2()` / `looseVec2()` schema helpers. Same
 rules as any command: pure, registered (+ `2d` toolset in `packages/mcp/src/toolsets.ts`),
 happy + failure tests.
@@ -41,13 +41,13 @@ Registering it gives the UI tool and the MCP tool (drivable by Claude or any age
 - Dimensions/annotations are entities too (`dimension` kind), created via a command.
 
 ## The 2D → 3D bridge (do not duplicate geometry)
-A closed 2D shape (circle, rectangle, closed polyline) is the input to `extrude_sketch`
-(raw point profiles: `extrude_profile`, `revolve_profile`) to become a solid. Sketch once in 2D, build the solid from it. Never
+A closed 2D shape (circle, rectangle, closed polyline) is the input to `extrude_profile`
+(`id`/`ids`; raw point profiles too) and `revolve_profile` to become a solid. Sketch once in 2D, build the solid from it. Never
 re-encode the same shape separately for the 2D and 3D worlds.
 
 ## Done checklist
 - [ ] New 2D kinds added to `SHAPE2D_KINDS`/`Entity`; viewport has a render branch
 - [ ] Draw commands are pure, registered, snake_case, tested (happy + failure)
 - [ ] Snap/ortho math is pure + unit-tested, applied (not computed) in components
-- [ ] Closed shapes feed `extrude_sketch` — no geometry duplicated across 2D/3D
+- [ ] Closed shapes feed `extrude_profile` — no geometry duplicated across 2D/3D
 - [ ] Verified in the 2D drafting view (`verify-llull`); `npm run check` green

@@ -71,9 +71,19 @@ describe('second review regressions', () => {
       start: [0, 0],
       end: [4000, 0],
     }).document;
-    doc = execute(doc, 'draw_line', { start: [0, 5000], end: [1000, 5000] }).document;
+    doc = execute(doc, 'draw_polyline', {
+      points: [
+        [0, 5000],
+        [1000, 5000],
+      ],
+    }).document;
     const a = doc.order[doc.order.length - 1]!;
-    doc = execute(doc, 'draw_line', { start: [2000, 6000], end: [3000, 6000] }).document;
+    doc = execute(doc, 'draw_polyline', {
+      points: [
+        [2000, 6000],
+        [3000, 6000],
+      ],
+    }).document;
     const b = doc.order[doc.order.length - 1]!;
     const constrained = execute(doc, 'add_constraint', {
       constraint: {

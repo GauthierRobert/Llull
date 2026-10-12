@@ -38,12 +38,12 @@ const docWithLine = (): { doc: Doc; id: string } =>
 const extrusionOf = (result: ReturnType<typeof execute>): ExtrusionEntity =>
   result.document.entities[result.affected[0]!] as ExtrusionEntity;
 
-// extrude_sketch
+// extrude_profile
 
-describe('extrude_sketch', () => {
+describe('extrude_profile', () => {
   it('circle → creates an extrusion with 32 profile points and correct depth', () => {
     const { doc, id } = docWithCircle();
-    const result = execute(doc, 'extrude_sketch', { id, depth: 10 });
+    const result = execute(doc, 'extrude_profile', { id, depth: 10 });
 
     expect(result.affected).toHaveLength(1);
     const extId = result.affected[0]!;
@@ -58,14 +58,14 @@ describe('extrude_sketch', () => {
 
   it('circle extrude: source circle remains in document', () => {
     const { doc, id } = docWithCircle();
-    const result = execute(doc, 'extrude_sketch', { id, depth: 5 });
+    const result = execute(doc, 'extrude_profile', { id, depth: 5 });
     expect(result.document.entities[id]).toBeDefined();
     expect(result.document.entities[id]!.kind).toBe('circle');
   });
 
   it('circle extrude: profile points lie on the correct radius', () => {
     const { doc, id } = docWithCircle();
-    const result = execute(doc, 'extrude_sketch', { id, depth: 2 });
+    const result = execute(doc, 'extrude_profile', { id, depth: 2 });
     const ext = extrusionOf(result);
     for (const [x, y] of ext.profile) {
       expect(Math.sqrt(x * x + y * y)).toBeCloseTo(5, 5);
@@ -74,7 +74,7 @@ describe('extrude_sketch', () => {
 
   it('rectangle → creates an extrusion with 4 profile points at correct corners', () => {
     const { doc, id } = docWithRectangle();
-    const result = execute(doc, 'extrude_sketch', { id, depth: 3 });
+    const result = execute(doc, 'extrude_profile', { id, depth: 3 });
 
     expect(result.affected).toHaveLength(1);
     const ext = extrusionOf(result);
@@ -91,7 +91,7 @@ describe('extrude_sketch', () => {
 
   it('closed polyline → creates an extrusion with the polyline points', () => {
     const { doc, id } = docWithPolyline(true, 'poly-1');
-    const result = execute(doc, 'extrude_sketch', { id, depth: 7 });
+    const result = execute(doc, 'extrude_profile', { id, depth: 7 });
 
     expect(result.affected).toHaveLength(1);
     const ext = extrusionOf(result);
@@ -106,7 +106,7 @@ describe('extrude_sketch', () => {
   ])('is pure — input document is never mutated (%s)', (_label, make) => {
     const { doc, id } = make();
     const snapshot = JSON.stringify(doc);
-    execute(doc, 'extrude_sketch', { id, depth: 5 });
+    execute(doc, 'extrude_profile', { id, depth: 5 });
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 
@@ -114,7 +114,11 @@ describe('extrude_sketch', () => {
 
   it('missing id → graceful no-op', () => {
     const doc = createEmptyDocument();
-    expectNoOp(execute(doc, 'extrude_sketch', { id: 'nonexistent', depth: 5 }), doc, 'nonexistent');
+    expectNoOp(
+      execute(doc, 'extrude_profile', { id: 'nonexistent', depth: 5 }),
+      doc,
+      'nonexistent',
+    );
   });
 
   it.each([
@@ -122,17 +126,17 @@ describe('extrude_sketch', () => {
     ['negative depth', -1, undefined],
   ])('%s → graceful no-op', (_label, depth, summary) => {
     const { doc, id } = docWithCircle();
-    expectNoOp(execute(doc, 'extrude_sketch', { id, depth }), doc, summary);
+    expectNoOp(execute(doc, 'extrude_profile', { id, depth }), doc, summary);
   });
 
   it('line entity → graceful no-op (not a closed profile)', () => {
     const { doc, id } = docWithLine();
-    expectNoOp(execute(doc, 'extrude_sketch', { id, depth: 5 }), doc, 'not a closed 2D profile');
+    expectNoOp(execute(doc, 'extrude_profile', { id, depth: 5 }), doc, 'not a closed 2D profile');
   });
 
   it('open polyline → graceful no-op', () => {
     const { doc, id } = docWithPolyline(false, 'poly-open-1');
-    expectNoOp(execute(doc, 'extrude_sketch', { id, depth: 5 }), doc, 'not closed');
+    expectNoOp(execute(doc, 'extrude_profile', { id, depth: 5 }), doc, 'not closed');
   });
 
   it('closed polyline with < 3 points → graceful no-op', () => {
@@ -144,7 +148,7 @@ describe('extrude_sketch', () => {
       ],
       closed: true,
     });
-    const result = execute(doc, 'extrude_sketch', { id, depth: 5 });
+    const result = execute(doc, 'extrude_profile', { id, depth: 5 });
     expectNoOp(result, doc, 'fewer than 3 points');
   });
 });

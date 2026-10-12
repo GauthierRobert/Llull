@@ -260,7 +260,7 @@ describe('text decals', () => {
 
   it('refuses 2D targets, removes decals, scales them and validates saved ones', () => {
     const { doc, id } = base();
-    const sketch = execute(doc, 'draw_circle', { center: [0, 0], radius: 1 });
+    const sketch = execute(doc, 'draw_arc', { center: [0, 0], radius: 1 });
     expectNoOp(
       execute(sketch.document, 'add_decal', { id: sketch.affected[0], ...onTop }),
       sketch.document,

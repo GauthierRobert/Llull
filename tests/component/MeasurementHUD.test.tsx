@@ -179,15 +179,15 @@ describe('MeasurementHUD — measure_bounding_box', () => {
   });
 });
 
-// measure_volume
+// mass_properties (volume only)
 
-describe('MeasurementHUD — measure_volume', () => {
+describe('MeasurementHUD — mass_properties without density', () => {
   beforeEach(() => {
     resetStore();
   });
 
   it('renders volume value and unit', () => {
-    setMeasure('measure_volume', { volume: 8, unit: 'mm³' });
+    setMeasure('mass_properties', { volume: 8, volumeUnit: 'mm³' });
     render(<MeasurementHUD />);
     expect(screen.getByText('8.000')).toBeDefined();
     expect(screen.getByText('mm³')).toBeDefined();
@@ -202,7 +202,13 @@ describe('MeasurementHUD — mass_properties', () => {
   });
 
   it('renders mass value and "g" unit', () => {
-    setMeasure('mass_properties', { volume: 8, density: 0.00785, mass: 0.0628, unit: 'g' });
+    setMeasure('mass_properties', {
+      volume: 8,
+      volumeUnit: 'mm³',
+      density: 0.00785,
+      mass: 0.0628,
+      unit: 'g',
+    });
     render(<MeasurementHUD />);
     expect(screen.getByText('Mass Properties')).toBeDefined();
     // mass value: "0.063"
@@ -210,7 +216,13 @@ describe('MeasurementHUD — mass_properties', () => {
   });
 
   it('renders volume and density rows', () => {
-    setMeasure('mass_properties', { volume: 8, density: 0.00785, mass: 0.0628, unit: 'g' });
+    setMeasure('mass_properties', {
+      volume: 8,
+      volumeUnit: 'mm³',
+      density: 0.00785,
+      mass: 0.0628,
+      unit: 'g',
+    });
     render(<MeasurementHUD />);
     // Both "Volume" and "Density" labels must appear
     const rows = screen.getAllByText(/volume|density/i);

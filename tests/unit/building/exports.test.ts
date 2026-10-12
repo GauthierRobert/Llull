@@ -105,9 +105,14 @@ describe('plan drawing', () => {
 describe('export_dxf', () => {
   it('writes an R12 DXF with AIA layers, entities and the 2D drafting', () => {
     let doc = house();
-    doc = run(doc, 'draw_line', { start: [0, -3000], end: [10000, -3000] });
+    doc = run(doc, 'draw_polyline', {
+      points: [
+        [0, -3000],
+        [10000, -3000],
+      ],
+    });
     doc = run(doc, 'draw_rectangle', { width: 1000, height: 500, position: [0, -5000] });
-    doc = run(doc, 'draw_circle', { center: [0, 0], radius: 300, position: [12000, 0] });
+    doc = run(doc, 'draw_arc', { center: [0, 0], radius: 300, position: [12000, 0] });
     doc = run(doc, 'draw_arc', { center: [0, 0], radius: 300, startAngle: 0, endAngle: 1.5 });
     doc = run(doc, 'draw_polyline', {
       points: [
@@ -148,7 +153,12 @@ describe('export_dxf', () => {
   });
 
   it('exports drafting-only documents and fails cleanly', () => {
-    const drafting = run(createEmptyDocument(), 'draw_line', { start: [0, 0], end: [1, 0] });
+    const drafting = run(createEmptyDocument(), 'draw_polyline', {
+      points: [
+        [0, 0],
+        [1, 0],
+      ],
+    });
     const result = execute(drafting, 'export_dxf', {});
     expect((result.data as DxfExport).filename).toBe('Untitled_project_drafting.dxf');
     expect(execute(drafting, 'export_dxf', { levelId: 'level-1' }).summary).toMatch(/no level/);

@@ -136,7 +136,7 @@ describe('offset_2d on a rotated rectangle', () => {
   });
 });
 
-describe('extrude_sketch does not inherit the sketch rotation', () => {
+describe('extrude_profile does not inherit the sketch rotation', () => {
   const sketch = (): { doc: CadDocument; id: string } => {
     const base = run(createEmptyDocument(), 'draw_rectangle', { width: 4, height: 2 }).document;
     const id = base.order[0] as string;
@@ -152,9 +152,9 @@ describe('extrude_sketch does not inherit the sketch rotation', () => {
 
   it('defaults to [0, 0, 0] and uses an explicit rotation verbatim', () => {
     const { doc, id } = sketch();
-    const plain = run(doc, 'extrude_sketch', { id, depth: 3 });
+    const plain = run(doc, 'extrude_profile', { id, depth: 3 });
     expect((only(plain.document, 'extrusion') as ExtrusionEntity).rotation).toEqual([0, 0, 0]);
-    const rotated = run(doc, 'extrude_sketch', { id, depth: 3, rotation: [0, 0, Math.PI / 2] });
+    const rotated = run(doc, 'extrude_profile', { id, depth: 3, rotation: [0, 0, Math.PI / 2] });
     expect((only(rotated.document, 'extrusion') as ExtrusionEntity).rotation).toEqual([
       0,
       0,
@@ -164,7 +164,7 @@ describe('extrude_sketch does not inherit the sketch rotation', () => {
 
   it('failure: depth <= 0 is a no-op', () => {
     const { doc, id } = sketch();
-    expect(run(doc, 'extrude_sketch', { id, depth: 0 }).document).toBe(doc);
+    expect(run(doc, 'extrude_profile', { id, depth: 0 }).document).toBe(doc);
   });
 });
 
@@ -304,7 +304,7 @@ describe('explode_polyline prunes group membership', () => {
         [1, 1],
       ],
     }).document;
-    doc = run(doc, 'draw_circle', { center: [0, 0], radius: 1 }).document;
+    doc = run(doc, 'draw_arc', { center: [0, 0], radius: 1 }).document;
     const [poly, circle] = doc.order as [string, string];
     doc = run(doc, 'group_entities', { ids: [poly, circle, poly] }).document;
     const group = Object.values(doc.groups)[0];
@@ -333,8 +333,8 @@ describe('group_entities dedupes ids', () => {
 describe('deleting entities prunes constraints, joints and drives', () => {
   const build = (): CadDocument => {
     let doc = createEmptyDocument();
-    doc = run(doc, 'draw_circle', { center: [0, 0], radius: 1 }).document;
-    doc = run(doc, 'draw_circle', { center: [5, 0], radius: 1 }).document;
+    doc = run(doc, 'draw_arc', { center: [0, 0], radius: 1 }).document;
+    doc = run(doc, 'draw_arc', { center: [5, 0], radius: 1 }).document;
     const [a, b] = doc.order as [string, string];
     const constraint: Constraint = {
       id: 'c1',
@@ -382,7 +382,7 @@ describe('deleting entities prunes constraints, joints and drives', () => {
   });
 
   it('delete_entities keeps unrelated records', () => {
-    const doc = run(build(), 'draw_circle', { center: [9, 9], radius: 1 }).document;
+    const doc = run(build(), 'draw_arc', { center: [9, 9], radius: 1 }).document;
     const extra = doc.order[2] as string;
     const result = run(doc, 'delete_entities', { ids: [extra] });
     expect(result.document.constraintOrder).toEqual(['c1']);

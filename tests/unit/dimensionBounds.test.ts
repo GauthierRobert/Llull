@@ -3,11 +3,18 @@ import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 
 function farDimension(offset?: number): { doc: CadDocument; dimensionId: string } {
-  const a = execute(createEmptyDocument(), 'draw_line', {
-    start: [1_000_000, 0],
-    end: [1_000_010, 0],
+  const a = execute(createEmptyDocument(), 'draw_polyline', {
+    points: [
+      [1_000_000, 0],
+      [1_000_010, 0],
+    ],
   });
-  const b = execute(a.document, 'draw_line', { start: [1_000_000, 4], end: [1_000_010, 4] });
+  const b = execute(a.document, 'draw_polyline', {
+    points: [
+      [1_000_000, 4],
+      [1_000_010, 4],
+    ],
+  });
   const dimension = execute(b.document, 'add_dimension', {
     dimensionKind: 'linear',
     entityIds: [a.affected[0]!, b.affected[0]!],

@@ -26,7 +26,7 @@ function created(doc: CadDocument, params: object): { doc: CadDocument; e: Subdi
 }
 
 const volumeOf = (doc: CadDocument, id: string): number =>
-  (execute(doc, 'measure_volume', { entityId: id }).data as { volume: number }).volume;
+  (execute(doc, 'mass_properties', { entityId: id }).data as { volume: number }).volume;
 
 /** A 10 × 10 square loop, given out of order and partly reversed. */
 const square: Vec3[][] = [
@@ -122,7 +122,7 @@ describe('surface_from_curves', () => {
         [0, 0],
       ],
     ]) {
-      const drawn = execute(doc, 'draw_line', { start, end });
+      const drawn = execute(doc, 'draw_polyline', { points: [start, end] });
       doc = drawn.document;
       ids.push(drawn.affected[0] as string);
     }

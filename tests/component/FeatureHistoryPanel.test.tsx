@@ -85,9 +85,9 @@ describe('FeatureHistoryPanel — rendering', () => {
   });
 
   it('shows the command name for each step', () => {
-    setHistory([makeStep('s1', 'draw_line')]);
+    setHistory([makeStep('s1', 'draw_polyline')]);
     render(<FeatureHistoryPanel />);
-    expect(screen.getByText('draw_line')).toBeDefined();
+    expect(screen.getByText('draw_polyline')).toBeDefined();
   });
 
   it('shows the optional label when a step has one', () => {

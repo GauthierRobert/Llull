@@ -16,8 +16,18 @@ describe('display precision bounds', () => {
   });
 
   describe('add_dimension precision', () => {
-    const a = execute(doc, 'draw_line', { start: [0, 0], end: [10, 0] });
-    const b = execute(a.document, 'draw_line', { start: [0, 5], end: [10, 5] });
+    const a = execute(doc, 'draw_polyline', {
+      points: [
+        [0, 0],
+        [10, 0],
+      ],
+    });
+    const b = execute(a.document, 'draw_polyline', {
+      points: [
+        [0, 5],
+        [10, 5],
+      ],
+    });
     const entityIds = [a.affected[0]!, b.affected[0]!];
 
     it.each([-1, 101])('rejects precision %s', (precision) => {

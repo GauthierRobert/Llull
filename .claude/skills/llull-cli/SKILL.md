@@ -92,7 +92,7 @@ Always one call per plan (`llull run plan.json`), not a loop of single calls.
    (or `--doc part.llull` instead of `--app`).
    The report prints one line per step with the ids it created.
 4. **Inspect / measure** (read-only, never written): `llull describe_scene`,
-   `llull measure_volume entityId=mesh-4.1`, `llull check_model`.
+   `llull mass_properties entityId=mesh-4.1`, `llull check_model`.
 5. **Look at it**: `llull render_view view=iso --save view.png --app` then read the PNG.
 6. **Exchange (Python/CadQuery bundled in the desktop app)**: `llull import_step file=supplier.step --app`,
    `llull export_step --save out/part.step --app` (exact B-rep), `llull import_dwg file=site.dwg

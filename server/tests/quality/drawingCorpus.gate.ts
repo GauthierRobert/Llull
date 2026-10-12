@@ -51,7 +51,7 @@ function solidVolume(doc: CadDocument): number {
   for (const id of doc.order) {
     const entity = doc.entities[id];
     if (entity === undefined || !is3D(entity)) continue;
-    const measured = execute(doc, 'measure_volume', { entityId: id });
+    const measured = execute(doc, 'mass_properties', { entityId: id });
     total += (measured.data as { volume: number } | undefined)?.volume ?? 0;
   }
   return total;

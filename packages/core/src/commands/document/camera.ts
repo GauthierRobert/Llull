@@ -47,7 +47,8 @@ export const setCamera = defineCommand({
   name: 'set_camera',
   description:
     'Set one or more camera fields (target, azimuth, polar, distance). ' +
-    'Unspecified fields are preserved. ' +
+    'Unspecified fields are preserved, so target alone re-centres the orbit on a point ' +
+    '(optionally with azimuth/polar to also change direction) without changing the distance. ' +
     'target is [x,y,z] world-space orbit centre. ' +
     'azimuth is horizontal angle in radians (XY plane, measured from +Y toward +X). ' +
     'polar is vertical angle in radians (0 = overhead along +Z, π/2 = eye-level). ' +
@@ -99,56 +100,6 @@ export const setCamera = defineCommand({
     return report(
       { ...doc, camera: next },
       `set_camera: updated ${changed.join(', ')}. target=${JSON.stringify(next.target)}, azimuth=${next.azimuth.toFixed(3)}, polar=${next.polar.toFixed(3)}, distance=${next.distance.toFixed(3)}.`,
-    );
-  },
-});
-
-/**
- * @command look_at
- * @pure
- * @layer core/commands
- * @affects nothing — writes only document.camera; affected:[]
- * @invariant distance is preserved; only target (and optionally azimuth/polar) change
- * @failure no params or bad target → no-op
- */
-export const lookAt = defineCommand({
-  name: 'look_at',
-  description:
-    'Orbit the camera to look at a specific world-space point without changing the orbit distance. ' +
-    'Provide target [x, y, z] to set the orbit centre. ' +
-    'Optionally override azimuth and/or polar to also change camera direction. ' +
-    'distance is preserved. Use set_camera to change distance explicitly. ' +
-    'Does NOT add to feature history.',
-  annotations: { metaHistory: true, idempotent: true },
-  params: z.object({
-    target: vec3('World-space point [x, y, z] to set as the orbit centre.'),
-    azimuth: z
-      .number()
-      .optional()
-      .describe(
-        'Optional horizontal orbit angle in radians (measured from +Y toward +X in the XY plane). ' +
-          'Omit to keep the current azimuth.',
-      ),
-    polar: z
-      .number()
-      .optional()
-      .describe(
-        'Optional vertical orbit angle in radians (0 = overhead, π/2 = eye-level); clamped to (0.01, π−0.01). ' +
-          'Omit to keep the current polar angle.',
-      ),
-  }),
-  run: (doc, p): CommandResult => {
-    const prev: CameraState = doc.camera;
-    const next: CameraState = {
-      target: p.target,
-      azimuth: p.azimuth ?? prev.azimuth,
-      polar: p.polar === undefined ? prev.polar : clampPolar(p.polar),
-      distance: prev.distance,
-    };
-
-    return report(
-      { ...doc, camera: next },
-      `look_at: target set to ${JSON.stringify(next.target)}, azimuth=${next.azimuth.toFixed(3)}, polar=${next.polar.toFixed(3)}, distance preserved at ${next.distance.toFixed(3)}.`,
     );
   },
 });

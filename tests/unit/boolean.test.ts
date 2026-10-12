@@ -207,7 +207,12 @@ describe('boolean commands', () => {
       ['b', false],
     ])('no-op when operand %s is a 2D entity', (_operand, lineFirst) => {
       const { doc: boxDoc, ids } = docWithBoxes(1);
-      const lineResult = execute(boxDoc, 'draw_line', { start: [0, 0], end: [1, 0] });
+      const lineResult = execute(boxDoc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [1, 0],
+        ],
+      });
       const doc = lineResult.document;
       const lineId = lineResult.affected[0]!;
       const operands = lineFirst ? { a: lineId, b: ids[0]! } : { a: ids[0]!, b: lineId };

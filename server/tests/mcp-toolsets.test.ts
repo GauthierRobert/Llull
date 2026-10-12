@@ -174,7 +174,7 @@ describe('MCP toolsets', () => {
     const names = tools.map((tool) => tool.name);
     expect(names).toContain('add_box');
     expect(names).toContain('describe_scene');
-    expect(names).not.toContain('draw_line');
+    expect(names).not.toContain('draw_polyline');
     expect(names).not.toContain('add_wall');
     expect(names).not.toContain('import_step');
   });
@@ -195,8 +195,13 @@ describe('MCP toolsets', () => {
   it('tools/call refuses a tool of a disabled toolset and names it', async () => {
     const sessionId = await openSession();
     const result = (await rpc(sessionId, 'tools/call', {
-      name: 'draw_line',
-      arguments: { start: [0, 0], end: [1, 0] },
+      name: 'draw_polyline',
+      arguments: {
+        points: [
+          [0, 0],
+          [1, 0],
+        ],
+      },
     })) as { isError?: boolean; content: { text?: string }[] };
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain('"2d"');
@@ -207,7 +212,19 @@ describe('MCP toolsets', () => {
     const sessionId = await openSession();
     const result = (await rpc(sessionId, 'tools/call', {
       name: 'build_project',
-      arguments: { actions: [{ command: 'draw_line', params: { start: [0, 0], end: [5, 0] } }] },
+      arguments: {
+        actions: [
+          {
+            command: 'draw_polyline',
+            params: {
+              points: [
+                [0, 0],
+                [5, 0],
+              ],
+            },
+          },
+        ],
+      },
     })) as { isError?: boolean; content: { text?: string }[] };
     expect(result.isError).toBe(false);
     expect(Object.values(getLiveDoc().entities).some((entity) => entity.kind === 'line')).toBe(

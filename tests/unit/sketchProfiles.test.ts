@@ -105,7 +105,7 @@ describe('revolve_profile with profileIds', () => {
     expect(Math.min(...xs)).toBeCloseTo(4, 9);
     expect(Math.max(...xs)).toBeCloseTo(6, 9);
     const volume = (
-      execute({ ...empty, entities: { [torus.id]: torus }, order: [torus.id] }, 'measure_volume', {
+      execute({ ...empty, entities: { [torus.id]: torus }, order: [torus.id] }, 'mass_properties', {
         entityId: torus.id,
       }).data as { volume: number }
     ).volume;
@@ -147,7 +147,7 @@ describe('revolve_profile with profileIds', () => {
   });
 });
 
-describe('extrude_sketch with curved sketches', () => {
+describe('extrude_profile with curved sketches', () => {
   it.each([
     ['circle', { kind: 'circle', center: [0, 0], radius: 2 }, 2],
     ['ellipse', { kind: 'ellipse', center: [0, 0], radiusX: 3, radiusY: 1 }, 4],
@@ -166,7 +166,7 @@ describe('extrude_sketch with curved sketches', () => {
     ],
   ])('%s keeps %#: exact curves', (_label, shape, count) => {
     const doc = docWith({ id: 's', ...shape });
-    const ext = created<ExtrusionEntity>(doc, 'extrude_sketch', { id: 's', depth: 2 });
+    const ext = created<ExtrusionEntity>(doc, 'extrude_profile', { id: 's', depth: 2 });
     expect(ext.curves).toHaveLength(count);
   });
 
@@ -182,12 +182,12 @@ describe('extrude_sketch with curved sketches', () => {
       },
       { id: 'flat', kind: 'line', start: [0, -2], end: [0, 2] },
     );
-    const result = execute(doc, 'extrude_sketch', { ids: ['flat', 'arc'], depth: 1 });
+    const result = execute(doc, 'extrude_profile', { ids: ['flat', 'arc'], depth: 1 });
     const ext = result.document.entities[result.affected[0] as string] as ExtrusionEntity;
     expect(ext.curves?.map((s) => s.type)).toEqual(['line', 'arc']);
     expect(result.summary).toContain('[flat, arc]');
     const volume = (
-      execute(result.document, 'measure_volume', { entityId: ext.id }).data as { volume: number }
+      execute(result.document, 'mass_properties', { entityId: ext.id }).data as { volume: number }
     ).volume;
     expect(volume).toBeCloseTo(2 * Math.PI, 1);
   });
@@ -207,7 +207,7 @@ describe('extrude_sketch with curved sketches', () => {
         position: [14, 0, 1],
       },
     );
-    const ext = created<ExtrusionEntity>(doc, 'extrude_sketch', { ids: ['a', 'b'], depth: 1 });
+    const ext = created<ExtrusionEntity>(doc, 'extrude_profile', { ids: ['a', 'b'], depth: 1 });
     expect(ext.position).toEqual([10, 0, 1]);
     expect(ext.curves).toBeUndefined();
     expect(ext.profile).toEqual([
@@ -218,7 +218,7 @@ describe('extrude_sketch with curved sketches', () => {
   });
 
   it.each([
-    ['neither id nor ids', { depth: 1 }, 'give id'],
+    ['neither profile, id nor ids', { depth: 1 }, 'give profile'],
     ['open spline', { id: 'open', depth: 1 }, 'not closed'],
     ['different rotation', { ids: ['a', 'tilted'], depth: 1 }, 'different rotation'],
     ['off-plane piece', { ids: ['a', 'lifted'], depth: 1 }, 'off the plane'],
@@ -243,7 +243,7 @@ describe('extrude_sketch with curved sketches', () => {
       { id: 'note', kind: 'text', content: 'x', height: 1 },
       { id: 'pt', kind: 'point' },
     );
-    expectNoOp(execute(doc, 'extrude_sketch', params), doc, text);
+    expectNoOp(execute(doc, 'extrude_profile', params), doc, text);
   });
 
   it('a closed polyline that repeats its first point still extrudes', () => {
@@ -258,14 +258,14 @@ describe('extrude_sketch with curved sketches', () => {
         [0, 0],
       ],
     });
-    const ext = created<ExtrusionEntity>(doc, 'extrude_sketch', { id: 'p', depth: 1 });
+    const ext = created<ExtrusionEntity>(doc, 'extrude_profile', { id: 'p', depth: 1 });
     expect(ext.profile).toHaveLength(3);
   });
 });
 
 describe('exact curves survive edits and persistence', () => {
   const doc = docWith({ id: 'c', kind: 'circle', center: [0, 0], radius: 2 });
-  const ext = created<ExtrusionEntity>(doc, 'extrude_sketch', { id: 'c', depth: 2 });
+  const ext = created<ExtrusionEntity>(doc, 'extrude_profile', { id: 'c', depth: 2 });
   const withExt = { ...empty, entities: { [ext.id]: ext }, order: [ext.id] };
 
   it('scale_entity scales the polygon and its curves together', () => {
@@ -317,9 +317,9 @@ describe('exact curves survive edits and persistence', () => {
 });
 
 describe('sketch loop review fixes', () => {
-  it('extrude_sketch refuses id and ids together', () => {
+  it('extrude_profile refuses id and ids together', () => {
     const doc = docWith({ id: 'c', kind: 'circle', center: [0, 0], radius: 1 });
-    expectNoOp(execute(doc, 'extrude_sketch', { id: 'c', ids: ['c'], depth: 1 }), doc, 'not both');
+    expectNoOp(execute(doc, 'extrude_profile', { id: 'c', ids: ['c'], depth: 1 }), doc, 'not both');
   });
 
   it('snaps near-coincident joints so the exact chain is watertight', () => {
@@ -335,7 +335,10 @@ describe('sketch loop review fixes', () => {
         endAngle: (3 * Math.PI) / 2 + 1e-7,
       },
     );
-    const ext = created<ExtrusionEntity>(doc, 'extrude_sketch', { ids: ['a', 'b', 'c'], depth: 1 });
+    const ext = created<ExtrusionEntity>(doc, 'extrude_profile', {
+      ids: ['a', 'b', 'c'],
+      depth: 1,
+    });
     const curves = ext.curves ?? [];
     curves.forEach((segment, i) => {
       const next = curves[(i + 1) % curves.length];
@@ -345,7 +348,7 @@ describe('sketch loop review fixes', () => {
 
   it('a saved profile whose curves do not close is refused', () => {
     const doc = docWith({ id: 'c', kind: 'circle', center: [0, 0], radius: 1 });
-    const ext = created<ExtrusionEntity>(doc, 'extrude_sketch', { id: 'c', depth: 1 });
+    const ext = created<ExtrusionEntity>(doc, 'extrude_profile', { id: 'c', depth: 1 });
     const broken = { ...ext, curves: ext.curves?.slice(0, 1) } as Entity;
     const result = execute(createEmptyDocument(), 'load_document', {
       json: serializeDocument({ ...empty, entities: { [ext.id]: broken }, order: [ext.id] }),

@@ -87,7 +87,12 @@ describe('shell_solid', () => {
     expect(execute(doc, 'shell_solid', { id: 'ghost', thickness: 1 }).summary).toContain(
       'not found',
     );
-    const line = execute(doc, 'draw_line', { start: [0, 0], end: [1, 0] });
+    const line = execute(doc, 'draw_polyline', {
+      points: [
+        [0, 0],
+        [1, 0],
+      ],
+    });
     const result = execute(line.document, 'shell_solid', { id: line.affected[0]!, thickness: 1 });
     expect(result.document).toBe(line.document);
     expect(result.summary).toContain('2D shape');

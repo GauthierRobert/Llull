@@ -45,7 +45,7 @@ function conversation(userText: string, assistantText: string): McpPromptMessage
 
 /**
  * @prompt model_bracket
- * draw_rectangle → extrude_sketch body, then N × (draw_circle → extrude_sketch → boolean_subtract)
+ * draw_rectangle → extrude_profile body, then N × (draw_arc → extrude_profile → boolean_subtract)
  * for the mounting holes, as one build_project action-list.
  */
 const modelBracket: PromptTemplate = {
@@ -92,8 +92,8 @@ const modelBracket: PromptTemplate = {
       const holeSolidAlias = `hole_solid_${i}`;
       const bodyIn = i === 0 ? 'body' : `body_${i - 1}`;
       holeActions.push(
-        `    { "command": "draw_circle",    "params": { "center": [${cx}, ${h / 2}], "radius": ${holeRadius} }, "as": "${holeSketchAlias}" },`,
-        `    { "command": "extrude_sketch",  "params": { "id": "$${holeSketchAlias}", "depth": ${holeDepth} }, "as": "${holeSolidAlias}" },`,
+        `    { "command": "draw_arc",       "params": { "center": [${cx}, ${h / 2}], "radius": ${holeRadius} }, "as": "${holeSketchAlias}" },`,
+        `    { "command": "extrude_profile", "params": { "id": "$${holeSketchAlias}", "depth": ${holeDepth} }, "as": "${holeSolidAlias}" },`,
         `    { "command": "boolean_subtract","params": { "a": "$${bodyIn}", "b": "$${holeSolidAlias}" }, "as": "body_${i}" },`,
       );
     }
@@ -110,7 +110,7 @@ const modelBracket: PromptTemplate = {
         `{\n` +
         `  "actions": [\n` +
         `    { "command": "draw_rectangle", "params": { "width": ${w}, "height": ${h} }, "as": "base_rect" },\n` +
-        `    { "command": "extrude_sketch",  "params": { "id": "$base_rect", "depth": ${t} }, "as": "body" },\n` +
+        `    { "command": "extrude_profile", "params": { "id": "$base_rect", "depth": ${t} }, "as": "body" },\n` +
         holeSection +
         `\n` +
         `    { "command": "set_entity_name", "params": { "id": "$${finalBodyAlias}", "name": "bracket_body" } },\n` +
@@ -121,7 +121,7 @@ const modelBracket: PromptTemplate = {
         `\`\`\`\n\n` +
         `**Key points**\n` +
         `- \`draw_rectangle\` requires only \`width\` and \`height\`; \`position\` (optional [x,y,z]) places the work-plane origin.\n` +
-        `- \`extrude_sketch\` takes \`id\` (or \`ids\` of open pieces forming one loop) and \`depth\`; it inherits the sketch's position automatically.\n` +
+        `- \`extrude_profile\` takes \`id\` (or \`ids\` of open pieces forming one loop) and \`depth\`; it inherits the sketch's position automatically.\n` +
         `- \`boolean_subtract\` uses params \`a\` (base solid) and \`b\` (tool solid); BOTH operands are consumed and replaced by a new mesh entity — bind the result with \`as\` so later steps can reference it.\n` +
         `- Each subtract chains to the previous result: body → body_0 → body_1 → … The final mesh alias is \`$${finalBodyAlias}\`.\n` +
         `- \`$alias\` references let later steps use entity ids created in earlier steps without knowing them in advance.\n` +
@@ -239,18 +239,18 @@ const parametricPart: PromptTemplate = {
         `      "as": "base_profile" },\n` +
         `\n` +
         `    // Step 1 — extrude into body solid\n` +
-        `    // extrude_sketch takes id (or ids of loop pieces) and depth; it inherits the sketch's position.\n` +
-        `    { "command": "extrude_sketch",\n` +
+        `    // extrude_profile takes id (or ids of loop pieces) and depth; it inherits the sketch's position.\n` +
+        `    { "command": "extrude_profile",\n` +
         `      "params": { "id": "$base_profile", "depth": 10 },\n` +
         `      "as": "body" },\n` +
         `\n` +
         `    // Step 2 — add a cutout profile\n` +
-        `    { "command": "draw_circle",\n` +
+        `    { "command": "draw_arc",\n` +
         `      "params": { "center": [50, 30], "radius": 8 },\n` +
         `      "as": "cutout_profile" },\n` +
         `\n` +
         `    // Step 3 — extrude cutout (depth > body depth to guarantee clean cut)\n` +
-        `    { "command": "extrude_sketch",\n` +
+        `    { "command": "extrude_profile",\n` +
         `      "params": { "id": "$cutout_profile", "depth": 12 },\n` +
         `      "as": "cutter" },\n` +
         `\n` +

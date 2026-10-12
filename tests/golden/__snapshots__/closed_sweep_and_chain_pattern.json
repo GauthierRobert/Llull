@@ -408,7 +408,7 @@
     "featureHistory": [
       {
         "id": "#17",
-        "name": "draw_circle",
+        "name": "draw_arc",
         "params": {
           "center": [
             0,

@@ -47,7 +47,7 @@ A "reference defect" is proved, not assumed: a variant built the reference's way
 - OCC booleans did not merge coplanar faces → a fillet on one visible edge rounded half of it
   (`ShapeUpgrade_UnifySameDomain` after every boolean).
 - `edgesNear` picked the edge with the nearest *mid point*, not the nearest edge.
-- `measure_volume` / `mass_properties` used the coarse display mesh (up to ~1 % off): exact B-rep
+- `mass_properties` (formerly `measure_volume`) used the coarse display mesh (up to ~1 % off): exact B-rep
   volume under OCC.
 - `fillet_edge` committed invalid solids (later booleans hung) and solids whose mesh had a hole
   (non-watertight STL): now refused with a reason.

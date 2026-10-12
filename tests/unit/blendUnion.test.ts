@@ -26,7 +26,7 @@ function frame(): { doc: CadDocument; ids: string[] } {
         params: { radius: 0.7, height: 10, rotation: [0, Math.PI / 2, 0] },
       },
       { command: 'add_box', params: { size: [1, 1, 1], position: [0, 0, 5] } },
-      { command: 'draw_circle', params: { center: [0, 0], radius: 1 } },
+      { command: 'draw_arc', params: { center: [0, 0], radius: 1 } },
     ],
   });
   return { doc: result.document, ids: result.document.order };

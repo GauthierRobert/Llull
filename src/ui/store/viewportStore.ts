@@ -55,7 +55,7 @@ interface ViewportStoreState {
 
   /**
    * Layer ids locally hidden from the viewport — a pure render override: it does NOT dispatch
-   * set_layer_visibility and does NOT touch the server document.
+   * update_layer.visible and does NOT touch the server document.
    */
   hiddenLayerIds: ReadonlySet<string>;
 

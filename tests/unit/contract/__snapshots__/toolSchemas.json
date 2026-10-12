@@ -5262,7 +5262,7 @@
     "name": "drainage_schedule"
   },
   {
-    "description": "Draw a circular arc in the local 2D work plane, defined by center, radius, and start/end angles in radians. Angles are measured counter-clockwise from the +X axis. radius must be > 0. The arc sweeps CCW from startAngle to endAngle (endAngle < startAngle wraps around CCW); a sweep larger than 2π is wrapped into (0, 2π] and the summary says so. For a full circle use draw_circle.",
+    "description": "Draw a circular arc or a full circle in the local 2D work plane, defined by center and radius (and start/end angles in radians for an arc). Angles are measured counter-clockwise from the +X axis. radius must be > 0. The arc sweeps CCW from startAngle to endAngle (endAngle < startAngle wraps around CCW); a sweep larger than 2π is wrapped into (0, 2π] and the summary says so. OMIT BOTH startAngle and endAngle to draw a full circle (a `circle` entity, id circ-*); give both for an `arc` entity (id arc-*).",
     "input_schema": {
       "properties": {
         "center": {
@@ -5277,7 +5277,7 @@
           "type": "string"
         },
         "endAngle": {
-          "description": "End angle in radians, measured counter-clockwise from the +X axis. Arc sweeps from startAngle to endAngle counter-clockwise.",
+          "description": "End angle in radians, measured counter-clockwise from the +X axis. Arc sweeps from startAngle to endAngle counter-clockwise. Omit together with startAngle for a full circle.",
           "type": "number"
         },
         "position": {
@@ -5292,15 +5292,13 @@
           "type": "number"
         },
         "startAngle": {
-          "description": "Start angle in radians, measured counter-clockwise from the +X axis. E.g. 0 = rightmost point.",
+          "description": "Start angle in radians, measured counter-clockwise from the +X axis. E.g. 0 = rightmost point. Omit together with endAngle for a full circle.",
           "type": "number"
         }
       },
       "required": [
         "center",
-        "radius",
-        "startAngle",
-        "endAngle"
+        "radius"
       ],
       "type": "object"
     },
@@ -5350,41 +5348,6 @@
       "type": "object"
     },
     "name": "draw_belt_around"
-  },
-  {
-    "description": "Draw a full circle in the local 2D work plane, defined by center and radius. radius must be > 0.",
-    "input_schema": {
-      "properties": {
-        "center": {
-          "description": "Center point [x, y] of the circle in local 2D work-plane coordinates.",
-          "items": {
-            "type": "number"
-          },
-          "type": "array"
-        },
-        "color": {
-          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#4a90d9\".",
-          "type": "string"
-        },
-        "position": {
-          "description": "World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0]. Format [x, y, z]; [x, y] is accepted and placed at z=0.",
-          "items": {
-            "type": "number"
-          },
-          "type": "array"
-        },
-        "radius": {
-          "description": "Circle radius. Must be greater than 0.",
-          "type": "number"
-        }
-      },
-      "required": [
-        "center",
-        "radius"
-      ],
-      "type": "object"
-    },
-    "name": "draw_circle"
   },
   {
     "description": "Draw an axis-aligned ellipse in the local 2D work plane, defined by center and semi-axis radii. radiusX is the half-width along the local X axis; radiusY is the half-height along the local Y axis. Both must be > 0. position places the work-plane origin in 3D space (default [0,0,0]).",
@@ -5478,44 +5441,6 @@
     "name": "draw_involute"
   },
   {
-    "description": "Draw a straight line segment defined by start and end points in the local 2D work plane. position places the work-plane origin in 3D space (default [0,0,0]).",
-    "input_schema": {
-      "properties": {
-        "color": {
-          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#4a90d9\".",
-          "type": "string"
-        },
-        "end": {
-          "description": "End point [x, y] in local 2D work-plane coordinates.",
-          "items": {
-            "type": "number"
-          },
-          "type": "array"
-        },
-        "position": {
-          "description": "World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0]. Format [x, y, z]; [x, y] is accepted and placed at z=0.",
-          "items": {
-            "type": "number"
-          },
-          "type": "array"
-        },
-        "start": {
-          "description": "Start point [x, y] in local 2D work-plane coordinates.",
-          "items": {
-            "type": "number"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "start",
-        "end"
-      ],
-      "type": "object"
-    },
-    "name": "draw_line"
-  },
-  {
     "description": "Place a point marker at the given 3D world position. The point entity has no local 2D geometry — its position is the point location.",
     "input_schema": {
       "properties": {
@@ -5537,7 +5462,7 @@
     "name": "draw_point"
   },
   {
-    "description": "Draw a connected sequence of line segments through an ordered list of 2D points in the local work plane. Requires at least 2 points. When closed=true the last point connects back to the first. A closed polyline can be fed to extrude_sketch to become a 3D solid.",
+    "description": "Draw a connected sequence of line segments through an ordered list of 2D points in the local work plane. Requires at least 2 points. When closed=true the last point connects back to the first. An OPEN series of exactly 2 points is a single straight segment and creates a `line` entity (id line-*); any other series creates a `polyline` entity (id poly-*). A closed polyline can be fed to extrude_profile (id/ids) to become a 3D solid.",
     "input_schema": {
       "properties": {
         "closed": {
@@ -6513,7 +6438,7 @@
     "name": "extend"
   },
   {
-    "description": "Extrude a closed 2D polygon profile along +Z into a solid. Right-handed world frame, +Z up. position is the origin of the profile plane [x, y, z] in document units; the solid spans from position.z to position.z + depth. depth must be > 0. Orientation: pass EITHER rotation (Euler radians) OR axis [dx,dy,dz] = the extrusion direction (the profile plane normal; local +Z maps to it). axis wins when both are given; the derived Euler angles are stored.",
+    "description": "Extrude a closed 2D profile along +Z into an extrusion solid. Right-handed world frame, +Z up. Give EXACTLY ONE source: `profile` (inline array of [x, y] points, at least 3, implicitly closed, placed at `position`, default [0,0,0]); OR `id` of one closed drawn shape (circle, rectangle, ellipse, closed polyline, closed spline); OR `ids` of several coplanar open pieces (line, arc, open polyline, open spline) that join end to end into one closed loop, in any order and direction. A drawn sketch keeps its curved boundaries exact (true arcs and Bézier splines for the exact kernel and STEP export; the polygon is only the display tessellation), is placed at the (first) source entity position (override with `position`), does not inherit the source rotation, and stays in the document. The solid spans from the position along +Z for depth units (depth must be > 0). Orientation: pass EITHER rotation (Euler radians) OR axis [dx,dy,dz] = the extrusion direction (the profile plane normal; local +Z maps to it). axis wins when both are given; the derived Euler angles are stored.",
     "input_schema": {
       "properties": {
         "axis": {
@@ -6528,18 +6453,29 @@
           "type": "string"
         },
         "depth": {
-          "description": "Extrusion depth in document units along +Z from position. Must be > 0.",
+          "description": "Extrusion depth in document units along +Z from the position. Must be > 0.",
           "type": "number"
         },
+        "id": {
+          "description": "Id of one closed 2D shape: circle, rectangle, ellipse, closed polyline or closed spline. Use ids instead for a loop made of several pieces.",
+          "type": "string"
+        },
+        "ids": {
+          "description": "Ids of coplanar 2D pieces (line, arc, polyline, spline) that join end to end into one closed loop; order and direction do not matter. Alternative to id and profile.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "position": {
-          "description": "World-space origin of the profile plane [x, y, z] in document units. Right-handed frame, +Z up. Defaults to [0, 0, 0]. Format [x, y, z]; [x, y] is accepted and placed at z=0.",
+          "description": "World-space origin of the profile plane [x, y, z] in document units. Defaults to [0, 0, 0] for an inline profile and to the (first) source entity position for id/ids. Format [x, y, z]; [x, y] is accepted and placed at z=0.",
           "items": {
             "type": "number"
           },
           "type": "array"
         },
         "profile": {
-          "description": "Array of [x, y] points forming a closed loop in the XY plane of the profile. At least 3 points are needed for a valid solid.",
+          "description": "Inline closed loop: array of [x, y] points in the XY plane of the profile (at least 3, do not repeat the first point). Omit when id or ids is given.",
           "type": "array"
         },
         "rotation": {
@@ -6551,46 +6487,11 @@
         }
       },
       "required": [
-        "profile",
         "depth"
       ],
       "type": "object"
     },
     "name": "extrude_profile"
-  },
-  {
-    "description": "Extrude a closed 2D sketch into a 3D extrusion solid. Right-handed world frame, +Z up. Give `id` of one closed shape (circle, rectangle, ellipse, closed polyline, closed spline), or `ids` of several coplanar open pieces (line, arc, open polyline, open spline) that join end to end into one closed loop, in any order and direction. Curved boundaries are kept exact (true arcs and Bézier splines for the exact kernel and STEP export; the polygon is only the display tessellation). The solid is placed at the (first) source entity position and extends depth units along +Z (before the optional rotation); the source rotation is not inherited. Sources stay in the document.",
-    "input_schema": {
-      "properties": {
-        "depth": {
-          "description": "Extrusion depth in document units along +Z from the source entity position. Must be > 0.",
-          "type": "number"
-        },
-        "id": {
-          "description": "Id of one closed 2D shape: circle, rectangle, ellipse, closed polyline or closed spline. Use ids instead for a loop made of several pieces.",
-          "type": "string"
-        },
-        "ids": {
-          "description": "Ids of coplanar 2D pieces (line, arc, polyline, spline) that join end to end into one closed loop; order and direction do not matter. Alternative to id.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "rotation": {
-          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X) for the resulting extrusion solid. Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
-          "items": {
-            "type": "number"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "depth"
-      ],
-      "type": "object"
-    },
-    "name": "extrude_sketch"
   },
   {
     "description": "Round a single vertex of a polyline with a tangent arc of the given radius. The polyline entity is updated: the vertex at vertexIndex is replaced by two tangent points (one on each adjacent segment), and a new arc entity is added tangent to both segments. vertexIndex is 0-based; for an open polyline valid range is 1 to N-2 (interior vertices only); for a closed polyline any vertex 0 to N-1 is valid. No-op if radius is too large for the adjacent segment lengths, or if the entity is not a polyline.",
@@ -7332,36 +7233,6 @@
     "name": "loft_sections"
   },
   {
-    "annotations": {
-      "idempotentHint": true
-    },
-    "description": "Orbit the camera to look at a specific world-space point without changing the orbit distance. Provide target [x, y, z] to set the orbit centre. Optionally override azimuth and/or polar to also change camera direction. distance is preserved. Use set_camera to change distance explicitly. Does NOT add to feature history.",
-    "input_schema": {
-      "properties": {
-        "azimuth": {
-          "description": "Optional horizontal orbit angle in radians (measured from +Y toward +X in the XY plane). Omit to keep the current azimuth.",
-          "type": "number"
-        },
-        "polar": {
-          "description": "Optional vertical orbit angle in radians (0 = overhead, π/2 = eye-level); clamped to (0.01, π−0.01). Omit to keep the current polar angle.",
-          "type": "number"
-        },
-        "target": {
-          "description": "World-space point [x, y, z] to set as the orbit centre.",
-          "items": {
-            "type": "number"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "target"
-      ],
-      "type": "object"
-    },
-    "name": "look_at"
-  },
-  {
     "description": "Create a cylinder (tube) that spans exactly from world point p1 to world point p2. Automatically computes the orientation so the cylinder axis runs from p1 to p2 in any plane — eliminates the need to manually derive Euler angles. p1 and p2 are [x, y, z] world coordinates. radius is the tube cross-section radius (> 0). The returned entity id is the only affected id. Fails gracefully (no-op) when radius <= 0 or p1 equals p2 (degenerate tube).",
     "input_schema": {
       "properties": {
@@ -7401,21 +7272,20 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Compute the mass of a 3D solid from its volume and density. Supported entity kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', 'subdivision', and 'instance' (assembly: the sum over its component solids, each with its own material density, else the instance material, else the density param). Density resolution: if the entity has a material assigned (via assign_material) and that material exists in doc.materials, the material's density is used automatically — the density param is ignored for that entity. Otherwise the caller-supplied density param is used (back-compat). The density is in g/(document-unit)³ — e.g. for a document in mm: steel ≈ 0.00785, aluminium ≈ 0.0027. Returns data: { volume, density, mass, unit } where unit describes the mass unit (grams). Does not modify the document.",
+    "description": "Measure the volume of a 3D solid and, when a density is known, its mass. Supported entity kinds: 'box' (w×h×d), 'cylinder' (π r² h), 'sphere' (4/3 π r³), 'extrusion' (profile area × depth), 'mesh' (a kernel result with the OCC kernel: the exact B-rep volume; otherwise the signed-tetrahedra sum of its display triangles — data.method says which), 'cone', 'torus', 'wedge' (half the enclosing box), 'pyramid', 'revolution' (Pappus's centroid theorem; a profile crossing the axis falls back to the bounding-box volume), 'sweep' (round section: section area × exact path length; other sections: closed-mesh sum), 'loft', 'subdivision' (closed-mesh sum), and 'instance' (assembly: the sum over its component solids, each with its own material density, else the instance material, else the density param). 2D shape entities are rejected. Density resolution: if the entity has a material assigned (via assign_material) and that material exists in doc.materials, the material's density is used automatically — the density param is ignored for that entity. Otherwise the density param is used (g/(document-unit)³ — for a document in mm: steel ≈ 0.00785, aluminium ≈ 0.0027). With neither, only the volume is returned. Returns data: { volume, volumeUnit (e.g. \"mm³\"), method? } and, when a density is known, { density, mass, unit: \"g\" }. Does not modify the document.",
     "input_schema": {
       "properties": {
         "density": {
-          "description": "Fallback material density in g/(document-unit)³. Must be > 0. Used only when the entity has no material assigned via assign_material. Examples for a mm document: steel ≈ 0.00785, aluminium ≈ 0.0027, PLA ≈ 0.00124.",
+          "description": "Optional fallback material density in g/(document-unit)³. Must be > 0 when given. Used only when the entity has no material assigned via assign_material; omit it to measure the volume alone. Examples for a mm document: steel ≈ 0.00785, aluminium ≈ 0.0027, PLA ≈ 0.00124.",
           "type": "number"
         },
         "entityId": {
-          "description": "Id of the 3D solid entity to compute mass for. Supported kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', 'subdivision'.",
+          "description": "Id of the 3D solid entity to measure. Supported kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', 'subdivision', 'instance'.",
           "type": "string"
         }
       },
       "required": [
-        "entityId",
-        "density"
+        "entityId"
       ],
       "type": "object"
     },
@@ -7553,25 +7423,6 @@
       "type": "object"
     },
     "name": "measure_perimeter"
-  },
-  {
-    "annotations": {
-      "readOnlyHint": true
-    },
-    "description": "Compute the volume of a 3D solid entity. Supported kinds: 'box' (w×h×d), 'cylinder' (π r² h), 'sphere' (4/3 π r³), 'extrusion' (profile area × depth), 'mesh' (a kernel result with the OCC kernel: the exact B-rep volume; otherwise the signed-tetrahedra sum of its display triangles — data.method says which), 'cone' (π r² h / 3), 'torus' (2 π² · ringRadius · tubeRadius²), 'wedge' (w×h×d / 2 — half the enclosing box), 'pyramid' (baseWidth × baseDepth × height / 3), 'instance' (sum of its component's solid children, baked with the instance scale), 'revolution' (Pappus's centroid theorem: sweepAngle × |x_centroid| × profileArea; falls back to bounding-box approximation if the profile crosses the revolution axis), 'sweep' (round section: section area × exact path length; other sections: closed-mesh sum), 'loft' and 'subdivision' (closed-mesh sum). Returns data: { volume, unit } where unit is the cubed document unit (e.g. \"mm³\"). 2D shape entities are rejected. Does not modify the document.",
-    "input_schema": {
-      "properties": {
-        "entityId": {
-          "description": "Id of the 3D solid entity to measure. Supported kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', 'subdivision'.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "entityId"
-      ],
-      "type": "object"
-    },
-    "name": "measure_volume"
   },
   {
     "description": "Mirror an entity across the origin along a world axis by negating that axis component of its position. axis must be 'x', 'y', or 'z'.",
@@ -7837,30 +7688,6 @@
       "type": "object"
     },
     "name": "remove_decal"
-  },
-  {
-    "annotations": {
-      "idempotentHint": true
-    },
-    "description": "Rename a layer. Does not affect visibility, lock state, or entities. Graceful no-op if the layer id does not exist or the name is empty.",
-    "input_schema": {
-      "properties": {
-        "id": {
-          "description": "Id of the layer to rename.",
-          "type": "string"
-        },
-        "name": {
-          "description": "New display name for the layer. Must be non-empty.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "id",
-        "name"
-      ],
-      "type": "object"
-    },
-    "name": "rename_layer"
   },
   {
     "annotations": {
@@ -8262,7 +8089,7 @@
     "annotations": {
       "idempotentHint": true
     },
-    "description": "Set one or more camera fields (target, azimuth, polar, distance). Unspecified fields are preserved. target is [x,y,z] world-space orbit centre. azimuth is horizontal angle in radians (XY plane, measured from +Y toward +X). polar is vertical angle in radians (0 = overhead along +Z, π/2 = eye-level). distance is the radius of the orbit sphere; must be > 0. Does NOT add to feature history.",
+    "description": "Set one or more camera fields (target, azimuth, polar, distance). Unspecified fields are preserved, so target alone re-centres the orbit on a point (optionally with azimuth/polar to also change direction) without changing the distance. target is [x,y,z] world-space orbit centre. azimuth is horizontal angle in radians (XY plane, measured from +Y toward +X). polar is vertical angle in radians (0 = overhead along +Z, π/2 = eye-level). distance is the radius of the orbit sphere; must be > 0. Does NOT add to feature history.",
     "input_schema": {
       "properties": {
         "azimuth": {
@@ -8413,54 +8240,6 @@
       "type": "object"
     },
     "name": "set_joint_value"
-  },
-  {
-    "annotations": {
-      "idempotentHint": true
-    },
-    "description": "Lock or unlock a layer. Entities on a locked layer cannot have their layer reassigned via set_entity_layer. (Note: locking does not yet block geometry edits to those entities — broader lock enforcement is a planned follow-up.) Graceful no-op if the layer id does not exist.",
-    "input_schema": {
-      "properties": {
-        "id": {
-          "description": "Id of the layer to lock or unlock.",
-          "type": "string"
-        },
-        "locked": {
-          "description": "true to lock the layer; false to unlock it.",
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "id",
-        "locked"
-      ],
-      "type": "object"
-    },
-    "name": "set_layer_lock"
-  },
-  {
-    "annotations": {
-      "idempotentHint": true
-    },
-    "description": "Show or hide a layer. Hidden layers are not rendered in the viewport. Graceful no-op if the layer id does not exist.",
-    "input_schema": {
-      "properties": {
-        "id": {
-          "description": "Id of the layer to change.",
-          "type": "string"
-        },
-        "visible": {
-          "description": "true to make the layer visible; false to hide it.",
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "id",
-        "visible"
-      ],
-      "type": "object"
-    },
-    "name": "set_layer_visibility"
   },
   {
     "annotations": {
@@ -9363,6 +9142,41 @@
       "type": "object"
     },
     "name": "update_equipment"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true
+    },
+    "description": "Change one or more properties of a layer: rename it (name), show or hide it (visible; hidden layers are not rendered), lock or unlock it (locked; entities on a locked layer cannot be reassigned via set_entity_layer, but geometry edits are not blocked), or tint it (color). Give at least one field; fields not given are kept. Entities are not affected. Graceful no-op if the layer id does not exist, no field is given, the name is empty or the color is not #rrggbb.",
+    "input_schema": {
+      "properties": {
+        "color": {
+          "description": "New layer tint as a hex string #rrggbb, e.g. \"#ff0000\"; any other format is rejected.",
+          "type": "string"
+        },
+        "id": {
+          "description": "Id of the layer to change.",
+          "type": "string"
+        },
+        "locked": {
+          "description": "true to lock the layer; false to unlock it.",
+          "type": "boolean"
+        },
+        "name": {
+          "description": "New display name for the layer. Must be non-empty.",
+          "type": "string"
+        },
+        "visible": {
+          "description": "true to make the layer visible; false to hide it.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "update_layer"
   },
   {
     "description": "Rename a level or change its elevation / floor-to-floor height. All walls, slabs, columns, beams, stairs, doors, windows and rooms on the level move and regenerate accordingly; walls and columns at full storey height and stairs climbing the storey follow a new height.",

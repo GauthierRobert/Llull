@@ -261,7 +261,7 @@ describe('build_project read-only steps', () => {
     const result = execute(createEmptyDocument(), 'build_project', {
       actions: [
         { command: 'add_box', params: { size: [10, 10, 10] }, as: 'b' },
-        { command: 'measure_volume', params: { entityId: '$b' } },
+        { command: 'mass_properties', params: { entityId: '$b' } },
         { command: 'add_box', params: { size: [1, 1, 1] } },
       ],
     });
@@ -277,7 +277,7 @@ describe('build_project read-only steps', () => {
     const result = execute(doc, 'build_project', {
       actions: [
         { command: 'add_box', params: { size: [10, 10, 10] } },
-        { command: 'measure_volume', params: { entityId: 'missing' } },
+        { command: 'mass_properties', params: { entityId: 'missing' } },
       ],
     });
     expect((result.data as BuildData).failedAt).toBe(1);

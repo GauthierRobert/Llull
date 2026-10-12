@@ -33,10 +33,10 @@ official mass; `npm run quality:drawings` replays them).
   booleans; exact tangent points / fillet centres in closed form; A/B variants by flag) and
   write JSON — never hand-type 200 steps. Normalise arc angles to [0, 2π) with end > start
   (`draw_arc` rejects sweeps > 2π).
-- **Exact curves**: `draw_line` + `draw_arc` pieces → `extrude_sketch {ids}` /
+- **Exact curves**: `draw_polyline` (2 points) + `draw_arc` pieces → `extrude_profile {ids}` /
   `revolve_profile {profileIds}`. Polygon profiles lose volume. No elliptical arc piece: use a
   dense `draw_spline` (mass error negligible) or a revolved/clipped `draw_ellipse`.
-- **Sketch planes** (three.js XYZ Euler on `extrude_sketch` / `extrude_profile`): XY `[0,0,0]`
+- **Sketch planes** (three.js XYZ Euler on `extrude_profile`): XY `[0,0,0]`
   (+Z) · XZ `["=pi/2",0,0]` (local y→Z, extrudes −Y) · YZ `["=pi/2","=pi/2",0]` (local x→Y,
   y→Z, extrudes +X). Tilted cutters: sketch in the face's own (s, w) frame, then
   `rotation [0, θ, 0]`. Prefer `rotation` to `axis` for sketches. Check every step's AABB.
@@ -56,7 +56,7 @@ official mass; `npm run quality:drawings` replays them).
 
 ## 3. Verify in layers (cheap → strong); every failing layer names a feature
 
-1. **Mass / volume**: `mass_properties` / `measure_volume` (OCC: exact B-rep,
+1. **Mass / volume**: `mass_properties` (OCC: exact B-rep,
    `data.method: "exact"`) vs the title block. Never judge mass from the STL (display mesh, up to
    0.4 % low on small curved parts).
 2. **Extents**: `measure_bounding_box entityId=<solid>` vs the overall dims (whole-document bounds

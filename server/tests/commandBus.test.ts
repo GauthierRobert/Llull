@@ -5,7 +5,7 @@
  *
  * Covers:
  *   (a) applyCommand — mutating command updates live doc + pushes undo history.
- *   (b) applyCommand — query command (measure_volume) returns data, no history/broadcast.
+ *   (b) applyCommand — query command (mass_properties) returns data, no history/broadcast.
  *   (c) applyCommand — no-op (graceful bad params) pushes nothing.
  *   (d) applyCommand — unknown command → isError true, doc unchanged.
  *   (e) undo/redo — move through history, update canUndo/canRedo.
@@ -73,7 +73,7 @@ describe('applyCommand — mutating command', () => {
 
 // (b) Query command — data returned, no history push, no doc change
 
-describe('applyCommand — query command (measure_volume)', () => {
+describe('applyCommand — query command (mass_properties)', () => {
   it('returns data and leaves the live document unchanged', () => {
     // First add a box so there is something to measure.
     applyCommand('add_box', { size: [2, 2, 2], position: [0, 0, 0] });
@@ -83,7 +83,7 @@ describe('applyCommand — query command (measure_volume)', () => {
     const entityIds = Object.keys(docBefore.entities);
     expect(entityIds).toHaveLength(1);
 
-    const result = applyCommand('measure_volume', { entityId: entityIds[0] });
+    const result = applyCommand('mass_properties', { entityId: entityIds[0] });
 
     expect(result.isError).toBe(false);
     expect(result.data).toBeDefined();
@@ -101,7 +101,7 @@ describe('applyCommand — query command (measure_volume)', () => {
     const unsub = subscribeLive(fakeRes);
     const writeCountBefore = fakeRes.written.length;
 
-    applyCommand('measure_volume', { entityId });
+    applyCommand('mass_properties', { entityId });
 
     // No additional write after the query.
     expect(fakeRes.written).toHaveLength(writeCountBefore);
@@ -299,11 +299,11 @@ describe('applyCommand — idempotent commandId', () => {
   it('a recently used id survives eviction', () => {
     applyCommand('add_box', { size: [1, 1, 1] }, 'keep');
     for (let index = 0; index < 998; index++) {
-      applyCommand('measure_volume', { id: 'none' }, `f-${index}`);
+      applyCommand('mass_properties', { id: 'none' }, `f-${index}`);
     }
     applyCommand('add_box', { size: [1, 1, 1] }, 'keep'); // refresh LRU position
-    applyCommand('measure_volume', { id: 'none' }, 'push-1');
-    applyCommand('measure_volume', { id: 'none' }, 'push-2');
+    applyCommand('mass_properties', { id: 'none' }, 'push-1');
+    applyCommand('mass_properties', { id: 'none' }, 'push-2');
     const before = getLiveDoc().order.length;
     applyCommand('add_box', { size: [1, 1, 1] }, 'keep');
     expect(getLiveDoc().order.length).toBe(before);
@@ -325,7 +325,7 @@ describe('applyCommand — changed flag', () => {
   });
 
   it('is false for a query and for an empty undo, true for a real undo', () => {
-    expect(applyCommand('measure_volume', { id: 'none' }).changed).toBe(false);
+    expect(applyCommand('mass_properties', { id: 'none' }).changed).toBe(false);
     expect(undo().changed).toBe(false);
     applyCommand('add_box', { size: [1, 1, 1] });
     expect(undo().changed).toBe(true);

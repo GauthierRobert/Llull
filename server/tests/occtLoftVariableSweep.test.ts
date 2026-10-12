@@ -106,7 +106,7 @@ describe('variable-section sweep on the live kernels', () => {
 
 describe('closed-path sweeps on the live kernels', () => {
   it('a hollow ring along a circle sketch is one exact solid with the Pappus volume', () => {
-    const doc = execute(empty, 'draw_circle', { center: [0, 0], radius: 30 }).document;
+    const doc = execute(empty, 'draw_arc', { center: [0, 0], radius: 30 }).document;
     const ring = created(doc, 'sweep_profile', {
       pathId: doc.order[0],
       radius: 4,

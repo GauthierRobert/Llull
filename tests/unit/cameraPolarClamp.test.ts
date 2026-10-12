@@ -16,13 +16,13 @@ describe('camera polar clamp', () => {
     expect(result.document.camera.polar).toBeCloseTo(expected);
   });
 
-  it('look_at clamps polar the same way', () => {
-    const result = execute(doc, 'look_at', { target: [0, 0, 0], polar: 0 });
+  it('set_camera clamps polar the same way', () => {
+    const result = execute(doc, 'set_camera', { target: [0, 0, 0], polar: 0 });
     expect(result.document.camera.polar).toBeCloseTo(0.01);
   });
 
-  it('look_at without polar keeps the current polar', () => {
-    const result = execute(doc, 'look_at', { target: [1, 2, 3] });
+  it('set_camera without polar keeps the current polar', () => {
+    const result = execute(doc, 'set_camera', { target: [1, 2, 3] });
     expect(result.document.camera.polar).toBe(doc.camera.polar);
   });
 });

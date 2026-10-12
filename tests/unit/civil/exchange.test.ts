@@ -181,9 +181,11 @@ describe('export_civil_dxf', () => {
   });
 
   it('refuses a document without civil entities', () => {
-    const doc = execute(createEmptyDocument(), 'draw_line', {
-      start: [0, 0],
-      end: [1, 1],
+    const doc = execute(createEmptyDocument(), 'draw_polyline', {
+      points: [
+        [0, 0],
+        [1, 1],
+      ],
     }).document;
     const result = execute(doc, 'export_civil_dxf', {});
     expect(result.data).toBeUndefined();

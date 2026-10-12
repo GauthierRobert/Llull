@@ -44,7 +44,7 @@ const AGENT_LOOP_STEPS: readonly AgentLoopStep[] = [
   {
     tool: 'add_box (or any create/edit command)',
     description:
-      'Create or modify geometry via any registered command (add_box, draw_line, extrude_profile, …).',
+      'Create or modify geometry via any registered command (add_box, draw_polyline, extrude_profile, …).',
   },
   {
     tool: 'render_view',

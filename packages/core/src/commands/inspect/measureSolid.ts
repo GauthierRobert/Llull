@@ -1,18 +1,12 @@
 import type { CadDocument, Entity, Vec3 } from '../../model/types';
-import { cross3, dot3 } from '../../lib/vec3';
 import type { CommandResult, ExecutionContext } from '../types';
 import { defineCommand, z } from '../schema';
-import { entityBounds, entityBoundsInDoc, mergeBounds } from '../../geometry/bounds';
+import { entityBoundsInDoc, mergeBounds } from '../../geometry/bounds';
 import { expandInstance } from '../../geometry/instanceExpansion';
 import type { Bounds } from '../../geometry/bounds';
 import { formatLength } from '../document/units';
-import { polygonArea, polygonCentroid } from '../../lib/polygon';
+import { childVolume, solidVolume } from './solidVolume';
 import { noop, report } from '../noop';
-import { chainLength } from '../../geometry/curveSegments';
-import { sweepTriangles } from '../../geometry/sweep';
-import { loftTriangles } from '../../geometry/loft';
-import { subdivisionTriangles } from '../../geometry/subdivision';
-import { currentContext } from '../context';
 
 interface MeasureBoundingBoxData {
   min: Vec3;
@@ -90,247 +84,46 @@ export const measureBoundingBox = defineCommand({
   },
 });
 
-interface MeasureVolumeData {
-  volume: number;
-  unit: string;
-  /** 'exact': the kernel's B-rep volume; 'mesh': the display triangles; 'analytic': a closed form. */
-  method?: 'exact' | 'mesh';
-}
-
-/**
- * Exact volume of a kernel result (a mesh entity that keeps its B-rep recipe), or null when no
- * kernel with exact topology (OCC) is installed. The display mesh is a coarse tessellation (0.1
- * linear / 0.5 rad angular deflection), so its volume is off by up to ~1 % on small curved parts —
- * too much for a mass check against a drawing.
- */
-function exactVolume(e: Entity, ctx: ExecutionContext | undefined): number | null {
-  if (e.kind !== 'mesh' || e.brep === undefined) return null;
-  const kernel = (ctx ?? currentContext()).kernel;
-  const shape = kernel?.evaluate(e.brep) ?? null;
-  const topology = shape === null ? null : (kernel?.topology(shape) ?? null);
-  return topology !== null && topology.volume > 0 ? topology.volume : null;
-}
-
-/** Round sections: annulus area × path length (Pappus); other sections: tessellated volume. */
-function sweepVolume(e: Extract<Entity, { kind: 'sweep' }>): number {
-  const { section } = e;
-  if (section.shape === 'circle' && e.stations === undefined) {
-    const bore = section.innerRadius ?? 0;
-    return Math.PI * (section.radius ** 2 - bore ** 2) * chainLength(e.path);
-  }
-  return closedMeshVolume(sweepTriangles(e).flat(2));
-}
-
-/** Volume of a closed, outward-wound triangle soup. */
-function closedMeshVolume(positions: number[]): number {
-  const indices = Array.from({ length: positions.length / 3 }, (_, corner) => corner);
-  return Math.abs(meshVolume(positions, indices));
-}
-
-/** Signed-tetrahedra volume of a closed, consistently wound indexed mesh (Σ A·(B×C) / 6). */
-function meshVolume(positions: ReadonlyArray<number>, indices: ReadonlyArray<number>): number {
-  const vertex = (i: number): Vec3 => [
-    positions[i * 3] as number,
-    positions[i * 3 + 1] as number,
-    positions[i * 3 + 2] as number,
-  ];
-  let sum = 0;
-  for (let t = 0; t + 2 < indices.length; t += 3) {
-    sum += dot3(
-      vertex(indices[t] as number),
-      cross3(vertex(indices[t + 1] as number), vertex(indices[t + 2] as number)),
-    );
-  }
-  return Math.abs(sum / 6);
-}
-
-/**
- * @command measure_volume
- * @pure
- * @layer core/commands
- * @affects nothing — read-only; document returned unchanged, affected:[]
- * @invariant data is { volume: number, unit: string } where unit is derived (e.g. "mm³")
- * @failure non-solid entity or missing id -> no-op, affected:[], no data
- */
-export const measureVolume = defineCommand({
-  name: 'measure_volume',
-  annotations: { readOnly: true },
-  description:
-    "Compute the volume of a 3D solid entity. Supported kinds: 'box' (w×h×d), " +
-    "'cylinder' (π r² h), 'sphere' (4/3 π r³), 'extrusion' (profile area × depth), " +
-    "'mesh' (a kernel result with the OCC kernel: the exact B-rep volume; otherwise the signed-tetrahedra sum " +
-    'of its display triangles — data.method says which), ' +
-    "'cone' (π r² h / 3), 'torus' (2 π² · ringRadius · tubeRadius²), " +
-    "'wedge' (w×h×d / 2 — half the enclosing box), " +
-    "'pyramid' (baseWidth × baseDepth × height / 3), " +
-    "'instance' (sum of its component's solid children, baked with the instance scale), " +
-    "'revolution' (Pappus's centroid theorem: sweepAngle × |x_centroid| × profileArea; " +
-    'falls back to bounding-box approximation if the profile crosses the revolution axis), ' +
-    "'sweep' (round section: section area × exact path length; other sections: closed-mesh sum), 'loft' and 'subdivision' (closed-mesh sum). " +
-    'Returns data: { volume, unit } where unit is the cubed document unit (e.g. "mm³"). ' +
-    '2D shape entities are rejected. Does not modify the document.',
-  params: z.object({
-    entityId: z
-      .string()
-      .describe(
-        "Id of the 3D solid entity to measure. Supported kinds: 'box', 'cylinder', 'sphere', " +
-          "'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', 'subdivision'.",
-      ),
-  }),
-  run: (doc, { entityId }, ctx): CommandResult => {
-    const e = doc.entities[entityId];
-    if (!e) return noop(doc, `measure_volume: entity '${entityId}' not found.`);
-
-    const volumeUnit = `${doc.units}³`;
-    let volume: number;
-    let method: MeasureVolumeData['method'];
-
-    switch (e.kind) {
-      case 'box':
-        volume = e.size[0] * e.size[1] * e.size[2];
-        break;
-      case 'cylinder':
-        volume = Math.PI * e.radius * e.radius * e.height;
-        break;
-      case 'sphere':
-        volume = (4 / 3) * Math.PI * e.radius * e.radius * e.radius;
-        break;
-      case 'extrusion':
-        volume = polygonArea(e.profile) * e.depth;
-        break;
-      case 'mesh': {
-        const exact = exactVolume(e, ctx);
-        method = exact === null ? 'mesh' : 'exact';
-        volume = exact ?? meshVolume(e.mesh.positions, e.mesh.indices);
-        break;
-      }
-      case 'cone':
-        volume = (Math.PI * e.radius * e.radius * e.height) / 3;
-        break;
-      case 'torus':
-        volume = 2 * Math.PI * Math.PI * e.ringRadius * e.tubeRadius * e.tubeRadius;
-        break;
-      case 'wedge':
-        volume = (e.size[0] * e.size[1] * e.size[2]) / 2;
-        break;
-      case 'pyramid':
-        volume = (e.baseWidth * e.baseDepth * e.height) / 3;
-        break;
-      case 'instance': {
-        const component = doc.components[e.componentId];
-        if (!component) {
-          return noop(
-            doc,
-            `measure_volume: instance '${entityId}' references missing component '${e.componentId}'.`,
-          );
-        }
-        // Bake the instance (scale, rotation, translation) and sum its solid children.
-        volume = 0;
-        for (const child of expandInstance(e, component)) {
-          volume += childVolume(doc, child);
-        }
-        break;
-      }
-      case 'revolution': {
-        // Pappus: V = sweepAngle * |centroid x| * profile area; profile x = distance from the axis.
-        // A profile crossing the axis falls back to the bounding-box volume.
-        if (e.profile.some(([x]) => x < 0)) {
-          const b = entityBounds(e);
-          volume = (b.max[0] - b.min[0]) * (b.max[1] - b.min[1]) * (b.max[2] - b.min[2]);
-          return report(
-            doc,
-            `Volume of ${entityId} ≈ ${volume.toFixed(doc.displayPrecision)} ${volumeUnit} ` +
-              `(bounding-box approximation — profile crosses revolution axis; Pappus requires profile x ≥ 0).`,
-            { volume, unit: volumeUnit } satisfies MeasureVolumeData,
-          );
-        }
-        const profileArea = polygonArea(e.profile);
-        volume =
-          profileArea < 1e-12
-            ? 0
-            : (e.angle ?? 2 * Math.PI) * Math.abs(polygonCentroid(e.profile)[0]) * profileArea;
-        break;
-      }
-      case 'sweep':
-        volume = sweepVolume(e);
-        break;
-      case 'loft':
-        volume = closedMeshVolume(loftTriangles(e).flat(2));
-        break;
-      case 'subdivision':
-        volume = closedMeshVolume(subdivisionTriangles(e).flat(2));
-        break;
-      default:
-        return noop(
-          doc,
-          `measure_volume: entity '${entityId}' is kind '${e.kind}'; ` +
-            "supported kinds are 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', 'subdivision'.",
-        );
-    }
-
-    const data: MeasureVolumeData = {
-      volume,
-      unit: volumeUnit,
-      ...(method === undefined ? {} : { method }),
-    };
-    const how =
-      method === 'exact'
-        ? ' (exact B-rep)'
-        : method === 'mesh'
-          ? ' (display mesh; the OCC kernel gives the exact B-rep volume)'
-          : '';
-    return report(
-      doc,
-      `Volume of ${entityId} = ${volume.toFixed(doc.displayPrecision)} ${volumeUnit}${how}.`,
-      data,
-    );
-  },
-});
-
 interface MassPropertiesData {
   volume: number;
-  density: number;
-  mass: number;
-  unit: string;
-}
-
-function childVolume(doc: CadDocument, child: Entity): number {
-  const part = measureVolume.run(
-    { ...doc, entities: { [child.id]: child } },
-    { entityId: child.id },
-  );
-  return (part.data as MeasureVolumeData | undefined)?.volume ?? 0;
+  volumeUnit: string;
+  method?: 'exact' | 'mesh';
+  density?: number;
+  mass?: number;
+  unit?: 'g';
 }
 
 /**
  * Volume and mass of a baked instance: every solid child uses its own material density, else the
  * instance's material, else `fallbackDensity`. Nested instances recurse; 2D children weigh nothing.
+ * `mass` is null when some solid child has no known density.
  */
 function instanceMass(
   doc: CadDocument,
   instance: Entity & { kind: 'instance' },
-  fallbackDensity: number,
-): { volume: number; mass: number } | string {
+  fallbackDensity: number | undefined,
+  ctx: ExecutionContext | undefined,
+): { volume: number; mass: number | null } | string {
   const component = doc.components[instance.componentId];
   if (!component)
     return `instance '${instance.id}' references missing component '${instance.componentId}'.`;
   let volume = 0;
-  let mass = 0;
+  let mass: number | null = 0;
   for (const baked of expandInstance(instance, component)) {
-    const child = baked;
     const materialId = baked.materialId ?? instance.materialId;
     const material = materialId ? doc.materials[materialId] : undefined;
     const density = material?.density ?? fallbackDensity;
-    if (child.kind === 'instance') {
-      const nested = instanceMass(doc, child, density);
+    if (baked.kind === 'instance') {
+      const nested = instanceMass(doc, baked, density, ctx);
       if (typeof nested === 'string') return nested;
       volume += nested.volume;
-      mass += nested.mass;
+      mass = mass === null || nested.mass === null ? null : mass + nested.mass;
       continue;
     }
-    const partVolume = childVolume(doc, child);
+    const partVolume = childVolume(doc, baked, ctx);
     volume += partVolume;
-    mass += partVolume * density;
+    if (partVolume > 0 && density === undefined) mass = null;
+    else if (mass !== null) mass += partVolume * (density ?? 0);
   }
   return { volume, mass };
 }
@@ -340,57 +133,81 @@ function instanceMass(
  * @pure
  * @layer core/commands
  * @affects nothing — read-only; document returned unchanged, affected:[]
- * @invariant data is { volume, density, mass, unit }
- * @failure non-solid entity, missing id, or effective density <= 0 -> no-op, affected:[], no data
+ * @invariant data is { volume, volumeUnit, method? } plus { density, mass, unit: 'g' } when a density is known
+ * @failure non-solid entity, missing id, or a given density <= 0 -> no-op, affected:[], no data
  *
  * Density resolution order:
  *   1. If the entity has a `materialId` and that material exists in `doc.materials`,
  *      the material's density is used (ignores the `density` param for that entity).
- *   2. Otherwise the caller-supplied `density` param is used (back-compat).
+ *   2. Otherwise the caller-supplied `density` param is used.
+ *   3. Otherwise only the volume is returned (no mass).
  * Unit assumption: density is in g/(document-unit)³ so that mass = volume × density in grams.
  */
 export const massProperties = defineCommand({
   name: 'mass_properties',
   annotations: { readOnly: true },
   description:
-    'Compute the mass of a 3D solid from its volume and density. ' +
-    "Supported entity kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', " +
-    "'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', 'subdivision', and 'instance' (assembly: the sum over its " +
-    'component solids, each with its own material density, else the instance material, else the density param). ' +
+    'Measure the volume of a 3D solid and, when a density is known, its mass. ' +
+    "Supported entity kinds: 'box' (w×h×d), 'cylinder' (π r² h), 'sphere' (4/3 π r³), 'extrusion' (profile area × depth), " +
+    "'mesh' (a kernel result with the OCC kernel: the exact B-rep volume; otherwise the signed-tetrahedra sum of its " +
+    "display triangles — data.method says which), 'cone', 'torus', 'wedge' (half the enclosing box), 'pyramid', " +
+    "'revolution' (Pappus's centroid theorem; a profile crossing the axis falls back to the bounding-box volume), " +
+    "'sweep' (round section: section area × exact path length; other sections: closed-mesh sum), 'loft', " +
+    "'subdivision' (closed-mesh sum), and 'instance' (assembly: the sum over its component solids, each with its " +
+    'own material density, else the instance material, else the density param). 2D shape entities are rejected. ' +
     'Density resolution: if the entity has a material assigned (via assign_material) and that ' +
     "material exists in doc.materials, the material's density is used automatically — the density " +
-    'param is ignored for that entity. Otherwise the caller-supplied density param is used (back-compat). ' +
-    'The density is in g/(document-unit)³ — e.g. for a document in mm: steel ≈ 0.00785, aluminium ≈ 0.0027. ' +
-    'Returns data: { volume, density, mass, unit } where unit describes the mass unit (grams). ' +
-    'Does not modify the document.',
+    'param is ignored for that entity. Otherwise the density param is used (g/(document-unit)³ — for a document in ' +
+    'mm: steel ≈ 0.00785, aluminium ≈ 0.0027). With neither, only the volume is returned. ' +
+    'Returns data: { volume, volumeUnit (e.g. "mm³"), method? } and, when a density is known, ' +
+    '{ density, mass, unit: "g" }. Does not modify the document.',
   params: z.object({
     entityId: z
       .string()
       .describe(
-        "Id of the 3D solid entity to compute mass for. Supported kinds: 'box', 'cylinder', 'sphere', " +
-          "'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', 'subdivision'.",
+        "Id of the 3D solid entity to measure. Supported kinds: 'box', 'cylinder', 'sphere', " +
+          "'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', 'subdivision', 'instance'.",
       ),
     density: z
       .number()
       .describe(
-        'Fallback material density in g/(document-unit)³. Must be > 0. ' +
-          'Used only when the entity has no material assigned via assign_material. ' +
+        'Optional fallback material density in g/(document-unit)³. Must be > 0 when given. ' +
+          'Used only when the entity has no material assigned via assign_material; omit it to measure the volume alone. ' +
           'Examples for a mm document: steel ≈ 0.00785, aluminium ≈ 0.0027, PLA ≈ 0.00124.',
-      ),
+      )
+      .optional(),
   }),
   run: (doc, { entityId, density }, ctx): CommandResult => {
-    if (density <= 0)
+    if (density !== undefined && density <= 0)
       return noop(doc, `mass_properties: density must be > 0, got ${String(density)}.`);
 
     const e = doc.entities[entityId];
     if (!e) return noop(doc, `mass_properties: entity '${entityId}' not found.`);
 
+    const volumeUnit = `${doc.units}³`;
+    const materialDensity = e.materialId ? doc.materials[e.materialId]?.density : undefined;
+    const effectiveDensity = materialDensity ?? density;
+    const densitySource = materialDensity === undefined ? 'param' : `material '${e.materialId}'`;
+
     if (e.kind === 'instance') {
-      const assembly = instanceMass(doc, e, density);
+      const assembly = instanceMass(doc, e, density, ctx);
       if (typeof assembly === 'string') return noop(doc, `mass_properties: ${assembly}`);
       const { volume, mass } = assembly;
-      const averageDensity = volume > 0 ? mass / volume : density;
-      const data: MassPropertiesData = { volume, density: averageDensity, mass, unit: 'g' };
+      if (mass === null)
+        return report(
+          doc,
+          `Volume of ${entityId} = ${volume.toFixed(doc.displayPrecision)} ${volumeUnit} ` +
+            '(no mass: some parts have no material density and no density param was given).',
+          { volume, volumeUnit } satisfies MassPropertiesData,
+        );
+      const averageDensity = volume > 0 ? mass / volume : (density ?? 0);
+      const data: MassPropertiesData = {
+        volume,
+        volumeUnit,
+        density: averageDensity,
+        mass,
+        unit: 'g',
+      };
       return report(
         doc,
         `Mass of assembly ${entityId}: volume=${volume.toFixed(doc.displayPrecision)} ${doc.units}³, ` +
@@ -399,25 +216,31 @@ export const massProperties = defineCommand({
       );
     }
 
-    let effectiveDensity = density;
-    let densitySource = 'param';
-    if (e.materialId) {
-      const mat = doc.materials[e.materialId];
-      if (mat) {
-        effectiveDensity = mat.density;
-        densitySource = `material '${e.materialId}'`;
-      }
+    const measured = solidVolume(doc, e, ctx);
+    if ('error' in measured) return noop(doc, `mass_properties: ${measured.error}`);
+    const { volume, method, approximation } = measured;
+    const volumeData = { volume, volumeUnit, ...(method === undefined ? {} : { method }) };
+    const shown = volume.toFixed(doc.displayPrecision);
+    if (effectiveDensity === undefined) {
+      const how =
+        method === 'exact'
+          ? ' (exact B-rep)'
+          : method === 'mesh'
+            ? ' (display mesh; the OCC kernel gives the exact B-rep volume)'
+            : '';
+      const sign = approximation === undefined ? '=' : '≈';
+      const note = approximation === undefined ? how : ` (${approximation})`;
+      return report(
+        doc,
+        `Volume of ${entityId} ${sign} ${shown} ${volumeUnit}${note}.`,
+        volumeData satisfies MassPropertiesData,
+      );
     }
-
-    const volumeResult = measureVolume.run(doc, { entityId }, ctx);
-    if (!volumeResult.data) return noop(doc, volumeResult.summary);
-
-    const { volume } = volumeResult.data as MeasureVolumeData;
     const mass = volume * effectiveDensity;
-    const data: MassPropertiesData = { volume, density: effectiveDensity, mass, unit: 'g' };
+    const data: MassPropertiesData = { ...volumeData, density: effectiveDensity, mass, unit: 'g' };
     return report(
       doc,
-      `Mass of ${entityId}: volume=${volume.toFixed(doc.displayPrecision)} ${doc.units}³, ` +
+      `Mass of ${entityId}: volume=${shown} ${doc.units}³${approximation === undefined ? '' : ` (${approximation})`}, ` +
         `density=${effectiveDensity} g/${doc.units}³ (${densitySource}), mass=${mass.toFixed(doc.displayPrecision)} g.`,
       data,
     );

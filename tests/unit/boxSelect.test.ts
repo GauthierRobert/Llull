@@ -23,7 +23,15 @@ describe('boxSelectMode', () => {
 
 describe('entitiesInBox — one entity per Shape2DKind', () => {
   const { doc, ids } = build([
-    ['draw_line', { start: [1, 1], end: [3, 1] }],
+    [
+      'draw_polyline',
+      {
+        points: [
+          [1, 1],
+          [3, 1],
+        ],
+      },
+    ],
     [
       'draw_polyline',
       {
@@ -35,7 +43,7 @@ describe('entitiesInBox — one entity per Shape2DKind', () => {
         closed: false,
       },
     ],
-    ['draw_circle', { center: [2, 6], radius: 1 }],
+    ['draw_arc', { center: [2, 6], radius: 1 }],
     ['draw_rectangle', { width: 2, height: 1, position: [1, 8, 0] }],
     ['draw_ellipse', { center: [2, 11], radiusX: 1, radiusY: 0.5 }],
     ['draw_arc', { center: [2, 14], radius: 1, startAngle: 0, endAngle: Math.PI / 2 }],
