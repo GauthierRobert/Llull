@@ -21,6 +21,7 @@ import type { Vec2 } from '@core/model/types';
 import { type DrawToolKind, useStore, useToolStore } from '@ui/store';
 import { isEditingKeyEvent } from '@ui/hooks/useKeyboardShortcuts';
 import { useCaptureKeydown } from '@ui/hooks/useCaptureKeydown';
+import { useToolKeys } from '@ui/hooks/useToolKeys';
 import { drawToolDescriptor, isChainTool } from './drawToolTable';
 
 interface UseDrawToolResult {
@@ -113,22 +114,15 @@ export function useDrawTool(): UseDrawToolResult {
   );
 
   // Keyboard: Escape cancels; Enter finishes a polyline, wall chain or spline.
-  const onKey = useCallback(
-    (e: KeyboardEvent): void => {
-      if (isEditingKeyEvent(e)) return;
-      if (e.key === 'Escape') {
-        // First Esc drops the shape in progress; a second Esc returns to Select.
-        if (activeTool === 'none') return;
-        e.preventDefault();
-        if (inProgress) setCollectedPoints([]);
-        else setActiveTool('none');
-      } else if (e.key === 'Enter' && isChainTool(activeTool)) {
-        finishChain();
-      }
-    },
-    [activeTool, inProgress, finishChain, setActiveTool, setCollectedPoints],
-  );
-  useCaptureKeydown(onKey);
+  const clearPoints = useCallback(() => setCollectedPoints([]), [setCollectedPoints]);
+  const disarm = useCallback(() => setActiveTool('none'), [setActiveTool]);
+  useToolKeys({
+    armed: activeTool !== 'none',
+    inProgress,
+    onCancel: clearPoints,
+    onDisarm: disarm,
+    onEnter: isChainTool(activeTool) ? finishChain : null,
+  });
 
   // Ctrl/Cmd+Z mid-operation removes the last collected point instead of undoing the document.
   // stopPropagation so the global undo shortcut never sees it.

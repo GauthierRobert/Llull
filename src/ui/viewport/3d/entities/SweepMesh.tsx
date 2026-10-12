@@ -10,21 +10,21 @@
 import { useMemo } from 'react';
 import type { SweepEntity } from '@core/model/types';
 import { sweepTriangles } from '@core/geometry/sweep';
-import { buildTriangleSoupGeometry } from './meshSolidGeometry';
-import { SolidMeshShell, type SolidMeshKindProps, type SolidSurface } from './SolidMeshShell';
+import type { SolidMeshKindProps, SolidSurface } from './SolidMeshShell';
+import { TriangleSoupMesh } from './TriangleSoupMesh';
 
 const SWEEP_SURFACE: SolidSurface = { roughness: 0.4, metalness: 0.3, envMapIntensity: 0.9 };
 
 export function SweepMesh({
   entity,
   ...shell
-}: SolidMeshKindProps<SweepEntity>): React.ReactElement | null {
+}: SolidMeshKindProps<SweepEntity>): React.ReactElement {
   const { path, section, stations } = entity;
-  const geometry = useMemo(() => {
-    const shape = stations === undefined ? { path, section } : { path, section, stations };
-    return buildTriangleSoupGeometry(sweepTriangles(shape));
-  }, [path, section, stations]);
-
-  if (geometry === null) return null;
-  return <SolidMeshShell entity={entity} geometry={geometry} surface={SWEEP_SURFACE} {...shell} />;
+  const triangles = useMemo(
+    () => sweepTriangles(stations === undefined ? { path, section } : { path, section, stations }),
+    [path, section, stations],
+  );
+  return (
+    <TriangleSoupMesh entity={entity} triangles={triangles} surface={SWEEP_SURFACE} {...shell} />
+  );
 }

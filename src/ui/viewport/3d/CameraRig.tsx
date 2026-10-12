@@ -9,7 +9,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import type * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useStore } from '@ui/store';
-import { toRenderPosition } from './floatingOrigin';
+import { driveCamera } from './cameraBridge';
 
 /**
  * Convert spherical CameraState → a cartesian THREE.Vector3 eye position.
@@ -58,21 +58,13 @@ export function CameraReactor(): null {
     const orbit = controls as OrbitControlsImpl | null;
     if (!orbit) return;
 
-    // The camera lives in render space (world − renderOrigin), like the entity group.
-    const { renderOrigin } = useStore.getState();
     const eye = sphericalToCartesian(
       docCamera.target,
       docCamera.azimuth,
       docCamera.polar,
       docCamera.distance,
     );
-    camera.position.set(...toRenderPosition(eye, renderOrigin));
-    orbit.target.set(...toRenderPosition(docCamera.target, renderOrigin));
-
-    // Sync OrbitControls internal spherical state to new position/target.
-    orbit.update();
-    // Queue a render frame (demand frameloop).
-    invalidate();
+    driveCamera(camera, orbit, invalidate, eye, docCamera.target);
   }, [docCamera, camera, controls, invalidate]);
 
   return null;

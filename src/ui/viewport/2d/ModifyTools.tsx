@@ -15,13 +15,14 @@ import React, { useRef, useEffect } from 'react';
 import { type IconName, Icon } from '@ui/components/Icon';
 import { NumberField } from '@ui/components/NumberField';
 import type { ModifyToolKind } from '@ui/store';
+import { enterEscapeKeys } from '../enterEscapeKeys';
 import type { ModifyToolPhase } from './useModifyTool';
 
 interface ModifyToolsProps {
   activeTool: ModifyToolKind;
   phase: ModifyToolPhase;
   pendingValue: number;
-  onSelectTool: (tool: ModifyToolKind) => void;
+  onToggleTool: (tool: ModifyToolKind) => void;
   onSetValue: (v: number) => void;
   onCommitValue: () => void;
 }
@@ -82,7 +83,7 @@ export function ModifyTools({
   activeTool,
   phase,
   pendingValue,
-  onSelectTool,
+  onToggleTool,
   onSetValue,
   onCommitValue,
 }: ModifyToolsProps): React.ReactElement {
@@ -110,7 +111,7 @@ export function ModifyTools({
             key={tool}
             type="button"
             className={`draw-tool-btn${activeTool === tool ? ' draw-tool-btn--active' : ''}`}
-            onClick={() => onSelectTool(activeTool === tool ? 'none' : tool)}
+            onClick={() => onToggleTool(tool)}
             aria-pressed={activeTool === tool}
             title={`${label} (${kbHint})`}
             aria-label={label}
@@ -132,12 +133,7 @@ export function ModifyTools({
               step={0.1}
               value={pendingValue}
               onValueChange={onSetValue}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  onCommitValue();
-                }
-              }}
+              onKeyDown={enterEscapeKeys({ onEnter: onCommitValue })}
               aria-label={`${valueLabel(activeTool)} value`}
             />
             <button

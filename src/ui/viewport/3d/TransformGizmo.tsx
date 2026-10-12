@@ -242,11 +242,7 @@ export function TransformGizmo({
   return (
     <>
       {/* Sibling pattern: a real scene-graph <group> is the controls' target (see header). */}
-      <group
-        ref={targetRef}
-        position={[x, y, z]}
-        rotation={[entity.rotation[0], entity.rotation[1], entity.rotation[2]]}
-      />
+      <group ref={targetRef} position={[x, y, z]} rotation={entity.rotation} />
       <TransformControls
         ref={controlsRef}
         object={targetRef as unknown as MutableRefObject<THREE.Object3D>}

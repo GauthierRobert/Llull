@@ -23,8 +23,8 @@ import { type GizmoMode, useStore, useToolStore } from '@ui/store';
 import { Entities } from './Entities';
 import { TransformGizmo } from './TransformGizmo';
 import { RenderOriginSyncer } from '../RenderOriginSyncer';
-import { ViewPresetsInner, ViewPresetsOverlay } from './ViewPresets';
-import { NamedViewsInner } from './NamedViews';
+import { ViewPresetsOverlay } from './ViewPresets';
+import { CameraBridge } from './cameraBridge';
 import { MeasureBBoxWireframe } from './MeasureBBoxWireframe';
 import { ClippingPlane } from './ClippingPlane';
 import { ViewportControls } from './ViewportControls';
@@ -110,9 +110,7 @@ function SceneContents({
       <RenderOriginSyncer />
       <AdaptiveClipping />
 
-      <ViewPresetsInner />
-
-      <NamedViewsInner />
+      <CameraBridge />
 
       <ClippingPlane />
 

@@ -25,22 +25,11 @@ import * as THREE from 'three';
 import type { Vec2 } from '@core/model/types';
 import { chainSegments, ellipseOutline, loopSegments, segmentsGeometry } from '../lineGeometry';
 import { useDisposable } from '../useDisposable';
+import { SNAP_COLORS_2D } from '../viewportPalette';
 import { useZoomSnap } from './useSnap';
 import { pixelsToWorld } from './gridHelpers';
 import type { SnapType } from './snapping/types';
 import { GroundPlane, toDocumentPoint } from './GroundPlane';
-
-const SNAP_COLORS: Record<SnapType, string> = {
-  endpoint: '#e040fb', // magenta
-  midpoint: '#00e5ff', // cyan
-  center: '#ffee58', // yellow
-  intersection: '#ff9800', // orange
-  perpendicular: '#69f0ae', // green
-  tangent: '#b9f6ca', // lime
-  extension: '#26c6da', // teal
-  nearest: '#40c4ff', // blue
-  grid: '#546e7a', // muted blue-grey
-};
 
 /**
  * Base glyph half-size the geometry is built at (world units). The rendered glyph is rescaled so
@@ -131,7 +120,11 @@ function SnapGlyph({ snapType, x, y, zoom }: GlyphProps): React.ReactElement {
   const geometry = useDisposable(() => segmentsGeometry(GLYPH_VERTICES[snapType]), [snapType]);
   const material = useDisposable(
     () =>
-      new THREE.LineBasicMaterial({ color: SNAP_COLORS[snapType], linewidth: 2, depthTest: false }),
+      new THREE.LineBasicMaterial({
+        color: SNAP_COLORS_2D[snapType],
+        linewidth: 2,
+        depthTest: false,
+      }),
     [snapType],
   );
   return (

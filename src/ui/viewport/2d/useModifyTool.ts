@@ -23,8 +23,7 @@
 import { useState, useCallback } from 'react';
 import type { Vec2 } from '@core/model/types';
 import { type ModifyToolKind, useStore, useToolStore } from '@ui/store';
-import { isEditingKeyEvent } from '@ui/hooks/useKeyboardShortcuts';
-import { useCaptureKeydown } from '@ui/hooks/useCaptureKeydown';
+import { useToolKeys } from '@ui/hooks/useToolKeys';
 import { MODIFY_KEYS } from '@ui/hooks/shortcuts';
 import { nearestVertex, signedOffsetDistance } from './modifyHelpers';
 
@@ -71,6 +70,8 @@ interface UseModifyToolResult {
   pickedVertexIndex: number | null;
   pendingValue: number;
   setActiveTool: (tool: ModifyToolKind) => void;
+  /** Arm `tool`, or disarm it when it is already armed. */
+  toggleTool: (tool: ModifyToolKind) => void;
   /**
    * Handle a click on an entity in the viewport.
    * `entityId` is the id of the entity that was clicked.
@@ -201,27 +202,30 @@ export function useModifyTool(): UseModifyToolResult {
 
   // Keyboard: Esc cancels the pick in progress, then disarms; Enter commits (value phase);
   // O/F/K/T/X/E activate tools. Keys typed into fields or dialogs are never consumed.
-  const onKey = useCallback(
-    (e: KeyboardEvent): void => {
-      if (isEditingKeyEvent(e)) return;
-      if (e.key === 'Escape') {
-        if (activeTool === 'none') return;
-        e.preventDefault();
-        if (phase === 'pick-entity') setActiveTool('none');
-        else cancel();
-      } else if (e.key === 'Enter' && phase === 'enter-value') {
-        commitValue();
-      } else if (!e.ctrlKey && !e.metaKey && !e.altKey) {
-        const tool = MODIFY_KEYS[e.key.toLowerCase()];
-        if (tool !== undefined) {
-          e.preventDefault();
-          setActiveTool(activeTool === tool ? 'none' : tool);
-        }
-      }
-    },
-    [activeTool, cancel, commitValue, phase, setActiveTool],
+  const disarm = useCallback(() => setActiveTool('none'), [setActiveTool]);
+  const toggleTool = useCallback(
+    (tool: ModifyToolKind) =>
+      setActiveTool(useToolStore.getState().modifyTool === tool ? 'none' : tool),
+    [setActiveTool],
   );
-  useCaptureKeydown(onKey);
+  const onHotkey = useCallback(
+    (e: KeyboardEvent): void => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const tool = MODIFY_KEYS[e.key.toLowerCase()];
+      if (tool === undefined) return;
+      e.preventDefault();
+      toggleTool(tool);
+    },
+    [toggleTool],
+  );
+  useToolKeys({
+    armed: activeTool !== 'none',
+    inProgress: phase !== 'pick-entity',
+    onCancel: cancel,
+    onDisarm: disarm,
+    onEnter: phase === 'enter-value' ? commitValue : null,
+    onOtherKey: onHotkey,
+  });
 
   return {
     activeTool,
@@ -231,6 +235,7 @@ export function useModifyTool(): UseModifyToolResult {
     pickedVertexIndex,
     pendingValue,
     setActiveTool,
+    toggleTool,
     handleEntityPick,
     setPendingValue,
     commitValue,

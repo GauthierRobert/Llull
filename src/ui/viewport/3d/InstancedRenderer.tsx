@@ -23,6 +23,7 @@ import { buildCylinderGeometry, buildSphereGeometry } from './entities/primitive
 import { useDisposable } from '../useDisposable';
 import { isAdditiveSelect } from '../selectClick';
 import { useStableByKey } from '../useStableByKey';
+import { XRAY_OPACITY } from '../viewportPalette';
 
 /**
  * Creates the THREE geometry for a given batchable kind + representative entity.
@@ -87,7 +88,7 @@ export function makeMaterialArgs(
         ...SHADED_MATERIAL_ARGS,
         envMapIntensity: 0,
         transparent: true,
-        opacity: 0.18,
+        opacity: XRAY_OPACITY.idle,
         depthWrite: false,
         side: THREE.DoubleSide,
       };
@@ -146,7 +147,7 @@ function InstanceBatchMesh({
   useEffect(() => {
     if (displayMode === 'xray') {
       const hasSelected = batch.entities.some((e) => selectionSet.has(e.id));
-      material.opacity = hasSelected ? 0.35 : 0.18;
+      material.opacity = hasSelected ? XRAY_OPACITY.selected : XRAY_OPACITY.idle;
       material.needsUpdate = true;
     }
   }, [displayMode, batch.entities, selectionSet, material]);

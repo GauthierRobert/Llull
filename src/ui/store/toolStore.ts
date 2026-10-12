@@ -45,13 +45,15 @@ interface ToolStoreState {
   setViewMode(viewMode: ViewMode): void;
   /** Arm a 2D draw tool; arming any tool other than 'none' disarms the modify tool and shows 2D. */
   setDrawTool(drawTool: DrawToolKind): void;
+  /** Arm `drawTool`, or disarm it when it is already the armed draw tool. */
+  toggleDrawTool(drawTool: DrawToolKind): void;
   /** Arm a 2D modify tool; arming any tool other than 'none' disarms the draw tool and shows 2D. */
   setModifyTool(modifyTool: ModifyToolKind): void;
   setGizmoMode(gizmoMode: GizmoMode): void;
   setShortcutsOpen(shortcutsOpen: boolean): void;
 }
 
-export const useToolStore = create<ToolStoreState>()((set) => ({
+export const useToolStore = create<ToolStoreState>()((set, get) => ({
   viewMode: '3d',
   drawTool: 'none',
   modifyTool: 'none',
@@ -64,6 +66,10 @@ export const useToolStore = create<ToolStoreState>()((set) => ({
 
   setDrawTool(drawTool: DrawToolKind): void {
     set(drawTool === 'none' ? { drawTool } : { drawTool, modifyTool: 'none', viewMode: '2d' });
+  },
+
+  toggleDrawTool(drawTool: DrawToolKind): void {
+    get().setDrawTool(get().drawTool === drawTool ? 'none' : drawTool);
   },
 
   setModifyTool(modifyTool: ModifyToolKind): void {

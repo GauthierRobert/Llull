@@ -9,6 +9,7 @@
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import type { LineEntity } from '@core/model/types';
+import { positionsGeometry } from '../lineGeometry';
 import { buildLineBatch } from './batchLines';
 
 interface BatchedLines2DProps {
@@ -18,11 +19,7 @@ interface BatchedLines2DProps {
 export function BatchedLines2D({ lines }: BatchedLines2DProps): React.ReactElement | null {
   const batch = useMemo(() => {
     const built = buildLineBatch(lines);
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute(
-      'position',
-      new THREE.BufferAttribute(Float32Array.from(built.positions), 3),
-    );
+    const geometry = positionsGeometry(built.positions);
     geometry.setAttribute('color', new THREE.BufferAttribute(Float32Array.from(built.colors), 3));
     return { geometry, anchor: built.anchor };
   }, [lines]);

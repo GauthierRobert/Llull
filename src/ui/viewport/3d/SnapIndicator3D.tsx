@@ -18,15 +18,8 @@ import { useEffect } from 'react';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useDisposable } from '../useDisposable';
+import { SNAP_COLORS_3D } from '../viewportPalette';
 import type { Snap3DType } from './snap3d';
-
-const SNAP_COLOUR: Record<Snap3DType, string> = {
-  vertex: '#f5c842',
-  edge: '#42d4f5',
-  'face-center': '#42f5a7',
-  grid: '#8090a0',
-  none: '#ffffff',
-};
 
 const INDICATOR_SIZE = 0.18;
 
@@ -47,7 +40,7 @@ export function SnapIndicator3D({
   const material = useDisposable(
     () =>
       new THREE.MeshBasicMaterial({
-        color: SNAP_COLOUR[snapType],
+        color: SNAP_COLORS_3D[snapType],
         wireframe: true,
         depthTest: false,
         transparent: true,

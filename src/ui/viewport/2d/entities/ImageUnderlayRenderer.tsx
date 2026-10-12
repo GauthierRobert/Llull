@@ -52,7 +52,7 @@ export function ImageUnderlayRenderer({
   );
 
   return (
-    <group position={position} rotation={[rotation[0], rotation[1], rotation[2]]}>
+    <group position={position} rotation={rotation}>
       <mesh geometry={geometry} material={material} renderOrder={-1} raycast={noRaycast} />
       {selected && <ShapeLine positions={frame} position={[0, 0, 0]} color={color} selected />}
     </group>

@@ -9,7 +9,7 @@ function tools(pendingValue: number, onSetValue: (value: number) => void): React
       activeTool="fillet"
       phase="enter-value"
       pendingValue={pendingValue}
-      onSelectTool={vi.fn()}
+      onToggleTool={vi.fn()}
       onSetValue={onSetValue}
       onCommitValue={vi.fn()}
     />

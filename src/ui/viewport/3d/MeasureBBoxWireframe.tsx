@@ -15,6 +15,7 @@ import { positionsGeometry } from '../lineGeometry';
 import { useBoundingBoxMeasure } from '../useBoundingBoxMeasure';
 import { useDisposable } from '../useDisposable';
 import { useOverlayMaterial } from '../useOverlayMaterial';
+import { OVERLAY_ACCENT } from '../viewportPalette';
 
 /** Segment vertices of the 12 box edges: corner bit 0/1/2 selects max x/y/z; an edge joins two corners differing in one bit. */
 function boxEdgePositions([x0, y0, z0]: Vec3, [x1, y1, z1]: Vec3): number[] {
@@ -32,7 +33,7 @@ function boxEdgePositions([x0, y0, z0]: Vec3, [x1, y1, z1]: Vec3): number[] {
 
 function BBoxLines({ min, max }: { min: Vec3; max: Vec3 }): React.ReactElement {
   const geometry = useDisposable(() => positionsGeometry(boxEdgePositions(min, max)), [min, max]);
-  const material = useOverlayMaterial('#60a5fa', 0.85); // accent blue matching --accent
+  const material = useOverlayMaterial(OVERLAY_ACCENT, 0.85);
   return <lineSegments geometry={geometry} material={material} renderOrder={999} />;
 }
 

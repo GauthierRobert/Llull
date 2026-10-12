@@ -9,20 +9,15 @@
 import { useMemo } from 'react';
 import type { LoftEntity } from '@core/model/types';
 import { loftTriangles } from '@core/geometry/loft';
-import { buildTriangleSoupGeometry } from './meshSolidGeometry';
-import { SolidMeshShell, type SolidMeshKindProps, type SolidSurface } from './SolidMeshShell';
+import type { SolidMeshKindProps, SolidSurface } from './SolidMeshShell';
+import { TriangleSoupMesh } from './TriangleSoupMesh';
 
 const LOFT_SURFACE: SolidSurface = { roughness: 0.4, metalness: 0.2, envMapIntensity: 0.9 };
 
-export function LoftMesh({
-  entity,
-  ...shell
-}: SolidMeshKindProps<LoftEntity>): React.ReactElement | null {
+export function LoftMesh({ entity, ...shell }: SolidMeshKindProps<LoftEntity>): React.ReactElement {
   const { rings, ruled } = entity;
-  const geometry = useMemo(() => {
-    return buildTriangleSoupGeometry(loftTriangles({ rings, ruled }));
-  }, [rings, ruled]);
-
-  if (geometry === null) return null;
-  return <SolidMeshShell entity={entity} geometry={geometry} surface={LOFT_SURFACE} {...shell} />;
+  const triangles = useMemo(() => loftTriangles({ rings, ruled }), [rings, ruled]);
+  return (
+    <TriangleSoupMesh entity={entity} triangles={triangles} surface={LOFT_SURFACE} {...shell} />
+  );
 }

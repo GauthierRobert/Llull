@@ -37,8 +37,8 @@ export function TextMesh({ entity, selected, onSelect }: TextMeshProps): React.R
   return (
     <Text
       font={TEXT_FONT_URL}
-      position={[position[0], position[1], position[2]]}
-      rotation={[rotation[0], rotation[1], rotation[2]]}
+      position={position}
+      rotation={rotation}
       fontSize={height}
       color={selected ? SELECTION_COLOR : color}
       anchorX={toAnchorX(anchor)}

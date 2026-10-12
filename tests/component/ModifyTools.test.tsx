@@ -18,7 +18,7 @@ function renderModifyTools(
     activeTool: ModifyToolKind;
     phase: ModifyToolPhase;
     pendingValue: number;
-    onSelectTool: (t: ModifyToolKind) => void;
+    onToggleTool: (t: ModifyToolKind) => void;
     onSetValue: (v: number) => void;
     onCommitValue: () => void;
   }> = {},
@@ -27,7 +27,7 @@ function renderModifyTools(
     activeTool: 'none' as ModifyToolKind,
     phase: 'idle' as ModifyToolPhase,
     pendingValue: 1,
-    onSelectTool: vi.fn(),
+    onToggleTool: vi.fn(),
     onSetValue: vi.fn(),
     onCommitValue: vi.fn(),
     ...overrides,
@@ -82,18 +82,18 @@ describe('ModifyTools', () => {
     }
   });
 
-  it('calls onSelectTool with the tool kind when a button is clicked (inactive → active)', () => {
-    const onSelectTool = vi.fn();
-    renderModifyTools({ activeTool: 'none', onSelectTool });
+  it('calls onToggleTool with the tool kind when a button is clicked', () => {
+    const onToggleTool = vi.fn();
+    renderModifyTools({ activeTool: 'none', onToggleTool });
     fireEvent.click(screen.getByRole('button', { name: 'Fillet' }));
-    expect(onSelectTool).toHaveBeenCalledWith('fillet');
+    expect(onToggleTool).toHaveBeenCalledWith('fillet');
   });
 
-  it('calls onSelectTool with "none" when the active tool button is clicked (toggle off)', () => {
-    const onSelectTool = vi.fn();
-    renderModifyTools({ activeTool: 'offset', phase: 'pick-entity', onSelectTool });
+  it('calls onToggleTool with the tool kind when the active tool button is clicked (the hook toggles it off)', () => {
+    const onToggleTool = vi.fn();
+    renderModifyTools({ activeTool: 'offset', phase: 'pick-entity', onToggleTool });
     fireEvent.click(screen.getByRole('button', { name: 'Offset' }));
-    expect(onSelectTool).toHaveBeenCalledWith('none');
+    expect(onToggleTool).toHaveBeenCalledWith('offset');
   });
 
   it('shows pick-entity hint for the offset tool', () => {

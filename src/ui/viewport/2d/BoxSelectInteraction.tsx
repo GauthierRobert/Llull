@@ -18,12 +18,12 @@ import { useStore, useViewportStore } from '@ui/store';
 import { isEntityVisible } from '../entityVisibility';
 import { useAnchoredGeometry, useDisposable } from '../useDisposable';
 import { useOverlayMaterial } from '../useOverlayMaterial';
+import { OVERLAY_ACCENT } from '../viewportPalette';
 import { boxSelectMode, entitiesInBox } from './boxSelect';
 import { pixelsToWorld } from './gridHelpers';
 import { GroundPlane, toDocumentPoint } from './GroundPlane';
 import { useCaptureKeydown } from '@ui/hooks/useCaptureKeydown';
 
-const BOX_COLOR = '#60a5fa';
 const DASH_PX = 6;
 
 interface BoxSelectInteractionProps {
@@ -39,12 +39,12 @@ interface RubberBandProps {
 
 function RubberBand({ start, end, zoom }: RubberBandProps): React.ReactElement {
   const crossing = boxSelectMode(start, end) === 'crossing';
-  const solid = useOverlayMaterial(BOX_COLOR, 0.9);
+  const solid = useOverlayMaterial(OVERLAY_ACCENT, 0.9);
   const dash = pixelsToWorld(DASH_PX, zoom);
   const dashed = useDisposable(
     () =>
       new THREE.LineDashedMaterial({
-        color: BOX_COLOR,
+        color: OVERLAY_ACCENT,
         depthTest: false,
         transparent: true,
         opacity: 0.9,

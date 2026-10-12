@@ -14,6 +14,7 @@ import type { Vec3 } from '@core/model/types';
 import { useAnchoredGeometry } from '../useDisposable';
 import { useBoundingBoxMeasure } from '../useBoundingBoxMeasure';
 import { useOverlayMaterial } from '../useOverlayMaterial';
+import { OVERLAY_ACCENT } from '../viewportPalette';
 
 /** Draw height: slightly above the entities. */
 const RECT_Z = 0.1;
@@ -32,7 +33,7 @@ function RectLines2D({ min, max }: { min: Vec3; max: Vec3 }): React.ReactElement
     RECT_Z,
     [x0, y0, x1, y1],
   );
-  const material = useOverlayMaterial('#60a5fa', 0.9);
+  const material = useOverlayMaterial(OVERLAY_ACCENT, 0.9);
 
   // lineLoop closes the last→first segment automatically.
   return (
