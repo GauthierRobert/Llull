@@ -7,6 +7,7 @@
 import type { BuildingModel, CurvedWallElement, WallElement } from '@core/model/building';
 import type { Vec2 } from '@core/model/types';
 import { distance, toCounterClockwise } from '@lib/polygon';
+import { wrapAngle } from '@lib/angle';
 import { elementsOf } from '../model';
 import type { WallExtent } from './wallExtent';
 
@@ -87,8 +88,7 @@ export function arcOffsetOf(wall: CurvedWallElement, at: Vec2): number {
   const arc = curvedWallArc(wall);
   if (!arc) return 0;
   const angle = Math.atan2(at[1] - arc.center[1], at[0] - arc.center[0]);
-  let delta = (angle - arc.startAngle) * Math.sign(arc.sweep);
-  delta = ((delta % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  let delta = wrapAngle((angle - arc.startAngle) * Math.sign(arc.sweep));
   const sweep = Math.abs(arc.sweep);
   // Outside the arc: snap to the nearer end.
   if (delta > sweep) delta = delta - sweep < 2 * Math.PI - delta ? sweep : 0;

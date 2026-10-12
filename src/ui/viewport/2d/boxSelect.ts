@@ -10,7 +10,7 @@
 import type { CadDocument, Entity, EntityId, Vec2 } from '@core/model/types';
 import { dimensionLabelBox, textLocalBox, underlayFrame } from './modifyHelpers';
 import { solidOutline } from './solidOutline';
-import { normalizeAngle } from './snapping/geometry';
+import { wrapAngle } from '@lib/angle';
 
 export type BoxSelectMode = 'window' | 'crossing';
 
@@ -128,7 +128,7 @@ function sampleEntity(document: CadDocument, entity: Entity): SampledGeometry | 
     case 'ellipse':
       return lines(sampleArc(entity.center, entity.radiusX, entity.radiusY, 0, 2 * Math.PI));
     case 'arc': {
-      const sweep = normalizeAngle(entity.endAngle - entity.startAngle);
+      const sweep = wrapAngle(entity.endAngle - entity.startAngle);
       return lines(
         sampleArc(entity.center, entity.radius, entity.radius, entity.startAngle, sweep),
       );

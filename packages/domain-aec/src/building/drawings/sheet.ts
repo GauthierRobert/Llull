@@ -12,6 +12,7 @@ import { noop } from '@core/commands/noop';
 import { type PlanDrawing, type PlanPrimitive } from './planModel';
 import { buildPlanDrawing } from './planDrawing';
 import { escapeXml } from '@lib/escapeXml';
+import { wrapAngle } from '@lib/angle';
 import { round } from '../../shared/numeric';
 
 export const PAPER_SIZES = ['A4', 'A3', 'A2', 'A1', 'A0'] as const;
@@ -172,7 +173,7 @@ class SheetPainter {
           center[0] + radius * Math.cos(endAngle),
           center[1] + radius * Math.sin(endAngle),
         ]);
-        const sweep = (((endAngle - startAngle) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+        const sweep = wrapAngle(endAngle - startAngle);
         const r = n(radius * this.paperPerUnit);
         this.parts.push(
           `<path d="M ${n(start[0])} ${n(start[1])} A ${r} ${r} 0 ${sweep > Math.PI ? 1 : 0} 1 ${n(end[0])} ${n(end[1])}" class="thin"/>`,

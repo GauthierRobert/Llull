@@ -6,6 +6,7 @@
  */
 
 import type { Vec3 } from '../model/vectors';
+import { positiveSweep } from './angle';
 
 export interface DxfRecord {
   readonly type: string;
@@ -188,8 +189,7 @@ function point(record: DxfRecord, offset = 0): Vec3 {
 
 /** Arc points from `start` to `end` (radians, CCW) around `center`. */
 function arcPoints(center: Vec3, radius: number, start: number, end: number): Vec3[] {
-  let sweep = end - start;
-  while (sweep <= 0) sweep += Math.PI * 2;
+  const sweep = positiveSweep(end - start);
   const segments = Math.max(4, Math.ceil(sweep / (Math.PI / 24)));
   return Array.from({ length: segments + 1 }, (_, k): Vec3 => {
     const angle = start + (sweep * k) / segments;

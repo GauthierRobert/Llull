@@ -1,5 +1,6 @@
 import type { CadDocument, Constraint, EntityRef, Vec2, Vec3 } from '../../model/types';
 import { cross2, dot2, len2 } from '../../lib/vec2';
+import { wrapSignedAngle } from '../../lib/angle';
 import { resolveNumeric } from './expression';
 
 type Point = readonly [number, number];
@@ -55,11 +56,6 @@ type Turns = Map<string, number>;
 
 /** Fraction of the angular error corrected per iteration (keeps coupled constraints stable). */
 const TURN_RELAXATION = 0.5;
-
-/** `angle` wrapped into (-π, π]. */
-function wrapAngle(angle: number): number {
-  return angle - 2 * Math.PI * Math.round(angle / (2 * Math.PI));
-}
 
 /** Smallest signed distance from `angle` to the nearest multiple of `period` (offset by `phase`). */
 function distanceToLattice(angle: number, phase: number, period: number): number {
@@ -166,7 +162,7 @@ function applyConstraintGradient(
       if (!da || !db) return 0;
       const target = resolveNumeric(c.value, doc.parameters);
       if (target === null) return 0;
-      const err = wrapAngle(Math.atan2(cross2(da, db), dot2(da, db)) - target);
+      const err = wrapSignedAngle(Math.atan2(cross2(da, db), dot2(da, db)) - target);
       // Line b turns about its midpoint (translating a line never changes its direction).
       addTurn(c.b.entityId, -TURN_RELAXATION * err);
       return err * err;

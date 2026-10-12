@@ -3,6 +3,7 @@ import { compactNumber } from '../../lib/compactNumber';
 import { defineCommand, z, colorField, nameField } from '../schema';
 import { nextId } from '../../lib/id';
 import { sampleArc } from '../../lib/arc';
+import { positiveSweep } from '../../lib/angle';
 import { len2 } from '../../lib/vec2';
 import { ORIGIN, finiteVec3OrZero } from '../../lib/vec3';
 import { MAX_CURVE_SAMPLES } from '../limits';
@@ -42,8 +43,7 @@ function externalTangentPoints(p1: PulleySpec, p2: PulleySpec): readonly [Point,
 
 /** CCW sweep from `startAngle` to `endAngle`, normalised into (0, 2π]. */
 function ccwSweep(startAngle: number, endAngle: number): number {
-  let sweep = endAngle - startAngle;
-  while (sweep <= 0) sweep += 2 * Math.PI;
+  let sweep = positiveSweep(endAngle - startAngle);
   while (sweep > 2 * Math.PI) sweep -= 2 * Math.PI;
   return sweep;
 }
