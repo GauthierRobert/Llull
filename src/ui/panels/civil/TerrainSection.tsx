@@ -5,25 +5,18 @@
  * `surface_report` statistics and a contour-interval edit (`update_surface`).
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import type { SurfaceObject } from '@core/model/civil';
 import { useStore } from '@ui/store';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { CivilObjectRow, useCivilObjects, NumberField, TextField } from './CivilParts';
 import { optionalNumber, parseNumber } from '@ui/numberText';
-import { runQuery } from './civilQuery';
+import { useCivilReport } from './civilQuery';
 
 function SurfaceRow({ surface }: { surface: SurfaceObject }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
-  const civil = useStore((s) => s.document.civil);
-  const units = useStore((s) => s.document.units);
   const [interval, setIntervalText] = useState('');
-  const report = useMemo(
-    () => runQuery('surface_report', { surfaceId: surface.id }).summary,
-    // the report reads only the civil model and the document units
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [civil, units, surface.id],
-  );
+  const report = useCivilReport('surface_report', 'surfaceId', surface.id);
   const applyInterval = (): void => {
     const value = parseNumber(interval);
     if (value === undefined || value <= 0) return;

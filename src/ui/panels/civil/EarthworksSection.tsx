@@ -6,7 +6,7 @@
  * surface-to-surface volume comparison (`compare_surfaces`).
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import type { PlatformObject } from '@core/model/civil';
 import { useStore } from '@ui/store';
 import { PanelSection, FormError } from '@ui/panels/PanelParts';
@@ -17,23 +17,17 @@ import {
   CivilStatus,
   useCivilObjects,
   NumberField,
+  PointsFromSelectionRow,
   TextField,
 } from './CivilParts';
 import { optionalNumber, parseNumber } from '@ui/numberText';
-import { formatPoints, parsePoints, selectedPolylinePoints } from './civilInput';
-import { runQuery } from './civilQuery';
+import { parsePoints } from './civilInput';
+import { runQuery, useCivilReport } from './civilQuery';
 
 function PlatformRow({ platform }: { platform: PlatformObject }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
-  const civil = useStore((s) => s.document.civil);
-  const units = useStore((s) => s.document.units);
   const [swell, setSwell] = useState('');
-  const volumes = useMemo(
-    () => runQuery('platform_earthworks', { platformId: platform.id }).summary,
-    // the volumes read only the civil model and the document units
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [civil, units, platform.id],
-  );
+  const volumes = useCivilReport('platform_earthworks', 'platformId', platform.id);
   return (
     <CivilObjectRow object={platform} detail={volumes}>
       <NumberField
@@ -113,15 +107,6 @@ export function EarthworksSection(): React.ReactElement {
   const [error, setError] = useState('');
   const surfaceId = chosenId(surfaces, surface);
 
-  const takeSelection = (): void => {
-    const points = selectedPolylinePoints(useStore.getState().document);
-    if (points === null) setError('Select one closed polyline first.');
-    else {
-      setOutline(formatPoints(points));
-      setError('');
-    }
-  };
-
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
     const boundary = parsePoints(outline);
@@ -156,23 +141,20 @@ export function EarthworksSection(): React.ReactElement {
       testId="civil-earthworks"
     >
       <form className="civil-form" onSubmit={handleSubmit} aria-label="Add platform">
-        <div className="building-inline-form">
+        <PointsFromSelectionRow
+          value={outline}
+          set={setOutline}
+          label="Platform outline"
+          noSelectionError="Select one closed polyline first."
+          setError={setError}
+        >
           <CivilObjectSelect
             objects={surfaces}
             value={surfaceId}
             label="Platform surface"
             onChange={setSurface}
           />
-          <TextField
-            value={outline}
-            set={setOutline}
-            hint="x,y; x,y; x,y; …"
-            label="Platform outline"
-          />
-          <button type="button" className="btn btn--ghost btn--sm" onClick={takeSelection}>
-            From selection
-          </button>
-        </div>
+        </PointsFromSelectionRow>
         <div className="building-inline-form">
           <NumberField
             value={elevation}

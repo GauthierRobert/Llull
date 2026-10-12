@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import { createEmptyBuilding, type ProjectInfo } from '@core/model/building';
 import { PanelSection } from '@ui/panels/PanelParts';
+import { LabeledInput } from './LabeledInput';
 
 const FIELDS: ReadonlyArray<readonly [keyof ProjectInfo, string]> = [
   ['name', 'Project'],
@@ -47,17 +48,14 @@ function ProjectForm({ project }: ProjectFormProps): React.ReactElement {
       aria-label="Project information"
     >
       {FIELDS.map(([key, label]) => (
-        <label key={key} className="field">
-          <span className="field__label">{label}</span>
-          <input
-            type="text"
-            value={values[key]}
-            onChange={(event) =>
-              setValues((previous) => ({ ...previous, [key]: event.target.value }))
-            }
-            data-testid={`project-${key}`}
-          />
-        </label>
+        <LabeledInput
+          key={key}
+          label={label}
+          type="text"
+          value={values[key]}
+          onChange={(value) => setValues((previous) => ({ ...previous, [key]: value }))}
+          testId={`project-${key}`}
+        />
       ))}
       <button type="submit" className="btn btn--ghost btn--sm" disabled={!changed}>
         Save project info

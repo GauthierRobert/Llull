@@ -20,6 +20,7 @@ import {
   MEMBER_ROLE_OPTIONS,
   type SelectOption,
 } from './steelProfileOptions';
+import { LabeledInput } from './LabeledInput';
 
 interface SelectFieldProps {
   label: string;
@@ -47,19 +48,6 @@ function SelectField({
           </option>
         ))}
       </select>
-    </label>
-  );
-}
-
-function TextField({
-  label,
-  value,
-  onChange,
-}: Omit<SelectFieldProps, 'options' | 'blankLabel'>): React.ReactElement {
-  return (
-    <label className="field">
-      <span className="field__label">{label}</span>
-      <input type="text" value={value} onChange={(event) => onChange(event.target.value)} />
     </label>
   );
 }
@@ -105,7 +93,7 @@ export function SteelMemberEditor({ member }: { member: SteelMemberElement }): R
           <span className="field__label">Keep top of steel (move the axis)</span>
         </label>
       )}
-      <TextField label="Grade" value={values.material} onChange={set('material')} />
+      <LabeledInput label="Grade" type="text" value={values.material} onChange={set('material')} />
       <SelectField
         label="Role"
         value={values.role}
@@ -139,7 +127,7 @@ export function SteelMemberEditor({ member }: { member: SteelMemberElement }): R
           onChange={set('baseFixity')}
         />
       )}
-      <TextField label="Note" value={values.note} onChange={set('note')} />
+      <LabeledInput label="Note" type="text" value={values.note} onChange={set('note')} />
       <button type="submit" className="btn btn--primary btn--sm" data-testid="member-save">
         Save member
       </button>

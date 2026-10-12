@@ -5,6 +5,7 @@
 
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { parseNumberRow } from '@ui/numberText';
+import { localToWorld2D } from '@ui/viewport/2d/snapping/geometry';
 
 /** Splits on `;` or new lines, dropping blank rows. */
 const rows = (text: string): string[] =>
@@ -49,14 +50,7 @@ export function selectedPolylinePoints(doc: CadDocument): Vec2[] | null {
   if (doc.selection.length !== 1) return null;
   const entity = doc.entities[doc.selection[0] ?? ''];
   if (entity?.kind !== 'polyline') return null;
-  const cos = Math.cos(entity.rotation[2]);
-  const sin = Math.sin(entity.rotation[2]);
-  return entity.points.map(
-    ([x, y]): Vec2 => [
-      entity.position[0] + x * cos - y * sin,
-      entity.position[1] + x * sin + y * cos,
-    ],
-  );
+  return entity.points.map(([x, y]): Vec2 => localToWorld2D(entity, x, y));
 }
 
 /** Plan points as the "x,y; x,y" text the point fields accept. */

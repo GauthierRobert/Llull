@@ -8,6 +8,7 @@
 import React, { useMemo } from 'react';
 import type { CivilCategory, CivilObject } from '@core/model/civil';
 import { useStore } from '@ui/store';
+import { formatPoints, selectedPolylinePoints } from './civilInput';
 
 /** Civil objects of `category` in creation order (re-derived when the civil model changes). */
 export function useCivilObjects<C extends CivilCategory>(
@@ -144,5 +145,44 @@ export function NumberField({ value, set, hint, label }: CivilFieldProps): React
       aria-label={label}
       onChange={(event) => set(event.target.value)}
     />
+  );
+}
+
+interface PointsFromSelectionRowProps {
+  value: string;
+  set: (text: string) => void;
+  label: string;
+  /** Shown through `setError` when the selection is not one polyline. */
+  noSelectionError: string;
+  setError: (message: string) => void;
+  /** Controls placed before the points field. */
+  children?: React.ReactNode;
+}
+
+/** "x,y; …" points field with a "From selection" button that copies the selected polyline. */
+export function PointsFromSelectionRow({
+  value,
+  set,
+  label,
+  noSelectionError,
+  setError,
+  children,
+}: PointsFromSelectionRowProps): React.ReactElement {
+  const takeSelection = (): void => {
+    const points = selectedPolylinePoints(useStore.getState().document);
+    if (points === null) setError(noSelectionError);
+    else {
+      set(formatPoints(points));
+      setError('');
+    }
+  };
+  return (
+    <div className="building-inline-form">
+      {children}
+      <TextField value={value} set={set} hint="x,y; x,y; x,y; …" label={label} />
+      <button type="button" className="btn btn--ghost btn--sm" onClick={takeSelection}>
+        From selection
+      </button>
+    </div>
   );
 }

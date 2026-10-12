@@ -17,6 +17,7 @@ import { isLocalMode, refuseDuringSync, runLocally, stepLocalHistory } from './l
 import { postDispatch, postHistoryStep } from './onlineMode';
 import type { CadStoreState, DispatchOptions, LiveStatus } from './storeTypes';
 import { type LiveCommandEvent, type LiveSnapshotEvent, applyLiveCommand } from '@mcp/liveSync';
+import { toggledInList } from '@ui/toggleMember';
 
 export const useStore = create<CadStoreState>()((set, get) => {
   const stepHistory = (direction: 'undo' | 'redo'): void => {
@@ -75,10 +76,7 @@ export const useStore = create<CadStoreState>()((set, get) => {
     select: (ids: EntityId[]): void => setSelection([...ids]),
 
     toggleSelection(id: EntityId): void {
-      const current = get().document.selection;
-      setSelection(
-        current.includes(id) ? current.filter((existingId) => existingId !== id) : [...current, id],
-      );
+      setSelection(toggledInList(get().document.selection, id));
     },
 
     clearSelection: (): void => setSelection([]),

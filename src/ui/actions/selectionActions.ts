@@ -16,10 +16,10 @@ import { useStore } from '@ui/store';
  * @affects dispatches delete_building_element and/or delete_entities; no-op on empty selection
  */
 export function deleteSelection(): void {
-  const state = useStore.getState();
-  if (state.document.selection.length === 0) return;
-  const { elementIds, entityIds } = partitionSelection();
-  if (elementIds.length > 0) state.dispatch('delete_building_element', { elementIds });
+  const parts = partitionSelection();
+  if (parts === null) return;
+  const { elementIds, entityIds } = parts;
+  if (elementIds.length > 0) dispatchStep('delete_building_element', { elementIds }, false);
   // A mixed selection is two commands but one local undo step.
   if (entityIds.length > 0)
     dispatchStep('delete_entities', { ids: entityIds }, elementIds.length > 0);
@@ -35,9 +35,13 @@ function dispatchStep(name: string, params: unknown, joinPrevious: boolean): voi
 /** Gap (document units) between a duplicated selection and its originals. */
 const DUPLICATE_GAP = 1.5;
 
-/** Selection ids split into building elements (owning generated geometry) and plain entities. */
-function partitionSelection(): { elementIds: string[]; entityIds: string[] } {
+/**
+ * Selection ids split into building elements (owning generated geometry) and plain entities;
+ * null when nothing is selected.
+ */
+function partitionSelection(): { elementIds: string[]; entityIds: string[] } | null {
   const { document } = useStore.getState();
+  if (document.selection.length === 0) return null;
   const elementIds = new Set<string>();
   const entityIds: string[] = [];
   for (const id of document.selection) {
@@ -85,9 +89,9 @@ export function duplicateSelection(): void {
  * @affects dispatches move_entities and/or move_building_element; no-op on empty selection
  */
 export function moveSelection(delta: Vec3, options: { joinPrevious?: boolean } = {}): void {
-  const state = useStore.getState();
-  if (state.document.selection.length === 0) return;
-  const { elementIds, entityIds } = partitionSelection();
+  const parts = partitionSelection();
+  if (parts === null) return;
+  const { elementIds, entityIds } = parts;
   const joinPrevious = options.joinPrevious === true;
   let dispatched = false;
   if (elementIds.length > 0 && delta[2] === 0) {
