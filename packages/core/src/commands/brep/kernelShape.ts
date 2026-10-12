@@ -25,6 +25,12 @@ function unsupportedOp(kernel: GeometryKernel, recipe: ShapeRecipe): ShapeRecipe
       return null;
     case 'boolean':
       return unsupportedOp(kernel, recipe.a) ?? unsupportedOp(kernel, recipe.b);
+    case 'blend':
+      for (const source of recipe.sources) {
+        const missing = unsupportedOp(kernel, source);
+        if (missing !== null) return missing;
+      }
+      return null;
     default:
       return unsupportedOp(kernel, recipe.source);
   }

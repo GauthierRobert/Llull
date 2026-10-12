@@ -5,12 +5,14 @@ import {
   type Vec3,
   SHAPE2D_KINDS,
   SOLID_KINDS,
+  FINISH_PATTERNS,
 } from '../../model/types';
 import { isRecord } from '../../lib/isRecord';
 import { isFiniteNumber, isPositiveNumber } from '../../lib/isFiniteNumber';
 import { isHexColor } from '../../lib/isHexColor';
 import { validateShapeRecipe } from '../../geometry/shapeRecipe';
 import { chainIssue } from '../../geometry/curveSegments';
+import { MAX_SUBDIVISION_LEVELS, type Cage, cageProblem } from '../../geometry/subdivision';
 import type { CurveSegment } from '../../model/curve';
 import { isVec2 } from '../../lib/vec2';
 import { MAX_IMAGE_DATA_URL_LENGTH } from '../limits';
@@ -55,6 +57,8 @@ function sweepProblem(v: Record<string, unknown>): string | null {
     return 'path must be a non-empty array of line/arc/bezier segments with [x, y, z] points';
   const pathIssue = chainIssue(path as CurveSegment<Vec3>[], false);
   if (pathIssue !== null) return `path invalid — ${pathIssue}`;
+  const stations = stationsProblem(v['stations']);
+  if (stations !== null) return stations;
   const section = v['section'];
   if (!isRecord(section)) return 'section must be an object';
   if (section['shape'] === 'circle') {
@@ -73,6 +77,86 @@ function sweepProblem(v: Record<string, unknown>): string | null {
   )
     return "section must be { shape: 'circle', radius } or { shape: 'profile', profile (>= 3 points) }";
   return curvesProblem(section['curves']);
+}
+
+/** Optional text decals of an entity, or null when absent / valid. */
+function decalsProblem(decals: unknown): string | null {
+  if (decals === undefined) return null;
+  if (!Array.isArray(decals)) return 'decals must be an array';
+  for (const decal of decals) {
+    if (!isRecord(decal) || typeof decal['id'] !== 'string' || typeof decal['text'] !== 'string')
+      return 'each decal needs an id and a text';
+    if (decal['text'].trim() === '') return `decal ${decal['id']}: text must not be empty`;
+    if (!isFiniteVec3(decal['center']) || !isFiniteVec3(decal['normal']))
+      return `decal ${String(decal['id'])}: center and normal must be finite Vec3`;
+    if (Math.hypot(...(decal['normal'] as readonly number[])) < 1e-12)
+      return `decal ${String(decal['id'])}: normal must be non-zero`;
+    if (
+      !isFiniteNumber(decal['angle']) ||
+      !['width', 'height', 'depth'].every((k) => isPositiveNumber(decal[k]))
+    )
+      return `decal ${String(decal['id'])}: angle must be finite and width / height / depth > 0`;
+    if (
+      !isHexColor(decal['color']) ||
+      (decal['background'] !== undefined && !isHexColor(decal['background']))
+    )
+      return `decal ${String(decal['id'])}: color / background must be #rrggbb`;
+  }
+  return null;
+}
+
+/** Rings: >= `minRings` arrays of equal length >= 3 holding finite points of `dims` numbers. */
+function ringsProblem(rings: unknown, dims: number, minRings: number): string | null {
+  const isPoint = (p: unknown): boolean =>
+    Array.isArray(p) && p.length === dims && p.every(isFiniteNumber);
+  if (!Array.isArray(rings) || rings.length < minRings) return `needs >= ${minRings} rings`;
+  const size = Array.isArray(rings[0]) ? rings[0].length : 0;
+  const ok = rings.every(
+    (ring) => Array.isArray(ring) && ring.length === size && size >= 3 && ring.every(isPoint),
+  );
+  return ok ? null : `rings must share one length >= 3 and hold finite ${dims}D points`;
+}
+
+/** A subdivision entity's cage + levels, or null when valid. */
+function subdivisionProblem(v: Record<string, unknown>): string | null {
+  const { vertices, faces, creases, levels } = v;
+  const isPoint = (p: unknown): boolean =>
+    Array.isArray(p) && p.length === 3 && p.every(isFiniteNumber);
+  const isIndexList = (list: unknown): boolean =>
+    Array.isArray(list) && list.every((n) => Number.isInteger(n));
+  if (!Array.isArray(vertices) || !vertices.every(isPoint))
+    return 'vertices must be finite [x, y, z] points';
+  if (!Array.isArray(faces) || !faces.every(isIndexList))
+    return 'faces must be arrays of vertex indices';
+  if (!Array.isArray(creases) || !creases.every((c) => isIndexList(c) && c.length === 2))
+    return 'creases must be [a, b] vertex index pairs';
+  if (
+    !Number.isInteger(levels) ||
+    (levels as number) < 0 ||
+    (levels as number) > MAX_SUBDIVISION_LEVELS
+  )
+    return `levels must be an integer 0..${MAX_SUBDIVISION_LEVELS}`;
+  return cageProblem({ vertices, faces, creases } as Cage);
+}
+
+/** Optional variable-section stations of a sweep, or null when absent / valid. */
+function stationsProblem(stations: unknown): string | null {
+  if (stations === undefined) return null;
+  if (!Array.isArray(stations) || !stations.every((s) => isRecord(s) && isFiniteNumber(s['at'])))
+    return 'stations must be { at, ring } entries';
+  const ats = stations.map((s) => (s as Record<string, unknown>)['at'] as number);
+  if (
+    ats[0] !== 0 ||
+    ats[ats.length - 1] !== 1 ||
+    ats.some((at, i) => i > 0 && !(at > (ats[i - 1] as number)))
+  )
+    return 'station at values must rise strictly from 0 to 1';
+  const problem = ringsProblem(
+    stations.map((s) => (s as Record<string, unknown>)['ring']),
+    2,
+    2,
+  );
+  return problem === null ? null : `stations ${problem}`;
 }
 
 /** Optional exact 2D boundary (`curves`) problem, or null. */
@@ -152,6 +236,9 @@ export function validateEntityValue(v: unknown): string | null {
   if (!isHexColor(color))
     return `entity ${id}: color '${String(color)}' is not a valid hex color (#rrggbb)`;
 
+  const decals = decalsProblem(v['decals']);
+  if (decals !== null) return `entity ${id}: ${decals}`;
+
   // Kind-specific numeric invariants.
   for (const field of POSITIVE_FIELDS[kind] ?? []) {
     const value = v[field];
@@ -187,6 +274,17 @@ export function validateEntityValue(v: unknown): string | null {
     case 'sweep': {
       const problem = sweepProblem(v);
       if (problem !== null) return `entity ${id} (sweep): ${problem}`;
+      break;
+    }
+    case 'loft': {
+      const problem = ringsProblem(v['rings'], 3, 2);
+      if (problem !== null) return `entity ${id} (loft): ${problem}`;
+      if (typeof v['ruled'] !== 'boolean') return `entity ${id} (loft): ruled must be a boolean`;
+      break;
+    }
+    case 'subdivision': {
+      const problem = subdivisionProblem(v);
+      if (problem !== null) return `entity ${id} (subdivision): ${problem}`;
       break;
     }
     case 'image': {
@@ -238,6 +336,18 @@ export function validateMaterialValue(name: string, v: unknown): string | null {
     return `material '${name}': metalness must be a finite number in [0, 1], got ${String(metalness)}`;
   if (!isUnit(roughness))
     return `material '${name}': roughness must be a finite number in [0, 1], got ${String(roughness)}`;
+  const finish = v['finish'];
+  if (finish === undefined) return null;
+  if (!isRecord(finish) || !(FINISH_PATTERNS as readonly unknown[]).includes(finish['pattern']))
+    return `material '${name}': finish.pattern must be one of ${FINISH_PATTERNS.join(', ')}`;
+  if (!isPositiveNumber(finish['scale']))
+    return `material '${name}': finish.scale must be finite and > 0`;
+  if (finish['color2'] !== undefined && !isHexColor(finish['color2']))
+    return `material '${name}': finish.color2 must be a #rrggbb colour`;
+  const inRange = (x: unknown, max: number): boolean =>
+    x === undefined || (isFiniteNumber(x) && x >= 0 && x <= max);
+  if (!inRange(finish['normalStrength'], 2) || !inRange(finish['clearcoat'], 1))
+    return `material '${name}': finish normalStrength must be in [0, 2] and clearcoat in [0, 1]`;
   return null;
 }
 

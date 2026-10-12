@@ -17,6 +17,7 @@ import {
   sectionBanner,
 } from './format';
 import { placementKwargs, pythonTuple, modifierLine, shapeCallOpen } from './pythonCalls';
+import { FREECAD_SUBDIVISION_PY, SUBDIVISION_PY } from './pythonSubdivision';
 
 const HELPERS = String.raw`
 import math
@@ -177,6 +178,8 @@ export function emitFreeCad(program: FeatureProgram): string {
     '# Rotations are XYZ Euler angles in degrees (applied about Z, then Y, then X).',
     '# Run from Macro ▸ Macros… or `freecadcmd <file>`; edit PARAMETERS to regenerate.',
     HELPERS,
+    SUBDIVISION_PY,
+    FREECAD_SUBDIVISION_PY,
     '',
     `doc = App.newDocument("llull")`,
     '',

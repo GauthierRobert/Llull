@@ -29,6 +29,7 @@ export interface FakeKernelSpec {
   readonly solid?: MeshData | null;
   readonly boolean?: MeshData | null;
   readonly fillet?: MeshData | null;
+  readonly blend?: MeshData | null;
   readonly chamfer?: MeshData | null;
   readonly shell?: MeshData | null;
   readonly topology?: ShapeTopology | null;
@@ -66,6 +67,10 @@ export function fakeKernel(spec: FakeKernelSpec = {}): FakeKernel {
     fillet: (source, edges, size) => {
       calls.push({ op: 'fillet', operands: [source], edges, size });
       return shape(spec.fillet);
+    },
+    blend: (sources, size) => {
+      calls.push({ op: 'blend', operands: sources, size });
+      return shape(spec.blend);
     },
     chamfer: (source, edges, size) => {
       calls.push({ op: 'chamfer', operands: [source], edges, size });

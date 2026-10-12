@@ -94,3 +94,22 @@ export function composeEulerXYZ(outer: Vec3, inner: Vec3): [number, number, numb
 export function rotateEulerAboutWorldZ(euler: Vec3, angle: number): [number, number, number] {
   return composeEulerXYZ([0, 0, angle], euler);
 }
+
+/** Intrinsic XYZ Euler angles of the rotation taking world X/Y/Z onto the orthonormal `x`/`y`/`z`. */
+export function eulerFromAxes(x: Vec3, y: Vec3, z: Vec3): [number, number, number] {
+  return matrixToEuler([
+    [x[0], y[0], z[0]],
+    [x[1], y[1], z[1]],
+    [x[2], y[2], z[2]],
+  ]);
+}
+
+/** `v` rotated by the inverse of `euler` ((Rx·Ry·Rz)⁻¹ = Rz⁻¹·Ry⁻¹·Rx⁻¹), about the origin. */
+export function inverseEulerXYZ(v: Vec3, [rx, ry, rz]: Vec3): [number, number, number] {
+  const o: Vec3 = [0, 0, 0];
+  return applyEulerXYZ(applyEulerXYZ(applyEulerXYZ(v, o, [-rx, 0, 0]), o, [0, -ry, 0]), o, [
+    0,
+    0,
+    -rz,
+  ]);
+}

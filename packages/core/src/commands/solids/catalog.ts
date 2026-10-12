@@ -6,6 +6,10 @@ import { addCylinder, addSphere, addCone, addTorus } from './round';
 import { addWedge, addPyramid } from './prismatic';
 import { extrudeSketch, revolveProfile } from './profile';
 import { sweepProfile } from './sweep';
+import { loftSections } from './loft';
+import { addSubdivisionSolid } from './subdivision';
+import { editSubdivisionCage } from './subdivisionCage';
+import { surfaceFromCurves } from './surfaceFromCurves';
 import { makeTubeBetween } from './composite';
 import { addSpurGear } from './gears';
 import { addHelixSpring } from './helixSpring';
@@ -27,6 +31,10 @@ export const solidsCommands = commandCatalog(
   extrudeSketch,
   revolveProfile,
   sweepProfile,
+  loftSections,
+  addSubdivisionSolid,
+  editSubdivisionCage,
+  surfaceFromCurves,
   makeTubeBetween,
   addSpurGear,
   addHelixSpring,

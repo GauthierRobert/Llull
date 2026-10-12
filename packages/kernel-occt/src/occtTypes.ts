@@ -65,6 +65,23 @@ export interface OccOffsetMaker extends OccHandle {
 
 export interface OccFilletMaker extends OccBuilder {
   Add_2(radius: number, edge: OccShape): void;
+  Add_3(radiusStart: number, radiusEnd: number, edge: OccShape): void;
+}
+
+/** TopTools_ListOfShape (no iterator class in the binding: read First_1 then RemoveFirst). */
+export interface OccShapeList extends OccHandle {
+  Append_1(shape: OccShape): void;
+  Assign(other: OccShapeList): void;
+  Size(): number;
+  First_1(): OccShape;
+  RemoveFirst(): void;
+}
+
+/** Multi-argument fuse with its intersection (section) edges. */
+export interface OccFuse extends OccBuilder {
+  SetArguments(shapes: OccShapeList): void;
+  SetTools(shapes: OccShapeList): void;
+  SectionEdges(): OccShapeList;
 }
 
 export interface OccMakePolygon extends OccHandle {
@@ -83,6 +100,7 @@ export interface OccSewing extends OccHandle {
   Add(shape: OccShape): void;
   Perform(progress: unknown): void;
   SewedShape(): OccShape;
+  NbFreeEdges(): number;
 }
 
 export interface OccMakeSolid extends OccBuilder {

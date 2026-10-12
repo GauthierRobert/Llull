@@ -38,7 +38,7 @@ describe('SweepMesh — sweep_profile command → kind "sweep"', () => {
       ],
       radius: 1,
     }).entity as SweepEntity;
-    const positions = sweepTriangles(pipe.path, pipe.section).flat(2);
+    const positions = sweepTriangles(pipe).flat(2);
     const geometry = buildMeshSolidGeometry({
       positions,
       indices: Array.from({ length: positions.length / 3 }, (_, corner) => corner),

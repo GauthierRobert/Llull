@@ -308,6 +308,44 @@ export function filletPolyline(
   return segments;
 }
 
+/**
+ * Closed 3D polygon with every corner rounded by `bendRadius`: the open polyline from the middle
+ * of the closing edge round all vertices and back, so the chain closes on a straight (G1) joint.
+ * Each closing-edge half must fit its own bend.
+ */
+export function filletClosedPolygon(
+  points: ReadonlyArray<Vec3>,
+  bendRadius: number,
+): CurveSegment<Vec3>[] | string {
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (points.length < 3 || first === undefined || last === undefined)
+    return 'a closed path needs at least 3 points';
+  const mid = scale3(add3(first, last), 0.5);
+  return filletPolyline([mid, ...points, mid], bendRadius);
+}
+
+/** Whether a chain ends where it starts (within JOINT_TOLERANCE). */
+export function isClosedChain(segments: ReadonlyArray<CurveSegment<Point>>): boolean {
+  const first = segments[0];
+  const last = segments[segments.length - 1];
+  return (
+    first !== undefined &&
+    last !== undefined &&
+    distance3(start(first), end(last)) <= JOINT_TOLERANCE
+  );
+}
+
+/** Whether the closing joint of a closed chain is tangent-continuous. */
+export function closesSmoothly(segments: ReadonlyArray<CurveSegment<Point>>): boolean {
+  const first = segments[0];
+  const last = segments[segments.length - 1];
+  if (first === undefined || last === undefined) return false;
+  const a = segmentTangent(last, 1);
+  const b = segmentTangent(first, 0);
+  return Math.acos(Math.min(1, Math.max(-1, dot3(a, b)))) <= G1_TOLERANCE;
+}
+
 /** Arc length of a chain: exact for lines and arcs, 64-chord estimate for Béziers. */
 export function chainLength(segments: ReadonlyArray<CurveSegment<Point>>): number {
   return segments.reduce((total, segment) => {

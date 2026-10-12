@@ -823,6 +823,68 @@
     "name": "add_cylinder"
   },
   {
+    "description": "Paint a line of text onto a 3D solid as a decal (logo, brand, part number, sidewall lettering): it is projected along -normal onto the faces turned toward it within the decal box, keeps following the solid when it moves or rotates, shows in the viewport and is exported to glTF as a textured overlay (never part of STL / STEP solids). Text uses the built-in block font (A–Z, 0–9, - . , : / + & ! ? ' #; lower case prints as capitals). Place it with `at` (a world point on the surface) and `normal` (the outward surface direction there).",
+    "input_schema": {
+      "properties": {
+        "angle": {
+          "description": "Rotation of the text about the normal, radians (default 0).",
+          "type": "number"
+        },
+        "at": {
+          "description": "World point on the surface at the decal centre.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "background": {
+          "description": "Optional #rrggbb background behind the letters (default transparent).",
+          "type": "string"
+        },
+        "color": {
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#ffffff\".",
+          "type": "string"
+        },
+        "depth": {
+          "description": "Projection depth through curved surfaces (> 0). Default: 2 × height.",
+          "type": "number"
+        },
+        "height": {
+          "description": "Letter block height in document units (> 0).",
+          "type": "number"
+        },
+        "id": {
+          "description": "Id of the 3D solid to paint.",
+          "type": "string"
+        },
+        "normal": {
+          "description": "Outward surface direction at `at` (world); the decal projects along -normal.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "text": {
+          "description": "Text, 1..64 characters.",
+          "type": "string"
+        },
+        "width": {
+          "description": "Decal width (> 0). Default: from the text length at this height.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "text",
+        "at",
+        "normal",
+        "height"
+      ],
+      "type": "object"
+    },
+    "name": "add_decal"
+  },
+  {
     "description": "Place an associative dimension annotation in the document. `dimensionKind` controls the measurement type: 'linear' — straight-line distance between 2 line or point entities (entityIds length=2); 'aligned' — distance parallel to the segment between 2 line or point entities (entityIds length=2); 'radial' — radius of a circle, arc, or ellipse entity (entityIds length=1); 'angular' — angle at the vertex between 2 line segments or 3 points (entityIds length=3: vertex point first, then 2 line or point entities). `entityIds` is an array of existing entity ids whose geometry the dimension measures; the count must match the kind. Optional `offset` is the perpendicular distance (model units) from the measured geometry to the dimension line (default 5). Optional `precision` overrides the document display precision (decimal places) for this dimension. Optional `label` replaces the computed numeric value with a custom string (e.g. 'REF' or '≈ 42 mm'). Optional `layer` is the target layer id.",
     "input_schema": {
       "properties": {
@@ -2764,6 +2826,131 @@
     "name": "add_steel_member"
   },
   {
+    "description": "Create a freeform solid as a Catmull-Clark subdivision surface over a coarse polygon control cage — for organic shapes no primitive gives (saddles, shifter hoods, grips, dropouts, fairings, handles). Start from a `box` cage (size + segments per axis) or a `cylinder` cage (radius, height, sides, segments along Z), both centred on `position`, or give a custom closed cage (`vertices` local to `position` + `faces` as vertex-index loops wound counter-clockwise seen from outside). Then shape it with edit_subdivision_cage (move / scale regions of cage vertices, with soft falloff; crease edges). The surface stays inside the cage and is smooth (2-3 levels); creased edges stay sharp. Returns data { vertexCount, faceCount, vertices } (cage vertices in world coordinates, by index) to aim later edits. A closed solid: booleans, blend_union, measurement and export all work. With the OCC kernel a smooth solid (levels >= 1) is an exact B-spline solid — one bicubic face per refined cage quad, exactly the limit surface away from extraordinary vertices and creases (close to it there) — so STEP export and booleans are exact; levels 0 stays faceted.",
+    "input_schema": {
+      "properties": {
+        "box": {
+          "description": "Box cage centred on position.",
+          "properties": {
+            "segments": {
+              "description": "Cage faces along x, y, z (1..32; default [1, 1, 1]).",
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "size": {
+              "description": "Cage size [x, y, z] (> 0); the smooth surface sits inside it.",
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "size"
+          ],
+          "type": "object"
+        },
+        "color": {
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
+          "type": "string"
+        },
+        "creases": {
+          "description": "Cage edges kept sharp, as [vertexIndex, vertexIndex] pairs (each must be an edge of a face).",
+          "items": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "cylinder": {
+          "description": "Cylinder (n-gon prism) cage along Z centred on position.",
+          "properties": {
+            "height": {
+              "description": "Cage height along Z (> 0).",
+              "type": "number"
+            },
+            "radius": {
+              "description": "Cage circumradius (> 0).",
+              "type": "number"
+            },
+            "segments": {
+              "description": "Side-face rings along Z (1..32; default 1).",
+              "type": "integer"
+            },
+            "sides": {
+              "description": "Sides of the cage polygon (3..64; default 8).",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "radius",
+            "height"
+          ],
+          "type": "object"
+        },
+        "faces": {
+          "description": "Custom cage faces (use with vertices); the cage must be closed.",
+          "items": {
+            "description": "Vertex indices of one face, counter-clockwise from outside.",
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "id": {
+          "description": "Optional explicit entity id. If omitted a unique id is generated.",
+          "type": "string"
+        },
+        "layerId": {
+          "description": "Layer id to assign the entity to. Defaults to the document default layer.",
+          "type": "string"
+        },
+        "levels": {
+          "description": "Subdivision levels 0..4 (0 = the faceted cage itself; 2-3 is smooth; each level quadruples the face count).",
+          "type": "integer"
+        },
+        "name": {
+          "description": "Optional display name.",
+          "type": "string"
+        },
+        "position": {
+          "description": "World position of the cage origin. Defaults to [0, 0, 0]. Format [x, y, z]; [x, y] is accepted and placed at z=0.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "rotation": {
+          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X). Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "vertices": {
+          "description": "Custom cage vertices (use with faces).",
+          "items": {
+            "description": "Cage vertex [x, y, z], local to position.",
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "add_subdivision_solid"
+  },
+  {
     "description": "Place an annotation text label in the document. `content` is the text string (must not be empty). `position` is the world-space anchor [x, y, z] — for 2D annotations use z=0 (the default work plane). `height` is the cap-height in model units (must be > 0). Optional `rotation` is Euler angles [rx, ry, rz] in radians that orient the work plane (default [0,0,0]). Optional `anchor` controls horizontal alignment: 'left' (default) — position is left edge; 'center' — position is horizontal midpoint; 'right' — position is right edge. Optional `color` is a hex string (e.g. \"#333333\"). Optional `layer` is the target layer id.",
     "input_schema": {
       "properties": {
@@ -3350,6 +3537,30 @@
       "type": "object"
     },
     "name": "bill_of_materials"
+  },
+  {
+    "description": "Weld 2+ solids into ONE exact solid and round every joint where they meet with a fillet: the one-piece frame operation (bike frame tubes, lugs and dropouts; pipe tees; brackets welded to plates; organic joints between swept or lofted parts). All intersection curves created by the union are filleted with `radius` (for a radius that varies along one edge, use fillet_edge radiusEnd on the result). The operands are consumed and replaced by one mesh entity that keeps the exact construction (STEP export, further fillets and booleans see true faces). Requires the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server); the default Manifold kernel cannot fillet and gracefully no-ops (use boolean_union there). If the kernel refuses, try another radius: a blend must fit inside the smallest wall it touches, and a crotch where three solids meet can reject specific radii.",
+    "input_schema": {
+      "properties": {
+        "ids": {
+          "description": "Ids of the 3D solids to weld (>= 2, distinct). The first one styles the result.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "radius": {
+          "description": "Joint fillet radius in document units (> 0).",
+          "type": "number"
+        }
+      },
+      "required": [
+        "ids",
+        "radius"
+      ],
+      "type": "object"
+    },
+    "name": "blend_union"
   },
   {
     "description": "Compute the intersection of two 3D solid entities, producing a mesh entity that covers only the volume shared by both solids. Both operand entities are consumed (removed) and replaced by the intersection mesh. Requires a geometry kernel to be injected. Both operands must be 3D solids (any solid kind: box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, mesh); 2D shapes are rejected.",
@@ -4301,12 +4512,35 @@
     "description": "Define or replace a named material in the document material library. A material carries a physical density (used by mass_properties for mass = volume × density) and PBR visual properties (color, metalness, roughness) used by the 3D viewport renderer. If a material with the same name already exists it is fully replaced. Density units match the document unit system: for a mm document, density is in g/mm³ (steel ≈ 0.00785, aluminium ≈ 0.0027, PLA ≈ 0.00124). Assign the material to entities with assign_material.",
     "input_schema": {
       "properties": {
+        "clearcoat": {
+          "description": "Clear lacquer over the finish in [0, 1] (glossy carbon, painted parts). Default 0.",
+          "type": "number"
+        },
         "color": {
           "description": "Diffuse/albedo color as a 6-digit CSS hex string, e.g. \"#b0b0b0\" for grey steel. Must match the pattern #rrggbb (exactly 6 hex digits after the #). Used by the 3D viewport PBR renderer.",
           "type": "string"
         },
+        "color2": {
+          "description": "Secondary #rrggbb colour of the finish (crossing tows, checker squares).",
+          "type": "string"
+        },
         "density": {
           "description": "Density in (mass-unit) per (document-length-unit)³. Must be > 0 and finite. For a document in mm: g/mm³ — steel ≈ 0.00785, aluminium ≈ 0.0027, PLA ≈ 0.00124, titanium ≈ 0.00445, copper ≈ 0.00893. This value is used by mass_properties when the material is assigned to an entity.",
+          "type": "number"
+        },
+        "finish": {
+          "description": "Optional procedural surface texture (albedo + normal + roughness maps, box-projected, shown in the viewport and embedded in export_gltf): carbon_twill (2×2 twill carbon weave), carbon_plain (plain weave), brushed (brushed metal), knurl (diamond knurling), checker. Carbon fibre: color \"#16181b\", metalness 0.2, roughness 0.35, finish \"carbon_twill\", clearcoat 1.",
+          "enum": [
+            "carbon_twill",
+            "carbon_plain",
+            "brushed",
+            "knurl",
+            "checker"
+          ],
+          "type": "string"
+        },
+        "finishScale": {
+          "description": "Size of one texture tile in document units (> 0; a carbon tile holds 8 tows). Default 24.",
           "type": "number"
         },
         "metalness": {
@@ -4316,6 +4550,10 @@
         "name": {
           "description": "Human-readable material name used as the lookup key, e.g. \"steel\", \"aluminium_6061\". Must be a non-empty string. Case-sensitive. Used with assign_material to reference this material.",
           "type": "string"
+        },
+        "normalStrength": {
+          "description": "Relief depth of the finish normal map in [0, 2]. Default 1.",
+          "type": "number"
         },
         "roughness": {
           "description": "PBR roughness factor in [0, 1]. 0 = mirror-smooth (polished metal), 1 = fully diffuse/matte (rough concrete, unfinished wood). Brushed aluminium ≈ 0.3, matte plastic ≈ 0.7.",
@@ -5525,6 +5763,86 @@
     "name": "edit_step_params"
   },
   {
+    "description": "Sculpt a subdivision solid (add_subdivision_solid) by editing its control cage: select cage vertices by `vertexIndices` or by a world-space `region` box (none = all), optionally with a soft `falloff` distance so neighbours follow smoothly, then `translate` them (world vector), `scale` them about `pivot` (per axis of the solid; pivot defaults to the selection centre), and/or set `crease` (true: cage edges between selected vertices turn sharp; false: smooth again). `levels` changes the refinement. Order: scale, then translate. Returns data { vertexCount, faceCount, vertices, selected } (world cage vertices; indices of fully selected vertices).",
+    "input_schema": {
+      "properties": {
+        "crease": {
+          "description": "true: make edges between selected vertices sharp; false: make them smooth.",
+          "type": "boolean"
+        },
+        "falloff": {
+          "description": "Soft-selection distance (>= 0, default 0): vertices this close to the selection move partly (smoothstep).",
+          "type": "number"
+        },
+        "id": {
+          "description": "Id of the subdivision solid.",
+          "type": "string"
+        },
+        "levels": {
+          "description": "Subdivision levels 0..4 (0 = the faceted cage itself; 2-3 is smooth; each level quadruples the face count).",
+          "type": "integer"
+        },
+        "pivot": {
+          "description": "World-space scale centre. Default: centre of the fully selected vertices.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "region": {
+          "description": "Select the cage vertices inside this world-space box (alternative to indices).",
+          "properties": {
+            "max": {
+              "description": "World-space maximum corner [x, y, z] of the selection box.",
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "min": {
+              "description": "World-space minimum corner [x, y, z] of the selection box.",
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "min",
+            "max"
+          ],
+          "type": "object"
+        },
+        "scale": {
+          "description": "Scale factors [sx, sy, sz] (> 0) along the solid axes about the pivot (e.g. [0.6, 0.6, 1] narrows).",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "translate": {
+          "description": "World-space move [dx, dy, dz] of the selection.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "vertexIndices": {
+          "description": "Cage vertex indices to select (from the data of add_subdivision_solid).",
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "edit_subdivision_cage"
+  },
+  {
     "annotations": {
       "idempotentHint": true,
       "readOnlyHint": true
@@ -5896,7 +6214,7 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Export the document (or a subset of entities) to glTF 2.0 format. Produces a triangle tessellation in world space for every exportable 3D solid entity. 2D shape entities are silently skipped. Revolution and instance entities are fully expanded. Returns the UNCHANGED document, affected:[], and a data object with:   format (\"gltf\" or \"glb\"), triangleCount, nodeCount, materialCount,   text (glTF 2.0 JSON string — when binary=false, default),   base64 (GLB binary blob base64-encoded — when binary=true). Structure: one glTF node + mesh per entity (node.name = the entity name from set_entity_name, else its id), one PBR material per distinct entity color (baseColorFactor from the hex color), and entities that belong to a group (group_entities) are children of a node named after the group. Meshes carry POSITION and NORMAL attributes. The BIN buffer is inlined as a data: URI in JSON mode. In GLB mode the 12-byte header + JSON chunk + BIN chunk are packed per the glTF 2.0 spec. entityIds: omit to export all 3D entities; provide an array to export a subset. binary: false (default) → data.text contains JSON; true → data.base64 contains GLB. Does NOT modify the document.",
+    "description": "Export the document (or a subset of entities) to glTF 2.0 format. Produces a triangle tessellation in world space for every exportable 3D solid entity. 2D shape entities are silently skipped. Revolution and instance entities are fully expanded. Returns the UNCHANGED document, affected:[], and a data object with:   format (\"gltf\" or \"glb\"), triangleCount, nodeCount, materialCount,   text (glTF 2.0 JSON string — when binary=false, default),   base64 (GLB binary blob base64-encoded — when binary=true). Structure: one glTF node + mesh per entity (node.name = the entity name from set_entity_name, else its id; each child of an instance is its own node), and entities that belong to a group (group_entities) are children of a node named after the group. Node extras carry the llull entity id and kind. Meshes carry POSITION and creased smooth NORMAL attributes. One PBR material per distinct appearance: the assigned document material (color, metalness, roughness) or else the entity color, converted to linear glTF factors — ready for Blender / Cycles or any viewer. A material finish (create_material finish) embeds procedural albedo / normal / roughness PNG maps with box-projected TEXCOORD_0 (plus KHR_materials_clearcoat); text decals (add_decal) are extra alpha-blended textured meshes. The BIN buffer is inlined as a data: URI in JSON mode. In GLB mode the 12-byte header + JSON chunk + BIN chunk are packed per the glTF 2.0 spec. entityIds: omit to export all 3D entities; provide an array to export a subset. binary: false (default) → data.text contains JSON; true → data.base64 contains GLB. Does NOT modify the document.",
     "input_schema": {
       "properties": {
         "binary": {
@@ -6329,6 +6647,10 @@
         "radius": {
           "description": "Fillet radius in document units. Must be > 0.",
           "type": "number"
+        },
+        "radiusEnd": {
+          "description": "Variable fillet: radius at the END of each selected edge (> 0); the radius varies linearly from radius at the edge start to radiusEnd. Omit for a constant radius.",
+          "type": "number"
         }
       },
       "required": [
@@ -6371,7 +6693,7 @@
           "type": "array"
         },
         "kind": {
-          "description": "Filter by entity kind. One of: \"box\", \"cylinder\", \"sphere\", \"extrusion\", \"mesh\", \"cone\", \"torus\", \"wedge\", \"pyramid\", \"revolution\", \"sweep\", \"line\", \"polyline\", \"arc\", \"circle\", \"rectangle\", \"point\", \"ellipse\", \"spline\", \"text\", \"dimension\", \"image\", \"instance\". Omit to match all kinds.",
+          "description": "Filter by entity kind. One of: \"box\", \"cylinder\", \"sphere\", \"extrusion\", \"mesh\", \"cone\", \"torus\", \"wedge\", \"pyramid\", \"revolution\", \"sweep\", \"loft\", \"subdivision\", \"line\", \"polyline\", \"arc\", \"circle\", \"rectangle\", \"point\", \"ellipse\", \"spline\", \"text\", \"dimension\", \"image\", \"instance\". Omit to match all kinds.",
           "enum": [
             "box",
             "cylinder",
@@ -6384,6 +6706,8 @@
             "pyramid",
             "revolution",
             "sweep",
+            "loft",
+            "subdivision",
             "line",
             "polyline",
             "arc",
@@ -6929,6 +7253,85 @@
     "name": "load_document"
   },
   {
+    "description": "Loft a solid through 2+ cross-sections placed in 3D, in order: transitions such as round-to-square ducts, tapered and flattened bike tubes, bottle and nozzle bodies, boat hulls, aero fairings. Right-handed world frame, +Z up. Give either `sectionIds` (closed 2D sketches: circle, ellipse, rectangle, closed polyline or spline; each placed by its own work-plane position and rotation) or inline `sections` (each a center [x, y, z], optional plane rotation (Euler XYZ radians, [0,0,0] = an XY-plane section), and one of radius, radiusX+radiusY, section points or sectionId). Sections are resampled to the same point count and aligned so the surface does not twist; ruled: false (default) blends smoothly through all sections, ruled: true joins neighbours with straight lines. Kept exact for the OCC kernel and STEP export (B-spline skin through the sections).",
+    "input_schema": {
+      "properties": {
+        "color": {
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
+          "type": "string"
+        },
+        "id": {
+          "description": "Optional explicit entity id. If omitted a unique id is generated.",
+          "type": "string"
+        },
+        "layerId": {
+          "description": "Layer id to assign the entity to. Defaults to the document default layer.",
+          "type": "string"
+        },
+        "ruled": {
+          "description": "true: straight lines between neighbouring sections; false (default): smooth blend.",
+          "type": "boolean"
+        },
+        "sectionIds": {
+          "description": "Ids of closed 2D sketches, in loft order, each in its own (parallel or tilted) plane.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "sections": {
+          "description": "Inline sections in loft order (alternative to sectionIds).",
+          "items": {
+            "properties": {
+              "center": {
+                "description": "Section plane origin [x, y, z] in world coordinates.",
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              "radius": {
+                "description": "Round section radius (> 0).",
+                "type": "number"
+              },
+              "radiusX": {
+                "description": "Elliptical section: half-width along section x (> 0); give with radiusY.",
+                "type": "number"
+              },
+              "radiusY": {
+                "description": "Elliptical section: half-height along section y (> 0); give with radiusX.",
+                "type": "number"
+              },
+              "rotation": {
+                "description": "Section plane rotation, Euler XYZ radians; [0, 0, 0] lays the section in the XY plane.",
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              "section": {
+                "description": "Polygon section: closed [x, y] points (>= 3).",
+                "type": "array"
+              },
+              "sectionId": {
+                "description": "Id of a closed 2D sketch (circle, ellipse, rectangle, closed polyline/spline).",
+                "type": "string"
+              }
+            },
+            "required": [
+              "center"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "loft_sections"
+  },
+  {
     "annotations": {
       "idempotentHint": true
     },
@@ -6998,7 +7401,7 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Compute the mass of a 3D solid from its volume and density. Supported entity kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', and 'instance' (assembly: the sum over its component solids, each with its own material density, else the instance material, else the density param). Density resolution: if the entity has a material assigned (via assign_material) and that material exists in doc.materials, the material's density is used automatically — the density param is ignored for that entity. Otherwise the caller-supplied density param is used (back-compat). The density is in g/(document-unit)³ — e.g. for a document in mm: steel ≈ 0.00785, aluminium ≈ 0.0027. Returns data: { volume, density, mass, unit } where unit describes the mass unit (grams). Does not modify the document.",
+    "description": "Compute the mass of a 3D solid from its volume and density. Supported entity kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', 'subdivision', and 'instance' (assembly: the sum over its component solids, each with its own material density, else the instance material, else the density param). Density resolution: if the entity has a material assigned (via assign_material) and that material exists in doc.materials, the material's density is used automatically — the density param is ignored for that entity. Otherwise the caller-supplied density param is used (back-compat). The density is in g/(document-unit)³ — e.g. for a document in mm: steel ≈ 0.00785, aluminium ≈ 0.0027. Returns data: { volume, density, mass, unit } where unit describes the mass unit (grams). Does not modify the document.",
     "input_schema": {
       "properties": {
         "density": {
@@ -7006,7 +7409,7 @@
           "type": "number"
         },
         "entityId": {
-          "description": "Id of the 3D solid entity to compute mass for. Supported kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep'.",
+          "description": "Id of the 3D solid entity to compute mass for. Supported kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', 'subdivision'.",
           "type": "string"
         }
       },
@@ -7155,11 +7558,11 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Compute the volume of a 3D solid entity. Supported kinds: 'box' (w×h×d), 'cylinder' (π r² h), 'sphere' (4/3 π r³), 'extrusion' (profile area × depth), 'mesh' (signed-tetrahedra sum — assumes closed, consistently wound mesh), 'cone' (π r² h / 3), 'torus' (2 π² · ringRadius · tubeRadius²), 'wedge' (w×h×d / 2 — half the enclosing box), 'pyramid' (baseWidth × baseDepth × height / 3), 'instance' (sum of its component's solid children, baked with the instance scale), 'revolution' (Pappus's centroid theorem: sweepAngle × |x_centroid| × profileArea; falls back to bounding-box approximation if the profile crosses the revolution axis), 'sweep' (round section: section area × exact path length; other sections: closed-mesh sum). Returns data: { volume, unit } where unit is the cubed document unit (e.g. \"mm³\"). 2D shape entities are rejected. Does not modify the document.",
+    "description": "Compute the volume of a 3D solid entity. Supported kinds: 'box' (w×h×d), 'cylinder' (π r² h), 'sphere' (4/3 π r³), 'extrusion' (profile area × depth), 'mesh' (signed-tetrahedra sum — assumes closed, consistently wound mesh), 'cone' (π r² h / 3), 'torus' (2 π² · ringRadius · tubeRadius²), 'wedge' (w×h×d / 2 — half the enclosing box), 'pyramid' (baseWidth × baseDepth × height / 3), 'instance' (sum of its component's solid children, baked with the instance scale), 'revolution' (Pappus's centroid theorem: sweepAngle × |x_centroid| × profileArea; falls back to bounding-box approximation if the profile crosses the revolution axis), 'sweep' (round section: section area × exact path length; other sections: closed-mesh sum), 'loft' and 'subdivision' (closed-mesh sum). Returns data: { volume, unit } where unit is the cubed document unit (e.g. \"mm³\"). 2D shape entities are rejected. Does not modify the document.",
     "input_schema": {
       "properties": {
         "entityId": {
-          "description": "Id of the 3D solid entity to measure. Supported kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep'.",
+          "description": "Id of the 3D solid entity to measure. Supported kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', 'subdivision'.",
           "type": "string"
         }
       },
@@ -7337,6 +7740,47 @@
     "name": "offset_2d"
   },
   {
+    "description": "Lay copies of an entity along a curve, each ORIENTED by the curve: chain links round a chainring and cassette loop, tyre tread blocks round a tyre, sprocket / gear teeth, cable clips, rivets, fence posts. Model the source at the world origin in its \"along the path\" pose: its local +X follows the path tangent, +Y the path normal, +Z the binormal (≈ world up on a horizontal path); copies rotate about their position. rollStep adds an extra roll about the tangent per copy (π/2 alternates chain plates). Path: `pathId` (a 2D sketch curve: line, arc, polyline, spline, circle, ellipse, rectangle; open or closed) or `path` points (straight runs, or smooth: true for a spline; closed: true loops back). Open paths put copies at both ends; closed loops space count copies evenly all round. The source is kept.",
+    "input_schema": {
+      "properties": {
+        "closed": {
+          "description": "With path points: loop back from the last point to the first.",
+          "type": "boolean"
+        },
+        "count": {
+          "description": "Number of copies, 1..10000.",
+          "type": "integer"
+        },
+        "path": {
+          "description": "World [x, y, z] points of the path (>= 2). Alternative to pathId.",
+          "type": "array"
+        },
+        "pathId": {
+          "description": "Id of a 2D sketch curve to follow (placed by its own work plane).",
+          "type": "string"
+        },
+        "rollStep": {
+          "description": "Extra roll about the tangent added per copy, in radians (default 0).",
+          "type": "number"
+        },
+        "smooth": {
+          "description": "With path points: a smooth spline through them (default: straight runs).",
+          "type": "boolean"
+        },
+        "sourceId": {
+          "description": "Id of the entity to copy (2D or 3D).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceId",
+        "count"
+      ],
+      "type": "object"
+    },
+    "name": "pattern_along_path"
+  },
+  {
     "annotations": {
       "idempotentHint": true,
       "readOnlyHint": true
@@ -7372,6 +7816,27 @@
       "type": "object"
     },
     "name": "quantity_takeoff"
+  },
+  {
+    "description": "Remove one decal (by its id, from add_decal) from a solid.",
+    "input_schema": {
+      "properties": {
+        "decalId": {
+          "description": "Id of the decal to remove.",
+          "type": "string"
+        },
+        "id": {
+          "description": "Id of the solid carrying the decal.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "decalId"
+      ],
+      "type": "object"
+    },
+    "name": "remove_decal"
   },
   {
     "annotations": {
@@ -8446,6 +8911,74 @@
     "name": "surface_elevation"
   },
   {
+    "description": "Create a freeform shell part from boundary curves — hoods, fairings, fenders, panels, saddle tops, aero covers. Give 4 curves that close a loop (any order or direction; ends must meet) for a Coons patch spanning them, or 2 opposite curves for a surface ruled between them. Curves are `curves` (each 2+ world points; 3+ points pass a smooth curve through them) or `curveIds` (2D sketch curves — line, arc, polyline, spline — each in its own plane). The surface is thickened by `thickness` behind its front side (flip: in front) into a closed solid with a sharp rim, stored as a subdivision solid: reshape it with edit_subdivision_cage; with the OCC kernel it is an exact B-spline solid (STEP). The smooth surface follows the curves within the smoothing of a `cells` grid (more cells = closer). Returns data { vertexCount, faceCount, vertices }.",
+    "input_schema": {
+      "properties": {
+        "cells": {
+          "description": "Cage cells [along the first curve, across] (1..24 each; default [8, 8]).",
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "color": {
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
+          "type": "string"
+        },
+        "curveIds": {
+          "description": "2 or 4 ids of 2D sketch curves bounding the patch (alternative to curves).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "curves": {
+          "description": "2 or 4 boundary curves as world point lists (alternative to curveIds).",
+          "items": {
+            "items": {
+              "description": "Curve point [x, y, z] in world coordinates.",
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "flip": {
+          "description": "Thicken toward the other side of the surface (default false).",
+          "type": "boolean"
+        },
+        "id": {
+          "description": "Optional explicit entity id. If omitted a unique id is generated.",
+          "type": "string"
+        },
+        "layerId": {
+          "description": "Layer id to assign the entity to. Defaults to the document default layer.",
+          "type": "string"
+        },
+        "levels": {
+          "description": "Subdivision levels 0..4 (0 = the faceted cage itself; 2-3 is smooth; each level quadruples the face count).",
+          "type": "integer"
+        },
+        "name": {
+          "description": "Optional display name.",
+          "type": "string"
+        },
+        "thickness": {
+          "description": "Wall thickness in document units (> 0).",
+          "type": "number"
+        }
+      },
+      "required": [
+        "thickness"
+      ],
+      "type": "object"
+    },
+    "name": "surface_from_curves"
+  },
+  {
     "annotations": {
       "idempotentHint": true,
       "readOnlyHint": true
@@ -8466,12 +8999,16 @@
     "name": "surface_report"
   },
   {
-    "description": "Sweep a closed cross-section along a 3D path into a solid: pipes, tubes, hoses, handrails, ducts, cable runs, coils. Right-handed world frame, +Z up. Path: either `path`, world [x, y, z] points — joined by straight runs whose corners are rounded with circular bends of bendRadius (pipe elbows), or with smooth: true a smooth spline through the points — or `pathId`, an open 2D sketch entity (line, arc, open polyline, open spline) placed by its work plane. Section (exactly one): `radius` for a round tube (+ innerRadius for a hollow pipe), `section` as [x, y] polygon points, or `sectionId` of a closed 2D sketch (circle, ellipse, rectangle, closed polyline/spline). The section is centred on the path; its +y axis points toward world +Z (toward +Y when the path starts vertical) and it is carried along with a rotation-minimizing (twist-free) frame. Paths, bends and sketched sections stay exact for the exact kernel and STEP export. Booleans with other solids work like any primitive (e.g. boolean_union to weld pipes to a flange).",
+    "description": "Sweep a closed cross-section along a 3D path into a solid: pipes, tubes, hoses, handrails, ducts, cable runs, coils. Right-handed world frame, +Z up. Path: either `path`, world [x, y, z] points — joined by straight runs whose corners are rounded with circular bends of bendRadius (pipe elbows), or with smooth: true a smooth spline through the points — or `pathId`, a 2D sketch curve (line, arc, polyline, spline, circle, ellipse, rectangle) placed by its work plane. Paths may be open or closed loops (closed: true, or a closed sketch); a loop has no end caps. Section (exactly one): `radius` for a round tube (+ innerRadius for a hollow pipe), `section` as [x, y] polygon points, or `sectionId` of a closed 2D sketch (circle, ellipse, rectangle, closed polyline/spline). The section is centred on the path; its +y axis points toward world +Z (toward +Y when the path starts vertical) and it is carried along with a rotation-minimizing (twist-free) frame. Paths, bends and sketched sections stay exact for the exact kernel and STEP export. Booleans with other solids work like any primitive (e.g. boolean_union to weld pipes to a flange).",
     "input_schema": {
       "properties": {
         "bendRadius": {
           "description": "Centre-line radius of the bend at each corner of a straight-run path, in document units. Default: 3 × the section radius (a long-radius elbow). Must exceed the section radius.",
           "type": "number"
+        },
+        "closed": {
+          "description": "With path points: also join the last point back to the first, making a closed loop (rings, chains, tyre treads, gaskets); the closing corner is bent or smoothed like the others. A closed sketch pathId (circle, ellipse, closed spline/polyline, rectangle) is a loop already.",
+          "type": "boolean"
         },
         "color": {
           "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
@@ -8494,7 +9031,7 @@
           "type": "array"
         },
         "pathId": {
-          "description": "Id of an open 2D sketch entity (line, arc, open polyline, open spline) to use as the path instead of path.",
+          "description": "Id of a 2D sketch curve (line, arc, polyline, spline, circle, ellipse, rectangle; open or closed) to use as the path instead of path.",
           "type": "string"
         },
         "radius": {
@@ -8512,6 +9049,42 @@
         "smooth": {
           "description": "With path points (or a polyline pathId): true = smooth spline through the points (centripetal Catmull-Rom), false (default) = straight runs with circular bends.",
           "type": "boolean"
+        },
+        "stations": {
+          "description": "Variable section: >= 2 cross-sections along the path, with `at` strictly increasing from 0 to 1, each a radius, radiusX+radiusY ellipse, section polygon or sectionId. The section blends smoothly between stations (taper, flatten, round-to-oval, any shape to any shape). Replaces radius / innerRadius / section / sectionId.",
+          "items": {
+            "properties": {
+              "at": {
+                "description": "Path fraction of this section: 0 = path start, 1 = path end.",
+                "type": "number"
+              },
+              "radius": {
+                "description": "Round section radius (> 0).",
+                "type": "number"
+              },
+              "radiusX": {
+                "description": "Elliptical section: half-width along section x (> 0); give with radiusY.",
+                "type": "number"
+              },
+              "radiusY": {
+                "description": "Elliptical section: half-height along section y (> 0); give with radiusX.",
+                "type": "number"
+              },
+              "section": {
+                "description": "Polygon section: closed [x, y] points (>= 3).",
+                "type": "array"
+              },
+              "sectionId": {
+                "description": "Id of a closed 2D sketch (circle, ellipse, rectangle, closed polyline/spline).",
+                "type": "string"
+              }
+            },
+            "required": [
+              "at"
+            ],
+            "type": "object"
+          },
+          "type": "array"
         }
       },
       "required": [],

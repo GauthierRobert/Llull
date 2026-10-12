@@ -25,6 +25,8 @@ import {
   type OccApi,
   type OccBuilder,
   type OccFilletMaker,
+  type OccFuse,
+  type OccShapeList,
   type OccHandle,
   type OccOffsetMaker,
   type OccShape,
@@ -138,7 +140,8 @@ export function nativeFailureCount(): number {
 
 /**
  * Fillet or chamfer the selected unique edges of an exact solid (both builders share
- * `Add_2(size, edge)`); the input shape is left untouched.
+ * `Add_2(size, edge)`; a fillet with `sizeEnd` uses `Add_3(size, sizeEnd, edge)`, a radius varying
+ * linearly along the edge); the input shape is left untouched.
  * @failure size <= 0, a selected index out of range, no edge, builder not done -> null
  */
 function roundEdges(
@@ -147,8 +150,9 @@ function roundEdges(
   edgeIndices: readonly number[],
   size: number,
   makeBuilder: (solid: OccShape) => OccFilletMaker,
+  sizeEnd?: number,
 ): OccShape | null {
-  if (!(size > 0)) return null;
+  if (!(size > 0) || (sizeEnd !== undefined && !(sizeEnd > 0))) return null;
   return guarded('refusal', (own) => {
     const edges = uniqueSubShapes(api, shape, 'TopAbs_EDGE').map(own);
     if (edgeIndices.some((index) => edges[index] === undefined)) return null;
@@ -157,13 +161,68 @@ function roundEdges(
     const maker = own(makeBuilder(shape));
     for (const current of selected) {
       try {
-        maker.Add_2(size, own(api.TopoDS.Edge_1(current) as OccShape));
+        const edge = own(api.TopoDS.Edge_1(current) as OccShape);
+        if (sizeEnd === undefined) maker.Add_2(size, edge);
+        else maker.Add_3(size, sizeEnd, edge);
       } catch {
         // Degenerate or seam edge: skip.
       }
     }
     maker.Build();
     return maker.IsDone() ? maker.Shape() : null;
+  });
+}
+
+/** Fillet `edges` of `solid` in one builder (`shape`: ChFi3d section type); null when not done. */
+function filletAll(
+  api: OccApi,
+  solid: OccShape,
+  edges: readonly OccShape[],
+  radius: number,
+  shape: unknown,
+  own: <T extends OccHandle>(handle: T) => T,
+): OccShape | null {
+  const maker = own(new api.BRepFilletAPI_MakeFillet(solid, shape) as OccFilletMaker);
+  for (const edge of edges) maker.Add_2(radius, edge);
+  maker.Build();
+  return maker.IsDone() ? maker.Shape() : null;
+}
+
+/**
+ * One-piece union of `shapes` (a single multi-argument BRepAlgoAPI_Fuse) whose section edges — the
+ * new joint curves where the solids meet — are filleted by `radius`.
+ * Buried intersection curves (inside the union) are dropped. The fillet tries all joints at once (rational, then polynomial sections), then one joint at a
+ * time; it never returns a partly blended solid. Disjoint solids have no joints: their plain union
+ * is returned.
+ * @failure fuse not done, every fillet strategy refused -> null
+ */
+function blendedUnion(api: OccApi, shapes: readonly OccShape[], radius: number): OccShape | null {
+  const [first, ...rest] = shapes;
+  if (first === undefined || rest.length === 0 || !(radius > 0)) return null;
+  return guarded('fragile', (own) => {
+    const argumentsList = own(new api.TopTools_ListOfShape_1() as OccShapeList);
+    argumentsList.Append_1(first);
+    const tools = own(new api.TopTools_ListOfShape_1() as OccShapeList);
+    for (const shape of rest) tools.Append_1(shape);
+    const fuse = own(new api.BRepAlgoAPI_Fuse_1() as OccFuse);
+    fuse.SetArguments(argumentsList);
+    fuse.SetTools(tools);
+    fuse.Build();
+    if (!fuse.IsDone()) return null;
+    const fused = fuse.Shape();
+    const list = own(new api.TopTools_ListOfShape_1() as OccShapeList);
+    list.Assign(fuse.SectionEdges());
+    // Section edges include intersection curves buried inside the union; only boundary edges blend.
+    const boundary = uniqueSubShapes(api, fused, 'TopAbs_EDGE').map(own);
+    const joints: OccShape[] = [];
+    while (list.Size() > 0) {
+      const edge = own(api.TopoDS.Edge_1(list.First_1()) as OccShape);
+      list.RemoveFirst();
+      if (api.BRep_Tool.Degenerated(edge) === true) continue;
+      if (boundary.some((candidate) => candidate.IsSame(edge))) joints.push(edge);
+    }
+    if (joints.length === 0) return fused;
+    return filletAll(api, fused, joints, radius, api.ChFi3d_FilletShape.ChFi3d_Rational, own);
   });
 }
 
@@ -224,14 +283,16 @@ export function occtOps(api: OccApi): KernelOps<OccShape> {
         const builder = own(new api[BOOLEAN_BUILDERS[op]](a, b) as OccBuilder);
         return builder.IsDone() ? builder.Shape() : null;
       }),
-    fillet: (shape, edges, radius) =>
+    fillet: (shape, edges, radius, radiusEnd) =>
       roundEdges(
         api,
         shape,
         edges,
         radius,
         (solid) => new api.BRepFilletAPI_MakeFillet(solid, api.ChFi3d_FilletShape.ChFi3d_Rational),
+        radiusEnd,
       ),
+    blend: (shapes, radius) => blendedUnion(api, shapes, radius),
     chamfer: (shape, edges, distance) =>
       roundEdges(api, shape, edges, distance, (solid) => new api.BRepFilletAPI_MakeChamfer(solid)),
     shell: (shape, thickness) => hollow(api, shape, thickness),

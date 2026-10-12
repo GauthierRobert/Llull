@@ -244,6 +244,115 @@ export const plans: Record<string, GoldenAction[]> = {
       },
     },
   ],
+  closed_sweep_and_chain_pattern: [
+    { command: 'draw_circle', params: { center: [0, 0], radius: 40 }, as: 'loop' },
+    { command: 'sweep_profile', params: { pathId: '$loop', radius: 3, innerRadius: 2 } },
+    { command: 'add_box', params: { size: [8, 2, 4] }, as: 'link' },
+    {
+      command: 'pattern_along_path',
+      params: { sourceId: '$link', count: 12, pathId: '$loop', rollStep: Math.PI / 2 },
+    },
+  ],
+  subdivision_saddle: [
+    {
+      command: 'add_subdivision_solid',
+      params: { box: { size: [270, 140, 30], segments: [4, 2, 1] }, levels: 2, name: 'saddle' },
+      as: 'saddle',
+    },
+    {
+      command: 'edit_subdivision_cage',
+      params: {
+        id: '$saddle',
+        region: { min: [60, -100, -50], max: [200, 100, 50] },
+        scale: [1, 0.3, 0.7],
+        falloff: 60,
+      },
+    },
+    {
+      command: 'edit_subdivision_cage',
+      params: {
+        id: '$saddle',
+        region: { min: [-200, -100, -50], max: [-100, 100, 50] },
+        translate: [0, 0, 12],
+      },
+    },
+    {
+      command: 'edit_subdivision_cage',
+      params: {
+        id: '$saddle',
+        region: { min: [-200, -100, -50], max: [200, 100, -1] },
+        crease: true,
+      },
+    },
+  ],
+  surface_from_curves_hood: [
+    {
+      command: 'surface_from_curves',
+      params: {
+        curves: [
+          [
+            [0, 0, 0],
+            [40, 0, 18],
+            [80, 0, 0],
+          ],
+          [
+            [0, 50, 0],
+            [40, 50, 10],
+            [80, 50, 0],
+          ],
+        ],
+        thickness: 2,
+        cells: [6, 4],
+        name: 'hood',
+      },
+      as: 'hood',
+    },
+    {
+      command: 'edit_subdivision_cage',
+      params: {
+        id: '$hood',
+        region: { min: [30, -10, 0], max: [50, 60, 40] },
+        translate: [0, 0, 4],
+        falloff: 20,
+      },
+    },
+  ],
+  loft_and_variable_sweep: [
+    {
+      command: 'loft_sections',
+      params: {
+        sections: [
+          { center: [0, 0, 0], radius: 2 },
+          {
+            center: [0, 0, 4],
+            section: [
+              [-1.5, -1.5],
+              [1.5, -1.5],
+              [1.5, 1.5],
+              [-1.5, 1.5],
+            ],
+          },
+          { center: [1, 0, 8], radiusX: 2.5, radiusY: 0.8, rotation: [0, 0.25, 0] },
+        ],
+      },
+    },
+    {
+      command: 'sweep_profile',
+      params: {
+        path: [
+          [6, 0, 0],
+          [16, 0, 0],
+          [16, 0, 10],
+        ],
+        bendRadius: 4,
+        stations: [
+          { at: 0, radius: 1.2 },
+          { at: 0.5, radiusX: 0.8, radiusY: 1.6 },
+          { at: 1, radius: 0.6 },
+        ],
+      },
+    },
+  ],
   bell_nozzle_and_plumbing: [
     {
       command: 'draw_spline',

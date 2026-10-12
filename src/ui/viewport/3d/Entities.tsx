@@ -28,6 +28,9 @@ import { WedgeMesh } from './entities/WedgeMesh';
 import { PyramidMesh } from './entities/PyramidMesh';
 import { RevolutionMesh } from './entities/RevolutionMesh';
 import { SweepMesh } from './entities/SweepMesh';
+import { DecalOverlay } from './entities/DecalOverlay';
+import { LoftMesh } from './entities/LoftMesh';
+import { SubdivisionMesh } from './entities/SubdivisionMesh';
 import { TextMesh } from './entities/TextMesh';
 import { Shape2DRenderer } from '../2d/Shape2DRenderer';
 import { isBatchable, groupEntitiesForInstancing } from './grouping';
@@ -54,6 +57,8 @@ const SOLID_MESHES: { [K in SolidKind]: SolidMeshBranch<Extract<Entity, { kind: 
   pyramid: PyramidMesh,
   revolution: RevolutionMesh,
   sweep: SweepMesh,
+  loft: LoftMesh,
+  subdivision: SubdivisionMesh,
 };
 
 /**
@@ -137,8 +142,15 @@ const EntityRenderer = memo(function EntityRenderer({
   if (entity.kind in SOLID_MESHES) {
     // Keyed by kind, so the branch picked always matches the entity's narrowed type.
     const Mesh = SOLID_MESHES[entity.kind as SolidKind] as SolidMeshBranch<Entity>;
-    return (
+    const mesh = (
       <Mesh entity={entity} selected={selected} onSelect={onSelect} pbrMaterial={pbrMaterial} />
+    );
+    if (entity.decals === undefined) return mesh;
+    return (
+      <>
+        {mesh}
+        <DecalOverlay entity={entity} />
+      </>
     );
   }
   switch (entity.kind) {
@@ -200,24 +212,31 @@ export function Entities(): React.ReactElement {
   }, [order, entities, layers, hiddenLayerIds, hiddenEntityIds]);
 
   // Pass the materials map so batches can carry per-batch PBR overrides.
+  // Textured (finish) materials and decals need per-entity geometry, so they skip instancing.
+  const hasFinish = useCallback(
+    (entity: Entity): boolean =>
+      entity.decals !== undefined ||
+      (entity.materialId !== undefined && materials[entity.materialId]?.finish !== undefined),
+    [materials],
+  );
   // Animated entities are located by scene-object name, so they take the per-entity path.
   const animatedIds = useMemo(() => animatedEntityIds(animations, groups), [animations, groups]);
   const batches = useMemo(
     () =>
       groupEntitiesForInstancing(
-        visibleEntities.filter((entity) => !animatedIds.has(entity.id)),
+        visibleEntities.filter((entity) => !animatedIds.has(entity.id) && !hasFinish(entity)),
         materials,
       ),
-    [visibleEntities, animatedIds, materials],
+    [visibleEntities, animatedIds, materials, hasFinish],
   );
   const nonBatchableEntities = useMemo(
     () =>
       visibleEntities.filter(
         (entity) =>
-          (!isBatchable(entity) || animatedIds.has(entity.id)) &&
+          (!isBatchable(entity) || animatedIds.has(entity.id) || hasFinish(entity)) &&
           layers[entity.layerId]?.name !== GRID_LAYER_NAME,
       ),
-    [visibleEntities, animatedIds, layers],
+    [visibleEntities, animatedIds, layers, hasFinish],
   );
 
   return (

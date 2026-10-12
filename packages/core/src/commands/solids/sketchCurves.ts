@@ -6,7 +6,7 @@
 
 import type { CurveSegment } from '../../model/curve';
 import type { CadDocument, Entity, Vec2, Vec3 } from '../../model/types';
-import { applyEulerXYZ } from '../../lib/eulerRotation';
+import { applyEulerXYZ, inverseEulerXYZ } from '../../lib/eulerRotation';
 import { add3, distance3, sub3 } from '../../lib/vec3';
 import {
   JOINT_TOLERANCE,
@@ -124,15 +124,7 @@ export function entityCurves(
   }
 }
 
-/** Inverse of the intrinsic XYZ Euler rotation (Rx·Ry·Rz)⁻¹ = Rz⁻¹·Ry⁻¹·Rx⁻¹. */
-function unrotate(v: Vec3, [rx, ry, rz]: Vec3): Vec3 {
-  const o: Vec3 = [0, 0, 0];
-  return applyEulerXYZ(applyEulerXYZ(applyEulerXYZ(v, o, [-rx, 0, 0]), o, [0, -ry, 0]), o, [
-    0,
-    0,
-    -rz,
-  ]);
-}
+const unrotate = inverseEulerXYZ;
 
 const firstPoint = (chain: ReadonlyArray<CurveSegment<Vec2>>): Vec2 | undefined =>
   chain[0]?.points[0];
@@ -222,16 +214,15 @@ export function sketchLoop(doc: CadDocument, ids: readonly string[]): SketchLoop
 }
 
 /**
- * World-space path of one open 2D entity (line, arc, open polyline or spline) placed by its own
- * position and rotation.
- * @failure missing / closed / non-curve entity -> message
+ * World-space path of one 2D curve entity (line, arc, polyline, spline, circle, ellipse,
+ * rectangle — open or closed) placed by its own position and rotation.
+ * @failure missing / non-curve entity -> message
  */
 export function sketchPath(doc: CadDocument, id: string): CurveSegment<Vec3>[] | string {
   const entity = doc.entities[id];
   if (entity === undefined) return `no entity "${id}"`;
   const own = entityCurves(entity);
   if (own === null) return `entity "${id}" (kind="${entity.kind}") is not a 2D curve`;
-  if (own.closed) return `entity "${id}" is closed; a sweep path must be open`;
   const toWorld = ([x, y]: Vec2): Vec3 =>
     add3(applyEulerXYZ([x, y, 0], [0, 0, 0], entity.rotation), entity.position);
   return own.curves.map((segment) => mapSegment(segment, toWorld));

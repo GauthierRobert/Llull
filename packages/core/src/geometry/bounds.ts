@@ -9,6 +9,8 @@ import type {
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { ORIGIN, add3, sub3 } from '../lib/vec3';
 import { sweepTriangles } from './sweep';
+import { loftTriangles } from './loft';
+import { subdivisionTriangles } from './subdivision';
 
 /** World-space axis-aligned bounding box. */
 export interface Bounds {
@@ -99,9 +101,15 @@ function meshLocalBounds(e: Extract<Entity, { kind: 'mesh' }>): Bounds {
   return bounds(sub3(min, e.position), sub3(max, e.position));
 }
 
-/** Local-space AABB of a sweep: its tessellated surface around the local origin. */
-function sweepLocalBounds(e: Extract<Entity, { kind: 'sweep' }>): Bounds {
-  const corners = sweepTriangles(e.path, e.section).flat();
+/** Local-space AABB of a sweep or loft: its tessellated surface around the local origin. */
+function sweepLocalBounds(e: Extract<Entity, { kind: 'sweep' | 'loft' | 'subdivision' }>): Bounds {
+  const corners = (
+    e.kind === 'sweep'
+      ? sweepTriangles(e)
+      : e.kind === 'loft'
+        ? loftTriangles(e)
+        : subdivisionTriangles(e)
+  ).flat();
   if (corners.length === 0) return bounds(ORIGIN, ORIGIN);
   const { min, max } = positionsExtent(corners.flat());
   return bounds(min, max);
@@ -145,6 +153,8 @@ export function localBounds(e: Entity): Bounds {
         [e.baseWidth / 2, e.baseDepth / 2, e.height],
       );
     case 'sweep':
+    case 'loft':
+    case 'subdivision':
       return sweepLocalBounds(e);
     case 'revolution': {
       // Conservative: radial extent around the world axis closest to `axis`, axial extent from the profile.

@@ -26,6 +26,8 @@ export const SOLID_KINDS = [
   'pyramid',
   'revolution',
   'sweep',
+  'loft',
+  'subdivision',
 ] as const;
 
 export type SolidKind = (typeof SOLID_KINDS)[number];
@@ -65,6 +67,30 @@ export interface BaseEntity {
   tags?: readonly string[];
   /** Key into `CadDocument.materials`; set by `assign_material`. */
   materialId?: string;
+  /** Decals painted on this solid (entity-local frame); set by `add_decal`. */
+  decals?: ReadonlyArray<Decal>;
+}
+
+/**
+ * Text decal projected onto its solid along `-normal` (paint: shown and exported to glTF, not a
+ * solid). All vectors are in the owning entity's local frame (before its rotation / position).
+ * @invariant width, height, depth > 0; normal non-zero; text non-empty
+ */
+export interface Decal {
+  readonly id: string;
+  readonly text: string;
+  readonly center: Vec3;
+  /** Outward surface direction the decal faces (it projects along -normal). */
+  readonly normal: Vec3;
+  /** Rotation of the text about `normal`, radians (0 = text +x along the projected world X/Y). */
+  readonly angle: number;
+  readonly width: number;
+  readonly height: number;
+  /** Projection depth through the surface. */
+  readonly depth: number;
+  readonly color: string;
+  /** Optional opaque background behind the text. */
+  readonly background?: string;
 }
 
 export interface BoxEntity extends BaseEntity {
@@ -184,6 +210,44 @@ export interface SweepEntity extends BaseEntity {
   readonly kind: 'sweep';
   path: ReadonlyArray<CurveSegment<Vec3>>;
   section: SweepSection;
+  /**
+   * Variable section: rings (SECTION_RING_POINTS points, section coordinates, read as closed
+   * Catmull-Rom curves) at path fractions `at`, blended in between; replaces `section` geometry.
+   * @invariant >= 2 stations, `at` strictly increasing from 0 to 1, equal ring point counts
+   */
+  stations?: ReadonlyArray<SweepStation>;
+}
+
+/** One cross-section of a variable sweep at path fraction `at` (0 = start, 1 = end). */
+export interface SweepStation {
+  readonly at: number;
+  readonly ring: ReadonlyArray<Vec2>;
+}
+
+/**
+ * Solid skinned through ordered 3D section rings (local to `position`), each a closed Catmull-Rom
+ * curve through SECTION_RING_POINTS aligned points; `ruled` joins neighbours with straight lines.
+ * @invariant >= 2 rings, equal point counts, consistent winding
+ * @see loft_sections
+ */
+export interface LoftEntity extends BaseEntity {
+  readonly kind: 'loft';
+  rings: ReadonlyArray<ReadonlyArray<Vec3>>;
+  ruled: boolean;
+}
+
+/**
+ * Freeform solid: a closed polygon control cage (local to `position`) refined `levels` times by
+ * Catmull-Clark subdivision; cage edges listed in `creases` stay sharp.
+ * @invariant closed 2-manifold cage, faces wound counter-clockwise seen from outside, 0..4 levels
+ * @see add_subdivision_solid, edit_subdivision_cage
+ */
+export interface SubdivisionEntity extends BaseEntity {
+  readonly kind: 'subdivision';
+  vertices: ReadonlyArray<Vec3>;
+  faces: ReadonlyArray<ReadonlyArray<number>>;
+  creases: ReadonlyArray<readonly [number, number]>;
+  levels: number;
 }
 
 export interface LineEntity extends BaseEntity {
@@ -315,6 +379,8 @@ export type Entity =
   | PyramidEntity
   | RevolutionEntity
   | SweepEntity
+  | LoftEntity
+  | SubdivisionEntity
   | LineEntity
   | PolylineEntity
   | ArcEntity
@@ -590,6 +656,34 @@ export interface Material {
   color: string;
   metalness: number;
   roughness: number;
+  /** Procedural surface texture (albedo + normal + roughness maps); absent = plain PBR colour. */
+  finish?: MaterialFinish;
+}
+
+export const FINISH_PATTERNS = [
+  'carbon_twill',
+  'carbon_plain',
+  'brushed',
+  'knurl',
+  'checker',
+] as const;
+
+export type FinishPattern = (typeof FINISH_PATTERNS)[number];
+
+/**
+ * Tileable procedural finish: one texture tile spans `scale` document units, box-projected onto
+ * the part (glTF export + viewport use the same maps).
+ * @invariant scale > 0; normalStrength in [0, 2]; clearcoat in [0, 1]
+ */
+export interface MaterialFinish {
+  readonly pattern: FinishPattern;
+  readonly scale: number;
+  /** Secondary colour (alternate tows, checker squares); default derived from `color`. */
+  readonly color2?: string;
+  /** Normal-map strength (relief depth), default 1. */
+  readonly normalStrength?: number;
+  /** Clear lacquer layer over the finish (0 = none, 1 = full gloss coat), default 0. */
+  readonly clearcoat?: number;
 }
 
 export const DEFAULT_LAYER_ID = 'layer-default';
@@ -657,13 +751,19 @@ export type ShapeRecipe =
       readonly a: ShapeRecipe;
       readonly b: ShapeRecipe;
     }
-  /** `edges`: 0-based indices into the source's unique edges (`ShapeTopology.edges`); [] = all. */
+  /**
+   * `edges`: 0-based indices into the source's unique edges (`ShapeTopology.edges`); [] = all.
+   * `sizeEnd` (fillet only): radius at each edge's end, varying linearly from `size` at its start.
+   */
   | {
       readonly op: 'fillet' | 'chamfer';
       readonly source: ShapeRecipe;
       readonly edges: readonly number[];
       readonly size: number;
+      readonly sizeEnd?: number;
     }
+  /** One-piece union of `sources` with every new intersection (joint) edge filleted by `radius`. */
+  | { readonly op: 'blend'; readonly sources: readonly ShapeRecipe[]; readonly radius: number }
   | { readonly op: 'shell'; readonly source: ShapeRecipe; readonly thickness: number }
   /** Rotate (M = Rx·Ry·Rz, radians) then translate. */
   | {

@@ -22,7 +22,8 @@ import {
   type OccSewing,
   type OccTopoDS,
 } from './occtTypes';
-import { chainFace, sweptSolid } from './occtCurves';
+import { chainFace, loftedSolid, sweptSolid } from './occtCurves';
+import { subdivisionBSplineSolid } from './occtPatches';
 
 /** Planar OCC face of a closed polygon wire through `corners`, or null when OCC rejects it. */
 function polygonFace(api: OccApi, corners: readonly Vec3[]): OccShape | null {
@@ -324,6 +325,19 @@ export function entityToOccShape(api: OccApi, entity: Entity): OccShape | null {
   if (entity.kind === 'wedge') return wedgeSolid(api, entity);
   if (entity.kind === 'revolution') return revolvedProfile(api, entity);
   if (entity.kind === 'mesh') return meshSolid(api, entity);
+  if (entity.kind === 'subdivision') {
+    // Smooth cages become exact B-spline faces; a faceted (level 0) cage keeps its triangles.
+    const shape = entity.levels > 0 ? subdivisionBSplineSolid(api, entity) : null;
+    return shape === null
+      ? tessellatedSolid(api, entity)
+      : placed(api, shape, placementTransform(api, entity.rotation, entity.position));
+  }
+  if (entity.kind === 'loft') {
+    const shape = loftedSolid(api, entity);
+    return shape === null
+      ? null
+      : placed(api, shape, placementTransform(api, entity.rotation, entity.position));
+  }
   if (entity.kind === 'sweep') {
     const shape = sweptSolid(api, entity);
     return shape === null
