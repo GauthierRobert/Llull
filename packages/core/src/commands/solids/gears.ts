@@ -7,10 +7,11 @@
 import type { CommandResult } from '../types';
 import { defineCommand, z, colorField, nameField, looseVec3 } from '../schema';
 import { nextId } from '../../lib/id';
-import { compactNumber as fmt } from '../../lib/compactNumber';
+import { compactNumber as fmt, vecText } from '../../lib/compactNumber';
 import {
   DEFAULT_FLANK_SAMPLES,
   externalGearPattern,
+  pitchRadiusOf,
   toothOutline,
   toothProfile,
 } from '../../lib/gearOutline';
@@ -23,27 +24,9 @@ import { commitEntity } from '../entity/commitEntity';
 import { newEntity } from '../entity/newEntity';
 import { ROTATION_CONVENTION, boundsText } from './shared';
 import { noop } from '../noop';
+import type { Vec2 as Point } from '../../model/vectors';
 
 const DEFAULT_GEAR_COLOR = '#7a9cbb';
-
-type Point = readonly [number, number];
-
-/**
- * `samples` points of the involute of a circle of radius `rb` (x = rb(cos t + t sin t),
- * y = rb(sin t - t cos t)), t linear from `tStart` to `tEnd`. Shared by `draw_involute`.
- */
-export function sampleInvolute(
-  rb: number,
-  tStart: number,
-  tEnd: number,
-  samples: number,
-): ReadonlyArray<Point> {
-  const n = Math.max(samples - 1, 1);
-  return Array.from({ length: n + 1 }, (_, i): Point => {
-    const t = tStart + ((tEnd - tStart) * i) / n;
-    return [rb * (Math.cos(t) + t * Math.sin(t)), rb * (Math.sin(t) - t * Math.cos(t))];
-  });
-}
 
 /**
  * Closed CCW involute spur gear outline centred at the origin (first point NOT repeated).
@@ -159,7 +142,7 @@ export const addSpurGear = defineCommand({
     const shapeProblem = pressureAngleProblem(pressureAngle) ?? faceWidthProblem(faceWidth);
     if (shapeProblem !== null) return noop(doc, `add_spur_gear failed: ${shapeProblem}`);
 
-    const pitchRadius = (mod * teethInt) / 2;
+    const pitchRadius = pitchRadiusOf(mod, teethInt);
     if (bore < 0)
       return noop(doc, `add_spur_gear failed: bore must be finite and >= 0, got ${String(bore)}.`);
     if (bore >= pitchRadius) {
@@ -208,7 +191,7 @@ export const addSpurGear = defineCommand({
       `Created spur_gear ${id}: module=${fmt(mod)} teeth=${teethInt} ` +
         `pitchD=${fmt(pitchDiameter)} outerD=${fmt(outerDiameter)} ` +
         `bore=${bore} face=${fmt(faceWidth)} ` +
-        `at [${resolvedPosition.map(fmt).join(', ')}].` +
+        `at ${vecText(resolvedPosition)}.` +
         `${bore > 0 ? ' Bored: mesh solid.' : ''} ${boundsText(rotatedEntityBounds(entity))}.`,
     );
   },

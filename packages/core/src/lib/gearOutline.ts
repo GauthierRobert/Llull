@@ -11,6 +11,28 @@ export const DEFAULT_FLANK_SAMPLES = 7;
 /** Backlash added between mating gears, as a fraction of the module (tooth thickness at pitch). */
 const BACKLASH_PER_MODULE = 0.05;
 
+/** Pitch-circle radius of a gear of `mod` (module) and `teeth`: module * teeth / 2. */
+export function pitchRadiusOf(mod: number, teeth: number): number {
+  return (mod * teeth) / 2;
+}
+
+/**
+ * `samples` points of the involute of a circle of radius `rb` (x = rb(cos t + t sin t),
+ * y = rb(sin t - t cos t)), t linear from `tStart` to `tEnd`. Shared by `draw_involute`.
+ */
+export function sampleInvolute(
+  rb: number,
+  tStart: number,
+  tEnd: number,
+  samples: number,
+): ReadonlyArray<Point2> {
+  const n = Math.max(samples - 1, 1);
+  return Array.from({ length: n + 1 }, (_, i): Point2 => {
+    const t = tStart + ((tEnd - tStart) * i) / n;
+    return [rb * (Math.cos(t) + t * Math.sin(t)), rb * (Math.sin(t) - t * Math.cos(t))];
+  });
+}
+
 /**
  * One tooth-pattern description. The outline carries `teeth` teeth, tooth 0 centred on angle `phase`.
  * Flanks are involutes of `baseRadius`; `halfAngleAtRef` is the half angular thickness of a tooth
@@ -191,7 +213,7 @@ function gearPattern(
   phase: number,
   { tip, root, backlashSign }: PatternDepths,
 ): ToothPattern {
-  const pitchRadius = (mod * teeth) / 2;
+  const pitchRadius = pitchRadiusOf(mod, teeth);
   return {
     teeth,
     baseRadius: pitchRadius * Math.cos(pressureAngle),

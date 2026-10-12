@@ -26,3 +26,21 @@ export function positiveSweep(sweep: number): number {
   while (result <= 0) result += TURN;
   return result;
 }
+
+/** Degrees to radians. */
+export function toRadians(degrees: number): number {
+  return (degrees * Math.PI) / 180;
+}
+
+/** Radians to degrees; with `decimals`, rounded to that many decimal places. */
+export function toDegrees(radians: number, decimals?: number): number {
+  const degrees = (radians * 180) / Math.PI;
+  if (decimals === undefined) return degrees;
+  const scale = 10 ** decimals;
+  return Math.round(degrees * scale) / scale;
+}
+
+/** Angle in [0, π] between two vectors given their dot product of unit vectors (acos, clamped). */
+export function angleFromCosine(cosine: number): number {
+  return Math.acos(Math.min(1, Math.max(-1, cosine)));
+}

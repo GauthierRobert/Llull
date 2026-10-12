@@ -10,6 +10,7 @@ import { boundsCorners, entityBounds } from '../../geometry/bounds';
 import { escapeXml } from '../../lib/escapeXml';
 import { type Projector, makeProjector } from './camera';
 import { appendBeforeClose, r2, svgDot } from './svg';
+import { planeToWorld } from '../../geometry/workPlane';
 
 /** Colour-coding group of an entity in the label overlay. */
 type EntityCategory = 'point' | 'curve2d' | 'solid3d' | 'annotation';
@@ -72,7 +73,7 @@ function evenlySampled<T>(points: T[]): T[] {
  */
 function entityKeyPoints(e: Entity): Vec3[] {
   const pos = e.position;
-  const lift = (x: number, y: number): Vec3 => [pos[0] + x, pos[1] + y, pos[2]];
+  const lift = (x: number, y: number): Vec3 => planeToWorld(pos, e.rotation, [x, y]);
 
   switch (e.kind) {
     case 'point':

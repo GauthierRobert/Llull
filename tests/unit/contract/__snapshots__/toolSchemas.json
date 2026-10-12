@@ -6895,11 +6895,11 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Compute the area of a closed 2D shape. Provide either: (a) an entityId for a closed polyline, rectangle, or circle entity; or (b) an explicit polygon as points ([[x,y],...], >= 3 points). Returns data: { area, unit } where unit is the squared document unit (e.g. \"mm²\"). Open polylines are rejected with an explanatory message. Does not modify the document.",
+    "description": "Compute the area of a closed 2D shape. Provide either: (a) an entityId for a closed polyline, rectangle, circle, or ellipse entity; or (b) an explicit polygon as points ([[x,y],...], >= 3 points). Returns data: { area, unit } where unit is the squared document unit (e.g. \"mm²\"). Open polylines are rejected with an explanatory message. Does not modify the document.",
     "input_schema": {
       "properties": {
         "entityId": {
-          "description": "Id of a closed 2D shape entity: 'polyline' (must have closed:true), 'rectangle', or 'circle'.",
+          "description": "Id of a closed 2D shape entity: 'polyline' (must have closed:true), 'rectangle', 'circle', or 'ellipse'.",
           "type": "string"
         },
         "points": {

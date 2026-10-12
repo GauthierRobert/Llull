@@ -1,6 +1,10 @@
 /** Pure planar polygon / segment helpers. @layer lib */
 
-export type Point2 = readonly [number, number];
+import { clamp01 } from './clamp';
+import type { Vec2 } from '../model/vectors';
+import { centroid2 } from './vec2';
+
+export type Point2 = Vec2;
 
 /** Signed shoelace area; > 0 when counter-clockwise. */
 export function signedArea(points: ReadonlyArray<Point2>): number {
@@ -30,8 +34,7 @@ export function polygonPerimeter(points: ReadonlyArray<Point2>): number {
 export function polygonCentroid(points: ReadonlyArray<Point2>): Point2 {
   const area = signedArea(points);
   if (Math.abs(area) < 1e-12) {
-    const sum = points.reduce<[number, number]>((acc, [x, y]) => [acc[0] + x, acc[1] + y], [0, 0]);
-    return [sum[0] / Math.max(points.length, 1), sum[1] / Math.max(points.length, 1)];
+    return centroid2(points);
   }
   let cx = 0;
   let cy = 0;
@@ -71,7 +74,7 @@ export function projectOntoSegment(
   const dy = b[1] - a[1];
   const lengthSquared = dx * dx + dy * dy;
   const rawT = lengthSquared === 0 ? 0 : ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / lengthSquared;
-  const t = Math.min(1, Math.max(0, rawT));
+  const t = clamp01(rawT);
   return { distance: distance(p, [a[0] + t * dx, a[1] + t * dy]), t };
 }
 
@@ -117,6 +120,19 @@ function lineIntersection(a1: Point2, a2: Point2, b1: Point2, b2: Point2): Point
   if (Math.abs(denominator) < 1e-12) return null;
   const t = ((b1[0] - a1[0]) * d2y - (b1[1] - a1[1]) * d2x) / denominator;
   return [a1[0] + t * d1x, a1[1] + t * d1y];
+}
+
+/** Crossing point of segments a1–a2 and b1–b2 (ends included), or null when parallel or apart. */
+export function segmentIntersection(a1: Point2, a2: Point2, b1: Point2, b2: Point2): Point2 | null {
+  const rx = a2[0] - a1[0];
+  const ry = a2[1] - a1[1];
+  const sx = b2[0] - b1[0];
+  const sy = b2[1] - b1[1];
+  const denominator = rx * sy - ry * sx;
+  if (Math.abs(denominator) < 1e-10) return null;
+  const t = ((b1[0] - a1[0]) * sy - (b1[1] - a1[1]) * sx) / denominator;
+  const u = ((b1[0] - a1[0]) * ry - (b1[1] - a1[1]) * rx) / denominator;
+  return t >= 0 && t <= 1 && u >= 0 && u <= 1 ? [a1[0] + t * rx, a1[1] + t * ry] : null;
 }
 
 /** Even-odd point-in-polygon test (points on the boundary may go either way). */

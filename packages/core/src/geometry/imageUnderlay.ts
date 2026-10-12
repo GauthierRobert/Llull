@@ -14,8 +14,9 @@
 
 import type { ImageEntity, Vec2, Vec3 } from '../model/types';
 import { applyEulerXYZ } from '../lib/eulerRotation';
-import { add3, sub3 } from '../lib/vec3';
+import { sub3 } from '../lib/vec3';
 import { wrapSignedAngle } from '../lib/angle';
+import { planeToWorld } from './workPlane';
 
 export type UnderlayPlacement = Pick<
   ImageEntity,
@@ -35,10 +36,7 @@ function rotatedOffset(rotation: Vec3, local: Vec2): Vec3 {
 
 /** World point of image pixel `pixel`. */
 export function pixelToWorld(placement: UnderlayPlacement, pixel: Vec2): Vec3 {
-  return add3(
-    placement.position,
-    rotatedOffset(placement.rotation, pixelToLocal(placement, pixel)),
-  );
+  return planeToWorld(placement.position, placement.rotation, pixelToLocal(placement, pixel));
 }
 
 /** World corners of the image: top-left, top-right, bottom-right, bottom-left (pixel order). */

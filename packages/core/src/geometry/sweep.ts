@@ -9,13 +9,15 @@
 
 import type { CurveSegment } from '../model/curve';
 import type { SweepEntity, SweepSection, SweepStation, Vec2, Vec3 } from '../model/types';
-import { add3, cross3, dot3, normalize3, scale3, sub3 } from '../lib/vec3';
-import { signedArea } from '../lib/polygon';
+import { add3, cross3, dot3, lerp3, normalize3, scale3, sub3 } from '../lib/vec3';
+import { segmentLengths } from '../lib/polyline';
+import { toCounterClockwise } from '../lib/polygon';
 import { triangulatePolygon } from '../lib/triangulate';
 import { isClosedChain, segmentPoint, segmentSteps, segmentTangent } from './curveSegments';
 import { sampleRing } from './sectionRing';
 import { quad, ringWalls as walls, skinTriangles } from './skin';
 import type { Triangle } from './triangles';
+import { clamp01 } from '../lib/clamp';
 
 /** Vertices around a circular sweep section. */
 const SWEEP_CIRCLE_SEGMENTS = 24;
@@ -102,8 +104,7 @@ function closeFrames(frames: SweepFrame[]): SweepFrame[] {
 /** Section loops in section coordinates: CCW outer boundary and optional CCW bore (same count). */
 function sectionLoops(section: SweepSection): { outer: Vec2[]; inner: Vec2[] | null } {
   if (section.shape === 'profile') {
-    const outer =
-      signedArea(section.profile) < 0 ? [...section.profile].reverse() : [...section.profile];
+    const outer = toCounterClockwise(section.profile);
     return { outer, inner: null };
   }
   const ring = (radius: number): Vec2[] =>
@@ -150,10 +151,8 @@ export type SweepShape = Pick<SweepEntity, 'path' | 'section'> & {
 /** Arc-length fraction (0..1) of every frame along the path. */
 function frameFractions(frames: readonly SweepFrame[]): number[] {
   const distances = [0];
-  for (let i = 1; i < frames.length; i++) {
-    const step = sub3((frames[i] as SweepFrame).point, (frames[i - 1] as SweepFrame).point);
-    distances.push((distances[i - 1] as number) + Math.hypot(...step));
-  }
+  for (const length of segmentLengths(frames.map((frame) => frame.point)))
+    distances.push((distances[distances.length - 1] as number) + length);
   const total = distances[distances.length - 1] as number;
   return distances.map((d) => (total > 0 ? d / total : 0));
 }
@@ -172,8 +171,8 @@ export function frameAtFraction(
   const a = frames[i] as SweepFrame;
   const b = (frames[i + 1] ?? a) as SweepFrame;
   const span = (fractions[i + 1] ?? 1) - (fractions[i] ?? 0);
-  const u = span > 0 ? Math.min(1, Math.max(0, (t - (fractions[i] as number)) / span)) : 0;
-  const lerp = (p: Vec3, q: Vec3): Vec3 => add3(p, scale3(sub3(q, p), u));
+  const u = span > 0 ? clamp01((t - (fractions[i] as number)) / span) : 0;
+  const lerp = (p: Vec3, q: Vec3): Vec3 => lerp3(p, q, u);
   const normal = normalize3(lerp(a.normal, b.normal));
   const tangent = normalize3(lerp(a.tangent, b.tangent));
   return { point: lerp(a.point, b.point), normal, binormal: cross3(tangent, normal) };
@@ -188,7 +187,7 @@ export function stationRingAt(stations: ReadonlyArray<SweepStation>, t: number):
   while (span < stations.length - 2 && t > (stations[span + 1] as SweepStation).at) span++;
   const a = stations[span] as SweepStation;
   const b = stations[span + 1] as SweepStation;
-  const u = Math.min(1, Math.max(0, (t - a.at) / Math.max(1e-12, b.at - a.at)));
+  const u = clamp01((t - a.at) / Math.max(1e-12, b.at - a.at));
   const w = u * u * (3 - 2 * u);
   return a.ring.map((p, i): Vec2 => {
     const q = b.ring[i] as Vec2;

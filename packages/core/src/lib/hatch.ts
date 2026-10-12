@@ -4,7 +4,7 @@
  * @pure
  */
 
-type Point = readonly [number, number];
+import type { Vec2 as Point } from '../model/vectors';
 
 /**
  * Segments of lines at `angle` (radians), `spacing` apart, inside the region bounded by `loops`

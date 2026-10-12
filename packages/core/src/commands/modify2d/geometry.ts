@@ -1,6 +1,6 @@
 import type { CadDocument, PolylineEntity, Vec2 } from '../../model/types';
 import type { CommandResult } from '../types';
-import { add2, normalize2, perp2, scale2, sub2 } from '../../lib/vec2';
+import { add2, lerp2, normalize2, perp2, scale2, sub2 } from '../../lib/vec2';
 import { noop } from '../noop';
 
 /** The polyline entity `id`, or the no-op result naming `command` when it is missing or another kind. */
@@ -44,7 +44,7 @@ export function segIntersect(p: Vec2, q: Vec2, r: Vec2, s: Vec2): { t: number; u
  * Compute the point on the infinite line through p→q at parameter t.
  */
 export function evalLine(p: Vec2, q: Vec2, t: number): Vec2 {
-  return add2(p, scale2(sub2(q, p), t));
+  return lerp2(p, q, t);
 }
 
 /**

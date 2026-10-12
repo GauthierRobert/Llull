@@ -17,7 +17,7 @@ import {
   matFromAxis,
   unitAxisOrNull,
 } from '../../lib/axisRotation';
-import { compactNumber as fmt } from '../../lib/compactNumber';
+import { compactNumber as fmt, vecText } from '../../lib/compactNumber';
 import { withEntity } from '../entity/entityOps';
 import { positionField } from './shared';
 import { newEntity } from '../entity/newEntity';
@@ -337,7 +337,7 @@ export const addBearing = defineCommand({
       summary:
         `Added ${section.type} bearing ${label} as group ${groupId} ("${group.name}"): bore ${fmt(section.bore)}, ` +
         `outer diameter ${fmt(section.outerDiameter)}, width ${fmt(section.width)}, ${layout.count} rolling elements; ` +
-        `centered at [${position.map(fmt).join(', ')}], axis [${unitAxis.map(fmt).join(', ')}]. ` +
+        `centered at ${vecText(position)}, axis ${vecText(unitAxis)}. ` +
         `Ids: ${memberIds.join(', ')}.`,
       affected: [...memberIds, groupId],
       data,

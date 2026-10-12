@@ -12,6 +12,7 @@ import { add3, finiteVec3OrZero } from '../../lib/vec3';
 import { nextId } from '../../lib/id';
 import { commitEntity } from '../entity/commitEntity';
 import { newEntity } from '../entity/newEntity';
+import { idOrNext, idTaken } from '../entity/explicitId';
 import { noop } from '../noop';
 import { compactNumber } from '../../lib/compactNumber';
 import { isVec2 } from '../../lib/vec2';
@@ -175,17 +176,17 @@ export function explicitIdField(): z.ZodOptional<z.ZodString> {
 
 /** `true` when the explicit `id` is non-empty and already names an entity. */
 export function explicitIdTaken(doc: CadDocument, id: string | undefined): id is string {
-  return id !== undefined && id.length > 0 && Object.hasOwn(doc.entities, id);
+  return id !== undefined && id.length > 0 && idTaken(doc.entities, id);
 }
 
 /** The explicit `id` when non-empty, else a fresh `prefix` id. */
 export function explicitIdOrNext(id: string | undefined, prefix: string): string {
-  return id !== undefined && id.length > 0 ? id : nextId(prefix);
+  return idOrNext(id, prefix);
 }
 
 /** `layerId` when it names an existing layer, else the default layer. */
 export function existingLayerOrDefault(doc: CadDocument, layerId: string | undefined): string {
-  return layerId !== undefined && Object.hasOwn(doc.layers, layerId) ? layerId : DEFAULT_LAYER_ID;
+  return layerId !== undefined && idTaken(doc.layers, layerId) ? layerId : DEFAULT_LAYER_ID;
 }
 
 /** `axis` param of a placed primitive: direction of the primitive's local +Z (its symmetry axis). */

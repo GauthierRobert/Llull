@@ -5,27 +5,16 @@
  * @layer core/commands
  */
 
-import {
-  type CadDocument,
-  type DimensionEntity,
-  type Entity,
-  type TextEntity,
-  type Vec3,
-  DEFAULT_LAYER_ID,
-} from '../../model/types';
+import { type DimensionEntity, type Entity, type TextEntity, type Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z, looseVec3 as vec3, layerIdField } from '../schema';
 import { nextId } from '../../lib/id';
 import { commitEntity } from '../entity/commitEntity';
 import { noop } from '../noop';
+import { existingLayerOrDefault } from '../solids/shared';
 import { MAX_DISPLAY_PRECISION } from '../limits';
 
 type TextAnchor = NonNullable<TextEntity['anchor']>;
-
-/** `layer` when it names an existing layer, else the default layer. */
-function layerIdOrDefault(doc: CadDocument, layer: string | undefined): string {
-  return layer !== undefined && layer in doc.layers ? layer : DEFAULT_LAYER_ID;
-}
 
 /**
  * @command add_text
@@ -95,7 +84,7 @@ export const addText = defineCommand({
       position: [position[0], position[1], position[2]] as Vec3,
       rotation: [rotation[0] ?? 0, rotation[1] ?? 0, rotation[2] ?? 0] as Vec3,
       anchor: anchor as TextAnchor,
-      layerId: layerIdOrDefault(doc, layer),
+      layerId: existingLayerOrDefault(doc, layer),
       color,
     };
 
@@ -222,7 +211,7 @@ export const addDimension = defineCommand({
       entityIds: [...entityIds],
       position: [0, 0, 0],
       rotation: [0, 0, 0],
-      layerId: layerIdOrDefault(doc, layer),
+      layerId: existingLayerOrDefault(doc, layer),
       color: '#333333',
       ...(offset !== undefined ? { offset } : {}),
       ...(precision !== undefined ? { precision } : {}),

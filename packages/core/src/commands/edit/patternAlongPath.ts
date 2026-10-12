@@ -11,7 +11,7 @@ import type { CurveSegment } from '../../model/curve';
 import type { Entity, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, looseVec3, untypedArray, z } from '../schema';
-import { changed, noop } from '../noop';
+import { changed, failer } from '../noop';
 import { MAX_COPIES_PER_COMMAND, MAX_PROFILE_POINTS } from '../limits';
 import { add3, cross3, isVec3, scale3, ORIGIN } from '../../lib/vec3';
 import { composeEulerXYZ, eulerFromAxes } from '../../lib/eulerRotation';
@@ -166,7 +166,7 @@ export const patternAlongPath = defineCommand({
       endOffset = 0,
     },
   ): CommandResult => {
-    const fail = (why: string): CommandResult => noop(doc, `pattern_along_path: ${why}; no-op.`);
+    const fail = failer(doc, 'pattern_along_path');
     if ((sourceId === undefined) === (componentId === undefined))
       return fail('give exactly one of sourceId or componentId');
     let source: Entity | undefined;

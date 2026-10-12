@@ -7,8 +7,7 @@
  */
 
 import { eulerFromMat, mulMat3, type Mat3 } from './axisRotation';
-
-type Vec3 = readonly [number, number, number];
+import type { Vec3 } from '../model/vectors';
 
 /** Rotate `v` by `euler` about `origin`. */
 export function applyEulerXYZ(v: Vec3, origin: Vec3, euler: Vec3): [number, number, number] {

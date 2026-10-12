@@ -5,6 +5,7 @@ import { formatLength } from '../document/units';
 import { boundsCenter, entityBoundsInDoc } from '../../geometry/bounds';
 import { dot3, sub3, len3, distance3 } from '../../lib/vec3';
 import { noop, report } from '../noop';
+import { angleFromCosine, toDegrees } from '../../lib/angle';
 
 /**
  * @command measure_distance
@@ -143,8 +144,8 @@ export const measureAngle = defineCommand({
     if (lenA < 1e-12 || lenB < 1e-12)
       return noop(doc, 'measure_angle: degenerate vector (zero length) — cannot compute angle.');
 
-    const radians = Math.acos(Math.max(-1, Math.min(1, dot3(vA, vB) / (lenA * lenB))));
-    const degrees = (radians * 180) / Math.PI;
+    const radians = angleFromCosine(dot3(vA, vB) / (lenA * lenB));
+    const degrees = toDegrees(radians);
     return report(
       doc,
       `Angle = ${degrees.toFixed(doc.displayPrecision)}° (${radians.toFixed(doc.displayPrecision)} rad).`,

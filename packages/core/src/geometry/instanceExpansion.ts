@@ -10,6 +10,7 @@ import { solidTriangles } from './solidTriangles';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { ORIGIN, add3 } from '../lib/vec3';
 import { scaleGeometry } from './scaleGeometry';
+import { soupIndices } from './meshVolume';
 
 export const UNIT_SCALE: Vec3 = [1, 1, 1];
 
@@ -56,7 +57,7 @@ function bakedMeshChild(child: Entity, instance: InstanceEntity, scale: Vec3, id
     ...(child.name !== undefined ? { name: child.name } : {}),
     ...(child.tags !== undefined ? { tags: child.tags } : {}),
     ...(child.materialId !== undefined ? { materialId: child.materialId } : {}),
-    mesh: { positions, indices: Array.from({ length: positions.length / 3 }, (_, n) => n) },
+    mesh: { positions, indices: soupIndices(positions) },
   };
 }
 

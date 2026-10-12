@@ -8,7 +8,7 @@ import type { CadDocument, Entity, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { nextId } from '../../lib/id';
-import { compactNumber as fmt } from '../../lib/compactNumber';
+import { compactNumber as fmt, vecText } from '../../lib/compactNumber';
 import { applyEulerXYZ } from '../../lib/eulerRotation';
 import { finiteVec3OrZero } from '../../lib/vec3';
 import { DEFAULT_FLANK_SAMPLES, externalGearPattern, toothOutline } from '../../lib/gearOutline';
@@ -23,7 +23,7 @@ import {
   pressureAngleProblem,
 } from './gearSolid';
 import { internalGearMesh, minRingOuterRadius } from './gearsInternal';
-import { noop } from '../noop';
+import { failedWith } from '../noop';
 
 const MAX_PLANETS = 12;
 
@@ -116,7 +116,7 @@ export const addPlanetaryGearset = defineCommand({
       namePrefix = 'planetary',
     },
   ): CommandResult => {
-    const fail = (why: string): CommandResult => noop(doc, `add_planetary_gearset failed: ${why}`);
+    const fail = failedWith(doc, 'add_planetary_gearset');
     if (!(mod > 0 && Number.isFinite(mod)))
       return fail(`module must be finite and > 0, got ${String(mod)}.`);
     const [sun, planet, count] = [sunTeeth, planetTeeth, planetCount].map(Math.round) as [
@@ -212,7 +212,7 @@ export const addPlanetaryGearset = defineCommand({
       summary:
         `Created planetary gearset: sun ${sunId} (${sun}T), ${count} planets [${planetIds.join(', ')}] (${planet}T), ` +
         `ring ${ringId} (${ring}T). module=${fmt(mod)} centerDistance=${fmt(centerDistance)} ` +
-        `ratio=${fmt(ratio)}:1 (sun in, ring fixed, carrier out) axis=${axis} at [${centre.map(fmt).join(', ')}].`,
+        `ratio=${fmt(ratio)}:1 (sun in, ring fixed, carrier out) axis=${axis} at ${vecText(centre)}.`,
       affected: [sunId, ...planetIds, ringId],
       data: {
         ringTeeth: ring,

@@ -13,14 +13,13 @@ import { newEntity } from '../entity/newEntity';
 import { pointsExtent } from '../../geometry/bounds';
 import { noop } from '../noop';
 import { elementAt } from '../../lib/elementAt';
+import type { Vec2 as Point } from '../../model/vectors';
 
 /** One pulley/sprocket specification: center in local 2D frame + radius. */
 interface PulleySpec {
   center: [number, number];
   radius: number;
 }
-
-type Point = readonly [number, number];
 
 /**
  * The two external tangent points of a pair of circles (same-side, "open belt" convention): [tp1, tp2]

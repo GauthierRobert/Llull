@@ -7,3 +7,8 @@ export function compactNumber(v: number): string {
 export function significantNumber(v: number, digits: number): string {
   return String(Number(v.toPrecision(digits)));
 }
+
+/** @pure `[a, b, c]` of the components via `compactNumber` (for summaries). */
+export function vecText(v: ReadonlyArray<number>): string {
+  return `[${v.map(compactNumber).join(', ')}]`;
+}

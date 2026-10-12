@@ -320,6 +320,11 @@ export function boundsCenter({ min, max }: Bounds): Vec3 {
   return [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2];
 }
 
+/** Radius of the sphere around the centre of an AABB that passes through its corners. */
+export function boundsDiagonalRadius({ min, max }: Bounds): number {
+  return Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) / 2;
+}
+
 /** Largest side of an AABB. */
 export function boundsExtent({ min, max }: Bounds): number {
   return Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2]);

@@ -2,8 +2,7 @@ import type { CadDocument, Constraint, EntityRef, Vec2, Vec3 } from '../../model
 import { cross2, dot2, len2 } from '../../lib/vec2';
 import { wrapSignedAngle } from '../../lib/angle';
 import { resolveNumeric } from './expression';
-
-type Point = readonly [number, number];
+import type { Vec2 as Point } from '../../model/vectors';
 
 /** Resolve a 2D point [x, y] from an EntityRef. Returns null when the entity is missing. */
 function resolvePoint(doc: CadDocument, ref: EntityRef): Point | null {

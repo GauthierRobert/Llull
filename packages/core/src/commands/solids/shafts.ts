@@ -10,7 +10,7 @@ import type { CommandResult } from '../types';
 import type { Point2 } from '../../lib/polygon';
 import { defineCommand, z, nameField } from '../schema';
 import { nextId } from '../../lib/id';
-import { compactNumber as fmt } from '../../lib/compactNumber';
+import { compactNumber as fmt, vecText } from '../../lib/compactNumber';
 import { finiteVec3OrZero } from '../../lib/vec3';
 import { DEFAULT_FLANK_SAMPLES, toothOutline } from '../../lib/gearOutline';
 import { addCap, addWalls, createMeshBuilder, prismMesh } from '../../geometry/prismMesh';
@@ -21,7 +21,7 @@ import { commitEntity } from '../entity/commitEntity';
 import { newEntity } from '../entity/newEntity';
 import { boundsText, positionField, rotationField } from './shared';
 import { placedMeshEntity, pressureAngleProblem } from './gearSolid';
-import { noop } from '../noop';
+import { failedWith } from '../noop';
 
 const SHAFT_SEGMENTS = 64;
 
@@ -76,7 +76,7 @@ export const addSplineShaft = defineCommand({
       name,
     },
   ): CommandResult => {
-    const fail = (why: string): CommandResult => noop(doc, `add_spline_shaft failed: ${why}`);
+    const fail = failedWith(doc, 'add_spline_shaft');
     if (!(referenceDiameter > 0 && Number.isFinite(referenceDiameter))) {
       return fail(`referenceDiameter must be finite and > 0, got ${String(referenceDiameter)}.`);
     }
@@ -117,7 +117,7 @@ export const addSplineShaft = defineCommand({
       doc,
       entity,
       `Created spline_shaft ${id}: W${fmt(referenceDiameter)}x${fmt(mod)}x${count} tipD=${fmt(2 * tipRadius)} ` +
-        `rootD=${fmt(2 * rootRadius)} length=${fmt(length)} (${profile.length} profile points) at [${at.map(fmt).join(', ')}]. ` +
+        `rootD=${fmt(2 * rootRadius)} length=${fmt(length)} (${profile.length} profile points) at ${vecText(at)}. ` +
         `${boundsText(rotatedEntityBounds(entity))}.`,
     );
   },
@@ -292,7 +292,7 @@ export const addKeyedShaft = defineCommand({
       name,
     },
   ): CommandResult => {
-    const fail = (why: string): CommandResult => noop(doc, `add_keyed_shaft failed: ${why}`);
+    const fail = failedWith(doc, 'add_keyed_shaft');
     if (!(diameter > 0 && Number.isFinite(diameter)))
       return fail(`diameter must be finite and > 0, got ${String(diameter)}.`);
     if (!(length > 0 && Number.isFinite(length)))
@@ -365,7 +365,7 @@ export const addKeyedShaft = defineCommand({
       summary:
         `Created keyed_shaft ${shaftId}: d=${fmt(diameter)} length=${fmt(length)} keyway b=${fmt(width)} t1=${fmt(depth)} ` +
         `length=${fmt(span)} from z=${fmt(start)}${includeKey ? ` plus key ${entities[1]!.id} (h=${fmt(height)})` : ''} ` +
-        `at [${at.map(fmt).join(', ')}]. ${boundsText(rotatedEntityBounds(shaft))}.`,
+        `at ${vecText(at)}. ${boundsText(rotatedEntityBounds(shaft))}.`,
       affected: entities.map((e) => e.id),
     };
   },

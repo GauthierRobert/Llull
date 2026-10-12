@@ -2,7 +2,7 @@ import type { CurveSegment } from '../../model/curve';
 import type { SweepSection, SweepStation, Vec2, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { colorField, defineCommand, untypedArray, z, layerIdField } from '../schema';
-import { noop } from '../noop';
+import { failer } from '../noop';
 import { isVec2 } from '../../lib/vec2';
 import { isVec3, sub3 } from '../../lib/vec3';
 import { polygonArea } from '../../lib/polygon';
@@ -259,7 +259,7 @@ export const sweepProfile = defineCommand({
       id: explicitId,
     },
   ): CommandResult => {
-    const fail = (why: string): CommandResult => noop(doc, `sweep_profile: ${why}; no-op.`);
+    const fail = failer(doc, 'sweep_profile');
     if (explicitIdTaken(doc, explicitId)) return fail(`entity id "${explicitId}" already exists`);
     const resolved =
       rawStations === undefined

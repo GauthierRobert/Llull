@@ -7,8 +7,7 @@ import type { MeshData } from '../model/types';
 import type { Point2 } from '../lib/polygon';
 import { applyEulerXYZ } from '../lib/eulerRotation';
 import { triangulatePolygon } from '../lib/triangulate';
-
-type Vec3 = readonly [number, number, number];
+import type { Vec3 } from '../model/vectors';
 
 export interface MeshBuilder {
   /** Index of the vertex at (x, y, z); identical coordinates share one vertex. */

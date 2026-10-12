@@ -9,7 +9,7 @@
 import { type CadDocument, type Decal, type Entity, is3D } from '../../model/types';
 import type { CommandResult } from '../types';
 import { colorField, defineCommand, vec3, z } from '../schema';
-import { changed, noop } from '../noop';
+import { changed, noop, failer } from '../noop';
 import { nextId } from '../../lib/id';
 import { isHexColor } from '../../lib/isHexColor';
 import { sub3 } from '../../lib/vec3';
@@ -76,7 +76,7 @@ export const addDecal = defineCommand({
     doc,
     { id, text, at, normal, height, width, angle = 0, depth, color = '#ffffff', background },
   ): CommandResult => {
-    const fail = (why: string): CommandResult => noop(doc, `add_decal: ${why}; no-op.`);
+    const fail = failer(doc, 'add_decal');
     const entity = target(doc, id);
     if (typeof entity === 'string') return fail(entity);
     if (text.trim().length === 0 || text.length > MAX_DECAL_TEXT)

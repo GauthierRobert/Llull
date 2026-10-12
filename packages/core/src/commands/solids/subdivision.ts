@@ -7,7 +7,7 @@
 import type { SubdivisionEntity, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { colorField, defineCommand, vec3, z, layerIdField, nameField } from '../schema';
-import { noop } from '../noop';
+import { failer } from '../noop';
 import { add3, finiteVec3OrZero, map3 } from '../../lib/vec3';
 import { applyEulerXYZ } from '../../lib/eulerRotation';
 import { newEntity } from '../entity/newEntity';
@@ -184,7 +184,7 @@ export const addSubdivisionSolid = defineCommand({
     id: explicitIdField(),
   }),
   run: (doc, params): CommandResult => {
-    const fail = (why: string): CommandResult => noop(doc, `add_subdivision_solid: ${why}; no-op.`);
+    const fail = failer(doc, 'add_subdivision_solid');
     const { levels = 3, creases = [], position = [0, 0, 0], rotation, layerId, name } = params;
     const explicitId = params.id;
     if (explicitIdTaken(doc, explicitId)) return fail(`entity id "${explicitId}" already exists`);

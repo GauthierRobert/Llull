@@ -16,7 +16,7 @@
 import { type CadDocument, type Constraint, CONSTRAINT_KINDS } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
-import { nextId } from '../../lib/id';
+import { idOrNext, idTaken } from '../entity/explicitId';
 import { runSolver } from './constraintSolver';
 import { changed, noop, report } from '../noop';
 import { expressionSyntaxError } from './expression';
@@ -139,9 +139,9 @@ export const addConstraint = defineCommand({
       }
     }
 
-    const constraintId = id !== undefined && id.length > 0 ? id : nextId('con');
+    const constraintId = idOrNext(id, 'con');
 
-    if (constraintId in doc.constraints) {
+    if (idTaken(doc.constraints, constraintId)) {
       return noop(
         doc,
         `add_constraint: constraint id '${constraintId}' already exists — no change made.`,

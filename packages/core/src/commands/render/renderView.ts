@@ -19,6 +19,7 @@ import { buildTurntableSvg, buildIsolateSvg, buildSectionSvg } from './multiPass
 import { report } from '../noop';
 import { is2D } from '../../model/types';
 import type { CadDocument } from '../../model/types';
+import { clamp } from '../../lib/clamp';
 
 /** `doc` without its 2D entities (read-only view for rendering; the input is untouched). */
 function withoutEntities2D(doc: CadDocument): CadDocument {
@@ -27,7 +28,7 @@ function withoutEntities2D(doc: CadDocument): CadDocument {
 }
 
 const clampPixels = (value: number | undefined, fallback: number): number =>
-  Math.max(64, Math.min(2000, Math.round(value ?? fallback)));
+  clamp(Math.round(value ?? fallback), 64, 2000);
 
 /**
  * @command render_view
@@ -236,7 +237,7 @@ export const renderView = defineCommand({
     };
 
     if (params.turntable) {
-      const frames = Math.max(1, Math.min(12, params.turntable.frames));
+      const frames = clamp(params.turntable.frames, 1, 12);
       const strip = buildTurntableSvg(scene, frames, view, width, height, options);
       return report(
         doc,

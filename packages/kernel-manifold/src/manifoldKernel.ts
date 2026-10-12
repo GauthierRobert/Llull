@@ -14,6 +14,7 @@ import type { MeshData } from '@core/model/types';
 import type { BooleanOp } from '@core/model/types';
 import { kernelFromOps, type CachingKernel, type KernelOps } from '@core/geometry/shapeKernel';
 import { type Entity, createEmptyDocument } from '@core/model/types';
+import { orientOutward, soupIndices } from '@core/geometry/meshVolume';
 import { entityTrianglePositions } from '@core/geometry/entityTriangles';
 import { toCounterClockwise } from '@lib/polygon';
 import { release, withOwned } from '@core/geometry/nativeObject';
@@ -120,7 +121,7 @@ function weldedManifold(
   indices: ReadonlyArray<number> | undefined,
   entity: Entity,
 ): ManifoldShape | null {
-  const corners = indices ?? Array.from({ length: positions.length / 3 }, (_, i) => i);
+  const corners = indices ?? soupIndices(positions);
   const vertexOf = new Map<string, number>();
   const vertProperties: number[] = [];
   const triVerts: number[] = [];
@@ -137,17 +138,12 @@ function weldedManifold(
     }
     triVerts.push(vertex);
   }
-  if (signedVolume(vertProperties, triVerts) < 0) {
-    // Inside-out input (consistent but inward winding): flip every triangle.
-    for (let i = 0; i + 2 < triVerts.length; i += 3) {
-      [triVerts[i + 1], triVerts[i + 2]] = [triVerts[i + 2] ?? 0, triVerts[i + 1] ?? 0];
-    }
-  }
+  const outwardTriVerts = orientOutward(vertProperties, triVerts);
   try {
     const mesh = new m.Mesh({
       numProp: 3,
       vertProperties: new Float32Array(vertProperties),
-      triVerts: new Uint32Array(triVerts),
+      triVerts: new Uint32Array(outwardTriVerts),
     });
     const prim = m.Manifold.ofMesh(mesh);
     // Tessellated primitives are already world-space; a mesh entity still honours its transform.
@@ -160,19 +156,6 @@ function weldedManifold(
   } catch {
     return null;
   }
-}
-
-function signedVolume(vertices: readonly number[], triangles: readonly number[]): number {
-  let sum = 0;
-  for (let i = 0; i + 2 < triangles.length; i += 3) {
-    const at = (corner: number, axis: number): number =>
-      vertices[(triangles[i + corner] ?? 0) * 3 + axis] ?? 0;
-    const [ax, ay, az] = [at(0, 0), at(0, 1), at(0, 2)];
-    const [bx, by, bz] = [at(1, 0), at(1, 1), at(1, 2)];
-    const [cx, cy, cz] = [at(2, 0), at(2, 1), at(2, 2)];
-    sum += ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx);
-  }
-  return sum / 6;
 }
 
 /** Corners closer than 1/WELD_SCALE document units are merged into one vertex. */

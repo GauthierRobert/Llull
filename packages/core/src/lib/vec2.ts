@@ -36,6 +36,20 @@ export function normalize2(a: Vec2, fallback: Vec2 = [0, 0]): Vec2 {
   return l < 1e-12 ? fallback : [a[0] / l, a[1] / l];
 }
 
+/** @pure a + (b - a) * t */
+export function lerp2(a: Vec2, b: Vec2, t: number): Vec2 {
+  return add2(a, scale2(sub2(b, a), t));
+}
+
+/** @pure vertex average of `points` (`[0, 0]` when empty) */
+export function centroid2(points: ReadonlyArray<Vec2>): Vec2 {
+  const count = Math.max(points.length, 1);
+  return [
+    points.reduce((sum, p) => sum + p[0], 0) / count,
+    points.reduce((sum, p) => sum + p[1], 0) / count,
+  ];
+}
+
 /** @pure left perpendicular (90° counter-clockwise) */
 export function perp2(a: Vec2): Vec2 {
   return [-a[1], a[0]];

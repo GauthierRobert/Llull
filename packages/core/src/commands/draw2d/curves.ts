@@ -6,7 +6,7 @@ import { defineCommand, z, colorField, nameField, looseVec2 as vec2 } from '../s
 import { nextId } from '../../lib/id';
 import { ORIGIN, finiteVec3OrZero } from '../../lib/vec3';
 import { MAX_CURVE_SAMPLES, MAX_SPLINE_CONTROL_POINTS } from '../limits';
-import { sampleInvolute } from '../solids/gears';
+import { sampleInvolute } from '../../lib/gearOutline';
 import {
   DEFAULT_DRAW_COLOR,
   drawPointSeries,

@@ -7,19 +7,21 @@
  */
 
 import type { Vec3 } from '../model/types';
-import { add3, distance3, normalize3, scale3, sub3, cross3, len3 } from '../lib/vec3';
+import { add3, distance3, lerp3, normalize3, scale3, sub3, cross3, len3 } from '../lib/vec3';
+import { segmentLengths } from '../lib/polyline';
 import type { Cage } from './subdivision';
+import { clamp, clamp01 } from '../lib/clamp';
 
 /** Point at arc-length fraction `t` in [0, 1] along a polyline (>= 2 points). */
 export function polylineAt(points: readonly Vec3[], t: number): Vec3 {
-  const lengths = points.slice(1).map((p, i) => distance3(points[i] as Vec3, p));
+  const lengths = segmentLengths(points);
   const total = lengths.reduce((sum, l) => sum + l, 0);
-  let target = Math.min(Math.max(t, 0), 1) * total;
+  let target = clamp01(t) * total;
   for (let i = 0; i < lengths.length; i++) {
     const length = lengths[i] as number;
     if (target <= length || i === lengths.length - 1) {
       const f = length > 0 ? Math.min(target / length, 1) : 0;
-      return add3(points[i] as Vec3, scale3(sub3(points[i + 1] as Vec3, points[i] as Vec3), f));
+      return lerp3(points[i] as Vec3, points[i + 1] as Vec3, f);
     }
     target -= length;
   }
@@ -119,8 +121,7 @@ export function boundaryPatchCage(
     grid.push([]);
     for (let j = 0; j <= nv; j++) grid[i]?.push(coonsPoint(sides, i / nu, j / nv));
   }
-  const g = (i: number, j: number): Vec3 =>
-    grid[Math.min(Math.max(i, 0), nu)]?.[Math.min(Math.max(j, 0), nv)] as Vec3;
+  const g = (i: number, j: number): Vec3 => grid[clamp(i, 0, nu)]?.[clamp(j, 0, nv)] as Vec3;
   const offsets: Vec3[][] = [];
   for (let i = 0; i <= nu; i++) {
     offsets.push([]);

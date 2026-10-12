@@ -1,7 +1,7 @@
 import { type CadDocument, type SubdivisionEntity, type Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { colorField, defineCommand, vec3, z, layerIdField, nameField } from '../schema';
-import { noop } from '../noop';
+import { failer } from '../noop';
 import { centroid3, distance3, sub3 } from '../../lib/vec3';
 import { newEntity } from '../entity/newEntity';
 import {
@@ -90,7 +90,7 @@ export const surfaceFromCurves = defineCommand({
     id: explicitIdField(),
   }),
   run: (doc, params): CommandResult => {
-    const fail = (why: string): CommandResult => noop(doc, `surface_from_curves: ${why}; no-op.`);
+    const fail = failer(doc, 'surface_from_curves');
     const { thickness, flip = false, cells = [8, 8], levels = 2, layerId, name } = params;
     const explicitId = params.id;
     if (explicitIdTaken(doc, explicitId)) return fail(`entity id "${explicitId}" already exists`);

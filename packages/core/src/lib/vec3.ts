@@ -18,6 +18,11 @@ export function centroid3(points: readonly Vec3[]): Vec3 {
   );
 }
 
+/** @pure a + (b - a) * t */
+export function lerp3(a: Vec3, b: Vec3, t: number): Vec3 {
+  return add3(a, scale3(sub3(b, a), t));
+}
+
 /** @pure component-wise a + b */
 export function add3(a: Vec3, b: Vec3): Vec3 {
   return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
