@@ -10,6 +10,7 @@
  *   the whole polygon.
  */
 import { describe, it, expect } from 'vitest';
+import type { Vec3 } from '@core/model/types';
 import {
   SEG_CIRCLE,
   SEG_SPHERE_LAT,
@@ -165,13 +166,9 @@ describe('tessellation - boxFaces / wedgeFaces', () => {
   const centroid = (points: ReadonlyArray<readonly [number, number, number]>): number[] =>
     [0, 1, 2].map((axis) => points.reduce((sum, p) => sum + (p[axis] ?? 0), 0) / points.length);
 
-  const outward = (faces: Array<Array<[number, number, number]>>, inside: number[]): boolean[] =>
+  const outward = (faces: Vec3[][], inside: number[]): boolean[] =>
     faces.map((face) => {
-      const [a, b, c] = face as [
-        [number, number, number],
-        [number, number, number],
-        [number, number, number],
-      ];
+      const [a, b, c] = face as [Vec3, Vec3, Vec3];
       const n = facetNormal(a, b, c);
       const mid = centroid(face);
       return (
