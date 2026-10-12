@@ -76,6 +76,7 @@ export default defineConfig(({ command }) => ({
       'server/**',
       'desktop/**',
       'tests/e2e/**',
+      'tests/pwa/**',
     ],
     coverage: {
       provider: 'v8',

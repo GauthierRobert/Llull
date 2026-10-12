@@ -19,6 +19,7 @@
     "check": "npm run typecheck && npm run arch && npm run deadcode && npm run lint && npm run format:check && npm run test",
     "format:check": "prettier --check \"**/*.{ts,tsx,mts,mjs,cjs,js}\"",
     "test:e2e": "playwright test",
+    "test:pwa": "playwright test -c playwright.pwa.config.ts",
     "quality:fetch": "node quality/fetchCorpus.mjs",
     "quality:step": "npm --prefix server run quality:step",
     "quality:drawings": "npm --prefix server run quality:drawings",
