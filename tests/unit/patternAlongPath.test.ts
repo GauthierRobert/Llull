@@ -7,7 +7,7 @@ import {
   createEmptyDocument,
 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { applyEulerXYZ, eulerFromAxes } from '@core/lib/eulerRotation';
+import { applyEulerXYZ, eulerFromAxes } from '@lib/eulerRotation';
 import { expectNoOp } from '../helpers/expectNoOp';
 
 const ORIGIN: Vec3 = [0, 0, 0];

@@ -12,7 +12,7 @@ import { sweepTriangles } from './sweep';
 import { loftTriangles } from './loft';
 import { subdivisionTriangles } from './subdivision';
 import {
-  boxExtents,
+  boxFaces,
   extrusionRings,
   meshTriangles,
   coneSurface,
@@ -22,54 +22,14 @@ import {
   sideQuads,
   sphereQuads,
   torusQuads,
-  wedgeCorners,
+  wedgeFaces,
 } from './tessellation';
 import { type Triangle, fanTriangulate, earClipTriangulateVerts } from './triangles';
 
 type Kind<K extends Entity['kind']> = Extract<Entity, { kind: K }>;
 
 function triangulateBox(e: Kind<'box'>): Triangle[] {
-  const { x0, x1, y0, y1, z0, z1 } = boxExtents(e.position, e.size);
-  // Counter-clockwise seen from outside (outward normals): -Z, +Z, -Y, +Y, -X, +X.
-  const quads: Vec3[][] = [
-    [
-      [x0, y0, z0],
-      [x0, y1, z0],
-      [x1, y1, z0],
-      [x1, y0, z0],
-    ],
-    [
-      [x0, y0, z1],
-      [x1, y0, z1],
-      [x1, y1, z1],
-      [x0, y1, z1],
-    ],
-    [
-      [x0, y0, z0],
-      [x1, y0, z0],
-      [x1, y0, z1],
-      [x0, y0, z1],
-    ],
-    [
-      [x0, y1, z0],
-      [x0, y1, z1],
-      [x1, y1, z1],
-      [x1, y1, z0],
-    ],
-    [
-      [x0, y0, z0],
-      [x0, y0, z1],
-      [x0, y1, z1],
-      [x0, y1, z0],
-    ],
-    [
-      [x1, y0, z0],
-      [x1, y1, z0],
-      [x1, y1, z1],
-      [x1, y0, z1],
-    ],
-  ];
-  return quads.flatMap(fanTriangulate);
+  return boxFaces(e.position, e.size).flatMap(fanTriangulate);
 }
 
 function triangulateCylinder(e: Kind<'cylinder'>): Triangle[] {
@@ -98,14 +58,7 @@ function triangulateTorus(e: Kind<'torus'>): Triangle[] {
 }
 
 function triangulateWedge(e: Kind<'wedge'>): Triangle[] {
-  const { f00, f10, f11, f01, b00, b10 } = wedgeCorners(e.position, e.size);
-  // Counter-clockwise seen from outside: front (-Z), bottom (-Y), top ramp, then the -X / +X triangles.
-  const quads: Vec3[][] = [
-    [f00, f01, f11, f10],
-    [f00, f10, b10, b00],
-    [f01, b00, b10, f11],
-  ];
-  return [...quads.flatMap(fanTriangulate), [f00, b00, f01], [f10, f11, b10]];
+  return wedgeFaces(e.position, e.size).flatMap(fanTriangulate);
 }
 
 function triangulatePyramid(e: Kind<'pyramid'>): Triangle[] {
@@ -158,7 +111,18 @@ function unrotatedTriangles(e: Entity): Triangle[] {
       return loftTriangles(e, e.position);
     case 'subdivision':
       return subdivisionTriangles(e, e.position);
-    default:
+    case 'line':
+    case 'polyline':
+    case 'arc':
+    case 'circle':
+    case 'rectangle':
+    case 'point':
+    case 'ellipse':
+    case 'spline':
+    case 'text':
+    case 'dimension':
+    case 'image':
+    case 'instance':
       return []; // 2D shapes and instances
   }
 }

@@ -3,7 +3,7 @@
  * @layer domain-aec
  */
 
-import type { CadDocument, DocumentUnit, Vec2 } from '@core/model/types';
+import type { CadDocument, Vec2 } from '@core/model/types';
 import type {
   BimCategory,
   BuildingElement,
@@ -11,31 +11,9 @@ import type {
   BuildingModel,
 } from '@core/model/building';
 import { createEmptyBuilding } from '@core/model/building';
+import { fromMm } from '@core/model/units';
 import { uniqueId } from '@lib/id';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
-
-const METRES_PER_UNIT: Readonly<Record<DocumentUnit, number>> = {
-  mm: 0.001,
-  cm: 0.01,
-  m: 1,
-  in: 0.0254,
-  ft: 0.3048,
-};
-
-/** Converts a length given in millimetres into the document's units. */
-export function fromMm(doc: Pick<CadDocument, 'units'>, millimetres: number): number {
-  return (millimetres * 0.001) / METRES_PER_UNIT[doc.units];
-}
-
-/** Converts a length in document units into millimetres (inverse of `fromMm`). */
-export function toMm(doc: Pick<CadDocument, 'units'>, value: number): number {
-  return value / fromMm(doc, 1);
-}
-
-/** Converts a length in document units to metres. */
-export function toMetres(doc: Pick<CadDocument, 'units'>, value: number): number {
-  return value * METRES_PER_UNIT[doc.units];
-}
 
 export function getBuilding(doc: Pick<CadDocument, 'building'>): BuildingModel {
   return doc.building ?? createEmptyBuilding();

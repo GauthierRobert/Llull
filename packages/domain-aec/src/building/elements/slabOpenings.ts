@@ -14,7 +14,8 @@ import {
   polygonArea,
   segmentsIntersect,
 } from '@lib/polygon';
-import { fromMm, getBuilding, isVec2List, toMetres, toVec2, withElement } from '../model';
+import { fromMm, toMetres } from '@core/model/units';
+import { getBuilding, isVec2List, toVec2, withElement } from '../model';
 import { noop } from '@core/commands/noop';
 import { commitBuilding } from '../evaluate/evaluateElements';
 import { stairPoint } from '../geometry/stairGeometry';

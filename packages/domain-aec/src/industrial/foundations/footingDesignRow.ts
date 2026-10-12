@@ -5,7 +5,7 @@
  */
 
 import type { BuildingModel, FootingElement, SteelMemberElement } from '@core/model/building';
-import { fromMm, toMetres } from '../../building/model';
+import { fromMm, toMetres } from '@core/model/units';
 import { round } from '../../shared/numeric';
 import { findProfile } from '../../steel/profiles';
 import { findPlate, hasCase, ultimateCombinations } from './foundationCombinations';

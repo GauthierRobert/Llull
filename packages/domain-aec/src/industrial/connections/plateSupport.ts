@@ -6,9 +6,9 @@
 
 import type { BasePlateElement, BuildingModel, SteelMemberElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
+import { fromMm } from '@core/model/units';
 import {
   elementsOf,
-  fromMm,
   nextElementId,
   nextMark,
   withElement,

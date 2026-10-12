@@ -1,0 +1,16 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": [
+        "server/src/index.ts",
+        "server/src/occtWorker.ts",
+        "server/src/cli/bin.ts",
+        "server/examples/*.{ts,mts}",
+        "server/tests/**/*.ts",
+        "desktop/src/main.ts",
+        "desktop/tests/**/*.ts"
+      ]
+    }
+  }
+}

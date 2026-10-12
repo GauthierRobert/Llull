@@ -1,7 +1,7 @@
 import { defineConfig, configDefaults } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'node:path';
-import { workspaceAliases } from './workspaceAliases';
+import { workspaceAliases } from './workspaceAliases.ts';
 
 export default defineConfig(({ command }) => ({
   plugins: [react()],
@@ -14,20 +14,28 @@ export default defineConfig(({ command }) => ({
   optimizeDeps: { exclude: ['manifold-3d'] },
   build: {
     chunkSizeWarningLimit: 900, // three.js alone is ~800 kB and cannot be split further
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks(id: string): string | undefined {
-          if (!id.includes('node_modules')) return undefined;
-          if (
-            id.includes('/three/') ||
-            id.includes('three-stdlib') ||
-            id.includes('three-mesh-bvh')
-          )
-            return 'vendor-three';
-          if (id.includes('@react-three') || id.includes('/postprocessing/')) return 'vendor-r3f';
-          if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/scheduler/'))
-            return 'vendor-react';
-          return undefined;
+        // Higher priority wins a shared module, so the leaf libraries (three, react) claim
+        // theirs before vendor-r3f pulls its dependencies in recursively.
+        codeSplitting: {
+          groups: [
+            {
+              name: 'vendor-react',
+              test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/,
+              priority: 2,
+            },
+            {
+              name: 'vendor-r3f',
+              test: /node_modules[\\/](@react-three|postprocessing)[\\/]/,
+              priority: 1,
+            },
+            {
+              name: 'vendor-three',
+              test: /node_modules[\\/](three|three-stdlib|three-mesh-bvh)[\\/]/,
+              priority: 3,
+            },
+          ],
         },
       },
     },
@@ -45,7 +53,7 @@ export default defineConfig(({ command }) => ({
       // manifold-3d's Node-only branch imports node:module; stub it for browser bundles only
       // (the vitest/node run keeps the real module).
       ...(command === 'build'
-        ? { 'node:module': resolve(__dirname, 'src/ui/geometry/nodeModuleStub.ts') }
+        ? { 'node:module': resolve(import.meta.dirname, 'src/ui/geometry/nodeModuleStub.ts') }
         : {}),
       ...workspaceAliases(),
     },
@@ -54,11 +62,20 @@ export default defineConfig(({ command }) => ({
     globals: true,
     environment: 'jsdom',
     setupFiles: './tests/setup.ts',
+    // Domain suites run whole engineering solves (portal-frame design, golden plans) that take
+    // several seconds, more under coverage instrumentation.
+    testTimeout: 30_000,
     // Isolated agent worktrees (continue-working skill) live under the repo root
     // and contain full repo copies; never scan them for tests.
     // `server/**` has its own node-env vitest config — keep it out of the app
     // (jsdom) suite so the two never cross-contaminate.
-    exclude: [...configDefaults.exclude, '.claude/worktrees/**', 'server/**', 'desktop/**', 'tests/e2e/**'],
+    exclude: [
+      ...configDefaults.exclude,
+      '.claude/worktrees/**',
+      'server/**',
+      'desktop/**',
+      'tests/e2e/**',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],

@@ -31,12 +31,12 @@ const UNAUTHORIZED = { error: 'Unauthorized — valid Bearer token required.' };
 export const sha256Hex = (value: string): string =>
   crypto.createHash('sha256').update(value).digest('hex');
 
-export function isRole(value: unknown): value is Role {
+function isRole(value: unknown): value is Role {
   return value === 'viewer' || value === 'editor' || value === 'admin';
 }
 
 /** True when `role` is at least `required`. */
-export function roleAtLeast(role: Role, required: Role): boolean {
+function roleAtLeast(role: Role, required: Role): boolean {
   return ROLE_RANK[role] >= ROLE_RANK[required];
 }
 
@@ -51,7 +51,7 @@ function parseUser(raw: unknown): NamedUser | null {
 let cache: { path: string; stamp: string; users: NamedUser[] } | null = null;
 
 /** Users file path, or undefined when named-user mode is off. */
-export function usersFilePath(): string | undefined {
+function usersFilePath(): string | undefined {
   const value = process.env['LLULL_USERS_FILE'];
   return value === undefined || value.trim() === '' ? undefined : value.trim();
 }
@@ -109,7 +109,7 @@ export function authenticateToken(token: string): NamedUser | null {
 }
 
 /** Bearer header token, or (when `allowQuery`) `?access_token=` for EventSource / downloads. */
-export function presentedToken(req: Request, allowQuery: boolean): string | undefined {
+function presentedToken(req: Request, allowQuery: boolean): string | undefined {
   const header = req.headers['authorization'];
   if (typeof header === 'string') {
     const presented = /^bearer +(.+)$/i.exec(header)?.[1];
@@ -121,7 +121,17 @@ export function presentedToken(req: Request, allowQuery: boolean): string | unde
 /** The authenticated user of this request (set by `requireRole`), if any. */
 export function requestUser(res: Response): NamedUser | undefined {
   const user: unknown = res.locals['llullUser'];
-  return isRecord(user) ? (user as unknown as NamedUser) : undefined;
+  return isNamedUser(user) ? user : undefined;
+}
+
+function isNamedUser(value: unknown): value is NamedUser {
+  return (
+    isRecord(value) &&
+    typeof value['id'] === 'string' &&
+    typeof value['name'] === 'string' &&
+    isRole(value['role']) &&
+    typeof value['tokenSha256'] === 'string'
+  );
 }
 
 /**

@@ -5,7 +5,8 @@
 import type { BuildingModel, SteelMemberElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import type { FrameNode } from '@lib/frame2d';
-import { elementsOf, toMm } from '../../building/model';
+import { toMm } from '@core/model/units';
+import { elementsOf } from '../../building/model';
 import { GRAVITY } from '../../shared/numeric';
 import { findProfile, sectionProperties } from '../../steel/profiles';
 import { E_STEEL } from '../steelDesign/steelDesign';

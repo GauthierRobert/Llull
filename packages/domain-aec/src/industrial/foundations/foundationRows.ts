@@ -4,7 +4,7 @@
 
 import type { FootingElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
-import { toMetres } from '../../building/model';
+import { toMetres } from '@core/model/units';
 import {
   BACKFILL_UNIT_WEIGHT,
   CONCRETE_UNIT_WEIGHT,

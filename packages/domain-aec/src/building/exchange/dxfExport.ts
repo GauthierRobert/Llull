@@ -5,7 +5,8 @@
 import { type CadDocument, type Entity, type Vec2, is2D } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { fileSlug, fromMm, getBuilding } from '../model';
+import { fromMm } from '@core/model/units';
+import { fileSlug, getBuilding } from '../model';
 import { noop } from '@core/commands/noop';
 import { buildPlanDrawing } from '../drawings/planDrawing';
 import { DxfWriter, HIDDEN_LAYERS, INSUNITS, fmt, writePrimitive } from './dxfWriter';

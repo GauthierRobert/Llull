@@ -11,7 +11,7 @@ import type { Vec2 } from '@core/model/types';
  * (scripts/generate-civil-samples.mjs), local site grid in metres.
  */
 
-export interface CivilManholeIntent {
+interface CivilManholeIntent {
   name: string;
   location: Vec2;
   /** Invert chosen by the scripted engineer (the brief leaves inverts to the designer). */

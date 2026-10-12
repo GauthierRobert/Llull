@@ -32,12 +32,12 @@ export interface CliBackend {
 }
 
 /** The backup kept next to a local document before each save: one level of undo. */
-export function backupPathOf(docPath: string): string {
+function backupPathOf(docPath: string): string {
   return `${docPath}.bak`;
 }
 
 /** The document stored at `docPath`; an empty document when the file does not exist yet. */
-export function readDocumentFile(docPath: string): CadDocument {
+function readDocumentFile(docPath: string): CadDocument {
   if (!fs.existsSync(docPath)) return createEmptyDocument();
   return deserializeDocument(fs.readFileSync(docPath, 'utf8'));
 }

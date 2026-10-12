@@ -6,14 +6,8 @@ import type { CadDocument, Vec3 } from '@core/model/types';
 import type { SteelMemberElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, looseVec3, z } from '@core/commands/schema';
-import {
-  elementAffected,
-  fromMm,
-  getBuilding,
-  resolveLevel,
-  toMetres,
-  withElement,
-} from '../../building/model';
+import { fromMm, toMetres } from '@core/model/units';
+import { elementAffected, getBuilding, resolveLevel, withElement } from '../../building/model';
 import { noop } from '@core/commands/noop';
 import { duplicateSummary, findTwin, sameSegment } from '../../shared/duplicates';
 import { regenerateBuilding } from '../../building/evaluate/evaluateElements';

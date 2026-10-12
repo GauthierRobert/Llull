@@ -8,9 +8,10 @@
 
 import type { FinishPattern, Material } from '../model/types';
 import { parseHexRgb } from '../lib/isHexColor';
+import { map3 } from '../lib/vec3';
 
 /** Texture tile edge in pixels. */
-export const FINISH_TEXTURE_SIZE = 256;
+const FINISH_TEXTURE_SIZE = 256;
 
 /** RGBA maps of one finish tile (`size` × `size` pixels each). */
 export interface FinishMaps {
@@ -109,7 +110,7 @@ export function finishMaps(
   const second =
     finish.color2 !== undefined
       ? hexRgb(finish.color2)
-      : (base.map((c) => Math.min(255, c * 1.18 + 10)) as unknown as Rgb);
+      : map3(base, (c) => Math.min(255, c * 1.18 + 10));
   const strength = finish.normalStrength ?? 1;
   const pixels = size * size;
   const heights = new Float32Array(pixels);

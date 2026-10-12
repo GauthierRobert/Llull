@@ -31,7 +31,7 @@ function bundle() {
     tsconfig: path.join(serverDir, 'tsconfig.json'),
     bundle: true,
     platform: 'node',
-    target: 'node20',
+    target: 'node22',
     format: 'cjs',
     packages: 'external',
     outfile: temporary,

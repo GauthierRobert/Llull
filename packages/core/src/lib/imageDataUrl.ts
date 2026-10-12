@@ -7,7 +7,7 @@
 
 import { base64ToUint8Array } from './base64';
 
-export type RasterMime = 'image/png' | 'image/jpeg';
+type RasterMime = 'image/png' | 'image/jpeg';
 
 export type ParsedImageDataUrl =
   | {

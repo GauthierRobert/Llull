@@ -7,7 +7,8 @@
 
 import type { CadDocument, Vec3 } from '@core/model/types';
 import type { BaseFixity, BuildingModel, JointFixity, MemberRole } from '@core/model/building';
-import { elementsOf, fromMm, getBuilding } from '../../building/model';
+import { fromMm } from '@core/model/units';
+import { elementsOf, getBuilding } from '../../building/model';
 import { GRAVITY } from '../../shared/numeric';
 import { findProfile, sectionProperties, type SteelProfile } from '../../steel/profiles';
 import { yieldStrength } from './steelDesign';
@@ -212,6 +213,9 @@ export function compressionClass(profile: SteelProfile, fy: number): 1 | 2 | 3 |
       return null;
   }
 }
+
+/** Beams whose top of steel differs by less than this are one floor level, mm. */
+export const LEVEL_TOLERANCE = 150;
 
 /** Means of the groups of `values` whose neighbours (sorted) lie within `tolerance`: the levels they stand at. */
 export const clusterMeans = (values: ReadonlyArray<number>, tolerance: number): number[] => {

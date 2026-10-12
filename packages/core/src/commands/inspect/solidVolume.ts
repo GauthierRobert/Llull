@@ -135,7 +135,17 @@ export function solidVolume(
       return { volume: closedMeshVolume(loftTriangles(e).flat(2)) };
     case 'subdivision':
       return { volume: closedMeshVolume(subdivisionTriangles(e).flat(2)) };
-    default:
+    case 'line':
+    case 'polyline':
+    case 'arc':
+    case 'circle':
+    case 'rectangle':
+    case 'point':
+    case 'ellipse':
+    case 'spline':
+    case 'text':
+    case 'dimension':
+    case 'image':
       return {
         error:
           `entity '${e.id}' is kind '${e.kind}'; ` +

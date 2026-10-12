@@ -12,7 +12,7 @@ import type {
   MomentConnectionElement,
   SteelMemberElement,
 } from '@core/model/building';
-import { fromMm } from '../../building/model';
+import { fromMm } from '@core/model/units';
 import { base, colorForMaterial, meshEntity, orientedBox } from '../../building/evaluate/entities';
 import { prismMesh, sweepFrame, type SweepFrame } from '../../shared/mesh';
 import { circlePolygon } from '@lib/arc';

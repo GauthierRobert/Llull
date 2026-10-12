@@ -3,7 +3,7 @@ import { createEmptyDocument } from '@core/model/types';
 import type { ExtrusionEntity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { entityToTriangles } from '@core/geometry/entityTriangles';
-import { polygonArea } from '@core/lib/polygon';
+import { polygonArea } from '@lib/polygon';
 import { isWatertight, signedVolume, triArea2D } from './gearTestUtils';
 
 describe('add_spur_gear end caps (regression)', () => {

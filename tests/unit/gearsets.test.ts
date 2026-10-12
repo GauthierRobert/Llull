@@ -3,8 +3,8 @@ import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument, ExtrusionEntity, MeshSolidEntity, Vec3 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { planetaryPhases } from '@core/commands/solids/gearsPlanetary';
-import { polygonArea } from '@core/lib/polygon';
-import type { Point2 } from '@core/lib/polygon';
+import { polygonArea } from '@lib/polygon';
+import type { Point2 } from '@lib/polygon';
 import { buildSpurGearProfile } from '@core/commands/solids/gears';
 import {
   isWatertight,

@@ -181,8 +181,10 @@ const WELD_SCALE = 1e6;
 /** Primitive tessellation never reads components; instances are not boolean operands. */
 const NO_COMPONENTS = createEmptyDocument();
 
-/** Untransformed primitive of a solid entity, or null for degenerate / unsupported entities. */
-function primitiveOf(m: ManifoldModule, entity: Entity): ManifoldShape | null {
+type PrimitiveEntity = Extract<Entity, { kind: 'box' | 'cylinder' | 'sphere' | 'extrusion' }>;
+
+/** Untransformed Manifold primitive of a box / cylinder / sphere / extrusion; null when degenerate. */
+function primitiveOf(m: ManifoldModule, entity: PrimitiveEntity): ManifoldShape | null {
   switch (entity.kind) {
     case 'box': {
       const [sx, sy, sz] = entity.size;
@@ -203,8 +205,6 @@ function primitiveOf(m: ManifoldModule, entity: Entity): ManifoldShape | null {
       section.delete();
       return prim;
     }
-    default:
-      return null;
   }
 }
 
@@ -233,7 +233,18 @@ function entityToManifold(m: ManifoldModule, entity: Entity): ManifoldShape | nu
         prim.delete();
       }
     }
-    default:
+    case 'line':
+    case 'polyline':
+    case 'arc':
+    case 'circle':
+    case 'rectangle':
+    case 'point':
+    case 'ellipse':
+    case 'spline':
+    case 'text':
+    case 'dimension':
+    case 'image':
+    case 'instance':
       return null;
   }
 }
@@ -259,7 +270,7 @@ const COMBINE = { union: 'add', subtract: 'subtract', intersect: 'intersect' } a
  * Native Manifold operations behind the recipe evaluator. Manifold is a mesh kernel: no B-rep, so
  * fillet / chamfer / shell / blend, `topology` and `exportStep` are null.
  */
-export function manifoldOps(mod: ManifoldModule): KernelOps<ManifoldShape> {
+function manifoldOps(mod: ManifoldModule): KernelOps<ManifoldShape> {
   return {
     unsupported: new Set(['fillet', 'chamfer', 'shell', 'blend']),
     solid: (entity) => withOwned(() => entityToManifold(mod, entity)),

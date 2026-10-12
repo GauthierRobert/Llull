@@ -4,7 +4,7 @@
 
 import type { FootingElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
-import { fromMm, toMetres } from '../../building/model';
+import { fromMm, toMetres } from '@core/model/units';
 import type { BaseReaction } from '../frames/frameModelSolve';
 import type { Combination, FootingCheckContext } from './foundationModel';
 import { footingRows } from './foundationRows';

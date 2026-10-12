@@ -7,7 +7,8 @@
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { fileSlug, getBuilding, toMm } from '../model';
+import { toMm } from '@core/model/units';
+import { fileSlug, getBuilding } from '../model';
 import { noop } from '@core/commands/noop';
 import { type PlanDrawing, type PlanPrimitive } from './planModel';
 import { buildPlanDrawing } from './planDrawing';

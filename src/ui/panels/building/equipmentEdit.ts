@@ -9,7 +9,7 @@
 import type { EquipmentElement } from '@core/model/building';
 import { FieldReader, radians, result } from './elementToolForm';
 
-export type EquipmentEditKey =
+type EquipmentEditKey =
   | 'mark'
   | 'name'
   | 'x'

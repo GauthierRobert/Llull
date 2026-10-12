@@ -72,7 +72,7 @@ app.use('/mcp', buildMcpRouter(exchange));
 const staticDir = process.env['LLULL_STATIC_DIR'];
 if (staticDir !== undefined && staticDir !== '') {
   app.use(express.static(staticDir));
-  app.get('*', (req, res, next) =>
+  app.get('/{*path}', (req, res, next) =>
     req.accepts('html') === 'html' ? res.sendFile(path.resolve(staticDir, 'index.html')) : next(),
   );
 }

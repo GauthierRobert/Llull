@@ -16,7 +16,7 @@ import type { AlignmentObject } from '@core/model/civil';
 import { horizontalElements } from '../alignment/alignmentGeometry';
 import { validateProfile, verticalCurves } from '../alignment/profileGeometry';
 import { formatStation } from '../model';
-import { toMetres } from '../../building/model';
+import { toMetres } from '@core/model/units';
 
 export const MAX_SUPERELEVATION = 0.07;
 /** Comfort criterion: rate of change of lateral acceleration (m/s^3). */

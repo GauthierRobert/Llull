@@ -13,7 +13,7 @@ import type { Triangle } from '@core/geometry/triangles';
 import { positionsGeometry } from '../../lineGeometry';
 
 /** Edges sharper than this stay hard (radians). */
-export const MESH_CREASE_ANGLE = (30 * Math.PI) / 180;
+const MESH_CREASE_ANGLE = (30 * Math.PI) / 180;
 
 /** @pure — returns a new non-indexed geometry with `position` + `normal` attributes. */
 export function buildMeshSolidGeometry(mesh: MeshData): THREE.BufferGeometry {

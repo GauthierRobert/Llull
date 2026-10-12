@@ -12,7 +12,8 @@ import type {
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { getBuilding, orderedElements, toMm } from '../../building/model';
+import { toMm } from '@core/model/units';
+import { getBuilding, orderedElements } from '../../building/model';
 import { round } from '../../shared/numeric';
 import { noop } from '@core/commands/noop';
 import { sweepFrame } from '../../shared/mesh';

@@ -11,7 +11,7 @@
  */
 
 import { boundsCorners, localBounds } from '@core/geometry/bounds';
-import { applyEulerXYZ } from '@core/lib/eulerRotation';
+import { applyEulerXYZ } from '@lib/eulerRotation';
 import { sweepSegmentRings } from '@core/geometry/sweep';
 import { loftRings } from '@core/geometry/loft';
 import { circlePoints } from '@core/geometry/tessellation';

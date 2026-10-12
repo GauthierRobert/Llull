@@ -11,7 +11,7 @@ import { civilMesh, civilPoint, civilPolyline, civilText } from '../entities';
 import { contourLevels, tinBounds, tinMesh, traceContour, type Tin } from './tin';
 import { surfaceTin } from './surfaceTin';
 import { labelHeight, type CivilContext } from '../context';
-import { toMetres } from '../../building/model';
+import { toMetres } from '@core/model/units';
 
 /** Above this many points a group is kept as data only (no per-point markers). */
 export const MAX_DRAWN_POINTS = 2000;

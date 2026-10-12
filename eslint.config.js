@@ -1,0 +1,70 @@
+/* ESLint flat config — strict but pragmatic. */
+import js from '@eslint/js';
+import reactHooks from 'eslint-plugin-react-hooks';
+import globals from 'globals';
+import tseslint from 'typescript-eslint';
+
+export default tseslint.config(
+  {
+    // Isolated agent worktrees hold full repo copies; never lint them twice.
+    ignores: [
+      '**/dist/**',
+      '**/coverage/**',
+      '**/node_modules/**',
+      '**/*.cjs',
+      '.claude/worktrees/**',
+    ],
+  },
+  js.configs.recommended,
+  tseslint.configs.recommended,
+  {
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: { ...globals.browser, ...globals.node },
+    },
+    plugins: { 'react-hooks': reactHooks },
+    rules: {
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': ['warn', { additionalHooks: '(useDisposable)' }],
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/explicit-function-return-type': ['warn', { allowExpressions: true }],
+      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { group: ['@core/lib/*'], message: 'Import core helpers via @lib/* instead.' },
+          ],
+        },
+      ],
+      '@typescript-eslint/consistent-type-imports': [
+        'error',
+        { fixStyle: 'separate-type-imports', disallowTypeAnnotations: false },
+      ],
+    },
+  },
+  {
+    files: ['src/**/*.{ts,tsx}', 'packages/*/src/**/*.ts', 'server/src/**/*.ts'],
+    rules: { 'max-lines': ['error', { max: 500, skipBlankLines: true, skipComments: true }] },
+  },
+  {
+    // server/ and desktop/ ship as CommonJS bundles (esbuild --format=cjs) but type-check with
+    // bundler resolution, so tsc would not flag ESM-only syntax.
+    files: ['server/src/**/*.ts', 'desktop/src/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "MetaProperty[meta.name='import']",
+          message: 'import.meta does not exist in the CommonJS server/desktop bundles.',
+        },
+      ],
+    },
+  },
+  {
+    // Plain-JS Node scripts (quality/*.mjs) cannot declare return types.
+    files: ['**/*.mjs', '**/*.js'],
+    rules: { '@typescript-eslint/explicit-function-return-type': 'off' },
+  },
+);

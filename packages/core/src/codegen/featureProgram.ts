@@ -135,9 +135,22 @@ function lowerShape(entity: Entity, doc: CadDocument, raw: unknown, ctx: LowerCo
         creases: entity.creases,
         levels: entity.levels,
       };
-    default: {
+    case 'mesh':
+    case 'sweep':
+    case 'loft':
+    case 'line':
+    case 'polyline':
+    case 'arc':
+    case 'circle':
+    case 'rectangle':
+    case 'point':
+    case 'ellipse':
+    case 'spline':
+    case 'text':
+    case 'dimension':
+    case 'image':
+    case 'instance':
       return { kind: 'mesh', positions: entityTrianglePositions(entity, doc) };
-    }
   }
 }
 

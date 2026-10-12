@@ -5,7 +5,7 @@
  * (it only ever sees the data URL).
  */
 
-export const IMAGE_REF_PREFIX = '@img:';
+const IMAGE_REF_PREFIX = '@img:';
 
 const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47];
 

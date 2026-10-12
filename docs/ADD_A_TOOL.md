@@ -56,9 +56,9 @@ export const editCommands = commandCatalog(
 
 `registry.ts` registers every feature catalog; you never edit it for a new command.
 
-Plugin command — add it to the plugin's command list (for the AEC plugins,
-`packages/domain-aec/src/index.ts`); installing the plugin registers it and places it in the
-plugin's toolset.
+Plugin command — list it in its domain's catalog (for the AEC plugins,
+`packages/domain-aec/src/<building|industrial|civil>/catalog.ts`, the same shape as a core feature
+folder); installing the plugin registers it and places it in the plugin's toolset.
 
 That's it for MCP — the MCP host reads the registry, so `scale_uniform` is now a callable
 tool for Claude and any MCP agent automatically (agents find it with `search_tools` and load

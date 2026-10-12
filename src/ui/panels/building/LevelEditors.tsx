@@ -29,7 +29,7 @@ const CATEGORY_LABELS: Record<(typeof COPYABLE)[number], string> = {
 };
 
 /** Copyable categories of copy_level_elements (read from the AEC command). */
-export const COPYABLE_CATEGORIES: ReadonlyArray<readonly [string, string]> = COPYABLE.map(
+const COPYABLE_CATEGORIES: ReadonlyArray<readonly [string, string]> = COPYABLE.map(
   (category) => [category, CATEGORY_LABELS[category]] as const,
 );
 

@@ -109,7 +109,7 @@ export function meshTriangles(mesh: {
 }
 
 /** Axis-aligned extents of a box centred at `position`. */
-export function boxExtents(
+function boxExtents(
   position: Vec3,
   size: Vec3,
 ): { x0: number; x1: number; y0: number; y1: number; z0: number; z1: number } {
@@ -126,7 +126,7 @@ export function boxExtents(
 }
 
 /** The six corners of a wedge whose lower-front-left corner is at `position` (size = [w, h, d]). */
-export function wedgeCorners(
+function wedgeCorners(
   position: Vec3,
   size: Vec3,
 ): { f00: Vec3; f10: Vec3; f11: Vec3; f01: Vec3; b00: Vec3; b10: Vec3 } {
@@ -141,6 +141,61 @@ export function wedgeCorners(
     b00: p(0, 0, d),
     b10: p(w, 0, d),
   };
+}
+
+/** Six outward-facing quads of a box centred at `position` (counter-clockwise from outside): -Z, +Z, -Y, +Y, -X, +X. */
+export function boxFaces(position: Vec3, size: Vec3): Vec3[][] {
+  const { x0, x1, y0, y1, z0, z1 } = boxExtents(position, size);
+  return [
+    [
+      [x0, y0, z0],
+      [x0, y1, z0],
+      [x1, y1, z0],
+      [x1, y0, z0],
+    ],
+    [
+      [x0, y0, z1],
+      [x1, y0, z1],
+      [x1, y1, z1],
+      [x0, y1, z1],
+    ],
+    [
+      [x0, y0, z0],
+      [x1, y0, z0],
+      [x1, y0, z1],
+      [x0, y0, z1],
+    ],
+    [
+      [x0, y1, z0],
+      [x0, y1, z1],
+      [x1, y1, z1],
+      [x1, y1, z0],
+    ],
+    [
+      [x0, y0, z0],
+      [x0, y0, z1],
+      [x0, y1, z1],
+      [x0, y1, z0],
+    ],
+    [
+      [x1, y0, z0],
+      [x1, y1, z0],
+      [x1, y1, z1],
+      [x1, y0, z1],
+    ],
+  ];
+}
+
+/** Outward-facing faces of a wedge (counter-clockwise from outside): front, bottom, top slope, then the -X / +X triangles. */
+export function wedgeFaces(position: Vec3, size: Vec3): Vec3[][] {
+  const { f00, f10, f11, f01, b00, b10 } = wedgeCorners(position, size);
+  return [
+    [f00, f01, f11, f10],
+    [f00, f10, b10, b00],
+    [f01, b00, b10, f11],
+    [f00, b00, f01],
+    [f10, f11, b10],
+  ];
 }
 
 /** Faces of a pyramid whose base centre is `position` (base face down, then 4 sides to the apex). */

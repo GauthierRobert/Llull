@@ -106,7 +106,8 @@ function SceneContents({
     <>
       <color attach="background" args={[palette.background]} />
 
-      {/* up={[0,0,1]}: world up is +Z (right-handed, Z-up document convention). */}
+      {/* up={[0,0,1]}: world up is +Z (right-handed, Z-up document convention); OrbitControls
+          orbits about the camera's up. */}
       <PerspectiveCamera
         makeDefault
         fov={VIEWPORT_FOV_DEGREES}
@@ -124,7 +125,6 @@ function SceneContents({
         dampingFactor={0.06}
         screenSpacePanning={false}
         enabled={orbitEnabled}
-        up={[0, 0, 1]}
       />
 
       <CameraReactor />

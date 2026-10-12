@@ -6,13 +6,13 @@
  */
 
 import * as THREE from 'three';
-import type { MeshProps } from '@react-three/fiber';
+import type { ThreeElements } from '@react-three/fiber';
 import type { Vec2 } from '@core/model/types';
 import { useStore } from '@ui/store';
 import { useDisposable } from '../useDisposable';
 
 type GroundPlaneProps = Pick<
-  MeshProps,
+  ThreeElements['mesh'],
   'onPointerMove' | 'onPointerDown' | 'onPointerUp' | 'onPointerLeave' | 'onClick' | 'onDoubleClick'
 > & { z?: number };
 

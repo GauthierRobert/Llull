@@ -20,7 +20,7 @@ import * as THREE from 'three';
 
 function withDisposeSpy<T extends THREE.BufferGeometry | THREE.Material>(
   make: () => T,
-  use: (obj: T) => void,
+  consume: (obj: T) => void,
 ): { disposeCalled: boolean } {
   const obj = make();
   let called = false;
@@ -29,7 +29,7 @@ function withDisposeSpy<T extends THREE.BufferGeometry | THREE.Material>(
     called = true;
     original();
   };
-  use(obj);
+  consume(obj);
   obj.dispose();
   return { disposeCalled: called };
 }

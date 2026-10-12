@@ -15,15 +15,13 @@ import type {
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
 import { distance, isValidPolygon, offsetPolygon, polygonArea } from '@lib/polygon';
+import { fromMm, toMetres, toMm } from '@core/model/units';
 import {
-  fromMm,
   getBuilding,
   isVec2List,
   nextElementId,
   nextMark,
   resolveLevel,
-  toMetres,
-  toMm,
   toVec2,
   withElement,
 } from '../model';

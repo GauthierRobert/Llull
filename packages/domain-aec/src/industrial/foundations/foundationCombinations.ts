@@ -9,7 +9,7 @@ import type {
   SteelMemberElement,
 } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
-import { toMetres } from '../../building/model';
+import { toMetres } from '@core/model/units';
 import { type BaseReaction } from '../frames/frameModelSolve';
 import { WIND_CASES, WIND_PRESSURE_CASES, type LoadCase } from '../frames/frameModelTypes';
 import { type Combination, type Factors, TOLERANCE_METRES } from './foundationModel';

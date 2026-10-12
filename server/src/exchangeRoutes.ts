@@ -1,37 +1,19 @@
 /**
  * @layer server
  * POST /exchange `{ name, params }` — the exchange tools (export_step, import_step, import_dwg,
- * import_code) for REST callers: the `llull` CLI with `--app` / `--server`. The same handlers as
- * MCP (`applyExchangeToolCall`); document changes go through the command bus (undo, live sync,
- * audit). Answers the command bus shape plus `changed`.
+ * import_code) for REST callers: the `llull` CLI with `--app` / `--server` (`liveExchange.ts`).
+ * Answers the command bus shape plus `changed`.
  */
 
 import { Router, type RequestHandler } from 'express';
-import { applyExchangeToolCall } from '@mcp/index';
+import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
-import { applyCommand } from './commandBus';
 import { unshapeExchangeResult } from './exchangeResult';
+import { applyLiveExchangeToolCall } from './liveExchange';
 import { getLiveDoc } from './liveDocument';
 import type { ExchangeOptions } from './pythonExchange';
 import { guardMutation } from './security';
-import { actorOf, type Actor } from './audit';
-
-/** Run an exchange tool against the live document; its commands go through the command bus. */
-export function applyLiveExchangeToolCall(
-  name: string,
-  params: unknown,
-  exchange: ExchangeOptions,
-  actor: Actor,
-): ReturnType<typeof applyExchangeToolCall> {
-  return applyExchangeToolCall(name, params, {
-    port: exchange.port,
-    dwg: exchange.dwg ?? null,
-    getDoc: getLiveDoc,
-    applyCommand: (commandName, commandParams) =>
-      applyCommand(commandName, commandParams, undefined, actor),
-    allowCodeExecution: exchange.allowCodeExecution,
-  });
-}
+import { actorOf } from './audit';
 
 export function buildExchangeRouter(
   restLimiter: RequestHandler,
@@ -58,7 +40,7 @@ export function buildExchangeRouter(
           .json({ ...unshapeExchangeResult(shaped), changed: getLiveDoc() !== before });
       })
       .catch((error: unknown) => {
-        res.status(500).json({ error: String(error) });
+        res.status(500).json({ error: errorMessage(error) });
       });
   });
   return router;

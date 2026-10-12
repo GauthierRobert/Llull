@@ -52,7 +52,7 @@ export function installUsersFile(dir: string, users: readonly TestUser[]): strin
   return file;
 }
 
-export const ENV_KEYS = [
+const ENV_KEYS = [
   'LLULL_USERS_FILE',
   'LLULL_AUDIT_FILE',
   'LLULL_AUDIT_MAX_BYTES',

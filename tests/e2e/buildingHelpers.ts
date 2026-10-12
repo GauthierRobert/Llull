@@ -84,12 +84,15 @@ export async function scheduleCsv(
 }
 
 export async function openProjectFile(page: Page, text: string): Promise<void> {
-  await page.locator('input[type="file"]').evaluate((input, content) => {
-    const transfer = new DataTransfer();
-    transfer.items.add(new File([content], 'project.json', { type: 'application/json' }));
-    (input as HTMLInputElement).files = transfer.files;
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-  }, text);
+  await page
+    .getByRole('group', { name: 'Project file' })
+    .locator('input[type="file"]')
+    .evaluate((input, content) => {
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([content], 'project.json', { type: 'application/json' }));
+      (input as HTMLInputElement).files = transfer.files;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }, text);
 }
 
 export const status = (page: Page): ReturnType<Page['getByTestId']> =>

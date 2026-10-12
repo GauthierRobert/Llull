@@ -6,7 +6,8 @@
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { elementsOf, fileSlug, getBuilding, toMetres, toMm } from '../model';
+import { toMetres, toMm } from '@core/model/units';
+import { elementsOf, fileSlug, getBuilding } from '../model';
 import { noop } from '@core/commands/noop';
 import { escapeXml } from '@lib/escapeXml';
 import { sub2 } from '@lib/vec2';

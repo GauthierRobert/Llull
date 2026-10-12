@@ -32,19 +32,30 @@ async function main() {
 
   const text = collectText(input);
   if (/\bconsole\.log\s*\(/.test(text))
-    notes.push('console.log present — remove before commit (console.warn/error allowed). [conventions C6]');
+    notes.push(
+      'console.log present — remove before commit (console.warn/error allowed). [conventions C6]',
+    );
   if (/^packages\/(core\/src\/commands|domain-[^/]+\/src)\//.test(filePath))
     notes.push(
       'Command layer changed — defineCommand + registered (registry.ts or plugin commands), happy + ' +
         'failure + `is pure` tests, then `npm run check`. [rules/commands.md]',
     );
-  if (/\.(ts|tsx)$/.test(filePath) && /\bdefineCommand\s*\(/.test(text) && !/^(packages\/[^/]+\/src|tests)\//.test(filePath))
-    notes.push('defineCommand outside packages/*/src — commands belong in core or a plugin. [architecture L1]');
+  if (
+    /\.(ts|tsx)$/.test(filePath) &&
+    /\bdefineCommand\s*\(/.test(text) &&
+    !/^(packages\/[^/]+\/src|tests)\//.test(filePath)
+  )
+    notes.push(
+      'defineCommand outside packages/*/src — commands belong in core or a plugin. [architecture L1]',
+    );
 
   if (notes.length === 0) return;
   process.stdout.write(
     JSON.stringify({
-      hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: 'llull:\n- ' + notes.join('\n- ') },
+      hookSpecificOutput: {
+        hookEventName: 'PostToolUse',
+        additionalContext: 'llull:\n- ' + notes.join('\n- '),
+      },
     }),
   );
 }

@@ -107,7 +107,7 @@ function groupPolylines(raw: readonly DxfRecord[]): DxfRecord[] {
   return result;
 }
 
-export function codeValue(record: DxfRecord, code: number): string | undefined {
+function codeValue(record: DxfRecord, code: number): string | undefined {
   return record.codes.find(([candidate]) => candidate === code)?.[1];
 }
 
@@ -293,7 +293,7 @@ export interface FlattenResult {
 }
 
 /** Primitives produced by one flatten at most (nested block inserts can multiply exponentially). */
-export const MAX_DXF_PRIMITIVES = 200000;
+const MAX_DXF_PRIMITIVES = 200000;
 
 /**
  * World-space primitives of every entity (block inserts expanded up to `maxDepth`); entities past

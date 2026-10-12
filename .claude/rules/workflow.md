@@ -5,7 +5,7 @@
 1. Locate the layer (architecture.md decision shortcuts).
 2. Write the change **and its test in the same change** (`packages/*` logic always). A bug fix
    starts with a failing test or golden plan (`fix-bug` skill).
-3. `npm run check` (typecheck + lint + format:check + test) → green. While iterating, run the
+3. `npm run check` (typecheck + arch + deadcode + lint + format:check + test) → green. While iterating, run the
    slice: `npx vitest run <file>` or `npx vitest related --run <changed files>`.
 4. Viewport/UI work: verify in the running app (`verify-llull` skill).
 

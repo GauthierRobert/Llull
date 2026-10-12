@@ -19,14 +19,14 @@ This is the whole design. Protect it.
 
 | Concern    | Choice                                  |
 | ---------- | --------------------------------------- |
-| UI         | React 18 + TypeScript (strict) + Vite   |
+| UI         | React 19 + TypeScript (strict) + Vite   |
 | 3D viewport| three.js + @react-three/fiber + drei (perspective) |
 | 2D viewport| same three.js scene, orthographic top-down; Line/Shape geometry |
 | State      | Zustand (single store, `dispatch`)      |
 | Schemas    | zod v4 (one schema per command → TS type + MCP JSON Schema + runtime validation) |
 | Kernels    | Manifold (default) / OpenCascade.js, behind `GeometryKernel` |
 | Tests      | Vitest + Testing Library                |
-| Lint/fmt   | ESLint + Prettier (`npm run check`)     |
+| Lint/fmt   | ESLint (flat config) + Prettier + knip (`npm run check`) |
 | Backend    | Node + Express (optional: MCP host + shared live document) |
 | Desktop    | Electron shell (`desktop/`) over the unchanged server + web app; bundled CPython + CadQuery |
 | Agents     | Local: Claude Code + `llull` CLI (`--app` drives the desktop window). Cloud: MCP (`/mcp`) |
@@ -50,8 +50,9 @@ packages/core/src/          @core  Framework-agnostic brain. NO react / DOM / wi
   plugins/                         plugin.ts (CadPlugin) · host.ts (installPlugin, derivedEntityIds)
   codegen/                         CadQuery / build123d / OpenSCAD / FreeCAD emitters
 packages/mcp/src/           @mcp   MCP tools/resources/prompts/toolsets/discovery/liveSync over the registry
-packages/domain-aec/src/    @aec   plugins: building/ (elements, geometry, evaluate, drawings, exchange,
-                                   quantities) · industrial/<discipline>/ · civil/<topic>/ · shared/
+packages/domain-aec/src/    @aec   plugins, each `<domain>/{catalog,plugin}.ts`: building/ (elements, geometry,
+                                   evaluate, drawings, exchange, quantities) · industrial/<discipline>/ ·
+                                   civil/<topic>/ · steel/ · shared/ · index.ts (public API)
 packages/kernel-manifold/src/ @kernel-manifold   Manifold GeometryKernel
 packages/kernel-occt/src/   @kernel-occt       OpenCascade GeometryKernel
 src/app/                    @app   Composition root: installDefaultPlugins()
@@ -120,8 +121,9 @@ Main thread by default; delegate for ≥ 2 independent lanes or > ~4 files in on
 ```bash
 npm install          # root + every packages/* workspace
 npm run dev          # app at http://localhost:5173
-npm run check        # typecheck + arch + lint + format:check + test — MUST pass before commit
+npm run check        # typecheck + arch + deadcode + lint + format:check + test — MUST pass before commit
 npm run arch         # dependency rules (layering, public API, no cycles) — .dependency-cruiser.cjs
+npm run deadcode     # no unused exports / exported types (knip, knip.json)
 npm run claude:lint  # .claude/ references (skills, agents, paths) resolve — run after editing .claude/
 npm run test:coverage
 npm run quality       # import + display quality gates on real CAD files (docs/QUALITY_GATES.md)

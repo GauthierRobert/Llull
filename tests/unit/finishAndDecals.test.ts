@@ -9,8 +9,8 @@ import {
 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { serializeDocument } from '@core/commands/persistence/serialization';
-import { encodePng } from '@core/lib/png';
-import { hasGlyph, rasterizeText } from '@core/lib/blockFont';
+import { encodePng } from '@lib/png';
+import { hasGlyph, rasterizeText } from '@lib/blockFont';
 import { boxUv, finishMaps } from '@core/geometry/finishMaps';
 import { decalAxes, decalPatch } from '@core/geometry/decal';
 import { expectNoOp } from '../helpers/expectNoOp';

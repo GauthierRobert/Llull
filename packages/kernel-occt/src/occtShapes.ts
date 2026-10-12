@@ -8,7 +8,7 @@
 import type { MeshData } from '@core/model/types';
 import { type Entity, type Vec3, createEmptyDocument } from '@core/model/types';
 import { entityTrianglePositions } from '@core/geometry/entityTriangles';
-import { cross3, dot3, sub3 } from '@lib/vec3';
+import { cross3, dot3, sub3, vec3At } from '@lib/vec3';
 import { isValidPolygon, toCounterClockwise } from '@lib/polygon';
 import { release } from '@core/geometry/nativeObject';
 import {
@@ -50,7 +50,7 @@ function polygonFace(api: OccApi, corners: readonly Vec3[]): OccShape | null {
  * promoted with BRepBuilderAPI_MakeSolid. Degenerate triangles are skipped.
  * @failure empty / malformed mesh, open shell, MakeSolid not done -> null
  */
-export function meshDataToTopoDSShape(api: OccApi, mesh: MeshData): OccShape | null {
+function meshDataToTopoDSShape(api: OccApi, mesh: MeshData): OccShape | null {
   const { positions, indices } = mesh;
   if (positions.length === 0 || indices.length === 0 || indices.length % 3 !== 0) return null;
 
@@ -299,12 +299,7 @@ const NO_COMPONENTS = createEmptyDocument();
 function soupVolume(positions: readonly number[]): number {
   let sum = 0;
   for (let i = 0; i + 8 < positions.length; i += 9) {
-    const [a, b, c] = [
-      positions.slice(i, i + 3),
-      positions.slice(i + 3, i + 6),
-      positions.slice(i + 6, i + 9),
-    ];
-    sum += dot3(a as unknown as Vec3, cross3(b as unknown as Vec3, c as unknown as Vec3));
+    sum += dot3(vec3At(positions, i), cross3(vec3At(positions, i + 3), vec3At(positions, i + 6)));
   }
   return sum / 6;
 }

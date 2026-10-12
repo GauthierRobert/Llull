@@ -15,8 +15,7 @@ export interface UnitPlane {
   offset: number;
 }
 
-export const signedDistance = (plane: UnitPlane, p: Vec3): number =>
-  dot3(plane.normal, p) - plane.offset;
+const signedDistance = (plane: UnitPlane, p: Vec3): number => dot3(plane.normal, p) - plane.offset;
 
 /** Visit each edge `a→b` of the closed polygon `verts` with both ends' signed plane distances. */
 export function forEachEdge(

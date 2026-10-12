@@ -16,7 +16,7 @@ function repoRoot(from: string = process.cwd()): string {
   return parent === from ? process.cwd() : repoRoot(parent);
 }
 
-export const REPORT_ROOT = path.join(repoRoot(), '.cache', 'production', 'reports');
+const REPORT_ROOT = path.join(repoRoot(), '.cache', 'production', 'reports');
 
 /** Start a driver's run from an empty report folder, so SUMMARY.md never mixes stale runs. */
 export function resetReports(driver: string): void {

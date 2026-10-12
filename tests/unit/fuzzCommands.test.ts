@@ -82,7 +82,9 @@ describe('fuzz: every command tolerates garbage params', () => {
         try {
           result = execute(doc, def.name, params);
         } catch (e) {
-          throw new Error(`${def.name} threw on ${JSON.stringify(params)}: ${String(e)}`);
+          throw new Error(`${def.name} threw on ${JSON.stringify(params)}: ${String(e)}`, {
+            cause: e,
+          });
         }
         expect(JSON.stringify(doc), `${def.name} mutated input`).toBe(snapshot);
         expect(typeof result.summary).toBe('string');

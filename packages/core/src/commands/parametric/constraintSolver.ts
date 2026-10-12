@@ -269,7 +269,6 @@ export function runSolver(doc: CadDocument): {
     );
   }
 
-  let residual = Infinity;
   let iterations = 0;
 
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
@@ -282,10 +281,9 @@ export function runSolver(doc: CadDocument): {
       totalError += applyConstraintGradient(workingDoc, c, deltas, turns, BASE_STEP);
     }
 
-    residual = totalError;
     iterations = iter + 1;
 
-    if (residual < RESIDUAL_THRESHOLD) break;
+    if (totalError < RESIDUAL_THRESHOLD) break;
 
     // Apply deltas.
     let maxDelta = 0;
@@ -310,7 +308,7 @@ export function runSolver(doc: CadDocument): {
 
   const document = buildDoc();
   // The loop measures the error BEFORE each update; report the error of the document returned.
-  residual = totalResidual(document);
+  const residual = totalResidual(document);
   const converged = residual < RESIDUAL_THRESHOLD;
   return { document, residual, iterations, converged };
 }

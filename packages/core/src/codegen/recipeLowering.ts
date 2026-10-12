@@ -34,7 +34,7 @@ export function meshSoup(mesh: MeshData): number[] {
 }
 
 /** Mid points of the selected edges of `source`, when the kernel has exact topology. */
-export function edgeMidPoints(
+function edgeMidPoints(
   kernel: GeometryKernel | null,
   source: ShapeRecipe,
   edges: readonly number[],

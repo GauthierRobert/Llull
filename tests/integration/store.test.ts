@@ -17,6 +17,7 @@
 import { execute } from '@core/commands/registry';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type { Mock } from 'vitest';
 import { useStore } from '@ui/store';
 import { serializeDocument } from '@core/commands/persistence/serialization';
 import {
@@ -536,7 +537,7 @@ function okResponse(affected?: string[]): {
 
 /** Simulated server: POST /command applies via execute; GET /live/snapshot returns state. */
 function simulatedServer(failFirst?: number): {
-  fetch: ReturnType<typeof vi.fn>;
+  fetch: Mock<(url: string, init?: RequestInit) => Promise<unknown>>;
   commands: () => string[];
   doc: () => CadDocument;
   bodies: () => { name: string; params: unknown; commandId?: string }[];

@@ -19,7 +19,7 @@ import { surfaceTinById } from '../surface/surfaceTin';
 import { elevationAt } from '../surface/tin';
 import { crossSlopesAt, hasSuperelevation, superelevationRate } from '../alignment/superelevation';
 import { formatStation, fromMetres } from '../model';
-import { toMetres } from '../../building/model';
+import { toMetres } from '@core/model/units';
 import { round } from '../../shared/numeric';
 
 export interface StationAnalysis {

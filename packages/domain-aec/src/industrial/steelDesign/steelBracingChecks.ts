@@ -16,6 +16,7 @@ import type { ColumnSegment } from './steelColumnChecks';
 import type { FrameCoverage } from './steelFrameDetect';
 import {
   clusterMeans,
+  LEVEL_TOLERANCE,
   compressionClass,
   minorRadius,
   nearestIndex,
@@ -33,8 +34,6 @@ import {
 
 type Direction = 'X' | 'Y';
 
-/** Beams whose top of steel differs by less than this are one floor level, mm. */
-const LEVEL_TOLERANCE = 150;
 /** A brace this close to the vertical plane's direction lies in that plane, mm. */
 const PLANE_TOLERANCE = 50;
 const CHORD_END_TOLERANCE = 150;

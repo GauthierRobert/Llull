@@ -304,7 +304,7 @@ async function runExec(args: ParsedArgv, io: CliIo): Promise<number> {
   const isExchange = exchangeTool(name) !== undefined;
   if (getCommand(name) === undefined && !isExchange) unknownCommand(name);
   const raw = await paramsOf(name, rest, io);
-  let params: unknown = raw;
+  let params: unknown;
   try {
     params = isExchange ? withFileContent(name, raw) : raw;
   } catch (error) {

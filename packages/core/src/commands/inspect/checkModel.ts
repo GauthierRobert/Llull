@@ -116,7 +116,17 @@ function checkDegenerateGeometry(e: Entity): Issue[] {
             ]
           : []),
       ];
-    default:
+    case 'point':
+    case 'line':
+    case 'polyline':
+    case 'rectangle':
+    case 'spline':
+    case 'dimension':
+    case 'mesh':
+    case 'revolution':
+    case 'loft':
+    case 'subdivision':
+    case 'instance':
       return [];
   }
 }

@@ -14,7 +14,7 @@ import { isHexColor } from '@lib/isHexColor';
 import { significantNumber } from '@lib/compactNumber';
 
 /** 3 significant digits without exponent notation for ordinary magnitudes (7850, not "7.85e+3"). */
-export function formatDensity(density: number): string {
+function formatDensity(density: number): string {
   return significantNumber(density, 3);
 }
 

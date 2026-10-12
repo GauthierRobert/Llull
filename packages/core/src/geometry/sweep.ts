@@ -18,7 +18,7 @@ import { quad, ringWalls as walls, skinTriangles } from './skin';
 import type { Triangle } from './triangles';
 
 /** Vertices around a circular sweep section. */
-export const SWEEP_CIRCLE_SEGMENTS = 24;
+const SWEEP_CIRCLE_SEGMENTS = 24;
 
 /** One path sample with its section axes. */
 export interface SweepFrame {
@@ -100,7 +100,7 @@ function closeFrames(frames: SweepFrame[]): SweepFrame[] {
 }
 
 /** Section loops in section coordinates: CCW outer boundary and optional CCW bore (same count). */
-export function sectionLoops(section: SweepSection): { outer: Vec2[]; inner: Vec2[] | null } {
+function sectionLoops(section: SweepSection): { outer: Vec2[]; inner: Vec2[] | null } {
   if (section.shape === 'profile') {
     const outer =
       signedArea(section.profile) < 0 ? [...section.profile].reverse() : [...section.profile];
@@ -197,7 +197,7 @@ export function stationRingAt(stations: ReadonlyArray<SweepStation>, t: number):
 }
 
 /** Dense section loop at path fraction `t` (the sampled curve of `stationRingAt`). */
-export function stationLoopAt(stations: ReadonlyArray<SweepStation>, t: number): Vec2[] {
+function stationLoopAt(stations: ReadonlyArray<SweepStation>, t: number): Vec2[] {
   return sampleRing(stationRingAt(stations, t)).map(([x, y]): Vec2 => [x, y]);
 }
 

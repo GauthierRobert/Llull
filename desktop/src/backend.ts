@@ -67,7 +67,7 @@ export async function chooseBackendPort(userDataDir: string): Promise<number> {
 }
 
 /** The part of a child process the lifecycle needs (Electron UtilityProcess and ChildProcess both fit). */
-export interface BackendProcess {
+interface BackendProcess {
   kill(): boolean;
   once(event: 'exit', listener: (code: number | null) => void): unknown;
 }
@@ -123,7 +123,7 @@ export async function startBackend(
     await waitForHealth(url, () => exitReason);
   } catch (error) {
     child.kill();
-    throw new Error(errorMessage(error));
+    throw new Error(errorMessage(error), { cause: error });
   }
   return {
     url,

@@ -38,8 +38,8 @@ Rules are already in context (`rules/commands.md` loads when you touch `packages
    viewport needs a render branch (hand that to viewport-engineer). For 2D drafting
    specifics, follow the `draw-2d` skill.
 3. Register: core — list it in its feature folder's `catalog.ts`, add the name to
-   one toolset in `packages/mcp/src/toolsets.ts`; plugin — add to its command list
-   (`packages/domain-aec/src/index.ts`).
+   one toolset in `packages/mcp/src/toolsets.ts`; plugin — list it in its domain's catalog
+   (`packages/domain-aec/src/<building|industrial|civil>/catalog.ts`).
 4. Write tests in `tests/unit/<domain>.test.ts` (plugins: `tests/unit/building/`): happy path (asserts `affected`,
    resulting entity, `document.order`) AND a failure path (missing id / invalid input
    ⇒ no-op). Ids are step-scoped and deterministic — no reset needed.

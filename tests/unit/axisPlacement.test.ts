@@ -3,8 +3,8 @@ import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { rotatedEntityBounds } from '@core/geometry/rotatedBounds';
-import { applyEulerXYZ } from '@core/lib/eulerRotation';
-import { eulerFromAxis, eulerFromMat, matFromEulerXYZ } from '@core/lib/axisRotation';
+import { applyEulerXYZ } from '@lib/eulerRotation';
+import { eulerFromAxis, eulerFromMat, matFromEulerXYZ } from '@lib/axisRotation';
 
 const empty = (): CadDocument => createEmptyDocument();
 

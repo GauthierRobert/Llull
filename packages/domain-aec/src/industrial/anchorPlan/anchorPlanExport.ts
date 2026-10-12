@@ -5,7 +5,8 @@
 import type { Vec2 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { elementsOf, existingLevelId, fileSlug, getBuilding, toMetres } from '../../building/model';
+import { toMetres } from '@core/model/units';
+import { elementsOf, existingLevelId, fileSlug, getBuilding } from '../../building/model';
 import { noop } from '@core/commands/noop';
 import { distance } from '@lib/polygon';
 import {

@@ -15,7 +15,7 @@ export const inertiaOf = (profile: string): number => {
 };
 
 /** Beam axis height under a floor at +3000: top of steel 30 mm below the floor. */
-export const AXIS = -180;
+const AXIS = -180;
 /** Level 1 column top, beam axes at 2820. */
 export const BEAM_Z = 3000 + AXIS;
 

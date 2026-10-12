@@ -34,7 +34,7 @@ const MAX_DXF_BYTES = 512 * 1024 * 1024;
 const MAX_CONCURRENT_CONVERSIONS = 2;
 const MAX_STDERR_BYTES = 16 * 1024;
 
-export const NO_DWG_CONVERTER_MESSAGE =
+const NO_DWG_CONVERTER_MESSAGE =
   'DWG import needs a converter on the server host: LibreDWG 0.14+ (provides dwg2dxf; the llull ' +
   'Docker image builds it, elsewhere build it from ftp.gnu.org/gnu/libredwg because distribution ' +
   'packages are often missing or outdated) or the ODA File Converter with ' +
@@ -79,7 +79,7 @@ export function dwgConfigFromEnv(env: NodeJS.ProcessEnv = process.env): DwgConve
 }
 
 /** True when `bytes` start with an "AC10xx" DWG version stamp. */
-export function hasDwgMagic(bytes: Uint8Array): boolean {
+function hasDwgMagic(bytes: Uint8Array): boolean {
   if (bytes.length < 6) return false;
   const head = Buffer.from(bytes.subarray(0, 6)).toString('latin1');
   return /^AC10\d\d$/.test(head);
@@ -201,9 +201,7 @@ export async function convertDwgToDxf(
 }
 
 /** The MCP-facing port; null when both converters are disabled. */
-export function createDwgConverterPort(
-  env: NodeJS.ProcessEnv = process.env,
-): DwgConverterPort | null {
+function createDwgConverterPort(env: NodeJS.ProcessEnv = process.env): DwgConverterPort | null {
   const config = dwgConfigFromEnv(env);
   if (config.dwg2dxf === null && config.odaConverter === null) return null;
   const limit = concurrencyLimiter(MAX_CONCURRENT_CONVERSIONS);

@@ -18,7 +18,7 @@ import {
   sheetDrawingArea,
   type PaperSize,
 } from '../../shared/sheetFrame';
-import { toMetres, toMm } from '../../building/model';
+import { toMetres, toMm } from '@core/model/units';
 import { endStation, horizontalElements } from '../alignment/alignmentGeometry';
 import { formatStation, getCivil } from '../model';
 import { analyseStations, reportRows, reportStations } from '../road/roadReport';

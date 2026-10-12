@@ -11,12 +11,12 @@ import type {
   SteelMemberElement,
 } from '@core/model/building';
 import { z } from '@core/commands/schema';
+import { toMm } from '@core/model/units';
 import {
   elementsOf,
   getBuilding,
   highestIndex,
   nextElementId,
-  toMm,
   withElement,
 } from '../../building/model';
 import { isFiniteNumber } from '@lib/isFiniteNumber';

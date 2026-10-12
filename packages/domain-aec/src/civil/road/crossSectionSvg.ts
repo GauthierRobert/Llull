@@ -12,7 +12,7 @@ import { surfaceTinById } from '../surface/surfaceTin';
 import type { StationAnalysis } from './roadReport';
 import { formatStation } from '../model';
 import { svgDocument, svgLine, svgPolygon, svgPolyline, svgRect, svgText } from './roadSvg';
-import { toMetres } from '../../building/model';
+import { toMetres } from '@core/model/units';
 
 const PANEL_WIDTH = 380;
 const PANEL_HEIGHT = 230;

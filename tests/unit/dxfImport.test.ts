@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { type Entity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { flattenDxf, parseDxf, codeNumber } from '@core/lib/dxfRead';
-import { aciToHex, insUnitsMillimetres } from '@core/lib/dxfUnits';
+import { flattenDxf, parseDxf, codeNumber } from '@lib/dxfRead';
+import { aciToHex, insUnitsMillimetres } from '@lib/dxfUnits';
 
 /** DXF text from [code, value] pairs. */
 function dxf(...pairs: Array<[number, string | number]>): string {

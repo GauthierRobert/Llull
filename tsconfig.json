@@ -25,7 +25,6 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
   },
-  "include": ["src", "packages", "tests"],
-  /* Node-side quality and production gates have their own tsconfig.json. */
-  "exclude": ["tests/quality", "tests/production"]
+  /* Tests type-check under tests/tsconfig.json (Node types). */
+  "include": ["src", "packages"]
 }

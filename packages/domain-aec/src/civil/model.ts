@@ -11,7 +11,7 @@ import {
   type CivilObject,
   createEmptyCivil,
 } from '@core/model/civil';
-import { fromMm, toMetres } from '../building/model';
+import { fromMm, toMetres } from '@core/model/units';
 import { dependentsOf } from './integrity';
 import { MM_PER_UNIT } from '@core/model/units';
 

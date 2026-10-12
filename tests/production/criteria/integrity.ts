@@ -11,7 +11,7 @@ import type { CheckOutcome, Criterion, GradeContext } from '../contract';
  */
 
 /** Key-order-independent JSON: the same model serialized with a different insertion order. */
-export function canonical(value: unknown): string {
+function canonical(value: unknown): string {
   return JSON.stringify(value, (_key, inner: unknown) =>
     inner !== null && typeof inner === 'object' && !Array.isArray(inner)
       ? Object.fromEntries(Object.entries(inner).sort(([a], [b]) => a.localeCompare(b)))

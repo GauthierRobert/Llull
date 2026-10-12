@@ -8,7 +8,7 @@ import type { SubdivisionEntity, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { colorField, defineCommand, vec3, z, layerIdField, nameField } from '../schema';
 import { noop } from '../noop';
-import { add3, finiteVec3OrZero } from '../../lib/vec3';
+import { add3, finiteVec3OrZero, map3 } from '../../lib/vec3';
 import { applyEulerXYZ } from '../../lib/eulerRotation';
 import { newEntity } from '../entity/newEntity';
 import {
@@ -233,7 +233,5 @@ const round = (value: number): number => Math.round(value * 1e6) / 1e6;
 
 /** World coordinates of a cage point. */
 export function worldOf(p: Vec3, entity: { position: Vec3; rotation: Vec3 }): Vec3 {
-  return add3(applyEulerXYZ(p, [0, 0, 0], entity.rotation), entity.position).map(
-    round,
-  ) as unknown as Vec3;
+  return map3(add3(applyEulerXYZ(p, [0, 0, 0], entity.rotation), entity.position), round);
 }

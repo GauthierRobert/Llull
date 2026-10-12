@@ -14,14 +14,14 @@ const MIN_BUBBLE_FRACTION = 0.012;
 
 type Point3 = readonly [number, number, number];
 
-export interface GridAxis {
+interface GridAxis {
   readonly id: string;
   readonly start: Point3;
   readonly end: Point3;
   readonly color: string;
 }
 
-export interface GridBubble {
+interface GridBubble {
   readonly id: string;
   readonly center: Point3;
   readonly radius: number;

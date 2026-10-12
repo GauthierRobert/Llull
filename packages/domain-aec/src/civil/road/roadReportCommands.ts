@@ -18,7 +18,7 @@ import { analyseStations, reportCsv, reportRows, reportStations } from './roadRe
 import { longSectionSvg } from '../sheets/longSectionSvg';
 import { crossSectionSvg, MAX_CROSS_SECTIONS } from './crossSectionSvg';
 import { validateProfile } from '../alignment/profileGeometry';
-import { toMetres } from '../../building/model';
+import { toMetres } from '@core/model/units';
 
 function checkedAlignment(
   doc: CadDocument,
