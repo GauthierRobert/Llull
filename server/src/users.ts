@@ -121,7 +121,17 @@ export function presentedToken(req: Request, allowQuery: boolean): string | unde
 /** The authenticated user of this request (set by `requireRole`), if any. */
 export function requestUser(res: Response): NamedUser | undefined {
   const user: unknown = res.locals['llullUser'];
-  return isRecord(user) ? (user as unknown as NamedUser) : undefined;
+  return isNamedUser(user) ? user : undefined;
+}
+
+function isNamedUser(value: unknown): value is NamedUser {
+  return (
+    isRecord(value) &&
+    typeof value['id'] === 'string' &&
+    typeof value['name'] === 'string' &&
+    isRole(value['role']) &&
+    typeof value['tokenSha256'] === 'string'
+  );
 }
 
 /**

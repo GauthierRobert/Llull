@@ -25,11 +25,9 @@ const PRESENTATION_FIELDS = new Set(['id', 'name', 'color', 'layerId', 'tags', '
 
 /** Stable key of an entity's geometry (presentation fields dropped, keys sorted). */
 export function geometryKey(entity: Entity): string {
-  const record = entity as unknown as Record<string, unknown>;
-  const kept = Object.keys(record)
-    .filter((key) => !PRESENTATION_FIELDS.has(key))
-    .sort()
-    .map((key) => [key, record[key]]);
+  const kept = Object.entries(entity)
+    .filter(([key]) => !PRESENTATION_FIELDS.has(key))
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   return JSON.stringify(kept);
 }
 

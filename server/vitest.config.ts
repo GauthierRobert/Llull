@@ -16,6 +16,8 @@ export default defineConfig({
     environment: 'node',
     include: ['tests/**/*.test.ts'],
     setupFiles: ['./tests/setup.ts'],
+    // Live OpenCascade / Manifold solves (booleans, fillets, STEP) take seconds each.
+    testTimeout: 30_000,
     // Tests that drive tools/list or tools/call across every toolset need them all exposed.
     env: { LLULL_TOOLSETS: 'all' },
   },

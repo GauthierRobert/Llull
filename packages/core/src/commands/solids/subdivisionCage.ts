@@ -2,7 +2,7 @@ import type { CadDocument, SubdivisionEntity, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
 import { changed, noop } from '../noop';
-import { add3, distance3, scale3, sub3 } from '../../lib/vec3';
+import { add3, distance3, map3, scale3, sub3 } from '../../lib/vec3';
 import { inverseEulerXYZ } from '../../lib/eulerRotation';
 import { replaceEntity } from '../entity/entityOps';
 import { edgeKey } from '../../geometry/subdivision';
@@ -184,13 +184,11 @@ export const editSubdivisionCage = defineCommand({
     const vertices = entity.vertices.map((p, v): Vec3 => {
       const w = weights[v] as number;
       if (w === 0) return p;
-      const blended = factors.map((s) => 1 + (s - 1) * w) as unknown as Vec3;
+      const blended = map3(factors, (s) => 1 + (s - 1) * w);
       return add3(
         add3(
           localPivot,
-          sub3(p, localPivot).map(
-            (value, axis) => value * (blended[axis] as number),
-          ) as unknown as Vec3,
+          map3(sub3(p, localPivot), (value, axis) => value * blended[axis]),
         ),
         scale3(localMove, w),
       );

@@ -33,17 +33,11 @@ export function unitAxisOrNull(v: unknown): Vec3 | null {
 
 /** Matrix product a · b. */
 export function mulMat3(a: Mat3, b: Mat3): Mat3 {
-  const out: number[] = [];
-  for (let r = 0; r < 3; r++) {
-    for (let c = 0; c < 3; c++) {
-      out.push(
-        (a[r * 3] ?? 0) * (b[c] ?? 0) +
-          (a[r * 3 + 1] ?? 0) * (b[3 + c] ?? 0) +
-          (a[r * 3 + 2] ?? 0) * (b[6 + c] ?? 0),
-      );
-    }
-  }
-  return out as unknown as Mat3;
+  const at = (r: number, c: number): number =>
+    (a[r * 3] ?? 0) * (b[c] ?? 0) +
+    (a[r * 3 + 1] ?? 0) * (b[3 + c] ?? 0) +
+    (a[r * 3 + 2] ?? 0) * (b[6 + c] ?? 0);
+  return [at(0, 0), at(0, 1), at(0, 2), at(1, 0), at(1, 1), at(1, 2), at(2, 0), at(2, 1), at(2, 2)];
 }
 
 /** Rotate `v` by `m`. */

@@ -137,7 +137,8 @@ export function sampleProfile(segments: ReadonlyArray<CurveSegment<Vec2>>): Vec2
 
 /** Same segment traversed backwards. */
 export function reverseSegment<P extends Point>(segment: CurveSegment<P>): CurveSegment<P> {
-  return { ...segment, points: [...segment.points].reverse() } as unknown as CurveSegment<P>;
+  const last = segment.points.length - 1;
+  return mapSegment(segment, (_point, i) => segment.points[last - i] as P);
 }
 
 /** Chain traversed backwards. */
@@ -147,12 +148,22 @@ export function reverseChain<P extends Point>(
   return [...segments].reverse().map(reverseSegment);
 }
 
-/** Every point mapped by `f` (scale, translate, plane change, …). */
-export function mapSegment<P extends Point, Q extends Point>(
+/** Every point mapped by `f` (scale, translate, plane change, snapping one end, …). */
+export function mapSegment<P, Q>(
   segment: CurveSegment<P>,
-  f: (point: P) => Q,
+  f: (point: P, index: number) => Q,
 ): CurveSegment<Q> {
-  return { type: segment.type, points: segment.points.map(f) } as unknown as CurveSegment<Q>;
+  const [a, b] = segment.points;
+  switch (segment.type) {
+    case 'line':
+      return { type: 'line', points: [f(a, 0), f(b, 1)] };
+    case 'arc':
+      return { type: 'arc', points: [f(a, 0), f(b, 1), f(segment.points[2], 2)] };
+    case 'bezier': {
+      const [, , c, d] = segment.points;
+      return { type: 'bezier', points: [f(a, 0), f(b, 1), f(c, 2), f(d, 3)] };
+    }
+  }
 }
 
 const start = (segment: CurveSegment<Point>): Vec3 => lift(segment.points[0]);

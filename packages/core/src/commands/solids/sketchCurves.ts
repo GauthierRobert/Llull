@@ -139,13 +139,12 @@ const near = (a: Vec2 | undefined, b: Vec2 | undefined): boolean =>
 function snapStart(piece: CurveSegment<Vec2>[], at: Vec2): CurveSegment<Vec2>[] {
   const [first, ...rest] = piece;
   if (first === undefined) return piece;
-  const points = [at, ...first.points.slice(1)];
-  return [{ type: first.type, points } as unknown as CurveSegment<Vec2>, ...rest];
+  return [mapSegment(first, (point, i) => (i === 0 ? at : point)), ...rest];
 }
 
 function snapEnd(segment: CurveSegment<Vec2>, at: Vec2): CurveSegment<Vec2> {
-  const points = [...segment.points.slice(0, -1), at];
-  return { type: segment.type, points } as unknown as CurveSegment<Vec2>;
+  const last = segment.points.length - 1;
+  return mapSegment(segment, (point, i) => (i === last ? at : point));
 }
 
 /** Pieces joined end-to-start in any order/direction; null when some piece never connects. */

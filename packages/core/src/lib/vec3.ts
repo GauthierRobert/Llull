@@ -59,6 +59,16 @@ export function distance3(a: Vec3, b: Vec3): number {
   return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 }
 
+/** @pure component-wise map, typed as a Vec3 (Array#map widens a tuple to number[]) */
+export function map3(a: Vec3, f: (component: number, axis: 0 | 1 | 2) => number): Vec3 {
+  return [f(a[0], 0), f(a[1], 1), f(a[2], 2)];
+}
+
+/** @pure the Vec3 starting at `offset` of a flat number array; missing components read as 0 */
+export function vec3At(values: readonly number[], offset: number): Vec3 {
+  return [values[offset] ?? 0, values[offset + 1] ?? 0, values[offset + 2] ?? 0];
+}
+
 /** @pure unit vector; `[0, 0, 1]` for (near-)zero-length input */
 export function normalize3(a: Vec3): Vec3 {
   const l = len3(a);

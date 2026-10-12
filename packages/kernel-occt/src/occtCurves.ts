@@ -9,7 +9,12 @@ import type { CurveSegment } from '@core/model/curve';
 import type { Entity, Vec2, Vec3 } from '@core/model/types';
 import { frameAtFraction, stationRingAt, sweepStartAxes } from '@core/geometry/sweep';
 import { ringCurves } from '@core/geometry/sectionRing';
-import { reverseChain, sampleProfile, segmentTangent } from '@core/geometry/curveSegments';
+import {
+  mapSegment,
+  reverseChain,
+  sampleProfile,
+  segmentTangent,
+} from '@core/geometry/curveSegments';
 import { add3, scale3 } from '@lib/vec3';
 import { signedArea } from '@lib/polygon';
 import { release } from '@core/geometry/nativeObject';
@@ -105,10 +110,7 @@ export function chainFace(
 ): OccShape | null {
   const isCounterClockwise = signedArea(sampleProfile(curves)) > 0;
   const oriented = isCounterClockwise === counterClockwise ? curves : reverseChain(curves);
-  const lifted = oriented.map(
-    (segment) =>
-      ({ type: segment.type, points: segment.points.map(place) }) as unknown as CurveSegment<Vec3>,
-  );
+  const lifted = oriented.map((segment) => mapSegment(segment, (point) => place(point)));
   const wire = chainWire(api, lifted);
   if (wire === null) return null;
   const face = wireFace(api, wire);
