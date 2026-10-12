@@ -10,6 +10,7 @@ import { defineCommand, z, vec2, vec3 } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
 import { isValidPolygon } from '@lib/polygon';
 import {
+  civilObjectOrFailure,
   civilAffected,
   civilObject,
   civilObjectsOf,
@@ -260,8 +261,8 @@ export const updateSurface = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const civil = getCivil(doc);
-    const surface = civilObject(civil, params.surfaceId, 'surface');
-    if (!surface) return noop(doc, `update_surface failed: no surface ${params.surfaceId}.`);
+    const surface = civilObjectOrFailure(doc, params.surfaceId, 'surface', 'update_surface');
+    if (typeof surface === 'string') return noop(doc, surface);
     const boundary = params.boundary?.length === 0 ? undefined : params.boundary;
     const maxEdgeLength = params.maxEdgeLength === 0 ? undefined : params.maxEdgeLength;
     const checked = checkSurfaceOptions({ ...params, boundary, maxEdgeLength });
