@@ -1,6 +1,6 @@
 import type { CommandResult } from '../types';
 import { defineCommand, z, looseVec3 } from '../schema';
-import { DEFAULT_SOLID_COLOR, placeSolid, placedSolidFields, rejectBadSize } from './shared';
+import { DEFAULT_SOLID_COLOR, placeSizedSolid, placedSolidFields } from './shared';
 import { ORIGIN } from '../../lib/vec3';
 
 /**
@@ -29,20 +29,11 @@ export const addBox = defineCommand({
     doc,
     { size, position = ORIGIN, rotation, color = DEFAULT_SOLID_COLOR, anchor },
   ): CommandResult => {
-    const rejected = rejectBadSize(doc, 'add_box', size);
-    if (rejected) return rejected;
-    const [w, h, d] = size;
-    return placeSolid(doc, {
-      kind: 'box',
-      idPrefix: 'box',
-      geometry: { size },
-      halfExtents: [w / 2, h / 2, d / 2],
-      defaultAnchor: 'center',
-      anchor,
+    return placeSizedSolid(doc, 'box', 'box', 'center', size, {
       position,
       rotation,
       color,
-      describe: (id) => `Added box ${id} of size ${size.join('×')}`,
+      anchor,
     });
   },
 });

@@ -225,36 +225,25 @@ function gearPattern(
   };
 }
 
-/** Standard full-depth (addendum m, dedendum 1.25m) external tooth pattern of module `mod`. */
-export function externalGearPattern(
+type PatternArgs = [
   mod: number,
   teeth: number,
   pressureAngle: number,
   flankSamples: number,
-  phase = 0,
-): ToothPattern {
-  return gearPattern(mod, teeth, pressureAngle, flankSamples, phase, {
-    tip: 1,
-    root: 1.25,
-    backlashSign: -1,
-  });
-}
+  phase?: number,
+];
+
+const patternWith =
+  (depths: PatternDepths) =>
+  (...[mod, teeth, pressureAngle, flankSamples, phase = 0]: PatternArgs): ToothPattern =>
+    gearPattern(mod, teeth, pressureAngle, flankSamples, phase, depths);
+
+/** Standard full-depth (addendum m, dedendum 1.25m) external tooth pattern of module `mod`. */
+export const externalGearPattern = patternWith({ tip: 1, root: 1.25, backlashSign: -1 });
 
 /**
  * Cavity outline of an internal (ring) gear. The outline is a tooth pattern whose "teeth" are the
  * ring's tooth SPACES: tip = ring root (pitch + 1.25m), root = ring tip (pitch − m), spaces widened
  * by the backlash so an external gear of the same module meshes without interference.
  */
-export function internalCavityPattern(
-  mod: number,
-  teeth: number,
-  pressureAngle: number,
-  flankSamples: number,
-  phase = 0,
-): ToothPattern {
-  return gearPattern(mod, teeth, pressureAngle, flankSamples, phase, {
-    tip: 1.25,
-    root: 1,
-    backlashSign: 1,
-  });
-}
+export const internalCavityPattern = patternWith({ tip: 1.25, root: 1, backlashSign: 1 });

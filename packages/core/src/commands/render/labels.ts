@@ -4,7 +4,7 @@
  * @layer core/commands
  */
 
-import type { Entity, Vec3 } from '../../model/types';
+import { type Entity, type Vec3, is2D } from '../../model/types';
 import type { RenderViewData } from './types';
 import { boundsCorners, entityBounds } from '../../geometry/bounds';
 import { escapeXml } from '../../lib/escapeXml';
@@ -25,6 +25,7 @@ const CATEGORY_STYLE: Record<EntityCategory, { color: string; caption: string }>
 };
 
 function entityCategory(e: Entity): EntityCategory {
+  if (!is2D(e)) return 'solid3d';
   switch (e.kind) {
     case 'point':
       return 'point';
@@ -40,21 +41,6 @@ function entityCategory(e: Entity): EntityCategory {
     case 'dimension':
     case 'image':
       return 'annotation';
-    case 'box':
-    case 'cylinder':
-    case 'sphere':
-    case 'extrusion':
-    case 'mesh':
-    case 'cone':
-    case 'torus':
-    case 'wedge':
-    case 'pyramid':
-    case 'revolution':
-    case 'sweep':
-    case 'loft':
-    case 'subdivision':
-    case 'instance':
-      return 'solid3d';
   }
 }
 
@@ -107,19 +93,7 @@ function entityKeyPoints(e: Entity): Vec3[] {
       return [lift(0, 0), lift(e.width, 0), lift(e.width, e.height), lift(0, e.height)];
     case 'instance':
       return [pos]; // its component's extent needs the document; anchor the label at its origin
-    case 'box':
-    case 'cylinder':
-    case 'sphere':
-    case 'extrusion':
-    case 'mesh':
-    case 'cone':
-    case 'torus':
-    case 'wedge':
-    case 'pyramid':
-    case 'revolution':
-    case 'sweep':
-    case 'loft':
-    case 'subdivision':
+    default:
       return boundsCorners(entityBounds(e));
   }
 }

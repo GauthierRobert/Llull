@@ -259,7 +259,7 @@ export function rejectNonPositive(
 }
 
 /** Same as `rejectNonPositive` for a `[w, h, d]` size vector (one combined summary). */
-export function rejectBadSize(doc: CadDocument, command: string, size: Vec3): CommandResult | null {
+function rejectBadSize(doc: CadDocument, command: string, size: Vec3): CommandResult | null {
   if (
     Array.isArray(size) &&
     size.length === 3 &&
@@ -349,4 +349,62 @@ export function placeSolid<K extends Entity['kind']>(
     rotation: resolved.rotation,
   });
   return commitSolid(doc, entity, spec.describe(id));
+}
+
+interface SolidPlacement {
+  readonly position: Vec3;
+  readonly rotation: unknown;
+  readonly axis?: unknown;
+  readonly color: string;
+  readonly anchor: unknown;
+}
+
+/** Validate a `[w, h, d]` size and place a `box` / `wedge` ("Added <kind> <id> of size w×h×d"). */
+export function placeSizedSolid(
+  doc: CadDocument,
+  kind: 'box' | 'wedge',
+  idPrefix: string,
+  defaultAnchor: PlacementAnchor,
+  size: Vec3,
+  placement: SolidPlacement,
+): CommandResult {
+  const rejected = rejectBadSize(doc, `add_${kind}`, size);
+  if (rejected) return rejected;
+  const [w, h, d] = size;
+  return placeSolid(doc, {
+    kind,
+    idPrefix,
+    geometry: { size },
+    halfExtents: [w / 2, h / 2, d / 2],
+    defaultAnchor,
+    ...placement,
+    describe: (id) => `Added ${kind} ${id} of size ${size.join('×')}`,
+  });
+}
+
+/** Validate radius/height and place a `cylinder` / `cone` ("... with <radiusLabel> r and height h"). */
+export function placeRoundSolid(
+  doc: CadDocument,
+  kind: 'cylinder' | 'cone',
+  idPrefix: string,
+  defaultAnchor: PlacementAnchor,
+  radiusLabel: string,
+  dims: { readonly radius: number; readonly height: number },
+  placement: SolidPlacement,
+): CommandResult {
+  const { radius, height } = dims;
+  const rejected = rejectNonPositive(doc, `add_${kind}`, [
+    ['radius', radius],
+    ['height', height],
+  ]);
+  if (rejected) return rejected;
+  return placeSolid(doc, {
+    kind,
+    idPrefix,
+    geometry: { radius, height },
+    halfExtents: [radius, radius, height / 2],
+    defaultAnchor,
+    ...placement,
+    describe: (id) => `Added ${kind} ${id} with ${radiusLabel} ${radius} and height ${height}`,
+  });
 }

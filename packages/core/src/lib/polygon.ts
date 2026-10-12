@@ -6,14 +6,24 @@ import { centroid2, lerp2, orient2 } from './vec2';
 
 export type Point2 = Vec2;
 
-/** Signed shoelace area; > 0 when counter-clockwise. */
-export function signedArea(points: ReadonlyArray<Point2>): number {
-  let twiceArea = 0;
+/** Calls `visit(x1, y1, x2, y2, cross)` for each closed-polygon edge; cross = x1*y2 - x2*y1. */
+function forEachEdge(
+  points: ReadonlyArray<Point2>,
+  visit: (x1: number, y1: number, x2: number, y2: number, cross: number) => void,
+): void {
   for (let i = 0; i < points.length; i++) {
     const [x1, y1] = points[i] as Point2;
     const [x2, y2] = points[(i + 1) % points.length] as Point2;
-    twiceArea += x1 * y2 - x2 * y1;
+    visit(x1, y1, x2, y2, x1 * y2 - x2 * y1);
   }
+}
+
+/** Signed shoelace area; > 0 when counter-clockwise. */
+export function signedArea(points: ReadonlyArray<Point2>): number {
+  let twiceArea = 0;
+  forEachEdge(points, (_x1, _y1, _x2, _y2, cross) => {
+    twiceArea += cross;
+  });
   return twiceArea / 2;
 }
 
@@ -38,13 +48,10 @@ export function polygonCentroid(points: ReadonlyArray<Point2>): Point2 {
   }
   let cx = 0;
   let cy = 0;
-  for (let i = 0; i < points.length; i++) {
-    const [x1, y1] = points[i] as Point2;
-    const [x2, y2] = points[(i + 1) % points.length] as Point2;
-    const cross = x1 * y2 - x2 * y1;
+  forEachEdge(points, (x1, y1, x2, y2, cross) => {
     cx += (x1 + x2) * cross;
     cy += (y1 + y2) * cross;
-  }
+  });
   return [cx / (6 * area), cy / (6 * area)];
 }
 

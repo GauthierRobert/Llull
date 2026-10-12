@@ -13,7 +13,7 @@
 import type { MeshData } from '@core/model/types';
 import type { BooleanOp } from '@core/model/types';
 import { kernelFromOps, type CachingKernel, type KernelOps } from '@core/geometry/shapeKernel';
-import { type Entity, createEmptyDocument } from '@core/model/types';
+import { type Entity, createEmptyDocument, is2D } from '@core/model/types';
 import { orientOutward, soupIndices } from '@core/geometry/meshVolume';
 import { entityTrianglePositions } from '@core/geometry/entityTriangles';
 import { toCounterClockwise } from '@lib/polygon';
@@ -192,6 +192,7 @@ function primitiveOf(m: ManifoldModule, entity: PrimitiveEntity): ManifoldShape 
 }
 
 function entityToManifold(m: ManifoldModule, entity: Entity): ManifoldShape | null {
+  if (is2D(entity)) return null;
   switch (entity.kind) {
     case 'mesh':
       return weldedManifold(m, entity.mesh.positions, entity.mesh.indices, entity);
@@ -216,17 +217,6 @@ function entityToManifold(m: ManifoldModule, entity: Entity): ManifoldShape | nu
         prim.delete();
       }
     }
-    case 'line':
-    case 'polyline':
-    case 'arc':
-    case 'circle':
-    case 'rectangle':
-    case 'point':
-    case 'ellipse':
-    case 'spline':
-    case 'text':
-    case 'dimension':
-    case 'image':
     case 'instance':
       return null;
   }

@@ -1,4 +1,4 @@
-import type { CadDocument, Entity } from '../../model/types';
+import { type CadDocument, type Entity, is2D } from '../../model/types';
 import { signedMeshVolume } from '../../geometry/meshVolume';
 import type { ExecutionContext } from '../types';
 import { entityBounds } from '../../geometry/bounds';
@@ -60,6 +60,13 @@ export function solidVolume(
   e: Entity,
   ctx: ExecutionContext | undefined,
 ): SolidVolume {
+  if (is2D(e)) {
+    return {
+      error:
+        `entity '${e.id}' is kind '${e.kind}'; ` +
+        "supported kinds are 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', 'subdivision', 'instance'.",
+    };
+  }
   switch (e.kind) {
     case 'box':
       return { volume: e.size[0] * e.size[1] * e.size[2] };
@@ -117,22 +124,6 @@ export function solidVolume(
       return { volume: closedMeshVolume(loftTriangles(e).flat(2)) };
     case 'subdivision':
       return { volume: closedMeshVolume(subdivisionTriangles(e).flat(2)) };
-    case 'line':
-    case 'polyline':
-    case 'arc':
-    case 'circle':
-    case 'rectangle':
-    case 'point':
-    case 'ellipse':
-    case 'spline':
-    case 'text':
-    case 'dimension':
-    case 'image':
-      return {
-        error:
-          `entity '${e.id}' is kind '${e.kind}'; ` +
-          "supported kinds are 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', 'subdivision', 'instance'.",
-      };
   }
 }
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { orderedEntities } from '@core/commands/entity/entityOps';
 import { execute } from '@core/commands/registry';
 import { docWith } from '../helpers/fixtureDocument';
 import { ellipsePoint } from '@lib/arc';
@@ -97,5 +98,13 @@ describe('check_model positive-field table', () => {
     const healthy = docWith({ id: 'c', kind: 'cylinder', radius: 1, height: 2 });
     const data = execute(healthy, 'check_model', {}).data as { issues: Array<{ code: string }> };
     expect(data.issues.some((i) => i.code === 'degenerate_size')).toBe(false);
+  });
+});
+
+describe('orderedEntities', () => {
+  it('lists entities in document order and skips dangling ids', () => {
+    const doc = docWith({ id: 'b', kind: 'point' }, { id: 'a', kind: 'point' });
+    expect(orderedEntities(doc).map((e) => e.id)).toEqual(['b', 'a']);
+    expect(orderedEntities({ ...doc, order: ['a', 'ghost'] }).map((e) => e.id)).toEqual(['a']);
   });
 });

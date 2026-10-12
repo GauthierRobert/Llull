@@ -46,10 +46,15 @@ export function pressureAngleProblem(pressureAngle: number): string | null {
 }
 
 /** Why `faceWidth` is not a usable gear face width, or `null` when it is. */
-export function faceWidthProblem(faceWidth: number): string | null {
+function faceWidthProblem(faceWidth: number): string | null {
   return faceWidth > 0 && Number.isFinite(faceWidth)
     ? null
     : `faceWidth must be finite and > 0, got ${String(faceWidth)}.`;
+}
+
+/** First of `pressureAngleProblem` / `faceWidthProblem` that fails, or `null` when both pass. */
+export function toothShapeProblem(pressureAngle: number, faceWidth: number): string | null {
+  return pressureAngleProblem(pressureAngle) ?? faceWidthProblem(faceWidth);
 }
 
 /** Local-frame mesh → world-space `mesh` entity (position/rotation baked, entity transform identity). */

@@ -14,6 +14,7 @@ import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
 import { failer, report } from '../noop';
 import { entityOfKind } from '../entity/entityOfKind';
+import { orderedEntities } from '../entity/entityOps';
 import { POINT_3D } from './measureDistanceAngle';
 import { boundsCenter, boundsOverlap, entityBoundsInDoc } from '../../geometry/bounds';
 import type { Bounds } from '../../geometry/bounds';
@@ -189,9 +190,7 @@ export const findEntities = defineCommand({
     const tagFuzzyLc = tagFuzzy?.toLowerCase();
 
     const matches: EntityMatch[] = [];
-    for (const id of doc.order) {
-      const e = doc.entities[id];
-      if (!e) continue;
+    for (const e of orderedEntities(doc)) {
       if (kind !== undefined && e.kind !== kind) continue;
       if (layerId !== undefined && e.layerId !== layerId) continue;
       if (name !== undefined) {

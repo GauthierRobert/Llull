@@ -16,12 +16,7 @@ import {
   toothProfile,
 } from '../../lib/gearOutline';
 import { circleThrough, ringMesh } from '../../geometry/prismMesh';
-import {
-  faceWidthProblem,
-  moduleProblem,
-  placedMeshEntity,
-  pressureAngleProblem,
-} from './gearSolid';
+import { moduleProblem, placedMeshEntity, toothShapeProblem } from './gearSolid';
 import { finiteVec3OrZero } from '../../lib/vec3';
 import { MAX_GEAR_TEETH } from '../limits';
 import { newEntity } from '../entity/newEntity';
@@ -142,7 +137,7 @@ export const addSpurGear = defineCommand({
       );
     }
 
-    const shapeProblem = pressureAngleProblem(pressureAngle) ?? faceWidthProblem(faceWidth);
+    const shapeProblem = toothShapeProblem(pressureAngle, faceWidth);
     if (shapeProblem !== null) return fail(shapeProblem);
 
     const pitchRadius = pitchRadiusOf(mod, teethInt);

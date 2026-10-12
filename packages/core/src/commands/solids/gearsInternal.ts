@@ -19,13 +19,7 @@ import {
 import { circleThrough, ringMesh } from '../../geometry/prismMesh';
 import { MAX_GEAR_TEETH } from '../limits';
 import { commitSolid, positionField, rotationField } from './shared';
-import {
-  faceWidthProblem,
-  moduleProblem,
-  placedMeshEntity,
-  pressureAngleProblem,
-  teethCountProblem,
-} from './gearSolid';
+import { moduleProblem, placedMeshEntity, teethCountProblem, toothShapeProblem } from './gearSolid';
 import { failedWith } from '../noop';
 
 /** Minimum radial wall (in modules) between the tooth-space roots and the rim. */
@@ -113,8 +107,7 @@ export const addInternalGear = defineCommand({
     const shapeProblem =
       moduleProblem(mod) ??
       teethCountProblem('teeth', teethInt, 12, teeth) ??
-      pressureAngleProblem(pressureAngle) ??
-      faceWidthProblem(faceWidth);
+      toothShapeProblem(pressureAngle, faceWidth);
     if (shapeProblem !== null) return fail(shapeProblem);
     const minRim = minRingOuterRadius(mod, teethInt);
     if (!(outerRadius >= minRim && Number.isFinite(outerRadius))) {

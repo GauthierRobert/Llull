@@ -4,6 +4,7 @@ import { ORIGIN } from '../../lib/vec3';
 import {
   DEFAULT_SOLID_COLOR,
   axisField,
+  placeRoundSolid,
   placeSolid,
   placedSolidFields,
   positionField,
@@ -45,24 +46,15 @@ export const addCylinder = defineCommand({
     doc,
     { radius, height, position = ORIGIN, rotation, axis, color = DEFAULT_SOLID_COLOR, anchor },
   ): CommandResult => {
-    const rejected = rejectNonPositive(doc, 'add_cylinder', [
-      ['radius', radius],
-      ['height', height],
-    ]);
-    if (rejected) return rejected;
-    return placeSolid(doc, {
-      kind: 'cylinder',
-      idPrefix: 'cyl',
-      geometry: { radius, height },
-      halfExtents: [radius, radius, height / 2],
-      defaultAnchor: 'center',
-      anchor,
-      position,
-      rotation,
-      axis,
-      color,
-      describe: (id) => `Added cylinder ${id} with radius ${radius} and height ${height}`,
-    });
+    return placeRoundSolid(
+      doc,
+      'cylinder',
+      'cyl',
+      'center',
+      'radius',
+      { radius, height },
+      { position, rotation, axis, color, anchor },
+    );
   },
 });
 
@@ -158,24 +150,15 @@ export const addCone = defineCommand({
     doc,
     { radius, height, position = ORIGIN, rotation, axis, color = DEFAULT_SOLID_COLOR, anchor },
   ): CommandResult => {
-    const rejected = rejectNonPositive(doc, 'add_cone', [
-      ['radius', radius],
-      ['height', height],
-    ]);
-    if (rejected) return rejected;
-    return placeSolid(doc, {
-      kind: 'cone',
-      idPrefix: 'cone',
-      geometry: { radius, height },
-      halfExtents: [radius, radius, height / 2],
-      defaultAnchor: 'base-center',
-      anchor,
-      position,
-      rotation,
-      axis,
-      color,
-      describe: (id) => `Added cone ${id} with base radius ${radius} and height ${height}`,
-    });
+    return placeRoundSolid(
+      doc,
+      'cone',
+      'cone',
+      'base-center',
+      'base radius',
+      { radius, height },
+      { position, rotation, axis, color, anchor },
+    );
   },
 });
 
