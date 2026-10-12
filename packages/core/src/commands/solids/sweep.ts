@@ -1,7 +1,7 @@
 import type { CurveSegment } from '../../model/curve';
 import type { SweepSection, SweepStation, Vec2, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
-import { colorField, defineCommand, untypedArray, z } from '../schema';
+import { colorField, defineCommand, untypedArray, z, layerIdField } from '../schema';
 import { noop } from '../noop';
 import { isVec2 } from '../../lib/vec2';
 import { sub3 } from '../../lib/vec3';
@@ -240,10 +240,7 @@ export const sweepProfile = defineCommand({
           'Replaces radius / innerRadius / section / sectionId.',
       )
       .optional(),
-    layerId: z
-      .string()
-      .describe('Layer id to assign the entity to. Defaults to the document default layer.')
-      .optional(),
+    layerId: layerIdField(),
     color: colorField(DEFAULT_SOLID_COLOR),
     id: explicitIdField(),
   }),

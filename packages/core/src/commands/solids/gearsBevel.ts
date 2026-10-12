@@ -11,7 +11,7 @@
 import type { MeshData, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import type { Point2 } from '../../lib/polygon';
-import { defineCommand, z } from '../schema';
+import { defineCommand, z, nameField } from '../schema';
 import { nextId } from '../../lib/id';
 import { compactNumber as fmt } from '../../lib/compactNumber';
 import { finiteVec3OrZero } from '../../lib/vec3';
@@ -213,7 +213,7 @@ export const addBevelGear = defineCommand({
     position: positionField('Centre of the heel face. '),
     rotation: rotationField('Applied about `position` after `axis`. '),
     color: z.string().describe('Hex color. Default "#b08d57".').optional(),
-    name: z.string().describe('Optional display name.').optional(),
+    name: nameField(),
   }),
   run: (
     doc,

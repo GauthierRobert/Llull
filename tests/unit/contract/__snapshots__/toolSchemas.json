@@ -247,7 +247,7 @@
           "type": "number"
         },
         "name": {
-          "description": "Optional display name.",
+          "description": "Optional display name for the entity (shown in the scene tree).",
           "type": "string"
         },
         "pitchAngle": {
@@ -1497,7 +1497,7 @@
           "type": "number"
         },
         "name": {
-          "description": "Optional display name.",
+          "description": "Optional display name for the entity (shown in the scene tree).",
           "type": "string"
         },
         "outerRadius": {
@@ -2525,7 +2525,7 @@
           "type": "number"
         },
         "name": {
-          "description": "Optional display name.",
+          "description": "Optional display name for the entity (shown in the scene tree).",
           "type": "string"
         },
         "position": {
@@ -2839,7 +2839,7 @@
           "type": "integer"
         },
         "name": {
-          "description": "Optional display name.",
+          "description": "Optional display name for the entity (shown in the scene tree).",
           "type": "string"
         },
         "position": {
@@ -8345,7 +8345,7 @@
           "type": "integer"
         },
         "name": {
-          "description": "Optional display name.",
+          "description": "Optional display name for the entity (shown in the scene tree).",
           "type": "string"
         },
         "thickness": {

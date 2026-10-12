@@ -1,7 +1,15 @@
-import { type CadDocument, type Vec2, type Vec3, DEFAULT_LAYER_ID } from '../../model/types';
+import type { CadDocument, Vec2, Vec3 } from '../../model/types';
 import type { CurveSegment } from '../../model/curve';
 import type { CommandResult } from '../types';
-import { defineCommand, z, looseVec3, tolerant, untypedArray, colorField } from '../schema';
+import {
+  defineCommand,
+  z,
+  looseVec3,
+  tolerant,
+  untypedArray,
+  colorField,
+  layerIdField,
+} from '../schema';
 import { axisVector, isValidAxis } from '../../lib/axis';
 import { ORIGIN, finiteVec3OrZero, len3 } from '../../lib/vec3';
 import { noop } from '../noop';
@@ -19,6 +27,10 @@ import {
   resolveRotation,
   axisField,
   rotationField,
+  existingLayerOrDefault,
+  explicitIdField,
+  explicitIdOrNext,
+  explicitIdTaken,
 } from './shared';
 import { sketchLoop } from './sketchCurves';
 import { mapSegment } from '../../geometry/curveSegments';
@@ -305,15 +317,9 @@ export const revolveProfile = defineCommand({
           'Malformed or non-length-3 values are ignored and [0,0,0] is used.',
       ),
     ).optional(),
-    layerId: z
-      .string()
-      .describe('Layer id to assign the entity to. Defaults to the document default layer.')
-      .optional(),
+    layerId: layerIdField(),
     color: colorField(DEFAULT_SOLID_COLOR),
-    id: z
-      .string()
-      .describe('Optional explicit entity id. If omitted a unique id is generated.')
-      .optional(),
+    id: explicitIdField(),
   }),
   run: (
     doc,
@@ -364,11 +370,7 @@ export const revolveProfile = defineCommand({
     if (badProfile) return badProfile;
     const flatProfile = rejectZeroAreaProfile(doc, 'revolve_profile', profile);
     if (flatProfile) return flatProfile;
-    if (
-      explicitId !== undefined &&
-      explicitId.length > 0 &&
-      Object.hasOwn(doc.entities, explicitId)
-    ) {
+    if (explicitIdTaken(doc, explicitId)) {
       return noop(
         doc,
         `revolve_profile: entity id "${explicitId}" already exists; choose another id or omit it; no-op.`,
@@ -394,7 +396,7 @@ export const revolveProfile = defineCommand({
 
     const segments = Math.max(3, rawSegments ?? 32);
 
-    const id = explicitId !== undefined && explicitId.length > 0 ? explicitId : nextId('rev');
+    const id = explicitIdOrNext(explicitId, 'rev');
     const entity = newEntity(
       'revolution',
       id,
@@ -403,8 +405,7 @@ export const revolveProfile = defineCommand({
       color,
       {
         rotation: finiteVec3OrZero(rotation),
-        layerId:
-          layerId !== undefined && Object.hasOwn(doc.layers, layerId) ? layerId : DEFAULT_LAYER_ID,
+        layerId: existingLayerOrDefault(doc, layerId),
       },
     );
 

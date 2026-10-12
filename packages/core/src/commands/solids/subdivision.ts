@@ -6,7 +6,7 @@
 
 import type { SubdivisionEntity, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
-import { colorField, defineCommand, vec3, z } from '../schema';
+import { colorField, defineCommand, vec3, z, layerIdField, nameField } from '../schema';
 import { noop } from '../noop';
 import { add3, finiteVec3OrZero } from '../../lib/vec3';
 import { applyEulerXYZ } from '../../lib/eulerRotation';
@@ -178,12 +178,9 @@ export const addSubdivisionSolid = defineCommand({
     levels: levelsField.optional(),
     position: vec3('World position of the cage origin. Defaults to [0, 0, 0].').optional(),
     rotation: rotationField(),
-    layerId: z
-      .string()
-      .describe('Layer id to assign the entity to. Defaults to the document default layer.')
-      .optional(),
+    layerId: layerIdField(),
     color: colorField(DEFAULT_SOLID_COLOR),
-    name: z.string().describe('Optional display name.').optional(),
+    name: nameField(),
     id: explicitIdField(),
   }),
   run: (doc, params): CommandResult => {

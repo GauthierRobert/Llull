@@ -8,7 +8,7 @@
 import type { Entity, MeshData, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import type { Point2 } from '../../lib/polygon';
-import { defineCommand, z } from '../schema';
+import { defineCommand, z, nameField } from '../schema';
 import { nextId } from '../../lib/id';
 import { compactNumber as fmt } from '../../lib/compactNumber';
 import { finiteVec3OrZero } from '../../lib/vec3';
@@ -60,7 +60,7 @@ export const addSplineShaft = defineCommand({
     position: positionField('Centre of the bottom face. '),
     rotation: rotationField(),
     color: z.string().describe('Hex color. Default "#9aa3ad".').optional(),
-    name: z.string().describe('Optional display name.').optional(),
+    name: nameField(),
   }),
   run: (
     doc,

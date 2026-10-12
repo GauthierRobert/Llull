@@ -6,7 +6,7 @@
 
 import type { MeshData } from '../../model/types';
 import type { CommandResult } from '../types';
-import { defineCommand, z } from '../schema';
+import { defineCommand, z, nameField } from '../schema';
 import { nextId } from '../../lib/id';
 import { compactNumber as fmt } from '../../lib/compactNumber';
 import { finiteVec3OrZero } from '../../lib/vec3';
@@ -83,7 +83,7 @@ export const addInternalGear = defineCommand({
     position: positionField('Centre of the ring on its axis (z = bottom face). '),
     rotation: rotationField(),
     color: z.string().describe('Hex color. Default "#8892a0".').optional(),
-    name: z.string().describe('Optional display name.').optional(),
+    name: nameField(),
   }),
   run: (
     doc,

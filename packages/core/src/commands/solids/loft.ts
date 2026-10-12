@@ -1,6 +1,6 @@
 import type { CadDocument, Vec2, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
-import { colorField, defineCommand, vec3, z } from '../schema';
+import { colorField, defineCommand, vec3, z, layerIdField } from '../schema';
 import { noop } from '../noop';
 import { add3, distance3, dot3, scale3, sub3 } from '../../lib/vec3';
 import { applyEulerXYZ } from '../../lib/eulerRotation';
@@ -134,10 +134,7 @@ export const loftSections = defineCommand({
         'true: straight lines between neighbouring sections; false (default): smooth blend.',
       )
       .optional(),
-    layerId: z
-      .string()
-      .describe('Layer id to assign the entity to. Defaults to the document default layer.')
-      .optional(),
+    layerId: layerIdField(),
     color: colorField(DEFAULT_SOLID_COLOR),
     id: explicitIdField(),
   }),
