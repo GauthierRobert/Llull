@@ -101,4 +101,60 @@ describe('retired command migration', () => {
       'oscillate',
     ]);
   });
+
+  it('maps add_mate onto add_constraint, keeping the minted mate id', () => {
+    let doc = createEmptyDocument();
+    for (const x of [0, 10]) {
+      const box = execute(doc, 'add_box', { size: [1, 1, 1], position: [x, 0, 0] });
+      doc = execute(box.document, 'create_component', {
+        name: `C${x}`,
+        entityIds: [box.affected[0]!],
+      }).document;
+    }
+    const [first, second] = doc.order;
+    const nextStep = doc.featureHistory.length + 1;
+    const saved = serializeDocument({
+      ...doc,
+      featureHistory: [
+        ...doc.featureHistory,
+        {
+          id: `step-${nextStep}`,
+          name: 'add_mate',
+          params: {
+            kind: 'distance',
+            a: { instanceId: first },
+            b: { instanceId: second },
+            value: 4,
+          },
+        },
+        {
+          id: `step-${nextStep + 1}`,
+          name: 'update_constraint',
+          params: { id: `mate-${nextStep}.1`, patch: { value: 6 } },
+        },
+      ],
+      nextStepNumber: nextStep + 2,
+    });
+    const loaded = deserializeDocument(saved);
+    expect(loaded.featureHistory.at(-2)?.params).toEqual({
+      constraint: { kind: 'distance', a: { entityId: first }, b: { entityId: second }, value: 4 },
+      id: `mate-${nextStep}.1`,
+    });
+    const replayed = execute(loaded, 'replay_history', {}).document;
+    expect(replayed.constraints[`mate-${nextStep}.1`]).toMatchObject({
+      kind: 'distance',
+      value: 6,
+    });
+  });
+
+  it('keeps an explicit add_mate id and mints fresh ids inside recipes', () => {
+    const mate = { kind: 'coincident', a: { instanceId: 'i1' }, b: { instanceId: 'i2' } };
+    const raw = migrateRetiredCommands({
+      featureHistory: [{ id: 'step-1', name: 'add_mate', params: { ...mate, id: 'm' } }],
+      recipes: { r: { name: 'r', steps: [{ id: 'step-1', name: 'add_mate', params: mate }] } },
+    });
+    expect((raw['featureHistory'] as Array<{ params: { id?: string } }>)[0]?.params.id).toBe('m');
+    const recipes = raw['recipes'] as CadDocument['recipes'];
+    expect(recipes['r']?.steps[0]?.params).not.toHaveProperty('id');
+  });
 });

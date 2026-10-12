@@ -75,7 +75,11 @@ export interface CommandDefinition<P> {
  * Maps the params of a retired command onto the call that replaced it. Persistence applies it to
  * saved feature-history / recipe steps so documents recorded before the merge still replay.
  */
-export type RetiredCommandRewrite = (params: Record<string, unknown>) => {
+export type RetiredCommandRewrite = (
+  params: Record<string, unknown>,
+  /** The saved top-level history step; absent for nested plan actions and recipe steps. */
+  step?: { readonly id: string },
+) => {
   readonly name: string;
   readonly params: Record<string, unknown>;
 };

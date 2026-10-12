@@ -524,8 +524,10 @@ export const plans: Record<string, GoldenAction[]> = {
     cubeInstance(5, 'ia'),
     cubeInstance(20, 'ib'),
     {
-      command: 'add_mate',
-      params: { kind: 'distance', a: { instanceId: '$ia' }, b: { instanceId: '$ib' }, value: 5 },
+      command: 'add_constraint',
+      params: {
+        constraint: { kind: 'distance', a: { entityId: '$ia' }, b: { entityId: '$ib' }, value: 5 },
+      },
     },
   ],
   assembly_joints: [

@@ -166,7 +166,6 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'create_component',
     'insert_instance',
     'explode_instance',
-    'add_mate',
     'bill_of_materials',
     'add_joint',
     'delete_joint',
