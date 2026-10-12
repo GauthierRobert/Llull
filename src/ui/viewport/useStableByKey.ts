@@ -13,3 +13,8 @@ export function useStableByKey<T>(value: T, key: string): T {
   if (stable.current.key !== key) stable.current = { key, value };
   return stable.current.value;
 }
+
+/** Content key of a point list (`"x,y;x,y"`), for `useStableByKey`. */
+export function pointsKey(points: ReadonlyArray<ReadonlyArray<number>>): string {
+  return points.map((point) => point.join(',')).join(';');
+}

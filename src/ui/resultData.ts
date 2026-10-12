@@ -82,8 +82,12 @@ export function isBoundsData(value: unknown): value is { min: Triple; max: Tripl
 }
 
 /** `measure_bounding_box` data: bounds plus their `size`. */
-export function isBoundingBoxData(
-  value: unknown,
-): value is { min: Triple; max: Triple; size: Triple } {
+export interface BoundingBoxData {
+  readonly min: Triple;
+  readonly max: Triple;
+  readonly size: Triple;
+}
+
+export function isBoundingBoxData(value: unknown): value is BoundingBoxData {
   return isBoundsData(value) && isTriple((value as DataRecord)['size']);
 }
