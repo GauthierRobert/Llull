@@ -6,39 +6,28 @@
  * surface-to-surface volume comparison (`compare_surfaces`).
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import type { PlatformObject } from '@core/model/civil';
 import { useStore } from '@ui/store';
 import { PanelSection, FormError } from '@ui/panels/PanelParts';
 import {
-  chosenId,
   CivilObjectRow,
   CivilObjectSelect,
   CivilStatus,
   useCivilObjects,
   NumberField,
+  PointsFromSelectionRow,
   TextField,
+  useChosenId,
 } from './CivilParts';
-import {
-  formatPoints,
-  optionalNumber,
-  parseNumber,
-  parsePoints,
-  selectedPolylinePoints,
-} from './civilInput';
-import { runQuery } from './civilQuery';
+import { optionalNumber, parseNumber, optionalText } from '@ui/numberText';
+import { parsePoints } from './civilInput';
+import { runQuery, useCivilReport } from './civilQuery';
 
 function PlatformRow({ platform }: { platform: PlatformObject }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
-  const civil = useStore((s) => s.document.civil);
-  const units = useStore((s) => s.document.units);
   const [swell, setSwell] = useState('');
-  const volumes = useMemo(
-    () => runQuery('platform_earthworks', { platformId: platform.id }).summary,
-    // the volumes read only the civil model and the document units
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [civil, units, platform.id],
-  );
+  const volumes = useCivilReport('platform_earthworks', 'platformId', platform.id);
   return (
     <CivilObjectRow object={platform} detail={volumes}>
       <NumberField
@@ -66,11 +55,9 @@ function PlatformRow({ platform }: { platform: PlatformObject }): React.ReactEle
 
 function CompareSurfaces(): React.ReactElement {
   const surfaces = useCivilObjects('surface');
-  const [base, setBase] = useState('');
-  const [comparison, setComparison] = useState('');
+  const [baseId, setBase] = useChosenId(surfaces);
+  const [comparisonId, setComparison] = useChosenId(surfaces, false, 1);
   const [status, setStatus] = useState('');
-  const baseId = chosenId(surfaces, base);
-  const comparisonId = chosenId(surfaces, comparison !== '' ? comparison : (surfaces[1]?.id ?? ''));
   return (
     <div className="building-inline-form" aria-label="Compare surfaces">
       <CivilObjectSelect
@@ -109,23 +96,13 @@ export function EarthworksSection(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const surfaces = useCivilObjects('surface');
   const platforms = useCivilObjects('platform');
-  const [surface, setSurface] = useState('');
+  const [surfaceId, setSurface] = useChosenId(surfaces);
   const [outline, setOutline] = useState('');
   const [elevation, setElevation] = useState('');
   const [cutSlope, setCutSlope] = useState('');
   const [fillSlope, setFillSlope] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
-  const surfaceId = chosenId(surfaces, surface);
-
-  const takeSelection = (): void => {
-    const points = selectedPolylinePoints(useStore.getState().document);
-    if (points === null) setError('Select one closed polyline first.');
-    else {
-      setOutline(formatPoints(points));
-      setError('');
-    }
-  };
 
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
@@ -145,7 +122,7 @@ export function EarthworksSection(): React.ReactElement {
       elevation: level,
       ...optionalNumber('cutSlope', cutSlope),
       ...optionalNumber('fillSlope', fillSlope),
-      ...(name.trim() !== '' ? { name: name.trim() } : {}),
+      ...optionalText('name', name),
     });
     setError('');
   };
@@ -161,23 +138,20 @@ export function EarthworksSection(): React.ReactElement {
       testId="civil-earthworks"
     >
       <form className="civil-form" onSubmit={handleSubmit} aria-label="Add platform">
-        <div className="building-inline-form">
+        <PointsFromSelectionRow
+          value={outline}
+          set={setOutline}
+          label="Platform outline"
+          noSelectionError="Select one closed polyline first."
+          setError={setError}
+        >
           <CivilObjectSelect
             objects={surfaces}
             value={surfaceId}
             label="Platform surface"
             onChange={setSurface}
           />
-          <TextField
-            value={outline}
-            set={setOutline}
-            hint="x,y; x,y; x,y; …"
-            label="Platform outline"
-          />
-          <button type="button" className="btn btn--ghost btn--sm" onClick={takeSelection}>
-            From selection
-          </button>
-        </div>
+        </PointsFromSelectionRow>
         <div className="building-inline-form">
           <NumberField
             value={elevation}

@@ -33,18 +33,18 @@ verify and refine.
 | Phase               | Commands                                                                                                                             |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | Setup               | `set_units`, `set_parameter`, `add_layer`, `create_material`                                                                         |
-| 2D sketch           | `draw_line` `draw_polyline` `draw_arc` `draw_circle` `draw_rectangle` `draw_ellipse` `draw_spline` `draw_point`                      |
+| 2D sketch           | `draw_polyline` (2 points = line) `draw_arc` (no angles = circle) `draw_rectangle` `draw_ellipse` `draw_spline` `draw_point`                      |
 | 2D edit             | `offset_2d` `trim` `extend` `fillet_2d` `chamfer_2d` `explode_polyline`                                                              |
-| 2D→3D               | `extrude_sketch` `extrude_profile` `revolve_profile`                                                                                 |
+| 2D→3D               | `extrude_profile` (profile / id / ids) `revolve_profile`                                                                                 |
 | Primitives          | `add_box` `add_cylinder` `add_sphere` `add_cone` `add_torus` `add_wedge` `add_pyramid`                                               |
-| Combine             | `boolean_union` `boolean_subtract` `boolean_intersect` `make_tube_between`                                                           |
+| Combine             | `boolean` (op `union` / `subtract` / `intersect`)                                                           |
 | Modify 3D           | `fillet_edge` `chamfer_edge`                                                                                                         |
-| Place/replicate     | `move_entity` `rotate_entity` `scale_entity` `mirror_entity` `array_linear` `array_polar` `duplicate_entity`                         |
+| Place/replicate     | `move_entities` `rotate_entity` `scale_entity` `mirror_entity` `array_linear` `array_polar` `duplicate_entities`                         |
 | Organize            | `group_entities` `ungroup_entities` `set_entity_name` `set_entity_layer` `assign_material`                                           |
-| Reuse               | `instantiate_template` (`bolt_hole_pattern`, `flange`, `rectangular_plate_with_holes`), `instantiate_recipe`, `create_configuration` |
+| Reuse               | `instantiate_recipe`, `create_configuration` |
 | Annotate            | `add_text` `add_dimension`                                                                                                           |
 | Inspect (read-only) | `describe_scene` `find_entities` `check_model`                                                                                       |
-| Measure (read-only) | `measure_distance` `measure_angle` `measure_area` `measure_perimeter` `measure_bounding_box` `measure_volume` `mass_properties`      |
+| Measure (read-only) | `measure_distance` `measure_angle` `measure_area` `measure_perimeter` `measure_bounding_box` `mass_properties` (volume, +mass with density)      |
 | Output              | `render_view` `export_stl` `save_recipe`                                                                                             |
 | Orchestrate         | **`build_project`** (the plan transaction) · `replay_history` + history edits                                                        |
 
@@ -71,7 +71,7 @@ its first affected id later as `$base` (or `$base[N]` for the Nth). Typical shap
     { "command": "set_parameter", "params": { "name": "bore", "value": 20 } },
     { "command": "add_cylinder", "params": { "radius": 40, "height": 30 }, "as": "body" },
     { "command": "add_cylinder", "params": { "radius": 10, "height": 40 }, "as": "hole" },
-    { "command": "boolean_subtract", "params": { "a": "$body", "b": "$hole" }, "as": "part" },
+    { "command": "boolean", "params": { "op": "subtract",  "a": "$body", "b": "$hole" }, "as": "part" },
     { "command": "fillet_edge", "params": { "id": "$part", "radius": 2 } },
   ],
 }
@@ -102,7 +102,7 @@ pow hypot mod min max`.
         },
       ],
     },
-    { "command": "move_entity", "params": { "id": "$piston3", "delta": [0, 0, 5] } },
+    { "command": "move_entities", "params": { "ids": ["$piston3"], "delta": [0, 0, 5] } },
   ],
 }
 ```
@@ -116,8 +116,8 @@ for the dependency to be tracked; the legacy `{ repeat, step }` / `{ for_each, s
 (single step, not nestable) still work but are frozen to values per iteration.
 `validate: true` expands loops and reports issues by path, e.g. `step 4 › iter 2 › step 1 (add_box): ...`.
 
-Reuse beats hand-drafting: prefer `instantiate_template` for bolt patterns/flanges/plates
-and `instantiate_recipe`/`array_*` for repetition before drawing primitives one by one.
+Reuse beats hand-drafting: prefer a `repeat` loop (e.g. bolt circles via `=r*cos(2*pi*i/n)`),
+`instantiate_recipe` or `array_*` for repetition before drawing primitives one by one.
 
 ### 3. Validate (dry run) before applying
 
@@ -137,7 +137,7 @@ kind/name/layer for follow-up steps.
 
 - `check_model` — geometry defects, structural issues, parameter errors. Resolve all.
 - Verify the driving dims with `measure_bounding_box`, `measure_distance`,
-  `measure_volume`; `mass_properties` for mass/CoM if a material is assigned.
+  `mass_properties` for volume, and mass if a material or density is given.
 - Compare against the intent's requirements; if off, go to step 6.
 
 ### 6. Refine parametrically (edit the recipe, not the geometry)
@@ -159,7 +159,7 @@ and design variants with `create_configuration` / `activate_configuration`.
 
 - One `build_project` per coherent sub-assembly; alias its top entity, then `group_entities`
   and `set_entity_name` so later plans reference it by name via `find_entities`.
-- Place sub-assemblies with `move_entity`/`rotate_entity`; replicate with `array_linear`/
+- Place sub-assemblies with `move_entities`/`rotate_entity`; replicate with `array_linear`/
   `array_polar` rather than re-authoring identical parts.
 - Use `add_layer` + `set_entity_layer` to keep large models navigable; `assign_material`
   per part so `mass_properties` and `render_view` are meaningful.

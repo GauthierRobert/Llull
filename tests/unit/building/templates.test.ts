@@ -20,7 +20,12 @@ describe('add_building_template', () => {
 
   it('creates an office frame and keeps an existing project name; ids continue after existing ones', () => {
     let doc = execute(createEmptyDocument(), 'set_project_info', { name: 'Tower A' }).document;
-    doc = execute(doc, 'add_wall', { start: [0, -20000], end: [5000, -20000] }).document;
+    doc = execute(doc, 'draw_walls', {
+      points: [
+        [0, -20000],
+        [5000, -20000],
+      ],
+    }).document;
     const result = execute(doc, 'add_building_template', { template: 'office', origin: [0, 0] });
     const building = result.document.building!;
     expect(building.project.name).toBe('Tower A');
@@ -51,9 +56,11 @@ describe('add_building_template', () => {
 
 describe('second review regressions', () => {
   it('templates still work after elements and levels were deleted (B1)', () => {
-    let doc = execute(createEmptyDocument(), 'add_wall', {
-      start: [0, 0],
-      end: [4000, 0],
+    let doc = execute(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
     }).document;
     doc = execute(doc, 'add_door', { wallId: 'wall-1' }).document;
     doc = execute(doc, 'add_stair', { start: [500, 500] }).document;
@@ -67,13 +74,25 @@ describe('second review regressions', () => {
   });
 
   it('solve_constraints still runs in a document with a building (B2)', () => {
-    let doc = execute(createEmptyDocument(), 'add_wall', {
-      start: [0, 0],
-      end: [4000, 0],
+    let doc = execute(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
     }).document;
-    doc = execute(doc, 'draw_line', { start: [0, 5000], end: [1000, 5000] }).document;
+    doc = execute(doc, 'draw_polyline', {
+      points: [
+        [0, 5000],
+        [1000, 5000],
+      ],
+    }).document;
     const a = doc.order[doc.order.length - 1]!;
-    doc = execute(doc, 'draw_line', { start: [2000, 6000], end: [3000, 6000] }).document;
+    doc = execute(doc, 'draw_polyline', {
+      points: [
+        [2000, 6000],
+        [3000, 6000],
+      ],
+    }).document;
     const b = doc.order[doc.order.length - 1]!;
     const constrained = execute(doc, 'add_constraint', {
       constraint: {
@@ -90,11 +109,15 @@ describe('second review regressions', () => {
 
   it('copies of generated geometry are refused and never resolve to the element (H1)', async () => {
     const { buildingElementOf } = await import('@aec/index');
-    const doc = execute(createEmptyDocument(), 'add_wall', {
-      start: [0, 0],
-      end: [4000, 0],
+    const doc = execute(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
     }).document;
-    expect(execute(doc, 'duplicate_entity', { id: 'wall-1:body-0' }).summary).toMatch(/rejected/);
+    expect(execute(doc, 'duplicate_entities', { ids: ['wall-1:body-0'] }).summary).toMatch(
+      /rejected/,
+    );
     expect(buildingElementOf(doc, 'wall-1:body-0')).toBe('wall-1');
     const forged = {
       ...doc,
@@ -104,11 +127,18 @@ describe('second review regressions', () => {
   });
 
   it('the building uid survives history replay and is not burned by reads (H3)', () => {
-    let doc = execute(createEmptyDocument(), 'add_wall', {
-      start: [0, 0],
-      end: [4000, 0],
+    let doc = execute(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
     }).document;
-    doc = execute(doc, 'add_wall', { start: [0, 3000], end: [4000, 3000] }).document;
+    doc = execute(doc, 'draw_walls', {
+      points: [
+        [0, 3000],
+        [4000, 3000],
+      ],
+    }).document;
     const uid = doc.building!.uid;
     expect(uid).toBeDefined();
     const replayed = execute(doc, 'replay_history', {}).document;

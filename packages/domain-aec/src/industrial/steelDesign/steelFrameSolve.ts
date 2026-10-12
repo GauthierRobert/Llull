@@ -10,7 +10,7 @@ import { solveFrame, type FrameResult } from '@lib/frame2d';
 import type { LoadFactors } from './steelBeamAnalysis';
 import { amplificationOf } from './steelDesign';
 import type { FrameSystem, StoreyPiece } from './steelFrameModel';
-import { GAMMA_IMPOSED, GAMMA_PERMANENT } from './steelFraming';
+import { GAMMA_G, GAMMA_Q } from '../../shared/loadFactors';
 
 export interface FrameSolutions {
   /** 1.35 G + 1.5 Q with the notional forces toward +u and −u. */
@@ -26,7 +26,7 @@ export interface FrameSolutions {
   readonly amplification: number;
 }
 
-const ULS: LoadFactors = { permanent: GAMMA_PERMANENT, imposed: GAMMA_IMPOSED };
+const ULS: LoadFactors = { permanent: GAMMA_G, imposed: GAMMA_Q };
 const SLS: LoadFactors = { permanent: 1, imposed: 1 };
 /** Horne's reference horizontal force, 1/200 of the vertical load. */
 const HORNE_FACTOR = 1 / 200;

@@ -62,8 +62,16 @@ describe('render_view overlays', () => {
   it('showLabels marks 3D solids, 2D shapes, names and a legend', () => {
     let { doc } = boxDoc();
     const draws: [string, Record<string, unknown>][] = [
-      ['draw_line', { start: [0, 0], end: [4, 0] }],
-      ['draw_circle', { center: [0, 0], radius: 1 }],
+      [
+        'draw_polyline',
+        {
+          points: [
+            [0, 0],
+            [4, 0],
+          ],
+        },
+      ],
+      ['draw_arc', { center: [0, 0], radius: 1 }],
       ['draw_ellipse', { center: [0, 0], radiusX: 3, radiusY: 1.5 }],
       ['draw_arc', { center: [0, 0], radius: 2, startAngle: 0, endAngle: 1.5 }],
       ['draw_rectangle', { width: 2, height: 1 }],
@@ -157,8 +165,18 @@ describe('render_view label markers and axes (ported from server enrichment test
 
   it.each([
     ['box (8 AABB corners)', 'add_box', { position: [0, 0, 0], size: [2, 2, 2] }, 8],
-    ['line (2 endpoints)', 'draw_line', { start: [0, 0], end: [3, 3] }, 2],
-    ['circle (center + radius handle)', 'draw_circle', { center: [1, 2], radius: 1.5 }, 2],
+    [
+      'line (2 endpoints)',
+      'draw_polyline',
+      {
+        points: [
+          [0, 0],
+          [3, 3],
+        ],
+      },
+      2,
+    ],
+    ['circle (center + radius handle)', 'draw_arc', { center: [1, 2], radius: 1.5 }, 2],
     [
       'ellipse (center + 2 semi-axes)',
       'draw_ellipse',
@@ -216,7 +234,12 @@ describe('render_view label markers and axes (ported from server enrichment test
 describe('render_view hide2D and scale label', () => {
   it('hide2D drops 2D entities from drawing, count and framing; default keeps them', () => {
     const { doc } = boxDoc();
-    const sketched = execute(doc, 'draw_line', { start: [100, 100], end: [200, 200] }).document;
+    const sketched = execute(doc, 'draw_polyline', {
+      points: [
+        [100, 100],
+        [200, 200],
+      ],
+    }).document;
     const shown = render(sketched, bare);
     expect(shown.entityCount).toBe(2);
     expect(shown.bounds?.max[0]).toBeGreaterThan(50);

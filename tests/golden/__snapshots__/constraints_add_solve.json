@@ -86,15 +86,17 @@
     "featureHistory": [
       {
         "id": "#4",
-        "name": "draw_line",
+        "name": "draw_polyline",
         "params": {
-          "start": [
-            0,
-            0
-          ],
-          "end": [
-            10,
-            0
+          "points": [
+            [
+              0,
+              0
+            ],
+            [
+              10,
+              0
+            ]
           ]
         },
         "suppressed": false,
@@ -104,15 +106,17 @@
       },
       {
         "id": "#5",
-        "name": "draw_line",
+        "name": "draw_polyline",
         "params": {
-          "start": [
-            0,
-            1
-          ],
-          "end": [
-            10,
-            4
+          "points": [
+            [
+              0,
+              1
+            ],
+            [
+              10,
+              4
+            ]
           ]
         },
         "suppressed": false,

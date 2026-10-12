@@ -8,7 +8,8 @@
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import { PanelSection } from '@ui/panels/PanelParts';
-import { optionalNumber, parseNumber, parsePoints } from './civilInput';
+import { optionalNumber, parseNumber, optionalText } from '@ui/numberText';
+import { parsePoints } from './civilInput';
 import { NumberField, TextField } from './CivilParts';
 
 export function CivilCrsSection(): React.ReactElement {
@@ -29,7 +30,7 @@ export function CivilCrsSection(): React.ReactElement {
     dispatch('set_coordinate_system', {
       name: name.trim(),
       ...optionalNumber('epsg', epsg),
-      ...(datum.trim() !== '' ? { verticalDatum: datum.trim() } : {}),
+      ...optionalText('verticalDatum', datum),
     });
   };
 

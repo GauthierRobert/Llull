@@ -36,12 +36,9 @@ import {
   sameSegment,
 } from '../../shared/duplicates';
 import { commitBuilding } from '../evaluate/evaluateElements';
+import { levelIdParam } from '../levelParams';
 
-const levelIdParam = (): z.ZodOptional<z.ZodString> =>
-  z
-    .string()
-    .optional()
-    .describe('Level id. Default: active level (a "Level 0" is created if none).');
+const concreteMaterialParam = z.string().optional().describe('Material. Default concrete.');
 
 /**
  * Drops walls with a free endpoint (one touching no other wall's endpoint) until none remain —
@@ -151,7 +148,7 @@ export const addSlab = defineCommand({
       .describe(
         'With wallIds: slab edge at the outer wall faces, the wall centerlines (default — the slab bears into the walls), or the inner faces.',
       ),
-    levelId: levelIdParam(),
+    levelId: levelIdParam,
     thickness: z
       .number()
       .optional()
@@ -166,7 +163,7 @@ export const addSlab = defineCommand({
       .enum(['floor', 'roof', 'foundation'])
       .optional()
       .describe('Slab role used in schedules and IFC. Default floor.'),
-    material: z.string().optional().describe('Material. Default concrete.'),
+    material: concreteMaterialParam,
   }),
   run: (
     doc,
@@ -288,8 +285,8 @@ export const addColumn = defineCommand({
       .number()
       .optional()
       .describe('Column height, in document units. Default: the level height.'),
-    levelId: levelIdParam(),
-    material: z.string().optional().describe('Material. Default concrete.'),
+    levelId: levelIdParam,
+    material: concreteMaterialParam,
   }),
   run: (doc, params): CommandResult => {
     const building = getBuilding(doc);
@@ -385,8 +382,8 @@ export const addBeam = defineCommand({
       .number()
       .optional()
       .describe('Offset of the beam top from the top of the level, in document units. Default 0.'),
-    levelId: levelIdParam(),
-    material: z.string().optional().describe('Material. Default concrete.'),
+    levelId: levelIdParam,
+    material: concreteMaterialParam,
   }),
   run: (doc, { start, end, width, depth, topOffset = 0, levelId, material }): CommandResult => {
     if (distance(start, end) <= 0)
@@ -462,8 +459,8 @@ export const addStair = defineCommand({
       .number()
       .optional()
       .describe('Tread (going) depth, in document units. Default 280 mm.'),
-    levelId: levelIdParam(),
-    material: z.string().optional().describe('Material. Default concrete.'),
+    levelId: levelIdParam,
+    material: concreteMaterialParam,
   }),
   run: (
     doc,

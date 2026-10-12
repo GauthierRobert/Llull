@@ -123,7 +123,7 @@
       },
       {
         "id": "#9",
-        "name": "rename_layer",
+        "name": "update_layer",
         "params": {
           "id": "#4",
           "name": "Windows"
@@ -135,7 +135,7 @@
       },
       {
         "id": "#10",
-        "name": "set_layer_visibility",
+        "name": "update_layer",
         "params": {
           "id": "#4",
           "visible": false
@@ -147,7 +147,7 @@
       },
       {
         "id": "#11",
-        "name": "set_layer_lock",
+        "name": "update_layer",
         "params": {
           "id": "#2",
           "locked": true

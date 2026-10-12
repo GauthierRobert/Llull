@@ -2,6 +2,7 @@ import { type Component, type JointKind, CONSTRAINT_KINDS } from '../../model/ty
 import { findComponentCycle } from '../assembly/assemblies';
 import { isRecord } from '../../lib/isRecord';
 import { isFiniteNumber } from '../../lib/isFiniteNumber';
+import { isVec3 } from '../../lib/vec3';
 import { documentExtensions } from '../../plugins/host';
 import {
   isStringArray,
@@ -31,8 +32,7 @@ function validateJointMateRef(id: string, field: string, v: unknown): string | n
 
 function validateJointAxis(id: string, axis: unknown): string | null {
   if (axis === 'x' || axis === 'y' || axis === 'z') return null;
-  if (Array.isArray(axis) && axis.length === 3 && (axis as unknown[]).every(isFiniteNumber))
-    return null;
+  if (isVec3(axis)) return null;
   return `joint '${id}': axis must be 'x', 'y', 'z', or a [x,y,z] finite-number array, got ${JSON.stringify(axis)}`;
 }
 

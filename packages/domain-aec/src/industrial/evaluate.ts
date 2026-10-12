@@ -25,7 +25,8 @@ import {
   orientedBox,
 } from '../building/evaluate/entities';
 import { prismMesh, sweepMesh } from '../shared/mesh';
-import { circleOutline, findProfile, profileOutline } from '../steel/profiles';
+import { circlePolygon } from '@lib/arc';
+import { findProfile, profileOutline } from '../steel/profiles';
 import { cross3, dot3, sub3 } from '@lib/vec3';
 import { normalize } from '../shared/vec3';
 import { shapeOf } from './equipment/equipmentShape';
@@ -170,7 +171,7 @@ export function evaluateEquipment(equipment: EquipmentElement, level: BuildingLe
   }
   const [cx, cy] = equipment.location;
   const radius = (shape === 'vertical_vessel' ? length : width) / 2;
-  const circle = circleOutline(radius, VESSEL_SEGMENTS);
+  const circle = circlePolygon([0, 0], radius, VESSEL_SEGMENTS);
   const [cos, sin] = [Math.cos(equipment.angle), Math.sin(equipment.angle)];
   const mesh =
     shape === 'vertical_vessel'
@@ -211,7 +212,7 @@ const PIPE_SEGMENTS = 16;
 
 export function evaluatePipe(pipe: PipeElement, level: BuildingLevel): Entity[] {
   const radius = pipe.diameter / 2;
-  const circle = circleOutline(radius, PIPE_SEGMENTS);
+  const circle = circlePolygon([0, 0], radius, PIPE_SEGMENTS);
   const color = colorForMaterial(pipe.material, '#2f9c8f');
   const points = pipe.points.map((point) => atLevel(level, point));
   const entities = sweepRun(pipe, circle, points, `Pipe ${pipe.mark} ${pipe.service}`, color);

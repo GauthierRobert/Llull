@@ -47,7 +47,7 @@ function sweepOf(doc: CadDocument, params: Record<string, unknown>): SweepEntity
 
 function volumeOf(entity: Entity): number {
   const doc = { ...empty, entities: { [entity.id]: entity }, order: [entity.id] };
-  return (execute(doc, 'measure_volume', { entityId: entity.id }).data as { volume: number })
+  return (execute(doc, 'mass_properties', { entityId: entity.id }).data as { volume: number })
     .volume;
 }
 

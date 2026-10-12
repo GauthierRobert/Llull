@@ -59,7 +59,7 @@ describe('buildElevationDrawing', () => {
     const frame = buildElevationDrawing(doc, { direction: 'south', exclude: ['panel'] })!;
     expect(frame.items.length).not.toBe(all.items.length);
     const layerId = doc.entities['panel-1:body']!.layerId;
-    const hidden = execute(doc, 'set_layer_visibility', { id: layerId, visible: false });
+    const hidden = execute(doc, 'update_layer', { id: layerId, visible: false });
     expect(hidden.affected.length, hidden.summary).toBeGreaterThan(0);
     expect(buildElevationDrawing(hidden.document, { direction: 'south' })!.items).toHaveLength(
       frame.items.length,

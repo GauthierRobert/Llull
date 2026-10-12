@@ -209,7 +209,7 @@ describe('palette catalog', () => {
 
   it('ranks the best label match first and drops non-matches', () => {
     const results = searchPaletteItems(items, 'measure vol', []);
-    expect(results[0]?.id).toBe('command:measure_volume');
+    expect(results[0]?.id).toBe('command:mass_properties');
     expect(searchPaletteItems(items, 'qqqzzz', [])).toEqual([]);
   });
 });

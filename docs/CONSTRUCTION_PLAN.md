@@ -38,7 +38,7 @@ Playwright end-to-end suite (`npm run test:e2e`).
       `delete_level`, `set_project_info`, `describe_building`.
 - [x] **S2 — Structural grid.** `add_grid_line`, `add_grid_system` (lettered/numbered
       axes with bubbles).
-- [x] **S3 — Walls.** `add_wall`, `draw_walls` (chain/closed loop), `update_wall`,
+- [x] **S3 — Walls.** `draw_walls` (chain/closed loop), `update_wall`,
       automatic corner joins, `delete_building_element`, `move_building_element`.
 - [x] **S4 — Doors & windows.** `add_door`, `add_window`, `update_opening` — hosted,
       cut the wall, door swing drawn in plan.

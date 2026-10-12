@@ -32,7 +32,15 @@ const cubeInstance = (x: number, as: string): GoldenAction => ({
 
 export const plans: Record<string, GoldenAction[]> = {
   '2d_lines_polylines': [
-    { command: 'draw_line', params: { start: [0, 0], end: [10, 5] } },
+    {
+      command: 'draw_polyline',
+      params: {
+        points: [
+          [0, 0],
+          [10, 5],
+        ],
+      },
+    },
     {
       command: 'draw_polyline',
       params: {
@@ -63,8 +71,8 @@ export const plans: Record<string, GoldenAction[]> = {
       command: 'draw_arc',
       params: { center: [0, 0], radius: 5, startAngle: 0, endAngle: Math.PI },
     },
-    { command: 'draw_circle', params: { center: [3, 3], radius: 2 } },
-    { command: 'draw_circle', params: { center: [-3, 3], radius: 1.5, color: '#ff0000' } },
+    { command: 'draw_arc', params: { center: [3, 3], radius: 2 } },
+    { command: 'draw_arc', params: { center: [-3, 3], radius: 1.5, color: '#ff0000' } },
   ],
   '2d_rectangles': [
     { command: 'draw_rectangle', params: { width: 10, height: 4 } },
@@ -125,10 +133,46 @@ export const plans: Record<string, GoldenAction[]> = {
     },
   ],
   modify2d_offset_trim_extend: [
-    { command: 'draw_line', params: { start: [0, 0], end: [10, 0] }, as: 'a' },
-    { command: 'draw_line', params: { start: [5, -5], end: [5, 5] }, as: 'b' },
-    { command: 'draw_line', params: { start: [0, 3], end: [3, 3] }, as: 'c' },
-    { command: 'draw_line', params: { start: [8, -4], end: [8, 8] }, as: 'd' },
+    {
+      command: 'draw_polyline',
+      params: {
+        points: [
+          [0, 0],
+          [10, 0],
+        ],
+      },
+      as: 'a',
+    },
+    {
+      command: 'draw_polyline',
+      params: {
+        points: [
+          [5, -5],
+          [5, 5],
+        ],
+      },
+      as: 'b',
+    },
+    {
+      command: 'draw_polyline',
+      params: {
+        points: [
+          [0, 3],
+          [3, 3],
+        ],
+      },
+      as: 'c',
+    },
+    {
+      command: 'draw_polyline',
+      params: {
+        points: [
+          [8, -4],
+          [8, 8],
+        ],
+      },
+      as: 'd',
+    },
     { command: 'trim', params: { id: '$a', boundaryId: '$b' } },
     { command: 'extend', params: { id: '$c', boundaryId: '$d' } },
     {
@@ -198,9 +242,9 @@ export const plans: Record<string, GoldenAction[]> = {
       params: { baseWidth: 3, baseDepth: 3, height: 4, position: [8, 8, 0] },
     },
   ],
-  extrude_sketch_and_profile: [
+  extrude_profile_from_sketch_and_points: [
     { command: 'draw_rectangle', params: { width: 4, height: 2 }, as: 'r' },
-    { command: 'extrude_sketch', params: { id: '$r', depth: 3 } },
+    { command: 'extrude_profile', params: { id: '$r', depth: 3 } },
     {
       command: 'extrude_profile',
       params: {
@@ -245,7 +289,7 @@ export const plans: Record<string, GoldenAction[]> = {
     },
   ],
   closed_sweep_and_chain_pattern: [
-    { command: 'draw_circle', params: { center: [0, 0], radius: 40 }, as: 'loop' },
+    { command: 'draw_arc', params: { center: [0, 0], radius: 40 }, as: 'loop' },
     { command: 'sweep_profile', params: { pathId: '$loop', radius: 3, innerRadius: 2 } },
     { command: 'add_box', params: { size: [8, 2, 4] }, as: 'link' },
     {
@@ -366,7 +410,16 @@ export const plans: Record<string, GoldenAction[]> = {
       },
       as: 'wall',
     },
-    { command: 'draw_line', params: { start: [6, 10], end: [5.6, 10] }, as: 'lip' },
+    {
+      command: 'draw_polyline',
+      params: {
+        points: [
+          [6, 10],
+          [5.6, 10],
+        ],
+      },
+      as: 'lip',
+    },
     {
       command: 'draw_spline',
       params: {
@@ -379,7 +432,16 @@ export const plans: Record<string, GoldenAction[]> = {
       },
       as: 'inner',
     },
-    { command: 'draw_line', params: { start: [2.6, 0], end: [3, 0] }, as: 'base' },
+    {
+      command: 'draw_polyline',
+      params: {
+        points: [
+          [2.6, 0],
+          [3, 0],
+        ],
+      },
+      as: 'base',
+    },
     {
       command: 'revolve_profile',
       params: { profileIds: ['$wall', '$lip', '$inner', '$base'], segments: 24 },
@@ -414,7 +476,7 @@ export const plans: Record<string, GoldenAction[]> = {
   ],
   transforms_move_rotate_scale_mirror: [
     { command: 'add_box', params: { size: [1, 1, 1] }, as: 'b' },
-    { command: 'move_entity', params: { id: '$b', delta: [3, 2, 1] } },
+    { command: 'move_entities', params: { ids: ['$b'], delta: [3, 2, 1] } },
     { command: 'rotate_entity', params: { id: '$b', delta: [0, 0, Math.PI / 4] } },
     { command: 'scale_entity', params: { id: '$b', factor: 2 } },
     { command: 'mirror_entity', params: { id: '$b', axis: 'x' } },
@@ -427,7 +489,7 @@ export const plans: Record<string, GoldenAction[]> = {
   ],
   duplicate_group_ungroup: [
     { command: 'add_box', params: { size: [1, 2, 3] }, as: 'b' },
-    { command: 'duplicate_entity', params: { id: '$b', offset: [5, 0, 0] }, as: 'dup' },
+    { command: 'duplicate_entities', params: { ids: ['$b'], offset: [5, 0, 0] }, as: 'dup' },
     { command: 'group_entities', params: { ids: ['$b', '$dup'], name: 'pair' }, as: 'g' },
     { command: 'set_entity_name', params: { id: '$b', name: 'original', tags: ['a', 'b'] } },
   ],
@@ -436,9 +498,9 @@ export const plans: Record<string, GoldenAction[]> = {
     { command: 'add_layer', params: { name: 'Doors' }, as: 'l2' },
     { command: 'add_box', params: { size: [1, 1, 1] }, as: 'b' },
     { command: 'set_entity_layer', params: { entityId: '$b', layerId: '$l1' } },
-    { command: 'rename_layer', params: { id: '$l2', name: 'Windows' } },
-    { command: 'set_layer_visibility', params: { id: '$l2', visible: false } },
-    { command: 'set_layer_lock', params: { id: '$l1', locked: true } },
+    { command: 'update_layer', params: { id: '$l2', name: 'Windows' } },
+    { command: 'update_layer', params: { id: '$l2', visible: false } },
+    { command: 'update_layer', params: { id: '$l1', locked: true } },
   ],
   materials_assign: [
     { command: 'add_box', params: { size: [1, 1, 1] }, as: 'b' },
@@ -482,7 +544,7 @@ export const plans: Record<string, GoldenAction[]> = {
         },
       ],
     },
-    { command: 'move_entity', params: { id: '$piston0', delta: [0, 0, 5] } },
+    { command: 'move_entities', params: { ids: ['$piston0'], delta: [0, 0, 5] } },
   ],
   configurations: [
     { command: 'set_parameter', params: { name: 'w', expression: '10' } },
@@ -497,8 +559,26 @@ export const plans: Record<string, GoldenAction[]> = {
     { command: 'instantiate_recipe', params: { name: 'cube' } },
   ],
   constraints_add_solve: [
-    { command: 'draw_line', params: { start: [0, 0], end: [10, 0] }, as: 'a' },
-    { command: 'draw_line', params: { start: [0, 1], end: [10, 4] }, as: 'b' },
+    {
+      command: 'draw_polyline',
+      params: {
+        points: [
+          [0, 0],
+          [10, 0],
+        ],
+      },
+      as: 'a',
+    },
+    {
+      command: 'draw_polyline',
+      params: {
+        points: [
+          [0, 1],
+          [10, 4],
+        ],
+      },
+      as: 'b',
+    },
     {
       command: 'add_constraint',
       params: { constraint: { kind: 'parallel', a: { entityId: '$a' }, b: { entityId: '$b' } } },
@@ -524,8 +604,10 @@ export const plans: Record<string, GoldenAction[]> = {
     cubeInstance(5, 'ia'),
     cubeInstance(20, 'ib'),
     {
-      command: 'add_mate',
-      params: { kind: 'distance', a: { instanceId: '$ia' }, b: { instanceId: '$ib' }, value: 5 },
+      command: 'add_constraint',
+      params: {
+        constraint: { kind: 'distance', a: { entityId: '$ia' }, b: { entityId: '$ib' }, value: 5 },
+      },
     },
   ],
   assembly_joints: [
@@ -555,31 +637,6 @@ export const plans: Record<string, GoldenAction[]> = {
       },
     },
   ],
-  templates: [
-    {
-      command: 'instantiate_template',
-      params: {
-        template: 'bolt_hole_pattern',
-        params: { count: 6, boltCircleRadius: 10, holeRadius: 1 },
-      },
-    },
-    {
-      command: 'instantiate_template',
-      params: {
-        template: 'rectangular_plate_with_holes',
-        params: {
-          width: 40,
-          height: 20,
-          holeRows: 2,
-          holeCols: 3,
-          holeRadius: 2,
-          marginX: 5,
-          marginY: 5,
-        },
-        position: [0, 30, 0],
-      },
-    },
-  ],
   distribute_align_stack: [
     { command: 'add_box', params: { size: [1, 1, 1], position: [0, 0, 0] }, as: 'a' },
     { command: 'add_box', params: { size: [1, 1, 1], position: [7, 2, 0] }, as: 'b' },
@@ -592,7 +649,7 @@ export const plans: Record<string, GoldenAction[]> = {
     { command: 'set_units', params: { units: 'mm', displayPrecision: 2 } },
     { command: 'add_box', params: { size: [10, 10, 10] }, as: 'b' },
     { command: 'set_camera', params: { azimuth: 0.5, polar: 1, distance: 30 } },
-    { command: 'animate_spin', params: { targetId: '$b', speed: 1 } },
+    { command: 'animate', params: { targetId: '$b', mode: 'spin', speed: 1 } },
   ],
   building_shell_from_primitives: [
     { command: 'add_layer', params: { name: 'Walls' }, as: 'lw' },
@@ -669,10 +726,42 @@ export const plans: Record<string, GoldenAction[]> = {
   building_walls_openings_slab: [
     { command: 'set_units', params: { units: 'mm' } },
     { command: 'add_grid_system', params: { xSpacings: [5000, 5000], ySpacings: [4000] } },
-    { command: 'add_wall', params: { start: [0, 0], end: [10000, 0] } },
-    { command: 'add_wall', params: { start: [10000, 0], end: [10000, 8000] } },
-    { command: 'add_wall', params: { start: [10000, 8000], end: [0, 8000] } },
-    { command: 'add_wall', params: { start: [0, 8000], end: [0, 0] } },
+    {
+      command: 'draw_walls',
+      params: {
+        points: [
+          [0, 0],
+          [10000, 0],
+        ],
+      },
+    },
+    {
+      command: 'draw_walls',
+      params: {
+        points: [
+          [10000, 0],
+          [10000, 8000],
+        ],
+      },
+    },
+    {
+      command: 'draw_walls',
+      params: {
+        points: [
+          [10000, 8000],
+          [0, 8000],
+        ],
+      },
+    },
+    {
+      command: 'draw_walls',
+      params: {
+        points: [
+          [0, 8000],
+          [0, 0],
+        ],
+      },
+    },
     { command: 'add_door', params: { wallId: 'wall-1', offset: 1500 } },
     { command: 'add_window', params: { wallId: 'wall-2', offset: 3000 } },
     { command: 'add_slab', params: { wallIds: ['wall-1', 'wall-2', 'wall-3', 'wall-4'] } },
@@ -825,16 +914,16 @@ export const kernelPlans: Record<string, GoldenAction[]> = {
       },
       as: 'pipe',
     },
-    { command: 'boolean_union', params: { a: '$drum', b: '$pipe' } },
+    { command: 'boolean', params: { op: 'union', a: '$drum', b: '$pipe' } },
   ],
   kernel_boolean_union: [
     { command: 'add_box', params: { size: [2, 2, 2] }, as: 'a' },
     { command: 'add_box', params: { size: [2, 2, 2], position: [1, 1, 1] }, as: 'b' },
-    { command: 'boolean_union', params: { a: '$a', b: '$b' } },
+    { command: 'boolean', params: { op: 'union', a: '$a', b: '$b' } },
   ],
   kernel_boolean_subtract: [
     { command: 'add_box', params: { size: [4, 4, 4] }, as: 'a' },
     { command: 'add_cylinder', params: { radius: 1, height: 6 }, as: 'b' },
-    { command: 'boolean_subtract', params: { a: '$a', b: '$b' } },
+    { command: 'boolean', params: { op: 'subtract', a: '$a', b: '$b' } },
   ],
 };

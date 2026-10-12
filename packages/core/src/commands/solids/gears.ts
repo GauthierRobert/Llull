@@ -15,7 +15,7 @@ import {
   toothProfile,
 } from '../../lib/gearOutline';
 import { circleThrough, ringMesh } from '../../geometry/prismMesh';
-import { placedMeshEntity } from './gearSolid';
+import { faceWidthProblem, placedMeshEntity, pressureAngleProblem } from './gearSolid';
 import { finiteVec3OrZero } from '../../lib/vec3';
 import { MAX_GEAR_TEETH } from '../limits';
 import { rotatedEntityBounds } from '../../geometry/rotatedBounds';
@@ -156,19 +156,8 @@ export const addSpurGear = defineCommand({
       );
     }
 
-    if (pressureAngle <= 0 || pressureAngle >= Math.PI / 2) {
-      return noop(
-        doc,
-        `add_spur_gear failed: pressureAngle must be in (0, π/2), got ${String(pressureAngle)}.`,
-      );
-    }
-
-    if (faceWidth <= 0) {
-      return noop(
-        doc,
-        `add_spur_gear failed: faceWidth must be finite and > 0, got ${String(faceWidth)}.`,
-      );
-    }
+    const shapeProblem = pressureAngleProblem(pressureAngle) ?? faceWidthProblem(faceWidth);
+    if (shapeProblem !== null) return noop(doc, `add_spur_gear failed: ${shapeProblem}`);
 
     const pitchRadius = (mod * teethInt) / 2;
     if (bore < 0)

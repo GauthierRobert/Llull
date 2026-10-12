@@ -1,16 +1,15 @@
 /** 3D primitives, profile solids (extrude / revolve / sweep), gears and composite solids. */
 
 import { commandCatalog } from '../schema';
-import { addBox, extrude } from './basic';
+import { addBox } from './basic';
 import { addCylinder, addSphere, addCone, addTorus } from './round';
 import { addWedge, addPyramid } from './prismatic';
-import { extrudeSketch, revolveProfile } from './profile';
+import { extrudeProfile, revolveProfile } from './profile';
 import { sweepProfile } from './sweep';
 import { loftSections } from './loft';
 import { addSubdivisionSolid } from './subdivision';
 import { editSubdivisionCage } from './subdivisionCage';
 import { surfaceFromCurves } from './surfaceFromCurves';
-import { makeTubeBetween } from './composite';
 import { addSpurGear } from './gears';
 import { addHelixSpring } from './helixSpring';
 import { addBearing } from './bearings';
@@ -27,15 +26,13 @@ export const solidsCommands = commandCatalog(
   addTorus,
   addWedge,
   addPyramid,
-  extrude,
-  extrudeSketch,
+  extrudeProfile,
   revolveProfile,
   sweepProfile,
   loftSections,
   addSubdivisionSolid,
   editSubdivisionCage,
   surfaceFromCurves,
-  makeTubeBetween,
   addSpurGear,
   addHelixSpring,
   addBearing,

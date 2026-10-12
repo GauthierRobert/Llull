@@ -11,10 +11,11 @@ import { useStore } from '@ui/store';
 import type { Material } from '@core/model/types';
 import { PanelEmpty, PanelHeader } from '@ui/panels/PanelParts';
 import { isHexColor } from '@lib/isHexColor';
+import { significantNumber } from '@lib/compactNumber';
 
 /** 3 significant digits without exponent notation for ordinary magnitudes (7850, not "7.85e+3"). */
 export function formatDensity(density: number): string {
-  return String(Number(density.toPrecision(3)));
+  return significantNumber(density, 3);
 }
 
 interface MaterialRowProps {

@@ -12,12 +12,7 @@ export { CONVENTIONS_GUIDE, CONVENTIONS_URI } from './conventions';
 export { listMcpPrompts, getMcpPrompt } from './prompts';
 export { SERVER_INSTRUCTIONS } from './instructions';
 
-export type {
-  CadExchangePort,
-  DwgConverterPort,
-  ProgramRun,
-  PythonLanguage,
-} from './exchangeTools';
+export type { CadExchangePort, DwgConverterPort, ProgramRun } from './exchangeTools';
 export {
   buildExchangeToolDefinitions,
   applyExchangeToolCall,
@@ -38,6 +33,7 @@ export {
   TOOLSET_NAMES,
   TOOLSETS,
   parseToolsets,
+  isToolsetName,
   toolsetOf,
   isToolEnabled,
   isPromptEnabled,

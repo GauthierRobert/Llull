@@ -55,7 +55,12 @@ function docWithBox(): { doc: CadDocument; boxId: string } {
 
 function docWithLine(): { doc: CadDocument; lineId: string } {
   const doc = createEmptyDocument();
-  const r = execute(doc, 'draw_line', { start: [0, 0], end: [1, 0] });
+  const r = execute(doc, 'draw_polyline', {
+    points: [
+      [0, 0],
+      [1, 0],
+    ],
+  });
   return { doc: r.document, lineId: r.affected[0]! };
 }
 

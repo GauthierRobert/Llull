@@ -15,6 +15,7 @@ import { OptionSelect } from '@ui/panels/OptionSelect';
 import { capitalize } from '@ui/panels/capitalize';
 import { downloadText } from '@ui/download';
 import { isCsvData, isEstimateData } from '@ui/resultData';
+import { parseNumber } from '@ui/numberText';
 
 const UNIT_LABEL: Readonly<Record<string, string>> = {
   m: 'm',
@@ -51,8 +52,8 @@ function RateForm({ lines }: { lines: ReadonlyArray<CostLine> }): React.ReactEle
 
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
-    const value = Number(rate);
-    if (selectedKey === '' || rate.trim() === '' || !Number.isFinite(value) || value < 0) return;
+    const value = parseNumber(rate);
+    if (selectedKey === '' || value === undefined || value < 0) return;
     dispatch('set_cost_rates', { rates: { [selectedKey]: value } });
     setRate('');
   };

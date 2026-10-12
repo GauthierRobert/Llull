@@ -12,6 +12,7 @@ import fs from 'fs';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { isRecord } from '@lib/isRecord';
 import { errorMessage } from '@lib/errorMessage';
+import { nonEmptyString } from '@lib/nonEmptyString';
 import { getLicense } from './license';
 
 export type Role = 'viewer' | 'editor' | 'admin';
@@ -114,8 +115,7 @@ export function presentedToken(req: Request, allowQuery: boolean): string | unde
     const presented = /^bearer +(.+)$/i.exec(header)?.[1];
     if (presented !== undefined) return presented;
   }
-  const query = req.query['access_token'];
-  return allowQuery && typeof query === 'string' && query !== '' ? query : undefined;
+  return allowQuery ? nonEmptyString(req.query['access_token']) : undefined;
 }
 
 /** The authenticated user of this request (set by `requireRole`), if any. */

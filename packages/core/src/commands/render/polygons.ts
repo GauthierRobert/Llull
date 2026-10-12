@@ -38,18 +38,20 @@ import { subdivisionTriangles } from '../../geometry/subdivision';
 import {
   SEG_CIRCLE,
   boxExtents,
-  circlePoints,
   extrusionRings,
   facetNormal,
   meshTriangles,
-  pyramidCorners,
-  ringEdges,
+  coneSurface,
+  cylinderRings,
+  pyramidFaces,
   sideQuads,
   sphereQuads,
   torusQuads,
   wedgeCorners,
 } from '../../geometry/tessellation';
 import type { PreDepthPolygon } from './types';
+import { positiveSweep } from '../../lib/angle';
+import { arcPolyline } from '../../lib/arc';
 
 // 3D solids
 
@@ -116,9 +118,7 @@ function tessellateBox(e: BoxEntity): PreDepthPolygon[] {
 
 /** Z-up cylinder: axis along Z, centered at position. */
 function tessellateCylinder(e: CylinderEntity): PreDepthPolygon[] {
-  const [px, py, pz] = e.position;
-  const bottom = circlePoints(px, py, pz - e.height / 2, e.radius, SEG_CIRCLE);
-  const top = circlePoints(px, py, pz + e.height / 2, e.radius, SEG_CIRCLE);
+  const { bottom, top } = cylinderRings(e);
   return prism(bottom, top, e.color);
 }
 
@@ -128,14 +128,9 @@ function tessellateSphere(e: SphereEntity): PreDepthPolygon[] {
 
 /** Z-up cone: base circle in XY at position, apex at position+[0,0,height]. */
 function tessellateCone(e: ConeEntity): PreDepthPolygon[] {
-  const [px, py, pz] = e.position;
-  const base = circlePoints(px, py, pz, e.radius, SEG_CIRCLE);
-  const apex: Vec3 = [px, py, pz + e.height];
-  // Base cap (reversed winding = face down), then one side triangle per base edge.
-  return makePolygons(
-    [[...base].reverse(), ...ringEdges(base).map(([from, to]): Vec3[] => [from, to, apex])],
-    e.color,
-  );
+  const { base, sides } = coneSurface(e);
+  // Base cap (reversed winding = face down), then the side triangles.
+  return makePolygons([[...base].reverse(), ...sides], e.color);
 }
 
 /** Torus: ring in XY plane, tube extends ±tubeRadius in Z. */
@@ -160,17 +155,7 @@ function tessellateWedge(e: WedgeEntity): PreDepthPolygon[] {
 
 /** Pyramid: rectangular base centered at position in XY, apex at position+[0,0,height]. */
 function tessellatePyramid(e: PyramidEntity): PreDepthPolygon[] {
-  const { b00, b10, b11, b01, apex } = pyramidCorners(e);
-  return makePolygons(
-    [
-      [b00, b01, b11, b10], // base, facing down
-      [b00, b10, apex],
-      [b10, b11, apex],
-      [b11, b01, apex],
-      [b01, b00, apex],
-    ],
-    e.color,
-  );
+  return makePolygons(pyramidFaces(e), e.color);
 }
 
 /** Revolution: closed profile swept about an axis (frames and caps: geometry/revolution.ts). */
@@ -228,16 +213,9 @@ function strokeEllipseArc(
   startAngle: number,
   span: number,
 ): PreDepthPolygon[] {
-  const verts: Vec3[] = [];
-  for (let i = 0; i <= SEG_CIRCLE; i++) {
-    const a = startAngle + (span * i) / SEG_CIRCLE;
-    verts.push(
-      place2D(
-        [e.center[0] + radiusX * Math.cos(a), e.center[1] + radiusY * Math.sin(a)],
-        e.position,
-      ),
-    );
-  }
+  const verts = arcPolyline(e.center, radiusX, startAngle, span, SEG_CIRCLE, radiusY).map((point) =>
+    place2D(point, e.position),
+  );
   return [stroke(verts, e.color)];
 }
 
@@ -253,8 +231,7 @@ function tessellate2DPolyline(e: PolylineEntity): PreDepthPolygon[] {
 }
 
 function tessellate2DArc(e: ArcEntity): PreDepthPolygon[] {
-  let span = e.endAngle - e.startAngle;
-  if (span <= 0) span += 2 * Math.PI;
+  const span = positiveSweep(e.endAngle - e.startAngle);
   return strokeEllipseArc(e, e.radius, e.radius, e.startAngle, span);
 }
 

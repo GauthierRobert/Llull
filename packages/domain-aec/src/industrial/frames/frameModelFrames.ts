@@ -2,7 +2,7 @@
  * @layer domain-aec
  */
 
-import type { BuildingModel } from '@core/model/building';
+import type { BuildingModel, SteelMemberElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import type { FrameNode } from '@lib/frame2d';
 import { elementsOf, toMm } from '../../building/model';
@@ -43,6 +43,9 @@ export function framesOf(
       member.role === 'rafter' && Math.abs(mm(member.start[1] - member.end[1])) < tolerance,
   );
   const near = (a: number, b: number): boolean => Math.abs(a - b) < tolerance;
+  const spansY = (member: SteelMemberElement, y: number): boolean =>
+    Math.min(mm(member.start[1]), mm(member.end[1])) <= y + tolerance &&
+    Math.max(mm(member.start[1]), mm(member.end[1])) >= y - tolerance;
   const { candidates, tributaryOf } = frameCandidates(rafters, mm, tolerance);
   const gridLabel = (y: number): string => {
     const grid = Object.values(building.elements).find(
@@ -53,12 +56,7 @@ export function framesOf(
   };
   const purlinXs = (y: number): number[] =>
     members
-      .filter(
-        (member) =>
-          member.role === 'purlin' &&
-          Math.min(mm(member.start[1]), mm(member.end[1])) <= y + tolerance &&
-          Math.max(mm(member.start[1]), mm(member.end[1])) >= y - tolerance,
-      )
+      .filter((member) => member.role === 'purlin' && spansY(member, y))
       .map((member) => mm(member.start[0]));
   const selfWeight = (profileName: string): number =>
     ((findProfile(profileName)?.massPerMetre ?? 0) * GRAVITY) / 1000;
@@ -186,8 +184,7 @@ export function framesOf(
             (member) =>
               member.role === 'rail' &&
               Math.abs(mm(member.start[0]) - x) < 1000 &&
-              Math.min(mm(member.start[1]), mm(member.end[1])) <= y + tolerance &&
-              Math.max(mm(member.start[1]), mm(member.end[1])) >= y - tolerance,
+              spansY(member, y),
           )
           .map((member) => mm(member.start[2]))
           .filter((z) => z > zBottom && z < zTop),

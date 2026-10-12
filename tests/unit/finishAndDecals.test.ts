@@ -207,7 +207,7 @@ describe('text decals', () => {
   it('converts world placement into the frame of a moved and rotated solid', () => {
     const { doc, id } = base();
     const moved = execute(
-      execute(doc, 'move_entity', { id, delta: [5, 0, 0] }).document,
+      execute(doc, 'move_entities', { ids: [id], delta: [5, 0, 0] }).document,
       'rotate_entity',
       { id, delta: [0, 0, Math.PI / 2] },
     ).document;
@@ -260,7 +260,7 @@ describe('text decals', () => {
 
   it('refuses 2D targets, removes decals, scales them and validates saved ones', () => {
     const { doc, id } = base();
-    const sketch = execute(doc, 'draw_circle', { center: [0, 0], radius: 1 });
+    const sketch = execute(doc, 'draw_arc', { center: [0, 0], radius: 1 });
     expectNoOp(
       execute(sketch.document, 'add_decal', { id: sketch.affected[0], ...onTop }),
       sketch.document,

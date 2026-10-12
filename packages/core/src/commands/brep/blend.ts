@@ -36,7 +36,7 @@ export const blendUnion = defineCommand({
     'radiusEnd on the result). The operands are consumed and replaced by one mesh entity that ' +
     'keeps the exact construction (STEP export, further fillets and booleans see true faces). ' +
     `Requires ${OCC_KERNEL_HINT}; the default Manifold kernel cannot fillet and gracefully no-ops ` +
-    '(use boolean_union there). If the kernel refuses, try another radius: a blend must fit inside ' +
+    '(use boolean op union there). If the kernel refuses, try another radius: a blend must fit inside ' +
     'the smallest wall it touches, and a crotch where three solids meet can reject specific radii.',
   params: z.object({
     ids: z
@@ -62,7 +62,7 @@ export const blendUnion = defineCommand({
     const kernel = (ctx ?? currentContext()).kernel;
     if (!kernel) return noop(doc, kernelUnavailable('blend_union'));
     if (!kernel.supports('blend'))
-      return fail(`this kernel cannot fillet joints; use ${OCC_KERNEL_HINT}, or boolean_union`);
+      return fail(`this kernel cannot fillet joints; use ${OCC_KERNEL_HINT}, or boolean op union`);
     const recipe: ShapeRecipe = {
       op: 'blend',
       sources: operands.map((entity) => operandRecipe(kernel, entity)),

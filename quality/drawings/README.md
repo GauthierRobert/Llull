@@ -47,7 +47,7 @@ A "reference defect" is proved, not assumed: a variant built the reference's way
 - OCC booleans did not merge coplanar faces → a fillet on one visible edge rounded half of it
   (`ShapeUpgrade_UnifySameDomain` after every boolean).
 - `edgesNear` picked the edge with the nearest *mid point*, not the nearest edge.
-- `measure_volume` / `mass_properties` used the coarse display mesh (up to ~1 % off): exact B-rep
+- `mass_properties` (formerly `measure_volume`) used the coarse display mesh (up to ~1 % off): exact B-rep
   volume under OCC.
 - `fillet_edge` committed invalid solids (later booleans hung) and solids whose mesh had a hole
   (non-watertight STL): now refused with a reason.
@@ -56,5 +56,5 @@ A "reference defect" is proved, not assumed: a variant built the reference's way
   current OCP.
 
 Open (not fixed here): `loft_sections` resamples by arc length (stadium → stadium lofts twist,
-−8 % volume); no elliptical-arc sketch piece; no sheet-metal commands; `move_entity` `delta` vs `duplicate_entity` `offset`; `rotate_entity`
+−8 % volume); no elliptical-arc sketch piece; no sheet-metal commands; `move_entities` `delta` vs `duplicate_entities` `offset`; `rotate_entity`
 pivots about `position` (a sweep's path start).

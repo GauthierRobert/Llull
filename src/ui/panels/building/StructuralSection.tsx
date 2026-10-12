@@ -12,6 +12,7 @@ import { execute } from '@core/commands/registry';
 import type { BuildingModel } from '@core/model/building';
 import { isRecord } from '@lib/isRecord';
 import { PanelSection } from '@ui/panels/PanelParts';
+import { LabeledInput } from './LabeledInput';
 
 /** The fields every structural check row shares (frames, bracing, foundations, runways). */
 interface ReportRow {
@@ -148,30 +149,27 @@ export function StructuralSection(): React.ReactElement {
       testId="building-structure"
     >
       <div className="building-inline-form">
-        <label className="field" title="Roof dead load, kN/m²">
-          <span className="field__label">Roof dead load (kN/m²)</span>
-          <input
-            type="number"
-            value={deadLoad}
-            onChange={(event) => setDeadLoad(event.target.value)}
-          />
-        </label>
-        <label className="field" title="Snow load, kN/m²">
-          <span className="field__label">Snow load (kN/m²)</span>
-          <input
-            type="number"
-            value={snowLoad}
-            onChange={(event) => setSnowLoad(event.target.value)}
-          />
-        </label>
-        <label className="field" title="Peak velocity pressure qp, kN/m² (0 = no wind)">
-          <span className="field__label">Wind pressure qp (kN/m²)</span>
-          <input
-            type="number"
-            value={windPressure}
-            onChange={(event) => setWindPressure(event.target.value)}
-          />
-        </label>
+        <LabeledInput
+          label="Roof dead load (kN/m²)"
+          title="Roof dead load, kN/m²"
+          type="number"
+          value={deadLoad}
+          onChange={setDeadLoad}
+        />
+        <LabeledInput
+          label="Snow load (kN/m²)"
+          title="Snow load, kN/m²"
+          type="number"
+          value={snowLoad}
+          onChange={setSnowLoad}
+        />
+        <LabeledInput
+          label="Wind pressure qp (kN/m²)"
+          title="Peak velocity pressure qp, kN/m² (0 = no wind)"
+          type="number"
+          value={windPressure}
+          onChange={setWindPressure}
+        />
       </div>
       <p className="building-subhead">Verify (read-only, the model is not changed)</p>
       <div className="building-inline-form">

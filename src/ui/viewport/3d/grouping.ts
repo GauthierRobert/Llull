@@ -9,6 +9,7 @@
  */
 
 import type { Entity, EntityId, Material } from '@core/model/types';
+import { significantNumber } from '@lib/compactNumber';
 import type { PbrMaterial } from './useMaterialProps';
 
 /** Entity kinds that support InstancedMesh rendering in v1. */
@@ -46,7 +47,7 @@ export interface InstanceBatch {
 export function entityRenderKey(entity: Entity): string | null {
   const { color, layerId } = entity;
   const matSuffix = entity.materialId ? `|mat:${entity.materialId}` : '';
-  const n = (v: number): string => parseFloat(v.toPrecision(6)).toString();
+  const n = (v: number): string => significantNumber(v, 6);
 
   switch (entity.kind) {
     case 'box': {

@@ -15,6 +15,7 @@ import {
   equipmentValues,
   type EquipmentEditValues,
 } from './equipmentEdit';
+import { LabeledInput } from './LabeledInput';
 
 interface EquipmentEditorProps {
   element: EquipmentElement;
@@ -45,15 +46,14 @@ export function EquipmentEditor({ element, levels }: EquipmentEditorProps): Reac
       onSubmit={handleSubmit}
     >
       {EQUIPMENT_EDIT_FIELDS.map((field) => (
-        <label key={field.key} className="field">
-          <span className="field__label">{field.label}</span>
-          <input
-            type={field.kind}
-            value={values[field.key]}
-            onChange={(event) => change(field.key, event.target.value)}
-            data-testid={`equipment-edit-${field.key}`}
-          />
-        </label>
+        <LabeledInput
+          key={field.key}
+          label={field.label}
+          type={field.kind}
+          value={values[field.key]}
+          onChange={(value) => change(field.key, value)}
+          testId={`equipment-edit-${field.key}`}
+        />
       ))}
       <label className="field">
         <span className="field__label">Shape</span>

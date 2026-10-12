@@ -15,6 +15,20 @@ export const AXIS_ROTATION: Readonly<Record<'x' | 'y' | 'z', Vec3>> = {
   z: [0, 0, 0],
 };
 
+/** Why `pressureAngle` (radians) is not a usable gear pressure angle, or `null` when it is. */
+export function pressureAngleProblem(pressureAngle: number): string | null {
+  return pressureAngle > 0 && pressureAngle < Math.PI / 2
+    ? null
+    : `pressureAngle must be in (0, π/2), got ${String(pressureAngle)}.`;
+}
+
+/** Why `faceWidth` is not a usable gear face width, or `null` when it is. */
+export function faceWidthProblem(faceWidth: number): string | null {
+  return faceWidth > 0 && Number.isFinite(faceWidth)
+    ? null
+    : `faceWidth must be finite and > 0, got ${String(faceWidth)}.`;
+}
+
 /** Local-frame mesh → world-space `mesh` entity (position/rotation baked, entity transform identity). */
 export function meshGearEntity(
   id: string,

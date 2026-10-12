@@ -14,7 +14,7 @@ import {
   DEFAULT_LAYER_ID,
 } from '../../model/types';
 import type { CommandResult } from '../types';
-import { defineCommand, z, looseVec3 as vec3 } from '../schema';
+import { defineCommand, z, looseVec3 as vec3, layerIdField } from '../schema';
 import { nextId } from '../../lib/id';
 import { commitEntity } from '../entity/commitEntity';
 import { noop } from '../noop';
@@ -71,10 +71,7 @@ export const addText = defineCommand({
       .string()
       .describe('Hex color string, e.g. "#333333". Defaults to "#333333".')
       .optional(),
-    layer: z
-      .string()
-      .describe('Layer id to assign the entity to. Defaults to the document default layer.')
-      .optional(),
+    layer: layerIdField(),
   }),
   run: (
     doc,
@@ -173,10 +170,7 @@ export const addDimension = defineCommand({
         "Custom text to display instead of the computed value, e.g. 'REF' or '≈ 42 mm'. Omit to show the computed measurement.",
       )
       .optional(),
-    layer: z
-      .string()
-      .describe('Layer id to assign the entity to. Defaults to the document default layer.')
-      .optional(),
+    layer: layerIdField(),
   }),
   run: (doc, { dimensionKind, entityIds, offset, precision, label, layer }): CommandResult => {
     const rule = DIMENSION_RULES[dimensionKind];

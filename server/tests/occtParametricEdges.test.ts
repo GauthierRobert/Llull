@@ -56,7 +56,7 @@ describe('occt booleans merge same-domain faces', () => {
     });
     doc = apply(doc, 'add_box', { size: [20, 20, 40], anchor: 'min', position: [0, 0, 0] });
     const [plate, upright] = doc.order;
-    doc = apply(doc, 'boolean_union', { a: plate, b: upright });
+    doc = apply(doc, 'boolean', { op: 'union', a: plate, b: upright });
     // An L-shaped prism: 8 faces, 18 edges (two 6-gon caps + 6 side faces) — no split side faces.
     const topology = topologyOf(doc);
     expect(topology.faces).toHaveLength(8);

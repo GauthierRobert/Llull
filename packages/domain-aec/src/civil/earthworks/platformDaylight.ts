@@ -6,6 +6,7 @@
 
 import type { Vec2 } from '@core/model/types';
 import { polygonPerimeter } from '@lib/polygon';
+import { normalize2 } from '@lib/vec2';
 import { daylightReach } from './earthworksMath';
 import { elevationAt, type Tin } from '../surface/tin';
 
@@ -35,17 +36,12 @@ interface RingPoint {
   readonly normal: Vec2;
 }
 
-function unit(x: number, y: number): Vec2 {
-  const length = Math.hypot(x, y);
-  return length === 0 ? [0, 0] : [x / length, y / length];
-}
-
 /** Pad outline (CCW) as points with outward normals; vertices get the corner bisector. */
 export function outlineRing(boundary: ReadonlyArray<Vec2>): RingPoint[] {
   const count = boundary.length;
   const edgeNormals = boundary.map((a, i): Vec2 => {
     const b = boundary[(i + 1) % count] as Vec2;
-    return unit(b[1] - a[1], -(b[0] - a[0]));
+    return normalize2([b[1] - a[1], -(b[0] - a[0])]);
   });
   const step = polygonPerimeter(boundary) / RING_POINTS;
   const ring: RingPoint[] = [];
@@ -53,7 +49,7 @@ export function outlineRing(boundary: ReadonlyArray<Vec2>): RingPoint[] {
     const b = boundary[(i + 1) % count] as Vec2;
     const previous = edgeNormals[(i + count - 1) % count] as Vec2;
     const normal = edgeNormals[i] as Vec2;
-    const corner = unit(previous[0] + normal[0], previous[1] + normal[1]);
+    const corner = normalize2([previous[0] + normal[0], previous[1] + normal[1]]);
     ring.push({ at: a, normal: corner[0] === 0 && corner[1] === 0 ? normal : corner });
     const pieces = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / step));
     for (let k = 1; k < pieces; k++) {

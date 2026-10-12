@@ -136,7 +136,7 @@ describe('offset_2d on a rotated rectangle', () => {
   });
 });
 
-describe('extrude_sketch does not inherit the sketch rotation', () => {
+describe('extrude_profile does not inherit the sketch rotation', () => {
   const sketch = (): { doc: CadDocument; id: string } => {
     const base = run(createEmptyDocument(), 'draw_rectangle', { width: 4, height: 2 }).document;
     const id = base.order[0] as string;
@@ -152,9 +152,9 @@ describe('extrude_sketch does not inherit the sketch rotation', () => {
 
   it('defaults to [0, 0, 0] and uses an explicit rotation verbatim', () => {
     const { doc, id } = sketch();
-    const plain = run(doc, 'extrude_sketch', { id, depth: 3 });
+    const plain = run(doc, 'extrude_profile', { id, depth: 3 });
     expect((only(plain.document, 'extrusion') as ExtrusionEntity).rotation).toEqual([0, 0, 0]);
-    const rotated = run(doc, 'extrude_sketch', { id, depth: 3, rotation: [0, 0, Math.PI / 2] });
+    const rotated = run(doc, 'extrude_profile', { id, depth: 3, rotation: [0, 0, Math.PI / 2] });
     expect((only(rotated.document, 'extrusion') as ExtrusionEntity).rotation).toEqual([
       0,
       0,
@@ -164,7 +164,7 @@ describe('extrude_sketch does not inherit the sketch rotation', () => {
 
   it('failure: depth <= 0 is a no-op', () => {
     const { doc, id } = sketch();
-    expect(run(doc, 'extrude_sketch', { id, depth: 0 }).document).toBe(doc);
+    expect(run(doc, 'extrude_profile', { id, depth: 0 }).document).toBe(doc);
   });
 });
 
@@ -284,13 +284,13 @@ describe('add_box size length', () => {
   });
 });
 
-describe('move_entity', () => {
+describe('move_entities', () => {
   it('requires a 3-component delta', () => {
     const base = run(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
     const id = base.order[0] as string;
-    const bad = run(base, 'move_entity', { id, delta: [1, 2] });
+    const bad = run(base, 'move_entities', { ids: [id], delta: [1, 2] });
     expect(bad.document).toBe(base);
-    const good = run(base, 'move_entity', { id, delta: [1, 2, 3] });
+    const good = run(base, 'move_entities', { ids: [id], delta: [1, 2, 3] });
     expect((good.document.entities[id] as Entity).position).toEqual([1, 2, 3]);
   });
 });
@@ -304,7 +304,7 @@ describe('explode_polyline prunes group membership', () => {
         [1, 1],
       ],
     }).document;
-    doc = run(doc, 'draw_circle', { center: [0, 0], radius: 1 }).document;
+    doc = run(doc, 'draw_arc', { center: [0, 0], radius: 1 }).document;
     const [poly, circle] = doc.order as [string, string];
     doc = run(doc, 'group_entities', { ids: [poly, circle, poly] }).document;
     const group = Object.values(doc.groups)[0];
@@ -333,8 +333,8 @@ describe('group_entities dedupes ids', () => {
 describe('deleting entities prunes constraints, joints and drives', () => {
   const build = (): CadDocument => {
     let doc = createEmptyDocument();
-    doc = run(doc, 'draw_circle', { center: [0, 0], radius: 1 }).document;
-    doc = run(doc, 'draw_circle', { center: [5, 0], radius: 1 }).document;
+    doc = run(doc, 'draw_arc', { center: [0, 0], radius: 1 }).document;
+    doc = run(doc, 'draw_arc', { center: [5, 0], radius: 1 }).document;
     const [a, b] = doc.order as [string, string];
     const constraint: Constraint = {
       id: 'c1',
@@ -361,9 +361,9 @@ describe('deleting entities prunes constraints, joints and drives', () => {
     };
   };
 
-  it('delete_entity removes dependent records and reports them', () => {
+  it('delete_entities removes dependent records and reports them', () => {
     const doc = build();
-    const result = run(doc, 'delete_entity', { id: doc.order[0] });
+    const result = run(doc, 'delete_entities', { ids: [doc.order[0]] });
     expect(result.document.constraintOrder).toEqual([]);
     expect(result.document.constraints).toEqual({});
     expect(result.document.jointOrder).toEqual([]);
@@ -382,7 +382,7 @@ describe('deleting entities prunes constraints, joints and drives', () => {
   });
 
   it('delete_entities keeps unrelated records', () => {
-    const doc = run(build(), 'draw_circle', { center: [9, 9], radius: 1 }).document;
+    const doc = run(build(), 'draw_arc', { center: [9, 9], radius: 1 }).document;
     const extra = doc.order[2] as string;
     const result = run(doc, 'delete_entities', { ids: [extra] });
     expect(result.document.constraintOrder).toEqual(['c1']);
@@ -434,12 +434,12 @@ describe('execute marks refusals as rejected', () => {
     const doc = createEmptyDocument();
     expect(run(doc, 'no_such_tool', {}).rejected).toBe(true);
     expect(run(doc, 'add_box', { size: 'big' }).rejected).toBe(true);
-    expect(run(doc, 'delete_entity', { id: 'constructor' }).rejected).toBe(true);
+    expect(run(doc, 'delete_entities', { ids: ['constructor'] }).rejected).toBe(true);
   });
 
   it('a command-level no-op and a success are not rejected', () => {
     const doc = createEmptyDocument();
-    expect(run(doc, 'delete_entity', { id: 'ghost' }).rejected).toBeUndefined();
+    expect(run(doc, 'delete_entities', { ids: ['ghost'] }).rejected).toBeUndefined();
     expect(run(doc, 'add_box', { size: [1, 1, 1] }).rejected).toBeUndefined();
   });
 

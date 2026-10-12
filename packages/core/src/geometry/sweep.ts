@@ -14,12 +14,11 @@ import { signedArea } from '../lib/polygon';
 import { triangulatePolygon } from '../lib/triangulate';
 import { isClosedChain, segmentPoint, segmentSteps, segmentTangent } from './curveSegments';
 import { sampleRing } from './sectionRing';
-import { skinTriangles } from './skin';
+import { quad, ringWalls as walls, skinTriangles } from './skin';
+import type { Triangle } from './triangles';
 
 /** Vertices around a circular sweep section. */
 export const SWEEP_CIRCLE_SEGMENTS = 24;
-
-type Triangle = readonly [Vec3, Vec3, Vec3];
 
 /** One path sample with its section axes. */
 export interface SweepFrame {
@@ -141,20 +140,6 @@ export function sweepSegmentRings(sweep: SweepShape): Vec3[][] {
         ),
       ),
   );
-}
-
-const quad = (a: Vec3, b: Vec3, c: Vec3, d: Vec3): Triangle[] => [
-  [a, b, c],
-  [a, c, d],
-];
-
-/** Wall quads between two rings, outward for a CCW section (flip for a bore). */
-function walls(lower: readonly Vec3[], upper: readonly Vec3[], flip: boolean): Triangle[] {
-  return lower.flatMap((_, j) => {
-    const k = (j + 1) % lower.length;
-    const [a, b, c, d] = [lower[j], lower[k], upper[k], upper[j]] as [Vec3, Vec3, Vec3, Vec3];
-    return flip ? quad(d, c, b, a) : quad(a, b, c, d);
-  });
 }
 
 /** What a sweep's geometry depends on (a SweepEntity satisfies it). */

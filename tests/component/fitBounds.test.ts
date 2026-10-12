@@ -48,4 +48,16 @@ describe('computeFitFraming', () => {
     const fit = computeFitFraming(useStore.getState().document, [id])!;
     expect(fit.distance).toBeLessThan(0.2);
   });
+
+  it('frames a dimension with the geometry it measures, like fit_view', () => {
+    const a = localDispatch('draw_point', { position: [0, 0, 0] }).affected[0]!;
+    const b = localDispatch('draw_point', { position: [100, 0, 0] }).affected[0]!;
+    const dim = localDispatch('add_dimension', {
+      dimensionKind: 'linear',
+      entityIds: [a, b],
+      offset: 5,
+    }).affected[0]!;
+    const framing = computeFitFraming(useStore.getState().document, [dim]);
+    expect(framing?.center[0]).toBeCloseTo(50);
+  });
 });

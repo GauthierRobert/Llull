@@ -16,7 +16,9 @@
 import { spawn } from 'node:child_process';
 import { lstat, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { CadExchangePort, DwgConverterPort, ProgramRun, PythonLanguage } from '@mcp/index';
+import type { Readable } from 'node:stream';
+import type { PythonBackend } from '@core/codegen/pythonRuntime';
+import type { CadExchangePort, DwgConverterPort, ProgramRun } from '@mcp/index';
 
 /** Response size cap (it is JSON.parse'd in memory). ~96 MB of STEP once base64-encoded. */
 const MAX_OUTPUT_BYTES = 128 * 1024 * 1024;
@@ -78,6 +80,15 @@ export function codeExecutionAllowed(env: NodeJS.ProcessEnv = process.env): bool
   return env['LLULL_ALLOW_CODE_EXECUTION'] === '1';
 }
 
+/** Keep the last `maxBytes` of a child's stderr; the getter returns them as UTF-8. */
+export function captureStderrTail(stderr: Readable, maxBytes: number): () => string {
+  let tail = Buffer.alloc(0);
+  stderr.on('data', (chunk: Buffer) => {
+    tail = Buffer.concat([tail, chunk]).subarray(-maxBytes);
+  });
+  return () => tail.toString('utf8');
+}
+
 /** Run the bridge once with a JSON request; resolves with its parsed response. */
 export function callBridge(
   python: string,
@@ -91,7 +102,7 @@ export function callBridge(
       env: bridgeEnvironment(),
     });
     const stdout: Buffer[] = [];
-    let stderr = Buffer.alloc(0);
+    const stderr = captureStderrTail(child.stderr, MAX_STDERR_BYTES);
     let size = 0;
     let settled = false;
     const finish = (error: Error | null, value?: BridgeResponse): void => {
@@ -115,9 +126,6 @@ export function callBridge(
       }
       stdout.push(chunk);
     });
-    child.stderr.on('data', (chunk: Buffer) => {
-      stderr = Buffer.concat([stderr, chunk]).subarray(-MAX_STDERR_BYTES);
-    });
     child.on('error', (error) => {
       finish(
         new Error(
@@ -130,7 +138,7 @@ export function callBridge(
       try {
         finish(null, JSON.parse(text) as BridgeResponse);
       } catch {
-        const detail = stderr.toString('utf8').trim().slice(-2000);
+        const detail = stderr().trim().slice(-2000);
         finish(
           new Error(`Python bridge exited with code ${String(code)} without a response. ${detail}`),
         );
@@ -205,7 +213,7 @@ export function concurrencyLimiter(limit: number): <T>(task: () => Promise<T>) =
 export function createPythonExchangePort(config: PythonExchangeConfig): CadExchangePort {
   const limit = concurrencyLimiter(MAX_CONCURRENT_RUNS);
   const run = async (
-    language: PythonLanguage | 'step',
+    language: PythonBackend | 'step',
     request: Record<string, unknown>,
   ): Promise<BridgeResponse> => {
     const python = language === 'build123d' ? config.build123dPython : config.python;

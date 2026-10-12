@@ -41,9 +41,9 @@ function buildRichDoc(): CadDocument {
         as: 'hole',
         params: { radius: 5, height: 50, position: [10, 0, 0] },
       },
-      { command: 'boolean_subtract', as: 'cutPlate', params: { a: '$plate', b: '$hole' } },
+      { command: 'boolean', as: 'cutPlate', params: { op: 'subtract', a: '$plate', b: '$hole' } },
       { command: 'set_entity_name', params: { id: '$cutPlate', name: 'Plate' } },
-      { command: 'move_entity', params: { id: '$cutPlate', delta: ['=width', 0, 0] } },
+      { command: 'move_entities', params: { ids: ['$cutPlate'], delta: ['=width', 0, 0] } },
       { command: 'add_cone', params: { radius: 3, height: 4, rotation: [0.5, 0, '=len'] } },
       { command: 'add_torus', params: { ringRadius: 10, tubeRadius: 2 } },
       { command: 'add_wedge', params: { size: [1, 2, 3] } },
@@ -159,19 +159,19 @@ describe('export_code', () => {
   });
 
   it('supports union and intersect booleans in every language', () => {
-    const build = (command: string): CadDocument =>
+    const build = (op: string): CadDocument =>
       execute(createEmptyDocument(), 'build_project', {
         actions: [
           { command: 'add_box', as: 'a', params: { size: [2, 2, 2] } },
           { command: 'add_box', as: 'b', params: { size: [1, 1, 1], position: [1, 0, 0] } },
-          { command, params: { a: '$a', b: '$b' } },
+          { command: 'boolean', params: { op, a: '$a', b: '$b' } },
         ],
       }).document;
-    const union = build('boolean_union');
+    const union = build('union');
     expect(codeOf(union, 'cadquery').text).toContain('= union(box_1, box_2)');
     expect(codeOf(union, 'openscad').text).toContain('union() {');
     expect(codeOf(union, 'freecad').text).toContain('.fuse(');
-    const intersect = build('boolean_intersect');
+    const intersect = build('intersect');
     expect(codeOf(intersect, 'cadquery').text).toContain('= intersect(box_1, box_2)');
     expect(codeOf(intersect, 'openscad').text).toContain('intersection() {');
     expect(codeOf(intersect, 'freecad').text).toContain('.common(');
@@ -181,7 +181,7 @@ describe('export_code', () => {
     let doc = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
     const id = doc.order[0]!;
     doc = execute(doc, 'add_sphere', { radius: 1 }).document;
-    doc = execute(doc, 'delete_entity', { id }).document;
+    doc = execute(doc, 'delete_entities', { ids: [id] }).document;
     const data = codeOf(doc, 'cadquery');
     expect(data.solidCount).toBe(1);
     expect(data.text).toContain('remove(box_1)');
@@ -339,10 +339,10 @@ function plateTrace(): unknown {
         },
       },
       {
-        command: 'boolean_subtract',
+        command: 'boolean',
         ref: 'f3',
         name: 'Plate',
-        params: { a: { ref: 'f1' }, b: { ref: 'f2' } },
+        params: { op: 'subtract', a: { ref: 'f1' }, b: { ref: 'f2' } },
       },
     ],
   };
@@ -368,7 +368,7 @@ describe('apply_code_trace', () => {
     expect(plate.kind).toBe('mesh');
     expect(plate.name).toBe('Plate');
     const names = doc.featureHistory.map((s) => s.name);
-    expect(names).toEqual(['add_box', 'add_cylinder', 'boolean_subtract', 'set_entity_name']);
+    expect(names).toEqual(['add_box', 'add_cylinder', 'boolean', 'set_entity_name']);
   });
 
   it('records parameter-driven terms as =expr and resolves refs to entity ids', () => {
@@ -457,10 +457,10 @@ describe('apply_code_trace', () => {
           },
           { command: 'add_sphere', ref: 'f2', params: { radius: { value: 1 } } },
           {
-            command: 'move_entity',
-            params: { id: { ref: 'f2' }, delta: [{ value: 1 }, { value: 0 }, { value: 0 }] },
+            command: 'move_entities',
+            params: { ids: [{ ref: 'f2' }], delta: [{ value: 1 }, { value: 0 }, { value: 0 }] },
           },
-          { command: 'delete_entity', params: { id: { ref: 'f2' } } },
+          { command: 'delete_entities', params: { ids: [{ ref: 'f2' }] } },
         ],
       },
     });
@@ -582,7 +582,7 @@ describe('apply_code_trace', () => {
       expectAbort(
         {
           parameters: [],
-          features: [{ command: 'delete_entity', params: { id: { ref: 'f9' } } }],
+          features: [{ command: 'delete_entities', params: { ids: [{ ref: 'f9' }] } }],
         },
         'unknown solid reference "f9"',
       );
@@ -628,7 +628,7 @@ describe('apply_code_trace', () => {
       actions: [
         { command: 'add_box', as: 'a', params: { size: [4, 4, 4] } },
         { command: 'add_cylinder', as: 'b', params: { radius: 1, height: 10 } },
-        { command: 'boolean_subtract', params: { a: '$a', b: '$b' } },
+        { command: 'boolean', params: { op: 'subtract', a: '$a', b: '$b' } },
       ],
     }).document;
     const traced = execute(createEmptyDocument(), 'apply_code_trace', {
@@ -653,9 +653,9 @@ describe('apply_code_trace', () => {
             },
           },
           {
-            command: 'boolean_subtract',
+            command: 'boolean',
             ref: 'f3',
-            params: { a: { ref: 'f1' }, b: { ref: 'f2' } },
+            params: { op: 'subtract', a: { ref: 'f1' }, b: { ref: 'f2' } },
           },
         ],
       },

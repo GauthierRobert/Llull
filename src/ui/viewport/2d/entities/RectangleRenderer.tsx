@@ -6,7 +6,7 @@
 
 import { useMemo } from 'react';
 import type { RectangleEntity } from '@core/model/types';
-import { flattenPoints } from '../../lineGeometry';
+import { closeLoop, flattenPoints, rectangleCorners } from '../../lineGeometry';
 import { ShapeLine } from './ShapeLine';
 
 export function RectangleRenderer({
@@ -17,14 +17,7 @@ export function RectangleRenderer({
   selected: boolean;
 }): React.ReactElement {
   const positions = useMemo(
-    () =>
-      flattenPoints([
-        [0, 0],
-        [width, 0],
-        [width, height],
-        [0, height],
-        [0, 0],
-      ]),
+    () => flattenPoints(closeLoop(rectangleCorners(width, height))),
     [width, height],
   );
   return (

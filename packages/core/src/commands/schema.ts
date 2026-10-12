@@ -267,3 +267,11 @@ export function nameField(): z.ZodOptional<z.ZodString> {
     .describe('Optional display name for the entity (shown in the scene tree).')
     .optional();
 }
+
+/** Optional layer id param of a created entity. */
+export function layerIdField(): z.ZodOptional<z.ZodString> {
+  return z
+    .string()
+    .describe('Layer id to assign the entity to. Defaults to the document default layer.')
+    .optional();
+}

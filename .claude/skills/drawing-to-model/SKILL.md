@@ -33,14 +33,14 @@ official mass; `npm run quality:drawings` replays them).
   booleans; exact tangent points / fillet centres in closed form; A/B variants by flag) and
   write JSON — never hand-type 200 steps. Normalise arc angles to [0, 2π) with end > start
   (`draw_arc` rejects sweeps > 2π).
-- **Exact curves**: `draw_line` + `draw_arc` pieces → `extrude_sketch {ids}` /
+- **Exact curves**: `draw_polyline` (2 points) + `draw_arc` pieces → `extrude_profile {ids}` /
   `revolve_profile {profileIds}`. Polygon profiles lose volume. No elliptical arc piece: use a
   dense `draw_spline` (mass error negligible) or a revolved/clipped `draw_ellipse`.
-- **Sketch planes** (three.js XYZ Euler on `extrude_sketch` / `extrude_profile`): XY `[0,0,0]`
+- **Sketch planes** (three.js XYZ Euler on `extrude_profile`): XY `[0,0,0]`
   (+Z) · XZ `["=pi/2",0,0]` (local y→Z, extrudes −Y) · YZ `["=pi/2","=pi/2",0]` (local x→Y,
   y→Z, extrudes +X). Tilted cutters: sketch in the face's own (s, w) frame, then
   `rotation [0, θ, 0]`. Prefer `rotation` to `axis` for sketches. Check every step's AABB.
-- **Trim, don't build**: extrude the main outline full width, then `boolean_intersect` with one
+- **Trim, don't build**: extrude the main outline full width, then `boolean` op `intersect` with one
   trim prism per other view (rounded ends, tapers, top-view corner radii). Avoid coplanar
   boolean junctions (overlap tools by ≥ 0.5; build multi-section lofts as one solid).
 - **Fillets**: OCC (`--kernel occt`), `fillet_edge edgesNear` = any point on the edge (use the
@@ -48,15 +48,15 @@ official mass; `npm run quality:drawings` replays them).
   PLACES" corners in a view prefer a rounded-rectangle prism intersect. A concave fillet against a
   cylinder or a corner where several blends meet is fragile: llull refuses it with a reason —
   build it instead: revolved arc ring, (disc − torus) ∩ box, or arcs in the profile.
-- Booleans consume operands (`duplicate_entity` first; THRU tools overshoot); `rotate_entity`
-  pivots about the entity `position` (a sweep: its path start) — compensate with `move_entity`.
+- Booleans consume operands (`duplicate_entities` first; THRU tools overshoot); `rotate_entity`
+  pivots about the entity `position` (a sweep: its path start) — compensate with `move_entities`.
   `loft_sections` resamples by arc length: a stadium→stadium loft twists (−8 %); build it as
   oblique circle-lofts ∪ trapezoid-prism ∩ trapezoid-prism.
 - Don't leave variant tools in the document: `export_stl` exports every solid.
 
 ## 3. Verify in layers (cheap → strong); every failing layer names a feature
 
-1. **Mass / volume**: `mass_properties` / `measure_volume` (OCC: exact B-rep,
+1. **Mass / volume**: `mass_properties` (OCC: exact B-rep,
    `data.method: "exact"`) vs the title block. Never judge mass from the STL (display mesh, up to
    0.4 % low on small curved parts).
 2. **Extents**: `measure_bounding_box entityId=<solid>` vs the overall dims (whole-document bounds

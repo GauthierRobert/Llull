@@ -198,22 +198,22 @@ def custom(shape, color=None, name=None):
     return _new("import_mesh", {"bodies": [body]}, shape, color, name)
 
 
-def _combine(command, a, b, kind):
-    params = {"a": {"ref": a.ref}, "b": {"ref": b.ref}}
-    return _new(command, params, _boolean(kind, a.shape, b.shape), a.color, None, consumes=(a, b))
+def _combine(op, a, b, kind):
+    params = {"op": op, "a": {"ref": a.ref}, "b": {"ref": b.ref}}
+    return _new("boolean", params, _boolean(kind, a.shape, b.shape), a.color, None, consumes=(a, b))
 
 
 def union(a, b):
-    return _combine("boolean_union", a, b, "union")
+    return _combine("union", a, b, "union")
 
 
 def cut(a, b):
     """a minus b."""
-    return _combine("boolean_subtract", a, b, "cut")
+    return _combine("subtract", a, b, "cut")
 
 
 def intersect(a, b):
-    return _combine("boolean_intersect", a, b, "intersect")
+    return _combine("intersect", a, b, "intersect")
 
 
 def _round(command, size_key, solid, edges, size, near, make):
@@ -247,14 +247,14 @@ def shell(solid, thickness):
 
 
 def translate(solid, delta):
-    _record("move_entity", {"id": {"ref": solid.ref}, "delta": _terms(delta)})
+    _record("move_entities", {"ids": [{"ref": solid.ref}], "delta": _terms(delta)})
     moved = Solid(solid.ref, _translate(solid.shape, [float(d) for d in delta]), solid.color, solid.name)
     LLULL_LIVE[solid.ref] = moved
     return moved
 
 
 def remove(solid):
-    _record("delete_entity", {"id": {"ref": solid.ref}})
+    _record("delete_entities", {"ids": [{"ref": solid.ref}]})
     LLULL_LIVE.pop(solid.ref, None)
 
 

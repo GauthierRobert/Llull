@@ -1309,15 +1309,17 @@
       },
       {
         "id": "#66",
-        "name": "add_wall",
+        "name": "draw_walls",
         "params": {
-          "start": [
-            0,
-            0
-          ],
-          "end": [
-            10000,
-            0
+          "points": [
+            [
+              0,
+              0
+            ],
+            [
+              10000,
+              0
+            ]
           ]
         },
         "suppressed": false,
@@ -1328,15 +1330,17 @@
       },
       {
         "id": "#67",
-        "name": "add_wall",
+        "name": "draw_walls",
         "params": {
-          "start": [
-            10000,
-            0
-          ],
-          "end": [
-            10000,
-            8000
+          "points": [
+            [
+              10000,
+              0
+            ],
+            [
+              10000,
+              8000
+            ]
           ]
         },
         "suppressed": false,
@@ -1347,15 +1351,17 @@
       },
       {
         "id": "#68",
-        "name": "add_wall",
+        "name": "draw_walls",
         "params": {
-          "start": [
-            10000,
-            8000
-          ],
-          "end": [
-            0,
-            8000
+          "points": [
+            [
+              10000,
+              8000
+            ],
+            [
+              0,
+              8000
+            ]
           ]
         },
         "suppressed": false,
@@ -1366,15 +1372,17 @@
       },
       {
         "id": "#69",
-        "name": "add_wall",
+        "name": "draw_walls",
         "params": {
-          "start": [
-            0,
-            8000
-          ],
-          "end": [
-            0,
-            0
+          "points": [
+            [
+              0,
+              8000
+            ],
+            [
+              0,
+              0
+            ]
           ]
         },
         "suppressed": false,

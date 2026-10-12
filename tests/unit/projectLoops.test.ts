@@ -110,7 +110,7 @@ describe('build_project nestable loops', () => {
     const result = run(createEmptyDocument(), [
       ...params(3, 10),
       polar,
-      { command: 'move_entity', params: { id: '$piston2', delta: [0, 0, 5] } },
+      { command: 'move_entities', params: { ids: ['$piston2'], delta: [0, 0, 5] } },
     ]);
     const data = result.data as PlanData;
     expect(data.ok).toBe(true);
@@ -123,11 +123,11 @@ describe('build_project nestable loops', () => {
     const built = run(createEmptyDocument(), [
       ...params(3, 10),
       polar,
-      { command: 'move_entity', params: { id: '$piston1', delta: [0, 0, 5] } },
+      { command: 'move_entities', params: { ids: ['$piston1'], delta: [0, 0, 5] } },
     ]).document;
     const history = built.featureHistory;
-    expect(history.map((s) => s.name)).toEqual(['build_project', 'move_entity']);
-    expect((history[1]?.params as { id: string }).id).toBe(built.order[1]);
+    expect(history.map((s) => s.name)).toEqual(['build_project', 'move_entities']);
+    expect((history[1]?.params as { ids: string[] }).ids).toEqual([built.order[1]]);
     const replayed = execute(built, 'replay_history', {}).document;
     expect(replayed.entities).toEqual(built.entities);
   });
@@ -138,13 +138,13 @@ describe('build_project nestable loops', () => {
       { command: 'add_box', as: 'base', params: { size: [1, 1, 1] } },
       {
         repeat: { count: '=n' },
-        actions: [{ command: 'move_entity', params: { id: '$base', delta: [1, 0, 0] } }],
+        actions: [{ command: 'move_entities', params: { ids: ['$base'], delta: [1, 0, 0] } }],
       },
     ]).document;
     const loopStep = built.featureHistory[1]?.params as {
-      actions: { actions: { params: { id: string } }[] }[];
+      actions: { actions: { params: { ids: string[] } }[] }[];
     };
-    expect(loopStep.actions[0]?.actions[0]?.params.id).toBe(built.order[0]);
+    expect(loopStep.actions[0]?.actions[0]?.params.ids).toEqual([built.order[0]]);
     const replayed = execute(built, 'replay_history', {}).document;
     expect(replayed.entities).toEqual(built.entities);
     const bigger = execute(built, 'set_parameter', { name: 'n', expression: '5' }).document;
@@ -168,7 +168,7 @@ describe('build_project nestable loops', () => {
           },
         ],
       },
-      { command: 'move_entity', params: { id: '$c1_2', delta: [0, 0, 1] } },
+      { command: 'move_entities', params: { ids: ['$c1_2'], delta: [0, 0, 1] } },
     ]);
     const spots = cylinders(result.document).map((c) => [c.position[0], c.position[1]]);
     expect(spots).toEqual([
@@ -278,7 +278,7 @@ describe('build_project nestable loops', () => {
     const ref = run(createEmptyDocument(), [
       {
         repeat: { count: 1 },
-        actions: [{ command: 'move_entity', params: { id: '$nope{i}', delta: [0, 0, 0] } }],
+        actions: [{ command: 'move_entities', params: { ids: ['$nope{i}'], delta: [0, 0, 0] } }],
       },
     ]);
     expect(ref.summary).toContain('nope0');
@@ -332,7 +332,7 @@ describe('build_project validate with loops', () => {
         actions: [
           { command: 'nope_cmd' },
           { command: 'add_box' },
-          { command: 'move_entity', params: { id: '$ghost', delta: [0, 0, 0] } },
+          { command: 'move_entities', params: { ids: ['$ghost'], delta: [0, 0, 0] } },
           { command: 'add_box', as: 'x{q}', params: { size: [1, 1, 1] } },
           { repeat: { count: 1 }, step: { command: 'add_box' } },
           7,
@@ -354,8 +354,8 @@ describe('build_project validate with loops', () => {
         repeat: { count: 2 },
         actions: [
           { command: 'add_box', as: 'b{i}', params: { size: [1, 1, 1] } },
-          { command: 'move_entity', params: { id: '$b{i}', delta: [0, 0, 0] } },
-          { command: 'move_entity', params: { id: '$b{i+1}', delta: [0, 0, 0] } },
+          { command: 'move_entities', params: { ids: ['$b{i}'], delta: [0, 0, 0] } },
+          { command: 'move_entities', params: { ids: ['$b{i+1}'], delta: [0, 0, 0] } },
         ],
       },
     ]);
@@ -394,7 +394,7 @@ describe('replay of a loop step that needs the kernel', () => {
           suppressed: false,
           params: {
             actions: [
-              { repeat: { count: 1 }, actions: [{ command: 'boolean_union', params: {} }] },
+              { repeat: { count: 1 }, actions: [{ command: 'boolean', params: { op: 'union' } }] },
             ],
           },
         },

@@ -16,6 +16,7 @@
 import type { BooleanOp, Entity, MeshData, ShapeRecipe, Vec3 } from '../model/types';
 import type { GeometryKernel, ShapeHandle, ShapeTopology } from './kernel';
 import { recipeKey } from './shapeRecipe';
+import { errorMessage } from '../lib/errorMessage';
 
 /**
  * Native operations of a concrete kernel. Each returns a NEW native shape (never one of its inputs:
@@ -175,9 +176,7 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
       builds++;
       shape = build(ops, recipe, evaluateNative);
     } catch (error) {
-      console.warn(
-        `[kernel] ${recipe.op} failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      console.warn(`[kernel] ${recipe.op} failed: ${errorMessage(error)}`);
       shape = null;
     }
     shapes.set(key, shape);

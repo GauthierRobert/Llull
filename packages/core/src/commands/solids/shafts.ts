@@ -8,7 +8,7 @@
 import type { Entity, MeshData, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import type { Point2 } from '../../lib/polygon';
-import { defineCommand, z } from '../schema';
+import { defineCommand, z, nameField } from '../schema';
 import { nextId } from '../../lib/id';
 import { compactNumber as fmt } from '../../lib/compactNumber';
 import { finiteVec3OrZero } from '../../lib/vec3';
@@ -20,7 +20,7 @@ import { withEntity } from '../entity/entityOps';
 import { commitEntity } from '../entity/commitEntity';
 import { newEntity } from '../entity/newEntity';
 import { boundsText, positionField, rotationField } from './shared';
-import { placedMeshEntity } from './gearSolid';
+import { placedMeshEntity, pressureAngleProblem } from './gearSolid';
 import { noop } from '../noop';
 
 const SHAFT_SEGMENTS = 64;
@@ -60,7 +60,7 @@ export const addSplineShaft = defineCommand({
     position: positionField('Centre of the bottom face. '),
     rotation: rotationField(),
     color: z.string().describe('Hex color. Default "#9aa3ad".').optional(),
-    name: z.string().describe('Optional display name.').optional(),
+    name: nameField(),
   }),
   run: (
     doc,
@@ -90,9 +90,8 @@ export const addSplineShaft = defineCommand({
     }
     if (!(length > 0 && Number.isFinite(length)))
       return fail(`length must be finite and > 0, got ${String(length)}.`);
-    if (!(pressureAngle > 0 && pressureAngle < Math.PI / 2)) {
-      return fail(`pressureAngle must be in (0, π/2), got ${String(pressureAngle)}.`);
-    }
+    const angleProblem = pressureAngleProblem(pressureAngle);
+    if (angleProblem !== null) return fail(angleProblem);
     const referenceRadius = referenceDiameter / 2;
     const tipRadius = referenceRadius - 0.1 * mod;
     const rootRadius = tipRadius - 0.9 * mod;

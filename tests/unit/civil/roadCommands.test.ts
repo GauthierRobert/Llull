@@ -507,7 +507,7 @@ describe('persistence and derivation', () => {
 
   it('refuses deleting a generated entity', () => {
     const { doc, id } = designed(101);
-    const result = execute(doc, 'delete_entity', { id: `${id}:corridor` });
+    const result = execute(doc, 'delete_entities', { ids: [`${id}:corridor`] });
     expect(result.rejected).toBe(true);
     expect(result.document).toBe(doc);
   });

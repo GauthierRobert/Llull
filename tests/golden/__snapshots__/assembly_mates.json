@@ -162,16 +162,18 @@
       },
       {
         "id": "#11",
-        "name": "add_mate",
+        "name": "add_constraint",
         "params": {
-          "kind": "distance",
-          "a": {
-            "instanceId": "#4"
-          },
-          "b": {
-            "instanceId": "#5"
-          },
-          "value": 5
+          "constraint": {
+            "kind": "distance",
+            "a": {
+              "entityId": "#4"
+            },
+            "b": {
+              "entityId": "#5"
+            },
+            "value": 5
+          }
         },
         "suppressed": false,
         "affected": [
@@ -216,7 +218,6 @@
     },
     "constraints": {
       "#12": {
-        "id": "#12",
         "kind": "distance",
         "a": {
           "entityId": "#4"
@@ -224,7 +225,8 @@
         "b": {
           "entityId": "#5"
         },
-        "value": 5
+        "value": 5,
+        "id": "#12"
       }
     },
     "constraintOrder": [

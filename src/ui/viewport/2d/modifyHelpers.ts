@@ -26,6 +26,7 @@ import { underlayCorners } from '@core/geometry/imageUnderlay';
 import { DEFAULT_OFFSET, dimensionDrawing } from './entities/dimensionGeometry';
 import { nearestOnArc } from './snapping/geometry';
 import { ringsDistSq, solidOutline } from './solidOutline';
+import { rectangleCorners } from '../lineGeometry';
 
 /** Pick radius in screen pixels (selection and modify-tool picks). */
 export const PICK_RADIUS_PX = 10;
@@ -152,17 +153,7 @@ export function entityDistSq(entity: Entity, worldPick: Vec2): number {
     }
     case 'rectangle': {
       // Rectangle corners are in local space (lower-left at local origin).
-      const { width, height } = entity;
-      return chainDistSq(
-        pick,
-        [
-          [0, 0],
-          [width, 0],
-          [width, height],
-          [0, height],
-        ],
-        true,
-      );
+      return chainDistSq(pick, rectangleCorners(entity.width, entity.height), true);
     }
     case 'point':
       return distance(pick, [0, 0]) ** 2;
@@ -295,6 +286,30 @@ function solidOutlineDistSq(document: CadDocument, solid: Entity, worldPick: Vec
 }
 
 /**
+ * Id of the first pickable entity (document order) with the lowest `score` strictly below
+ * `limit`; a null score never wins.
+ */
+function lowestScoringEntityId(
+  document: CadDocument,
+  isPickable: (entity: Entity) => boolean,
+  score: (entity: Entity) => number | null,
+  limit: number,
+): EntityId | null {
+  let bestId: EntityId | null = null;
+  let bestScore = limit;
+  for (const id of document.order) {
+    const entity = document.entities[id];
+    if (!entity || !isPickable(entity)) continue;
+    const value = score(entity);
+    if (value !== null && value < bestScore) {
+      bestScore = value;
+      bestId = id;
+    }
+  }
+  return bestId;
+}
+
+/**
  * Id of the entity nearest to `worldPick` within `tolerance` world units, or null.
  * Entities rejected by `isPickable` (e.g. hidden ones) are ignored.
  * @pure
@@ -305,24 +320,17 @@ export function nearestEntityId(
   tolerance: number,
   isPickable: (entity: Entity) => boolean = () => true,
 ): EntityId | null {
-  const toleranceSq = tolerance * tolerance;
-  let bestId: EntityId | null = null;
-  let bestDist = Infinity;
-  for (const id of document.order) {
-    const entity = document.entities[id];
-    if (!entity || !isPickable(entity)) continue;
-    const dSq =
+  return lowestScoringEntityId(
+    document,
+    isPickable,
+    (entity) =>
       entity.kind === 'dimension'
         ? dimensionLabelDistSq(document, entity, worldPick)
         : is3D(entity)
           ? solidOutlineDistSq(document, entity, worldPick)
-          : entityDistSq(entity, worldPick);
-    if (dSq < toleranceSq && dSq < bestDist) {
-      bestDist = dSq;
-      bestId = id;
-    }
-  }
-  return bestId;
+          : entityDistSq(entity, worldPick),
+    tolerance * tolerance,
+  );
 }
 
 /**
@@ -372,16 +380,10 @@ export function pickEntityId(
 ): EntityId | null {
   const onOutline = nearestEntityId(document, worldPick, tolerance, isPickable);
   if (onOutline !== null) return onOutline;
-  let bestId: EntityId | null = null;
-  let bestArea = Infinity;
-  for (const id of document.order) {
-    const entity = document.entities[id];
-    if (!entity || !isPickable(entity)) continue;
-    const area = enclosingArea(entity, worldPick);
-    if (area !== null && area < bestArea) {
-      bestArea = area;
-      bestId = id;
-    }
-  }
-  return bestId;
+  return lowestScoringEntityId(
+    document,
+    isPickable,
+    (entity) => enclosingArea(entity, worldPick),
+    Infinity,
+  );
 }

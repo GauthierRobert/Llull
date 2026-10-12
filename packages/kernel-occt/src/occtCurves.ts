@@ -12,7 +12,8 @@ import { ringCurves } from '@core/geometry/sectionRing';
 import { reverseChain, sampleProfile, segmentTangent } from '@core/geometry/curveSegments';
 import { add3, scale3 } from '@lib/vec3';
 import { signedArea } from '@lib/polygon';
-import { release, type OccApi, type OccHandle, type OccMakeFace, type OccShape } from './occtTypes';
+import { release } from '@core/geometry/nativeObject';
+import { type OccApi, type OccHandle, type OccMakeFace, type OccShape } from './occtTypes';
 
 interface OccEdgeMaker extends OccHandle {
   IsDone(): boolean;

@@ -150,9 +150,11 @@ describe('entityBounds — per kind', () => {
   });
 
   it('line: bbox of endpoints offset by position', () => {
-    const doc = execute(createEmptyDocument(), 'draw_line', {
-      start: [1, 1],
-      end: [4, 5],
+    const doc = execute(createEmptyDocument(), 'draw_polyline', {
+      points: [
+        [1, 1],
+        [4, 5],
+      ],
       position: [1, 0, 0],
     }).document;
     expect(entityBounds(lastEntity(doc))).toEqual({ min: [2, 1, 0], max: [5, 5, 0] });
@@ -184,7 +186,7 @@ describe('entityBounds — per kind', () => {
   });
 
   it('circle: center ± radius', () => {
-    const doc = execute(createEmptyDocument(), 'draw_circle', {
+    const doc = execute(createEmptyDocument(), 'draw_arc', {
       center: [2, 2],
       radius: 3,
     }).document;

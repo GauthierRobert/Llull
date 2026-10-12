@@ -6,6 +6,8 @@
  */
 
 import type { Vec3 } from '../model/vectors';
+import { positiveSweep } from './angle';
+import { arcPolyline } from './arc';
 
 export interface DxfRecord {
   readonly type: string;
@@ -188,13 +190,11 @@ function point(record: DxfRecord, offset = 0): Vec3 {
 
 /** Arc points from `start` to `end` (radians, CCW) around `center`. */
 function arcPoints(center: Vec3, radius: number, start: number, end: number): Vec3[] {
-  let sweep = end - start;
-  while (sweep <= 0) sweep += Math.PI * 2;
+  const sweep = positiveSweep(end - start);
   const segments = Math.max(4, Math.ceil(sweep / (Math.PI / 24)));
-  return Array.from({ length: segments + 1 }, (_, k): Vec3 => {
-    const angle = start + (sweep * k) / segments;
-    return [center[0] + radius * Math.cos(angle), center[1] + radius * Math.sin(angle), center[2]];
-  });
+  return arcPolyline([center[0], center[1]], radius, start, sweep, segments).map(
+    ([x, y]): Vec3 => [x, y, center[2]],
+  );
 }
 
 /** LWPOLYLINE vertices with bulge arcs densified, at `elevation`. */

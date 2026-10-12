@@ -34,7 +34,7 @@ Always one call per plan (`llull run plan.json`), not a loop of single calls.
      { "command": "set_units", "params": { "units": "mm" } },
      { "command": "add_box", "params": { "size": [80, 60, 10] }, "as": "plate" },
      { "command": "add_cylinder", "params": { "radius": 4, "height": 20 }, "as": "hole" },
-     { "command": "boolean_subtract", "params": { "a": "$plate", "b": "$hole" } }
+     { "command": "boolean", "params": { "a": "$plate", "b": "$hole" } }
    ]
    ```
    **Loops / parameters:** don't generate long plans in a script. Use nestable loops and `=expr`
@@ -92,7 +92,7 @@ Always one call per plan (`llull run plan.json`), not a loop of single calls.
    (or `--doc part.llull` instead of `--app`).
    The report prints one line per step with the ids it created.
 4. **Inspect / measure** (read-only, never written): `llull describe_scene`,
-   `llull measure_volume entityId=mesh-4.1`, `llull check_model`.
+   `llull mass_properties entityId=mesh-4.1`, `llull check_model`.
 5. **Look at it**: `llull render_view view=iso --save view.png --app` then read the PNG.
 6. **Exchange (Python/CadQuery bundled in the desktop app)**: `llull import_step file=supplier.step --app`,
    `llull export_step --save out/part.step --app` (exact B-rep), `llull import_dwg file=site.dwg
@@ -124,7 +124,7 @@ target=drawing` (needs a DWG converter). `llull list exchange` shows them all.
 
 ## Long plans: progress, timing, timeout
 
-- `llull run plan.json --progress` (automatic on a terminal) streams `[12/189] boolean_subtract … 3.2s`
+- `llull run plan.json --progress` (automatic on a terminal) streams `[12/189] boolean … 3.2s`
   per step to stderr, announcing kernel commands (booleans, fillets) before they start so a slow OCC
   boolean does not look like a hang. Steps over 10 s always print a `warning: slow step` line.
 - Every step of the `--json` report carries `durationMs` (text mode shows steps over 1 s as `[3.2s]`).

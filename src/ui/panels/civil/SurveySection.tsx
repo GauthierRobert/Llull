@@ -13,6 +13,8 @@ import { PanelSection } from '@ui/panels/PanelParts';
 import { OptionSelect } from '@ui/panels/OptionSelect';
 import { CivilObjectRow, useCivilObjects, TextField } from './CivilParts';
 import { DxfImports, readChosenFile } from './DxfImports';
+import { fileStem } from '@ui/chosenFile';
+import { optionalText } from '@ui/numberText';
 
 const FORMATS = ['PENZD', 'PNEZD', 'PENZ', 'PNEZ', 'ENZ', 'NEZ'] as const;
 
@@ -37,7 +39,7 @@ export function SurveySection(): React.ReactElement {
   const loadFile = (event: React.ChangeEvent<HTMLInputElement>): void =>
     readChosenFile(event, (content, fileName) => {
       setText(content);
-      setName((previous) => (previous.trim() === '' ? fileName.replace(/\.[^.]+$/, '') : previous));
+      setName((previous) => (previous.trim() === '' ? fileStem(fileName) : previous));
     });
 
   const handleSubmit = (event: React.FormEvent): void => {
@@ -47,7 +49,7 @@ export function SurveySection(): React.ReactElement {
       text,
       format,
       sourceUnit: unit,
-      ...(name.trim() !== '' ? { name: name.trim() } : {}),
+      ...optionalText('name', name),
     });
     setText('');
     setName('');

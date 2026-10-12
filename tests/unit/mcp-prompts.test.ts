@@ -113,16 +113,16 @@ describe('getMcpPrompt("model_bracket")', () => {
     expect(text).toMatch(/draw_rectangle/);
   });
 
-  it('assistant message mentions extrude_sketch', () => {
+  it('assistant message mentions extrude_profile', () => {
     const result = getMcpPrompt('model_bracket', { width: '80', height: '40', thickness: '6' });
     const text = result!.messages[1]!.content.text;
-    expect(text).toMatch(/extrude_sketch/);
+    expect(text).toMatch(/extrude_profile/);
   });
 
-  it('assistant message mentions boolean_subtract', () => {
+  it('assistant message mentions the boolean subtract', () => {
     const result = getMcpPrompt('model_bracket', { width: '80', height: '40', thickness: '6' });
     const text = result!.messages[1]!.content.text;
-    expect(text).toMatch(/boolean_subtract/);
+    expect(text).toMatch(/"op": "subtract"/);
   });
 
   it('assistant message mentions set_entity_name', () => {
@@ -213,16 +213,16 @@ describe('getMcpPrompt("parametric_part")', () => {
     expect(text).toMatch(/build_project/);
   });
 
-  it('assistant message mentions extrude_sketch', () => {
+  it('assistant message mentions extrude_profile', () => {
     const result = getMcpPrompt('parametric_part', {});
     const text = result!.messages[1]!.content.text;
-    expect(text).toMatch(/extrude_sketch/);
+    expect(text).toMatch(/extrude_profile/);
   });
 
-  it('assistant message mentions boolean_subtract', () => {
+  it('assistant message mentions the boolean subtract', () => {
     const result = getMcpPrompt('parametric_part', {});
     const text = result!.messages[1]!.content.text;
-    expect(text).toMatch(/boolean_subtract/);
+    expect(text).toMatch(/"op": "subtract"/);
   });
 
   it('assistant message mentions set_entity_name', () => {

@@ -4,7 +4,8 @@ import React, { useRef, useState } from 'react';
 
 const AXES = ['x', 'y', 'z'] as const;
 
-function formatNumber(n: number): string {
+/** Read-only number display: always 3 decimals. */
+function formatReadout(n: number): string {
   return n.toFixed(3);
 }
 
@@ -41,7 +42,7 @@ export function ScalarRow({
   return (
     <PropRow label={label}>
       <span className="props-number">
-        {formatNumber(value)}
+        {formatReadout(value)}
         {unit !== undefined && <span className="props-unit">{unit}</span>}
       </span>
     </PropRow>
@@ -134,7 +135,7 @@ export function AxisFields({ values, label, onAxisCommit }: AxisFieldsProps): Re
           return (
             <span key={axis} className="axis-field">
               {letter}
-              <span className="axis-field__value">{formatNumber(n)}</span>
+              <span className="axis-field__value">{formatReadout(n)}</span>
             </span>
           );
         }

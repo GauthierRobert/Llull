@@ -32,7 +32,7 @@ describe('commands that consume entities report the constraints they drop', () =
 
   it('boolean ops prune and report constraints on consumed operands', () => {
     setGeometryKernel(kernel);
-    const result = execute(doc, 'boolean_union', { a, b });
+    const result = execute(doc, 'boolean', { op: 'union', a, b });
     expect(result.document.constraints).toEqual({});
     expect(result.document.constraintOrder).toEqual([]);
     expect(result.summary).toContain(NOTE);
@@ -77,7 +77,8 @@ describe('commands that consume entities report the constraints they drop', () =
     const lone = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });
     const other = execute(lone.document, 'add_box', { size: [1, 1, 1] });
     setGeometryKernel(kernel);
-    const result = execute(other.document, 'boolean_union', {
+    const result = execute(other.document, 'boolean', {
+      op: 'union',
       a: lone.affected[0]!,
       b: other.affected[0]!,
     });

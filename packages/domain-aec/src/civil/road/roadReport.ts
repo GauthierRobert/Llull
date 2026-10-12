@@ -20,6 +20,7 @@ import { elevationAt } from '../surface/tin';
 import { crossSlopesAt, hasSuperelevation, superelevationRate } from '../alignment/superelevation';
 import { formatStation, fromMetres } from '../model';
 import { toMetres } from '../../building/model';
+import { round } from '../../shared/numeric';
 
 export interface StationAnalysis {
   readonly station: number;
@@ -47,8 +48,6 @@ export interface ReportRow {
   /** Signed superelevation (+ = banked for a left-hand curve); null without a superelevation design. */
   readonly superelevationPercent: number | null;
 }
-
-const roundTo = (value: number, digits: number): number => Number(value.toFixed(digits));
 
 /** Start, every `interval` from the start, end. */
 export function reportStations(alignment: AlignmentObject, interval: number): number[] {
@@ -109,20 +108,20 @@ export function reportRows(
     const designM = entry.designZ === null ? null : toMetres(doc, entry.designZ);
     const groundM = entry.groundZ === null ? null : toMetres(doc, entry.groundZ);
     return {
-      station: roundTo(toMetres(doc, entry.station), 3),
+      station: round(toMetres(doc, entry.station), 3),
       stationText: formatStation(toMetres(doc, entry.station)),
-      x: roundTo(toMetres(doc, placed?.point[0] ?? 0), 3),
-      y: roundTo(toMetres(doc, placed?.point[1] ?? 0), 3),
-      groundM: groundM === null ? null : roundTo(groundM, 3),
-      designM: designM === null ? null : roundTo(designM, 3),
-      cutFillM: designM === null || groundM === null ? null : roundTo(designM - groundM, 3),
-      cutAreaM2: entry.areas ? roundTo(entry.areas.cutArea * areaFactor, 3) : null,
-      fillAreaM2: entry.areas ? roundTo(entry.areas.fillArea * areaFactor, 3) : null,
-      cumulativeCutM3: roundTo(cut, 2),
-      cumulativeFillM3: roundTo(fill, 2),
-      massHaulM3: roundTo(cut - fill, 2),
+      x: round(toMetres(doc, placed?.point[0] ?? 0), 3),
+      y: round(toMetres(doc, placed?.point[1] ?? 0), 3),
+      groundM: groundM === null ? null : round(groundM, 3),
+      designM: designM === null ? null : round(designM, 3),
+      cutFillM: designM === null || groundM === null ? null : round(designM - groundM, 3),
+      cutAreaM2: entry.areas ? round(entry.areas.cutArea * areaFactor, 3) : null,
+      fillAreaM2: entry.areas ? round(entry.areas.fillArea * areaFactor, 3) : null,
+      cumulativeCutM3: round(cut, 2),
+      cumulativeFillM3: round(fill, 2),
+      massHaulM3: round(cut - fill, 2),
       superelevationPercent: hasSuperelevation(alignment)
-        ? roundTo(
+        ? round(
             superelevationRate(crossSlopesAt(alignment, crossfall, laneWidth, entry.station)) * 100,
             3,
           )

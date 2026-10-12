@@ -6,8 +6,18 @@
  * @pure
  */
 
-import type { Feature, ShapeSpec, Term, Term2, Term3 } from './program';
-import { formatDegrees, formatNumber, formatTerm, isZero, numberRows, quote } from './format';
+import type { Feature, FeatureProgram, ShapeSpec, Term, Term2, Term3 } from './program';
+import {
+  featureLinesWithHeadings,
+  formatDegrees,
+  formatNumber,
+  formatTerm,
+  isZero,
+  numberRows,
+  parameterLines,
+  quote,
+  sectionBanner,
+} from './format';
 
 /** `(a, b, c)` */
 export function pythonTuple(terms: readonly Term[]): string {
@@ -80,4 +90,19 @@ export function placementKwargs(shape: ShapeSpec, position: Term3, rotation: Ter
   if (!isZero(position)) text += `, position=${pythonTuple(position)}`;
   if (!isZero(rotation)) text += `, rotation=(${rotation.map(pythonDegrees).join(', ')})`;
   return text;
+}
+
+/** The PARAMETERS and MODEL sections of a Python script (`#` comments, step headings). */
+export function parametersAndModel(
+  program: FeatureProgram,
+  assignment: (parameter: FeatureProgram['parameters'][number]) => string,
+  featureLine: (feature: Feature) => string,
+): string[] {
+  return [
+    sectionBanner('PARAMETERS'),
+    ...parameterLines(program, '#', assignment),
+    '',
+    sectionBanner('MODEL'),
+    ...featureLinesWithHeadings(program, '#', featureLine),
+  ];
 }

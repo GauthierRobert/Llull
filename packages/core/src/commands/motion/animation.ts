@@ -48,7 +48,7 @@ const triggerField = z
       "'click' toggles the animation on/off when the user clicks the animated part in the viewport.",
   );
 
-/** Raw (possibly malformed) target/channel/axis/trigger/pivot inputs shared by the animate_* commands. */
+/** Raw (possibly malformed) target/channel/axis/trigger/pivot inputs of an animate call. */
 interface AnimationInput {
   readonly targetId: string;
   readonly targetKind: 'entity' | 'group';
@@ -92,100 +92,55 @@ function withAnimation(doc: CadDocument, anim: Animation): CadDocument {
 }
 
 /**
- * @command animate_spin
+ * @command animate
  * @pure
  * @layer core/commands
  * @affects creates 1 animation record (not an entity)
- * @invariant targetId must exist in doc.entities or doc.groups
- * @failure missing targetId -> no-op, affected:[]
+ * @invariant targetId must exist in doc.entities or doc.groups; spin needs a finite speed;
+ *   oscillate needs amplitude > 0 and frequency > 0
+ * @failure missing targetId or missing / invalid motion values -> no-op, affected:[]
  */
-export const animateSpin = defineCommand({
-  name: 'animate_spin',
+export const animate = defineCommand({
+  name: 'animate',
   description:
-    'Attach a constant-velocity spin animation to an entity or group. ' +
-    'For the rotation channel, speed is angular velocity in rad/s (e.g. 6.283 = 1 revolution/s). ' +
-    'For the position channel, speed is linear velocity in document units per second. ' +
+    'Attach a motion clip to an entity or group. ' +
+    "mode 'spin' = constant velocity: speed is angular velocity in rad/s for the rotation channel " +
+    '(e.g. 6.283 = 1 revolution/s) or linear velocity in document units/s for the position channel. ' +
+    "mode 'oscillate' = sinusoidal motion sin(2π·frequency·t) · amplitude: amplitude is the peak " +
+    'displacement (radians for rotation, document units for position) and frequency is in Hz; both must be > 0. ' +
     'axis is the world-space direction vector ([0,1,0] = Y axis); it need not be unit-length — the viewport normalizes it. ' +
     'pivot is the world-space rotation pivot point; when omitted, the player defaults to the target entity/group position. ' +
     "trigger 'auto' runs the animation under the global Play button; 'click' toggles it when the user clicks the part in the viewport.",
   params: z.object({
     targetId: targetIdField,
+    mode: z
+      .enum(['spin', 'oscillate'])
+      .describe(
+        "'spin' = constant velocity (give speed); 'oscillate' = back-and-forth sine motion (give amplitude and frequency).",
+      ),
     speed: z
       .number()
-      .describe(
-        'Constant velocity: rad/s for the rotation channel (e.g. 6.283 ≈ 1 rev/s), or document units/s for the position channel.',
-      ),
-    axis: z
-      .array(z.number())
       .optional()
       .describe(
-        'World-space direction vector [x, y, z] the spin acts along. ' +
-          'For rotation this is the spin axle; for position this is the translation direction. ' +
-          'Need not be unit-length. Defaults to [0, 1, 0] (Y axis).',
+        'spin: constant velocity, rad/s for the rotation channel (e.g. 6.283 ≈ 1 rev/s) or document units/s for the position channel.',
       ),
-    channel: z
-      .string()
-      .optional()
-      .describe(
-        "Transform channel to drive: 'rotation' (default) spins the part; 'position' translates it at constant speed.",
-      ),
-    pivot: pivotField,
-    trigger: triggerField,
-  }),
-  run: (doc, { targetId, speed, axis, channel, pivot, trigger }): CommandResult => {
-    const targetKind = resolveTargetKind(doc, targetId);
-    if (targetKind === null) return noop(doc, `animate_spin: no entity or group ${targetId}.`);
-
-    const anim = buildAnimation(
-      { targetId, targetKind, axis, channel, trigger, pivot },
-      { mode: 'spin', speed },
-    );
-    const { id, axis: resolvedAxis, channel: resolvedChannel, trigger: resolvedTrigger } = anim;
-
-    return report(
-      withAnimation(doc, anim),
-      `Spin ${id}: ${targetKind} ${targetId} ${resolvedChannel === 'rotation' ? 'rotates' : 'translates'} about [${resolvedAxis.join(',')}] at ${speed.toFixed(3)} ${resolvedChannel === 'rotation' ? 'rad/s' : 'units/s'} (${resolvedTrigger}).`,
-    );
-  },
-});
-
-/**
- * @command animate_oscillate
- * @pure
- * @layer core/commands
- * @affects creates 1 animation record (not an entity)
- * @invariant targetId must exist; amplitude > 0; frequency > 0
- * @failure missing targetId, amplitude <= 0, or frequency <= 0 -> no-op, affected:[]
- */
-export const animateOscillate = defineCommand({
-  name: 'animate_oscillate',
-  description:
-    'Attach a sinusoidal oscillation animation to an entity or group. ' +
-    'The motion follows sin(2π·frequency·t) · amplitude. ' +
-    'amplitude is the peak displacement: radians for the rotation channel, document units for position. ' +
-    'frequency is cycles per second (Hz); must be > 0. ' +
-    'axis is the world-space direction vector ([0,1,0] = Y axis); it need not be unit-length — the viewport normalizes it. ' +
-    'pivot is the world-space rotation pivot; when omitted the player uses the target position. ' +
-    "trigger 'auto' runs under the global Play button; 'click' toggles when the user clicks the part.",
-  params: z.object({
-    targetId: targetIdField,
     amplitude: z
       .number()
+      .optional()
       .describe(
-        'Peak displacement of the oscillation. For the rotation channel this is radians; ' +
-          'for the position channel this is document units. Must be greater than 0.',
+        'oscillate: peak displacement, radians for the rotation channel or document units for the position channel. Must be > 0.',
       ),
     frequency: z
       .number()
+      .optional()
       .describe(
-        'Number of complete oscillation cycles per second (Hz). Must be greater than 0. ' +
-          'Example: 0.5 = one full back-and-forth every 2 seconds; 2 = two cycles per second.',
+        'oscillate: complete cycles per second (Hz), > 0. Example: 0.5 = one full back-and-forth every 2 seconds.',
       ),
     axis: z
       .array(z.number())
       .optional()
       .describe(
-        'World-space direction vector [x, y, z] the oscillation acts along. ' +
+        'World-space direction vector [x, y, z] the motion acts along. ' +
           'For rotation this is the axle; for position this is the translation direction. ' +
           'Need not be unit-length. Defaults to [0, 1, 0] (Y axis).',
       ),
@@ -193,38 +148,45 @@ export const animateOscillate = defineCommand({
       .string()
       .optional()
       .describe(
-        "Transform channel to drive: 'rotation' (default) rocks the part; 'position' slides it back and forth.",
+        "Transform channel to drive: 'rotation' (default) turns / rocks the part; 'position' translates / slides it.",
       ),
     pivot: pivotField,
     trigger: triggerField,
   }),
-  run: (doc, { targetId, amplitude, frequency, axis, channel, pivot, trigger }): CommandResult => {
+  run: (
+    doc,
+    { targetId, mode, speed, amplitude, frequency, axis, channel, pivot, trigger },
+  ): CommandResult => {
     const targetKind = resolveTargetKind(doc, targetId);
-    if (targetKind === null) return noop(doc, `animate_oscillate: no entity or group ${targetId}.`);
+    if (targetKind === null) return noop(doc, `animate: no entity or group ${targetId}.`);
+    const input = { targetId, targetKind, axis, channel, trigger, pivot };
 
-    if (amplitude <= 0) {
-      return noop(
-        doc,
-        `animate_oscillate: amplitude must be > 0 (got ${amplitude}); ${targetId} unchanged.`,
+    if (mode === 'spin') {
+      if (speed === undefined || !Number.isFinite(speed))
+        return noop(doc, `animate: spin needs a finite speed; ${targetId} unchanged.`);
+      const anim = buildAnimation(input, { mode, speed });
+      const rotates = anim.channel === 'rotation';
+      return report(
+        withAnimation(doc, anim),
+        `Spin ${anim.id}: ${targetKind} ${targetId} ${rotates ? 'rotates' : 'translates'} about [${anim.axis.join(',')}] at ${speed.toFixed(3)} ${rotates ? 'rad/s' : 'units/s'} (${anim.trigger}).`,
       );
     }
 
-    if (frequency <= 0) {
+    if (amplitude === undefined || !(amplitude > 0))
       return noop(
         doc,
-        `animate_oscillate: frequency must be > 0 (got ${frequency}); ${targetId} unchanged.`,
+        `animate: oscillate amplitude must be > 0 (got ${amplitude}); ${targetId} unchanged.`,
       );
-    }
-
-    const anim = buildAnimation(
-      { targetId, targetKind, axis, channel, trigger, pivot },
-      { mode: 'oscillate', amplitude, frequency },
-    );
-    const { id, axis: resolvedAxis, channel: resolvedChannel, trigger: resolvedTrigger } = anim;
-
+    if (frequency === undefined || !(frequency > 0))
+      return noop(
+        doc,
+        `animate: oscillate frequency must be > 0 (got ${frequency}); ${targetId} unchanged.`,
+      );
+    const anim = buildAnimation(input, { mode, amplitude, frequency });
+    const rotates = anim.channel === 'rotation';
     return report(
       withAnimation(doc, anim),
-      `Oscillate ${id}: ${targetKind} ${targetId} ${resolvedChannel === 'rotation' ? 'rocks' : 'slides'} about [${resolvedAxis.join(',')}] ±${amplitude.toFixed(3)} ${resolvedChannel === 'rotation' ? 'rad' : 'units'} at ${frequency.toFixed(3)} Hz (${resolvedTrigger}).`,
+      `Oscillate ${anim.id}: ${targetKind} ${targetId} ${rotates ? 'rocks' : 'slides'} about [${anim.axis.join(',')}] ±${amplitude.toFixed(3)} ${rotates ? 'rad' : 'units'} at ${frequency.toFixed(3)} Hz (${anim.trigger}).`,
     );
   },
 });

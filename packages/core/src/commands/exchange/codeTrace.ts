@@ -15,6 +15,7 @@ import { buildParamEnv } from '../history/regenerate';
 import { evaluateExpression, extractReferences } from '../parametric/expression';
 import { MAX_TRACE_FEATURES } from '../limits';
 import { isRecord } from '../../lib/isRecord';
+import { migrateRetiredCalls } from '../persistence/retiredCommands';
 import { changed, noop } from '../noop';
 
 interface TraceParameter {
@@ -47,14 +48,12 @@ const TRACE_COMMANDS: ReadonlySet<string> = new Set([
   'revolve_profile',
   'import_mesh',
   'add_subdivision_solid',
-  'boolean_union',
-  'boolean_subtract',
-  'boolean_intersect',
+  'boolean',
   'fillet_edge',
   'chamfer_edge',
   'shell_solid',
-  'move_entity',
-  'delete_entity',
+  'move_entities',
+  'delete_entities',
   'set_entity_name',
 ]);
 
@@ -229,7 +228,9 @@ export const applyCodeTrace = defineCommand({
     mode: z.enum(['replace', 'append']).optional().describe('"replace" (default) or "append".'),
   }),
   annotations: { metaHistory: true, destructive: true },
-  run: (doc, { trace: rawTrace, mode = 'replace' }): CommandResult => {
+  run: (doc, { trace: recorded, mode = 'replace' }): CommandResult => {
+    // Code generated before a command was retired still records the old name.
+    const rawTrace = migrateRetiredCalls(recorded);
     const invalid = validateTrace(rawTrace);
     if (invalid !== null) return abort(doc, invalid);
     const trace = rawTrace as unknown as CodeTrace;

@@ -1,4 +1,10 @@
-import type { BaseEntity, CadDocument, Entity, Vec3 } from '../../model/types';
+import {
+  DEFAULT_LAYER_ID,
+  type BaseEntity,
+  type CadDocument,
+  type Entity,
+  type Vec3,
+} from '../../model/types';
 import type { CommandResult } from '../types';
 import { z, colorField, looseVec3, tolerant } from '../schema';
 import { rotatedEntityBounds } from '../../geometry/rotatedBounds';
@@ -157,6 +163,29 @@ export function placedSolidFields(
 } {
   const anchor = anchorField(shape, defaultAnchor, details);
   return { position: positionField(), anchor, rotation, color: colorField(DEFAULT_SOLID_COLOR) };
+}
+
+/** Optional explicit `id` param of a created solid. */
+export function explicitIdField(): z.ZodOptional<z.ZodString> {
+  return z
+    .string()
+    .describe('Optional explicit entity id. If omitted a unique id is generated.')
+    .optional();
+}
+
+/** `true` when the explicit `id` is non-empty and already names an entity. */
+export function explicitIdTaken(doc: CadDocument, id: string | undefined): id is string {
+  return id !== undefined && id.length > 0 && Object.hasOwn(doc.entities, id);
+}
+
+/** The explicit `id` when non-empty, else a fresh `prefix` id. */
+export function explicitIdOrNext(id: string | undefined, prefix: string): string {
+  return id !== undefined && id.length > 0 ? id : nextId(prefix);
+}
+
+/** `layerId` when it names an existing layer, else the default layer. */
+export function existingLayerOrDefault(doc: CadDocument, layerId: string | undefined): string {
+  return layerId !== undefined && Object.hasOwn(doc.layers, layerId) ? layerId : DEFAULT_LAYER_ID;
 }
 
 /** `axis` param of a placed primitive: direction of the primitive's local +Z (its symmetry axis). */

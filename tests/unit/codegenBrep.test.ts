@@ -53,7 +53,8 @@ function model(): CadDocument {
     radius: 0.5,
   });
   const drill = step(filleted.document, 'add_cylinder', { radius: 0.3, height: 4 });
-  const drilled = step(drill.document, 'boolean_subtract', {
+  const drilled = step(drill.document, 'boolean', {
+    op: 'subtract',
     a: filleted.affected[0],
     b: drill.affected[0],
   });

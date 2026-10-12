@@ -2,7 +2,7 @@
  * @layer ui/panels
  *
  * LayersPanel — layer list (name, visibility, lock, color swatch, entity count) with controls that
- * dispatch the layer commands: add_layer, rename_layer, set_layer_lock, delete_layer.
+ * dispatch the layer commands: add_layer, update_layer, delete_layer.
  * The eye toggle is a LOCAL viewport filter (`useViewportStore.hiddenLayerIds`): it dispatches no
  * command and never changes the document's `layer.visible`.
  */
@@ -72,7 +72,7 @@ function LayerRow({ layer, entityCount }: LayerRowProps): React.ReactElement {
       <button
         type="button"
         className={`icon-btn layer-lock${layer.locked ? ' layer-lock--locked' : ''}`}
-        onClick={() => dispatch('set_layer_lock', { id: layer.id, locked: !layer.locked })}
+        onClick={() => dispatch('update_layer', { id: layer.id, locked: !layer.locked })}
         aria-pressed={layer.locked}
         aria-label={layer.locked ? `Unlock layer ${layer.name}` : `Lock layer ${layer.name}`}
         title={layer.locked ? 'Locked — click to unlock' : 'Unlocked — click to lock'}
@@ -99,7 +99,7 @@ function LayerRow({ layer, entityCount }: LayerRowProps): React.ReactElement {
           value={layer.name}
           autoFocus
           onCommit={(name) => {
-            if (name.trim() !== '') dispatch('rename_layer', { id: layer.id, name: name.trim() });
+            if (name.trim() !== '') dispatch('update_layer', { id: layer.id, name: name.trim() });
           }}
           onFinish={() => setRenaming(false)}
         />

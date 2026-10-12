@@ -6,15 +6,17 @@
   }
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    28.2,
-    -16.1
-   ],
-   "end": [
-    28.2,
-    16.1
+   "points": [
+    [
+     28.2,
+     -16.1
+    ],
+    [
+     28.2,
+     16.1
+    ]
    ],
    "position": [
     0,
@@ -32,7 +34,7 @@
     16.1
    ],
    "radius": 2.5,
-   "startAngle": 0.0,
+   "startAngle": 0,
    "endAngle": 1.5707963267948966,
    "position": [
     0,
@@ -43,15 +45,17 @@
   "as": "k2"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    25.7,
-    18.6
-   ],
-   "end": [
-    23.57,
-    18.6
+   "points": [
+    [
+     25.7,
+     18.6
+    ],
+    [
+     23.57,
+     18.6
+    ]
    ],
    "position": [
     0,
@@ -80,15 +84,17 @@
   "as": "k4"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    18.6,
-    23.57
-   ],
-   "end": [
-    18.6,
-    25.7
+   "points": [
+    [
+     18.6,
+     23.57
+    ],
+    [
+     18.6,
+     25.7
+    ]
    ],
    "position": [
     0,
@@ -106,7 +112,7 @@
     25.7
    ],
    "radius": 2.5,
-   "startAngle": 0.0,
+   "startAngle": 0,
    "endAngle": 1.5707963267948966,
    "position": [
     0,
@@ -117,15 +123,17 @@
   "as": "k6"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    16.1,
-    28.2
-   ],
-   "end": [
-    -16.1,
-    28.2
+   "points": [
+    [
+     16.1,
+     28.2
+    ],
+    [
+     -16.1,
+     28.2
+    ]
    ],
    "position": [
     0,
@@ -154,15 +162,17 @@
   "as": "k8"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -18.6,
-    25.7
-   ],
-   "end": [
-    -18.6,
-    23.57
+   "points": [
+    [
+     -18.6,
+     25.7
+    ],
+    [
+     -18.6,
+     23.57
+    ]
    ],
    "position": [
     0,
@@ -191,15 +201,17 @@
   "as": "k10"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -23.57,
-    18.6
-   ],
-   "end": [
-    -25.7,
-    18.6
+   "points": [
+    [
+     -23.57,
+     18.6
+    ],
+    [
+     -25.7,
+     18.6
+    ]
    ],
    "position": [
     0,
@@ -228,15 +240,17 @@
   "as": "k12"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -28.2,
-    16.1
-   ],
-   "end": [
-    -28.2,
-    -16.1
+   "points": [
+    [
+     -28.2,
+     16.1
+    ],
+    [
+     -28.2,
+     -16.1
+    ]
    ],
    "position": [
     0,
@@ -265,15 +279,17 @@
   "as": "k14"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -25.7,
-    -18.6
-   ],
-   "end": [
-    -23.57,
-    -18.6
+   "points": [
+    [
+     -25.7,
+     -18.6
+    ],
+    [
+     -23.57,
+     -18.6
+    ]
    ],
    "position": [
     0,
@@ -291,7 +307,7 @@
     -23.57
    ],
    "radius": 4.969999999999999,
-   "startAngle": 0.0,
+   "startAngle": 0,
    "endAngle": 1.5707963267948966,
    "position": [
     0,
@@ -302,15 +318,17 @@
   "as": "k16"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -18.6,
-    -23.57
-   ],
-   "end": [
-    -18.6,
-    -25.7
+   "points": [
+    [
+     -18.6,
+     -23.57
+    ],
+    [
+     -18.6,
+     -25.7
+    ]
    ],
    "position": [
     0,
@@ -339,15 +357,17 @@
   "as": "k18"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -16.1,
-    -28.2
-   ],
-   "end": [
-    16.1,
-    -28.2
+   "points": [
+    [
+     -16.1,
+     -28.2
+    ],
+    [
+     16.1,
+     -28.2
+    ]
    ],
    "position": [
     0,
@@ -376,15 +396,17 @@
   "as": "k20"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    18.6,
-    -25.7
-   ],
-   "end": [
-    18.6,
-    -23.57
+   "points": [
+    [
+     18.6,
+     -25.7
+    ],
+    [
+     18.6,
+     -23.57
+    ]
    ],
    "position": [
     0,
@@ -413,15 +435,17 @@
   "as": "k22"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    23.57,
-    -18.6
-   ],
-   "end": [
-    25.7,
-    -18.6
+   "points": [
+    [
+     23.57,
+     -18.6
+    ],
+    [
+     25.7,
+     -18.6
+    ]
    ],
    "position": [
     0,
@@ -450,7 +474,7 @@
   "as": "k24"
  },
  {
-  "command": "extrude_sketch",
+  "command": "extrude_profile",
   "params": {
    "ids": [
     "$k1",
@@ -488,15 +512,17 @@
   "as": "cap0"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    28.08,
-    -16.1
-   ],
-   "end": [
-    28.08,
-    16.1
+   "points": [
+    [
+     28.08,
+     -16.1
+    ],
+    [
+     28.08,
+     16.1
+    ]
    ],
    "position": [
     0,
@@ -514,7 +540,7 @@
     16.1
    ],
    "radius": 2.38,
-   "startAngle": 0.0,
+   "startAngle": 0,
    "endAngle": 1.5707963267948966,
    "position": [
     0,
@@ -525,15 +551,17 @@
   "as": "k26"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    25.7,
-    18.48
-   ],
-   "end": [
-    23.57,
-    18.48
+   "points": [
+    [
+     25.7,
+     18.48
+    ],
+    [
+     23.57,
+     18.48
+    ]
    ],
    "position": [
     0,
@@ -562,15 +590,17 @@
   "as": "k28"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    18.48,
-    23.57
-   ],
-   "end": [
-    18.48,
-    25.7
+   "points": [
+    [
+     18.48,
+     23.57
+    ],
+    [
+     18.48,
+     25.7
+    ]
    ],
    "position": [
     0,
@@ -588,7 +618,7 @@
     25.7
    ],
    "radius": 2.38,
-   "startAngle": 0.0,
+   "startAngle": 0,
    "endAngle": 1.5707963267948966,
    "position": [
     0,
@@ -599,15 +629,17 @@
   "as": "k30"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    16.1,
-    28.08
-   ],
-   "end": [
-    -16.1,
-    28.08
+   "points": [
+    [
+     16.1,
+     28.08
+    ],
+    [
+     -16.1,
+     28.08
+    ]
    ],
    "position": [
     0,
@@ -636,15 +668,17 @@
   "as": "k32"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -18.48,
-    25.7
-   ],
-   "end": [
-    -18.48,
-    23.57
+   "points": [
+    [
+     -18.48,
+     25.7
+    ],
+    [
+     -18.48,
+     23.57
+    ]
    ],
    "position": [
     0,
@@ -673,15 +707,17 @@
   "as": "k34"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -23.57,
-    18.48
-   ],
-   "end": [
-    -25.7,
-    18.48
+   "points": [
+    [
+     -23.57,
+     18.48
+    ],
+    [
+     -25.7,
+     18.48
+    ]
    ],
    "position": [
     0,
@@ -710,15 +746,17 @@
   "as": "k36"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -28.08,
-    16.1
-   ],
-   "end": [
-    -28.08,
-    -16.1
+   "points": [
+    [
+     -28.08,
+     16.1
+    ],
+    [
+     -28.08,
+     -16.1
+    ]
    ],
    "position": [
     0,
@@ -747,15 +785,17 @@
   "as": "k38"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -25.7,
-    -18.48
-   ],
-   "end": [
-    -23.57,
-    -18.48
+   "points": [
+    [
+     -25.7,
+     -18.48
+    ],
+    [
+     -23.57,
+     -18.48
+    ]
    ],
    "position": [
     0,
@@ -773,7 +813,7 @@
     -23.57
    ],
    "radius": 5.089999999999999,
-   "startAngle": 0.0,
+   "startAngle": 0,
    "endAngle": 1.5707963267948966,
    "position": [
     0,
@@ -784,15 +824,17 @@
   "as": "k40"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -18.48,
-    -23.57
-   ],
-   "end": [
-    -18.48,
-    -25.7
+   "points": [
+    [
+     -18.48,
+     -23.57
+    ],
+    [
+     -18.48,
+     -25.7
+    ]
    ],
    "position": [
     0,
@@ -821,15 +863,17 @@
   "as": "k42"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -16.1,
-    -28.08
-   ],
-   "end": [
-    16.1,
-    -28.08
+   "points": [
+    [
+     -16.1,
+     -28.08
+    ],
+    [
+     16.1,
+     -28.08
+    ]
    ],
    "position": [
     0,
@@ -858,15 +902,17 @@
   "as": "k44"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    18.48,
-    -25.7
-   ],
-   "end": [
-    18.48,
-    -23.57
+   "points": [
+    [
+     18.48,
+     -25.7
+    ],
+    [
+     18.48,
+     -23.57
+    ]
    ],
    "position": [
     0,
@@ -895,15 +941,17 @@
   "as": "k46"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    23.57,
-    -18.48
-   ],
-   "end": [
-    25.7,
-    -18.48
+   "points": [
+    [
+     23.57,
+     -18.48
+    ],
+    [
+     25.7,
+     -18.48
+    ]
    ],
    "position": [
     0,
@@ -932,7 +980,7 @@
   "as": "k48"
  },
  {
-  "command": "extrude_sketch",
+  "command": "extrude_profile",
   "params": {
    "ids": [
     "$k25",
@@ -970,15 +1018,17 @@
   "as": "mid"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    28.2,
-    -16.1
-   ],
-   "end": [
-    28.2,
-    16.1
+   "points": [
+    [
+     28.2,
+     -16.1
+    ],
+    [
+     28.2,
+     16.1
+    ]
    ],
    "position": [
     0,
@@ -996,7 +1046,7 @@
     16.1
    ],
    "radius": 2.5,
-   "startAngle": 0.0,
+   "startAngle": 0,
    "endAngle": 1.5707963267948966,
    "position": [
     0,
@@ -1007,15 +1057,17 @@
   "as": "k50"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    25.7,
-    18.6
-   ],
-   "end": [
-    23.57,
-    18.6
+   "points": [
+    [
+     25.7,
+     18.6
+    ],
+    [
+     23.57,
+     18.6
+    ]
    ],
    "position": [
     0,
@@ -1044,15 +1096,17 @@
   "as": "k52"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    18.6,
-    23.57
-   ],
-   "end": [
-    18.6,
-    25.7
+   "points": [
+    [
+     18.6,
+     23.57
+    ],
+    [
+     18.6,
+     25.7
+    ]
    ],
    "position": [
     0,
@@ -1070,7 +1124,7 @@
     25.7
    ],
    "radius": 2.5,
-   "startAngle": 0.0,
+   "startAngle": 0,
    "endAngle": 1.5707963267948966,
    "position": [
     0,
@@ -1081,15 +1135,17 @@
   "as": "k54"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    16.1,
-    28.2
-   ],
-   "end": [
-    -16.1,
-    28.2
+   "points": [
+    [
+     16.1,
+     28.2
+    ],
+    [
+     -16.1,
+     28.2
+    ]
    ],
    "position": [
     0,
@@ -1118,15 +1174,17 @@
   "as": "k56"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -18.6,
-    25.7
-   ],
-   "end": [
-    -18.6,
-    23.57
+   "points": [
+    [
+     -18.6,
+     25.7
+    ],
+    [
+     -18.6,
+     23.57
+    ]
    ],
    "position": [
     0,
@@ -1155,15 +1213,17 @@
   "as": "k58"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -23.57,
-    18.6
-   ],
-   "end": [
-    -25.7,
-    18.6
+   "points": [
+    [
+     -23.57,
+     18.6
+    ],
+    [
+     -25.7,
+     18.6
+    ]
    ],
    "position": [
     0,
@@ -1192,15 +1252,17 @@
   "as": "k60"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -28.2,
-    16.1
-   ],
-   "end": [
-    -28.2,
-    -16.1
+   "points": [
+    [
+     -28.2,
+     16.1
+    ],
+    [
+     -28.2,
+     -16.1
+    ]
    ],
    "position": [
     0,
@@ -1229,15 +1291,17 @@
   "as": "k62"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -25.7,
-    -18.6
-   ],
-   "end": [
-    -23.57,
-    -18.6
+   "points": [
+    [
+     -25.7,
+     -18.6
+    ],
+    [
+     -23.57,
+     -18.6
+    ]
    ],
    "position": [
     0,
@@ -1255,7 +1319,7 @@
     -23.57
    ],
    "radius": 4.969999999999999,
-   "startAngle": 0.0,
+   "startAngle": 0,
    "endAngle": 1.5707963267948966,
    "position": [
     0,
@@ -1266,15 +1330,17 @@
   "as": "k64"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -18.6,
-    -23.57
-   ],
-   "end": [
-    -18.6,
-    -25.7
+   "points": [
+    [
+     -18.6,
+     -23.57
+    ],
+    [
+     -18.6,
+     -25.7
+    ]
    ],
    "position": [
     0,
@@ -1303,15 +1369,17 @@
   "as": "k66"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -16.1,
-    -28.2
-   ],
-   "end": [
-    16.1,
-    -28.2
+   "points": [
+    [
+     -16.1,
+     -28.2
+    ],
+    [
+     16.1,
+     -28.2
+    ]
    ],
    "position": [
     0,
@@ -1340,15 +1408,17 @@
   "as": "k68"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    18.6,
-    -25.7
-   ],
-   "end": [
-    18.6,
-    -23.57
+   "points": [
+    [
+     18.6,
+     -25.7
+    ],
+    [
+     18.6,
+     -23.57
+    ]
    ],
    "position": [
     0,
@@ -1377,15 +1447,17 @@
   "as": "k70"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    23.57,
-    -18.6
-   ],
-   "end": [
-    25.7,
-    -18.6
+   "points": [
+    [
+     23.57,
+     -18.6
+    ],
+    [
+     25.7,
+     -18.6
+    ]
    ],
    "position": [
     0,
@@ -1414,7 +1486,7 @@
   "as": "k72"
  },
  {
-  "command": "extrude_sketch",
+  "command": "extrude_profile",
   "params": {
    "ids": [
     "$k49",
@@ -1452,31 +1524,33 @@
   "as": "cap1"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$cap0",
    "b": "$mid"
   },
   "as": "bb"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$bb",
    "b": "$cap1"
   },
   "as": "body"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -23.65,
-    -28.2
-   ],
-   "end": [
-    23.65,
-    -28.2
+   "points": [
+    [
+     -23.65,
+     -28.2
+    ],
+    [
+     23.65,
+     -28.2
+    ]
    ],
    "position": [
     0,
@@ -1505,15 +1579,17 @@
   "as": "k74"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    28.2,
-    -23.65
-   ],
-   "end": [
-    28.2,
-    23.65
+   "points": [
+    [
+     28.2,
+     -23.65
+    ],
+    [
+     28.2,
+     23.65
+    ]
    ],
    "position": [
     0,
@@ -1531,7 +1607,7 @@
     23.65
    ],
    "radius": 4.55,
-   "startAngle": 0.0,
+   "startAngle": 0,
    "endAngle": 1.5707963267948966,
    "position": [
     0,
@@ -1542,15 +1618,17 @@
   "as": "k76"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    23.65,
-    28.2
-   ],
-   "end": [
-    -23.65,
-    28.2
+   "points": [
+    [
+     23.65,
+     28.2
+    ],
+    [
+     -23.65,
+     28.2
+    ]
    ],
    "position": [
     0,
@@ -1579,15 +1657,17 @@
   "as": "k78"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -28.2,
-    23.65
-   ],
-   "end": [
-    -28.2,
-    -23.65
+   "points": [
+    [
+     -28.2,
+     23.65
+    ],
+    [
+     -28.2,
+     -23.65
+    ]
    ],
    "position": [
     0,
@@ -1616,7 +1696,7 @@
   "as": "k80"
  },
  {
-  "command": "extrude_sketch",
+  "command": "extrude_profile",
   "params": {
    "ids": [
     "$k73",
@@ -1638,8 +1718,8 @@
   "as": "fl"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$body",
    "b": "$fl"
   },
@@ -1660,8 +1740,8 @@
   "as": "hl0"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$b",
    "b": "$hl0"
   },
@@ -1682,8 +1762,8 @@
   "as": "hl1"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t0",
    "b": "$hl1"
   },
@@ -1704,8 +1784,8 @@
   "as": "hl2"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t1",
    "b": "$hl2"
   },
@@ -1726,8 +1806,8 @@
   "as": "hl3"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t2",
    "b": "$hl3"
   },
@@ -1741,15 +1821,15 @@
    "position": [
     0,
     0,
-    56.0
+    56
    ],
    "anchor": "base-center"
   },
   "as": "pilot"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$t3",
    "b": "$pilot"
   },
@@ -1763,15 +1843,15 @@
    "position": [
     0,
     0,
-    56.0
+    56
    ],
    "anchor": "base-center"
   },
   "as": "shaft"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$p1",
    "b": "$shaft"
   },
@@ -1794,8 +1874,8 @@
   "as": "flat"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$p2",
    "b": "$flat"
   },

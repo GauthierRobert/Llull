@@ -6,15 +6,17 @@
   }
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -25,
-    25
-   ],
-   "end": [
-    -25,
-    5.0
+   "points": [
+    [
+     -25,
+     25
+    ],
+    [
+     -25,
+     5
+    ]
    ],
    "position": [
     0,
@@ -28,10 +30,10 @@
   "command": "draw_arc",
   "params": {
    "center": [
-    -20.0,
-    5.0
+    -20,
+    5
    ],
-   "radius": 5.0,
+   "radius": 5,
    "startAngle": 3.141592653589793,
    "endAngle": 4.71238898038469,
    "position": [
@@ -43,15 +45,17 @@
   "as": "t2"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -20.0,
-    0
-   ],
-   "end": [
-    20.0,
-    0
+   "points": [
+    [
+     -20,
+     0
+    ],
+    [
+     20,
+     0
+    ]
    ],
    "position": [
     0,
@@ -65,10 +69,10 @@
   "command": "draw_arc",
   "params": {
    "center": [
-    20.0,
-    5.0
+    20,
+    5
    ],
-   "radius": 5.0,
+   "radius": 5,
    "startAngle": 4.71238898038469,
    "endAngle": 6.283185307179586,
    "position": [
@@ -80,15 +84,17 @@
   "as": "t4"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    25,
-    5.0
-   ],
-   "end": [
-    25,
-    25
+   "points": [
+    [
+     25,
+     5
+    ],
+    [
+     25,
+     25
+    ]
    ],
    "position": [
     0,
@@ -99,15 +105,17 @@
   "as": "t5"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    25,
-    25
-   ],
-   "end": [
-    22.0,
-    25
+   "points": [
+    [
+     25,
+     25
+    ],
+    [
+     22,
+     25
+    ]
    ],
    "position": [
     0,
@@ -118,15 +126,17 @@
   "as": "t6"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    22.0,
-    25
-   ],
-   "end": [
-    22.0,
-    5.0
+   "points": [
+    [
+     22,
+     25
+    ],
+    [
+     22,
+     5
+    ]
    ],
    "position": [
     0,
@@ -140,10 +150,10 @@
   "command": "draw_arc",
   "params": {
    "center": [
-    20.0,
-    5.0
+    20,
+    5
    ],
-   "radius": 2.0,
+   "radius": 2,
    "startAngle": 4.71238898038469,
    "endAngle": 6.283185307179586,
    "position": [
@@ -155,15 +165,17 @@
   "as": "t8"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    20.0,
-    3.0
-   ],
-   "end": [
-    -20.0,
-    3.0
+   "points": [
+    [
+     20,
+     3
+    ],
+    [
+     -20,
+     3
+    ]
    ],
    "position": [
     0,
@@ -177,10 +189,10 @@
   "command": "draw_arc",
   "params": {
    "center": [
-    -20.0,
-    5.0
+    -20,
+    5
    ],
-   "radius": 2.0,
+   "radius": 2,
    "startAngle": 3.141592653589793,
    "endAngle": 4.71238898038469,
    "position": [
@@ -192,15 +204,17 @@
   "as": "t10"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -22.0,
-    5.0
-   ],
-   "end": [
-    -22.0,
-    25
+   "points": [
+    [
+     -22,
+     5
+    ],
+    [
+     -22,
+     25
+    ]
    ],
    "position": [
     0,
@@ -211,15 +225,17 @@
   "as": "t11"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -22.0,
-    25
-   ],
-   "end": [
-    -25,
-    25
+   "points": [
+    [
+     -22,
+     25
+    ],
+    [
+     -25,
+     25
+    ]
    ],
    "position": [
     0,
@@ -230,7 +246,7 @@
   "as": "t12"
  },
  {
-  "command": "extrude_sketch",
+  "command": "extrude_profile",
   "params": {
    "ids": [
     "$t1",
@@ -259,8 +275,8 @@
   "command": "add_box",
   "params": {
    "size": [
-    15.0,
-    5.0,
+    15,
+    5,
     20
    ],
    "position": [
@@ -272,8 +288,8 @@
   "as": "t14"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t13",
    "b": "$t14"
   },
@@ -293,8 +309,8 @@
   "as": "t16"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t15",
    "b": "$t16"
   },
@@ -314,8 +330,8 @@
   "as": "t18"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t17",
    "b": "$t18"
   },
@@ -329,7 +345,7 @@
    "position": [
     0,
     0,
-    15.0
+    15
    ],
    "axis": [
     1,
@@ -340,8 +356,8 @@
   "as": "t20"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t19",
    "b": "$t20"
   },
@@ -351,7 +367,7 @@
   "command": "fillet_edge",
   "params": {
    "id": "$t21",
-   "radius": 2.0,
+   "radius": 2,
    "edgesNear": [
     [
      23.5,

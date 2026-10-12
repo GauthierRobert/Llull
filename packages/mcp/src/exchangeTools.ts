@@ -18,13 +18,13 @@
  */
 
 import type { CadDocument } from '@core/model/types';
+import type { PythonBackend } from '@core/codegen/pythonRuntime';
 import { execute } from '@core/commands/registry';
 import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
+import { nonEmptyString } from '@lib/nonEmptyString';
 import type { McpToolDefinition } from './tools';
 import { shapeToolCallContent, type McpShapedResult } from './dispatch';
-
-export type PythonLanguage = 'cadquery' | 'build123d';
 
 export interface ProgramRun {
   /** LLULL_TRACE of a llull-runtime script, or an import_mesh trace for any other script. */
@@ -39,7 +39,7 @@ export interface ProgramRun {
 /** Port to the Python exchange process. Implementations throw Error with an agent-readable message. */
 export interface CadExchangePort {
   runProgram(request: {
-    language: PythonLanguage;
+    language: PythonBackend;
     source: string;
     step: boolean;
   }): Promise<ProgramRun>;
@@ -197,13 +197,8 @@ function failure(message: string): McpShapedResult {
   return shapeToolCallContent({ summary: message, affected: [], isError: true });
 }
 
-function stringArg(args: Record<string, unknown>, key: string): string | undefined {
-  const value = args[key];
-  return typeof value === 'string' && value !== '' ? value : undefined;
-}
-
 /** A tool's `language` argument (default cadquery), or null when it names another library. */
-function pythonLanguage(raw: unknown): PythonLanguage | null {
+function pythonLanguage(raw: unknown): PythonBackend | null {
   const value = raw ?? 'cadquery';
   return value === 'cadquery' || value === 'build123d' ? value : null;
 }
@@ -287,7 +282,7 @@ async function exportStep(
   port: CadExchangePort,
   args: Record<string, unknown>,
 ): Promise<McpShapedResult> {
-  const name = stringArg(args, 'name');
+  const name = nonEmptyString(args['name']);
   const file = await exportStepFile(deps.getDoc, port, {
     language: args.language,
     save: args.save !== false,
@@ -317,8 +312,8 @@ async function importStep(
 ): Promise<McpShapedResult> {
   const stepBase64 = await readInput(
     port,
-    stringArg(args, 'stepBase64'),
-    stringArg(args, 'path'),
+    nonEmptyString(args['stepBase64']),
+    nonEmptyString(args['path']),
     'base64',
   );
   const { bodies } = await port.importStep(stepBase64);
@@ -344,9 +339,9 @@ async function importDwg(
   const target = args.target ?? 'drawing';
   if (target !== 'drawing' && target !== 'survey')
     return failure('import_dwg: target must be "drawing" or "survey"; nothing was changed.');
-  let dwgBase64 = stringArg(args, 'dwgBase64');
+  let dwgBase64 = nonEmptyString(args['dwgBase64']);
   if (dwgBase64 === undefined) {
-    const file = stringArg(args, 'path');
+    const file = nonEmptyString(args['path']);
     if (file === undefined) return failure('import_dwg: provide dwgBase64 or path.');
     if (dwg.readExchangeFile === undefined) {
       return failure(
@@ -384,7 +379,12 @@ async function importCode(
     );
   }
   const mode = args.mode === 'append' ? 'append' : 'replace';
-  const source = await readInput(port, stringArg(args, 'code'), stringArg(args, 'path'), 'utf8');
+  const source = await readInput(
+    port,
+    nonEmptyString(args['code']),
+    nonEmptyString(args['path']),
+    'utf8',
+  );
   const run = await port.runProgram({ language, source, step: false });
   const result = deps.applyCommand('apply_code_trace', { trace: run.trace, mode });
   const kind = run.traced

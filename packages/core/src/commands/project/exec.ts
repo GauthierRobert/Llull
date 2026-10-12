@@ -68,7 +68,7 @@ export function execStep(
     recorded,
   );
   // A graceful no-op (no change + nothing affected) is a soft failure for a plan step; a read-only
-  // query that answered (measure_volume, inspect_topology, …) is a success that changes nothing.
+  // query that answered (mass_properties, inspect_topology, …) is a success that changes nothing.
   const answered = getCommand(command)?.annotations?.readOnly === true && result.data !== undefined;
   const ok = result.affected.length > 0 || result.document !== run.current || answered;
   report(ok, label ? `${label}: ${result.summary}` : result.summary, result.affected);

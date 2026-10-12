@@ -1,16 +1,17 @@
-import {
-  type CadDocument,
-  type SubdivisionEntity,
-  type Vec3,
-  DEFAULT_LAYER_ID,
-} from '../../model/types';
+import { type CadDocument, type SubdivisionEntity, type Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
-import { colorField, defineCommand, vec3, z } from '../schema';
+import { colorField, defineCommand, vec3, z, layerIdField, nameField } from '../schema';
 import { noop } from '../noop';
-import { nextId } from '../../lib/id';
-import { add3, distance3, scale3, sub3 } from '../../lib/vec3';
+import { centroid3, distance3, sub3 } from '../../lib/vec3';
 import { newEntity } from '../entity/newEntity';
-import { DEFAULT_SOLID_COLOR, commitSolid } from './shared';
+import {
+  DEFAULT_SOLID_COLOR,
+  commitSolid,
+  existingLayerOrDefault,
+  explicitIdField,
+  explicitIdOrNext,
+  explicitIdTaken,
+} from './shared';
 import { sketchPath } from './sketchCurves';
 import { catmullRomBeziers, sampleChain } from '../../geometry/curveSegments';
 import { boundaryPatchCage, coonsSides } from '../../geometry/boundaryPatch';
@@ -83,27 +84,16 @@ export const surfaceFromCurves = defineCommand({
       )
       .optional(),
     levels: levelsField.optional(),
-    layerId: z
-      .string()
-      .describe('Layer id to assign the entity to. Defaults to the document default layer.')
-      .optional(),
+    layerId: layerIdField(),
     color: colorField(DEFAULT_SOLID_COLOR),
-    name: z.string().describe('Optional display name.').optional(),
-    id: z
-      .string()
-      .describe('Optional explicit entity id. If omitted a unique id is generated.')
-      .optional(),
+    name: nameField(),
+    id: explicitIdField(),
   }),
   run: (doc, params): CommandResult => {
     const fail = (why: string): CommandResult => noop(doc, `surface_from_curves: ${why}; no-op.`);
     const { thickness, flip = false, cells = [8, 8], levels = 2, layerId, name } = params;
     const explicitId = params.id;
-    if (
-      explicitId !== undefined &&
-      explicitId.length > 0 &&
-      Object.hasOwn(doc.entities, explicitId)
-    )
-      return fail(`entity id "${explicitId}" already exists`);
+    if (explicitIdTaken(doc, explicitId)) return fail(`entity id "${explicitId}" already exists`);
     if (!(thickness > 0)) return fail(`thickness must be > 0 (got ${thickness})`);
     if (!cells.every((n) => Number.isInteger(n) && n >= 1 && n <= MAX_PATCH_CELLS))
       return fail(`cells must be integers 1..${MAX_PATCH_CELLS}`);
@@ -117,11 +107,8 @@ export const surfaceFromCurves = defineCommand({
     if (typeof cage === 'string') return fail(cage);
     const problem = sizeProblem(cage, levels) ?? cageProblem(cage);
     if (problem !== null) return fail(problem);
-    const origin = scale3(
-      cage.vertices.reduce<Vec3>((sum, p) => add3(sum, p), [0, 0, 0]),
-      1 / cage.vertices.length,
-    );
-    const id = explicitId !== undefined && explicitId.length > 0 ? explicitId : nextId('subd');
+    const origin = centroid3(cage.vertices);
+    const id = explicitIdOrNext(explicitId, 'subd');
     const entity = newEntity(
       'subdivision',
       id,
@@ -135,8 +122,7 @@ export const surfaceFromCurves = defineCommand({
       params.color ?? DEFAULT_SOLID_COLOR,
       {
         name,
-        layerId:
-          layerId !== undefined && Object.hasOwn(doc.layers, layerId) ? layerId : DEFAULT_LAYER_ID,
+        layerId: existingLayerOrDefault(doc, layerId),
       },
     ) as SubdivisionEntity;
     const result = commitSolid(

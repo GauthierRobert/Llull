@@ -17,7 +17,12 @@ function Harness(): React.ReactElement {
 
 /** Renders the harness with a wall's generated body and the loose entity `a` selected. */
 function renderWithSelectedWall(): void {
-  const walled = execute(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [1000, 0] });
+  const walled = execute(createEmptyDocument(), 'draw_walls', {
+    points: [
+      [0, 0],
+      [1000, 0],
+    ],
+  });
   useStore.setState({ document: { ...walled.document, selection: ['wall-1:body-0', 'a'] } });
   render(<Harness />);
 }

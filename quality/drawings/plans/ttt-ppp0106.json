@@ -6,15 +6,17 @@
   }
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -15,
-    15
-   ],
-   "end": [
-    15,
-    15
+   "points": [
+    [
+     -15,
+     15
+    ],
+    [
+     15,
+     15
+    ]
    ],
    "position": [
     0,
@@ -25,15 +27,17 @@
   "as": "t1"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    15,
-    15
-   ],
-   "end": [
-    15,
-    "=64-22*sqrt(2)"
+   "points": [
+    [
+     15,
+     15
+    ],
+    [
+     15,
+     "=64-22*sqrt(2)"
+    ]
    ],
    "position": [
     0,
@@ -62,15 +66,17 @@
   "as": "t3"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    "=27-6*sqrt(2)",
-    "=64-16*sqrt(2)"
-   ],
-   "end": [
-    "=22+5*sqrt(2)",
-    "=59-5*sqrt(2)"
+   "points": [
+    [
+     "=27-6*sqrt(2)",
+     "=64-16*sqrt(2)"
+    ],
+    [
+     "=22+5*sqrt(2)",
+     "=59-5*sqrt(2)"
+    ]
    ],
    "position": [
     0,
@@ -99,15 +105,17 @@
   "as": "t5"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    22,
-    69
-   ],
-   "end": [
-    -22,
-    69
+   "points": [
+    [
+     22,
+     69
+    ],
+    [
+     -22,
+     69
+    ]
    ],
    "position": [
     0,
@@ -136,15 +144,17 @@
   "as": "t7"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    "=-(22+5*sqrt(2))",
-    "=59-5*sqrt(2)"
-   ],
-   "end": [
-    "=-(27-6*sqrt(2))",
-    "=64-16*sqrt(2)"
+   "points": [
+    [
+     "=-(22+5*sqrt(2))",
+     "=59-5*sqrt(2)"
+    ],
+    [
+     "=-(27-6*sqrt(2))",
+     "=64-16*sqrt(2)"
+    ]
    ],
    "position": [
     0,
@@ -173,15 +183,17 @@
   "as": "t9"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -15,
-    "=64-22*sqrt(2)"
-   ],
-   "end": [
-    -15,
-    15
+   "points": [
+    [
+     -15,
+     "=64-22*sqrt(2)"
+    ],
+    [
+     -15,
+     15
+    ]
    ],
    "position": [
     0,
@@ -192,7 +204,7 @@
   "as": "t10"
  },
  {
-  "command": "extrude_sketch",
+  "command": "extrude_profile",
   "params": {
    "ids": [
     "$t1",
@@ -234,23 +246,25 @@
   "as": "t12"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$t11",
    "b": "$t12"
   },
   "as": "t13"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    14.9,
-    8
-   ],
-   "end": [
-    14.9,
-    14.1
+   "points": [
+    [
+     14.9,
+     8
+    ],
+    [
+     14.9,
+     14.1
+    ]
    ],
    "position": [
     0,
@@ -261,15 +275,17 @@
   "as": "t14"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    14.9,
-    14.1
-   ],
-   "end": [
-    21,
-    14.1
+   "points": [
+    [
+     14.9,
+     14.1
+    ],
+    [
+     21,
+     14.1
+    ]
    ],
    "position": [
     0,
@@ -280,15 +296,17 @@
   "as": "t15"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    21,
-    14.1
-   ],
-   "end": [
-    21,
-    14
+   "points": [
+    [
+     21,
+     14.1
+    ],
+    [
+     21,
+     14
+    ]
    ],
    "position": [
     0,
@@ -317,15 +335,17 @@
   "as": "t17"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    15,
-    8
-   ],
-   "end": [
-    14.9,
-    8
+   "points": [
+    [
+     15,
+     8
+    ],
+    [
+     14.9,
+     8
+    ]
    ],
    "position": [
     0,
@@ -356,7 +376,7 @@
   "as": "t19"
  },
  {
-  "command": "extrude_sketch",
+  "command": "extrude_profile",
   "params": {
    "ids": [
     "$t1",
@@ -380,9 +400,9 @@
   "as": "t20"
  },
  {
-  "command": "move_entity",
+  "command": "move_entities",
   "params": {
-   "id": "$t20",
+   "ids": ["$t20"],
    "delta": [
     0,
     -21.9,
@@ -392,16 +412,16 @@
   "as": "t21"
  },
  {
-  "command": "boolean_intersect",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "intersect", 
    "a": "$t19",
    "b": "$t21"
   },
   "as": "t22"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$t13",
    "b": "$t22"
   },
@@ -426,8 +446,8 @@
   "as": "t24"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t23",
    "b": "$t24"
   },
@@ -450,8 +470,8 @@
   "as": "t26"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t25",
    "b": "$t26"
   },
@@ -476,8 +496,8 @@
   "as": "t28"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t27",
    "b": "$t28"
   },
@@ -502,8 +522,8 @@
   "as": "t30"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t29",
    "b": "$t30"
   },
@@ -526,8 +546,8 @@
   "as": "t32"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t31",
    "b": "$t32"
   },

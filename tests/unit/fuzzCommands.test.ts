@@ -37,8 +37,13 @@ const GARBAGE: unknown[] = [
 function seeded(): CadDocument {
   let doc = createEmptyDocument();
   doc = execute(doc, 'add_box', { size: [10, 10, 10] }).document;
-  doc = execute(doc, 'draw_line', { start: [0, 0], end: [10, 0] }).document;
-  doc = execute(doc, 'draw_circle', { center: [0, 0], radius: 5 }).document;
+  doc = execute(doc, 'draw_polyline', {
+    points: [
+      [0, 0],
+      [10, 0],
+    ],
+  }).document;
+  doc = execute(doc, 'draw_arc', { center: [0, 0], radius: 5 }).document;
   return doc;
 }
 
@@ -99,7 +104,7 @@ describe('resource caps: huge counts are rejected, not allocated', () => {
     ['array_linear', (id) => ({ id, count: 5e6, offset: [1, 0, 0] })],
     ['array_polar', (id) => ({ id, count: 5e6, center: [0, 0] })],
     [
-      'array_along_path',
+      'pattern_along_path',
       (id) => ({
         sourceId: id,
         path: [
@@ -110,14 +115,10 @@ describe('resource caps: huge counts are rejected, not allocated', () => {
       }),
     ],
     [
-      'distribute_on_arc',
+      'pattern_along_path',
       (id) => ({
         sourceId: id,
-        center: [0, 0, 0],
-        normal: [0, 0, 1],
-        radius: 1,
-        startAngle: 0,
-        endAngle: 3,
+        arc: { center: [0, 0, 0], normal: [0, 0, 1], radius: 1, startAngle: 0, endAngle: 3 },
         count: 5e6,
       }),
     ],
@@ -139,7 +140,7 @@ describe('registry guard: prototype keys and short vectors', () => {
     const doc = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
     for (const id of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
       for (const [name, params] of [
-        ['delete_entity', { id }],
+        ['delete_entities', { ids: [id] }],
         ['set_entity_name', { id, name: 'x' }],
       ] as const) {
         const r = execute(doc, name, params);

@@ -47,7 +47,7 @@ function capture(options: {
 const PLAN = JSON.stringify([
   { command: 'add_box', params: { size: [20, 20, 20] }, as: 'body' },
   { command: 'add_cylinder', params: { radius: 4, height: 30 }, as: 'hole' },
-  { command: 'boolean_subtract', params: { a: '$body', b: '$hole' } },
+  { command: 'boolean', params: { op: 'subtract', a: '$body', b: '$hole' } },
 ]);
 
 let docPath = '';
@@ -68,8 +68,8 @@ describe('llull run — progress and timing', () => {
     expect(c.err).toEqual([
       '[1/3] add_box … 1.5s',
       '[2/3] add_cylinder … 1.5s',
-      '[3/3] boolean_subtract …',
-      '[3/3] boolean_subtract … 1.5s',
+      '[3/3] boolean …',
+      '[3/3] boolean … 1.5s',
     ]);
   });
 
@@ -101,7 +101,7 @@ describe('llull run — progress and timing', () => {
     const c = capture({ stdin: PLAN, tick: 12_000 });
     await runCli(['run', '-', ...docFlag()], c.io);
     expect(c.err).toHaveLength(3);
-    expect(c.err[2]).toBe('llull: warning: slow step [3/3] boolean_subtract took 12.0s');
+    expect(c.err[2]).toBe('llull: warning: slow step [3/3] boolean took 12.0s');
   });
 
   it('adds durationMs to every step in --json and shows slow steps in text mode', async () => {
@@ -112,7 +112,7 @@ describe('llull run — progress and timing', () => {
 
     const text = capture({ stdin: PLAN, tick: 2500 });
     await runCli(['run', '-', '--dry-run', ...docFlag()], text.io);
-    expect(text.out[0]).toMatch(/#2 ok {3}boolean_subtract \[2\.5s\]:/);
+    expect(text.out[0]).toMatch(/#2 ok {3}boolean \[2\.5s\]:/);
   });
 
   it('says --progress does nothing with --server', async () => {

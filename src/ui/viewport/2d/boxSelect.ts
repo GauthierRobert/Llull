@@ -10,6 +10,9 @@
 import type { CadDocument, Entity, EntityId, Vec2 } from '@core/model/types';
 import { dimensionLabelBox, textLocalBox, underlayFrame } from './modifyHelpers';
 import { solidOutline } from './solidOutline';
+import { wrapAngle } from '@lib/angle';
+import { closeLoop, rectangleCorners } from '../lineGeometry';
+import { arcPolyline } from '@lib/arc';
 
 export type BoxSelectMode = 'window' | 'crossing';
 
@@ -82,19 +85,6 @@ const insideOther = (inner: Box, outer: Box): boolean =>
   inner.minY >= outer.minY &&
   inner.maxY <= outer.maxY;
 
-function sampleArc(
-  center: Vec2,
-  radiusX: number,
-  radiusY: number,
-  startAngle: number,
-  sweep: number,
-): Vec2[] {
-  return Array.from({ length: CURVE_SAMPLES + 1 }, (_, i): Vec2 => {
-    const angle = startAngle + (sweep * i) / CURVE_SAMPLES;
-    return [center[0] + radiusX * Math.cos(angle), center[1] + radiusY * Math.sin(angle)];
-  });
-}
-
 /** Sampled world geometry of one 2D entity, or null for kinds with no selectable outline. */
 function sampleEntity(document: CadDocument, entity: Entity): SampledGeometry | null {
   const [ox, oy] = entity.position;
@@ -107,30 +97,20 @@ function sampleEntity(document: CadDocument, entity: Entity): SampledGeometry | 
     case 'line':
       return lines([entity.start, entity.end]);
     case 'polyline':
-      return lines(
-        entity.closed ? [...entity.points, ...entity.points.slice(0, 1)] : [...entity.points],
-      );
     case 'spline':
-      return lines(
-        entity.closed ? [...entity.points, ...entity.points.slice(0, 1)] : [...entity.points],
-      );
+      return lines(entity.closed ? closeLoop(entity.points) : [...entity.points]);
     case 'rectangle':
-      return lines([
-        [0, 0],
-        [entity.width, 0],
-        [entity.width, entity.height],
-        [0, entity.height],
-        [0, 0],
-      ]);
+      return lines(closeLoop(rectangleCorners(entity.width, entity.height)));
     case 'circle':
-      return lines(sampleArc(entity.center, entity.radius, entity.radius, 0, 2 * Math.PI));
+      return lines(arcPolyline(entity.center, entity.radius, 0, 2 * Math.PI, CURVE_SAMPLES));
     case 'ellipse':
-      return lines(sampleArc(entity.center, entity.radiusX, entity.radiusY, 0, 2 * Math.PI));
-    case 'arc': {
-      const sweep =
-        (((entity.endAngle - entity.startAngle) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
       return lines(
-        sampleArc(entity.center, entity.radius, entity.radius, entity.startAngle, sweep),
+        arcPolyline(entity.center, entity.radiusX, 0, 2 * Math.PI, CURVE_SAMPLES, entity.radiusY),
+      );
+    case 'arc': {
+      const sweep = wrapAngle(entity.endAngle - entity.startAngle);
+      return lines(
+        arcPolyline(entity.center, entity.radius, entity.startAngle, sweep, CURVE_SAMPLES),
       );
     }
     case 'point':
@@ -145,7 +125,7 @@ function sampleEntity(document: CadDocument, entity: Entity): SampledGeometry | 
     }
     case 'image': {
       const frame = underlayFrame(entity);
-      return frame === null ? null : { polylines: [[...frame, ...frame.slice(0, 1)]], boxes: [] };
+      return frame === null ? null : { polylines: [closeLoop(frame)], boxes: [] };
     }
     case 'dimension': {
       const label = dimensionLabelBox(document, entity);
@@ -167,9 +147,7 @@ function sampleEntity(document: CadDocument, entity: Entity): SampledGeometry | 
       // 3D solids: their top-view outline rings (derived 'bim' geometry is drawn elsewhere).
       if (entity.tags?.includes('bim') === true) return null;
       const rings = solidOutline(document, entity);
-      return rings === null
-        ? null
-        : { polylines: rings.map((ring) => [...ring, ...ring.slice(0, 1)]), boxes: [] };
+      return rings === null ? null : { polylines: rings.map((ring) => closeLoop(ring)), boxes: [] };
     }
   }
 }

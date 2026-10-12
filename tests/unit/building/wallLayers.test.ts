@@ -17,9 +17,11 @@ const BUILD_UP = [
 ];
 
 function wallDoc(): CadDocument {
-  return execute(createEmptyDocument(), 'add_wall', {
-    start: [0, 0],
-    end: [5000, 0],
+  return execute(createEmptyDocument(), 'draw_walls', {
+    points: [
+      [0, 0],
+      [5000, 0],
+    ],
     height: 3000,
   }).document;
 }

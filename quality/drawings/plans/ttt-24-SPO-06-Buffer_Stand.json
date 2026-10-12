@@ -6,15 +6,17 @@
   }
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -31.75,
-    0.0
-   ],
-   "end": [
-    31.75,
-    0.0
+   "points": [
+    [
+     -31.75,
+     0
+    ],
+    [
+     31.75,
+     0
+    ]
    ],
    "position": [
     -76.19999999999999,
@@ -25,15 +27,17 @@
   "as": "k1"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    31.75,
-    0.0
-   ],
-   "end": [
-    23.27397177151857,
-    80.6440216900509
+   "points": [
+    [
+     31.75,
+     0
+    ],
+    [
+     23.27397177151857,
+     80.6440216900509
+    ]
    ],
    "position": [
     -76.19999999999999,
@@ -47,7 +51,7 @@
   "command": "draw_arc",
   "params": {
    "center": [
-    0.0,
+    0,
     78.19782868541051
    ],
    "radius": 23.402171314589484,
@@ -62,15 +66,17 @@
   "as": "k3"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -23.27397177151857,
-    80.6440216900509
-   ],
-   "end": [
-    -31.75,
-    0.0
+   "points": [
+    [
+     -23.27397177151857,
+     80.6440216900509
+    ],
+    [
+     -31.75,
+     0
+    ]
    ],
    "position": [
     -76.19999999999999,
@@ -81,7 +87,7 @@
   "as": "k4"
  },
  {
-  "command": "extrude_sketch",
+  "command": "extrude_profile",
   "params": {
    "ids": [
     "$k1",
@@ -99,15 +105,17 @@
   "as": "body"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -53.974999999999994,
-    127.0
-   ],
-   "end": [
-    -53.974999999999994,
-    19.049999999999997
+   "points": [
+    [
+     -53.974999999999994,
+     127
+    ],
+    [
+     -53.974999999999994,
+     19.049999999999997
+    ]
    ],
    "position": [
     0,
@@ -136,15 +144,17 @@
   "as": "k6"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -41.275,
-    6.35
-   ],
-   "end": [
-    41.275,
-    6.35
+   "points": [
+    [
+     -41.275,
+     6.35
+    ],
+    [
+     41.275,
+     6.35
+    ]
    ],
    "position": [
     0,
@@ -173,15 +183,17 @@
   "as": "k8"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    53.974999999999994,
-    19.049999999999997
-   ],
-   "end": [
-    53.974999999999994,
-    127.0
+   "points": [
+    [
+     53.974999999999994,
+     19.049999999999997
+    ],
+    [
+     53.974999999999994,
+     127
+    ]
    ],
    "position": [
     0,
@@ -192,15 +204,17 @@
   "as": "k9"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    53.974999999999994,
-    127.0
-   ],
-   "end": [
-    -53.974999999999994,
-    127.0
+   "points": [
+    [
+     53.974999999999994,
+     127
+    ],
+    [
+     -53.974999999999994,
+     127
+    ]
    ],
    "position": [
     0,
@@ -211,7 +225,7 @@
   "as": "k10"
  },
  {
-  "command": "extrude_sketch",
+  "command": "extrude_profile",
   "params": {
    "ids": [
     "$k5",
@@ -231,8 +245,8 @@
   "as": "cav"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$body",
    "b": "$cav"
   },
@@ -275,31 +289,33 @@
   "as": "boss1"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$b1",
    "b": "$boss0"
   },
   "as": "b2"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$b2",
    "b": "$boss1"
   },
   "as": "b3"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -7.242434300360186,
-    0.0
-   ],
-   "end": [
-    7.242434300360186,
-    0.0
+   "points": [
+    [
+     -7.242434300360186,
+     0
+    ],
+    [
+     7.242434300360186,
+     0
+    ]
    ],
    "position": [
     -55.88,
@@ -310,15 +326,17 @@
   "as": "k11"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    7.242434300360186,
-    0.0
-   ],
-   "end": [
-    3.1672005937186594,
-    28.996794527876688
+   "points": [
+    [
+     7.242434300360186,
+     0
+    ],
+    [
+     3.1672005937186594,
+     28.996794527876688
+    ]
    ],
    "position": [
     -55.88,
@@ -332,7 +350,7 @@
   "command": "draw_arc",
   "params": {
    "center": [
-    0.0,
+    0,
     28.55167351276556
    ],
    "radius": 3.1983264872344397,
@@ -347,15 +365,17 @@
   "as": "k13"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    -3.1672005937186594,
-    28.996794527876688
-   ],
-   "end": [
-    -7.242434300360186,
-    0.0
+   "points": [
+    [
+     -3.1672005937186594,
+     28.996794527876688
+    ],
+    [
+     -7.242434300360186,
+     0
+    ]
    ],
    "position": [
     -55.88,
@@ -366,7 +386,7 @@
   "as": "k14"
  },
  {
-  "command": "extrude_sketch",
+  "command": "extrude_profile",
   "params": {
    "ids": [
     "$k11",
@@ -384,8 +404,8 @@
   "as": "rib"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$b3",
    "b": "$rib"
   },
@@ -410,8 +430,8 @@
   "as": "hole"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$b4",
    "b": "$hole"
   },
@@ -436,8 +456,8 @@
   "as": "cb0"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$b5",
    "b": "$cb0"
   },
@@ -462,8 +482,8 @@
   "as": "cb1"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$b6",
    "b": "$cb1"
   },
@@ -498,16 +518,16 @@
   "as": "lensB"
  },
  {
-  "command": "boolean_intersect",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "intersect", 
    "a": "$lensA",
    "b": "$lensB"
   },
   "as": "lens"
  },
  {
-  "command": "boolean_intersect",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "intersect", 
    "a": "$b7",
    "b": "$lens"
   },

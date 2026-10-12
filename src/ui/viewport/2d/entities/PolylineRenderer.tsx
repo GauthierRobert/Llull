@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import type { PolylineEntity } from '@core/model/types';
-import { flattenPoints } from '../../lineGeometry';
+import { closeLoop, flattenPoints } from '../../lineGeometry';
 import { ShapeLine } from './ShapeLine';
 
 export function PolylineRenderer({
@@ -14,11 +14,10 @@ export function PolylineRenderer({
 }): React.ReactElement | null {
   // `points` is a fresh array only when the polyline actually changes (commands are pure, L3),
   // so the reference is a correct + cheap memo key — no serialization.
-  const positions = useMemo(() => {
-    const [first] = points;
-    if (!first || points.length < 2) return null;
-    return flattenPoints(closed ? [...points, first] : points);
-  }, [points, closed]);
+  const positions = useMemo(
+    () => (points.length < 2 ? null : flattenPoints(closed ? closeLoop(points) : points)),
+    [points, closed],
+  );
 
   if (!positions) return null;
   return (

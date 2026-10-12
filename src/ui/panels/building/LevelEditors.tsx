@@ -9,6 +9,8 @@ import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import type { BuildingLevel } from '@core/model/building';
 import { COPYABLE } from '@aec/building/elements/elements';
+import { toggledInList } from '@ui/toggleMember';
+import { changedNumber, LabeledInput } from './LabeledInput';
 
 const CATEGORY_LABELS: Record<(typeof COPYABLE)[number], string> = {
   wall: 'Walls',
@@ -47,12 +49,11 @@ export function LevelEditForm({ level, units, onDone }: LevelEditFormProps): Rea
     event.preventDefault();
     const changes: Record<string, unknown> = {};
     if (name.trim() !== '' && name.trim() !== level.name) changes['name'] = name.trim();
-    if (elevation !== String(level.elevation) && Number.isFinite(Number(elevation))) {
-      changes['elevation'] = Number(elevation);
-    }
-    if (height !== String(level.height) && Number.isFinite(Number(height))) {
-      changes['height'] = Number(height);
-    }
+    Object.assign(
+      changes,
+      changedNumber('elevation', elevation, level.elevation),
+      changedNumber('height', height, level.height),
+    );
     if (Object.keys(changes).length > 0)
       dispatch('update_level', { levelId: level.id, ...changes });
     onDone();
@@ -64,22 +65,19 @@ export function LevelEditForm({ level, units, onDone }: LevelEditFormProps): Rea
       onSubmit={handleSubmit}
       aria-label={`Edit level ${level.name}`}
     >
-      <label className="field">
-        <span className="field__label">Level name</span>
-        <input type="text" value={name} onChange={(event) => setName(event.target.value)} />
-      </label>
-      <label className="field">
-        <span className="field__label">Elevation ({units})</span>
-        <input
-          type="number"
-          value={elevation}
-          onChange={(event) => setElevation(event.target.value)}
-        />
-      </label>
-      <label className="field">
-        <span className="field__label">Floor-to-floor height ({units})</span>
-        <input type="number" value={height} onChange={(event) => setHeight(event.target.value)} />
-      </label>
+      <LabeledInput label="Level name" type="text" value={name} onChange={setName} />
+      <LabeledInput
+        label={`Elevation (${units})`}
+        type="number"
+        value={elevation}
+        onChange={setElevation}
+      />
+      <LabeledInput
+        label={`Floor-to-floor height (${units})`}
+        type="number"
+        value={height}
+        onChange={setHeight}
+      />
       <button type="submit" className="btn btn--primary btn--sm">
         Save level
       </button>
@@ -91,10 +89,6 @@ interface CopyLevelFormProps {
   source: BuildingLevel;
   targets: ReadonlyArray<BuildingLevel>;
   onDone: () => void;
-}
-
-function toggled(list: ReadonlyArray<string>, value: string): string[] {
-  return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
 }
 
 export function CopyLevelForm({ source, targets, onDone }: CopyLevelFormProps): React.ReactElement {
@@ -126,7 +120,7 @@ export function CopyLevelForm({ source, targets, onDone }: CopyLevelFormProps): 
             <input
               type="checkbox"
               checked={targetIds.includes(level.id)}
-              onChange={() => setTargetIds((previous) => toggled(previous, level.id))}
+              onChange={() => setTargetIds((previous) => toggledInList(previous, level.id))}
             />
             <span>{level.name}</span>
           </label>
@@ -139,7 +133,7 @@ export function CopyLevelForm({ source, targets, onDone }: CopyLevelFormProps): 
             <input
               type="checkbox"
               checked={categories.includes(category)}
-              onChange={() => setCategories((previous) => toggled(previous, category))}
+              onChange={() => setCategories((previous) => toggledInList(previous, category))}
             />
             <span>{label}</span>
           </label>

@@ -6,15 +6,17 @@
   }
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    36.5,
-    0
-   ],
-   "end": [
-    65,
-    0
+   "points": [
+    [
+     36.5,
+     0
+    ],
+    [
+     65,
+     0
+    ]
    ],
    "position": [
     0,
@@ -25,15 +27,17 @@
   "as": "t1"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    65,
-    0
-   ],
-   "end": [
-    65,
-    5
+   "points": [
+    [
+     65,
+     0
+    ],
+    [
+     65,
+     5
+    ]
    ],
    "position": [
     0,
@@ -62,15 +66,17 @@
   "as": "t3"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    62,
-    8
-   ],
-   "end": [
-    45,
-    8
+   "points": [
+    [
+     62,
+     8
+    ],
+    [
+     45,
+     8
+    ]
    ],
    "position": [
     0,
@@ -99,15 +105,17 @@
   "as": "t5"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    42,
-    11
-   ],
-   "end": [
-    42,
-    22
+   "points": [
+    [
+     42,
+     11
+    ],
+    [
+     42,
+     22
+    ]
    ],
    "position": [
     0,
@@ -136,15 +144,17 @@
   "as": "t7"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    39,
-    25
-   ],
-   "end": [
-    20.5,
-    25
+   "points": [
+    [
+     39,
+     25
+    ],
+    [
+     20.5,
+     25
+    ]
    ],
    "position": [
     0,
@@ -173,15 +183,17 @@
   "as": "t9"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    17.5,
-    28
-   ],
-   "end": [
-    17.5,
-    52
+   "points": [
+    [
+     17.5,
+     28
+    ],
+    [
+     17.5,
+     52
+    ]
    ],
    "position": [
     0,
@@ -192,15 +204,17 @@
   "as": "t10"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    17.5,
-    52
-   ],
-   "end": [
-    10,
-    52
+   "points": [
+    [
+     17.5,
+     52
+    ],
+    [
+     10,
+     52
+    ]
    ],
    "position": [
     0,
@@ -211,15 +225,17 @@
   "as": "t11"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    10,
-    52
-   ],
-   "end": [
-    10,
-    18
+   "points": [
+    [
+     10,
+     52
+    ],
+    [
+     10,
+     18
+    ]
    ],
    "position": [
     0,
@@ -230,15 +246,17 @@
   "as": "t12"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    10,
-    18
-   ],
-   "end": [
-    33.5,
-    18
+   "points": [
+    [
+     10,
+     18
+    ],
+    [
+     33.5,
+     18
+    ]
    ],
    "position": [
     0,
@@ -267,15 +285,17 @@
   "as": "t14"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    36.5,
-    15
-   ],
-   "end": [
-    36.5,
-    0
+   "points": [
+    [
+     36.5,
+     15
+    ],
+    [
+     36.5,
+     0
+    ]
    ],
    "position": [
     0,
@@ -333,14 +353,14 @@
    ],
    "depth": 20,
    "position": [
-    0.0,
-    10.0,
-    0.0
+    0,
+    10,
+    0
    ],
    "rotation": [
     1.5707963267948963,
-    0.0,
-    0.0
+    0,
+    0
    ]
   },
   "as": "t17"
@@ -369,7 +389,7 @@
    "depth": 60,
    "position": [
     4.536796564403577,
-    0.0,
+    0,
     54.46320343559643
    ],
    "rotation": [
@@ -381,16 +401,16 @@
   "as": "t18"
  },
  {
-  "command": "boolean_intersect",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "intersect", 
    "a": "$t17",
    "b": "$t18"
   },
   "as": "t19"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$t16",
    "b": "$t19"
   },
@@ -421,7 +441,7 @@
    "position": [
     -8.660254037844387,
     -4.999999999999998,
-    0.0
+    0
    ],
    "rotation": [
     -1.5707963267948961,
@@ -467,16 +487,16 @@
   "as": "t22"
  },
  {
-  "command": "boolean_intersect",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "intersect", 
    "a": "$t21",
    "b": "$t22"
   },
   "as": "t23"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$t20",
    "b": "$t23"
   },
@@ -507,7 +527,7 @@
    "position": [
     8.660254037844384,
     -5.000000000000004,
-    0.0
+    0
    ],
    "rotation": [
     -1.5707963267948961,
@@ -553,16 +573,16 @@
   "as": "t26"
  },
  {
-  "command": "boolean_intersect",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "intersect", 
    "a": "$t25",
    "b": "$t26"
   },
   "as": "t27"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$t24",
    "b": "$t27"
   },
@@ -575,15 +595,15 @@
    "height": 30,
    "position": [
     53.975,
-    0.0,
+    0,
     4
    ]
   },
   "as": "t29"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t28",
    "b": "$t29"
   },
@@ -596,15 +616,15 @@
    "height": 10,
    "position": [
     53.975,
-    0.0,
+    0,
     9
    ]
   },
   "as": "t31"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t30",
    "b": "$t31"
   },
@@ -624,8 +644,8 @@
   "as": "t33"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t32",
    "b": "$t33"
   },
@@ -645,8 +665,8 @@
   "as": "t35"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t34",
    "b": "$t35"
   },
@@ -666,8 +686,8 @@
   "as": "t37"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t36",
    "b": "$t37"
   },
@@ -687,8 +707,8 @@
   "as": "t39"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t38",
    "b": "$t39"
   },
@@ -708,8 +728,8 @@
   "as": "t41"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t40",
    "b": "$t41"
   },
@@ -729,8 +749,8 @@
   "as": "t43"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t42",
    "b": "$t43"
   },
@@ -750,8 +770,8 @@
   "as": "t45"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t44",
    "b": "$t45"
   },
@@ -771,8 +791,8 @@
   "as": "t47"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t46",
    "b": "$t47"
   },
@@ -792,8 +812,8 @@
   "as": "t49"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t48",
    "b": "$t49"
   },
@@ -813,8 +833,8 @@
   "as": "t51"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$t50",
    "b": "$t51"
   },

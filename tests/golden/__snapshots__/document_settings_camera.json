@@ -100,9 +100,10 @@
       },
       {
         "id": "#6",
-        "name": "animate_spin",
+        "name": "animate",
         "params": {
           "targetId": "#1",
+          "mode": "spin",
           "speed": 1
         },
         "suppressed": false,

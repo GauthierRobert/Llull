@@ -10,7 +10,8 @@
 
 import type { StrutForce } from './steelBeamChecks';
 import { memberBuckling, sectionResistance } from './steelDesign';
-import { GAMMA_IMPOSED, GAMMA_PERMANENT, type BeamResult } from './steelFraming';
+import { GAMMA_G, GAMMA_Q } from '../../shared/loadFactors';
+import { type BeamResult } from './steelFraming';
 import type { ColumnSegment } from './steelColumnChecks';
 import type { FrameCoverage } from './steelFrameDetect';
 import {
@@ -195,13 +196,11 @@ export function checkBracing(
   for (const { loads } of beams) {
     const index = levelOf(loads.top);
     levelLoad[index] =
-      (levelLoad[index] ?? 0) +
-      GAMMA_PERMANENT * loads.directPermanent +
-      GAMMA_IMPOSED * loads.directImposed;
+      (levelLoad[index] ?? 0) + GAMMA_G * loads.directPermanent + GAMMA_Q * loads.directImposed;
   }
   for (const segment of columnSegments) {
     const index = levelOf(segment.to);
-    levelLoad[index] = (levelLoad[index] ?? 0) + GAMMA_PERMANENT * segment.weight;
+    levelLoad[index] = (levelLoad[index] ?? 0) + GAMMA_G * segment.weight;
   }
   const shearOf = (storey: number): number =>
     notionalFactor * levelLoad.slice(storey).reduce((sum, load) => sum + load, 0);

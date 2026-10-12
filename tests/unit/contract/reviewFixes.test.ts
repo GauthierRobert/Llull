@@ -20,8 +20,13 @@ describe('S2: replay cache never shares a minted building uid between documents'
   it('two fresh documents inserting the same wall get different uids', () => {
     const insert = (): CadDocument =>
       execute(createEmptyDocument(), 'insert_step', {
-        name: 'add_wall',
-        params: { start: [0, 0], end: [5000, 0] },
+        name: 'draw_walls',
+        params: {
+          points: [
+            [0, 0],
+            [5000, 0],
+          ],
+        },
       }).document;
     const a = insert();
     const b = insert();
@@ -57,7 +62,8 @@ describe('S4/S7: history operations refuse without a kernel instead of reporting
     doc = a.document;
     const b = execute(doc, 'add_box', { size: [2, 2, 2], position: [1, 0, 0] }, ctx);
     doc = b.document;
-    return execute(doc, 'boolean_union', { a: a.affected[0], b: b.affected[0] }, ctx).document;
+    return execute(doc, 'boolean', { op: 'union', a: a.affected[0], b: b.affected[0] }, ctx)
+      .document;
   }
 
   it('edit_step_params / set_step_suppressed / insert_step no-op with an explicit summary', () => {

@@ -8,8 +8,15 @@
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
-import { chosenId, CivilObjectSelect, useCivilObjects, NumberField, TextField } from './CivilParts';
-import { optionalNumber, parseNumber, parsePoints } from './civilInput';
+import {
+  CivilObjectSelect,
+  useCivilObjects,
+  NumberField,
+  TextField,
+  useChosenId,
+} from './CivilParts';
+import { optionalNumber, parseNumber, optionalText } from '@ui/numberText';
+import { parsePoints } from './civilInput';
 import { FormError } from '@ui/panels/PanelParts';
 
 const MANHOLE_FIELDS = [
@@ -37,11 +44,10 @@ export function ManholeForm(): React.ReactElement {
   const surfaces = useCivilObjects('surface');
   const [position, setPosition] = useState('');
   const [invert, setInvert] = useState('');
-  const [surface, setSurface] = useState('');
+  const [surfaceId, setSurface] = useChosenId(surfaces, true);
   const [fields, setFields] = useState(EMPTY_MANHOLE);
   const [name, setName] = useState('');
   const [error, setError] = useState('');
-  const surfaceId = chosenId(surfaces, surface, true);
 
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
@@ -59,7 +65,7 @@ export function ManholeForm(): React.ReactElement {
         (params, [key]) => ({ ...params, ...optionalNumber(key, fields[key]) }),
         {},
       ),
-      ...(name.trim() !== '' ? { name: name.trim() } : {}),
+      ...optionalText('name', name),
     });
     setError('');
     setPosition('');
@@ -108,13 +114,11 @@ export function ManholeForm(): React.ReactElement {
 export function PipeForm(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const manholes = useCivilObjects('manhole');
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  const [fromId, setFrom] = useChosenId(manholes);
+  const [toId, setTo] = useChosenId(manholes, false, 1);
   const [diameter, setDiameter] = useState('');
   const [material, setMaterial] = useState('');
   const [manningN, setManningN] = useState('');
-  const fromId = chosenId(manholes, from);
-  const toId = chosenId(manholes, to !== '' ? to : (manholes[1]?.id ?? ''));
 
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
@@ -123,7 +127,7 @@ export function PipeForm(): React.ReactElement {
       fromId,
       toId,
       ...optionalNumber('diameter', diameter),
-      ...(material.trim() !== '' ? { material: material.trim() } : {}),
+      ...optionalText('material', material),
       ...optionalNumber('manningN', manningN),
     });
   };

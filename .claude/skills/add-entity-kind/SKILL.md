@@ -29,7 +29,7 @@ Delegate in parallel when large: Lane 1 (`command-author`) model→codegen, Lane
 ## 3. Geometry & measure (mandatory for 3D)
 - `geometry/solidTriangles.ts` `unrotatedTriangles` (default `[]` — feeds STL/OBJ, Manifold, mesh
   fallback); shared generators in `geometry/tessellation.ts`.
-- `inspect/measureSolid.ts` `measure_volume` case + the kind lists in its description strings.
+- `inspect/solidVolume.ts` `solidVolume` case (`mass_properties`) + the kind lists in its description strings.
 - 2D: `inspect/measureAreaPerimeter.ts` if area/perimeter applies.
 - Optional: `geometry/rotatedBounds.ts`, `geometry/instanceExpansion.ts`, `render/labels.ts`.
 

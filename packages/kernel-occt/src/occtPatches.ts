@@ -11,9 +11,9 @@
 
 import type { SubdivisionEntity } from '@core/model/types';
 import { type BezierPatch, subdivisionPatches } from '@core/geometry/subdivisionPatches';
+import { release } from '@core/geometry/nativeObject';
 import {
   explorer,
-  release,
   type OccApi,
   type OccHandle,
   type OccMakeFace,

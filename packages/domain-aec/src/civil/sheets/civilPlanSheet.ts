@@ -18,7 +18,7 @@ import {
   sheetDrawingArea,
   type PaperSize,
   type Viewport,
-} from '../../building/drawings/sheet';
+} from '../../shared/sheetFrame';
 import { toMetres, toMm } from '../../building/model';
 import { niceStep } from '../road/roadSvg';
 import { clipPolyline, insideRect } from './planClip';

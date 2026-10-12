@@ -138,7 +138,7 @@ describe('add_steel_member / update_steel_member', () => {
       start: [0, 0, 0],
       end: [1000, 0, 0],
     });
-    const result = execute(doc, 'delete_entity', { id: 'member-1:body' });
+    const result = execute(doc, 'delete_entities', { ids: ['member-1:body'] });
     expect(result.affected).toEqual([]);
     expect(result.document.entities['member-1:body']).toBeDefined();
   });

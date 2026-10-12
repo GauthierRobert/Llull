@@ -226,7 +226,7 @@ export const exportIfc = defineCommand({
     if (building.levelOrder.length === 0) {
       return noop(
         doc,
-        'export_ifc: the building model has no levels (add_level / add_wall first).',
+        'export_ifc: the building model has no levels (add_level / draw_walls first).',
       );
     }
     const isoDate = /^\d{4}-\d{2}-\d{2}$/.test(building.project.date);

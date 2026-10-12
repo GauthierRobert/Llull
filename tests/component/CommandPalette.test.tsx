@@ -90,17 +90,17 @@ describe('CommandPalette', () => {
   it('opens the generated form for a command with params, pre-filled from the selection', () => {
     usePaletteStore.setState({ open: true });
     render(<Harness />);
-    search('move entity');
-    fireEvent.click(screen.getByRole('option', { name: /Move entity…/ }));
-    const form = screen.getByRole('form', { name: 'Move entity parameters' });
+    search('move entities');
+    fireEvent.click(screen.getByRole('option', { name: /Move entities…/ }));
+    const form = screen.getByRole('form', { name: 'Move entities parameters' });
     expect(form).toBeDefined();
-    expect((screen.getByLabelText(/^Id/) as HTMLInputElement).value).toBe('box-1.1');
+    expect((screen.getByLabelText(/^Ids/) as HTMLInputElement).value).toBe('box-1.1');
 
     fireEvent.change(screen.getByLabelText(/^Delta/), { target: { value: '10, 0, 0' } });
     fireEvent.submit(form);
     expect(dispatch).toHaveBeenCalledWith(
-      'move_entity',
-      { id: 'box-1.1', delta: [10, 0, 0] },
+      'move_entities',
+      { ids: ['box-1.1'], delta: [10, 0, 0] },
       expect.objectContaining({ selectAffected: true }),
     );
     expect(usePaletteStore.getState().open).toBe(false);

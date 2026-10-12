@@ -5,13 +5,14 @@
  */
 
 import { type Vec3, DOCUMENT_UNITS } from '@core/model/types';
-import type { PointGroupObject, SurveyPoint } from '@core/model/civil';
+import type { SurveyPoint } from '@core/model/civil';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
 import { flattenDxf, parseDxf, type DxfPrimitive } from '@lib/dxfRead';
 import { insUnitsMillimetres } from '@lib/dxfUnits';
-import { civilObjectsOf, fromUnit, getCivil, nextCivilId, withObject } from '../model';
+import { fromUnit, withObject } from '../model';
+import { newPointGroup } from './pointGroup';
 import { commitCivil } from '../evaluate';
 
 const SOURCES = ['points', 'vertices', 'faces', 'text'] as const;
@@ -121,15 +122,7 @@ export const importSurveyDxf = defineCommand({
         `import_survey_dxf failed: ${points.length} points exceed the ${MAX_POINTS}-point limit; filter by layers.`,
       );
     }
-    const civil = getCivil(doc);
-    const id = nextCivilId(civil, 'pointGroup');
-    const group: PointGroupObject = {
-      id,
-      category: 'pointGroup',
-      name: params.name?.trim() || `DXF survey ${civilObjectsOf(civil, 'pointGroup').length + 1}`,
-      entityIds: [],
-      points,
-    };
+    const { civil, id, group } = newPointGroup(doc, params.name, 'DXF survey', points);
     return commitCivil(
       doc,
       withObject(civil, group),

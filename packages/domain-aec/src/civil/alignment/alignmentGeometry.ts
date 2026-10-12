@@ -7,6 +7,7 @@
 
 import type { Vec2 } from '@core/model/types';
 import type { AlignmentObject } from '@core/model/civil';
+import { normalize2, sub2 } from '@lib/vec2';
 import {
   nearestAlongSpiral,
   spiralCurve,
@@ -77,8 +78,7 @@ interface Curve {
 }
 
 function unit(from: Vec2, to: Vec2): Vec2 {
-  const length = Math.hypot(to[0] - from[0], to[1] - from[1]);
-  return [(to[0] - from[0]) / length, (to[1] - from[1]) / length];
+  return normalize2(sub2(to, from));
 }
 
 function curveAt(
@@ -323,6 +323,11 @@ function arcSign(arc: ArcElement): number {
   return arc.rotation === 'ccw' ? 1 : -1;
 }
 
+/** Polar angle of the arc start about its centre. */
+function arcStartAngle(arc: ArcElement): number {
+  return Math.atan2(arc.start[1] - arc.center[1], arc.start[0] - arc.center[0]);
+}
+
 /** Point and travel direction on one element at `station` (clamped to the element). */
 export function elementPointAt(
   element: HorizontalElement,
@@ -339,10 +344,7 @@ export function elementPointAt(
     };
   }
   if (element.kind === 'spiral') return spiralPointAt(element, along);
-  const start = Math.atan2(
-    element.start[1] - element.center[1],
-    element.start[0] - element.center[0],
-  );
+  const start = arcStartAngle(element);
   const angle = start + (arcSign(element) * along) / element.radius;
   return {
     point: [
@@ -382,10 +384,7 @@ function nearestStationOnElement(element: HorizontalElement, xy: Vec2): number {
   if (element.kind === 'spiral') return nearestAlongSpiral(element, xy);
   const sign = arcSign(element);
   const full = Math.PI * 2;
-  const start = Math.atan2(
-    element.start[1] - element.center[1],
-    element.start[0] - element.center[0],
-  );
+  const start = arcStartAngle(element);
   const angle = Math.atan2(xy[1] - element.center[1], xy[0] - element.center[0]);
   const relative = (((sign * (angle - start)) % full) + full) % full;
   const sweep = element.length / element.radius;

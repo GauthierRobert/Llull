@@ -43,13 +43,13 @@ describe('search_tools on natural phrasing', () => {
     searchTools(query, count, new Set(parseToolsets('all').enabled)).map((r) => r.name);
 
   it.each([
-    ['cut a hole', 'boolean_subtract'],
-    ['make a hole in a plate', 'boolean_subtract'],
+    ['cut a hole', 'boolean'],
+    ['make a hole in a plate', 'boolean'],
     ['round the edges', 'fillet_edge'],
     ['bevel the edges', 'chamfer_edge'],
     ['how heavy is it', 'mass_properties'],
     ['take a picture', 'render_view'],
-    ['copy an entity many times in a row', 'duplicate_entity'],
+    ['copy an entity many times in a row', 'duplicate_entities'],
     ['export to STEP', 'export_step'],
     ['measure distance between two points', 'measure_distance'],
   ])('"%s" finds %s in the top results', (query, expected) => {
@@ -71,7 +71,7 @@ describe('search_tools', () => {
   it('ranks name matches first and reports toolset + enabled', () => {
     const results = searchTools('wall', 5, coreOnly());
     expect(results[0]?.name).toMatch(/wall/);
-    const wall = results.find((r) => r.name === 'add_wall');
+    const wall = results.find((r) => r.name === 'draw_walls');
     expect(wall).toMatchObject({ toolset: 'building', enabled: false });
     expect(wall?.description.length).toBeGreaterThan(0);
   });
@@ -107,7 +107,7 @@ describe('search_tools', () => {
   it('summary lists names and points disabled tools at enable_toolset', () => {
     const outcome = applyDiscoveryToolCall('search_tools', { query: 'wall' }, coreOnly());
     const summary = outcome?.result.content[0]?.text ?? '';
-    expect(summary).toContain('add_wall');
+    expect(summary).toContain('draw_walls');
     expect(summary).toContain('enable_toolset');
     expect(outcome?.toolsListChanged).toBe(false);
   });
@@ -125,7 +125,7 @@ describe('search_tools', () => {
 describe('closestToolNames', () => {
   it('finds the intended tool for a typo, closest first', () => {
     expect(closestToolNames('add_boxx', 3)[0]).toBe('add_box');
-    expect(closestToolNames('Boolean_Subtrct', 3)).toContain('boolean_subtract');
+    expect(closestToolNames('Boolen', 3)).toContain('boolean');
     expect(closestToolNames('add_box', 3)[0]).toBe('add_box');
   });
 

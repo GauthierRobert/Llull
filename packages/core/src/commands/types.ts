@@ -38,7 +38,7 @@ export interface CommandResult {
 export interface CommandAnnotations {
   /** Never mutates the document: returns the SAME document, `affected: []`, results in `data`. */
   readonly readOnly?: boolean;
-  /** Removes or irreversibly destroys document content (e.g. delete_entity, delete_layer). */
+  /** Removes or irreversibly destroys document content (e.g. delete_entities, delete_layer). */
   readonly destructive?: boolean;
   /** Calling twice with the same params gives the same end state as once (setter semantics). */
   readonly idempotent?: boolean;
@@ -70,6 +70,19 @@ export interface CommandDefinition<P> {
   readonly run: (doc: CadDocument, params: P, ctx?: ExecutionContext) => CommandResult;
   readonly annotations?: CommandAnnotations;
 }
+
+/**
+ * Maps the params of a retired command onto the call that replaced it. Persistence applies it to
+ * saved feature-history / recipe steps so documents recorded before the merge still replay.
+ */
+export type RetiredCommandRewrite = (
+  params: Record<string, unknown>,
+  /** The saved top-level history step; absent for nested plan actions and recipe steps. */
+  step?: { readonly id: string },
+) => {
+  readonly name: string;
+  readonly params: Record<string, unknown>;
+};
 
 export interface ParamsSchema {
   type: 'object';

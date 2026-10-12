@@ -5,10 +5,11 @@
  */
 
 import { escapeXml } from '@lib/escapeXml';
+import { round } from '../../shared/numeric';
 
 type Point = readonly [number, number];
 
-export const num = (value: number): string => String(Number(value.toFixed(2)));
+export const num = (value: number): string => String(round(value));
 
 export interface TextStyle {
   readonly size?: number;

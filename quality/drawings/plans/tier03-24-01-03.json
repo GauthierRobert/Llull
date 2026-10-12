@@ -6,29 +6,33 @@
   }
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    0,
-    0
-   ],
-   "end": [
-    25,
-    0
+   "points": [
+    [
+     0,
+     0
+    ],
+    [
+     25,
+     0
+    ]
    ]
   },
   "as": "k1"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    25,
-    0
-   ],
-   "end": [
-    25,
-    47
+   "points": [
+    [
+     25,
+     0
+    ],
+    [
+     25,
+     47
+    ]
    ]
   },
   "as": "k2"
@@ -38,8 +42,8 @@
   "params": {
    "points": [
     [
-     25.0,
-     47.0
+     25,
+     47
     ],
     [
      24.989291749527315,
@@ -103,7 +107,7 @@
     ],
     [
      22.320508075688775,
-     51.0
+     51
     ],
     [
      21.984043630531577,
@@ -231,36 +235,40 @@
     ],
     [
      5.000000000000001,
-     55.0
+     55
     ]
    ]
   },
   "as": "k3"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    5,
-    55
-   ],
-   "end": [
-    0,
-    55
+   "points": [
+    [
+     5,
+     55
+    ],
+    [
+     0,
+     55
+    ]
    ]
   },
   "as": "k4"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    0,
-    55
-   ],
-   "end": [
-    0,
-    0
+   "points": [
+    [
+     0,
+     55
+    ],
+    [
+     0,
+     0
+    ]
    ]
   },
   "as": "k5"
@@ -285,29 +293,33 @@
   "as": "rv6"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    0,
-    -1
-   ],
-   "end": [
-    21.05240777928304,
-    -1
+   "points": [
+    [
+     0,
+     -1
+    ],
+    [
+     21.05240777928304,
+     -1
+    ]
    ]
   },
   "as": "k7"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    21.05240777928304,
-    -1
-   ],
-   "end": [
-    18.997533142271045,
-    38.209343824971775
+   "points": [
+    [
+     21.05240777928304,
+     -1
+    ],
+    [
+     18.997533142271045,
+     38.209343824971775
+    ]
    ]
   },
   "as": "k8"
@@ -326,29 +338,33 @@
   "as": "k9"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    15.00301500325275,
-    42
-   ],
-   "end": [
-    0,
-    42
+   "points": [
+    [
+     15.00301500325275,
+     42
+    ],
+    [
+     0,
+     42
+    ]
    ]
   },
   "as": "k10"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    0,
-    42
-   ],
-   "end": [
-    0,
-    -1
+   "points": [
+    [
+     0,
+     42
+    ],
+    [
+     0,
+     -1
+    ]
    ]
   },
   "as": "k11"
@@ -373,8 +389,8 @@
   "as": "rv12"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$rv6",
    "b": "$rv12"
   },
@@ -424,16 +440,16 @@
   "as": "b16"
  },
  {
-  "command": "boolean_intersect",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "intersect", 
    "a": "$rv15",
    "b": "$b16"
   },
   "as": "i17"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$s13",
    "b": "$i17"
   },

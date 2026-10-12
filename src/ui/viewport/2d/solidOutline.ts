@@ -14,6 +14,7 @@ import { boundsCorners, localBounds } from '@core/geometry/bounds';
 import { applyEulerXYZ } from '@core/lib/eulerRotation';
 import { sweepSegmentRings } from '@core/geometry/sweep';
 import { loftRings } from '@core/geometry/loft';
+import { circlePoints } from '@core/geometry/tessellation';
 import { subdivide } from '@core/geometry/subdivision';
 import {
   type CadDocument,
@@ -63,13 +64,6 @@ function toWorldXY(e: Entity, points: ReadonlyArray<Vec3>): Vec2[] {
   return points.map((point): Vec2 => {
     const rotated = applyEulerXYZ(point, ORIGIN, e.rotation);
     return [rotated[0] + e.position[0], rotated[1] + e.position[1]];
-  });
-}
-
-function circlePoints(radius: number, z: number): Vec3[] {
-  return Array.from({ length: CIRCLE_SAMPLES }, (_, i): Vec3 => {
-    const angle = (2 * Math.PI * i) / CIRCLE_SAMPLES;
-    return [radius * Math.cos(angle), radius * Math.sin(angle), z];
   });
 }
 
@@ -128,10 +122,13 @@ function outlineRings(document: ComponentsDoc, e: Entity, depth: number): Outlin
   switch (e.kind) {
     case 'cylinder': {
       const { min, max } = localBounds(e);
-      return hullRing(e, [...circlePoints(e.radius, min[2]), ...circlePoints(e.radius, max[2])]);
+      return hullRing(e, [
+        ...circlePoints(0, 0, min[2], e.radius, CIRCLE_SAMPLES),
+        ...circlePoints(0, 0, max[2], e.radius, CIRCLE_SAMPLES),
+      ]);
     }
     case 'cone':
-      return hullRing(e, [...circlePoints(e.radius, 0), [0, 0, e.height]]);
+      return hullRing(e, [...circlePoints(0, 0, 0, e.radius, CIRCLE_SAMPLES), [0, 0, e.height]]);
     case 'sphere':
       return [circleAround(toWorldXY(e, [ORIGIN])[0] as Vec2, e.radius)];
     case 'torus':
@@ -193,7 +190,9 @@ function outlineRings(document: ComponentsDoc, e: Entity, depth: number): Outlin
 }
 
 function circleAround(center: Vec2, radius: number): Vec2[] {
-  return circlePoints(radius, 0).map(([x, y]): Vec2 => [center[0] + x, center[1] + y]);
+  return circlePoints(center[0], center[1], 0, radius, CIRCLE_SAMPLES).map(
+    ([x, y]): Vec2 => [x, y],
+  );
 }
 
 /** Rings with at least this many points are treated as curves (no per-vertex snaps). */

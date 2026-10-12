@@ -90,15 +90,16 @@ function lighten(color: string): string {
   return `rgb(${channel(0)},${channel(2)},${channel(4)})`;
 }
 
-const screenPath = (loop: readonly Vec3[], project: Projector): string =>
-  'M' +
-  loop
+const screenPoints = (verts: readonly Vec3[], project: Projector, separator: string): string =>
+  verts
     .map((vertex) => {
       const [sx, sy] = project(vertex);
       return `${r2(sx)},${r2(sy)}`;
     })
-    .join('L') +
-  'Z';
+    .join(separator);
+
+const screenPath = (loop: readonly Vec3[], project: Projector): string =>
+  `M${screenPoints(loop, project, 'L')}Z`;
 
 /** Section cap: flat light fill with a dark outline and a diagonal hatch on top. */
 function capSvg(loops: readonly Vec3[][], color: string, project: Projector): string {
@@ -120,12 +121,7 @@ function gapBridgeWidth(poly: Polygon3D, project: Projector): number {
 
 function polygonSvg(poly: Polygon3D, project: Projector): string {
   if (poly.loops) return capSvg(poly.loops, poly.color, project);
-  const points = poly.verts
-    .map((vertex) => {
-      const [sx, sy] = project(vertex);
-      return `${r2(sx)},${r2(sy)}`;
-    })
-    .join(' ');
+  const points = screenPoints(poly.verts, project, ' ');
   if (poly.stroke)
     return `  <polyline points="${points}" fill="none" stroke="${poly.color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`;
   const fill = shade(poly.normal, poly.color);

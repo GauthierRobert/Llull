@@ -10,10 +10,27 @@
 import React, { useState } from 'react';
 import { useLayoutStore, useStore, useToolStore } from '@ui/store';
 import { PALETTE_SHORTCUT_LABEL } from '@ui/hooks/shortcuts';
-import { Icon } from '@ui/components/Icon';
+import { Icon, type IconName } from '@ui/components/Icon';
 import { SOLID_PRESETS } from '@ui/components/toolbar/solidPresets';
 import { createSolid } from '@ui/actions/createSolid';
 import { startCivilSite } from '@ui/actions/civilStarter';
+
+function Tip({
+  icon,
+  children,
+}: {
+  icon: IconName;
+  children: React.ReactNode;
+}): React.ReactElement {
+  return (
+    <li className="empty-state__tip">
+      <span className="empty-state__tip-icon" aria-hidden="true">
+        <Icon name={icon} size={14} />
+      </span>
+      <span className="empty-state__tip-text">{children}</span>
+    </li>
+  );
+}
 
 export function EmptyState(): React.ReactElement | null {
   const entityCount = useStore((s) => s.document.order.length);
@@ -124,34 +141,19 @@ export function EmptyState(): React.ReactElement | null {
         </div>
 
         <ul className="empty-state__tips" aria-label="Tips">
-          <li className="empty-state__tip">
-            <span className="empty-state__tip-icon" aria-hidden="true">
-              <Icon name="transformMove" size={14} />
-            </span>
-            <span className="empty-state__tip-text">
-              <strong>Move things:</strong> click an object, then drag the gizmo arrows (3D) or
-              press <kbd className="kbd">M</kbd> (2D). Arrow keys nudge, the Properties panel takes
-              exact coordinates.
-            </span>
-          </li>
-          <li className="empty-state__tip">
-            <span className="empty-state__tip-icon" aria-hidden="true">
-              <Icon name="plug" size={14} />
-            </span>
-            <span className="empty-state__tip-text">
-              <strong>Or let AI build it:</strong> use <em>Connect agent</em> (top right) and ask
-              Claude to model something.
-            </span>
-          </li>
-          <li className="empty-state__tip">
-            <span className="empty-state__tip-icon" aria-hidden="true">
-              <Icon name="search" size={14} />
-            </span>
-            <span className="empty-state__tip-text">
-              Press <kbd className="kbd">{PALETTE_SHORTCUT_LABEL}</kbd> to search and run any of
-              llull’s commands, or <kbd className="kbd">?</kbd> for keyboard shortcuts.
-            </span>
-          </li>
+          <Tip icon="transformMove">
+            <strong>Move things:</strong> click an object, then drag the gizmo arrows (3D) or press{' '}
+            <kbd className="kbd">M</kbd> (2D). Arrow keys nudge, the Properties panel takes exact
+            coordinates.
+          </Tip>
+          <Tip icon="plug">
+            <strong>Or let AI build it:</strong> use <em>Connect agent</em> (top right) and ask
+            Claude to model something.
+          </Tip>
+          <Tip icon="search">
+            Press <kbd className="kbd">{PALETTE_SHORTCUT_LABEL}</kbd> to search and run any of
+            llull’s commands, or <kbd className="kbd">?</kbd> for keyboard shortcuts.
+          </Tip>
         </ul>
       </div>
     </div>

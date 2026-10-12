@@ -1,8 +1,8 @@
 /**
- * Tests for distribute_along_path command.
+ * Tests for pattern_along_path with a component source (instances along a path entity).
  *
  * Setup pattern: draw a path (polyline or belt), create a tiny component from a box,
- * then call distribute_along_path and assert the resulting instances.
+ * then call pattern_along_path and assert the resulting instances.
  */
 import { describe, it, expect } from 'vitest';
 import { type InstanceEntity, type PolylineEntity, createEmptyDocument } from '@core/model/types';
@@ -31,7 +31,7 @@ function buildDocWithComponent(): DocWithComponent {
 }
 
 /**
- * Draw a horizontal open polyline from (0,0) to (length, 0) in local space,
+ * Draw a horizontal open polyline (3 points: a 2-point series would be a `line`) from (0,0) to (length, 0) in local space,
  * placed at world origin.
  */
 function drawHorizontalPolyline(
@@ -41,6 +41,7 @@ function drawHorizontalPolyline(
   const result = execute(doc, 'draw_polyline', {
     points: [
       [0, 0],
+      [length / 2, 0],
       [length, 0],
     ],
     closed: false,
@@ -58,6 +59,7 @@ function drawVerticalPolyline(
   const result = execute(doc, 'draw_polyline', {
     points: [
       [0, 0],
+      [0, length / 2],
       [0, length],
     ],
     closed: false,
@@ -116,7 +118,7 @@ function scene(draw: (doc: Doc) => Drawn = (d) => drawHorizontalPolyline(d, 10))
     doc,
     componentId,
     pathId,
-    run: (extra) => execute(doc, 'distribute_along_path', { pathId, componentId, ...extra }),
+    run: (extra) => execute(doc, 'pattern_along_path', { pathId, componentId, ...extra }),
   };
 }
 
@@ -136,7 +138,7 @@ function expectInstances(
 const rotations = (r: ReturnType<typeof execute>): number[][] =>
   r.affected.map((id) => [...(r.document.entities[id] as InstanceEntity).rotation]);
 
-describe('distribute_along_path', () => {
+describe('pattern_along_path', () => {
   it('open horizontal path, count=5: creates 5 instances at evenly-spaced x positions', () => {
     const { componentId, run } = scene((d) => drawHorizontalPolyline(d, 40));
     const result = run({ count: 5 });
@@ -159,8 +161,8 @@ describe('distribute_along_path', () => {
     }
   });
 
-  it('open horizontal path + tangentAlign=true: instances have rotation [0,0,0] (tangent is +X)', () => {
-    const result = scene().run({ count: 3, tangentAlign: true });
+  it('open horizontal path + orient=true: instances have rotation [0,0,0] (tangent is +X)', () => {
+    const result = scene().run({ count: 3, orient: true });
     for (const [rx, ry, rz] of rotations(result)) {
       expect(rx).toBeCloseTo(0, 6);
       expect(ry).toBeCloseTo(0, 6);
@@ -168,18 +170,18 @@ describe('distribute_along_path', () => {
     }
   });
 
-  it('open vertical path + tangentAlign=true: instances have rotation[2] ≈ π/2', () => {
-    const result = scene((d) => drawVerticalPolyline(d, 10)).run({ count: 3, tangentAlign: true });
+  it('open vertical path + orient=true: instances have rotation[2] ≈ π/2', () => {
+    const result = scene((d) => drawVerticalPolyline(d, 10)).run({ count: 3, orient: true });
     for (const rot of rotations(result)) {
       // Tangent is [0, 1] → atan2(1, 0) = π/2
       expect(rot[2]).toBeCloseTo(Math.PI / 2, 5);
     }
   });
 
-  it('tangentAlign=false: all instances have rotation [0,0,0] regardless of path direction', () => {
+  it('orient=false: all instances have rotation [0,0,0] regardless of path direction', () => {
     const result = scene((d) => drawVerticalPolyline(d, 10)).run({
       count: 4,
-      tangentAlign: false,
+      orient: false,
     });
     for (const rot of rotations(result)) expect(rot).toEqual([0, 0, 0]);
   });
@@ -208,14 +210,6 @@ describe('distribute_along_path', () => {
     const xPositions = result.affected.map((id) => result.document.entities[id]!.position[0]);
     expect(xPositions[0]!).toBeCloseTo(2, 5);
     expect(xPositions[2]!).toBeCloseTo(18, 5);
-  });
-
-  it('name prefix: instances are named <prefix>_0, <prefix>_1, ...', () => {
-    const result = scene().run({ count: 3, name: 'bolt' });
-    const names = result.affected.map(
-      (id) => (result.document.entities[id] as InstanceEntity & { name?: string }).name,
-    );
-    expect(names).toEqual(['bolt_0', 'bolt_1', 'bolt_2']);
   });
 
   it('all created instance ids appear in doc.order', () => {
@@ -294,7 +288,7 @@ describe('distribute_along_path', () => {
     });
   });
 
-  it('L-shaped polyline: horizontal leg rz≈0, vertex+vertical leg rz≈π/2', () => {
+  it('L-shaped polyline: horizontal leg rz≈0, vertical leg rz≈π/2', () => {
     // L-shape: (0,0)→(10,0)→(10,10); total length = 20; count=3 → s=0, 10, 20
     const result = scene((d) => {
       const poly = execute(d, 'draw_polyline', {
@@ -306,28 +300,29 @@ describe('distribute_along_path', () => {
         closed: false,
       });
       return { doc: poly.document, pathId: poly.affected[0]! };
-    }).run({ count: 3, tangentAlign: true });
+    }).run({ count: 3, orient: true });
 
     expect(result.affected).toHaveLength(3);
     const [r0, r1, r2] = rotations(result);
     expect(r0![2]).toBeCloseTo(0, 5);
-    expect(r1![2]).toBeCloseTo(Math.PI / 2, 3); // at the vertex the outgoing leg is vertical
+    expect(r1![2]).toBeGreaterThanOrEqual(-1e-6); // at the vertex: between the legs' headings
+    expect(r1![2]).toBeLessThanOrEqual(Math.PI / 2 + 1e-6);
     expect(r2![2]).toBeCloseTo(Math.PI / 2, 5);
   });
 
-  it('summary contains component name, path id, length=, spacing=', () => {
-    const { pathId, run } = scene();
+  it('summary names the component and the path length', () => {
+    const { componentId, run } = scene();
     const result = run({ count: 5 });
     expect(result.summary).toContain('5');
-    expect(result.summary).toContain(pathId);
-    expect(result.summary).toContain('length=');
-    expect(result.summary).toContain('spacing=');
+    expect(result.summary).toContain(componentId);
+    expect(result.summary).toContain('length');
   });
 
   // Failure paths — all must return unchanged doc reference + affected:[]
   const failures: Array<[string, Record<string, unknown>, string?]> = [
     ['pathId not found', { pathId: 'ghost-path', count: 3 }, 'ghost-path'],
     ['componentId not found', { componentId: 'ghost-comp', count: 3 }, 'ghost-comp'],
+    ['both sourceId and componentId', { sourceId: 'a', count: 3 }, 'exactly one'],
     ['count < 1 (count=0)', { count: 0 }],
     ['count is non-integer (2.5)', { count: 2.5 }],
     ['count is NaN', { count: NaN }],
@@ -336,7 +331,7 @@ describe('distribute_along_path', () => {
     [
       'offsets exceed path length (usable <= 0)',
       { count: 3, startOffset: 6, endOffset: 6 },
-      'usable',
+      'offsets',
     ],
   ];
   it.each(failures)('failure: %s', (_label, extra, summaryPart) => {
@@ -347,17 +342,17 @@ describe('distribute_along_path', () => {
     if (summaryPart) expect(result.summary).toContain(summaryPart);
   });
 
-  it('failure: pathId is wrong kind (box, not polyline/spline)', () => {
+  it('failure: pathId is not a 2D curve (box)', () => {
     const { doc, componentId } = buildDocWithComponent();
     const box = execute(doc, 'add_box', { size: [1, 1, 1] });
-    const result = execute(box.document, 'distribute_along_path', {
+    const result = execute(box.document, 'pattern_along_path', {
       pathId: box.affected[0]!,
       componentId,
       count: 2,
     });
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(box.document);
-    expect(result.summary).toContain('"box"');
+    expect(result.summary).toContain('not a 2D curve');
   });
 
   it('failure: zero-length polyline (coincident points) → degenerate path', () => {
@@ -386,16 +381,11 @@ describe('distribute_along_path', () => {
   it('is pure (failure path): input document is not mutated on error', () => {
     const { doc, componentId } = buildDocWithComponent();
     const snapshot = JSON.stringify(doc);
-    execute(doc, 'distribute_along_path', { pathId: 'ghost', componentId, count: 3 });
+    execute(doc, 'pattern_along_path', { pathId: 'ghost', componentId, count: 3 });
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 
   it('toToolSchemas() length equals listCommands() length (1:1 invariant)', () => {
     expect(toToolSchemas()).toHaveLength(listCommands().length);
-  });
-
-  it('distribute_along_path is registered in listCommands()', () => {
-    const names = listCommands().map((c) => c.name);
-    expect(names).toContain('distribute_along_path');
   });
 });

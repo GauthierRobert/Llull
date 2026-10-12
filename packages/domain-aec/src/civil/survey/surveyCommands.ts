@@ -4,12 +4,13 @@
  */
 
 import { type Vec2, type Vec3, DOCUMENT_UNITS } from '@core/model/types';
-import type { PointGroupObject, SurfaceObject, SurveyPoint } from '@core/model/civil';
+import type { SurfaceObject, SurveyPoint } from '@core/model/civil';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2, vec3 } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
 import { isValidPolygon } from '@lib/polygon';
 import {
+  civilObjectOrFailure,
   civilAffected,
   civilObject,
   civilObjectsOf,
@@ -24,6 +25,7 @@ import {
 import { commitCivil, regenerateCivil } from '../evaluate';
 import { gridToLocal } from '../crs/crs';
 import { parseSurvey, SURVEY_FORMATS } from './surveyParse';
+import { newPointGroup } from './pointGroup';
 import { surfacePoints, surfaceTin } from '../surface/surfaceTin';
 import { triangleCount } from '../surface/tin';
 import { MAX_DRAWN_POINTS } from '../surface/surfaceEvaluate';
@@ -121,15 +123,7 @@ export const importSurveyPoints = defineCommand({
         `import_survey_points failed: ${surveyPoints.length} points exceed the ${MAX_POINTS}-point limit; split the file.`,
       );
     }
-    const civil = getCivil(doc);
-    const id = nextCivilId(civil, 'pointGroup');
-    const group: PointGroupObject = {
-      id,
-      category: 'pointGroup',
-      name: name?.trim() || `Survey ${civilObjectsOf(civil, 'pointGroup').length + 1}`,
-      entityIds: [],
-      points: surveyPoints,
-    };
+    const { civil, id, group } = newPointGroup(doc, name, 'Survey', surveyPoints);
     const skipped =
       parsed.rejectedLines.length > 0
         ? ` Skipped ${parsed.rejectedLines.length} unreadable line(s): ${parsed.rejectedLines.slice(0, 10).join(', ')}.`
@@ -267,8 +261,8 @@ export const updateSurface = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const civil = getCivil(doc);
-    const surface = civilObject(civil, params.surfaceId, 'surface');
-    if (!surface) return noop(doc, `update_surface failed: no surface ${params.surfaceId}.`);
+    const surface = civilObjectOrFailure(doc, params.surfaceId, 'surface', 'update_surface');
+    if (typeof surface === 'string') return noop(doc, surface);
     const boundary = params.boundary?.length === 0 ? undefined : params.boundary;
     const maxEdgeLength = params.maxEdgeLength === 0 ? undefined : params.maxEdgeLength;
     const checked = checkSurfaceOptions({ ...params, boundary, maxEdgeLength });

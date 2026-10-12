@@ -9,7 +9,7 @@ type InstanceFrameRefSchema = z.ZodObject<{
 }>;
 
 /**
- * Params object `{ instanceId, frame? }` naming one frame of an InstanceEntity (`add_joint`, `add_mate`).
+ * Params object `{ instanceId, frame? }` naming one frame of an InstanceEntity (`add_joint`).
  * @param ordinal which side the object is, for the `instanceId` description
  * @param description agent-facing description of the whole object
  */

@@ -21,8 +21,8 @@ feature step). It returns the SAME document, `affected: []`, a factual `summary`
 agent to consume programmatically. NEVER mutate the document in a query.
 
 ## Existing queries (extend these; snake_case, read-as-queries)
-`measure_distance`, `measure_angle`, `measure_area`, `measure_perimeter`, `measure_volume`,
-`measure_bounding_box`, `mass_properties` (material density via `assign_material`),
+`measure_distance`, `measure_angle`, `measure_area`, `measure_perimeter`,
+`measure_bounding_box`, `mass_properties` (volume; mass from material density via `assign_material`),
 `describe_scene`, `find_entities`, `check_model`; building plugin: `check_clashes`,
 `quantity_takeoff`, `check_*`.
 

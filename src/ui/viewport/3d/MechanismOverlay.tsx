@@ -11,6 +11,7 @@ import { Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { useStore, useViewportStore } from '@ui/store';
 import type { CadDocument, Constraint, Joint, Vec3 } from '@core/model/types';
+import { axisVector } from '@lib/axis';
 import { TEXT_FONT_URL } from '@ui/viewport/textFont';
 import { positionsGeometry } from '../lineGeometry';
 import { useDisposable } from '../useDisposable';
@@ -20,11 +21,8 @@ const PRISMATIC_COLOR = '#e040fb';
 const CONSTRAINT_COLOR = '#ffd740';
 
 /** Resolve a joint axis (shorthand or Vec3) to a THREE.Vector3. */
-function resolveAxis(axis: Joint['axis']): THREE.Vector3 {
-  if (axis === 'x') return new THREE.Vector3(1, 0, 0);
-  if (axis === 'y') return new THREE.Vector3(0, 1, 0);
-  if (axis === 'z') return new THREE.Vector3(0, 0, 1);
-  return new THREE.Vector3(axis[0], axis[1], axis[2]).normalize();
+function jointAxisDirection(axis: Joint['axis']): THREE.Vector3 {
+  return new THREE.Vector3(...axisVector(axis)).normalize();
 }
 
 type Entities = CadDocument['entities'];
@@ -97,7 +95,7 @@ function JointArrow({ joint, entities }: { joint: Joint; entities: Entities }): 
   const arrowHelper = useDisposable(
     () =>
       new THREE.ArrowHelper(
-        resolveAxis(joint.axis),
+        jointAxisDirection(joint.axis),
         new THREE.Vector3(...origin),
         ARROW_LENGTH,
         color,

@@ -85,9 +85,11 @@ describe('check_clashes: equipment through a floor', () => {
 
 describe('check_clashes: modelled walls', () => {
   const wallDoc = (): CadDocument => {
-    const doc = execute(createEmptyDocument(), 'add_wall', {
-      start: [0, 0],
-      end: [4000, 0],
+    const doc = execute(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
       thickness: 200,
     }).document;
     return execute(doc, 'add_equipment', {
@@ -114,9 +116,11 @@ describe('check_clashes: modelled walls', () => {
 
 describe('check_clashes: summary depth', () => {
   it('reports a sub-millimetre penetration with decimals and rejects a negative tolerance', () => {
-    let doc = execute(createEmptyDocument(), 'add_wall', {
-      start: [0, 0],
-      end: [4000, 0],
+    let doc = execute(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+      ],
       thickness: 200,
     }).document;
     doc = execute(doc, 'add_equipment', {

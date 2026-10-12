@@ -47,10 +47,10 @@ describe('edit commands', () => {
     expect(createEmptyDocument().groups).toEqual({});
   });
 
-  describe('duplicate_entity', () => {
+  describe('duplicate_entities', () => {
     it('creates a distinct entity with copied geometry', () => {
       const { doc, sourceId } = singleBox({ size: [2, 3, 4], position: [1, 1, 1] });
-      const result = execute(doc, 'duplicate_entity', { id: sourceId });
+      const result = execute(doc, 'duplicate_entities', { ids: [sourceId] });
 
       expect(result.affected).toHaveLength(1);
       const newId = result.affected[0]!;
@@ -65,13 +65,13 @@ describe('edit commands', () => {
 
     it('places copy at original position when no offset is given', () => {
       const { doc, sourceId } = singleBox({ position: [5, 6, 7] });
-      const result = execute(doc, 'duplicate_entity', { id: sourceId });
+      const result = execute(doc, 'duplicate_entities', { ids: [sourceId] });
       expect(result.document.entities[result.affected[0]!]!.position).toEqual([5, 6, 7]);
     });
 
     it('applies offset to the copy position', () => {
       const { doc, sourceId } = singleBox({ position: [0, 0, 0] });
-      const result = execute(doc, 'duplicate_entity', { id: sourceId, offset: [10, 0, -3] });
+      const result = execute(doc, 'duplicate_entities', { ids: [sourceId], offset: [10, 0, -3] });
 
       expect(result.document.entities[result.affected[0]!]!.position).toEqual([10, 0, -3]);
       // original unaffected
@@ -80,7 +80,7 @@ describe('edit commands', () => {
 
     it('appends the new id to doc.order', () => {
       const { doc, sourceId } = singleBox();
-      const result = execute(doc, 'duplicate_entity', { id: sourceId });
+      const result = execute(doc, 'duplicate_entities', { ids: [sourceId] });
       const newId = result.affected[0]!;
 
       expect(result.document.order).toContain(sourceId);
@@ -89,12 +89,12 @@ describe('edit commands', () => {
     });
 
     it('missing id is a graceful no-op', () => {
-      expectMissingNoOp('duplicate_entity', { id: 'ghost' }, 'ghost');
+      expectMissingNoOp('duplicate_entities', { ids: ['ghost'] }, 'ghost');
     });
 
     it('is pure — input document is not mutated', () => {
       const { doc, sourceId } = singleBox();
-      expectPure(doc, 'duplicate_entity', { id: sourceId });
+      expectPure(doc, 'duplicate_entities', { ids: [sourceId] });
     });
   });
 

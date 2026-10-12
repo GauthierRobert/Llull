@@ -46,7 +46,7 @@ export function rectParamsFromCorners(a: Vec2, b: Vec2): RectParams | null {
 }
 
 /**
- * Compute the radius for draw_circle from a center point and a rim point.
+ * Compute the radius for a full-circle draw_arc from a center point and a rim point.
  *
  * @pure
  * @failure returns null when center and rim are identical (radius = 0)

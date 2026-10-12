@@ -12,6 +12,7 @@ import path from 'path';
 import { serializeDocument } from '@core/commands/persistence/serialization';
 import type { CadDocument } from '@core/model/types';
 import { isRecord } from '@lib/isRecord';
+import { writeFileAtomic } from '@server/writeFileAtomic';
 
 type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
@@ -35,13 +36,6 @@ interface SessionOptions {
   readonly url: string;
   readonly token: string;
   readonly fetchImpl?: FetchLike;
-}
-
-function writeAtomic(filePath: string, text: string): void {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const temporary = `${filePath}.${process.pid}.tmp`;
-  fs.writeFileSync(temporary, text, 'utf8');
-  fs.renameSync(temporary, filePath);
 }
 
 /** The JSON body, or null for a non-JSON answer (proxy error page, crash): callers report the status. */
@@ -99,7 +93,8 @@ export function createDocumentSession(options: SessionOptions): DocumentSession 
       const target = filePath !== undefined ? path.resolve(filePath) : currentPath;
       if (target === null) throw new Error('no file chosen for this document (use Save As)');
       const current = await snapshot();
-      writeAtomic(target, serializeDocument(current.document));
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      writeFileAtomic(target, serializeDocument(current.document));
       currentPath = target;
       savedHash = current.stateHash;
       return target;

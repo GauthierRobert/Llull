@@ -6,6 +6,7 @@
  */
 
 import type { Vec2 } from '@core/model/types';
+import { pointsExtent } from '@core/geometry/bounds';
 
 /** Counter-clockwise triangles as flat vertex-index triples into the input array. */
 export type Triangles = number[];
@@ -36,17 +37,7 @@ function inCircle(points: ReadonlyArray<Vec2>, a: number, b: number, c: number, 
 
 /** Spatially coherent insertion order (serpentine rows) so the location walk stays short. */
 function insertionOrder(points: ReadonlyArray<Vec2>, count: number): number[] {
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (let i = 0; i < count; i++) {
-    const [x, y] = points[i] as Vec2;
-    minX = Math.min(minX, x);
-    minY = Math.min(minY, y);
-    maxX = Math.max(maxX, x);
-    maxY = Math.max(maxY, y);
-  }
+  const { minX, minY, maxX, maxY } = pointsExtent(points.slice(0, count));
   const rows = Math.max(1, Math.round(Math.sqrt(count / 4)));
   const rowHeight = (maxY - minY) / rows || 1;
   const key = (index: number): [number, number] => {
@@ -71,16 +62,7 @@ function insertionOrder(points: ReadonlyArray<Vec2>, count: number): number[] {
 export function delaunay(input: ReadonlyArray<Vec2>): Triangles {
   const count = input.length;
   if (count < 3) return [];
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (const [x, y] of input) {
-    minX = Math.min(minX, x);
-    minY = Math.min(minY, y);
-    maxX = Math.max(maxX, x);
-    maxY = Math.max(maxY, y);
-  }
+  const { minX, minY, maxX, maxY } = pointsExtent(input);
   const span = Math.max(maxX - minX, maxY - minY) || 1;
   const midX = (minX + maxX) / 2;
   const midY = (minY + maxY) / 2;
@@ -104,6 +86,9 @@ export function delaunay(input: ReadonlyArray<Vec2>): Triangles {
     return index;
   };
   const corner = (triangle: number, k: number): number => vertices[triangle * 3 + k] as number;
+  /** Triangle on the other side of edge `k` of `triangle` (its directed edge reversed). */
+  const across = (triangle: number, k: number): number | undefined =>
+    edges.get(corner(triangle, (k + 1) % 3) * stride + corner(triangle, k));
   let last = addTriangle(count, count + 1, count + 2);
 
   const locate = (p: Vec2): number => {
@@ -116,7 +101,7 @@ export function delaunay(input: ReadonlyArray<Vec2>): Triangles {
         const pa = points[a] as Vec2;
         const pb = points[b] as Vec2;
         if (orient(pa[0], pa[1], pb[0], pb[1], p[0], p[1]) < 0) {
-          const neighbour = edges.get(b * stride + a);
+          const neighbour = across(current, k);
           if (neighbour !== undefined) {
             current = neighbour;
             moved = true;
@@ -145,9 +130,7 @@ export function delaunay(input: ReadonlyArray<Vec2>): Triangles {
     while (queue.length > 0) {
       const triangle = queue.pop() as number;
       for (let k = 0; k < 3; k++) {
-        const a = corner(triangle, k);
-        const b = corner(triangle, (k + 1) % 3);
-        const neighbour = edges.get(b * stride + a);
+        const neighbour = across(triangle, k);
         if (neighbour === undefined || bad.has(neighbour)) continue;
         if (inCircle(points, corner(neighbour, 0), corner(neighbour, 1), corner(neighbour, 2), p)) {
           bad.add(neighbour);
@@ -158,10 +141,9 @@ export function delaunay(input: ReadonlyArray<Vec2>): Triangles {
     const boundary: Array<[number, number]> = [];
     for (const triangle of bad) {
       for (let k = 0; k < 3; k++) {
-        const a = corner(triangle, k);
-        const b = corner(triangle, (k + 1) % 3);
-        const neighbour = edges.get(b * stride + a);
-        if (neighbour === undefined || !bad.has(neighbour)) boundary.push([a, b]);
+        const neighbour = across(triangle, k);
+        if (neighbour === undefined || !bad.has(neighbour))
+          boundary.push([corner(triangle, k), corner(triangle, (k + 1) % 3)]);
       }
     }
     for (const triangle of bad) {

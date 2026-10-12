@@ -9,6 +9,7 @@
 
 import { create } from 'zustand';
 import type { EntityId } from '@core/model/types';
+import { toggledInSet } from '@ui/toggleMember';
 
 /** How all solid surfaces are rendered in the 3D viewport. */
 export type DisplayMode = 'shaded' | 'wireframe' | 'xray';
@@ -55,7 +56,7 @@ interface ViewportStoreState {
 
   /**
    * Layer ids locally hidden from the viewport — a pure render override: it does NOT dispatch
-   * set_layer_visibility and does NOT touch the server document.
+   * update_layer.visible and does NOT touch the server document.
    */
   hiddenLayerIds: ReadonlySet<string>;
 
@@ -106,13 +107,6 @@ const DEFAULT_CLIP_PLANE: ClipPlaneState = {
   flipped: false,
 };
 
-/** A copy of `members` with `member` removed if present, else added. */
-function toggled<Member>(members: ReadonlySet<Member>, member: Member): Set<Member> {
-  const next = new Set(members);
-  if (!next.delete(member)) next.add(member);
-  return next;
-}
-
 export const useViewportStore = create<ViewportStoreState>()((set) => ({
   displayMode: 'shaded',
   clipPlane: DEFAULT_CLIP_PLANE,
@@ -142,7 +136,7 @@ export const useViewportStore = create<ViewportStoreState>()((set) => ({
   },
 
   toggleEntityVisibility(id: EntityId): void {
-    set((state) => ({ hiddenEntityIds: toggled(state.hiddenEntityIds, id) }));
+    set((state) => ({ hiddenEntityIds: toggledInSet(state.hiddenEntityIds, id) }));
   },
 
   showAllEntities(): void {
@@ -150,7 +144,7 @@ export const useViewportStore = create<ViewportStoreState>()((set) => ({
   },
 
   toggleLayerVisibility(layerId: string): void {
-    set((state) => ({ hiddenLayerIds: toggled(state.hiddenLayerIds, layerId) }));
+    set((state) => ({ hiddenLayerIds: toggledInSet(state.hiddenLayerIds, layerId) }));
   },
 
   toggleSnap3d(): void {
@@ -178,7 +172,9 @@ export const useViewportStore = create<ViewportStoreState>()((set) => ({
   },
 
   toggleClickAnimation(animId: string): void {
-    set((state) => ({ activeClickAnimationIds: toggled(state.activeClickAnimationIds, animId) }));
+    set((state) => ({
+      activeClickAnimationIds: toggledInSet(state.activeClickAnimationIds, animId),
+    }));
   },
 
   setMechanismSelection(selection: MechanismSelection | null): void {

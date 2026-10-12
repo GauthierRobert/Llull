@@ -9,6 +9,7 @@ import {
 } from '../../model/types';
 import { isRecord } from '../../lib/isRecord';
 import { isFiniteNumber, isPositiveNumber } from '../../lib/isFiniteNumber';
+import { isVec3 } from '../../lib/vec3';
 import { isHexColor } from '../../lib/isHexColor';
 import { validateShapeRecipe } from '../../geometry/shapeRecipe';
 import { chainIssue } from '../../geometry/curveSegments';
@@ -87,7 +88,7 @@ function decalsProblem(decals: unknown): string | null {
     if (!isRecord(decal) || typeof decal['id'] !== 'string' || typeof decal['text'] !== 'string')
       return 'each decal needs an id and a text';
     if (decal['text'].trim() === '') return `decal ${decal['id']}: text must not be empty`;
-    if (!isFiniteVec3(decal['center']) || !isFiniteVec3(decal['normal']))
+    if (!isVec3(decal['center']) || !isVec3(decal['normal']))
       return `decal ${String(decal['id'])}: center and normal must be finite Vec3`;
     if (Math.hypot(...(decal['normal'] as readonly number[])) < 1e-12)
       return `decal ${String(decal['id'])}: normal must be non-zero`;
@@ -120,11 +121,9 @@ function ringsProblem(rings: unknown, dims: number, minRings: number): string | 
 /** A subdivision entity's cage + levels, or null when valid. */
 function subdivisionProblem(v: Record<string, unknown>): string | null {
   const { vertices, faces, creases, levels } = v;
-  const isPoint = (p: unknown): boolean =>
-    Array.isArray(p) && p.length === 3 && p.every(isFiniteNumber);
   const isIndexList = (list: unknown): boolean =>
     Array.isArray(list) && list.every((n) => Number.isInteger(n));
-  if (!Array.isArray(vertices) || !vertices.every(isPoint))
+  if (!Array.isArray(vertices) || !vertices.every(isVec3))
     return 'vertices must be finite [x, y, z] points';
   if (!Array.isArray(faces) || !faces.every(isIndexList))
     return 'faces must be arrays of vertex indices';
@@ -182,11 +181,6 @@ function isCurveSegment(s: unknown, dims: number): boolean {
 /** Points per curve segment type (`CurveSegment`). */
 const SEGMENT_POINT_COUNT: Readonly<Record<string, number>> = { line: 2, arc: 3, bezier: 4 };
 
-/** A Vec3 where all three components are finite numbers. */
-function isFiniteVec3(v: unknown): v is Vec3 {
-  return Array.isArray(v) && v.length === 3 && v.every(isFiniteNumber);
-}
-
 const VALID_ENTITY_KINDS: ReadonlySet<string> = new Set([
   ...SOLID_KINDS,
   ...SHAPE2D_KINDS,
@@ -196,7 +190,7 @@ const VALID_ENTITY_KINDS: ReadonlySet<string> = new Set([
 export function validateCamera(v: unknown): v is CameraState {
   if (!isRecord(v)) return false;
   return (
-    isFiniteVec3(v['target']) &&
+    isVec3(v['target']) &&
     isFiniteNumber(v['azimuth']) &&
     isFiniteNumber(v['polar']) &&
     isFiniteNumber(v['distance'])
@@ -230,8 +224,8 @@ export function validateEntityValue(v: unknown): string | null {
   if (typeof id !== 'string') return 'entity.id is not a string';
   if (typeof kind !== 'string') return `entity ${id}: kind is not a string`;
   if (!VALID_ENTITY_KINDS.has(kind)) return `entity ${id}: unknown kind '${kind}'`;
-  if (!isFiniteVec3(position)) return `entity ${id}: position must be a Vec3 of finite numbers`;
-  if (!isFiniteVec3(rotation)) return `entity ${id}: rotation must be a Vec3 of finite numbers`;
+  if (!isVec3(position)) return `entity ${id}: position must be a Vec3 of finite numbers`;
+  if (!isVec3(rotation)) return `entity ${id}: rotation must be a Vec3 of finite numbers`;
   if (typeof layerId !== 'string') return `entity ${id}: layerId is not a string`;
   if (!isHexColor(color))
     return `entity ${id}: color '${String(color)}' is not a valid hex color (#rrggbb)`;

@@ -41,15 +41,29 @@ function wallSectionFields(thickness: string, material: string): ToolField[] {
   ];
 }
 
-function wallSection(reader: FieldReader): {
-  thickness: number;
-  height: number | undefined;
-  material: string;
-} {
+/** A wall tool: `geometry` fields + the shared section fields -> ONE `command` on the level. */
+function wallTool(
+  id: string,
+  label: string,
+  geometryFields: ToolField[],
+  [thickness, material]: readonly [string, string],
+  command: string,
+  geometry: (reader: FieldReader) => Record<string, unknown>,
+): ElementTool {
   return {
-    thickness: reader.number('thickness'),
-    height: reader.optionalNumber('height'),
-    material: reader.text('material'),
+    id,
+    label,
+    fields: [...geometryFields, ...wallSectionFields(thickness, material)],
+    build: (values, context) => {
+      const reader = new FieldReader(values);
+      return result(reader, command, {
+        ...geometry(reader),
+        thickness: reader.number('thickness'),
+        height: reader.optionalNumber('height'),
+        material: reader.text('material'),
+        ...onLevel(context),
+      });
+    },
   };
 }
 
@@ -70,7 +84,33 @@ function hostedOpening(reader: FieldReader): {
   };
 }
 
-const NO_HOST_WALL = { ok: false, reason: 'Pick a host wall first.' } as const;
+/** Door / window: host wall + offset / size fields, then `extra` params; needs a host wall. */
+function hostedOpeningTool(
+  id: string,
+  label: string,
+  [width, height]: readonly [string, string],
+  extraFields: ToolField[],
+  command: string,
+  extra: (reader: FieldReader) => Record<string, unknown>,
+): ElementTool {
+  return {
+    id,
+    label,
+    fields: [
+      select('wallId', 'Host wall', '', 'hosts'),
+      num('offset', 'Offset from start', '', true),
+      num('width', 'Width', width),
+      num('height', 'Height', height),
+      ...extraFields,
+    ],
+    build: (values) => {
+      const reader = new FieldReader(values);
+      const opening = hostedOpening(reader);
+      if (opening === null) return { ok: false, reason: 'Pick a host wall first.' };
+      return result(reader, command, { ...opening, ...extra(reader) });
+    },
+  };
+}
 
 function corners([x1, y1, x2, y2]: PlanExtent): Array<[number, number]> {
   return [
@@ -121,69 +161,46 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     },
   },
   ...GRID_FRAMING_TOOLS,
-  {
-    id: 'perimeter',
-    label: 'Perimeter walls',
-    fields: [
-      num('x1', 'X1', '0'),
-      num('y1', 'Y1', '0'),
-      num('x2', 'X2', '10000'),
-      num('y2', 'Y2', '8000'),
-      ...wallSectionFields('300', 'masonry'),
-    ],
-    build: (values, context) => {
-      const reader = new FieldReader(values);
-      return result(reader, 'draw_walls', {
-        points: rectangle(reader),
-        closed: true,
-        ...wallSection(reader),
-        ...onLevel(context),
-      });
-    },
-  },
-  {
-    id: 'wall',
-    label: 'Wall',
-    fields: [
+  wallTool(
+    'perimeter',
+    'Perimeter walls',
+    [num('x1', 'X1', '0'), num('y1', 'Y1', '0'), num('x2', 'X2', '10000'), num('y2', 'Y2', '8000')],
+    ['300', 'masonry'],
+    'draw_walls',
+    (reader) => ({ points: rectangle(reader), closed: true }),
+  ),
+  wallTool(
+    'wall',
+    'Wall',
+    [
       num('x1', 'Start X', '0'),
       num('y1', 'Start Y', '0'),
       num('x2', 'End X', '5000'),
       num('y2', 'End Y', '0'),
-      ...wallSectionFields('200', 'concrete'),
     ],
-    build: (values, context) => {
-      const reader = new FieldReader(values);
-      return result(reader, 'add_wall', {
-        start: reader.point('x1', 'y1'),
-        end: reader.point('x2', 'y2'),
-        ...wallSection(reader),
-        ...onLevel(context),
-      });
-    },
-  },
-  {
-    id: 'curvedWall',
-    label: 'Curved wall',
-    fields: [
+    ['200', 'concrete'],
+    'draw_walls',
+    (reader) => ({ points: [reader.point('x1', 'y1'), reader.point('x2', 'y2')] }),
+  ),
+  wallTool(
+    'curvedWall',
+    'Curved wall',
+    [
       num('x1', 'Start X', '0'),
       num('y1', 'Start Y', '0'),
       num('xm', 'Through X', '3000'),
       num('ym', 'Through Y', '1500'),
       num('x2', 'End X', '6000'),
       num('y2', 'End Y', '0'),
-      ...wallSectionFields('200', 'concrete'),
     ],
-    build: (values, context) => {
-      const reader = new FieldReader(values);
-      return result(reader, 'add_curved_wall', {
-        start: reader.point('x1', 'y1'),
-        through: reader.point('xm', 'ym'),
-        end: reader.point('x2', 'y2'),
-        ...wallSection(reader),
-        ...onLevel(context),
-      });
-    },
-  },
+    ['200', 'concrete'],
+    'add_curved_wall',
+    (reader) => ({
+      start: reader.point('x1', 'y1'),
+      through: reader.point('xm', 'ym'),
+      end: reader.point('x2', 'y2'),
+    }),
+  ),
   {
     id: 'wallLayers',
     label: 'Wall build-up',
@@ -219,43 +236,27 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
       return result(reader, 'set_wall_layers', { wallIds, layers });
     },
   },
-  {
-    id: 'door',
-    label: 'Door',
-    fields: [
-      select('wallId', 'Host wall', '', 'hosts'),
-      num('offset', 'Offset from start', '', true),
-      num('width', 'Width', '900'),
-      num('height', 'Height', '2100'),
+  hostedOpeningTool(
+    'door',
+    'Door',
+    ['900', '2100'],
+    [
       select('swing', 'Hinge', 'left', [
         ['left', 'Left'],
         ['right', 'Right'],
       ]),
     ],
-    build: (values) => {
-      const reader = new FieldReader(values);
-      const opening = hostedOpening(reader);
-      if (opening === null) return NO_HOST_WALL;
-      return result(reader, 'add_door', { ...opening, swing: reader.text('swing') });
-    },
-  },
-  {
-    id: 'window',
-    label: 'Window',
-    fields: [
-      select('wallId', 'Host wall', '', 'hosts'),
-      num('offset', 'Offset from start', '', true),
-      num('width', 'Width', '1200'),
-      num('height', 'Height', '1200'),
-      num('sillHeight', 'Sill height', '900'),
-    ],
-    build: (values) => {
-      const reader = new FieldReader(values);
-      const opening = hostedOpening(reader);
-      if (opening === null) return NO_HOST_WALL;
-      return result(reader, 'add_window', { ...opening, sillHeight: reader.number('sillHeight') });
-    },
-  },
+    'add_door',
+    (reader) => ({ swing: reader.text('swing') }),
+  ),
+  hostedOpeningTool(
+    'window',
+    'Window',
+    ['1200', '1200'],
+    [num('sillHeight', 'Sill height', '900')],
+    'add_window',
+    (reader) => ({ sillHeight: reader.number('sillHeight') }),
+  ),
   {
     id: 'slab',
     label: 'Slab / roof',

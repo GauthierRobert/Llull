@@ -12,15 +12,16 @@
  *   already-snapped world coords.
  * - Esc cancels the current in-progress shape; Esc with nothing in progress returns to Select.
  * - Enter or double-click finishes a polyline, wall chain or spline in progress.
- * - 'move' translates the current selection by (second click - first click) via move_entity.
+ * - 'move' translates the current selection by (second click - first click) via move_entities.
  * - The hook is purely React state + callbacks — no three.js here.
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import type { Vec2 } from '@core/model/types';
 import { type DrawToolKind, useStore, useToolStore } from '@ui/store';
 import { moveSelection } from '@ui/actions/selectionActions';
 import { isEditingKeyEvent } from '@ui/hooks/useKeyboardShortcuts';
+import { useCaptureKeydown } from '@ui/hooks/useCaptureKeydown';
 import {
   CHAIN_DRAW_TOOLS,
   rectParamsFromCorners,
@@ -151,11 +152,11 @@ export function useDrawTool(): UseDrawToolResult {
           moveSelection([point[0] - first[0], point[1] - first[1], 0]);
           break;
         case 'line':
-          dispatch('draw_line', { start: first, end: point });
+          dispatch('draw_polyline', { points: [first, point] });
           break;
         case 'circle': {
           const radius = circleRadiusFromPoints(first, point);
-          if (radius !== null) dispatch('draw_circle', { center: first, radius });
+          if (radius !== null) dispatch('draw_arc', { center: first, radius });
           break;
         }
         case 'rectangle': {
@@ -175,8 +176,8 @@ export function useDrawTool(): UseDrawToolResult {
   );
 
   // Keyboard: Escape cancels; Enter finishes a polyline, wall chain or spline.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
+  const onKey = useCallback(
+    (e: KeyboardEvent): void => {
       if (isEditingKeyEvent(e)) return;
       if (e.key === 'Escape') {
         // First Esc drops the shape in progress; a second Esc returns to Select.
@@ -187,27 +188,25 @@ export function useDrawTool(): UseDrawToolResult {
       } else if (e.key === 'Enter' && CHAIN_DRAW_TOOLS.has(activeTool)) {
         finishChain();
       }
-    };
-    // Capture phase: runs before the global shortcut handler, which skips consumed (prevented) keys.
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [activeTool, inProgress, finishChain, setActiveTool, setCollectedPoints]);
+    },
+    [activeTool, inProgress, finishChain, setActiveTool, setCollectedPoints],
+  );
+  useCaptureKeydown(onKey);
 
   // Ctrl/Cmd+Z mid-operation removes the last collected point instead of undoing the document.
-  // Capture phase + stopPropagation so the global undo shortcut never sees it.
-  useEffect(() => {
-    if (!inProgress) return;
-    const onUndoKey = (e: KeyboardEvent): void => {
+  // stopPropagation so the global undo shortcut never sees it.
+  const onUndoKey = useCallback(
+    (e: KeyboardEvent): void => {
       if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.key.toLowerCase() !== 'z') return;
       const target = e.composedPath()[0];
       if (target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
       e.preventDefault();
       e.stopPropagation();
       setCollectedPoints((prev) => prev.slice(0, -1));
-    };
-    window.addEventListener('keydown', onUndoKey, true);
-    return () => window.removeEventListener('keydown', onUndoKey, true);
-  }, [inProgress, setCollectedPoints]);
+    },
+    [setCollectedPoints],
+  );
+  useCaptureKeydown(inProgress ? onUndoKey : null);
 
   return { activeTool, collectedPoints, setActiveTool, handleClick, finishChain };
 }

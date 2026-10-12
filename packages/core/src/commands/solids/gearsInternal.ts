@@ -6,7 +6,7 @@
 
 import type { MeshData } from '../../model/types';
 import type { CommandResult } from '../types';
-import { defineCommand, z } from '../schema';
+import { defineCommand, z, nameField } from '../schema';
 import { nextId } from '../../lib/id';
 import { compactNumber as fmt } from '../../lib/compactNumber';
 import { finiteVec3OrZero } from '../../lib/vec3';
@@ -16,7 +16,7 @@ import { MAX_GEAR_TEETH } from '../limits';
 import { rotatedEntityBounds } from '../../geometry/rotatedBounds';
 import { commitEntity } from '../entity/commitEntity';
 import { boundsText, positionField, rotationField } from './shared';
-import { placedMeshEntity } from './gearSolid';
+import { faceWidthProblem, placedMeshEntity, pressureAngleProblem } from './gearSolid';
 import { noop } from '../noop';
 
 /** Minimum radial wall (in modules) between the tooth-space roots and the rim. */
@@ -83,7 +83,7 @@ export const addInternalGear = defineCommand({
     position: positionField('Centre of the ring on its axis (z = bottom face). '),
     rotation: rotationField(),
     color: z.string().describe('Hex color. Default "#8892a0".').optional(),
-    name: z.string().describe('Optional display name.').optional(),
+    name: nameField(),
   }),
   run: (
     doc,
@@ -105,12 +105,8 @@ export const addInternalGear = defineCommand({
     if (!(teethInt >= 12 && teethInt <= MAX_GEAR_TEETH)) {
       return fail(`teeth must be an integer in [12, ${MAX_GEAR_TEETH}], got ${String(teeth)}.`);
     }
-    if (!(pressureAngle > 0 && pressureAngle < Math.PI / 2)) {
-      return fail(`pressureAngle must be in (0, π/2), got ${String(pressureAngle)}.`);
-    }
-    if (!(faceWidth > 0 && Number.isFinite(faceWidth))) {
-      return fail(`faceWidth must be finite and > 0, got ${String(faceWidth)}.`);
-    }
+    const shapeProblem = pressureAngleProblem(pressureAngle) ?? faceWidthProblem(faceWidth);
+    if (shapeProblem !== null) return fail(shapeProblem);
     const minRim = minRingOuterRadius(mod, teethInt);
     if (!(outerRadius >= minRim && Number.isFinite(outerRadius))) {
       return fail(

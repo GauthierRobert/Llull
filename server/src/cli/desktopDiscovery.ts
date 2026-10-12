@@ -9,6 +9,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { isRecord } from '@lib/isRecord';
+import { writeFileAtomic } from '../writeFileAtomic';
 
 export interface DesktopDiscovery {
   /** Base URL of the app's local backend, e.g. `http://127.0.0.1:47827`. */
@@ -34,10 +35,7 @@ export function desktopDiscoveryPath(home: string): string {
 /** Write the discovery file readable by the current user only. */
 export function writeDesktopDiscovery(home: string, discovery: DesktopDiscovery): void {
   fs.mkdirSync(home, { recursive: true, mode: 0o700 });
-  const target = desktopDiscoveryPath(home);
-  const temporary = `${target}.${process.pid}.tmp`;
-  fs.writeFileSync(temporary, JSON.stringify(discovery, null, 2), { mode: 0o600 });
-  fs.renameSync(temporary, target);
+  writeFileAtomic(desktopDiscoveryPath(home), JSON.stringify(discovery, null, 2), 0o600);
 }
 
 /** Remove the discovery file if it still belongs to `pid` (a newer app instance keeps its own). */

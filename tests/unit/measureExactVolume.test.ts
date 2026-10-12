@@ -1,5 +1,5 @@
 /**
- * measure_volume / mass_properties on kernel results: the exact B-rep volume when the kernel has
+ * mass_properties / mass_properties on kernel results: the exact B-rep volume when the kernel has
  * topology (OCC), else the display-mesh volume — `data.method` says which.
  */
 
@@ -22,20 +22,20 @@ function unionOfTwoBoxes(topology: ShapeTopology | null): {
   const first = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }, ctx);
   const second = execute(first.document, 'add_box', { size: [1, 1, 1] }, ctx);
   const [a, b] = second.document.order;
-  const union = execute(second.document, 'boolean_union', { a, b }, ctx);
+  const union = execute(second.document, 'boolean', { op: 'union', a, b }, ctx);
   return { doc: union.document, id: union.affected[0]!, kernel };
 }
 
-describe('measure_volume of a kernel result', () => {
+describe('mass_properties of a kernel result', () => {
   it('reports the exact B-rep volume when the kernel has topology', () => {
     const { doc, id, kernel } = unionOfTwoBoxes(TOPOLOGY);
     const result = execute(
       doc,
-      'measure_volume',
+      'mass_properties',
       { entityId: id },
       { ...defaultContext(), kernel },
     );
-    expect(result.data).toEqual({ volume: 0.17, unit: 'mm³', method: 'exact' });
+    expect(result.data).toEqual({ volume: 0.17, volumeUnit: 'mm³', method: 'exact' });
     expect(result.summary).toContain('(exact B-rep)');
     expect(result.affected).toEqual([]);
     expect(result.document).toBe(doc);
@@ -45,7 +45,7 @@ describe('measure_volume of a kernel result', () => {
     const { doc, id, kernel } = unionOfTwoBoxes(null);
     const result = execute(
       doc,
-      'measure_volume',
+      'mass_properties',
       { entityId: id },
       { ...defaultContext(), kernel },
     );
@@ -67,7 +67,7 @@ describe('measure_volume of a kernel result', () => {
 
   it('a primitive keeps its analytic volume (no method)', () => {
     const box = execute(createEmptyDocument(), 'add_box', { size: [2, 3, 4] });
-    const result = execute(box.document, 'measure_volume', { entityId: box.affected[0]! });
-    expect(result.data).toEqual({ volume: 24, unit: 'mm³' });
+    const result = execute(box.document, 'mass_properties', { entityId: box.affected[0]! });
+    expect(result.data).toEqual({ volume: 24, volumeUnit: 'mm³' });
   });
 });

@@ -200,15 +200,17 @@
     "featureHistory": [
       {
         "id": "#8",
-        "name": "draw_line",
+        "name": "draw_polyline",
         "params": {
-          "start": [
-            0,
-            0
-          ],
-          "end": [
-            10,
-            0
+          "points": [
+            [
+              0,
+              0
+            ],
+            [
+              10,
+              0
+            ]
           ]
         },
         "suppressed": false,
@@ -218,15 +220,17 @@
       },
       {
         "id": "#9",
-        "name": "draw_line",
+        "name": "draw_polyline",
         "params": {
-          "start": [
-            5,
-            -5
-          ],
-          "end": [
-            5,
-            5
+          "points": [
+            [
+              5,
+              -5
+            ],
+            [
+              5,
+              5
+            ]
           ]
         },
         "suppressed": false,
@@ -236,15 +240,17 @@
       },
       {
         "id": "#10",
-        "name": "draw_line",
+        "name": "draw_polyline",
         "params": {
-          "start": [
-            0,
-            3
-          ],
-          "end": [
-            3,
-            3
+          "points": [
+            [
+              0,
+              3
+            ],
+            [
+              3,
+              3
+            ]
           ]
         },
         "suppressed": false,
@@ -254,15 +260,17 @@
       },
       {
         "id": "#11",
-        "name": "draw_line",
+        "name": "draw_polyline",
         "params": {
-          "start": [
-            8,
-            -4
-          ],
-          "end": [
-            8,
-            8
+          "points": [
+            [
+              8,
+              -4
+            ],
+            [
+              8,
+              8
+            ]
           ]
         },
         "suppressed": false,

@@ -7,6 +7,8 @@
  * @pure
  */
 
+import { parseHexRgb } from './isHexColor';
+
 /** Seven rows of five bits (MSB = left column) per glyph. */
 const GLYPHS: Readonly<Record<string, readonly number[]>> = {
   A: [14, 17, 17, 31, 17, 17, 17],
@@ -73,14 +75,8 @@ export function hasGlyph(ch: string): boolean {
 type Rgba = readonly [number, number, number, number];
 
 function hexRgba(hex: string | undefined, alpha: number): Rgba {
-  const match = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec((hex ?? '').trim());
-  if (match === null) return [0, 0, 0, 0];
-  return [
-    parseInt(match[1] as string, 16),
-    parseInt(match[2] as string, 16),
-    parseInt(match[3] as string, 16),
-    alpha,
-  ];
+  const rgb = parseHexRgb(hex ?? '');
+  return rgb === null ? [0, 0, 0, 0] : [...rgb, alpha];
 }
 
 /**

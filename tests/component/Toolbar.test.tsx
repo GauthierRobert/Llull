@@ -56,7 +56,12 @@ describe('Toolbar', () => {
     const { rerender } = render(<Toolbar />);
     expect(button('Move')).toBeDisabled();
     expect(button('Rotate')).toBeDisabled();
-    useStore.getState().dispatch('draw_line', { start: [0, 0], end: [1, 0] });
+    useStore.getState().dispatch('draw_polyline', {
+      points: [
+        [0, 0],
+        [1, 0],
+      ],
+    });
     useStore.getState().select(useStore.getState().document.order);
     rerender(<Toolbar />);
     fireEvent.click(button('Move'));

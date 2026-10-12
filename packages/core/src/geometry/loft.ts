@@ -12,11 +12,10 @@ import { add3 } from '../lib/vec3';
 import { catmullRomBeziers, segmentPoint } from './curveSegments';
 import { sampleRing } from './sectionRing';
 import { skinTriangles } from './skin';
+import type { Triangle } from './triangles';
 
 /** Interpolated rings per span of a smooth loft. */
 const LOFT_SPAN_STEPS = 8;
-
-type Triangle = readonly [Vec3, Vec3, Vec3];
 
 /** Dense rings of a loft (local coordinates). */
 export function loftRings(loft: Pick<LoftEntity, 'rings' | 'ruled'>): Vec3[][] {

@@ -9,7 +9,7 @@
 import { useMemo } from 'react';
 import type { LoftEntity } from '@core/model/types';
 import { loftTriangles } from '@core/geometry/loft';
-import { buildMeshSolidGeometry } from './meshSolidGeometry';
+import { buildTriangleSoupGeometry } from './meshSolidGeometry';
 import { SolidMeshShell, type SolidMeshKindProps, type SolidSurface } from './SolidMeshShell';
 
 const LOFT_SURFACE: SolidSurface = { roughness: 0.4, metalness: 0.2, envMapIntensity: 0.9 };
@@ -20,10 +20,7 @@ export function LoftMesh({
 }: SolidMeshKindProps<LoftEntity>): React.ReactElement | null {
   const { rings, ruled } = entity;
   const geometry = useMemo(() => {
-    const positions = loftTriangles({ rings, ruled }).flat(2);
-    if (positions.length === 0) return null;
-    const indices = Array.from({ length: positions.length / 3 }, (_, corner) => corner);
-    return buildMeshSolidGeometry({ positions, indices });
+    return buildTriangleSoupGeometry(loftTriangles({ rings, ruled }));
   }, [rings, ruled]);
 
   if (geometry === null) return null;

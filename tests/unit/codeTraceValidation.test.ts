@@ -52,6 +52,23 @@ describe('apply_code_trace validation', () => {
     expect(result.affected).toHaveLength(3);
     expect(result.affected.every((id) => result.document.entities[id] !== undefined)).toBe(true);
   });
+  it('accepts traces from older generated code that still names retired commands', () => {
+    const result = execute(createEmptyDocument(), 'apply_code_trace', {
+      trace: {
+        parameters: [],
+        features: [
+          box('f1'),
+          { command: 'move_entity', params: { id: { ref: 'f1' }, delta: [5, 0, 0] } },
+        ],
+      },
+    });
+    const [id] = result.affected;
+    expect(result.document.entities[id!]?.position).toEqual([5, 0, 0]);
+    expect(result.document.featureHistory.map((step) => step.name)).toEqual([
+      'add_box',
+      'move_entities',
+    ]);
+  });
 });
 
 describe('buildFeatureProgram history check', () => {

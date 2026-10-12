@@ -45,7 +45,7 @@ function conversation(userText: string, assistantText: string): McpPromptMessage
 
 /**
  * @prompt model_bracket
- * draw_rectangle → extrude_sketch body, then N × (draw_circle → extrude_sketch → boolean_subtract)
+ * draw_rectangle → extrude_profile body, then N × (draw_arc → extrude_profile → boolean subtract)
  * for the mounting holes, as one build_project action-list.
  */
 const modelBracket: PromptTemplate = {
@@ -83,7 +83,7 @@ const modelBracket: PromptTemplate = {
     const holeRadius = Math.max(t * 0.4, 2);
     const holeDepth = t + 2; // punch fully through
 
-    // Hole centers are evenly spaced along the width. boolean_subtract consumes BOTH operands and
+    // Hole centers are evenly spaced along the width. a boolean subtract consumes BOTH operands and
     // returns a NEW mesh, so the subtracts chain: body → body_0 → body_1 → … → body_${n - 1}.
     const holeActions: string[] = [];
     for (let i = 0; i < n; i++) {
@@ -92,9 +92,9 @@ const modelBracket: PromptTemplate = {
       const holeSolidAlias = `hole_solid_${i}`;
       const bodyIn = i === 0 ? 'body' : `body_${i - 1}`;
       holeActions.push(
-        `    { "command": "draw_circle",    "params": { "center": [${cx}, ${h / 2}], "radius": ${holeRadius} }, "as": "${holeSketchAlias}" },`,
-        `    { "command": "extrude_sketch",  "params": { "id": "$${holeSketchAlias}", "depth": ${holeDepth} }, "as": "${holeSolidAlias}" },`,
-        `    { "command": "boolean_subtract","params": { "a": "$${bodyIn}", "b": "$${holeSolidAlias}" }, "as": "body_${i}" },`,
+        `    { "command": "draw_arc",       "params": { "center": [${cx}, ${h / 2}], "radius": ${holeRadius} }, "as": "${holeSketchAlias}" },`,
+        `    { "command": "extrude_profile", "params": { "id": "$${holeSketchAlias}", "depth": ${holeDepth} }, "as": "${holeSolidAlias}" },`,
+        `    { "command": "boolean",        "params": { "op": "subtract", "a": "$${bodyIn}", "b": "$${holeSolidAlias}" }, "as": "body_${i}" },`,
       );
     }
     const finalBodyAlias = `body_${n - 1}`;
@@ -110,7 +110,7 @@ const modelBracket: PromptTemplate = {
         `{\n` +
         `  "actions": [\n` +
         `    { "command": "draw_rectangle", "params": { "width": ${w}, "height": ${h} }, "as": "base_rect" },\n` +
-        `    { "command": "extrude_sketch",  "params": { "id": "$base_rect", "depth": ${t} }, "as": "body" },\n` +
+        `    { "command": "extrude_profile", "params": { "id": "$base_rect", "depth": ${t} }, "as": "body" },\n` +
         holeSection +
         `\n` +
         `    { "command": "set_entity_name", "params": { "id": "$${finalBodyAlias}", "name": "bracket_body" } },\n` +
@@ -121,8 +121,8 @@ const modelBracket: PromptTemplate = {
         `\`\`\`\n\n` +
         `**Key points**\n` +
         `- \`draw_rectangle\` requires only \`width\` and \`height\`; \`position\` (optional [x,y,z]) places the work-plane origin.\n` +
-        `- \`extrude_sketch\` takes \`id\` (or \`ids\` of open pieces forming one loop) and \`depth\`; it inherits the sketch's position automatically.\n` +
-        `- \`boolean_subtract\` uses params \`a\` (base solid) and \`b\` (tool solid); BOTH operands are consumed and replaced by a new mesh entity — bind the result with \`as\` so later steps can reference it.\n` +
+        `- \`extrude_profile\` takes \`id\` (or \`ids\` of open pieces forming one loop) and \`depth\`; it inherits the sketch's position automatically.\n` +
+        `- \`boolean\` with \`op: "subtract"\` uses params \`a\` (base solid) and \`b\` (tool solid); BOTH operands are consumed and replaced by a new mesh entity — bind the result with \`as\` so later steps can reference it.\n` +
         `- Each subtract chains to the previous result: body → body_0 → body_1 → … The final mesh alias is \`$${finalBodyAlias}\`.\n` +
         `- \`$alias\` references let later steps use entity ids created in earlier steps without knowing them in advance.\n` +
         `- \`describe_scene\` at the end lets you verify the final entity count and bounding box.\n` +
@@ -239,26 +239,26 @@ const parametricPart: PromptTemplate = {
         `      "as": "base_profile" },\n` +
         `\n` +
         `    // Step 1 — extrude into body solid\n` +
-        `    // extrude_sketch takes id (or ids of loop pieces) and depth; it inherits the sketch's position.\n` +
-        `    { "command": "extrude_sketch",\n` +
+        `    // extrude_profile takes id (or ids of loop pieces) and depth; it inherits the sketch's position.\n` +
+        `    { "command": "extrude_profile",\n` +
         `      "params": { "id": "$base_profile", "depth": 10 },\n` +
         `      "as": "body" },\n` +
         `\n` +
         `    // Step 2 — add a cutout profile\n` +
-        `    { "command": "draw_circle",\n` +
+        `    { "command": "draw_arc",\n` +
         `      "params": { "center": [50, 30], "radius": 8 },\n` +
         `      "as": "cutout_profile" },\n` +
         `\n` +
         `    // Step 3 — extrude cutout (depth > body depth to guarantee clean cut)\n` +
-        `    { "command": "extrude_sketch",\n` +
+        `    { "command": "extrude_profile",\n` +
         `      "params": { "id": "$cutout_profile", "depth": 12 },\n` +
         `      "as": "cutter" },\n` +
         `\n` +
         `    // Step 4 — subtract cutter from body\n` +
-        `    // boolean_subtract params are a (base solid) and b (tool solid).\n` +
+        `    // boolean op subtract: a (base solid) minus b (tool solid).\n` +
         `    // BOTH operands are consumed; bind the new mesh with as so later steps can use it.\n` +
-        `    { "command": "boolean_subtract",\n` +
-        `      "params": { "a": "$body", "b": "$cutter" },\n` +
+        `    { "command": "boolean",\n` +
+        `      "params": { "op": "subtract", "a": "$body", "b": "$cutter" },\n` +
         `      "as": "result" },\n` +
         `\n` +
         `    // Step 5 — name the final solid\n` +
@@ -315,7 +315,7 @@ const designBuilding: PromptTemplate = {
         `1. \`set_project_info\` (name, client, address, author, drawingNumber) — fills title blocks and IFC.\n` +
         `2. \`add_level\` per storey (elevation stacks automatically; height = floor-to-floor).\n` +
         `3. \`add_grid_system\` { xSpacings, ySpacings } — numbered / lettered axes.\n` +
-        `4. \`draw_walls\` { points, closed: true, thickness, material } for the envelope; \`add_wall\` for partitions ` +
+        `4. \`draw_walls\` { points, closed: true, thickness, material } for the envelope; \`draw_walls\` with two points for a partition ` +
         `(endpoints on another wall join automatically); \`add_curved_wall\` { start, through, end } for arcs; \`set_wall_layers\` for build-ups (render + insulation + structure + lining).\n` +
         `5. \`add_door\` / \`add_window\` { wallId, offset | at, width, height, sillHeight } — hosted; refused if they do not fit.\n` +
         `6. \`add_slab\` { wallIds } (or boundary), \`add_column\` { atGridIntersections: true }, \`add_beam\`, \`add_stair\` ` +

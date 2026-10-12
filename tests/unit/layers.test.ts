@@ -59,16 +59,16 @@ describe('layer commands', () => {
     });
   });
 
-  // rename_layer
+  // update_layer: name
 
-  describe('rename_layer', () => {
+  describe('update_layer name', () => {
     it('updates the layer name', () => {
       let doc = createEmptyDocument();
       const added = execute(doc, 'add_layer', { name: 'Old' });
       doc = added.document;
       const id = added.affected[0]!;
 
-      const result = execute(doc, 'rename_layer', { id, name: 'New' });
+      const result = execute(doc, 'update_layer', { id, name: 'New' });
       expect(result.affected).toEqual([id]);
       expect(result.document.layers[id]!.name).toBe('New');
     });
@@ -79,17 +79,17 @@ describe('layer commands', () => {
       doc = added.document;
       const id = added.affected[0]!;
       // lock and hide it first
-      doc = execute(doc, 'set_layer_lock', { id, locked: true }).document;
-      doc = execute(doc, 'set_layer_visibility', { id, visible: false }).document;
+      doc = execute(doc, 'update_layer', { id, locked: true }).document;
+      doc = execute(doc, 'update_layer', { id, visible: false }).document;
 
-      const result = execute(doc, 'rename_layer', { id, name: 'Renamed' });
+      const result = execute(doc, 'update_layer', { id, name: 'Renamed' });
       expect(result.document.layers[id]!.locked).toBe(true);
       expect(result.document.layers[id]!.visible).toBe(false);
     });
 
     it('missing id — no-op, affected:[]', () => {
       const doc = createEmptyDocument();
-      const result = execute(doc, 'rename_layer', { id: 'ghost', name: 'X' });
+      const result = execute(doc, 'update_layer', { id: 'ghost', name: 'X' });
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
       expect(result.summary).toContain('ghost');
@@ -97,74 +97,120 @@ describe('layer commands', () => {
 
     it('empty name — no-op, affected:[]', () => {
       const doc = createEmptyDocument();
-      const result = execute(doc, 'rename_layer', { id: DEFAULT_LAYER_ID, name: '' });
+      const result = execute(doc, 'update_layer', { id: DEFAULT_LAYER_ID, name: '' });
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
     });
   });
 
-  // set_layer_visibility
+  // update_layer: visible
 
-  describe('set_layer_visibility', () => {
+  describe('update_layer visible', () => {
     it('hides a visible layer', () => {
       const doc = createEmptyDocument();
-      const result = execute(doc, 'set_layer_visibility', { id: DEFAULT_LAYER_ID, visible: false });
+      const result = execute(doc, 'update_layer', { id: DEFAULT_LAYER_ID, visible: false });
       expect(result.affected).toEqual([DEFAULT_LAYER_ID]);
       expect(result.document.layers[DEFAULT_LAYER_ID]!.visible).toBe(false);
     });
 
     it('shows a hidden layer', () => {
       let doc = createEmptyDocument();
-      doc = execute(doc, 'set_layer_visibility', { id: DEFAULT_LAYER_ID, visible: false }).document;
-      const result = execute(doc, 'set_layer_visibility', { id: DEFAULT_LAYER_ID, visible: true });
+      doc = execute(doc, 'update_layer', { id: DEFAULT_LAYER_ID, visible: false }).document;
+      const result = execute(doc, 'update_layer', { id: DEFAULT_LAYER_ID, visible: true });
       expect(result.document.layers[DEFAULT_LAYER_ID]!.visible).toBe(true);
     });
 
     it('missing id — no-op, affected:[]', () => {
       const doc = createEmptyDocument();
-      const result = execute(doc, 'set_layer_visibility', { id: 'nope', visible: false });
+      const result = execute(doc, 'update_layer', { id: 'nope', visible: false });
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
     });
 
     it('does not change lock state or name', () => {
       let doc = createEmptyDocument();
-      doc = execute(doc, 'set_layer_lock', { id: DEFAULT_LAYER_ID, locked: true }).document;
-      const result = execute(doc, 'set_layer_visibility', { id: DEFAULT_LAYER_ID, visible: false });
+      doc = execute(doc, 'update_layer', { id: DEFAULT_LAYER_ID, locked: true }).document;
+      const result = execute(doc, 'update_layer', { id: DEFAULT_LAYER_ID, visible: false });
       expect(result.document.layers[DEFAULT_LAYER_ID]!.locked).toBe(true);
       expect(result.document.layers[DEFAULT_LAYER_ID]!.name).toBe('Layer 0');
     });
   });
 
-  // set_layer_lock
+  // update_layer: locked
 
-  describe('set_layer_lock', () => {
+  describe('update_layer locked', () => {
     it('locks an unlocked layer', () => {
       const doc = createEmptyDocument();
-      const result = execute(doc, 'set_layer_lock', { id: DEFAULT_LAYER_ID, locked: true });
+      const result = execute(doc, 'update_layer', { id: DEFAULT_LAYER_ID, locked: true });
       expect(result.affected).toEqual([DEFAULT_LAYER_ID]);
       expect(result.document.layers[DEFAULT_LAYER_ID]!.locked).toBe(true);
     });
 
     it('unlocks a locked layer', () => {
       let doc = createEmptyDocument();
-      doc = execute(doc, 'set_layer_lock', { id: DEFAULT_LAYER_ID, locked: true }).document;
-      const result = execute(doc, 'set_layer_lock', { id: DEFAULT_LAYER_ID, locked: false });
+      doc = execute(doc, 'update_layer', { id: DEFAULT_LAYER_ID, locked: true }).document;
+      const result = execute(doc, 'update_layer', { id: DEFAULT_LAYER_ID, locked: false });
       expect(result.document.layers[DEFAULT_LAYER_ID]!.locked).toBe(false);
     });
 
     it('missing id — no-op, affected:[]', () => {
       const doc = createEmptyDocument();
-      const result = execute(doc, 'set_layer_lock', { id: 'ghost', locked: true });
+      const result = execute(doc, 'update_layer', { id: 'ghost', locked: true });
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
     });
 
     it('does not change visibility or name', () => {
       const doc = createEmptyDocument();
-      const result = execute(doc, 'set_layer_lock', { id: DEFAULT_LAYER_ID, locked: true });
+      const result = execute(doc, 'update_layer', { id: DEFAULT_LAYER_ID, locked: true });
       expect(result.document.layers[DEFAULT_LAYER_ID]!.visible).toBe(true);
       expect(result.document.layers[DEFAULT_LAYER_ID]!.name).toBe('Layer 0');
+    });
+  });
+
+  // update_layer: several fields at once, no-field / bad-color guards
+
+  describe('update_layer combined fields', () => {
+    it('applies name, visible, locked and color in one call', () => {
+      const added = execute(createEmptyDocument(), 'add_layer', { name: 'L' });
+      const id = added.affected[0]!;
+      const result = execute(added.document, 'update_layer', {
+        id,
+        name: ' Walls ',
+        visible: false,
+        locked: true,
+        color: '#ff0000',
+      });
+      expect(result.affected).toEqual([id]);
+      expect(result.document.layers[id]).toMatchObject({
+        name: 'Walls',
+        visible: false,
+        locked: true,
+        color: '#ff0000',
+      });
+      expect(result.summary).toContain('visible = false');
+    });
+
+    it('no field given — no-op, affected:[]', () => {
+      const doc = createEmptyDocument();
+      const result = execute(doc, 'update_layer', { id: DEFAULT_LAYER_ID });
+      expect(result.affected).toHaveLength(0);
+      expect(result.document).toBe(doc);
+      expect(result.summary).toContain('at least one');
+    });
+
+    it('non-#rrggbb color — no-op, layer unchanged', () => {
+      const doc = createEmptyDocument();
+      const result = execute(doc, 'update_layer', { id: DEFAULT_LAYER_ID, color: 'red' });
+      expect(result.affected).toHaveLength(0);
+      expect(result.document).toBe(doc);
+    });
+
+    it('is pure — input document is not mutated', () => {
+      const doc = createEmptyDocument();
+      const snapshot = JSON.stringify(doc);
+      execute(doc, 'update_layer', { id: DEFAULT_LAYER_ID, locked: true, name: 'X' });
+      expect(JSON.stringify(doc)).toBe(snapshot);
     });
   });
 
@@ -216,7 +262,7 @@ describe('layer commands', () => {
     it('locked source layer — rejected, no-op, affected:[]', () => {
       let doc = createEmptyDocument();
       // lock the default layer
-      doc = execute(doc, 'set_layer_lock', { id: DEFAULT_LAYER_ID, locked: true }).document;
+      doc = execute(doc, 'update_layer', { id: DEFAULT_LAYER_ID, locked: true }).document;
 
       // add a target layer
       const layerResult = execute(doc, 'add_layer', { name: 'Target' });
@@ -339,18 +385,11 @@ describe('layer commands', () => {
 
   // Cross-cutting: toToolSchemas 1:1 with listCommands (layer entries)
 
-  it('all 6 layer commands are registered and appear in toToolSchemas', () => {
+  it('all 4 layer commands are registered and appear in toToolSchemas', () => {
     const names = listCommands().map((c) => c.name);
     const schemaNames = toToolSchemas().map((s) => s.name);
 
-    const layerCommandNames = [
-      'add_layer',
-      'rename_layer',
-      'set_layer_visibility',
-      'set_layer_lock',
-      'set_entity_layer',
-      'delete_layer',
-    ];
+    const layerCommandNames = ['add_layer', 'update_layer', 'set_entity_layer', 'delete_layer'];
 
     for (const name of layerCommandNames) {
       expect(names).toContain(name);

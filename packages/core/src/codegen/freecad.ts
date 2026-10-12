@@ -7,16 +7,14 @@
  */
 
 import type { Feature, FeatureProgram } from './program';
+import { commentText, formatNumber, provenance, quote, sectionBanner } from './format';
 import {
-  commentText,
-  featureLinesWithHeadings,
-  formatNumber,
-  parameterLines,
-  provenance,
-  quote,
-  sectionBanner,
-} from './format';
-import { placementKwargs, pythonTuple, modifierLine, shapeCallOpen } from './pythonCalls';
+  modifierLine,
+  parametersAndModel,
+  placementKwargs,
+  pythonTuple,
+  shapeCallOpen,
+} from './pythonCalls';
 import { FREECAD_SUBDIVISION_PY, SUBDIVISION_PY } from './pythonSubdivision';
 
 const HELPERS = String.raw`
@@ -183,17 +181,14 @@ export function emitFreeCad(program: FeatureProgram): string {
     '',
     `doc = App.newDocument("llull")`,
     '',
-    sectionBanner('PARAMETERS'),
   ];
   lines.push(
-    ...parameterLines(
+    ...parametersAndModel(
       program,
-      '#',
       (p) => `${p.identifier} = ${p.expression ?? formatNumber(p.value)}  # ${commentText(p.name)}`,
+      featureLine,
     ),
   );
-  lines.push('', sectionBanner('MODEL'));
-  lines.push(...featureLinesWithHeadings(program, '#', featureLine));
   lines.push('', sectionBanner('RESULT'));
   program.outputs.forEach((output, i) => {
     const name = output.name ?? `solid_${i + 1}`;

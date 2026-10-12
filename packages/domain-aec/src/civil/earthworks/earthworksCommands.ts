@@ -11,6 +11,7 @@ import { commandCatalog, defineCommand, z, vec2 } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
 import { isValidPolygon, segmentsIntersect, signedArea } from '@lib/polygon';
 import {
+  civilObjectOrFailure,
   civilObject,
   civilObjectsOf,
   getCivil,
@@ -19,7 +20,7 @@ import {
   withObject,
 } from '../model';
 import { commitCivil } from '../evaluate';
-import { surfaceTinById } from '../surface/surfaceTin';
+import { surfaceTin, surfaceTinById } from '../surface/surfaceTin';
 import { elevationAt, type Tin } from '../surface/tin';
 import {
   buildSamples,
@@ -31,13 +32,14 @@ import {
 } from './earthworksMath';
 import { daylightPoints } from './platformDaylight';
 import { toMetres } from '../../building/model';
+import { round as roundDigits } from '../../shared/numeric';
 
 const DEFAULT_CUT_SLOPE = 1.5;
 const DEFAULT_FILL_SLOPE = 2;
 const MAX_BOUNDARY_VERTICES = 2000;
 const BALANCE_ITERATIONS = 60;
 
-const round = (value: number, digits = 3): number => Number(value.toFixed(digits));
+const round = (value: number, digits = 3): number => roundDigits(value, digits);
 
 const slopeOf = (name: string, value: number): string | null =>
   value > 0 && Number.isFinite(value) ? null : `${name} must be > 0 (horizontal per 1 vertical).`;
@@ -145,9 +147,9 @@ export const addPlatform = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const civil = getCivil(doc);
-    const surface = civilObject(civil, params.surfaceId, 'surface');
-    const tin = surface ? surfaceTinById(civil, surface.id) : null;
-    if (!surface || !tin) return noop(doc, `add_platform failed: no surface ${params.surfaceId}.`);
+    const surface = civilObjectOrFailure(doc, params.surfaceId, 'surface', 'add_platform');
+    if (typeof surface === 'string') return noop(doc, surface);
+    const tin = surfaceTin(civil, surface);
     const id = nextCivilId(civil, 'platform');
     const platform: PlatformObject = {
       id,

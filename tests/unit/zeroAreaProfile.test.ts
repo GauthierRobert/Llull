@@ -65,17 +65,17 @@ describe('profiles that enclose no area are refused', () => {
     );
   });
 
-  describe('extrude_sketch', () => {
+  describe('extrude_profile', () => {
     it('refuses a closed polyline whose points are collinear', () => {
       const line = execute(empty, 'draw_polyline', { points: collinear, closed: true });
-      const result = execute(line.document, 'extrude_sketch', { id: line.affected[0]!, depth: 2 });
+      const result = execute(line.document, 'extrude_profile', { id: line.affected[0]!, depth: 2 });
       expect(result.document).toBe(line.document);
       expect(result.summary).toContain('encloses no area');
     });
 
     it('refuses a rectangle or circle whose size collapsed to zero', () => {
       const rectangle = execute(empty, 'draw_rectangle', { width: 4, height: 3 });
-      const circle = execute(rectangle.document, 'draw_circle', { center: [0, 0], radius: 2 });
+      const circle = execute(rectangle.document, 'draw_arc', { center: [0, 0], radius: 2 });
       const rectangleId = rectangle.affected[0]!;
       const circleId = circle.affected[0]!;
       const collapsed = {
@@ -87,7 +87,7 @@ describe('profiles that enclose no area are refused', () => {
         },
       } as typeof empty;
       for (const id of [rectangleId, circleId]) {
-        const result = execute(collapsed, 'extrude_sketch', { id, depth: 1 });
+        const result = execute(collapsed, 'extrude_profile', { id, depth: 1 });
         expect(result.document).toBe(collapsed);
         expect(result.summary).toContain('encloses no area');
       }
@@ -95,7 +95,7 @@ describe('profiles that enclose no area are refused', () => {
 
     it('still extrudes a proper rectangle', () => {
       const rectangle = execute(empty, 'draw_rectangle', { width: 4, height: 3 });
-      const result = execute(rectangle.document, 'extrude_sketch', {
+      const result = execute(rectangle.document, 'extrude_profile', {
         id: rectangle.affected[0]!,
         depth: 1,
       });

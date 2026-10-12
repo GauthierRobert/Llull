@@ -76,7 +76,8 @@ function seedPlateWithHole(server: LoadedServer): void {
     color: '#336699',
   });
   const hole = server.applyCommand('add_cylinder', { radius: 4, height: 20, position: [0, 0, 4] });
-  const cut = server.applyCommand('boolean_subtract', {
+  const cut = server.applyCommand('boolean', {
+    op: 'subtract',
     a: plate.affected[0],
     b: hole.affected[0],
   });

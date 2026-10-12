@@ -71,7 +71,7 @@ function modifyFailure(
     return (
       `${command}: the result could not be tessellated into a closed mesh (typically a corner where ` +
       'several rounded edges meet); document unchanged. Round fewer edges per call, or clip the corners ' +
-      'with boolean_intersect (e.g. a rounded-rectangle prism) instead.'
+      'with boolean op intersect (e.g. a rounded-rectangle prism) instead.'
     );
   if (command === 'shell_solid')
     return (

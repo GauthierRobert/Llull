@@ -22,6 +22,7 @@ import path from 'node:path';
 import type { DwgConverterPort } from '@mcp/index';
 import {
   bridgeEnvironment,
+  captureStderrTail,
   concurrencyLimiter,
   confinedPath,
   exchangeOptionsFromEnv,
@@ -92,7 +93,6 @@ type RunOutcome =
 /** Spawn `command args` (no shell); resolves, never rejects. */
 function runConverter(command: string, args: string[], timeoutMs: number): Promise<RunOutcome> {
   return new Promise((resolve) => {
-    let stderr = Buffer.alloc(0);
     let settled = false;
     const finish = (outcome: RunOutcome): void => {
       if (settled) return;
@@ -105,18 +105,16 @@ function runConverter(command: string, args: string[], timeoutMs: number): Promi
       env: bridgeEnvironment(),
       shell: false,
     });
+    const stderr = captureStderrTail(child.stderr, MAX_STDERR_BYTES);
     const timer = setTimeout(() => {
       child.kill('SIGKILL');
       finish({ kind: 'timeout' });
     }, timeoutMs);
-    child.stderr.on('data', (chunk: Buffer) => {
-      stderr = Buffer.concat([stderr, chunk]).subarray(-MAX_STDERR_BYTES);
-    });
     child.on('error', (error: NodeJS.ErrnoException) => {
       if (error.code === 'ENOENT' || error.code === 'EACCES') finish({ kind: 'missing' });
       else finish({ kind: 'done', code: null, stderr: error.message });
     });
-    child.on('close', (code) => finish({ kind: 'done', code, stderr: stderr.toString('utf8') }));
+    child.on('close', (code) => finish({ kind: 'done', code, stderr: stderr() }));
   });
 }
 

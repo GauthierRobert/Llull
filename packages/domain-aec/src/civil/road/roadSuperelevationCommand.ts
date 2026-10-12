@@ -7,7 +7,8 @@ import type { AlignmentObject } from '@core/model/civil';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
-import { civilObject, getCivil, toMetresText, withObject } from '../model';
+import { civilObjectOrFailure, getCivil, toMetresText, withObject } from '../model';
+import { alignmentIdParam } from './roadParams';
 import { commitCivil } from '../evaluate';
 
 /** Largest accepted full superelevation rate (ratio). */
@@ -32,7 +33,7 @@ export const setSuperelevation = defineCommand({
     'keeps the lane-edge relative gradient at 0.5 % (maxRate x laneWidth / 0.005). A rate below the ' +
     'crossfall is raised to the crossfall. Corridor, cross sections, volumes and alignment_report follow.',
   params: z.object({
-    alignmentId: z.string().describe('Alignment id, e.g. "alignment-1".'),
+    alignmentId: alignmentIdParam,
     maxRate: z
       .number()
       .describe('Full superelevation rate on curves, ratio 0..0.15 (0.07 = 7 %). 0 removes it.'),
@@ -44,8 +45,8 @@ export const setSuperelevation = defineCommand({
       ),
   }),
   run: (doc, { alignmentId, maxRate, runoffLength }): CommandResult => {
-    const alignment = civilObject(getCivil(doc), alignmentId, 'alignment');
-    if (!alignment) return noop(doc, `set_superelevation failed: no alignment ${alignmentId}.`);
+    const alignment = civilObjectOrFailure(doc, alignmentId, 'alignment', 'set_superelevation');
+    if (typeof alignment === 'string') return noop(doc, alignment);
     if (!Number.isFinite(maxRate) || maxRate < 0 || maxRate > MAX_SUPERELEVATION_RATE) {
       return noop(
         doc,

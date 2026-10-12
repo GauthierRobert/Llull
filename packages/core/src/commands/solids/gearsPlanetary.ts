@@ -16,7 +16,12 @@ import { MAX_GEAR_TEETH } from '../limits';
 import { withEntity } from '../entity/entityOps';
 import { newEntity } from '../entity/newEntity';
 import { positionField } from './shared';
-import { AXIS_ROTATION, placedMeshEntity } from './gearSolid';
+import {
+  AXIS_ROTATION,
+  faceWidthProblem,
+  placedMeshEntity,
+  pressureAngleProblem,
+} from './gearSolid';
 import { internalGearMesh, minRingOuterRadius } from './gearsInternal';
 import { noop } from '../noop';
 
@@ -130,12 +135,8 @@ export const addPlanetaryGearset = defineCommand({
         `planetCount must be an integer in [1, ${MAX_PLANETS}], got ${String(planetCount)}.`,
       );
     }
-    if (!(pressureAngle > 0 && pressureAngle < Math.PI / 2)) {
-      return fail(`pressureAngle must be in (0, π/2), got ${String(pressureAngle)}.`);
-    }
-    if (!(faceWidth > 0 && Number.isFinite(faceWidth))) {
-      return fail(`faceWidth must be finite and > 0, got ${String(faceWidth)}.`);
-    }
+    const shapeProblem = pressureAngleProblem(pressureAngle) ?? faceWidthProblem(faceWidth);
+    if (shapeProblem !== null) return fail(shapeProblem);
     if ((sun + ring) % count !== 0) {
       const valid = Array.from({ length: MAX_PLANETS }, (_, i) => i + 1).filter(
         (n) => (sun + ring) % n === 0,

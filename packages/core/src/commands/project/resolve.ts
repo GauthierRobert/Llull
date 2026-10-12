@@ -123,6 +123,25 @@ export function interpolate(
   return { text: filled, error };
 }
 
+/** A `$…{expr}…` string leaf with its placeholders filled; any other text passes through. */
+export function fillPlaceholders(
+  text: string,
+  env: Record<string, number>,
+): { text: string; error: string | null } {
+  return text.startsWith('$') && text.includes('{')
+    ? interpolate(text, env)
+    : { text, error: null };
+}
+
+/** Evaluate an `=expr` leaf; `$name` (a loop variable, `=$r * 2`) is stripped to match the env key. */
+export function evaluateLeafExpression(
+  text: string,
+  env: Record<string, number>,
+): { expr: string; result: EvalResult } {
+  const expr = text.slice(1).replace(/\$([A-Za-z_]\w*)/g, '$1');
+  return { expr, result: evaluateExpression(expr, env) };
+}
+
 /** Evaluate a plan expression (leading `=` optional) over the document parameters. */
 function evaluateOverParameters(raw: string, doc: CadDocument): EvalResult {
   return evaluateExpression(raw.startsWith('=') ? raw.slice(1) : raw, buildEnv(doc, {}));
@@ -162,23 +181,19 @@ export function resolveExprInParam(
   let firstError: string | null = null;
   const resolved = mapStringLeaves(value, (text) => {
     if (firstError !== null) return text;
-    if (text.startsWith('$') && text.includes('{')) {
-      const filled = interpolate(text, env);
-      if (filled.error !== null) {
-        firstError = filled.error;
-        return undefined;
-      }
-      text = filled.text;
+    const filled = fillPlaceholders(text, env);
+    if (filled.error !== null) {
+      firstError = filled.error;
+      return undefined;
     }
+    text = filled.text;
     if (REF.test(text)) {
       const ref = resolveRef(text, bindings);
       firstError = ref.error;
       return ref.value;
     }
     if (!text.startsWith('=')) return text;
-    // `$name` in an expression is a loop variable (`=$r * 2`): strip the `$` to match the env key.
-    const expr = text.slice(1).replace(/\$([A-Za-z_]\w*)/g, '$1');
-    const r = evaluateExpression(expr, env);
+    const { expr, result: r } = evaluateLeafExpression(text, env);
     if (!r.ok) {
       firstError = `expression "${expr}": ${r.error}`;
       return undefined;

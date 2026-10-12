@@ -45,12 +45,12 @@ describe('boolean commands', () => {
     setGeometryKernel(null);
   });
 
-  // boolean_union — happy path
+  // boolean union — happy path
 
-  describe('boolean_union', () => {
+  describe('boolean union', () => {
     it('creates one mesh entity and reports it as affected', () => {
       const { doc, idA, idB } = docWithTwoBoxes();
-      const result = execute(doc, 'boolean_union', { a: idA, b: idB });
+      const result = execute(doc, 'boolean', { op: 'union', a: idA, b: idB });
 
       expect(result.affected).toHaveLength(1);
       const newId = result.affected[0]!;
@@ -61,7 +61,7 @@ describe('boolean commands', () => {
 
     it('mesh entity carries the canned mesh data', () => {
       const { doc, idA, idB } = docWithTwoBoxes();
-      const result = execute(doc, 'boolean_union', { a: idA, b: idB });
+      const result = execute(doc, 'boolean', { op: 'union', a: idA, b: idB });
       const newId = result.affected[0]!;
       const entity = result.document.entities[newId] as MeshSolidEntity;
       expect(entity.mesh.positions).toEqual(TETRA.positions);
@@ -70,7 +70,7 @@ describe('boolean commands', () => {
 
     it('stores the boolean recipe of both operands as brep', () => {
       const { doc, idA, idB } = docWithTwoBoxes();
-      const result = execute(doc, 'boolean_union', { a: idA, b: idB });
+      const result = execute(doc, 'boolean', { op: 'union', a: idA, b: idB });
       const entity = result.document.entities[result.affected[0]!] as MeshSolidEntity;
       expect(entity.brep).toMatchObject({
         op: 'boolean',
@@ -82,14 +82,14 @@ describe('boolean commands', () => {
 
     it('consumes both operands from entities', () => {
       const { doc, idA, idB } = docWithTwoBoxes();
-      const result = execute(doc, 'boolean_union', { a: idA, b: idB });
+      const result = execute(doc, 'boolean', { op: 'union', a: idA, b: idB });
       expect(result.document.entities[idA]).toBeUndefined();
       expect(result.document.entities[idB]).toBeUndefined();
     });
 
     it('removes operands from order and appends new mesh id', () => {
       const { doc, idA, idB } = docWithTwoBoxes();
-      const result = execute(doc, 'boolean_union', { a: idA, b: idB });
+      const result = execute(doc, 'boolean', { op: 'union', a: idA, b: idB });
       const newId = result.affected[0]!;
       expect(result.document.order).not.toContain(idA);
       expect(result.document.order).not.toContain(idB);
@@ -98,7 +98,7 @@ describe('boolean commands', () => {
 
     it('summary mentions both operand ids, new id, and triangle count', () => {
       const { doc, idA, idB } = docWithTwoBoxes();
-      const result = execute(doc, 'boolean_union', { a: idA, b: idB });
+      const result = execute(doc, 'boolean', { op: 'union', a: idA, b: idB });
       const newId = result.affected[0]!;
       const triangleCount = TETRA.indices.length / 3; // 4
       expect(result.summary).toContain(idA);
@@ -110,7 +110,8 @@ describe('boolean commands', () => {
     it('new mesh entity inherits layerId and color from operand a', () => {
       const { doc, idA } = docWithTwoBoxes();
       const entityA = doc.entities[idA]!;
-      const result = execute(doc, 'boolean_union', {
+      const result = execute(doc, 'boolean', {
+        op: 'union',
         a: idA,
         b: Object.keys(doc.entities).find((id) => id !== idA)!,
       });
@@ -122,7 +123,7 @@ describe('boolean commands', () => {
 
     it('new mesh entity has position [0,0,0] and rotation [0,0,0]', () => {
       const { doc, idA, idB } = docWithTwoBoxes();
-      const result = execute(doc, 'boolean_union', { a: idA, b: idB });
+      const result = execute(doc, 'boolean', { op: 'union', a: idA, b: idB });
       const newId = result.affected[0]!;
       const entity = result.document.entities[newId]!;
       expect(entity.position).toEqual([0, 0, 0]);
@@ -131,20 +132,20 @@ describe('boolean commands', () => {
 
     it('passes op = union to the kernel', () => {
       const { doc, idA, idB } = docWithTwoBoxes();
-      execute(doc, 'boolean_union', { a: idA, b: idB });
+      execute(doc, 'boolean', { op: 'union', a: idA, b: idB });
       expect(lastBoolean(fake)?.boolean).toBe('union');
     });
   });
 
-  // boolean_subtract — operand order
+  // boolean subtract — operand order
 
-  describe('boolean_subtract', () => {
+  describe('boolean subtract', () => {
     it('passes operands to the kernel in the correct order (a first, b second)', () => {
       const { doc, idA, idB } = docWithTwoBoxes();
       const entityA = doc.entities[idA]!;
       const entityB = doc.entities[idB]!;
 
-      execute(doc, 'boolean_subtract', { a: idA, b: idB });
+      execute(doc, 'boolean', { op: 'subtract', a: idA, b: idB });
 
       const call = lastBoolean(fake)!;
       expect(call.boolean).toBe('subtract');
@@ -154,7 +155,7 @@ describe('boolean commands', () => {
 
     it('creates one mesh entity and consumes both operands', () => {
       const { doc, idA, idB } = docWithTwoBoxes();
-      const result = execute(doc, 'boolean_subtract', { a: idA, b: idB });
+      const result = execute(doc, 'boolean', { op: 'subtract', a: idA, b: idB });
 
       expect(result.affected).toHaveLength(1);
       expect(result.document.entities[idA]).toBeUndefined();
@@ -162,12 +163,12 @@ describe('boolean commands', () => {
     });
   });
 
-  // boolean_intersect
+  // boolean intersect
 
-  describe('boolean_intersect', () => {
+  describe('boolean intersect', () => {
     it('passes op = intersect to the kernel and creates mesh entity', () => {
       const { doc, idA, idB } = docWithTwoBoxes();
-      const result = execute(doc, 'boolean_intersect', { a: idA, b: idB });
+      const result = execute(doc, 'boolean', { op: 'intersect', a: idA, b: idB });
 
       expect(lastBoolean(fake)?.boolean).toBe('intersect');
       expect(result.affected).toHaveLength(1);
@@ -180,7 +181,7 @@ describe('boolean commands', () => {
   describe('no-op paths', () => {
     it('no-op when a is missing', () => {
       const { doc, idB } = docWithTwoBoxes();
-      const result = execute(doc, 'boolean_union', { a: 'ghost', b: idB });
+      const result = execute(doc, 'boolean', { op: 'union', a: 'ghost', b: idB });
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
       expect(result.summary).toContain('ghost');
@@ -188,7 +189,7 @@ describe('boolean commands', () => {
 
     it('no-op when b is missing', () => {
       const { doc, idA } = docWithTwoBoxes();
-      const result = execute(doc, 'boolean_union', { a: idA, b: 'ghost' });
+      const result = execute(doc, 'boolean', { op: 'union', a: idA, b: 'ghost' });
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
       expect(result.summary).toContain('ghost');
@@ -196,7 +197,7 @@ describe('boolean commands', () => {
 
     it('no-op when a and b are the same id', () => {
       const { doc, idA } = docWithTwoBoxes();
-      const result = execute(doc, 'boolean_union', { a: idA, b: idA });
+      const result = execute(doc, 'boolean', { op: 'union', a: idA, b: idA });
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
       expect(result.summary).toContain(idA);
@@ -207,12 +208,17 @@ describe('boolean commands', () => {
       ['b', false],
     ])('no-op when operand %s is a 2D entity', (_operand, lineFirst) => {
       const { doc: boxDoc, ids } = docWithBoxes(1);
-      const lineResult = execute(boxDoc, 'draw_line', { start: [0, 0], end: [1, 0] });
+      const lineResult = execute(boxDoc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [1, 0],
+        ],
+      });
       const doc = lineResult.document;
       const lineId = lineResult.affected[0]!;
       const operands = lineFirst ? { a: lineId, b: ids[0]! } : { a: ids[0]!, b: lineId };
 
-      const result = execute(doc, 'boolean_union', operands);
+      const result = execute(doc, 'boolean', { op: 'union', ...operands });
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
       expect(result.summary).toContain('2D');
@@ -224,7 +230,7 @@ describe('boolean commands', () => {
     ])('no-op when %s', (_label, kernel, summary) => {
       setGeometryKernel(kernel);
       const { doc, idA, idB } = docWithTwoBoxes();
-      const result = execute(doc, 'boolean_union', { a: idA, b: idB });
+      const result = execute(doc, 'boolean', { op: 'union', a: idA, b: idB });
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
       expect(result.summary).toContain(summary);
@@ -243,7 +249,7 @@ describe('boolean commands', () => {
       const groupId = grouped.affected[0]!;
       expect(docWithGroup.groups[groupId]!.memberIds).toEqual([idA, idB]);
 
-      const result = execute(docWithGroup, 'boolean_union', { a: idA, b: idB });
+      const result = execute(docWithGroup, 'boolean', { op: 'union', a: idA, b: idB });
 
       // Group dissolved because both members were consumed.
       expect(result.document.groups[groupId]).toBeUndefined();
@@ -257,7 +263,7 @@ describe('boolean commands', () => {
       const grouped = execute(doc, 'group_entities', { ids: [idA, idB, idC], name: 'Trio' });
       const groupId = grouped.affected[0]!;
 
-      const result = execute(grouped.document, 'boolean_union', { a: idA, b: idB });
+      const result = execute(grouped.document, 'boolean', { op: 'union', a: idA, b: idB });
       expect(result.document.groups[groupId]).toBeUndefined();
     });
 
@@ -269,7 +275,7 @@ describe('boolean commands', () => {
       const grouped = execute(doc, 'group_entities', { ids: [idC, idD], name: 'Survivors' });
       const groupId = grouped.affected[0]!;
 
-      const result = execute(grouped.document, 'boolean_union', { a: idA, b: idB });
+      const result = execute(grouped.document, 'boolean', { op: 'union', a: idA, b: idB });
 
       // Group of C+D must be untouched.
       expect(result.document.groups[groupId]).toBeDefined();
@@ -280,12 +286,12 @@ describe('boolean commands', () => {
   // Purity
 
   describe('purity', () => {
-    it.each(['boolean_union', 'boolean_subtract', 'boolean_intersect'])(
-      'is pure — input document is not mutated by %s',
-      (command) => {
+    it.each(['union', 'subtract', 'intersect'])(
+      'is pure — input document is not mutated by boolean %s',
+      (op) => {
         const { doc, idA, idB } = docWithTwoBoxes();
         const snapshot = JSON.stringify(doc);
-        execute(doc, command, { a: idA, b: idB });
+        execute(doc, 'boolean', { op, a: idA, b: idB });
         expect(JSON.stringify(doc)).toBe(snapshot);
       },
     );
@@ -304,7 +310,7 @@ describe('boolean commands', () => {
 
   it('scale_entity scales every position of a mesh entity by the factor', () => {
     const { doc, idA, idB } = docWithTwoBoxes();
-    const unioned = execute(doc, 'boolean_union', { a: idA, b: idB });
+    const unioned = execute(doc, 'boolean', { op: 'union', a: idA, b: idB });
     const meshId = unioned.affected[0]!;
     expect(unioned.document.entities[meshId]!.kind).toBe('mesh');
 

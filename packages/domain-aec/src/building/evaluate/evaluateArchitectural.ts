@@ -52,13 +52,20 @@ export interface EvaluationContext {
   readonly building: BuildingModel;
 }
 
+/** Plan frame of `wall` and the elevation of its base on `level`. */
+function wallPlacement(
+  wall: WallElement,
+  level: BuildingLevel,
+): { frame: ReturnType<typeof wallFrame>; baseZ: number } {
+  return { frame: wallFrame(wall), baseZ: level.elevation + wall.baseOffset };
+}
+
 export function evaluateWall(
   context: EvaluationContext,
   wall: WallElement,
   level: BuildingLevel,
 ): Entity[] {
-  const frame = wallFrame(wall);
-  const baseZ = level.elevation + wall.baseOffset;
+  const { frame, baseZ } = wallPlacement(wall, level);
   const color = colorForMaterial(wall.material, '#c9c4b8');
   const pieces = wallPieces(
     wall,
@@ -84,8 +91,7 @@ export function evaluateOpening(
   wall: WallElement,
   level: BuildingLevel,
 ): Entity[] {
-  const frame = wallFrame(wall);
-  const baseZ = level.elevation + wall.baseOffset;
+  const { frame, baseZ } = wallPlacement(wall, level);
   const [cx, cy] = pointAlong(wall, frame, opening.offset);
   const centerZ = baseZ + opening.sillHeight + opening.height / 2;
   if (opening.category === 'window') {

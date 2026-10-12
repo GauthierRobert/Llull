@@ -11,7 +11,7 @@
  * Presentation only — selection is view state set through the store's `select` (R1).
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import type { Entity, Vec2 } from '@core/model/types';
 import { useStore, useViewportStore } from '@ui/store';
@@ -22,6 +22,7 @@ import { anchoredGeometry } from '../lineGeometry';
 import { boxSelectMode, entitiesInBox } from './boxSelect';
 import { pixelsToWorld } from './gridHelpers';
 import { GroundPlane, toDocumentPoint } from './GroundPlane';
+import { useCaptureKeydown } from '@ui/hooks/useCaptureKeydown';
 
 const BOX_COLOR = '#60a5fa';
 const DASH_PX = 6;
@@ -83,18 +84,13 @@ export function BoxSelectInteraction({ zoom }: BoxSelectInteractionProps): React
   const dragging = drag !== null;
 
   // Esc cancels the box in progress (and only that): the release then selects nothing.
-  useEffect(() => {
-    if (!dragging) return;
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== 'Escape') return;
-      e.preventDefault();
-      e.stopPropagation();
-      setDrag(null);
-    };
-    // Capture phase: runs before the global shortcut handler, which skips consumed keys.
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [dragging]);
+  const cancelOnEscape = useCallback((e: KeyboardEvent): void => {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDrag(null);
+  }, []);
+  useCaptureKeydown(dragging ? cancelOnEscape : null);
 
   return (
     <>

@@ -135,7 +135,7 @@
       },
       {
         "id": "#6",
-        "name": "extrude_sketch",
+        "name": "extrude_profile",
         "params": {
           "id": "#1",
           "depth": 3

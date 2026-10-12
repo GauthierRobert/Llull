@@ -1,20 +1,20 @@
 import type { CurveSegment } from '../../model/curve';
-import {
-  type SweepSection,
-  type SweepStation,
-  type Vec2,
-  type Vec3,
-  DEFAULT_LAYER_ID,
-} from '../../model/types';
+import type { SweepSection, SweepStation, Vec2, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
-import { colorField, defineCommand, untypedArray, z } from '../schema';
+import { colorField, defineCommand, untypedArray, z, layerIdField } from '../schema';
 import { noop } from '../noop';
-import { nextId } from '../../lib/id';
 import { isVec2 } from '../../lib/vec2';
-import { sub3 } from '../../lib/vec3';
+import { isVec3, sub3 } from '../../lib/vec3';
 import { polygonArea } from '../../lib/polygon';
 import { newEntity } from '../entity/newEntity';
-import { DEFAULT_SOLID_COLOR, commitSolid } from './shared';
+import {
+  DEFAULT_SOLID_COLOR,
+  commitSolid,
+  existingLayerOrDefault,
+  explicitIdField,
+  explicitIdOrNext,
+  explicitIdTaken,
+} from './shared';
 import { MAX_PROFILE_POINTS } from '../limits';
 import { sketchLoop, sketchPath } from './sketchCurves';
 import { type SectionSpec, sectionSpecFields, specRing } from './sectionSpecs';
@@ -34,9 +34,6 @@ import {
 
 /** Default bend radius as a multiple of the section half-size (a long-radius pipe elbow). */
 const DEFAULT_BEND_FACTOR = 3;
-
-const isVec3 = (value: unknown): value is Vec3 =>
-  Array.isArray(value) && value.length === 3 && value.every(Number.isFinite);
 
 /** Section and its half-size (largest distance from the path), or an error message. */
 function resolveSection(
@@ -173,7 +170,7 @@ export const sweepProfile = defineCommand({
     'polyline/spline). The section is centred on the path; its +y axis points toward world +Z (toward +Y ' +
     'when the path starts vertical) and it is carried along with a rotation-minimizing (twist-free) frame. ' +
     'Paths, bends and sketched sections stay exact for the exact kernel and STEP export. ' +
-    'Booleans with other solids work like any primitive (e.g. boolean_union to weld pipes to a flange).',
+    'Booleans with other solids work like any primitive (e.g. boolean op union to weld pipes to a flange).',
   params: z.object({
     path: untypedArray(
       'World-space [x, y, z] points the section follows (>= 2). Without smooth, consecutive points are ' +
@@ -240,15 +237,9 @@ export const sweepProfile = defineCommand({
           'Replaces radius / innerRadius / section / sectionId.',
       )
       .optional(),
-    layerId: z
-      .string()
-      .describe('Layer id to assign the entity to. Defaults to the document default layer.')
-      .optional(),
+    layerId: layerIdField(),
     color: colorField(DEFAULT_SOLID_COLOR),
-    id: z
-      .string()
-      .describe('Optional explicit entity id. If omitted a unique id is generated.')
-      .optional(),
+    id: explicitIdField(),
   }),
   run: (
     doc,
@@ -269,12 +260,7 @@ export const sweepProfile = defineCommand({
     },
   ): CommandResult => {
     const fail = (why: string): CommandResult => noop(doc, `sweep_profile: ${why}; no-op.`);
-    if (
-      explicitId !== undefined &&
-      explicitId.length > 0 &&
-      Object.hasOwn(doc.entities, explicitId)
-    )
-      return fail(`entity id "${explicitId}" already exists`);
+    if (explicitIdTaken(doc, explicitId)) return fail(`entity id "${explicitId}" already exists`);
     const resolved =
       rawStations === undefined
         ? resolveSection(doc, radius, innerRadius, rawSection, sectionId)
@@ -309,12 +295,11 @@ export const sweepProfile = defineCommand({
       );
     const start = path[0]?.points[0] as Vec3;
     const local = path.map((segment) => mapSegment(segment, (p: Vec3): Vec3 => sub3(p, start)));
-    const id = explicitId !== undefined && explicitId.length > 0 ? explicitId : nextId('swp');
+    const id = explicitIdOrNext(explicitId, 'swp');
     const geometry =
       stations === undefined ? { path: local, section } : { path: local, section, stations };
     const entity = newEntity('sweep', id, geometry, start, color, {
-      layerId:
-        layerId !== undefined && Object.hasOwn(doc.layers, layerId) ? layerId : DEFAULT_LAYER_ID,
+      layerId: existingLayerOrDefault(doc, layerId),
     });
     const samples = sampleChain(path, false);
     let length = 0;

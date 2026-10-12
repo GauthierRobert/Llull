@@ -16,6 +16,7 @@ import { kernelFromOps, type CachingKernel, type KernelOps } from '@core/geometr
 import { type Entity, createEmptyDocument } from '@core/model/types';
 import { entityTrianglePositions } from '@core/geometry/entityTriangles';
 import { toCounterClockwise } from '@lib/polygon';
+import { release, withOwned } from '@core/geometry/nativeObject';
 
 // Minimal local interface for the Manifold WASM module (avoids `any`).
 // We only model the subset we actually call; the cast is at one boundary point.
@@ -252,32 +253,6 @@ function manifoldToMeshData(solid: ManifoldShape): MeshData | null {
   return { positions, indices: Array.from(mesh.triVerts) };
 }
 
-/** Free a WASM object; Manifold may already have released it, so failures are ignored. */
-function release(solid: ManifoldShape | null): void {
-  try {
-    solid?.delete();
-  } catch {
-    /* already released */
-  }
-}
-
-/** Run `body`, mapping any Manifold exception to null and freeing every solid it registered. */
-function withSolids<T>(
-  body: (own: <S extends ManifoldShape | null>(solid: S) => S) => T | null,
-): T | null {
-  const owned: Array<ManifoldShape | null> = [];
-  try {
-    return body((solid) => {
-      owned.push(solid);
-      return solid;
-    });
-  } catch {
-    return null;
-  } finally {
-    owned.forEach(release);
-  }
-}
-
 const COMBINE = { union: 'add', subtract: 'subtract', intersect: 'intersect' } as const;
 
 /**
@@ -287,16 +262,16 @@ const COMBINE = { union: 'add', subtract: 'subtract', intersect: 'intersect' } a
 export function manifoldOps(mod: ManifoldModule): KernelOps<ManifoldShape> {
   return {
     unsupported: new Set(['fillet', 'chamfer', 'shell', 'blend']),
-    solid: (entity) => withSolids(() => entityToManifold(mod, entity)),
-    boolean: (op: BooleanOp, a, b) => withSolids(() => a[COMBINE[op]](b)),
+    solid: (entity) => withOwned(() => entityToManifold(mod, entity)),
+    boolean: (op: BooleanOp, a, b) => withOwned(() => a[COMBINE[op]](b)),
     fillet: () => null,
     blend: () => null,
     chamfer: () => null,
     shell: () => null,
     place: (shape, position, rotation) =>
-      withSolids(() => applyTransform(shape, position, rotation)),
-    scale: (shape, factor) => (factor > 0 ? withSolids(() => shape.scale(factor)) : null),
-    tessellate: (shape) => withSolids(() => manifoldToMeshData(shape)),
+      withOwned(() => applyTransform(shape, position, rotation)),
+    scale: (shape, factor) => (factor > 0 ? withOwned(() => shape.scale(factor)) : null),
+    tessellate: (shape) => withOwned(() => manifoldToMeshData(shape)),
     topology: () => null,
     exportStep: () => null,
     release,

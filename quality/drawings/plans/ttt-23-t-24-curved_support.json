@@ -69,15 +69,17 @@
   "as": "plate"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    0,
-    0
-   ],
-   "end": [
-    0,
-    50
+   "points": [
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     50
+    ]
    ],
    "position": [
     -5.5,
@@ -88,15 +90,17 @@
   "as": "k1"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    0,
-    50
-   ],
-   "end": [
-    27.5,
-    50
+   "points": [
+    [
+     0,
+     50
+    ],
+    [
+     27.5,
+     50
+    ]
    ],
    "position": [
     -5.5,
@@ -107,15 +111,17 @@
   "as": "k2"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    27.5,
-    50
-   ],
-   "end": [
-    53.675193028801964,
-    46.32131652323596
+   "points": [
+    [
+     27.5,
+     50
+    ],
+    [
+     53.675193028801964,
+     46.32131652323596
+    ]
    ],
    "position": [
     -5.5,
@@ -162,15 +168,17 @@
   "as": "k5"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    100.41366129083303,
-    32
-   ],
-   "end": [
-    125,
-    32
+   "points": [
+    [
+     100.41366129083303,
+     32
+    ],
+    [
+     125,
+     32
+    ]
    ],
    "position": [
     -5.5,
@@ -181,15 +189,17 @@
   "as": "k6"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    125,
-    32
-   ],
-   "end": [
-    125,
-    0
+   "points": [
+    [
+     125,
+     32
+    ],
+    [
+     125,
+     0
+    ]
    ],
    "position": [
     -5.5,
@@ -200,15 +210,17 @@
   "as": "k7"
  },
  {
-  "command": "draw_line",
+  "command": "draw_polyline",
   "params": {
-   "start": [
-    125,
-    0
-   ],
-   "end": [
-    0,
-    0
+   "points": [
+    [
+     125,
+     0
+    ],
+    [
+     0,
+     0
+    ]
    ],
    "position": [
     -5.5,
@@ -219,7 +231,7 @@
   "as": "k8"
  },
  {
-  "command": "extrude_sketch",
+  "command": "extrude_profile",
   "params": {
    "ids": [
     "$k1",
@@ -241,24 +253,24 @@
   "as": "rib"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$big",
    "b": "$small"
   },
   "as": "u1"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$u1",
    "b": "$plate"
   },
   "as": "u2"
  },
  {
-  "command": "boolean_union",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "union", 
    "a": "$u2",
    "b": "$rib"
   },
@@ -279,8 +291,8 @@
   "as": "h1"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$u3",
    "b": "$h1"
   },
@@ -301,8 +313,8 @@
   "as": "h2"
  },
  {
-  "command": "boolean_subtract",
-  "params": {
+  "command": "boolean",
+  "params": {"op": "subtract", 
    "a": "$s1",
    "b": "$h2"
   },

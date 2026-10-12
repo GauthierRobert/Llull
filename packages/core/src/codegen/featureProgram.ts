@@ -243,10 +243,11 @@ function isPureTranslation(before: Entity, after: Entity, delta: unknown): delta
   );
 }
 
+/** `boolean` op -> the emitted program's combinator. */
 const BOOLEAN_KINDS: Readonly<Record<string, 'union' | 'cut' | 'intersect'>> = {
-  boolean_union: 'union',
-  boolean_subtract: 'cut',
-  boolean_intersect: 'intersect',
+  union: 'union',
+  subtract: 'cut',
+  intersect: 'intersect',
 };
 
 function lowerParameters(
@@ -412,7 +413,8 @@ function lowerStep(
     variable,
   });
 
-  const booleanKind = BOOLEAN_KINDS[step.name];
+  const booleanKind =
+    step.name === 'boolean' ? BOOLEAN_KINDS[String(child(event.params, 'op'))] : undefined;
   const operandA = String(child(event.params, 'a'));
   const operandB = String(child(event.params, 'b'));
   const left = variables.get(operandA);
@@ -446,7 +448,7 @@ function lowerStep(
     const variable = variables.get(current.id);
     if (variable === undefined) continue;
     const delta = child(event.params, 'delta');
-    if (step.name === 'move_entity' && isPureTranslation(previous, current, delta)) {
+    if (step.name === 'move_entities' && isPureTranslation(previous, current, delta)) {
       features.push({
         ...base(variable),
         op: 'translate',

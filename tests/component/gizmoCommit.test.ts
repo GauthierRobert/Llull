@@ -17,14 +17,17 @@ const rest: GizmoTransform = {
 const moved = (patch: Partial<GizmoTransform>): GizmoTransform => ({ ...rest, ...patch });
 
 describe('gizmoDragCommit', () => {
-  it('translate: a moved target becomes move_entity with the delta', () => {
+  it('translate: a moved target becomes move_entities with the delta', () => {
     const commit = gizmoDragCommit(
       'translate',
       'box-1.1',
       rest,
       moved({ position: { x: 0.5, y: 0, z: 1 } }),
     );
-    expect(commit).toEqual({ name: 'move_entity', params: { id: 'box-1.1', delta: [0.5, 0, 0] } });
+    expect(commit).toEqual({
+      name: 'move_entities',
+      params: { ids: ['box-1.1'], delta: [0.5, 0, 0] },
+    });
   });
 
   it('translate: a drag that ends where it began (e.g. snapped back to the grid) commits nothing', () => {

@@ -7,6 +7,7 @@
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import type { WallElement } from '@core/model/building';
+import { changedNumber, LabeledInput } from './LabeledInput';
 
 export function WallEditor({ wall }: { wall: WallElement }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
@@ -16,13 +17,10 @@ export function WallEditor({ wall }: { wall: WallElement }): React.ReactElement 
 
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
-    const changes: Record<string, unknown> = {};
-    if (thickness !== String(wall.thickness) && Number.isFinite(Number(thickness))) {
-      changes['thickness'] = Number(thickness);
-    }
-    if (height !== String(wall.height) && Number.isFinite(Number(height))) {
-      changes['height'] = Number(height);
-    }
+    const changes: Record<string, unknown> = {
+      ...changedNumber('thickness', thickness, wall.thickness),
+      ...changedNumber('height', height, wall.height),
+    };
     if (material.trim() !== '' && material !== wall.material) changes['material'] = material.trim();
     if (Object.keys(changes).length > 0) dispatch('update_wall', { wallId: wall.id, ...changes });
   };
@@ -34,18 +32,9 @@ export function WallEditor({ wall }: { wall: WallElement }): React.ReactElement 
       aria-label={`Wall ${wall.mark} properties`}
       data-testid="wall-editor"
     >
-      <label className="field">
-        <span className="field__label">Thickness</span>
-        <input type="number" value={thickness} onChange={(e) => setThickness(e.target.value)} />
-      </label>
-      <label className="field">
-        <span className="field__label">Height</span>
-        <input type="number" value={height} onChange={(e) => setHeight(e.target.value)} />
-      </label>
-      <label className="field">
-        <span className="field__label">Material</span>
-        <input type="text" value={material} onChange={(e) => setMaterial(e.target.value)} />
-      </label>
+      <LabeledInput label="Thickness" type="number" value={thickness} onChange={setThickness} />
+      <LabeledInput label="Height" type="number" value={height} onChange={setHeight} />
+      <LabeledInput label="Material" type="text" value={material} onChange={setMaterial} />
       <button type="submit" className="btn btn--primary btn--sm" data-testid="wall-save">
         Save wall
       </button>
