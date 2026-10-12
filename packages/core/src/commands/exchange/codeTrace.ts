@@ -15,6 +15,7 @@ import { buildParamEnv } from '../history/regenerate';
 import { evaluateExpression, extractReferences } from '../parametric/expression';
 import { MAX_TRACE_FEATURES } from '../limits';
 import { isRecord } from '../../lib/isRecord';
+import { migrateRetiredCalls } from '../persistence/retiredCommands';
 import { changed, noop } from '../noop';
 
 interface TraceParameter {
@@ -229,7 +230,9 @@ export const applyCodeTrace = defineCommand({
     mode: z.enum(['replace', 'append']).optional().describe('"replace" (default) or "append".'),
   }),
   annotations: { metaHistory: true, destructive: true },
-  run: (doc, { trace: rawTrace, mode = 'replace' }): CommandResult => {
+  run: (doc, { trace: recorded, mode = 'replace' }): CommandResult => {
+    // Code generated before a command was retired still records the old name.
+    const rawTrace = migrateRetiredCalls(recorded);
     const invalid = validateTrace(rawTrace);
     if (invalid !== null) return abort(doc, invalid);
     const trace = rawTrace as unknown as CodeTrace;

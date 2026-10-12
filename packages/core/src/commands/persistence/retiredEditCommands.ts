@@ -23,8 +23,8 @@ function call(name: string, entries: Params): ReturnType<RetiredCommandRewrite> 
   };
 }
 
-/** `ids: [id]` for a string id; `[]` otherwise so the batch command rejects it as the old one did. */
-const singleId = (id: unknown): string[] => (typeof id === 'string' ? [id] : []);
+/** `ids: [id]`; a missing id gives `[]` so the batch command rejects it as the old one did. */
+const singleId = (id: unknown): unknown[] => (id === undefined ? [] : [id]);
 
 /** Polyline length of a point list, or null when any point is not a finite triple. */
 function polylineLength(path: unknown): number | null {

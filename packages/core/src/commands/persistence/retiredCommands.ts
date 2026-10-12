@@ -75,13 +75,25 @@ function migrateSteps(steps: unknown, table: RewriteTable, topLevel: boolean): u
   });
 }
 
+function retiredTable(): RewriteTable {
+  return { ...CORE_RETIRED_COMMANDS, ...pluginRetiredCommands() };
+}
+
+/**
+ * Rewrite every retired `{ command, params }` call nested in `value` (plan actions, code traces).
+ * @pure
+ */
+export function migrateRetiredCalls(value: unknown): unknown {
+  return rewriteNested(value, retiredTable());
+}
+
 /**
  * Rewrite retired command calls in `featureHistory` and every recipe's `steps`.
  * @pure
  * @invariant a document naming no retired command is returned with equal content
  */
 export function migrateRetiredCommands(raw: Record<string, unknown>): Record<string, unknown> {
-  const table: RewriteTable = { ...CORE_RETIRED_COMMANDS, ...pluginRetiredCommands() };
+  const table = retiredTable();
   const recipes = raw['recipes'];
   return {
     ...raw,
