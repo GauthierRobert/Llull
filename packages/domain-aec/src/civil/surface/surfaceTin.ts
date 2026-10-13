@@ -1,8 +1,4 @@
-/**
- * The TIN of a surface object, memoized on the (immutable) surface and point-group objects.
- * @layer domain-aec/civil
- * @pure
- */
+/** The TIN of a surface object, memoized on the (immutable) surface and point-group objects. */
 
 import type { Vec3 } from '@core/model/types';
 import type { CivilModel, PointGroupObject, SurfaceObject } from '@core/model/civil';

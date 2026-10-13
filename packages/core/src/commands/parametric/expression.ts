@@ -1,9 +1,6 @@
 /**
  * Pure expression evaluator for the llull parametric parameter system.
  *
- * @layer core/commands
- * @pure — every exported function is stateless and side-effect-free.
- *
  * Supported grammar (EBNF):
  *   expr   = term { ('+' | '-') term }
  *   term   = factor { ('*' | '/') factor }
@@ -218,7 +215,6 @@ function parsePrimary(s: ParseState): EvalResult {
 /**
  * Evaluate a single expression string against a flat `env` map of name→value.
  *
- * @pure — no side effects; returns a typed result rather than throwing.
  * @invariant Does not mutate `env`.
  * @failure Returns EvalErr with a descriptive message on any parse/eval error, or when the
  *   result is not finite (divide-by-zero, overflow).
@@ -248,8 +244,6 @@ export function evaluateExpression(expression: string, env: Readonly<Record<stri
  * Syntax problem of `expression` independent of which parameters exist, else null. Unknown
  * references are NOT a syntax problem (a parameter may be defined later); a non-finite result
  * (divide by zero) only counts when the expression has no references to blame it on.
- *
- * @pure
  */
 export function expressionSyntaxError(expression: string): string | null {
   const refs = extractReferences(expression);
@@ -263,8 +257,6 @@ export function expressionSyntaxError(expression: string): string | null {
 /**
  * Extract the set of parameter names referenced in an expression.
  * Returns an empty set if the expression is unparseable or has no references.
- *
- * @pure — used by the topological-sort cycle detector in parameters.ts.
  */
 export function extractReferences(expression: string): ReadonlySet<string> {
   const tokensOrError = tokenize(expression);

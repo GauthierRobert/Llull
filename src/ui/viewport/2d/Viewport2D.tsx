@@ -1,5 +1,4 @@
 /**
- * @layer ui/viewport/2d
  * 2D drafting viewport: the same three.js scene through an orthographic top-down camera
  * (MapControls pan/zoom; pan disabled while a tool is armed, wheel zoom stays), an adaptive grid, a ScaleBar HUD
  * and floating-origin rendering. `frameloop="demand"`; presentational only, changes go through

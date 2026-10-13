@@ -1,8 +1,6 @@
 /**
  * Terrain TIN: triangulated surface from 3D points, spot-elevation queries through a bucket grid,
  * and contour tracing.
- * @layer domain-aec/civil
- * @pure
  */
 
 import type { Vec2, Vec3 } from '@core/model/types';

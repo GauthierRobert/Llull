@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/civil
- *
  * TerrainSection — `create_surface` (TIN + contours) from the point groups, each surface with its
  * `surface_report` statistics and a contour-interval edit (`update_surface`).
  */

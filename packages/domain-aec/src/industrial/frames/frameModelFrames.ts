@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { BuildingModel, SteelMemberElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import type { FrameNode } from '@lib/frame2d';

@@ -1,6 +1,4 @@
 /**
- * @layer ui/actions
- *
  * Actions on the current selection, shared by the main toolbar, keyboard shortcuts and the
  * properties panel. Each one only gathers params and dispatches commands (PRIME DIRECTIVE).
  */

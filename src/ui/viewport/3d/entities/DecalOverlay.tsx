@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Text decals of a solid: each decal's core projection patch (`@core/geometry/decal`, the same
  * triangles and UVs the glTF export writes) textured with the core block-font raster, drawn on top
  * of the solid in its local frame. Geometry and textures are rebuilt only when the entity changes

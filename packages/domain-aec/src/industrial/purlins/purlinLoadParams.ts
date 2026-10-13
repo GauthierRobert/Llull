@@ -1,7 +1,4 @@
-/**
- * Load parameters shared by check_purlins and design_purlins.
- * @layer domain-aec
- */
+/** Load parameters shared by check_purlins and design_purlins. */
 
 import { z } from '@core/commands/schema';
 import { existingLevelIdParam } from '../../building/levelParams';

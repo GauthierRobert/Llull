@@ -5,8 +5,6 @@
  * The kernel boundary is a SHAPE, not a mesh: a command hands the kernel a `ShapeRecipe` (the
  * construction tree) and gets back an opaque, kernel-owned `ShapeHandle` (an exact B-rep under OCC).
  * Meshes only come OUT of the kernel (`tessellate`), for display and mesh exports.
- *
- * @layer core/geometry
  */
 
 import type { MeshData, ShapeRecipe, Vec3 } from '../model/types';
@@ -61,8 +59,6 @@ export interface ShapeTopology {
  * kernel limitation); commands treat null as a no-op. Implementors must not mutate arguments.
  * Exact topology and STEP: OCC only (Manifold is a mesh kernel: `topology` / `exportStep` -> null,
  * and fillet / chamfer / shell recipes evaluate to null).
- *
- * @pure
  */
 export interface GeometryKernel {
   /** Whether this kernel can perform recipe nodes of `op` at all (Manifold: no fillet/chamfer/shell). */

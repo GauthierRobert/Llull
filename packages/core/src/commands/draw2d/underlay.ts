@@ -2,8 +2,6 @@
  * Image underlays: a scanned drawing placed on a work plane, calibrated to real units, and read
  * back as model coordinates ("trace from a drawing"). Geometry lives in
  * `geometry/imageUnderlay.ts`; these commands validate and commit it.
- *
- * @layer core/commands
  */
 
 import { type CadDocument, type ImageEntity, type Vec3, DEFAULT_LAYER_ID } from '../../model/types';
@@ -42,8 +40,6 @@ const opacityField = (note: string): z.ZodOptional<z.ZodNumber> =>
   z.number().describe(`Opacity in [0, 1] (0 = invisible, 1 = opaque). ${note}`).optional();
 
 /**
- * @command add_image_underlay
- * @pure
  * @affects creates 1 image entity
  * @invariant width = pixelWidth × unitsPerPixel; height keeps the image aspect ratio
  * @failure not a png/jpeg base64 data URL, too large, both width and pixelSize, non-positive size,
@@ -116,8 +112,6 @@ export const addImageUnderlay = defineCommand({
 });
 
 /**
- * @command calibrate_underlay
- * @pure
  * @affects modifies 1 image entity (width, height, position, rotation[2] when align is set)
  * @invariant |pixelToWorld(B) − pixelToWorld(A)| = distance afterwards
  * @failure missing/non-image id, distance <= 0, pixelA = pixelB -> no-op, affected:[]
@@ -175,8 +169,6 @@ export const calibrateUnderlayCommand = defineCommand({
 });
 
 /**
- * @command set_underlay
- * @pure
  * @affects modifies 1 image entity (opacity and/or locked)
  * @failure missing/non-image id, nothing to change, opacity outside [0, 1] -> no-op, affected:[]
  */
@@ -207,8 +199,6 @@ export const setUnderlay = defineCommand({
 });
 
 /**
- * @command image_to_world
- * @pure
  * @affects nothing — read-only; data.world / data.xy align with params.points
  * @failure missing/non-image id, no points, too many points -> no-op, affected:[]
  */

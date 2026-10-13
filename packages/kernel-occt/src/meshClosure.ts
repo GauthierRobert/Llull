@@ -1,5 +1,4 @@
 /**
- * @layer kernel
  * Watertightness of a triangle mesh: every edge shared by two triangles once vertices are welded
  * by position. Pure; used to refuse an OCC solid whose display mesh came out holed.
  */

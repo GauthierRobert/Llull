@@ -3,8 +3,6 @@
  * hogging lateral-torsional buckling over the hogging length), columns (N + M interaction §6.3.3 on
  * the axis the frame plane bends), storey drift and sway stability. Moments are amplified by
  * 1/(1 − 1/αcr) when αcr < 10 (EN 1993-1-1 §5.2.2(5)); the buckling length is the storey piece.
- * @layer domain-aec
- * @pure
  */
 
 import { toDegrees } from '@lib/angle';

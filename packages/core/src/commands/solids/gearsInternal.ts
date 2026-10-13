@@ -1,8 +1,4 @@
-/**
- * add_internal_gear: ring gear with internal involute teeth as one closed `mesh` solid (no booleans).
- *
- * @layer core/commands
- */
+/** add_internal_gear: ring gear with internal involute teeth as one closed `mesh` solid (no booleans). */
 
 import type { MeshData } from '../../model/types';
 import type { CommandResult } from '../types';
@@ -39,9 +35,6 @@ export function internalGearMesh(
 }
 
 /**
- * @command add_internal_gear
- * @pure
- * @layer core/commands
  * @affects creates 1 mesh entity (ring gear, teeth pointing inward)
  * @invariant module > 0; teeth integer in [12, MAX_GEAR_TEETH]; pressureAngle in (0, π/2); faceWidth > 0;
  *            outerRadius >= pitchRadius + 2.25·module

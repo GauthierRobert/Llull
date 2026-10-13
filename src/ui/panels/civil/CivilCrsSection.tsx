@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/civil
- *
  * CivilCrsSection — coordinate reference system (`set_coordinate_system`) and local-to-grid site
  * calibration (`set_site_calibration`). Param gathering only; the commands validate.
  */

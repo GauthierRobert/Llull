@@ -1,5 +1,4 @@
 /**
- * @layer server
  * `--save`: write the file(s) a command returned in `data` to disk. Generic over every export /
  * render command — no per-command code — by reading the payload conventions they share:
  * `files[]` ({ name|fileName, content|text }), base64 (`stlBase64`, `stepBase64`, `base64`) or text
@@ -36,10 +35,7 @@ export function fileOfRecord(record: Record<string, unknown>): OutputFile | null
   return null;
 }
 
-/**
- * The files carried by a command's `data`; empty when it carries none.
- * @pure
- */
+/** The files carried by a command's `data`; empty when it carries none. */
 export function filesOfData(data: unknown): OutputFile[] {
   if (!isRecord(data)) return [];
   const many = data['files'];
@@ -99,7 +95,6 @@ export function saveDataFiles(data: unknown, target: string): SavedFile[] {
 /**
  * `data` with every file payload replaced by a short marker, for printing after a save: the agent
  * keeps the metadata (counts, bounds, names) without megabytes of file text in its context.
- * @pure
  */
 export function withoutPayloads(data: unknown): unknown {
   if (Array.isArray(data)) return data.map(withoutPayloads);

@@ -1,14 +1,10 @@
-/**
- * Keeps evaluated building geometry consistent with the building model (architecture L4/L8).
- * @layer domain-aec
- */
+/** Keeps evaluated building geometry consistent with the building model (architecture L4/L8). */
 
 import type { DerivationGuard } from '@core/commands/derivation';
 import { editedOwners, ownerTag } from '../../shared/derived';
 import type { CadDocument } from '@core/model/types';
 
 /**
- * @pure
  * @returns ids of building elements whose generated entities `next` changed, removed or copied
  *          without going through a building command (empty when the edit is legal). Commands that
  *          rebuild entity objects without changing them (e.g. solve_constraints) are not flagged.

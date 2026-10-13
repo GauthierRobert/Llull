@@ -13,9 +13,6 @@ import { pointsExtent } from '../../geometry/bounds';
 import { noop } from '../noop';
 
 /**
- * @command draw_ellipse
- * @pure
- * @layer core/commands
  * @affects creates 1 ellipse entity
  * @invariant radiusX > 0 and radiusY > 0
  * @failure radiusX <= 0 or radiusY <= 0 -> no-op, affected:[]
@@ -44,9 +41,6 @@ export const drawEllipse = defineCommand({
 });
 
 /**
- * @command draw_spline
- * @pure
- * @layer core/commands
  * @affects creates 1 spline entity
  * @invariant points.length >= 2; each point is a 2-element [x,y] array
  * @failure fewer than 2 points or more than MAX_SPLINE_CONTROL_POINTS -> no-op, affected:[]
@@ -77,9 +71,6 @@ export const drawSpline = defineCommand({
 });
 
 /**
- * @command draw_involute
- * @pure
- * @layer core/commands
  * @affects creates 1 open polyline entity tracing an involute curve
  * @invariant baseRadius > 0; samples >= 2; endAngle > startAngle; all numerics finite
  * @failure baseRadius <= 0, samples < 2, endAngle <= startAngle, or any non-finite numeric -> no-op, affected:[]

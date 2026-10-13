@@ -2,8 +2,6 @@
  * LandXML 1.2 writer of the civil model: point groups (CgPoints), TIN surfaces, gravity pipe
  * networks and (via the roads module) alignments. LandXML coordinates are "northing easting
  * elevation" in metres.
- * @layer domain-aec/civil
- * @pure
  */
 
 import { compactNumber, fixedNumber } from '@lib/compactNumber';

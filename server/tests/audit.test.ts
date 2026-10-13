@@ -1,7 +1,4 @@
-/**
- * @layer server/tests
- * Per-user audit trail: JSONL lines (REST + MCP + undo), params hashed, rotation, admin query.
- */
+/** Per-user audit trail: JSONL lines (REST + MCP + undo), params hashed, rotation, admin query. */
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import fs from 'fs';

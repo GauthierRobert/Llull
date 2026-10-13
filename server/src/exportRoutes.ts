@@ -1,5 +1,4 @@
 /**
- * @layer server
  * GET /export/{stl,code,step} — file downloads of the shared live document. Guarded by `guardRead`
  * (bearer or `?access_token=`; browser downloads cannot send Authorization headers).
  */

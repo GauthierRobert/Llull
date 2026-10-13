@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Two clients write the one shared document at the same time while two other clients follow the
  * `/live` log: every follower sees the same gap-free sequence, replays it to the server's exact
  * state hash, and a retried `commandId` is applied once.

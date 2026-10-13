@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport
- *
  * Theme-aware canvas palette for the 2D and 3D viewports. three.js needs concrete
  * colors (CSS variables do not reach WebGL), so each theme maps to hex values that
  * match the design tokens in styles/tokens.css.

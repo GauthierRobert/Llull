@@ -1,5 +1,4 @@
 /**
- * @layer kernel
  * STEP AP214 writer over exact OCC shapes (STEPControl_Writer into the Emscripten in-memory FS).
  * @invariant the scratch path is short and fixed: this opencascade.js build corrupts `Write` paths
  *   longer than ~12 characters, and the kernel is synchronous, so one path is never shared

@@ -1,8 +1,4 @@
-/**
- * add_spur_gear: parametric involute spur gear as one `extrusion` entity (pure math, no kernel).
- *
- * @layer core/commands
- */
+/** add_spur_gear: parametric involute spur gear as one `extrusion` entity (pure math, no kernel). */
 
 import type { CommandResult } from '../types';
 import { defineCommand, z, colorField, nameField, looseVec3 } from '../schema';
@@ -35,9 +31,6 @@ export function buildSpurGearProfile(
 }
 
 /**
- * @command add_spur_gear
- * @pure
- * @layer core/commands
  * @affects creates 1 extrusion entity (spur gear solid)
  * @invariant module > 0; teeth >= 3; pressureAngle in (0, π/2); faceWidth > 0; bore >= 0 and bore < pitchRadius
  * @failure invalid params -> unchanged doc, summary explains which param violated, affected:[]

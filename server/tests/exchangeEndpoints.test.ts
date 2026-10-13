@@ -1,6 +1,4 @@
 /**
- * @layer server/tests
- *
  * HTTP + MCP end-to-end tests for the CAD-exchange surface:
  *   GET /export/code, GET /export/step, MCP tools export_step / import_step / import_code.
  *

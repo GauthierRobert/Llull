@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels
- *
  * AssemblyPanel — component library + instance tree.
  * Components: name, entity count, "Insert" (insert_instance at the origin).
  * Instances: component name + position; click selects, "Explode" dispatches explode_instance.

@@ -1,8 +1,6 @@
 /**
  * Composition root: the app, the MCP server and the test setup install the default
  * domain plugins here — the only place that knows which domains extend the CAD core.
- *
- * @layer app
  */
 
 import { installPlugin } from '@core/plugins/host';

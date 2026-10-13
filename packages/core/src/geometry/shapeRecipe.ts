@@ -3,8 +3,6 @@
  * chamfer / shell / placement / scale nodes). The kernel evaluates it to an exact, kernel-owned shape
  * (`ShapeHandle`); the document stores the recipe on result `mesh` entities (`brep`), never the shape.
  *
- * @layer core/geometry
- * @pure
  * @invariant `recipeKey` covers every input a kernel reads; presentation fields (id, name, color,
  *   layer, tags, material) never reach it, so a recolored operand reuses the cached shape
  */

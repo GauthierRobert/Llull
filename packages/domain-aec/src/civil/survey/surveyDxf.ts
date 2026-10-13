@@ -1,7 +1,6 @@
 /**
  * Survey points from a DXF: 3D points, polyline / line vertices (contours, breaklines), 3D face
  * corners and numeric spot-height texts become a point group for create_surface.
- * @layer domain-aec/civil
  */
 
 import { type Vec3, DOCUMENT_UNITS } from '@core/model/types';
@@ -45,8 +44,6 @@ function samples(primitive: DxfPrimitive, sources: ReadonlySet<Source>): Vec3[] 
 }
 
 /**
- * @command import_survey_dxf
- * @pure
  * @affects creates 1 point group
  * @failure not a DXF / no elevated point -> no-op
  */

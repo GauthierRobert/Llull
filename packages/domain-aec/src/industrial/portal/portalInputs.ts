@@ -1,8 +1,4 @@
-/**
- * Parameter validation and defaulting of add_portal_frame_building.
- * @layer domain-aec
- * @pure
- */
+/** Parameter validation and defaulting of add_portal_frame_building. */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { fromMm } from '@core/model/units';

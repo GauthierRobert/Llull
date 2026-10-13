@@ -1,7 +1,4 @@
-/**
- * Loads collected on one floor beam before its analysis: self weight, binned area loads, point loads.
- * @layer domain-aec
- */
+/** Loads collected on one floor beam before its analysis: self weight, binned area loads, point loads. */
 
 import { clamp } from '@lib/clamp';
 import type { LinePiece, PointLoad } from './steelBeamAnalysis';

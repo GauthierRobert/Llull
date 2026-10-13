@@ -1,5 +1,4 @@
 /**
- * @layer server
  * Exchange tools (export_step, import_step, import_dwg, import_code) against the shared live
  * document, for both transports (`POST /exchange` and MCP tools/call): the same handlers as MCP
  * (`applyExchangeToolCall`), with every document change routed through the command bus (undo,

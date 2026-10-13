@@ -1,9 +1,6 @@
 /**
  * Lower a CadDocument to a FeatureProgram (program.ts): replay the feature history, diff each step's
  * solids, and bind numeric fields to the `=expr` params that produced them.
- *
- * @layer core/codegen
- * @pure
  */
 
 import { type CadDocument, type Entity, type FeatureStep, type Vec3, is2D, is3D } from '../model/types';
@@ -445,7 +442,6 @@ function historyMismatch(doc: CadDocument, replayed: CadDocument): string | null
 /**
  * Lower a document to a FeatureProgram. Prefers the featureHistory (parametric, ordered); falls
  * back to the current geometry when there is no history or replay does not reproduce the document.
- * @pure — replay works on fresh documents; `doc` is never mutated.
  * @invariant replay draws entity ids from the global `nextId` counter (as replay_history does), so
  *   ids minted after an export differ from ids minted without one; no document content changes.
  * @invariant history is used only when it regenerates every solid of `doc` (count + geometry).

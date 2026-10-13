@@ -10,8 +10,6 @@
  *
  * Does NOT assert three.js / r3f renderer internals — the canvas is not
  * instantiated in this test environment (jsdom has no WebGL).
- *
- * @layer tests/component
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';

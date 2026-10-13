@@ -1,7 +1,4 @@
-/**
- * Process equipment (machines with maintenance clearances) and pipe runs.
- * @layer domain-aec
- */
+/** Process equipment (machines with maintenance clearances) and pipe runs. */
 
 import type { EquipmentElement, PipeElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
@@ -17,8 +14,6 @@ import { hasRepeatedPoint, routeLength, routeOrFailure } from '../piping/routeSu
 import { levelIdParam } from '../../building/levelParams';
 
 /**
- * @command add_equipment
- * @pure
  * @affects creates 1 equipment (box or cylindrical vessel on layer Q-EQPM; clearance drawn in plan)
  * @invariant vessel `size` is normalised to its bounding box; shape absent = box
  * @failure missing name / bad location / size <= 0 / clearance < 0 -> no-op
@@ -95,8 +90,6 @@ export const addEquipment = defineCommand({
 });
 
 /**
- * @command add_pipe_run
- * @pure
  * @affects creates 1 pipe run (segments + bends on layer P-PIPE) carrying its line-list data
  * @invariant diameter from `diameter`, else the DN outside-diameter table, else 114.3 mm (DN100)
  * @failure < 2 points / repeated point / diameter <= 0 / invalid or unknown DN without diameter -> no-op

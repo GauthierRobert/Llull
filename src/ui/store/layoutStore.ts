@@ -1,6 +1,4 @@
 /**
- * @layer ui/store
- *
  * Layout store — which sidebar tab is open and whether the docks are expanded.
  * Presentation-only UI state, persisted to localStorage; never part of CadDocument.
  * On a narrow window (drawer layout, see shell.css) both docks start closed so the viewport is

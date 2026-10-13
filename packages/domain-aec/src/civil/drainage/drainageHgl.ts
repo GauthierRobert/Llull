@@ -2,8 +2,6 @@
  * Hydraulic grade line (metres) from the outfall(s) upstream. Per pipe: friction slope
  * Sf = (Q n / (A R^(2/3)))^2 (full bore), water level = max(normal-depth level, downstream HGL +
  * Sf L); a manhole loss K v^2 / 2g is added where the pipe runs under pressure at its upstream end.
- * @layer domain-aec/civil
- * @pure
  */
 
 import type { CadDocument } from '@core/model/types';

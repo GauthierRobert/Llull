@@ -7,8 +7,6 @@
  * lateral jerk C = 0.6 m/s^3, V in km/h, R and Ls in m).
  * K = stopping-sight-distance based minimum for the next table speed >= the design speed; a grade
  * change above 0.5 % needs a vertical curve.
- * @layer domain-aec/civil
- * @pure
  */
 
 import type { CadDocument } from '@core/model/types';

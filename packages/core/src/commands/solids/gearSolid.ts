@@ -1,8 +1,4 @@
-/**
- * Shared helpers for gear/shaft commands that emit world-space `mesh` solids.
- *
- * @layer core/commands
- */
+/** Shared helpers for gear/shaft commands that emit world-space `mesh` solids. */
 
 import type { Entity, MeshData, Vec3 } from '../../model/types';
 import { placeMesh } from '../../geometry/prismMesh';

@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * NamedViews — savable camera bookmarks for the 3D viewport.
  *
  * `NamedViewsOverlay` is mounted OUTSIDE the Canvas; it reads `useNamedViewStore` and drives the

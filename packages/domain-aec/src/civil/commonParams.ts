@@ -1,7 +1,4 @@
-/**
- * Parameter schema shared by the civil edit commands.
- * @layer domain-aec/civil
- */
+/** Parameter schema shared by the civil edit commands. */
 
 import { z } from '@core/commands/schema';
 

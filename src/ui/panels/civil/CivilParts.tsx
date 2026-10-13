@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/civil
- *
  * Shared civil panel parts: typed object lists from the store, an object row with a delete
  * button (`delete_civil_object`), an object select and a status line. Presentation only.
  */

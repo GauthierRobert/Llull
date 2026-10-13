@@ -1,8 +1,6 @@
 /**
  * Gravity-pipe hydraulics in SI (metres, seconds, litres per second): Manning full-bore capacity,
  * partial-flow depth in a circular section, rational-method runoff.
- * @layer domain-aec/civil
- * @pure
  */
 import { bisect } from '@lib/bisect';
 

@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import { clamp } from '@lib/clamp';
 import { toRadians } from '@lib/angle';
 import type { BuildingModel, MomentConnectionElement } from '@core/model/building';

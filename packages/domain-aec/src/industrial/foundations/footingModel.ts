@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 export const FCK = 25; // N/mm², C25/30
 export const FCD = FCK / 1.5;
 export const FYK = 500; // N/mm², B500

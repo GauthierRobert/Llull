@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * Pure vertex builder for rendering many simple `line` entities as ONE LineSegments draw call.
  * World positions (entity rotation about Z + position applied) are stored relative to an anchor
  * so float32 vertex data stays precise far from the origin; per-line colour goes in a colour
@@ -20,10 +18,7 @@ interface LineBatch {
   readonly colors: number[];
 }
 
-/**
- * @pure
- * @invariant positions.length === colors.length === 6 * lines.length
- */
+/** @invariant positions.length === colors.length === 6 * lines.length */
 export function buildLineBatch(lines: ReadonlyArray<LineEntity>): LineBatch {
   const first = lines[0];
   const [anchorX, anchorY] = first ? localToWorld2D(first, first.start[0], first.start[1]) : [0, 0];

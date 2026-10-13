@@ -2,9 +2,6 @@
  * Polygons and segments against a plane — signed distances, crossings, Sutherland–Hodgman
  * clipping, section chords and their chaining into loops. The one section engine shared by the
  * render cutaway, decal clipping and the technical views (sections, elevations).
- *
- * @layer core/geometry
- * @pure
  */
 
 import type { Vec3 } from '../model/types';

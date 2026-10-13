@@ -1,6 +1,4 @@
 /**
- * @layer server/tests
- *
  * Shared supertest request for the MCP transport: POST /mcp with the JSON + SSE headers, inside
  * `sessionId` once a session exists. Not a test file (no `.test.ts` suffix).
  */

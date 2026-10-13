@@ -1,6 +1,4 @@
 /**
- * @layer tests/production/oracle
- *
  * Independent LandXML 1.2 reader for issued civil exchange files: well-formedness (every element
  * closed in order, one root) and what Civil 3D / 12d import — CgPoints, TIN surfaces, alignments
  * (spirals, profile) and the pipe network (structures, pipes with their slope attribute).

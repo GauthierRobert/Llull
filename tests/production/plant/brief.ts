@@ -3,8 +3,6 @@ import { gridCoordinates, letterLabels, type IntentMember, type PlantIntent } fr
 import { OPENING_MARGIN } from './script';
 
 /**
- * @layer tests/production/plant
- *
  * Renders a plant intent as the brief a lead engineer hands to a designer: rules for the steel
  * structure, tables for equipment and lines, and the deliverables expected. The structural rules
  * are stated, not enumerated — the designer derives the members, as in a real office.

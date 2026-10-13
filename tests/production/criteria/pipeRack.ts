@@ -9,8 +9,6 @@ import type { PlantIntent } from '../plant/intent';
 import { absoluteMembers } from './plantStructure';
 
 /**
- * @layer tests/production/criteria
- *
  * Pipe-rack acceptance, the checks a piping / structural lead does before issuing a rack: every
  * line and the tray rest on the steel of every bent they cross, headroom over the road, spacing
  * between lines, battery limit to battery limit continuity, and line metres per size against the

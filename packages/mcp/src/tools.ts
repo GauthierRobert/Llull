@@ -1,5 +1,4 @@
 /**
- * @layer mcp
  * MCP tool definitions generated from the command registry (`toToolSchemas()` is the only source;
  * no schema is hand-written here). No MCP SDK dependency — transport wiring lives in `server/`.
  */
@@ -15,10 +14,7 @@ export interface McpToolDefinition {
   annotations?: NonNullable<ToolSchema['annotations']>;
 }
 
-/**
- * @pure
- * @invariant buildMcpTools()[i].name === listCommands()[i].name for all i
- */
+/** @invariant buildMcpTools()[i].name === listCommands()[i].name for all i */
 export function buildMcpTools(): McpToolDefinition[] {
   return toToolSchemas().map(({ name, description, input_schema, annotations }) => ({
     name,

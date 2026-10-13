@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Exchange tools outside MCP: `unshapeExchangeResult`, `POST /exchange`, and the CLI (local
  * in-process + `file=`), with a fake Python port. A real CadQuery round trip (export_step →
  * import_step) runs when LLULL_TEST_PYTHON names an interpreter with CadQuery.

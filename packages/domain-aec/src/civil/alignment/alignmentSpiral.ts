@@ -3,8 +3,6 @@
  * length of a symmetric spiral-circular curve-spiral, and spiral element evaluation.
  * A spiral of length L ending at radius R has constant A^2 = R L, curvature l / A^2 at distance l and
  * heading change theta = l^2 / (2 A^2) from the tangent end.
- * @layer domain-aec/civil
- * @pure
  */
 
 import type { Vec2 } from '@core/model/types';

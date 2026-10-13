@@ -11,7 +11,7 @@ small files, discovery by name/path over prose. Command skeleton + tags: `rules/
 
 ## C2 — Comments
 
-Structured tags on commands (`@command @pure @layer @affects @invariant @failure`), not narration.
+Structured tags on commands (`@affects @invariant @failure` (path = layer, name = command; all commands are pure)), not narration.
 If a comment restates the code, delete it. Prose belongs in `docs/` (the human layer).
 
 ## C3 — Naming

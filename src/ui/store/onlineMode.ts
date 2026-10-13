@@ -1,5 +1,4 @@
 /**
- * @layer ui/store
  * ONLINE mode: POST /command, /undo, /redo; the document itself arrives over the /live SSE stream.
  * A POST network error while SSE is open never goes local (the command may have executed
  * server-side); HTTP 4xx/5xx never fall back either.

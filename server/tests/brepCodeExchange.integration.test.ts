@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Exact recipes through the Python bridge: a drilled block whose hole lip is filleted on the OCC
  * kernel exports as CadQuery code that rebuilds the B-rep (boolean + fillet, not a triangle soup),
  * writes an exact STEP (a toroidal fillet face), and round-trips back into an editable llull history.

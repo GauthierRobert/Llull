@@ -1,5 +1,4 @@
 /**
- * @layer mcp
  * MCP resources — read-only views of the live document, so an agent can orient without calling a
  * mutating tool first. Pure over the document; transport wiring lives in `server/`.
  *
@@ -7,8 +6,6 @@
  *   cad://scene        structured SceneSnapshot (entity ids/kinds/bounds/layers/groups/selection)
  *   cad://selection    selected entity ids + their kind/position summaries
  *   cad://conventions  static agent modeling guide (Markdown)
- *
- * @pure
  */
 
 import type { CadDocument } from '@core/model/types';
@@ -38,7 +35,6 @@ export const CAD_RESOURCE_URIS = {
   conventions: CONVENTIONS_URI,
 } as const;
 
-/** @pure static metadata; needs no document */
 export function listMcpResources(): McpResourceDescriptor[] {
   return [
     {
@@ -119,8 +115,6 @@ function selectionSummary(doc: CadDocument): { count: number; entities: unknown[
 /**
  * Dispatch a resource read by URI. Document-independent resources (conventions) ignore `doc`.
  *
- * @pure over doc
- * @layer mcp
  * @failure unknown URI -> null (the transport replies with an error)
  */
 export function readMcpResource(doc: CadDocument, uri: string): McpResourceContent | null {

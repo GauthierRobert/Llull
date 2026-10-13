@@ -1,5 +1,3 @@
-/** @layer ui/panels Kind-specific read-only dimension rows; null for kinds without any. */
-
 import React from 'react';
 import type { Entity } from '@core/model/types';
 import { AxisFields, PropRow, ScalarRow } from './propertyFields';

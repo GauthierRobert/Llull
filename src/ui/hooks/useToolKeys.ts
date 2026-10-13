@@ -1,6 +1,4 @@
 /**
- * @layer ui/hooks
- *
  * Shared keyboard contract of the armed 2D tools (draw and modify): two-stage Escape (first press
  * drops the operation in progress, the next disarms the tool) and Enter to commit/finish. Keys typed
  * into fields or dialogs are never consumed.

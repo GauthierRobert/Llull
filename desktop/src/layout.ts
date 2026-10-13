@@ -1,9 +1,7 @@
 /**
- * @layer desktop
  * Where the desktop app finds its parts: the built web app, the server bundle, the CLI bundle and
  * the bundled Python. Packaged: under `process.resourcesPath` (electron-builder `extraResources`).
  * Development (`npm start`): the repo checkout.
- * @pure
  */
 
 import path from 'path';

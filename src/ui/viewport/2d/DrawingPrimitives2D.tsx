@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * DrawingPrimitives2D — renders technical-drawing primitives with ISO 128 line weights: thick
  * continuous outlines (screen-constant width), thin lines, dashed hidden lines, chain centre lines,
  * 45° hatching and solid poché. The one renderer of every 2D technical drawing (the building plan

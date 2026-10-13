@@ -1,7 +1,4 @@
-/**
- * @layer ui/viewport/3d
- * Environment, shadows and light rig scaled by the render-quality tier. Presentation only.
- */
+/** Environment, shadows and light rig scaled by the render-quality tier. Presentation only. */
 
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import { useThree } from '@react-three/fiber';

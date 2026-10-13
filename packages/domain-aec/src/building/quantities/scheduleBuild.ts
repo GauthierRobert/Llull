@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import { shapeOf } from '../../industrial/equipment/equipmentShape';
 import type { CadDocument } from '@core/model/types';
 import type { CurvedWallElement, BuildingModel, OpeningElement, WallElement } from '@core/model/building';

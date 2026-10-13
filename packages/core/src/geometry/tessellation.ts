@@ -2,9 +2,6 @@
  * Tessellation constants and low-level pure geometry helpers shared by the SVG renderer
  * (`renderTessellation.ts`) and the triangle exporters (`exportTriangulate.ts`), so both
  * segment and wind every primitive the same way.
- *
- * @layer core/commands
- * @pure all exports are side-effect-free pure functions
  */
 
 import type { Vec3 } from '../model/types';
@@ -31,7 +28,6 @@ export const SEG_TORUS_TUBE = 12;
  * The first vertex is at angle 0 (positive-X direction).
  * Points are in counter-clockwise order when viewed from above.
  *
- * @pure
  * @param cx - X coordinate of the circle centre
  * @param cy - Y coordinate of the circle centre
  * @param cz - Z coordinate (height) of the circle plane
@@ -66,7 +62,6 @@ export function sideQuads(bottom: readonly Vec3[], top: readonly Vec3[]): Array<
  * Returns [ia, ib, ic] index triplets into `pts`; every triangle is counter-clockwise (CCW,
  * normal +Z) regardless of the input winding.
  *
- * @pure
  * @param pts - 2D polygon vertices in order; the polygon is treated as closed.
  */
 export function earClipTriangulate(pts: ReadonlyArray<readonly [number, number]>): Array<[number, number, number]> {
@@ -81,7 +76,6 @@ export function earClipTriangulate(pts: ReadonlyArray<readonly [number, number]>
 /**
  * Triangles of a mesh entity's data. Kernel output is indexed (shared vertices); an empty
  * `indices` means `positions` is a triangle soup (9 numbers per triangle).
- * @pure
  */
 export function meshTriangles(mesh: {
   readonly positions: readonly number[];

@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * Snap points of a solid's drawing — read off the drawn edges, so a snap is always on a line the
  * user sees:
  *  - endpoint: chain ends and real corners (turn above CORNER_ANGLE; a tessellated curve is smooth

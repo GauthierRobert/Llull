@@ -1,5 +1,4 @@
 /**
- * @layer server
  * POST /exchange `{ name, params }` — the exchange tools (export_step, import_step, import_dwg,
  * import_code) for REST callers: the `llull` CLI with `--app` / `--server` (`liveExchange.ts`).
  * Answers the command bus shape plus `changed`.

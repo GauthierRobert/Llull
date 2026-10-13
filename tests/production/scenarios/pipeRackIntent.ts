@@ -4,8 +4,6 @@ import { PIPE_OD, section } from '../oracle/steel';
 import { gridCoordinates, type IntentMember, type IntentPipe, type IntentTray, type PlantIntent } from '../plant/intent';
 
 /**
- * @layer tests/production/scenarios
- *
  * Inter-unit pipe rack of an oilseed extraction plant: 9 bays of 6 m (54 m, 10 portal bents),
  * two pipe tiers on IPE300 tier beams between HEB240 columns, longitudinal struts and vertical
  * X-bracing in bay 1, nine process / utility lines running battery limit to battery limit, a cable

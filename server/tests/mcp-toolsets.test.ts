@@ -1,7 +1,4 @@
-/**
- * @layer server/tests
- * LLULL_TOOLSETS filtering over the real MCP Streamable HTTP transport.
- */
+/** LLULL_TOOLSETS filtering over the real MCP Streamable HTTP transport. */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';

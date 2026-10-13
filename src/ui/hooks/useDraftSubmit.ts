@@ -1,5 +1,4 @@
 /**
- * @layer ui/hooks
  * Form `onSubmit` handler that dispatches `command` with the validated `draft` (null = not ready,
  * nothing is sent) and calls `onChanged` only when the document changed.
  */

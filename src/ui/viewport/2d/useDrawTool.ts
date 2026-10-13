@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * State machine for interactive 2D draw tools.
  *
  * Collects snapped click points, manages in-progress state, and on

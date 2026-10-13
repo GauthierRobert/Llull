@@ -1,8 +1,4 @@
-/**
- * add_planetary_gearset: sun + N planets + ring with the tooth phasing that lets them mesh.
- *
- * @layer core/commands
- */
+/** add_planetary_gearset: sun + N planets + ring with the tooth phasing that lets them mesh. */
 
 import type { CadDocument, Entity, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
@@ -37,9 +33,6 @@ export function planetaryPhases(sunTeeth: number, planetTeeth: number, planetCou
 }
 
 /**
- * @command add_planetary_gearset
- * @pure
- * @layer core/commands
  * @affects creates 1 sun (extrusion) + planetCount planets (extrusion) + 1 ring (mesh)
  * @invariant ringTeeth = sunTeeth + 2*planetTeeth; (sunTeeth + ringTeeth) % planetCount === 0; neighbouring planets do not touch
  * @failure assembly condition violated / invalid params -> unchanged doc, summary explains, affected:[]

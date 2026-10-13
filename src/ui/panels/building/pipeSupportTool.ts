@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/building
- *
  * "Pipe support" tool spec → `add_pipe_support` (param-gathering only, react R1). The pipe is picked
  * from the live list (`line:<number>` = every pipe of that line, `pipe:<id>` = one unnumbered pipe).
  */

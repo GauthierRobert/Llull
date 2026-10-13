@@ -3,7 +3,6 @@
  *
  * Shapes are cached Manifold solids keyed by recipe (`kernelFromOps`); no B-rep (see `manifoldOps`).
  *
- * @layer kernel (concrete adapter injected by the app / server; commands see only GeometryKernel)
  * @invariant primitives are centred like three.js (box, cylinder along +Z, sphere) or extruded
  *   along +Z from z=0; entity transform = rotate Z, then Y, then X (M = Rx·Ry·Rz), then translate
  * @invariant cone, torus, wedge, pyramid, revolution, sweep, mesh: welded `entityToTriangles` geometry

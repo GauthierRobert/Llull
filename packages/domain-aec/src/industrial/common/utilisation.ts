@@ -1,8 +1,4 @@
-/**
- * Utilisation helpers shared by the check rows and summaries.
- * @layer domain-aec
- * @pure
- */
+/** Utilisation helpers shared by the check rows and summaries. */
 
 /** The first item of highest utilisation; undefined when there is none. */
 export const highestUtilisation = <Item extends { utilisation: number }>(items: readonly Item[]): Item | undefined =>

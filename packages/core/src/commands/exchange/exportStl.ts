@@ -1,8 +1,4 @@
-/**
- * export_stl: read-only serialisation to STL (document returned unchanged, output in `data`).
- *
- * @layer core/commands
- */
+/** export_stl: read-only serialisation to STL (document returned unchanged, output in `data`). */
 
 import type { Vec3 } from '../../model/types';
 import { report } from '../noop';
@@ -81,9 +77,6 @@ export interface ExportStlData {
 }
 
 /**
- * @command export_stl
- * @pure
- * @layer core/commands
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data.triangleCount >= 0; data.format matches the requested format;
  *            ASCII STL wraps content in 'solid <name>'…'endsolid <name>';

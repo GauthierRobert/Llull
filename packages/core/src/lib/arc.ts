@@ -1,9 +1,4 @@
-/**
- * Arc sampling on a circle (or an axis-aligned ellipse with `radiusY`) about `center`.
- *
- * @layer lib
- * @pure
- */
+/** Arc sampling on a circle (or an axis-aligned ellipse with `radiusY`) about `center`. */
 
 /** The point at `angle` (radians) on the circle of `radius` about `center`. */
 export function polar(center: readonly [number, number], radius: number, angle: number): [number, number] {

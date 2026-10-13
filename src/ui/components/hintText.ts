@@ -1,6 +1,4 @@
 /**
- * @layer ui/components
- *
  * Contextual "what can I do now" text for the viewport hint bar. Pure: derived from the view,
  * the armed tool and the selection, so each state has one tested message.
  */

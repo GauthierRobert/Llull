@@ -76,9 +76,6 @@ function resolveCorner(doc: CadDocument, command: string, verb: string, poly: Po
 }
 
 /**
- * @command fillet_2d
- * @pure
- * @layer core/commands
  * @affects updates 1 polyline entity (trims the two adjacent segments) + creates 1 arc entity
  * @invariant entity must be kind:'polyline'; vertexIndex must be an interior vertex (1..n-2 for open, 0..n-1 for closed)
  * @failure missing id / wrong kind / invalid vertex / radius too large -> no-op, affected:[]
@@ -161,9 +158,6 @@ export const fillet2D = defineCommand({
 });
 
 /**
- * @command chamfer_2d
- * @pure
- * @layer core/commands
  * @affects updates 1 polyline entity (trims the two adjacent segments) + creates 1 line entity (the bevel)
  * @invariant entity must be kind:'polyline'; vertexIndex must be interior vertex
  * @failure missing id / wrong kind / invalid vertex / distance too large -> no-op, affected:[]

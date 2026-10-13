@@ -11,8 +11,6 @@ import type { UiRun } from './grading';
 import type { UiSession } from './session';
 
 /**
- * @layer tests/production/ui
- *
  * desmet-extraction-revision-b through the UI: the colleague's issued rev A project (built in
  * Node by running the building scenario's calls) is opened with "Open project"; the engineer
  * applies the change order with the same controls (the uprated extractor in the equipment editor),

@@ -2,9 +2,6 @@
  * Run a command through `execute` but record different params in the FeatureStep it appends —
  * used to keep parameter-driven `=expr` strings in featureHistory while the command itself
  * receives resolved numbers (architecture L8).
- *
- * @layer core/commands
- * @pure
  */
 
 import type { CadDocument } from '../../model/types';

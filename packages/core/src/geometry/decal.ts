@@ -1,5 +1,4 @@
 /**
- * @layer core/geometry
  * Decal projection (like three.js DecalGeometry): the solid's triangles facing the decal are
  * clipped to the decal box (±width/2, ±height/2, ±depth/2 around `center`, z along `normal`) and
  * given UVs in glTF convention (u right, v down from the top of the image). The patch is lifted

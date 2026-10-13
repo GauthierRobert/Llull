@@ -1,7 +1,6 @@
 /**
  * Installed plugins — the composition state the registry, persistence and toolsets read.
  *
- * @layer core/plugins
  * @invariant installation is idempotent per plugin name; order of installation is preserved
  */
 

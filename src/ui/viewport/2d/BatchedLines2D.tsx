@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * Renders every unselected, visible `line` entity as a single LineSegments draw call
  * (selected lines keep the per-entity path so they get the selection highlight). Geometry and
  * material are rebuilt when the set of line entities changes and disposed with the component (R9).

@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Subdivision solids in generated code. The pure Python port of Catmull-Clark + Bézier patches
  * (codegen/pythonSubdivision.ts) must reproduce the TypeScript patches (any python3). With
  * CadQuery available, the exported script builds exact B-spline faces (STEP) and its trace

@@ -1,6 +1,4 @@
 /**
- * @layer ui/hooks
- *
  * Single-key tool shortcuts — the one table read by the keyboard handler, the toolbar tooltips
  * and the shortcut sheet, so an advertised key is always a working key.
  * Keys are view-scoped: in the 3D view R/S drive the gizmo; in the 2D view they arm draw tools.

@@ -1,8 +1,6 @@
 /**
  * Place-by-relation commands — spatial layout utilities.
  *
- * @layer core/commands
- *
  * Three pure commands that reposition entities relative to each other using
  * world-space bounding-box arithmetic. No new geometry is created; only the
  * `position` of targeted entities changes.
@@ -37,9 +35,6 @@ const plural = (n: number): string => (n === 1 ? 'y' : 'ies');
 const EDGE_PATTERN = /^(min|max|center)-([xyz])$/;
 
 /**
- * @command align
- * @pure
- * @layer core/commands
  * @affects moves every entity in targetIds (their position is shifted along one axis)
  * @invariant all targetIds and referenceId must exist; reference entity is not moved
  * @failure missing id -> no-op, affected:[]
@@ -103,9 +98,6 @@ export const align = defineCommand({
 });
 
 /**
- * @command distribute
- * @pure
- * @layer core/commands
  * @affects repositions targetIds along the specified axis
  * @invariant targetIds.length >= 2; first and last entity are anchors (not moved)
  * @failure < 2 targetIds -> no-op; missing id -> no-op
@@ -189,9 +181,6 @@ export const distribute = defineCommand({
 });
 
 /**
- * @command stack_on
- * @pure
- * @layer core/commands
  * @affects moves movingId so its min face along axis meets baseId's max face
  * @invariant +Z up convention; default axis is 'z'
  * @failure missing id or movingId === baseId -> no-op, affected:[]

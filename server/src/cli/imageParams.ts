@@ -1,5 +1,4 @@
 /**
- * @layer server
  * `key=@img:path/to/scan.png` in CLI params: the file is read and passed as a base64 data URL, so
  * `add_image_underlay dataUrl=@img:scan.png` works from a shell while the command itself stays pure
  * (it only ever sees the data URL).

@@ -1,5 +1,4 @@
 /**
- * @layer desktop
  * Electron main process — wiring only. The app is the unchanged web app served by the unchanged
  * llull server, running locally in a utility process with a per-launch token; files, menus and
  * the CLI hand-off live in the Electron-free modules next to this file (tested without Electron).

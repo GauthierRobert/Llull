@@ -1,9 +1,6 @@
 /**
  * Parameter → feature dependencies: which history steps read which parameters, and
  * regeneration of only what a parameter change affects.
- *
- * @layer core/commands
- * @pure
  */
 
 import type { CadDocument, FeatureStep, Parameter } from '../../model/types';

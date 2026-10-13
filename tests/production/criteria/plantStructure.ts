@@ -6,8 +6,6 @@ import { section } from '../oracle/steel';
 import { gridCoordinates, letterLabels, type IntentMember, type PlantIntent } from '../plant/intent';
 
 /**
- * @layer tests/production/criteria
- *
  * Steel structure acceptance: levels, grid, every intended member present with the right section
  * at the right place (absolute axis ends, either direction), floors, and the steel tonnage checked
  * against an independent section table.

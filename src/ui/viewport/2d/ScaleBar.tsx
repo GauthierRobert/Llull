@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * HTML HUD overlay: a small scale bar that shows the current real-world length
  * of a fixed screen segment, labeled with the document units.
  *

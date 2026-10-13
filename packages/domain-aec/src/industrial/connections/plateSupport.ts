@@ -1,8 +1,4 @@
-/**
- * Base plate creation, refitting after member edits, and lookup of unplated columns.
- * @layer domain-aec
- * @pure
- */
+/** Base plate creation, refitting after member edits, and lookup of unplated columns. */
 
 import type { BasePlateElement, BuildingModel, SteelMemberElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';

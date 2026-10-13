@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * React error boundary wrapping the r3f Canvas.
  * Catches render errors in the 3D scene and shows a minimal fallback
  * so the rest of the app keeps running.

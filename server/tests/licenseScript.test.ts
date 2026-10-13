@@ -1,7 +1,4 @@
-/**
- * @layer server/tests
- * The vendor script (`scripts/license.mjs`) and the server verifier agree on the license format.
- */
+/** The vendor script (`scripts/license.mjs`) and the server verifier agree on the license format. */
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'child_process';
 import fs from 'fs';

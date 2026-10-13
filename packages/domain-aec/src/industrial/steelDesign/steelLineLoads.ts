@@ -2,8 +2,6 @@
  * Pipes and cable trays resting on beams: a run bears on a beam where it crosses the beam in plan
  * with its underside at the beam's top of steel; each support takes the run weight over half the
  * span to the neighbouring supports (the end supports also the overhang to the run end).
- * @layer domain-aec
- * @pure
  */
 
 import { clamp } from '@lib/clamp';

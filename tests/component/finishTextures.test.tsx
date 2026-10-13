@@ -2,8 +2,6 @@
  * Viewport finish textures: the hook builds three.js DataTextures from the core procedural maps
  * (repeat-wrapped, sRGB albedo) and disposes them when the finish changes; applyBoxUvs writes a
  * box-projected uv attribute. WebGL does not run in jsdom, so we check the three.js objects.
- *
- * @layer tests/component
  */
 
 import { describe, it, expect } from 'vitest';

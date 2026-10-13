@@ -1,8 +1,4 @@
-/**
- * Wind-bracing load path and member checks for a steel hall level (EN 1991-1-4, EN 1993-1-1).
- * @layer domain-aec
- * @pure
- */
+/** Wind-bracing load path and member checks for a steel hall level (EN 1991-1-4, EN 1993-1-1). */
 
 import type { CadDocument } from '@core/model/types';
 import { levelMembersInMm } from '../common/memberSupport';

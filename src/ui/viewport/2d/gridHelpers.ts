@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * Pure helpers for the adaptive 2D ortho grid and the scale-bar HUD.
  *
  * All functions are deterministic and side-effect free so they can be
@@ -39,7 +37,6 @@ const NICE_STEPS = [1, 2, 5] as const;
  * 3. If that step still fits within MAX_CELL_PX pixels, use it.
  *    Otherwise try the next nice step up.
  *
- * @pure deterministic
  * @invariant zoom > 0
  * @invariant result > 0
  */
@@ -74,8 +71,6 @@ export function adaptiveGridStep(zoom: number): number {
 /**
  * Compute the major grid step from a minor step.
  * Major lines are always 10× the minor step so the grid has two visible tiers.
- *
- * @pure deterministic
  */
 export function majorGridStep(minorStep: number): number {
   return minorStep * 10;
@@ -108,7 +103,6 @@ interface GridPatch {
  * @param margin        Patch size as a multiple of the viewport. Default 2.5.
  * @param maxDivisions  Hard cap on cell count (even). Default 1000.
  *
- * @pure deterministic
  * @invariant divisions even, 2 ≤ divisions ≤ maxDivisions
  * @failure step <= 0 or visibleWorld <= 0 -> minimal 2-cell patch
  */
@@ -133,7 +127,6 @@ export function localGridPatch(visibleWorld: number, step: number, margin = 2.5,
  * world-unit tolerance/size becomes sub-pixel when zoomed out and huge when
  * zoomed in, defeating the infinite-grid snapping.
  *
- * @pure deterministic
  * @invariant zoom > 0
  * @invariant result > 0 for pixels > 0
  * @failure zoom <= 0 -> returns pixels unchanged (1:1 fallback)
@@ -147,7 +140,6 @@ export function pixelsToWorld(pixels: number, zoom: number): number {
  * Label for a scale-bar length: exactly as many decimals as the value needs (0.005 -> "0.005",
  * 20 -> "20"). A fixed document precision would round tiny bars to "0.00"/"0.01" when zoomed in.
  *
- * @pure deterministic
  * @failure non-finite or non-positive length -> "0"
  */
 export function formatScaleBarLength(worldLength: number): string {
@@ -168,7 +160,6 @@ export function formatScaleBarLength(worldLength: number): string {
  * @returns            { worldLength, pixelLength } — world units and the
  *                     corresponding pixel width to render.
  *
- * @pure deterministic
  * @invariant zoom > 0
  * @invariant worldLength > 0, pixelLength > 0
  */

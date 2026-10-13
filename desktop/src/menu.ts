@@ -1,8 +1,6 @@
 /**
- * @layer desktop
  * The application menu as data: File (New / Open / Save / Save As), Edit and View roles, and Help
  * (Install Command Line Tool, Claude Code instructions). Handlers are injected; no Electron calls.
- * @pure
  */
 
 import type { MenuItemConstructorOptions } from 'electron';

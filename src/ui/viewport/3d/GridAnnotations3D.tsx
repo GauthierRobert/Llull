@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * GridAnnotations3D — structural grid (layer S-GRID) in the 3D view: continuous screen-space
  * lines at ground level plus camera-facing bubbles with readable labels, sized relative to the
  * grid extent. Presentation only; the entities come from `add_grid_system` / `add_grid_line`.

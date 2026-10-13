@@ -12,8 +12,6 @@ import { COMPLEX_2D, COMPLEX_3D } from './complexPlans';
 import { aspectOf, isFramed, pixelAspectSlack, shootCanvas, silhouette, type Silhouette } from './silhouette';
 
 /**
- * @layer tests/quality
- *
  * Display quality gate: every corpus document is opened in the real app (offline mode) and must
  * render without console / page / WebGL errors, unstretched, visible, framed, with the on-screen
  * aspect ratio of its bounding box (no deformation). The silhouette is the pixel diff between a

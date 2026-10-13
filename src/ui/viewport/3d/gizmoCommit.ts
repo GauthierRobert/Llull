@@ -1,7 +1,4 @@
 /**
- * @layer ui/viewport/3d
- * @pure
- *
  * What a finished gizmo drag turns into: the command + params for the transform the user made, or
  * null when the drag changed nothing (including a translate that snapped back to where it began).
  * The gizmo never edits the entity; the caller dispatches the returned command.
@@ -46,7 +43,6 @@ export type GizmoCommit =
 /**
  * Status hint for a translate drag that grid snap returned to its start: the user clearly dragged
  * (`rawEnd` differs from `start`) but nothing was committed. Null in every other case.
- * @pure
  */
 export function snapBackHint(
   start: Xyz,

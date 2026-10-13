@@ -1,5 +1,3 @@
-/** @layer server — `llull help` text. */
-
 export const USAGE = `llull — the CAD command registry from a shell (same commands as the UI and MCP).
 
 Usage: llull <subcommand> [args] [flags]

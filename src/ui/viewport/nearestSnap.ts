@@ -1,5 +1,3 @@
-/** @layer ui/viewport — candidate ranking shared by the 2D and 3D snappers. */
-
 /** Distances closer than this are ties, broken by type priority. */
 const TIE_EPSILON = 1e-10;
 
@@ -7,7 +5,6 @@ const TIE_EPSILON = 1e-10;
  * The candidate nearest to the cursor within `tolerance`; candidates at (numerically) the same
  * distance are ranked by type priority (lower number wins), then by order.
  *
- * @pure
  * @failure no candidate within tolerance -> null
  */
 export function nearestSnap<Type extends string, Candidate extends { readonly type: Type }>(

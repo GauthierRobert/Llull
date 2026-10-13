@@ -1,7 +1,4 @@
-/**
- * Drainage analysis commands: network hydraulic check, schedules and automatic pipe sizing.
- * @layer domain-aec/civil
- */
+/** Drainage analysis commands: network hydraulic check, schedules and automatic pipe sizing. */
 
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
@@ -92,8 +89,6 @@ function rainfallText(criteria: DrainageCriteria): string {
 }
 
 /**
- * @command check_drainage_network
- * @pure
  * @affects none (read-only)
  * @failure bad criteria -> no-op
  */
@@ -202,8 +197,6 @@ export const checkDrainageNetwork = defineCommand({
 });
 
 /**
- * @command drainage_schedule
- * @pure
  * @affects none (read-only)
  * @failure no manholes -> no-op
  */
@@ -257,8 +250,6 @@ export const drainageSchedule = defineCommand({
 });
 
 /**
- * @command size_drainage_pipes
- * @pure
  * @affects modifies the diameter of every pipe that needs a different commercial size
  * @failure no pipes / bad criteria -> no-op
  */

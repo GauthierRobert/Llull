@@ -1,8 +1,6 @@
 /**
  * Replay engine: regenerate a document from a feature-history recipe (architecture L8).
  * Commands resolve through the active `ExecutionContext.registry`.
- *
- * @layer core/commands
  */
 
 import { type CadDocument, type FeatureStep, createEmptyDocument } from '../../model/types';
@@ -34,7 +32,6 @@ export interface ReplayStepEvent {
  * state of `base` (classification in history_carry.ts). `=expr` params resolve against
  * `base.parameters`; unresolved ones are reported in `resolveWarnings`.
  *
- * @pure
  * @invariant steps with an unknown command name, or whose `run` throws, are skipped
  * @failure a live step needs the geometry kernel (`requiresKernel`) and none is available ->
  *   returns `base` unchanged (+ a warning) instead of regenerating without that step's geometry

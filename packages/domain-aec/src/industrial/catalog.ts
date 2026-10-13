@@ -1,7 +1,6 @@
 /**
  * Industrial-steel commands — portal frames, members, checks, fabrication — the `industrial`
  * plugin's catalog (see plugin.ts).
- * @layer domain-aec/industrial
  */
 
 import { commandCatalog } from '@core/commands/schema';

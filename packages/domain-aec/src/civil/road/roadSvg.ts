@@ -1,8 +1,4 @@
-/**
- * Small SVG builders for the road drawings (long section, cross sections). Text is XML-escaped.
- * @layer domain-aec/civil
- * @pure
- */
+/** Small SVG builders for the road drawings (long section, cross sections). Text is XML-escaped. */
 
 import { escapeXml } from '@lib/escapeXml';
 import { n, svgPoints } from '../../shared/sheetFrame';

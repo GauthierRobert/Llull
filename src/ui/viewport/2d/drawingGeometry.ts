@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * Vertex buffers of technical-drawing primitives (`@core/model/drawing`) by ISO 128 line weight:
  * thick continuous (cut, visible), thin continuous (thin, annotation, hatching, dimensions, chain
  * centre lines pre-split into long dash + dot) and thin dashed (hidden); solid poché fills and
@@ -148,10 +146,7 @@ function fillArea(
 
 const relative = (points: ReadonlyArray<Vec2>, [ax, ay]: Vec2): Vec2[] => points.map(([x, y]): Vec2 => [x - ax, y - ay]);
 
-/**
- * Line-weight buffers, fills and labels of `items`, relative to `anchor`.
- * @pure
- */
+/** Line-weight buffers, fills and labels of `items`, relative to `anchor`. */
 export function buildDrawingBuffers(
   items: ReadonlyArray<StyledPrimitive>,
   { patternUnit, hatchSpacing }: DrawingScale,

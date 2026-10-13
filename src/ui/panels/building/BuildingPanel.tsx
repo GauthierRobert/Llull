@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/building
- *
  * BuildingPanel — the construction (AEC/BIM) workspace, in workflow order: starter templates (empty)
  * or view actions, 1 levels, 2 element tools + the active level's elements, equipment editor,
  * 3 structural / clash checks, 4 quantities & cost, project title block, 5 deliverables.

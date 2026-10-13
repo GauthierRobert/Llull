@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * Shared body of the circle / arc / ellipse render branches: an EllipseCurve outline in the
  * entity's XY plane, memoized on its inputs.
  */

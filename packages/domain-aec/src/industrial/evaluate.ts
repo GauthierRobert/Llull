@@ -1,8 +1,6 @@
 /**
  * Evaluation of industrial elements: steel members, footings, cladding panels, equipment, pipes,
  * cable trays.
- * @layer domain-aec
- * @pure
  */
 
 import type { CadDocument, Entity, SphereEntity, Vec2, Vec3 } from '@core/model/types';

@@ -1,7 +1,4 @@
-/**
- * Building regeneration: evaluates every element into entities and replaces the stale ones.
- * @layer domain-aec
- */
+/** Building regeneration: evaluates every element into entities and replaces the stale ones. */
 
 import type { CadDocument, Entity } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
@@ -90,7 +87,6 @@ function evaluateElement(context: EvaluationContext, element: BuildingElement): 
 /**
  * Replaces all previously evaluated building entities with a fresh evaluation of `edited` (after
  * re-attaching the pipe supports whose pipe or steel it changed).
- * @pure
  * @returns the new document; each element's `entityIds` lists the entities generated for it
  */
 export function regenerateBuilding(doc: CadDocument, edited: BuildingModel): CadDocument {

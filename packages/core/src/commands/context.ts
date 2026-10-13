@@ -1,7 +1,6 @@
 /**
  * Execution context — the injected dependencies of one `execute` call.
  *
- * @layer core/commands
  * @invariant a command reads its kernel, id source and registry ONLY from its context
  *   (architecture L9, solid S5); no command touches a module-level singleton.
  * @invariant contexts nest: a command that calls `execute` (build_project, replay, recipes)

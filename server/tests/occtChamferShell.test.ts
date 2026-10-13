@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Live OpenCascade chamfer, fillet and shell on EXACT shapes (B-rep edges, not mesh triangles),
  * checked against closed-form volumes; the sewn-mesh leaf stays a working fallback.
  */

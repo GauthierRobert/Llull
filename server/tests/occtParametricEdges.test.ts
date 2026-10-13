@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Live OpenCascade: a fillet chosen by location (`edgesNear`) follows its edge through a parametric
  * edit — the feature history keeps the point, and replay re-resolves it on the regenerated B-rep.
  */

@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * Pure hit-testing for window / crossing box selection (standard CAD):
  *   window   = drag left -> right: entities FULLY inside the box
  *   crossing = drag right -> left: entities inside OR touching the box
@@ -163,7 +161,6 @@ function matches(geometry: SampledGeometry, box: Box, mode: BoxSelectMode): bool
 /**
  * Ids of 2D entities selected by the box between `start` and `end`; the mode follows the drag
  * direction. Entities rejected by `isSelectable` (hidden layers etc.) are ignored.
- * @pure
  */
 export function entitiesInBox(
   document: CadDocument,

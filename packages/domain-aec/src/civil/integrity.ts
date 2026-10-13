@@ -1,7 +1,6 @@
 /**
  * Keeps evaluated civil geometry consistent with the civil model (architecture L4/L8), and lists
  * the references between civil objects.
- * @layer domain-aec/civil
  */
 
 import type { DerivationGuard } from '@core/commands/derivation';

@@ -1,6 +1,4 @@
 /**
- * @layer ui/store
- *
  * Session store — presentation-only bookkeeping for autosave: whether the document changed since
  * the last explicit Save/Open/New, and whether the current content was restored from autosave.
  * Never part of CadDocument.

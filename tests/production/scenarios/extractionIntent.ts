@@ -3,8 +3,6 @@ import { section } from '../oracle/steel';
 import { gridCoordinates, type IntentMember, type IntentSupport, type IntentPipe, type PlantIntent } from '../plant/intent';
 
 /**
- * @layer tests/production/scenarios
- *
  * Solvent extraction building of a soybean crushing plant — the typical first deliverable of a
  * process-plant engineering office: a 4 × 2-bay multi-storey steel structure with gratings,
  * carrying the extractor, the desolventizer-toaster, the miscella tank and the conditioner, with

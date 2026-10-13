@@ -1,7 +1,4 @@
-/**
- * Equipment shapes (box, vertical vessel, horizontal vessel) and size normalisation.
- * @layer domain-aec
- */
+/** Equipment shapes (box, vertical vessel, horizontal vessel) and size normalisation. */
 
 import type { EquipmentElement, EquipmentShape } from '@core/model/building';
 import type { Vec3 } from '@core/model/types';

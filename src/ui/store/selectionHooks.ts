@@ -1,5 +1,3 @@
-/** @layer ui/store Narrow selection selectors shared by panels (and reusable by the viewport). */
-
 import { useMemo } from 'react';
 import type { Entity } from '@core/model/types';
 import { useStore } from './store';

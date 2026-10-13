@@ -1,7 +1,6 @@
 /**
  * IFC export of a pipe support: one IfcBuildingElementProxy (ObjectType PIPESUPPORT) whose body is
  * the support's extruded parts, with a Pset_llullPipeSupport property set (type, pipe, steel it bears on).
- * @layer domain-aec
  */
 
 import type { CadDocument } from '@core/model/types';

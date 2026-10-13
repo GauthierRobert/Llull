@@ -1,7 +1,4 @@
-/**
- * Starter building templates composed from the building commands (one undo step).
- * @layer domain-aec
- */
+/** Starter building templates composed from the building commands (one undo step). */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
@@ -176,8 +173,6 @@ function steps(doc: CadDocument, template: BuildingTemplate, origin: Vec2, creat
 }
 
 /**
- * @command add_building_template
- * @pure
  * @affects creates a complete multi-level building (all-or-nothing)
  * @failure unknown template / any step fails -> no-op with the failing step's summary
  */

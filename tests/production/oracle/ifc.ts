@@ -1,6 +1,4 @@
 /**
- * @layer tests/production/oracle
- *
  * Minimal, independent IFC (ISO 10303-21 STEP physical file) reader: what a BIM coordinator's
  * viewer checks first — entity counts, unique GlobalIds, resolvable references, storeys and which
  * storey contains each element. Shares no code with llull's IFC writer.

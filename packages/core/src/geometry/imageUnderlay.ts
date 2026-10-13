@@ -7,9 +7,6 @@
  * agents reading a picture count pixels). Local space: the entity's work plane, origin at the
  * image's lower-left corner, +y up. World: local rotated by the entity's Euler rotation (three.js
  * XYZ, so rotation[2] is the in-plane angle) about `position`, then offset by `position`.
- *
- * @layer geometry
- * @pure
  */
 
 import type { ImageEntity, Vec2, Vec3 } from '../model/types';

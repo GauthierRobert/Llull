@@ -1,5 +1,4 @@
 /**
- * @layer core/geometry
  * Sweep tessellation shared by export, kernels' mesh path and the viewport: the section is carried
  * along the sampled path by a rotation-minimizing frame (double reflection, Wang et al. 2008).
  * Start frame: binormal (section +y) is world +Z projected off the tangent (+Y when the path starts

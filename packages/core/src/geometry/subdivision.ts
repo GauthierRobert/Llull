@@ -1,5 +1,4 @@
 /**
- * @layer core/geometry
  * Catmull-Clark subdivision of a closed polygon cage with sharp creases (DeRose et al. rules for
  * infinitely sharp edges): crease edge points are midpoints, a vertex on two creases follows the
  * crease curve, a vertex on three or more stays a corner. Every level turns each n-gon into n

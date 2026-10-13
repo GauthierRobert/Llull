@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { EquipmentElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, looseVec2, vec3, z } from '@core/commands/schema';
@@ -11,8 +7,6 @@ import { commitBuilding } from '../../building/evaluate/evaluateElements';
 import { SHAPE_PARAM_TEXT, describeEquipmentShape, equipmentShapeSchema, normaliseEquipmentSize, shapeOf } from './equipmentShape';
 
 /**
- * @command update_equipment
- * @pure
  * @affects regenerates 1 equipment (same element id, mark kept unless renamed)
  * @invariant element id, GlobalId seed and schedule row identity survive the edit
  * @failure unknown element / tag, not equipment, ambiguous tag, duplicate mark, invalid values, unknown level -> no-op

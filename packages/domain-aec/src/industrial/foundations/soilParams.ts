@@ -1,7 +1,4 @@
-/**
- * Soil parameters shared by check_foundations and design_footings.
- * @layer domain-aec
- */
+/** Soil parameters shared by check_foundations and design_footings. */
 
 import { z } from '@core/commands/schema';
 import { isFiniteNumber } from '@lib/isFiniteNumber';

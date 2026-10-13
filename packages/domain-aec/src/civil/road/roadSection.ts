@@ -2,8 +2,6 @@
  * Road cross-section: the template (carriageway + shoulders with crossfall), the cut / fill batters
  * to daylight on an existing-ground TIN, and the cut / fill areas against that ground.
  * Lengths are document units; offsets are signed from the centreline (left of travel positive).
- * @layer domain-aec/civil
- * @pure
  */
 
 import type { Vec2 } from '@core/model/types';

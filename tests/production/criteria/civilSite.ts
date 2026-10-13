@@ -16,8 +16,6 @@ import { parseLandXml } from '../oracle/landxml';
 import { paperName, parseSheet, printedScales, STANDARD_SCALES } from '../oracle/svg';
 
 /**
- * @layer tests/production/criteria
- *
  * Acceptance criteria of a civil office's site job (survey → terrain → balanced pad → road →
  * storm network → sheets + LandXML). Engineering references are computed here, independently of
  * llull's code paths: convex-hull area, survey statistics, Barnett spiral length, Manning full-bore

@@ -2,8 +2,6 @@
  * Component tests for the `kind:'sweep'` 3D viewport render branch. WebGL does not run in jsdom,
  * so we check the observable path: `sweep_profile` through the store yields a sweep entity, and
  * the geometry SweepMesh builds from the shared core tessellation is non-empty with normals.
- *
- * @layer tests/component
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';

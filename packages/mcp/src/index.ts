@@ -1,5 +1,4 @@
 /**
- * @layer mcp
  * Barrel — the public surface of the MCP tool layer, imported by `server/` and tests. Types and
  * helpers used only inside one module stay private to it. The concrete transport (stdio / HTTP)
  * belongs in `server/` — never here.

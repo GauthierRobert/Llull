@@ -1,8 +1,4 @@
-/**
- * @layer ui/viewport/2d
- *
- * Pure intersection helpers between segments and circular curves (circles / arcs).
- */
+/** Pure intersection helpers between segments and circular curves (circles / arcs). */
 
 import { isAngleOnArc, type Segment } from './geometry';
 

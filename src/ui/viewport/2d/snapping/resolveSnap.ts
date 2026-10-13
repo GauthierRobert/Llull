@@ -1,8 +1,4 @@
-/**
- * @layer ui/viewport/2d
- *
- * Pick the best snap for a cursor position, and apply ortho / polar tracking.
- */
+/** Pick the best snap for a cursor position, and apply ortho / polar tracking. */
 
 import type { Vec2 } from '@core/model/types';
 import { nearestSnap } from '../../nearestSnap';
@@ -31,8 +27,6 @@ const SNAP_TYPE_PRIORITY: Record<SnapType, number> = {
  * Priority: endpoint > midpoint > center > intersection > perpendicular > tangent >
  * extension > nearest > grid.
  * Falls back to the nearest grid point when no geometric candidate is within tolerance.
- *
- * @pure deterministic, no side effects
  */
 export function snap(cursor: Vec2, candidates: SnapPoint[], gridSize: number, tolerance: number): SnapResult {
   const cx = cursor[0];
@@ -60,8 +54,6 @@ export function snap(cursor: Vec2, candidates: SnapPoint[], gridSize: number, to
  *   (default 15°, i.e. every 15° step from 0°).
  * - When both are false, returns cursor unchanged.
  * - When both are true, ortho takes precedence (ortho is a subset of polar at 90°).
- *
- * @pure deterministic, no side effects
  */
 export function applyOrthoPolar(origin: Vec2, cursor: Vec2, opts: OrthoPolarOpts): Vec2 {
   if (!opts.ortho && !opts.polar) return cursor;

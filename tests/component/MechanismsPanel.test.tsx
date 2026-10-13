@@ -13,7 +13,6 @@
  *   - "Delete" drive-relation button dispatches delete_drive_relation with the correct id.
  *
  * No geometry math or internals — behavioral testing only.
- * @layer tests/component
  */
 
 import { resetStore } from '../helpers/componentEntities';

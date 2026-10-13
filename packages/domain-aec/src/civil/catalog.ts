@@ -1,7 +1,6 @@
 /**
  * Civil / site-engineering commands — survey, terrain, earthworks, roads, drainage — the `civil`
  * plugin's catalog (see plugin.ts).
- * @layer domain-aec/civil
  */
 
 import { commandCatalog } from '@core/commands/schema';

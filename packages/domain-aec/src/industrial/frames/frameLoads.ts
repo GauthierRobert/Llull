@@ -1,8 +1,6 @@
 /**
  * Frame load inputs: candidate frames of a level (rafters chained into halls), frame-average roof
  * wind coefficients and crane rail wheel loads (EN 1991-3). Lengths in mm.
- * @layer domain-aec
- * @pure
  */
 import { toDegrees } from '@lib/angle';
 import type { SteelMemberElement } from '@core/model/building';

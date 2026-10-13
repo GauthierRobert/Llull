@@ -1,8 +1,6 @@
 /**
- * @layer server
  * How the `llull` CLI prints a result. Text mode reuses the MCP shaping (`shapeToolCallContent`:
  * the same size caps an agent gets over MCP); `--json` prints one machine-readable object.
- * @pure string builders only
  */
 
 import { shapeToolCallContent } from '@mcp/index';

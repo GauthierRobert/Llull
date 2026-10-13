@@ -1,5 +1,4 @@
 /**
- * @layer server
  * A `GeometryKernel` whose OpenCascade work runs in a worker thread, behind a SYNCHRONOUS call:
  * the server thread posts a request, blocks on `Atomics.wait`, and reads the reply with
  * `receiveMessageOnPort`. A WASM abort (Emscripten `process.exit`), a hang past the call timeout

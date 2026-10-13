@@ -1,7 +1,4 @@
-/**
- * What a civil evaluator sees: the document being regenerated and the civil model to evaluate.
- * @layer domain-aec/civil
- */
+/** What a civil evaluator sees: the document being regenerated and the civil model to evaluate. */
 
 import type { CadDocument } from '@core/model/types';
 import type { CivilModel } from '@core/model/civil';

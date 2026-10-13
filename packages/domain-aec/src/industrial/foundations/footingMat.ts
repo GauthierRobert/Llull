@@ -1,8 +1,4 @@
-/**
- * Reinforced-concrete pad mat design (EN 1992-1-1): soil-pressure envelope, flexure, one-way shear, punching.
- * @layer domain-aec
- * @pure
- */
+/** Reinforced-concrete pad mat design (EN 1992-1-1): soil-pressure envelope, flexure, one-way shear, punching. */
 
 import {
   BAR_DIAMETERS_MM,

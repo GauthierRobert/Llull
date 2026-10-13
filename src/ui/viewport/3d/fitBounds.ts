@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Camera framing for "Fit all / Fit selection": the centre of the entities' true world AABB and
  * the camera distance that fits its bounding sphere in the perspective frustum.
  */
@@ -24,7 +22,6 @@ export interface FitFraming {
  * World AABB of the existing entities among `ids` (instances expanded through their component,
  * dimensions framed with the geometry they measure) — the same bounds `fit_view` uses.
  *
- * @pure
  * @failure no ids, or none that exist -> null
  */
 export function mergedEntityBounds(document: CadDocument, ids: readonly string[]): Bounds | null {
@@ -39,7 +36,6 @@ export function mergedEntityBounds(document: CadDocument, ids: readonly string[]
 }
 
 /**
- * @pure
  * @param aspect viewport width / height (default square)
  * @failure no ids, or none that exist -> null
  */

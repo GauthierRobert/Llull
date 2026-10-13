@@ -1,8 +1,6 @@
 /**
  * Raster data URLs (`data:image/png;base64,…`, `data:image/jpeg;base64,…`): format check and the
  * intrinsic pixel size read from the PNG IHDR chunk / JPEG SOF marker. No DOM image decoding.
- * @layer lib
- * @pure
  */
 
 import { base64ToUint8Array } from './base64';

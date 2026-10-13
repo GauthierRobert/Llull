@@ -28,9 +28,6 @@ import { sketchLoop } from './sketchCurves';
 import { mapSegment } from '../../geometry/curveSegments';
 
 /**
- * @command extrude_profile
- * @pure
- * @layer core/commands
  * @affects creates 1 extrusion entity; sources (id/ids) are kept
  * @invariant depth > 0; exactly one of profile (>= 3 finite [x,y] points), id, ids
  * @invariant sketch sources store their exact `curves` and sit at the (first) source position unless
@@ -207,9 +204,6 @@ function resolveAxis(raw: unknown): Vec3 | null {
 }
 
 /**
- * @command revolve_profile
- * @pure
- * @layer core/commands
  * @affects creates 1 revolution entity — surface of revolution from a closed 2D polygon profile
  * @invariant profile.length >= 3; angle in (0, 2π]; segments >= 3
  * @failure profile < 3 points or any point not a finite [x,y] pair -> no-op, affected:[]

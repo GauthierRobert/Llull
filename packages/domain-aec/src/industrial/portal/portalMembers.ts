@@ -1,7 +1,4 @@
-/**
- * Portal hall steel member layout: frames, gable posts, purlins, side rails, X-bracing.
- * @layer domain-aec
- */
+/** Portal hall steel member layout: frames, gable posts, purlins, side rails, X-bracing. */
 
 import type { MemberSpec } from '../common/memberSupport';
 import type { HallGeometry, PortalProfiles } from './portalGeometry';

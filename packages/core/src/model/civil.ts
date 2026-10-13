@@ -2,8 +2,6 @@
  * Civil / site-engineering model (survey, terrain, earthworks, roads, drainage): the constructive
  * definition the civil plugin evaluates into ordinary entities. Lengths and elevations are in
  * document units; slopes are ratios (horizontal per 1 vertical for side slopes).
- *
- * @layer core/model
  */
 
 import type { Vec2, Vec3 } from './vectors';

@@ -1,5 +1,4 @@
 /**
- * @layer core/commands
  * 2D sketch entities → exact curve chains: one closed loop for profiles (extrude / revolve /
  * sweep sections) or an open 3D path for sweeps. Pure helpers, no document mutation.
  */

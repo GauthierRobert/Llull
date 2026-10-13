@@ -2,8 +2,6 @@
  * Which steel a pipe support bears on, and keeping that true when the model is edited: a deleted
  * member re-attaches its supports to the nearest steel in reach (else they become unattached), a moved
  * pipe or member re-runs the reach test at the new position.
- * @layer domain-aec
- * @pure
  */
 
 import type { BuildingModel, PipeSupportElement } from '@core/model/building';
@@ -120,7 +118,6 @@ function attachmentSignature(building: BuildingModel, support: PipeSupportElemen
  * to `doc.building` (or whose id is in `alsoIds`), or whose member no longer exists: the current
  * member is kept while it is still in reach, else the nearest member in reach, else the support is
  * unattached. Reach limits are the defaults, widened to the support's current pedestal / rod / bracket.
- * @pure
  */
 export function reconcilePipeSupports(doc: CadDocument, next: BuildingModel, alsoIds: ReadonlyArray<string> = []): SupportReconciliation {
   const previous = doc.building;

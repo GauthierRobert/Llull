@@ -4,8 +4,6 @@
  * each storey's shear is shared equally by the bracing planes of a direction, and inside a plane by
  * its braced bays. X-bracing is tension-only (one diagonal carries the panel shear / cos θ), a
  * single diagonal also buckles; the chords of a braced bay take the panel shear as a strut force.
- * @layer domain-aec
- * @pure
  */
 
 import type { StrutForce } from './steelBeamChecks';

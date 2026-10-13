@@ -1,5 +1,4 @@
 /**
- * @layer ui/viewport/3d
  * Camera synchronisation inside the Canvas: document.camera -> live camera/controls, and
  * adaptive near/far. Presentation only.
  */

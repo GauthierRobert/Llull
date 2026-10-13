@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import { ellipsePoint } from '@lib/arc';
 import { type CadDocument, type Entity, type Vec2, is2D, is3D } from '@core/model/types';
 import { LINE_PATTERNS } from '@core/model/drawing';
@@ -223,8 +219,6 @@ function buildDxf(doc: CadDocument, levelId: string | undefined, includeDrafting
 }
 
 /**
- * @command export_dxf
- * @pure read-only
  * @affects none; data = { filename, dxf, entityCount, layers }
  * @failure unknown level / nothing to export -> no data
  */

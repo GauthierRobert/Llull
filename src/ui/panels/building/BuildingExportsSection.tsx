@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/building
- *
  * BuildingExportsSection — downloads of the read-only exporters: DXF plan, IFC4 model, the
  * printable SVG plan sheet, elevation / section sheets and anchor bolt plan (paper + scale) and
  * DSTV NC1 fabrication files (one download per part). Presentation only.

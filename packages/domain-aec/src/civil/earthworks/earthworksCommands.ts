@@ -1,7 +1,6 @@
 /**
  * Earthworks commands: graded platforms (pads) with cut / fill batters, cut / fill volumes,
  * balancing a pad level and comparing two surfaces.
- * @layer domain-aec/civil
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
@@ -80,8 +79,6 @@ function worksOf(platform: PlatformObject, tin: Tin, spacing?: number): Earthwor
 }
 
 /**
- * @command add_platform
- * @pure
  * @affects creates 1 platform (pad + outline + daylight line + batters + label)
  * @invariant boundary is stored counter-clockwise; every vertex lies inside the surface TIN
  * @failure unknown surface / invalid polygon / bad slope / boundary outside surface -> no-op
@@ -138,8 +135,6 @@ export const addPlatform = defineCommand({
 });
 
 /**
- * @command update_platform
- * @pure
  * @affects regenerates 1 platform
  * @failure unknown platform / invalid value / boundary outside surface / no change -> no-op
  */
@@ -190,8 +185,6 @@ export const updatePlatform = defineCommand({
 });
 
 /**
- * @command platform_earthworks
- * @pure
  * @affects none (read-only)
  * @failure unknown platform / missing surface / bad spacing -> no-op
  */
@@ -257,8 +250,6 @@ function surfaceRange(tin: Tin, boundary: ReadonlyArray<Vec2>): [number, number]
 }
 
 /**
- * @command balance_platform
- * @pure
  * @affects regenerates 1 platform (new elevation)
  * @failure unknown platform / bad swell / no balancing level inside the ground range -> no-op
  */
@@ -330,8 +321,6 @@ export const balancePlatform = defineCommand({
 });
 
 /**
- * @command compare_surfaces
- * @pure
  * @affects none (read-only)
  * @failure unknown surface / bad spacing / no shared extent -> no-op
  */

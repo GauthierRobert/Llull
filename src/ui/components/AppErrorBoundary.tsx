@@ -1,6 +1,4 @@
 /**
- * @layer ui/components
- *
  * Top-level error boundary: a render crash anywhere shows a recoverable screen
  * instead of a blank page.
  */

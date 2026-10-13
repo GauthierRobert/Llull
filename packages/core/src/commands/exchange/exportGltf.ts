@@ -2,8 +2,6 @@
  * export_gltf: read-only glTF 2.0 / GLB export (scene layout: ./gltfScene.ts) — one named node +
  * mesh per entity (each child of an instance), one PBR material per distinct appearance, entity
  * groups as parent nodes, finishes as textures, decals as overlays (document returned unchanged).
- *
- * @layer core/commands
  */
 
 import type { CommandResult } from '../types';
@@ -70,9 +68,6 @@ function withInlineBuffer(scene: GltfScene): Record<string, unknown> {
 }
 
 /**
- * @command export_gltf
- * @pure
- * @layer core/commands
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data.format matches the binary param; data.triangleCount >= 0
  * @invariant one node + mesh per exported entity (node.name = entity name or id); one material per

@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { FootingElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
@@ -68,7 +64,6 @@ export function clayLayerError(layer: unknown): string | null {
  * Primary consolidation settlement (mm) of a clay layer in 5 sublayers: groundwater at the founding level,
  * γ' = unitWeight − 9.81, σ'0 = 18 D + γ' z (D = founding depth, z below the founding level), Δσ = q B L / ((B + z)(L + z)) at the sublayer centre (2:1 spreading),
  * s = Σ Cc h/(1+e0) log10((σ'0+Δσ)/σ'0); with σ'p, Cr up to σ'p and Cc beyond.
- * @pure
  */
 export function consolidationSettlement(
   netPressure: number,
@@ -102,7 +97,6 @@ export function consolidationSettlement(
 
 /**
  * Elastic settlement (mm) of a pad under SLS G+S: s = q B (1 − ν²) Is / Es, Is 0.88 (rigid square), q = (V + footing + backfill) / area − 18 kN/m³ × founding depth.
- * @pure
  */
 function footingSettlement(doc: CadDocument, reaction: BaseReaction, footing: FootingElement, soilModulus: number): number {
   const { pressure, breadth } = footingNetPressure(doc, reaction, footing);

@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * `ShapeLine` is the shared body of every 2D curve renderer: each renderer only supplies the flat
  * xyz vertex list.
  */

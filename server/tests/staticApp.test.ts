@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * On-prem static serving (`LLULL_STATIC_DIR`): built assets and the SPA fallback for HTML
  * navigations; API 404s stay JSON.
  */

@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { Located as BracingLocated } from '../bracing/bracingModel';
 import type { RoofCoefficients, RoofZone, ZoneCpe } from '../common/windCoefficients';
 

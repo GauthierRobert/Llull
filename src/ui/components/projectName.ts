@@ -1,7 +1,4 @@
-/**
- * @layer ui/components
- * Project-name helpers: the display name and the file-name stem derived from it.
- */
+/** Project-name helpers: the display name and the file-name stem derived from it. */
 
 import type { CadDocument } from '@core/model/types';
 import { fileSlug } from '@aec/building/model';

@@ -1,8 +1,4 @@
-/**
- * @layer ui/components
- *
- * Document-browser tabs (rail order): tab id, label, icon. Read by the Sidebar and the palette.
- */
+/** Document-browser tabs (rail order): tab id, label, icon. Read by the Sidebar and the palette. */
 
 import type { SidebarTab } from '@ui/store';
 import type { IconName } from '@ui/components/Icon';

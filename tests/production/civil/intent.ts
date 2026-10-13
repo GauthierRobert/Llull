@@ -3,8 +3,6 @@ import path from 'node:path';
 import type { Vec2 } from '@core/model/types';
 
 /**
- * @layer tests/production/civil
- *
  * Design intent of the civil-office job (site development): the survey the client supplies and the
  * engineer's layout decisions. The brief, the scripted calls and the acceptance criteria are all
  * generated from it, so they cannot disagree. Survey: public/samples/pilot-site-survey.csv

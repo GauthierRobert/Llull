@@ -1,5 +1,3 @@
-/** @layer ui/panels/building Pure option lists for the element tools' live selects. */
-
 import type { BuildingModel } from '@core/model/building';
 import type { ElementListKind } from './elementToolForm';
 

@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { SteelMemberElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
@@ -27,8 +23,6 @@ import { checkTable, failureSummary } from '../reports/checkReport';
 import { existingLevelIdParam } from '../../building/levelParams';
 
 /**
- * @command check_crane_runways
- * @pure read-only
  * @affects none; data = { rows: RunwayCheckRow[], csv, maxUtilisation, failures }
  * @failure bad params / unknown level / no crane beams -> no data
  */

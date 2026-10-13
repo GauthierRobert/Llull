@@ -1,9 +1,4 @@
-/**
- * Area enclosed by a closed 2D shape.
- *
- * @layer geometry
- * @pure
- */
+/** Area enclosed by a closed 2D shape. */
 
 import type { Entity } from '../model/types';
 import { polygonArea } from '../lib/polygon';

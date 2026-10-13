@@ -1,8 +1,4 @@
-/**
- * Load parameters shared by the portal-frame, foundation and footing commands: schema, validation, description.
- * @layer domain-aec
- * @pure
- */
+/** Load parameters shared by the portal-frame, foundation and footing commands: schema, validation, description. */
 
 import type { CadDocument } from '@core/model/types';
 import { z } from '@core/commands/schema';

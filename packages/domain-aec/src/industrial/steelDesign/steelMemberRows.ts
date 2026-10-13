@@ -1,8 +1,6 @@
 /**
  * Result rows of check_steel_members: one row per steel member, worst check first-class, and the
  * gates that turn a bar the checks do not cover into its skipped row.
- * @layer domain-aec
- * @pure
  */
 
 import type { MemberRole } from '@core/model/building';

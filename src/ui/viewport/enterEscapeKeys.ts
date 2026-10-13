@@ -1,5 +1,4 @@
 /**
- * @layer ui/viewport
  * `onKeyDown` handler for viewport text/number inputs: Enter commits (default prevented so it never
  * submits an ancestor form), Escape cancels. Either callback may be omitted.
  */

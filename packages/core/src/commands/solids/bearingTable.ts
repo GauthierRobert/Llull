@@ -1,8 +1,4 @@
-/**
- * Common rolling-bearing designations (ISO 15 boundary dimensions, mm): bore d, outer diameter D, width B.
- *
- * @layer core/commands
- */
+/** Common rolling-bearing designations (ISO 15 boundary dimensions, mm): bore d, outer diameter D, width B. */
 
 export const BEARING_TYPES = ['deep_groove_ball', 'spherical_roller', 'tapered_roller', 'cylindrical_roller'] as const;
 

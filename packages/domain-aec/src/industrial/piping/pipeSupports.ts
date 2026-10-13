@@ -1,7 +1,4 @@
-/**
- * Pipe supports: shoes / guides / anchors on steel below, hangers from steel above.
- * @layer domain-aec
- */
+/** Pipe supports: shoes / guides / anchors on steel below, hangers from steel above. */
 
 import type { PipeSupportElement } from '@core/model/building';
 import type { Vec3 } from '@core/model/types';
@@ -24,8 +21,6 @@ const SNAP_DISTANCE = 500;
 const MAX_SUPPORTS_PER_RUN = 500;
 
 /**
- * @command add_pipe_support
- * @pure
  * @affects creates one pipe support element per position (block / rod geometry on layer P-SUPP), in model order
  * @invariant supports of a pipe are never closer than 100 mm; a support with no steel found is stored unattached (memberId null)
  * @failure unknown pipe / line, neither or both of `at` and `spacing`, bad numbers, unknown or unsuitable memberId, no valid position -> no-op

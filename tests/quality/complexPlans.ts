@@ -1,8 +1,6 @@
 import type { GoldenAction } from '../golden/plans';
 
 /**
- * @layer tests/quality
- *
  * Complex native documents for the display gate: scale extremes (micro / site-plan), positions
  * far from the origin (floating-origin precision), dense and many-instance scenes, extreme aspect
  * ratios and rotated solids. Built from commands only (`build_project` actions).

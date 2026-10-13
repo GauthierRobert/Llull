@@ -1,8 +1,6 @@
 /**
  * Earthworks math (document units): grid-method cut / fill between a TIN and a graded pad with
  * cut / fill batters, and between two TINs.
- * @layer domain-aec/civil
- * @pure
  */
 
 import type { Vec2 } from '@core/model/types';

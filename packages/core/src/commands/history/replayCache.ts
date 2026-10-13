@@ -3,8 +3,6 @@
  * everything that determines it (initial state + every step's name, id and resolved params up to
  * that point). Editing step k or a parameter used only from step k on re-runs steps k..n only.
  *
- * @layer core/commands
- * @pure semantically transparent: a hit returns exactly what re-running the prefix would produce
  *   (commands are pure, ids are step-scoped, the kernel is memoized and deterministic)
  * @invariant a step that mints a globally unique id (`uniqueId`, e.g. the building uid) is never
  *   memoized; replayHistory folds that id into the key of every later state

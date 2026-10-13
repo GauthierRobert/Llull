@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import { sectionProperties, type SteelProfile } from '../../steel/profiles';
 import { E_STEEL, lateralTorsionalReduction, sectionResistance } from '../steelDesign/steelDesign';
 import type { Verdict } from './purlinModel';

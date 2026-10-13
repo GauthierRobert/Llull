@@ -1,5 +1,4 @@
 /**
- * @layer server
  * License + administration endpoints (transport only, no business logic):
  *
  *   GET /license         public: { mode, customer, seats, expires, label, evaluation, warning? }

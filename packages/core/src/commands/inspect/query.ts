@@ -1,8 +1,6 @@
 /**
  * Query commands — read-only document inspection that returns structured data.
  *
- * @layer core/commands
- *
  * These commands never mutate the document. They return the unchanged doc,
  * `affected:[]`, a factual `summary`, and structured results in `data`.
  * Designed so AI/MCP agents can filter and locate entities by meaning rather
@@ -47,9 +45,6 @@ const insideAabb = (b: Bounds, qMin: Corner, qMax: Corner): boolean => axes.ever
 const isInverted = (min: Corner, max: Corner): boolean => axes.some((i) => min[i] > max[i]);
 
 /**
- * @command find_entities
- * @pure
- * @layer core/commands
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data is FindEntitiesResult; document === input doc
  * @failure invalid bbox (bboxMin without bboxMax or vice-versa) -> no-op, affected:[]

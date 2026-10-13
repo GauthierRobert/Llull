@@ -1,5 +1,4 @@
 /**
- * @layer ui/viewport
  * Unlit line material for overlays drawn on top of the scene (depth test off), disposed with
  * its component (R9). Pass `opacity` to make it translucent.
  */

@@ -1,5 +1,4 @@
 /**
- * @layer ui/panels
  * LabeledSelect — the `field` label + native select over `[value, text]` options, with an optional
  * blank first choice.
  */

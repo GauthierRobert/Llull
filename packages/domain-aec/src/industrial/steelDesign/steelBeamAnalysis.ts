@@ -2,8 +2,6 @@
  * Simply supported beam under piecewise-uniform line loads and point loads: reactions, exact
  * maximum moment and shear, mid-span deflection by double integration of the exact moment diagram.
  * Units: positions m, line loads kN/m, point loads kN, moments kNm, deflection mm.
- * @layer domain-aec
- * @pure
  */
 
 import { clamp } from '@lib/clamp';

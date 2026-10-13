@@ -2,8 +2,6 @@
  * Linear-elastic 2D frame analysis (direct stiffness method, 3 DOF per node).
  * Units are the caller's (e.g. N, mm). Member loads are uniformly distributed, global components
  * per unit member length.
- * @layer lib
- * @pure
  */
 
 export interface FrameNode {

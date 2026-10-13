@@ -3,8 +3,6 @@
  * lateral-torsional buckling Mb,Rd (§6.3.2) unless restrained, shear Vpl,Rd (§6.2.6) with the
  * moment reduction above 0.5 Vpl,Rd (§6.2.8), serviceability deflection under G + Q, and — for the
  * chord of a braced bay — strut compression with bending (§6.3.3).
- * @layer domain-aec
- * @pure
  */
 
 import { lateralTorsionalReduction, memberBuckling } from './steelDesign';

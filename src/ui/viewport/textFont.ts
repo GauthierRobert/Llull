@@ -1,5 +1,4 @@
 /**
- * @layer ui/viewport
  * Self-hosted font for drei <Text> (troika). Without it troika fetches a default font from a
  * CDN at runtime, which fails offline. troika needs woff/ttf/otf (not woff2).
  */

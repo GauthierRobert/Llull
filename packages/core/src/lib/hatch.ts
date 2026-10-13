@@ -1,8 +1,4 @@
-/**
- * Hatch pattern lines: parallel lines clipped to a region (even-odd over all loops).
- * @layer lib
- * @pure
- */
+/** Hatch pattern lines: parallel lines clipped to a region (even-odd over all loops). */
 
 import type { Vec2 as Point } from '../model/vectors';
 

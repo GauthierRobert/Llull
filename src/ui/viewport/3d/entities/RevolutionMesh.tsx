@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Render branch for `kind:'revolution'` entities.
  *
  * Builds geometry with buildRevolutionGeometry (primitiveGeometry.ts), which uses the same

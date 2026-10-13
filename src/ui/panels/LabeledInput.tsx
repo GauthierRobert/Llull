@@ -1,7 +1,4 @@
-/**
- * @layer ui/panels
- * LabeledInput — the `field` label + input pair of the panel forms (text, number, color or range).
- */
+/** LabeledInput — the `field` label + input pair of the panel forms (text, number, color or range). */
 
 import React from 'react';
 

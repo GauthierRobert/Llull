@@ -1,7 +1,6 @@
 /**
  * DSTV NC1 export: one numerical-control file per steel piece (members, base plates, connection
  * end plates) for CNC saw / drill / profile-cutting lines. All lengths are millimetres.
- * @layer domain-aec
  */
 
 import type { BasePlateElement, MomentConnectionElement, SteelMemberElement } from '@core/model/building';
@@ -128,8 +127,6 @@ function endPlatePieces(doc: CadDocument, connection: MomentConnectionElement, s
 }
 
 /**
- * @command export_nc_files
- * @pure read-only
  * @affects none; data = { files: [{ name, content, mark, kind, profile, quantity, length, sourceIds }], count }
  * @invariant identical pieces (profile, length, cuts, holes, grade) share one file with quantity > 1
  * @failure no steel members / unknown level / bad params -> no-op, affected:[]

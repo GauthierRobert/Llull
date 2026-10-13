@@ -2,8 +2,6 @@
  * Orthographic projection of solids onto a view plane — the one engine behind every technical view
  * (the 2D viewport's top view, elevations, sections): front/back faces, feature + silhouette edges
  * and the cut by a section plane.
- * @layer geometry
- * @pure
  */
 
 import type { Vec2, Vec3 } from '../model/vectors';

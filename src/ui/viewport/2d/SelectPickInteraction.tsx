@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * Click-to-select for the 2D view while no draw or modify tool is armed.
  * Plain click selects the entity under the cursor (nearest outline, else the smallest closed
  * shape containing the point), Shift/Ctrl/Meta-click toggles it, a click on empty

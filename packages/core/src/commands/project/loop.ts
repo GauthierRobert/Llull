@@ -3,8 +3,6 @@
  * item is recorded in featureHistory as ONE `build_project` step holding the loop itself (outer
  * `$alias` refs frozen to ids), so replay re-expands it against the current parameters: changing
  * the loop count or any `=expr` input regenerates the geometry (architecture L8).
- *
- * @layer core/commands
  */
 
 import { stepIdSource } from '../../lib/id';

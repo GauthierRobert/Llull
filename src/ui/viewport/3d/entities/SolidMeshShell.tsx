@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Shared render shell for every 3D solid kind: selection click, display-mode material,
  * BVH raycasting acceleration and geometry disposal (R9). Each kind supplies only its
  * memoized geometry and base surface constants.

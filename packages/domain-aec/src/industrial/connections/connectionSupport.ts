@@ -1,8 +1,4 @@
-/**
- * Moment-connection joint discovery, creation and stale-joint removal.
- * @layer domain-aec
- * @pure
- */
+/** Moment-connection joint discovery, creation and stale-joint removal. */
 
 import type { BuildingModel, MomentConnectionElement, SteelMemberElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';

@@ -1,5 +1,4 @@
 /**
- * @layer mcp
  * Names of llull document files, shared by the CLI, the desktop app and the web Open dialog so
  * the extensions and the default file cannot drift. Constants only.
  */

@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * `startServer` fails with a clear, stack-free message when the port is taken, and does not leave
  * signal handlers behind.
  */

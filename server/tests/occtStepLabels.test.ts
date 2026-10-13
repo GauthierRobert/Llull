@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Live OpenCascade: export_step_exact stamps entity names, group names and colors on the STEP the
  * kernel writes (the product names and solid ids the kernel would otherwise number itself).
  */

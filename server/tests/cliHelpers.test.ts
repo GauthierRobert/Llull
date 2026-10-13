@@ -1,7 +1,4 @@
-/**
- * @layer server/tests
- * `llull` CLI pure helpers: argv parsing, params sources, catalog views, file payload extraction.
- */
+/** `llull` CLI pure helpers: argv parsing, params sources, catalog views, file payload extraction. */
 
 import { describe, expect, it } from 'vitest';
 import { mkdtempSync, readFileSync, existsSync } from 'node:fs';

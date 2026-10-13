@@ -17,8 +17,6 @@
  * Rendering path (WebGL) is validated structurally: the entity kind matches what
  * DimensionRenderer2D expects; presence in document.order confirms the renderer
  * switch has a branch (returning null on wrong data, not crashing).
- *
- * @layer tests/component
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';

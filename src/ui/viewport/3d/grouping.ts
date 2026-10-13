@@ -1,11 +1,7 @@
 /**
- * @layer ui/viewport/3d
- *
  * Pure helpers grouping entities into InstancedMesh batches: entities sharing geometry (kind +
  * params), color, layer and material render as one draw call. Batchable kinds (v1): box, cylinder,
  * sphere; every other kind takes the per-entity mesh path in Entities.tsx.
- *
- * @pure
  */
 
 import type { Entity, EntityId, Material } from '@core/model/types';
@@ -41,8 +37,6 @@ export interface InstanceBatch {
  *
  * Key shape (box): `"box|10|20|30|#c8553d|layer-default"`; the material, when set, adds
  * `|mat:<id>` so entities with different materials never share a batch.
- *
- * @pure
  */
 export function entityRenderKey(entity: Entity): string | null {
   const { color, layerId } = entity;
@@ -74,8 +68,6 @@ export function isBatchable(entity: Entity): boolean {
  * entities are omitted (the caller renders them per entity). Entities within a batch are sorted by
  * id so the instanceId → entityId mapping is deterministic across renders; `materials` resolves
  * each batch's PBR override.
- *
- * @pure
  */
 export function groupEntitiesForInstancing(entities: Entity[], materials: Record<string, Material> = {}): Map<string, InstanceBatch> {
   const map = new Map<string, InstanceBatch>();
@@ -114,8 +106,6 @@ export function groupEntitiesForInstancing(entities: Entity[], materials: Record
 /**
  * Given a batch and an instanceId (from InstancedMesh.raycast), returns the
  * entity id at that index, or `undefined` if the index is out of range.
- *
- * @pure
  */
 export function entityIdFromInstanceId(batch: InstanceBatch, instanceId: number): EntityId | undefined {
   return batch.entities[instanceId]?.id;

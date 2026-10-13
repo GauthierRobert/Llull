@@ -1,6 +1,4 @@
 /**
- * @layer server/tests/production
- *
  * Production gate, AI-agent driver: Claude gets ONLY the scenario brief (what a lead engineer
  * hands a designer) and must do the job through llull's MCP tools; the result is graded with the
  * same acceptance criteria as the scripted and UI drivers. Revision scenarios start from the

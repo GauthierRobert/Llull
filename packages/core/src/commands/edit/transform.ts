@@ -1,8 +1,6 @@
 /**
  * Transform commands — rotate, scale, mirror, array_linear, array_polar.
  * Each is a pure function over the document (no mutations).
- *
- * @layer core/commands
  */
 
 import type { CadDocument, Entity, Vec3 } from '../../model/types';
@@ -21,8 +19,6 @@ import { toDegrees } from '../../lib/angle';
 const arrayCountField = z.number().int().describe('Total number of instances including the original. Must be an integer >= 2.');
 
 /**
- * @command rotate_entity
- * @pure
  * @affects updates rotation on 1 entity
  * @invariant rotation is the existing Euler angles plus the delta (radians)
  * @failure missing id -> no-op, affected:[]
@@ -54,8 +50,6 @@ export const rotateEntity = defineCommand({
 });
 
 /**
- * @command scale_entity
- * @pure
  * @affects updates geometry dimensions on 1 entity (uniform scale)
  * @invariant factor > 0; box→size, cylinder→radius&height, sphere→radius, extrusion→profile&depth
  * @failure missing id or factor <= 0 -> no-op, affected:[]
@@ -83,8 +77,6 @@ type MirrorAxis = 'x' | 'y' | 'z';
 const VALID_AXES: ReadonlySet<string> = new Set<MirrorAxis>(['x', 'y', 'z']);
 
 /**
- * @command mirror_entity
- * @pure
  * @affects negates the matching position component of 1 entity
  * @invariant axis must be 'x', 'y', or 'z'; only position is changed
  * @failure missing id or invalid axis -> no-op, affected:[]
@@ -133,8 +125,6 @@ export function addCopies(
 }
 
 /**
- * @command array_linear
- * @pure
  * @affects creates count-1 new copies of the source entity
  * @invariant count >= 2; offset must be finite; each copy k gets position = original.position + k*offset
  * @failure missing id, count < 2, or offset not 3 finite numbers -> no-op, affected:[]
@@ -181,8 +171,6 @@ export const arrayLinear = defineCommand({
 });
 
 /**
- * @command array_polar
- * @pure
  * @affects creates count-1 new copies of the source entity arranged around an axis through center
  * @invariant count >= 2; copy k is the source rotated k*(angle/count) about the axis line (position and orientation)
  * @failure missing id, count < 2 or zero-length axis -> no-op, affected:[]

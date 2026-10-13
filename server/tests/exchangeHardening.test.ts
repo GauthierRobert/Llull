@@ -1,6 +1,4 @@
 /**
- * @layer server/tests
- *
  * Hardening of the Python exchange: secret-free child environment, symlink-proof exchange
  * directory, and the structured exportStepFile used by both the MCP tool and GET /export/step.
  */

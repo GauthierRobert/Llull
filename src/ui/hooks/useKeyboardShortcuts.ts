@@ -1,6 +1,4 @@
 /**
- * @layer ui/hooks
- *
  * Global shortcuts: Ctrl/Cmd+K command palette (also from inside fields), Ctrl/Cmd+Z undo, Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z redo, Ctrl/Cmd+D duplicate,
  * Delete/Backspace delete selection, arrows nudge selection (Shift ×10, repeats while held), Escape
  * clear selection (unless an armed 2D tool consumed it via preventDefault), `?` shortcut sheet, and

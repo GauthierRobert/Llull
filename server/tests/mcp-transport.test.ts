@@ -1,6 +1,4 @@
 /**
- * @layer server/tests
- *
  * MCP transport integration tests — real MCP Streamable HTTP handshake.
  *
  * These tests drive the actual MCP `CallToolRequestSchema` handler through the

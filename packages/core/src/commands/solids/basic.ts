@@ -4,9 +4,6 @@ import { DEFAULT_SOLID_COLOR, placeSizedSolid, placedSolidFields } from './share
 import { ORIGIN } from '../../lib/vec3';
 
 /**
- * @command add_box
- * @pure
- * @layer core/commands
  * @affects creates 1 box entity
  * @invariant all size components > 0
  * @failure any size component <= 0 or non-finite -> no-op, affected:[]

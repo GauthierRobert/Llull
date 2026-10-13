@@ -9,7 +9,6 @@ const r6 = (n: number): number => roundTo(n, 6);
 /**
  * `<image>` of an underlay, mapped onto the screen by one affine `matrix(...)`: an orthographic
  * projection of a planar image is affine, so its pixel axes project to the matrix columns.
- * @pure
  */
 export function underlaySvg(image: ImageEntity, project: Projector): string {
   const { pixelWidth, pixelHeight } = image;

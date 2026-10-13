@@ -1,7 +1,4 @@
 /**
- * @command set_units
- * @pure
- * @layer core/commands
  * @affects document-level units and displayPrecision only; affected:[]
  * @invariant units must be one of 'mm'|'cm'|'m'|'in'|'ft'; displayPrecision integer in [0, 20]
  * @failure invalid unit or negative/non-integer/>20 precision -> no-op, affected:[]

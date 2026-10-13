@@ -1,8 +1,4 @@
-/**
- * Oriented boxes of building elements (swept members, pipes, trays, curved walls, equipment, solids) and their SAT overlap.
- * @layer domain-aec
- * @pure
- */
+/** Oriented boxes of building elements (swept members, pipes, trays, curved walls, equipment, solids) and their SAT overlap. */
 
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
 import type { BuildingElement, BuildingLevel, BuildingModel } from '@core/model/building';
@@ -23,10 +19,7 @@ export interface OrientedBox {
   readonly half: Vec3;
 }
 
-/**
- * Penetration depth of two oriented boxes along their best separating axis (≤ 0 when apart).
- * @pure
- */
+/** Penetration depth of two oriented boxes along their best separating axis (≤ 0 when apart). */
 export function boxOverlap(a: OrientedBox, b: OrientedBox): number {
   const axes: Vec3[] = [...a.axes, ...b.axes];
   for (const u of a.axes)

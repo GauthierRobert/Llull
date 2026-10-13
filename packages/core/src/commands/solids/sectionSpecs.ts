@@ -1,5 +1,4 @@
 /**
- * @layer core/commands
  * Section specs shared by variable sweeps (`stations`) and lofts (`sections`): one of a circle
  * (`radius`), an ellipse (`radiusX` + `radiusY`), a polygon (`section` points) or a closed sketch
  * (`sectionId`), resolved to a section ring (geometry/sectionRing). Pure helpers.

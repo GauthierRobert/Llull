@@ -1,7 +1,6 @@
 /**
  * Python runtime embedded at the top of generated CadQuery / build123d scripts.
  *
- * @layer core/codegen
  * @invariant the TRACE half is backend-independent: every helper records the llull command it maps
  *   to (`LLULL_TRACE`), so running the script reproduces the llull feature history exactly.
  * @invariant a BACKEND block only wraps library calls (`_polygon_face`, `_extrude`, `_revolve`,

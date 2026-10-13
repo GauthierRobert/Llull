@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * Screen-constant sizing for `point` markers. A document-unit cross is invisible in mm drawings
  * (0.1 mm in a 100 m survey), so the marker is scaled each frame to a fixed pixel half-extent.
  */
@@ -20,7 +18,6 @@ type CameraProjection =
       readonly viewportHeight: number;
     };
 
-/** @pure World units spanned by `pixels` screen pixels at the marker; 1 when degenerate. */
 export function worldUnitsForPixels(pixels: number, projection: CameraProjection): number {
   if (projection.kind === 'orthographic') return projection.zoom > 0 ? pixels / projection.zoom : 1;
   const { fovDegrees, distance, viewportHeight } = projection;

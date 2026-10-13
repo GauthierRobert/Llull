@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * ViewportControls — floating glass toolbar (top-left) mounted OUTSIDE the Canvas.
  * Groups: display mode, section plane, 3D snap, render quality, animation transport.
  * Section options open as a popover under the toolbar. Render-only state (viewport store);

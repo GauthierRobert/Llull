@@ -1,7 +1,4 @@
 /**
- * @layer ui/components/commandPalette
- * @pure
- *
  * Generic param-gathering for ANY registry command: its `paramsSchema` becomes a list of form
  * fields; the string values typed into them become the params object passed to `dispatch`.
  * Validation of meaning stays in the command (`execute` + `run`); this only parses input shapes.

@@ -3,9 +3,6 @@
  * refs, `=expr` evaluation and loop expansion, with issues located by path
  * (`step 4 › iter 2 › step 1`). Nothing executes; `set_parameter` actions are tracked so later
  * expressions and loop counts that read them evaluate.
- *
- * @layer core/commands
- * @pure
  */
 
 import type { CadDocument } from '../../model/types';

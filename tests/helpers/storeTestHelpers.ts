@@ -1,6 +1,4 @@
 /**
- * @layer tests/helpers
- *
  * Test-only store utilities.
  *
  * Component tests that need to pre-populate the store with entities (e.g. to

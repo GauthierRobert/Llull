@@ -50,9 +50,6 @@ function moveEndpointToBoundary(doc: CadDocument, command: 'trim' | 'extend', id
 }
 
 /**
- * @command trim
- * @pure
- * @layer core/commands
  * @affects updates 1 line entity (the endpoint closer to the intersection moves to the intersection)
  * @invariant both entities must be kind:'line'
  * @failure missing id / wrong kind / no intersection -> no-op, affected:[]
@@ -73,9 +70,6 @@ export const trim = defineCommand({
 });
 
 /**
- * @command extend
- * @pure
- * @layer core/commands
  * @affects updates 1 line entity (the endpoint closer to the boundary is extended)
  * @invariant both entities must be kind:'line'
  * @failure missing id / wrong kind / parallel lines -> no-op, affected:[]

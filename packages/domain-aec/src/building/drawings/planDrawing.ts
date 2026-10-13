@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { WallElement } from '@core/model/building';
 import { fromMm } from '@core/model/units';
 import { elementsOf, existingLevelId, getBuilding, orderedElements } from '../model';

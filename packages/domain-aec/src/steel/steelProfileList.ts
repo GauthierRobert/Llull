@@ -1,17 +1,9 @@
-/**
- * @layer domain-aec
- */
-
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, tolerant, z } from '@core/commands/schema';
 import { noop, report } from '@core/commands/noop';
 import { STEEL_PROFILES } from './profiles';
 
-/**
- * @command list_steel_profiles
- * @pure read-only
- * @affects none; data = { profiles: SteelProfile[] }
- */
+/** @affects none; data = { profiles: SteelProfile[] } */
 export const listSteelProfiles = defineCommand({
   name: 'list_steel_profiles',
   annotations: { readOnly: true, idempotent: true },

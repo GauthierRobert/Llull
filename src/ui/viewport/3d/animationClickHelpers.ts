@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Pure helpers for the click-to-trigger animation interaction.
  * Extracted from Entities.tsx so they can be unit-tested without a DOM (rule W3).
  */
@@ -12,8 +10,6 @@ import type { Animation, EntityGroup, EntityId } from '@core/model/types';
  * return the ids of all `trigger:'click'` animations that target this entity —
  * either directly (`targetKind:'entity'` with `targetId === entityId`) or
  * via a group (`targetKind:'group'` whose `memberIds` contains `entityId`).
- *
- * @pure — reads inputs only, returns a new array.
  */
 export function findClickAnimationsForEntity(
   entityId: EntityId,
@@ -39,8 +35,6 @@ export function findClickAnimationsForEntity(
 /**
  * Ids of every entity targeted by any animation, directly or through a group. The AnimationPlayer
  * moves these by scene-object name, so they must not be folded into an InstancedMesh batch.
- *
- * @pure
  */
 export function animatedEntityIds(animations: Record<string, Animation>, groups: Record<string, EntityGroup>): Set<EntityId> {
   const result = new Set<EntityId>();

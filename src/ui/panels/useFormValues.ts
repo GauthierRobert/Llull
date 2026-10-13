@@ -1,5 +1,4 @@
 /**
- * @layer ui/panels
  * Controlled form state shared by the panel forms: field values, one inline error that clears on
  * every edit.
  */

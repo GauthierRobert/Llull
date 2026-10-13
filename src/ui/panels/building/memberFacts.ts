@@ -1,5 +1,3 @@
-/** @layer ui/panels/building Pure fact rows (label, value) of a steel member for the inspector. */
-
 import type { SteelMemberElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import { fixedNumber } from '@lib/compactNumber';

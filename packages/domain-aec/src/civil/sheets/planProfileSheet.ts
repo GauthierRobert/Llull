@@ -1,8 +1,6 @@
 /**
  * Plan-and-profile sheet: a stationed plan strip of the alignment above its long section, both at
  * the same horizontal scale so stations line up vertically.
- * @layer domain-aec/civil
- * @pure
  */
 
 import type { CadDocument } from '@core/model/types';
@@ -38,10 +36,7 @@ function sizeOf(svg: string): { width: number; height: number } {
   return { width: Number(match?.[1] ?? 0), height: Number(match?.[2] ?? 0) };
 }
 
-/**
- * @pure
- * @returns the sheet, or an explanation string when the alignment cannot be drawn
- */
+/** @returns the sheet, or an explanation string when the alignment cannot be drawn */
 export function buildPlanProfileSheet(
   doc: CadDocument,
   alignment: AlignmentObject,

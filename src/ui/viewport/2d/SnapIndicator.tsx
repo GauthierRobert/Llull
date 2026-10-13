@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * Visual snap indicator for the 2D drafting viewport.
  *
  * Tracks the pointer over the 2D canvas via an invisible ground plane, computes the snapped

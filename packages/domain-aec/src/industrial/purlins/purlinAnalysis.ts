@@ -1,8 +1,4 @@
-/**
- * Purlin and side-rail load model and member checks of a steel hall level (EN 1991-1-1/-3/-4, EN 1993-1-1/-3).
- * @layer domain-aec
- * @pure
- */
+/** Purlin and side-rail load model and member checks of a steel hall level (EN 1991-1-1/-3/-4, EN 1993-1-1/-3). */
 
 import { toDegrees } from '@lib/angle';
 import type { CadDocument } from '@core/model/types';

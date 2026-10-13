@@ -1,7 +1,4 @@
-/**
- * @layer server/tests
- * `setLiveDoc` hashes the document (a full serialization) only when a subscriber will receive it.
- */
+/** `setLiveDoc` hashes the document (a full serialization) only when a subscriber will receive it. */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 

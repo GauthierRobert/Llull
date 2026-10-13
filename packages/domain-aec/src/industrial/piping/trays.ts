@@ -1,7 +1,4 @@
-/**
- * Cable trays (electrical / data cable carriers): open U sections routed through 3D points.
- * @layer domain-aec
- */
+/** Cable trays (electrical / data cable carriers): open U sections routed through 3D points. */
 
 import type { CableTrayElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
@@ -17,8 +14,6 @@ import { levelIdParam } from '../../building/levelParams';
 export const trayLength = (tray: CableTrayElement): number => routeLength(tray.points);
 
 /**
- * @command add_cable_tray
- * @pure
  * @affects creates 1 cable tray run (U-section segments on layer E-TRAY)
  * @failure < 2 points / repeated point / width or height <= 0 -> no-op
  */

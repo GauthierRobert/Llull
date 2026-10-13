@@ -1,8 +1,6 @@
 /**
  * blend_union: weld several solids into one exact piece and round every joint where they meet —
  * the "one-piece frame" operation (tubes + lugs + dropouts → a single blended carbon frame).
- *
- * @layer core/commands
  */
 
 import { type Entity, type ShapeRecipe, is3D } from '../../model/types';
@@ -17,9 +15,6 @@ import { OCC_KERNEL_HINT } from './modify3d';
 const MAX_BLEND_OPERANDS = 200;
 
 /**
- * @command blend_union
- * @pure
- * @layer core/commands
  * @affects removes the operand solids; creates 1 mesh entity (their union, joints filleted)
  * @invariant >= 2 distinct 3D solids; radius > 0; a kernel with fillets (OCC)
  * @failure missing / duplicate / 2D / instance operand, bad radius, no kernel, kernel lacks blends,

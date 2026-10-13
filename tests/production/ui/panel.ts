@@ -1,8 +1,6 @@
 import type { UiSession } from './session';
 
 /**
- * @layer tests/production/ui
- *
  * Building panel controls: "Add element" tool forms, levels list, project information form,
  * equipment editor.
  * Fields keep their value between submissions (as for a human), so only changed ones are retyped.

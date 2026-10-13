@@ -5,9 +5,6 @@ import { idOrNext, idTaken } from '../entity/explicitId';
 import { detectCycleOnAdd, evaluateMotionInternal } from './jointsKinematics';
 import { changed, noop, report } from '../noop';
 /**
- * @command add_drive_relation
- * @pure
- * @layer core/commands
  * @affects appends 1 entry to doc.driveRelations and doc.driveRelationOrder
  * @invariant driver and driven must exist in doc.joints
  * @invariant driver !== driven (no self-coupling)
@@ -90,9 +87,6 @@ export const addDriveRelation = defineCommand({
 });
 
 /**
- * @command delete_drive_relation
- * @pure
- * @layer core/commands
  * @affects removes 1 entry from doc.driveRelations and doc.driveRelationOrder
  * @invariant driveRelationOrder and driveRelations remain consistent after deletion
  * @failure unknown drive relation id → no-op, affected:[]
@@ -127,9 +121,6 @@ export const deleteDriveRelation = defineCommand({
 });
 
 /**
- * @command evaluate_motion
- * @pure
- * @layer core/commands
  * @affects nothing — read-only query, affected:[]
  * @invariant document is returned unchanged; resolved joint values propagated in topo order
  * @failure no joints → empty data, friendly summary; unknown instanceIds → those joints skipped
@@ -171,9 +162,6 @@ export const evaluateMotion = defineCommand({
 });
 
 /**
- * @command bake_motion
- * @pure
- * @layer core/commands
  * @affects updates position and rotation of instance entities in doc.entities
  * @invariant joint values and drive relations are unchanged; only instance transforms change
  * @failure no joints → no-op with friendly summary

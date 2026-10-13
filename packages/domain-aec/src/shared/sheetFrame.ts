@@ -1,8 +1,6 @@
 /**
  * Drawing-sheet envelope shared by building, industrial and civil sheets: ISO paper, scale fitting,
  * frame, title block, north arrow, scale bar.
- * @layer domain-aec/shared
- * @pure
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';

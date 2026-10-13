@@ -2,9 +2,6 @@
  * Refusal summaries for kernel-dependent work while no geometry kernel is installed: single
  * commands (`kernelUnavailable`) and replays whose live steps, recipes included, need the kernel
  * (refusing beats silently dropping that geometry).
- *
- * @layer core/commands
- * @pure
  */
 
 import type { CadDocument, FeatureStep } from '../model/types';

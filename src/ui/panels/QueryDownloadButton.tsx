@@ -1,5 +1,4 @@
 /**
- * @layer ui/panels
  * QueryDownloadButton — runs a read-only export command on the current document, downloads its file
  * payload and reports the command summary (see `downloadQuery`). Never changes the document.
  */

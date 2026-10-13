@@ -1,6 +1,4 @@
 /**
- * @layer server/tests/quality
- *
  * STEP import quality gate: every pinned STEP file (quality/corpus.json) goes through the real
  * path an agent uses — Python bridge (`import_step` port) → `import_mesh` → measure/check
  * commands → save/load — and is compared with an independent OpenCascade reference

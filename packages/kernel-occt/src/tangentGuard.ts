@@ -4,9 +4,6 @@
  * aborts the whole WASM module. Shrinking the sphere by a hair turns the point contact into a
  * clean gap (a union stays two solids, an intersection is empty) so OCC never sees the
  * degenerate case.
- *
- * @layer kernel
- * @pure no WASM objects; works on entities only
  */
 
 import type { Entity, Vec3 } from '@core/model/types';

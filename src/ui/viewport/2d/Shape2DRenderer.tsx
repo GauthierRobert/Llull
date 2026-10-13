@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * One pure render branch per Shape2DKind, shared by the top-down 2D view and the 3D view (2D
  * shapes sit on their own work plane, so lifted shapes draw at their elevation in both). Non-2D
  * kinds render nothing.

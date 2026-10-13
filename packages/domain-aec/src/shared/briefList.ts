@@ -1,8 +1,4 @@
-/**
- * Truncated list text for command summaries.
- * @layer domain-aec
- * @pure
- */
+/** Truncated list text for command summaries. */
 
 /** The labels of the first `max` items, joined by `separator`; `separator` + "…" follows when there are more. */
 export const briefList = <Item>(items: readonly Item[], label: (item: Item) => string, max = 8, separator = ', '): string =>

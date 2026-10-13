@@ -1,5 +1,4 @@
 /**
- * @layer ui/viewport/2d
  * Geometry of an image underlay: a `width` × `height` plane covering [0, width] × [0, height] of the
  * work plane (lower-left at the entity origin, like `kind:'rectangle'`), UVs with v = 1 at the top
  * so the picture is upright.

@@ -2,8 +2,6 @@
  * Moment-frame analysis behind check_steel_members: detects the frames from the rigid joints,
  * solves each as a 2D frame, and returns the member rows, the frame reports and the storeys they
  * stabilise.
- * @layer domain-aec
- * @pure
  */
 
 import { notionalLabel } from './steelBracingChecks';

@@ -4,8 +4,6 @@ import { elementsOf, elevationOf, equipmentBox, insidePolygon, planCorners, plan
 import type { PlantIntent } from '../plant/intent';
 
 /**
- * @layer tests/production/criteria
- *
  * Process equipment acceptance: every tag placed as specified, gratings cut where equipment passes
  * through a floor (computed geometrically, independent of the clash detector), and every elevated
  * equipment standing on a floor of its level.

@@ -1,5 +1,4 @@
 /**
- * @layer server
  * POST /import/dwg — convert an uploaded DWG to ASCII DXF (`dwgConvert.ts`), then run
  * `import_dxf` / `import_survey_dxf` through the command bus (live document, undo, live-sync
  * broadcast). No geometry or entity logic here (L1, L6).

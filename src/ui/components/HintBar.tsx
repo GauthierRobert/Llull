@@ -1,6 +1,4 @@
 /**
- * @layer ui/components
- *
  * HintBar — a single-line overlay at the bottom of the viewport telling the user what they can
  * do right now (text from hintText). Presentation only.
  */

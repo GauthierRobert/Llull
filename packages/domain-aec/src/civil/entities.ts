@@ -1,8 +1,6 @@
 /**
  * Entity factory for evaluated civil objects: US National CAD Standard civil layers and the common
  * fields (`<objectId>:<part>` ids, `civil` + `civil:<id>` tags).
- * @layer domain-aec/civil
- * @pure
  */
 
 import type {

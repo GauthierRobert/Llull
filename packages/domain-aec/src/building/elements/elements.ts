@@ -1,7 +1,4 @@
-/**
- * Rooms, and generic edits on any building element (delete, move, copy to levels).
- * @layer domain-aec
- */
+/** Rooms, and generic edits on any building element (delete, move, copy to levels). */
 
 import type { Vec2, Vec3 } from '@core/model/types';
 import type { BuildingElement, BuildingModel, RoomElement } from '@core/model/building';
@@ -33,8 +30,6 @@ import { reconcilePipeSupports, reconciliationNote } from '../../industrial/pipi
 import { levelIdParam } from '../levelParams';
 
 /**
- * @command add_room
- * @pure
  * @affects creates the room outline + name/area tags on layer A-AREA
  * @failure missing name / invalid boundary / walls not a closed loop -> no-op
  */
@@ -87,8 +82,6 @@ const ignoredNote = (ids: ReadonlyArray<string>): string =>
   ids.length > 0 ? ` Ignored unknown id(s): ${[...new Set(ids)].join(', ')}.` : '';
 
 /**
- * @command delete_building_element
- * @pure
  * @affects removes the elements' evaluated entities (walls take their doors/windows along)
  * @failure no known ids -> no-op
  */
@@ -167,8 +160,6 @@ function translated(element: BuildingElement, dx: number, dy: number): BuildingE
 }
 
 /**
- * @command move_building_element
- * @pure
  * @affects regenerates the moved elements (hosted openings move with their wall)
  * @failure no known ids / invalid delta -> no-op
  */
@@ -275,8 +266,6 @@ export const COPYABLE = [
 ] as const;
 
 /**
- * @command copy_level_elements
- * @pure
  * @affects duplicates the source level's elements (and hosted openings) onto each target level
  * @failure unknown levels / nothing to copy -> no-op
  */

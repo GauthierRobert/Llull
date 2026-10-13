@@ -1,8 +1,4 @@
-/**
- * render_view showLabels overlay: per-entity id/name labels, key-point markers, legend.
- *
- * @layer core/commands
- */
+/** render_view showLabels overlay: per-entity id/name labels, key-point markers, legend. */
 
 import { type Entity, type Vec3, is2D } from '../../model/types';
 import type { RenderViewData } from './types';
@@ -102,8 +98,6 @@ function labelAnchor(keyPoints: Vec3[], project: Projector): [number, number] {
 /**
  * Append per-entity id/name labels, key-point markers (circles in the category colour) and a
  * category legend (top-right) to an SVG string, projected like the other overlays.
- *
- * @pure — returns a new SVG string; does not modify the input.
  */
 export function appendEntityLabels(svgString: string, data: RenderViewData, entities: ReadonlyArray<Entity>): string {
   const { camera, width, height } = data;

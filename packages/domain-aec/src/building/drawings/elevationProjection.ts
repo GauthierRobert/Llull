@@ -2,7 +2,6 @@
  * Elevations and sections of the 3D model: the core technical view (hidden lines removed, cut
  * faces hatched) seen from a compass side, hidden edges omitted (building convention), steel cut
  * faces filled solid.
- * @layer domain-aec
  */
 
 import type { CadDocument, Entity, Vec3 } from '@core/model/types';
@@ -43,10 +42,7 @@ function categoryOf(tags: ReadonlyArray<string> | undefined): string | null {
   return tags?.includes('bim') === true ? (tags[1] ?? null) : null;
 }
 
-/**
- * @pure
- * @returns the elevation / section line drawing, or null when no 3D geometry remains
- */
+/** @returns the elevation / section line drawing, or null when no 3D geometry remains */
 export function buildElevationDrawing(
   doc: CadDocument,
   options: {

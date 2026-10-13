@@ -1,5 +1,4 @@
 /**
- * @layer tests/helpers
  * Shared setup for component tests that dispatch a command through the store and inspect
  * the resulting entity. USE IN TESTS ONLY.
  */

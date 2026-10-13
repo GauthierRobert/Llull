@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Live OpenCascade vs Manifold: cylinder, sphere and cone are placed (rotation + position) and
  * combined with a box the same way by both kernels. Meshes are tessellated, so bounds and volumes
  * agree within chord tolerance, not exactly.

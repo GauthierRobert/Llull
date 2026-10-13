@@ -1,7 +1,4 @@
-/**
- * Gravity drainage network commands: manholes, pipes, hydraulic checks and sizing.
- * @layer domain-aec/civil
- */
+/** Gravity drainage network commands: manholes, pipes, hydraulic checks and sizing. */
 
 import type { Vec2 } from '@core/model/types';
 import type { ManholeObject } from '@core/model/civil';
@@ -66,8 +63,6 @@ function catchmentOf(
 }
 
 /**
- * @command add_manhole
- * @pure
  * @affects creates 1 manhole (cylinder body, plan circle, label)
  * @invariant rim above invert
  * @failure bad value / no rim source / position outside surface -> no-op
@@ -126,8 +121,6 @@ export const addManhole = defineCommand({
 });
 
 /**
- * @command update_manhole
- * @pure
  * @affects regenerates 1 manhole and the pipes attached to it
  * @failure unknown manhole / bad value / no change / zero-length pipe -> no-op
  */

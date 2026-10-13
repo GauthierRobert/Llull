@@ -1,6 +1,4 @@
 /**
- * @layer server/tests/quality
- *
  * Drawing-to-model gate: every part of quality/drawings/manifest.json was modelled in llull from a
  * published 2D technical drawing (plan in quality/drawings/plans/<id>.json) and verified against
  * the real 3D part. This replays each plan through `build_project` on the live OCC kernel and

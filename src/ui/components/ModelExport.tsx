@@ -1,6 +1,4 @@
 /**
- * @layer ui/components
- *
  * ModelExport — download the model as parametric code (CadQuery, build123d, OpenSCAD, FreeCAD
  * macro) via the read-only `export_code` command, or as an exact STEP file from the server's
  * `/export/step` route (Python bridge). Presentation + download only; no document mutation.

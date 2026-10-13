@@ -18,8 +18,6 @@
  * its own synthetic concave profile inline to stay decoupled from core math.
  * The THREE.ExtrudeGeometry path is exercised directly (jsdom can run THREE
  * without WebGL) mirroring the pattern in RevolutionMesh.test.tsx.
- *
- * @layer tests/component
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';

@@ -4,8 +4,6 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { CheckOutcome, Criterion, GradeContext } from '../contract';
 
 /**
- * @layer tests/production/criteria
- *
  * Data integrity: the saved project reopens identical, and the feature history replays to the same
  * model — an office archives the file and must be able to regenerate it years later.
  */

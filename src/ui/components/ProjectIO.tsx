@@ -1,6 +1,4 @@
 /**
- * @layer ui/components
- *
  * ProjectIO — Save downloads the in-store document as JSON; Open reads a chosen file and
  * dispatches `load_document` (PRIME DIRECTIVE: never mutate the document outside a command).
  * New clears it (`clear_document`) and the browser autosave. Cross-session persistence: the browser

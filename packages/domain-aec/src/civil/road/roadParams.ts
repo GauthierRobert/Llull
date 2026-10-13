@@ -1,7 +1,4 @@
-/**
- * Parameter schema shared by the alignment / road commands.
- * @layer domain-aec/civil
- */
+/** Parameter schema shared by the alignment / road commands. */
 
 import { z } from '@core/commands/schema';
 

@@ -1,6 +1,4 @@
 /**
- * @layer ui/store
- *
  * Render-only viewport presentation state — NOT part of CadDocument.
  *
  * PRIME DIRECTIVE: no document mutations ever happen here. These are pure presentation/render

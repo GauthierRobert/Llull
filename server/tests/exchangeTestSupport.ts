@@ -1,6 +1,4 @@
 /**
- * @layer server/tests
- *
  * Shared helpers for the Python-bridge test suites: detect a CadQuery / build123d python once.
  * Not a test file (no `.test.ts` suffix).
  */

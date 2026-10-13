@@ -1,7 +1,4 @@
-/**
- * Structural grid axes (column lines) with labelled bubbles.
- * @layer domain-aec
- */
+/** Structural grid axes (column lines) with labelled bubbles. */
 
 import type { Vec2 } from '@core/model/types';
 import type { BuildingModel, GridElement } from '@core/model/building';
@@ -61,8 +58,6 @@ export function addGrid(building: BuildingModel, label: string, start: Vec2, end
 }
 
 /**
- * @command add_grid_line
- * @pure
  * @affects creates the axis line + 2 bubbles + 2 labels
  * @failure zero length / duplicate label -> no-op
  */
@@ -97,8 +92,6 @@ export const addGridLine = defineCommand({
 const MAX_GRID_BAYS = 100;
 
 /**
- * @command add_grid_system
- * @pure
  * @affects creates (xSpacings.length + 1) numbered axes and (ySpacings.length + 1) lettered axes
  * @failure empty spacing lists, spacing <= 0 or a zero-length axis -> no-op
  */

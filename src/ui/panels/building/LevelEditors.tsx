@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/building
- *
  * Inline level editors: LevelEditForm → update_level (changed fields only); CopyLevelForm →
  * copy_level_elements (source level's elements to chosen upper levels, optional categories).
  */

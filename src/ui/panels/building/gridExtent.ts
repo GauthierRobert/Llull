@@ -1,5 +1,4 @@
 /**
- * @layer ui/panels/building
  * Plan bounds of the structural grid (param-gathering for "Grid extent" outlines): the outermost
  * axis crossings, so the bubble overshoot of the grid lines is not included. Without any crossing,
  * the line endpoints.

@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * Invisible 1e8-square plane at height `z` that the 2D interaction layers use to capture pointer
  * events on the drafting plane. Geometry + material are disposed on unmount (R9).
  */

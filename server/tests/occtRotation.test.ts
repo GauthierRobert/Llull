@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Live OpenCascade vs Manifold: a rotated box is placed identically by both kernels
  * (llull placement M = Rx·Ry·Rz, then translate), so booleans on rotated operands agree.
  */

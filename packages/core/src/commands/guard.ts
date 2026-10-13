@@ -1,7 +1,4 @@
-/**
- * @layer core/commands
- * The safety wrapper `execute` sees around every registered command.
- */
+/** The safety wrapper `execute` sees around every registered command. */
 
 import type { CommandDefinition, CommandResult, ParamsSchema } from './types';
 import { formatIssues } from './schema';
@@ -73,7 +70,6 @@ function corruptionReason(entity: unknown): string | null {
 }
 
 /**
- * @pure
  * @failure params fail `paramsValidator` (zod schema) -> no-op naming the failing path
  * @failure run throws (warned with stack), id-like params equal an Object.prototype key
  * (would alias entity-bag lookups), or affected entities contain NaN/Infinity/undefined vector

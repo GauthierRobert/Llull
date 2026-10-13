@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
@@ -16,8 +12,6 @@ import { analyseBracing, locateMembers } from './bracingAnalysis';
 import { existingLevelIdParam } from '../../building/levelParams';
 
 /**
- * @command check_bracing
- * @pure read-only
  * @affects none; data = { rows: BracingRow[], csv, maxUtilisation, failures, windForce, ... }
  * @invariant ULS wind = 1.5 · qp · 1.3 · gable area; tension-only diagonals; Npl,Rd = A·fy
  * @failure negative loads / unknown level / no bracing / no rafters -> no data

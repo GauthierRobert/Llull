@@ -1,5 +1,4 @@
 /**
- * @layer server
  * The shared live document over REST + SSE (protocol: `@mcp/liveSync`).
  *
  *   GET  /live           SSE: `snapshot` on connect / undo / redo; `command` per mutation.

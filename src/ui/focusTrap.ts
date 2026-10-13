@@ -1,5 +1,3 @@
-/** @layer ui Tab-key focus containment for modal dialogs (palette, MCP connect). */
-
 import type React from 'react';
 
 const CONTROL_SELECTOR = 'button,input,select,textarea,[tabindex]:not([tabindex="-1"])';

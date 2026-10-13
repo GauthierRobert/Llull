@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * POST /import/dwg and the import_dwg exchange tool, with a fake converter script (no LibreDWG
  * needed): success lands entities in the live document, no converter -> 503, bad magic -> 400,
  * slow converter -> 504.

@@ -1,5 +1,4 @@
 /**
- * @layer desktop
  * "Install the `llull` command": a small launcher in `~/.llull/bin` that runs the CLI bundle
  * shipped inside the app with the app's own runtime (`ELECTRON_RUN_AS_NODE=1`), so the user and
  * Claude Code get `llull` without installing Node. With the app running, `llull --app …` drives
@@ -19,10 +18,7 @@ function shQuote(value: string): string {
   return `"${value.replace(/(["\\$`])/g, '\\$1')}"`;
 }
 
-/**
- * The launcher script for `platform`.
- * @pure
- */
+/** The launcher script for `platform`. */
 export function cliShimFor(platform: NodeJS.Platform, runtime: string, cliEntry: string): CliShim {
   if (platform === 'win32') {
     return {

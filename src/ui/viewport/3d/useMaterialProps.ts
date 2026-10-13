@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Returns memoized `meshStandardMaterial` prop overrides for the active
  * display mode and selection state.
  *
@@ -59,8 +57,6 @@ interface UseMaterialPropsInput {
 /**
  * Returns material props for the given entity appearance inputs,
  * adjusted for the active display mode from the viewport store.
- *
- * @pure (aside from reading the store) — no mutations.
  */
 export function useMaterialProps({
   color,

@@ -1,7 +1,6 @@
 /**
  * Building (AEC / BIM) commands — levels, walls, openings, slabs, sheets, IFC, takeoff — the
  * `building` plugin's catalog (see plugin.ts).
- * @layer domain-aec/building
  */
 
 import { commandCatalog } from '@core/commands/schema';

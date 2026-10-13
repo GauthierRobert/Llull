@@ -3,8 +3,6 @@
  * a polyline/spline, a sketch curve or a circular arc — optionally oriented by the curve's
  * rotation-minimizing frame (the same frame sweeps use): chain links, tyre tread blocks, sprocket
  * teeth, fence posts, rivets along a seam, parts fanned round an arc.
- *
- * @layer core/commands
  */
 
 import type { CurveSegment } from '../../model/curve';
@@ -56,9 +54,6 @@ function fractionOf(k: number, count: number, loop: boolean, startFraction: numb
 }
 
 /**
- * @command pattern_along_path
- * @pure
- * @layer core/commands
  * @affects creates `count` copies of the source (an entity, or fresh instances of a component) along the path (source untouched)
  * @invariant copy k sits at path fraction k/(count-1) (open) or k/count (closed loop), shifted by
  *   startOffset; when oriented its local +X follows the tangent, +Y the frame normal, +Z the

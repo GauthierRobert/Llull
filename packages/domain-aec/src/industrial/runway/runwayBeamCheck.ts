@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { SteelMemberElement } from '@core/model/building';
 import { findProfile, sectionProperties } from '../../steel/profiles';
 import { craneActions, CRANE_FACTORS, type CraneModel } from '../frames/frameModelTypes';

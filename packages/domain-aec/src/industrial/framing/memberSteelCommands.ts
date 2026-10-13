@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { CadDocument, Vec3 } from '@core/model/types';
 import type { SteelMemberElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
@@ -39,8 +35,6 @@ const fixityText = (startJoint: string | undefined, endJoint: string | undefined
     .join('');
 
 /**
- * @command add_steel_member
- * @pure
  * @affects creates 1 steel member (exact section mesh on its role layer)
  * @failure unknown profile / role, zero length, unknown level -> no-op
  */
@@ -142,11 +136,7 @@ function topOfSteelShift(doc: Pick<CadDocument, 'units'>, member: SteelMemberEle
   return fromMm(doc, (old.h - section.h) / 2);
 }
 
-/**
- * @command update_steel_member
- * @pure
- * @failure unknown member / profile / role, zero length -> no-op
- */
+/** @failure unknown member / profile / role, zero length -> no-op */
 export const updateSteelMember = defineCommand({
   name: 'update_steel_member',
   description:

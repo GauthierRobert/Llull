@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * MeasureBBoxWireframe — renders the `measure_bounding_box` result as a wireframe box in the 3D
  * scene. Mounted inside the floating-origin group in SceneContents (Viewport3D.tsx); the box is
  * in document world coords and passes through unchanged.

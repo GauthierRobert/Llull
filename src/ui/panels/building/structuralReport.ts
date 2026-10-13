@@ -1,5 +1,3 @@
-/** @layer ui/panels/building Pure parsing of the structural check results into report rows. */
-
 import { isRecord } from '@lib/isRecord';
 
 /** The fields every structural check row shares (frames, bracing, foundations, runways). */

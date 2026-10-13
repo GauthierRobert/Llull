@@ -1,5 +1,3 @@
-/** @layer ui/viewport — vertex-data builders shared by the 2D and 3D line overlays. */
-
 import { ellipsePoint } from '@lib/arc';
 import * as THREE from 'three';
 import type { Vec2 } from '@core/model/types';
@@ -78,7 +76,6 @@ export function anchoredGeometry(
  * (about 0.06 units of resolution at 1e6); the anchor is added back on the CPU in float64 through
  * the object transform, so geometry far from the origin keeps its full precision.
  *
- * @pure
  * @invariant local[i] + anchor reproduces positions[i] (x, y); z is unchanged
  */
 export function rebaseToAnchor(positions: ReadonlyArray<number>): {

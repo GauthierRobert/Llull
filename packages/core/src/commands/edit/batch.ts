@@ -1,8 +1,4 @@
-/**
- * Batch commands: delete_entities / move_entities / duplicate_entities act on many entities as one undo step.
- *
- * @layer core/commands
- */
+/** Batch commands: delete_entities / move_entities / duplicate_entities act on many entities as one undo step. */
 
 import type { CadDocument, Entity } from '../../model/types';
 import type { CommandResult } from '../types';
@@ -21,7 +17,6 @@ type BatchIds =
 /**
  * Validate and split the `ids` of a batch command (`delete_entities`, `move_entities`).
  *
- * @pure
  * @param emptyDetail summary text (after `<command>: `) used when `ids` is empty
  * @failure empty, > MAX_BATCH_IDS, or no listed entity exists -> `{ ok: false, result }` no-op
  * @invariant `existing` and `missing` are de-duplicated, in first-seen order
@@ -41,9 +36,6 @@ function resolveBatchIds(doc: CadDocument, command: string, ids: readonly string
 }
 
 /**
- * @command delete_entities
- * @pure
- * @layer core/commands
  * @affects removes every existing listed entity from entities/order/selection; prunes them from
  *          all group memberIds; dissolves any group left with fewer than 2 members
  * @invariant all remaining group memberIds exist in entities; missing/duplicate ids are skipped
@@ -78,9 +70,6 @@ export const deleteEntities = defineCommand({
 });
 
 /**
- * @command move_entities
- * @pure
- * @layer core/commands
  * @affects translates every existing listed entity by delta; affected = the moved ids
  * @invariant only position changes; missing/duplicate ids are skipped
  * @failure empty ids, > MAX_BATCH_IDS ids, or none exist -> no-op, affected:[]
@@ -113,9 +102,6 @@ export const moveEntities = defineCommand({
 });
 
 /**
- * @command duplicate_entities
- * @pure
- * @layer core/commands
  * @affects creates one copy per existing listed entity at original.position + offset; affected = the new ids in input order
  * @invariant originals are unchanged; missing/duplicate ids are skipped
  * @failure empty ids, > MAX_BATCH_IDS ids, or none exist -> no-op, affected:[]

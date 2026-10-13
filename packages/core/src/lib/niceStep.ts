@@ -1,8 +1,3 @@
-/**
- * @layer lib
- * @pure
- */
-
 const NICE = [1, 2, 5, 10];
 
 /** Smallest 1-2-5 step (times a power of ten) that is at least `minimum`: scale bars, scales, ticks. */

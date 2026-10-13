@@ -39,7 +39,7 @@ export const arrayGrid = defineCommand({
   `affected: []`, explanatory summary. Never throw, never mutate.
 - Ids: `nextId(prefix)` from `@lib/id` (step-scoped automatically). Kernel: `ctx?.kernel` only,
   plus `annotations: { requiresKernel: true }`. Queries: `annotations: { readOnly: true }`, value in `data`.
-- Structured doc-comment tags (`@command @pure @affects @invariant @failure`).
+- Structured doc-comment tags (`@affects @invariant @failure` only).
 
 ### 2. New geometry? (only if needed)
 For 3D: add the literal to `SOLID_KINDS`. For 2D: add it to `SHAPE2D_KINDS` (the

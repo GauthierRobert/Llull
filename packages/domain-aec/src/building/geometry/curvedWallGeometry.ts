@@ -1,8 +1,4 @@
-/**
- * Curved wall geometry: arc through three points, plan band, evaluated mesh.
- * @layer domain-aec
- * @pure
- */
+/** Curved wall geometry: arc through three points, plan band, evaluated mesh. */
 
 import type { BuildingModel, CurvedWallElement, WallElement } from '@core/model/building';
 import type { Vec2 } from '@core/model/types';

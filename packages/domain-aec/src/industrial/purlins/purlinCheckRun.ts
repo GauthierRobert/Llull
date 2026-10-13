@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { CadDocument } from '@core/model/types';
 import { PURLIN_LOAD_SHAPE } from './purlinLoadParams';
 import type { CommandResult } from '@core/commands/types';
@@ -16,8 +12,6 @@ import { LIMIT_COLUMNS, checkTable, failureSummary, limitCells } from '../report
 import { maxUtilisation } from '../common/utilisation';
 
 /**
- * @command check_purlins
- * @pure read-only
  * @affects none; data = { rows: PurlinRow[], csv, maxUtilisation, failures, zones, ... }
  * @invariant simply supported over one bay; ULS gravity 1.35G + 1.5S; uplift 1.5 W - 1.0 G
  * @failure negative loads / unknown level / no purlins -> no data

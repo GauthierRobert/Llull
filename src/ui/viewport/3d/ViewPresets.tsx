@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * ViewPresets — floating overlay buttons for standard 3D view orientations (Front / Top / Right /
  * Iso) and fit-to-all / fit-to-selection.
  *

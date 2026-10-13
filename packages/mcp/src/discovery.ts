@@ -1,13 +1,9 @@
 /**
- * @layer mcp
- *
  * Tool-discovery meta-tools — `search_tools` and `enable_toolset`. They are MCP-layer tools, NOT
  * registry commands (the command contract / toolSchemas snapshot stay unchanged); both belong to
  * the always-enabled `core` toolset. A host exposes only `core` by default; an agent finds a tool
  * with `search_tools` and loads its schema by enabling the toolset (the host then sends
  * `notifications/tools/list_changed`).
- *
- * @pure the only mutation is the injected per-session `enabledToolsets` set, by `enable_toolset`.
  */
 
 import { clamp } from '@lib/clamp';

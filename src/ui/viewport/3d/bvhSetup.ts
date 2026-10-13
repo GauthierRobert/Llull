@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * BVH prototype patch — accelerates THREE.Mesh raycasting from O(n) to O(log n) for large
  * triangle counts. Called ONCE at viewport init; idempotent (safe under React StrictMode).
  * Patches `Mesh.prototype.raycast` and adds `BufferGeometry.computeBoundsTree` /

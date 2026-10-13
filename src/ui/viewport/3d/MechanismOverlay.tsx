@@ -1,5 +1,4 @@
 /**
- * @layer ui/viewport/3d
  * Cue for the constraint/joint highlighted in the MechanismsPanel: a dashed line + kind label
  * between the two constrained entities, or an axis arrow at joint instance `a` (revolute = cyan,
  * prismatic = magenta). Presentational only; mounted inside the floating-origin group.

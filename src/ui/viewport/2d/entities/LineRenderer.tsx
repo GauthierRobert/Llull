@@ -1,5 +1,3 @@
-/** @layer ui/viewport/2d — render branch for `kind:'line'`: one LineSegments segment in the XY plane. */
-
 import { useMemo } from 'react';
 import type { LineEntity } from '@core/model/types';
 import { ShapeLine } from './ShapeLine';

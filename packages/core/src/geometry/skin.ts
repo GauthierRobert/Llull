@@ -1,5 +1,4 @@
 /**
- * @layer core/geometry
  * Skin a closed solid through ordered rings of equal point count: quad walls between neighbouring
  * rings and planar-projected caps on the first and last ring.
  * @invariant rings wind counter-clockwise seen from the direction of travel (first → last ring),

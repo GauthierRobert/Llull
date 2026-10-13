@@ -1,8 +1,4 @@
-/**
- * check_model: read-only lint pass (geometry defects, structural inconsistencies, parameter errors).
- *
- * @layer core/commands
- */
+/** check_model: read-only lint pass (geometry defects, structural inconsistencies, parameter errors). */
 
 import type { CadDocument, Entity } from '../../model/types';
 import type { CommandResult } from '../types';
@@ -205,9 +201,6 @@ export function runModelChecks(doc: CadDocument, farThreshold: number): CheckRes
 }
 
 /**
- * @command check_model
- * @pure
- * @layer core/commands
  * @affects nothing — read-only; document returned as the SAME reference, affected:[]
  * @invariant data satisfies CheckResult; document === input doc (same reference)
  * @failure never throws; always returns a valid CheckResult in data

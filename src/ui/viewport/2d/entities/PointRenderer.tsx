@@ -1,7 +1,4 @@
-/**
- * @layer ui/viewport/2d — render branch for `kind:'point'`: a cross at the entity position whose
- * on-screen size is constant (rescaled per frame), so it stays visible at any model scale.
- */
+/** on-screen size is constant (rescaled per frame), so it stays visible at any model scale. */
 
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';

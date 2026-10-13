@@ -1,75 +1,61 @@
 import type { Vec2 } from '../model/vectors';
 
-/** @pure component-wise a + b */
 export function add2(a: Vec2, b: Vec2): Vec2 {
   return [a[0] + b[0], a[1] + b[1]];
 }
 
-/** @pure component-wise a - b */
 export function sub2(a: Vec2, b: Vec2): Vec2 {
   return [a[0] - b[0], a[1] - b[1]];
 }
 
-/** @pure a * s */
 export function scale2(a: Vec2, s: number): Vec2 {
   return [a[0] * s, a[1] * s];
 }
 
-/** @pure dot product */
 export function dot2(a: Vec2, b: Vec2): number {
   return a[0] * b[0] + a[1] * b[1];
 }
 
-/** @pure `center + R(angle)·[u, v]`: (u, v) rotated counter-clockwise by `angle`, then offset by `center` (x, y). */
 export function planPoint(center: readonly [number, number, ...number[]], angle: number, [u, v]: Vec2): Vec2 {
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
   return [center[0] + u * cos - v * sin, center[1] + u * sin + v * cos];
 }
 
-/** @pure z-component of a × b; > 0 when b is counter-clockwise from a */
 export function cross2(a: Vec2, b: Vec2): number {
   return a[0] * b[1] - a[1] * b[0];
 }
 
-/** @pure z-component of (a − o) × (b − o); > 0 when o → a → b turns counter-clockwise */
 export function orient2(o: Vec2, a: Vec2, b: Vec2): number {
   return cross2(sub2(a, o), sub2(b, o));
 }
 
-/** @pure Euclidean length */
 export function len2(a: Vec2): number {
   return Math.sqrt(a[0] * a[0] + a[1] * a[1]);
 }
 
-/** @pure unit vector; `fallback` for (near-)zero-length input */
 export function normalize2(a: Vec2, fallback: Vec2 = [0, 0]): Vec2 {
   const l = len2(a);
   return l < 1e-12 ? fallback : [a[0] / l, a[1] / l];
 }
 
-/** @pure a + (b - a) * t */
 export function lerp2(a: Vec2, b: Vec2, t: number): Vec2 {
   return add2(a, scale2(sub2(b, a), t));
 }
 
-/** @pure vertex average of `points` (`[0, 0]` when empty) */
 export function centroid2(points: ReadonlyArray<Vec2>): Vec2 {
   const count = Math.max(points.length, 1);
   return [points.reduce((sum, p) => sum + p[0], 0) / count, points.reduce((sum, p) => sum + p[1], 0) / count];
 }
 
-/** @pure left perpendicular (90° counter-clockwise) */
 export function perp2(a: Vec2): Vec2 {
   return [-a[1], a[0]];
 }
 
-/** @pure true for an exact-length-2 array of finite numbers */
 export function isVec2(value: unknown): value is Vec2 {
   return Array.isArray(value) && value.length === 2 && value.every((c) => typeof c === 'number' && Number.isFinite(c));
 }
 
-/** @pure true for an array whose every element satisfies `isVec2` */
 export function isVec2List(value: unknown): value is Vec2[] {
   return Array.isArray(value) && value.every(isVec2);
 }

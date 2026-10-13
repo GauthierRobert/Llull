@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * Render branch for `kind:'dimension'` entities in the 2D orthographic drafting viewport.
  *
  * Supports four dimension kinds (see dimensionGeometry): linear (horizontal distance between two

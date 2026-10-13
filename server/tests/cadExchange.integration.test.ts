@@ -1,6 +1,4 @@
 /**
- * @layer server/tests
- *
  * Real CAD-exchange round trips through the Python bridge (CadQuery / build123d on OpenCascade).
  * Skipped when the configured python has no CadQuery (CI). build123d tests additionally need
  * LLULL_TEST_BUILD123D_PYTHON=<python with build123d>.

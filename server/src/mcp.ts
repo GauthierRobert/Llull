@@ -1,5 +1,4 @@
 /**
- * @layer server
  * MCP endpoint — Streamable HTTP transport (auth + rate limit + session routing only; tool logic
  * is `./mcp/server.ts` over `@mcp`, architecture L6).
  *

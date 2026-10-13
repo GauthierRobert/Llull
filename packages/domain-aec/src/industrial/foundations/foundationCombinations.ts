@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { BasePlateElement, BuildingModel, FootingElement, SteelMemberElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import { toMetres } from '@core/model/units';

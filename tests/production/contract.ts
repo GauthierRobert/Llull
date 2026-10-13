@@ -2,8 +2,6 @@ import type { CommandResult } from '@core/commands/types';
 import type { CadDocument } from '@core/model/types';
 
 /**
- * @layer tests/production
- *
  * Production-scenario gate contract. A scenario is one real engineering-office job (bureau
  * d'études): a client brief, the tool calls an engineer would make, and the acceptance criteria
  * the office checks before issuing deliverables. Three drivers run the same scenario and the same

@@ -1,5 +1,4 @@
 /**
- * @layer ui/store
  * LOCAL MODE (offline, L6): commands run through `execute` with a bounded snapshot stack and are
  * queued in `localOutbox` for replay (`./outbox`).
  */

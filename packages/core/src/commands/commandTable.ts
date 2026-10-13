@@ -1,5 +1,4 @@
 /**
- * @layer core/commands
  * The command table: every registered (guarded) definition, looked up by name. It imports no
  * command, so the engine (`execute`), the context and commands that run other commands can all
  * read it without an import cycle. `registry.ts` fills it with the core catalog and plugins.

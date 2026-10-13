@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * Modify-tool palette for the 2D drafting viewport.
  *
  * Renders as an HTML overlay inside the viewport container (not inside the

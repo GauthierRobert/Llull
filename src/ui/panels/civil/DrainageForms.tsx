@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/civil
- *
  * Drainage input forms: `add_manhole` (position, invert, rim or ground surface, catchment, entry
  * time) and
  * `add_pipe` (upstream / downstream manholes, diameter, material, Manning n).

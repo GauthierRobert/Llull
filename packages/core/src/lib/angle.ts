@@ -1,9 +1,4 @@
-/**
- * Angle wrapping with explicit ranges (radians).
- *
- * @layer lib
- * @pure
- */
+/** Angle wrapping with explicit ranges (radians). */
 
 import { roundTo } from './compactNumber';
 

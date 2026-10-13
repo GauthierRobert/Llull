@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * Rubber-band previews rendered inside the r3f scene while a draw tool is active, and the
  * markers on already-placed vertices. Geometry is rebuilt per change and disposed (R9).
  *

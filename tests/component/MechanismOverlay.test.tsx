@@ -9,8 +9,6 @@
  *
  * We cannot run WebGL in jsdom, so we verify the geometry vertex count and
  * ArrowHelper color directly via THREE.js — same technique as RevolutionMesh.test.tsx.
- *
- * @layer tests/component
  */
 
 import { resetStore } from '../helpers/componentEntities';

@@ -1,6 +1,4 @@
 /**
- * @layer ui/store
- *
  * Autosave storage adapter: persists the serialized working document (same format as Save) to a
  * key/value storage. Never throws — quota or corruption problems are warned about and dropped.
  */

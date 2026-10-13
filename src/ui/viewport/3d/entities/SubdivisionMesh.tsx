@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Render branch for `kind:'subdivision'`: the core Catmull-Clark surface (geometry/subdivision.ts,
  * shared with export and the kernels) in the entity's local frame, with creased normals so sharp
  * cage creases stay hard. Memoized on the cage, which changes only when the solid does (L3).

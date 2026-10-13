@@ -1,8 +1,6 @@
 /**
  * World-space triangles of single solids (no instance resolution: see ./instanceExpansion and
  * ./exportTriangulate `entityToTriangles`). Counter-clockwise from outside (outward normals).
- *
- * @layer core/commands
  */
 
 import { type Entity, type Vec3, is2D } from '../model/types';

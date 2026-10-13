@@ -1,7 +1,4 @@
-/**
- * @layer tests/helpers
- * fetch stubs for store integration tests. USE IN TESTS ONLY.
- */
+/** fetch stubs for store integration tests. USE IN TESTS ONLY. */
 
 import { vi } from 'vitest';
 import type { ServerCommandResponse } from '@ui/store/serverCommands';

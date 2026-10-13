@@ -1,8 +1,4 @@
-/**
- * Evaluates a graded platform (pad): pad mesh and outline, daylight line, batter meshes, label.
- * @layer domain-aec/civil
- * @pure
- */
+/** Evaluates a graded platform (pad): pad mesh and outline, daylight line, batter meshes, label. */
 
 import type { Entity, Vec2 } from '@core/model/types';
 import type { PlatformObject } from '@core/model/civil';

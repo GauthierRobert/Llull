@@ -2,8 +2,6 @@
  * Load cases of a moment frame: ULS 1.35 G + 1.5 Q with the equivalent horizontal forces of EN
  * 1993-1-1 §5.3.2 (φ × the vertical load at each level, both directions), SLS G + Q (+ the same
  * forces for the storey drift), and αcr from the drift under V/200 (Horne, EN 1993-1-1 §5.2.1(4)B).
- * @layer domain-aec
- * @pure
  */
 
 import { solveFrame, type FrameResult } from '@lib/frame2d';

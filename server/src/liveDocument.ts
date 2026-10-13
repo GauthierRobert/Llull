@@ -1,5 +1,4 @@
 /**
- * @layer server
  * Shared live document — the ONE `CadDocument` every MCP session and the browser read and write.
  * `setLiveDoc` stores the document produced by `execute` and broadcasts the change to all SSE
  * subscribers (`GET /live`); transport/state glue only, it never creates or validates entities (L6).

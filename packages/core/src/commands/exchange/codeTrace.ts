@@ -2,7 +2,6 @@
  * apply_code_trace — rebuild the document from the LLULL_TRACE recorded by running a generated (and
  * possibly agent-edited) CadQuery / build123d script, so code edits regenerate an editable model.
  *
- * @layer core/commands
  * @see export_code (code_exchange.ts), packages/core/src/codegen/pythonRuntime.ts (the recorder)
  */
 
@@ -190,9 +189,6 @@ function abort(doc: CadDocument, reason: string): CommandResult {
 }
 
 /**
- * @command apply_code_trace
- * @pure
- * @layer core/commands
  * @affects replace (default): parameters, featureHistory and solids rebuilt from the trace;
  *   append: trace added on top. affected = live solids created by the trace, in creation order
  * @invariant every trace feature is recorded as one FeatureStep; parameter-driven terms are stored as

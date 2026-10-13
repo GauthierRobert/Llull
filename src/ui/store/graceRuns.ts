@@ -1,5 +1,4 @@
 /**
- * @layer ui/store
  * Dispatches still inside their connect grace period (see `CONNECT_GRACE_MS` in ./onlineMode),
  * in dispatch order. Shared by ./onlineMode (tracks them) and ./outbox (resets them).
  */

@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/building
- *
  * ProjectSection — title-block / IFC project metadata form → `set_project_info` (also on an
  * empty document: the command creates the building model).
  */

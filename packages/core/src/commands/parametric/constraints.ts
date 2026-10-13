@@ -1,10 +1,4 @@
 /**
- * @command add_constraint
- * @command delete_constraint
- * @command update_constraint
- * @command solve_constraints
- * @pure
- * @layer core/commands
  * @affects constraints record and constraintOrder in CadDocument; solve_constraints also
  *          updates entity positions in entities record.
  * @invariant Constraint ids are unique; each EntityRef.entityId must exist in the document
@@ -41,9 +35,6 @@ function validateConstraintShape(c: { kind: string; a: { entityId: string }; b: 
 }
 
 /**
- * @command add_constraint
- * @pure
- * @layer core/commands
  * @affects adds 1 entry to document.constraints and document.constraintOrder
  * @invariant constraint.id is unique within the document
  * @failure malformed constraint shape → no-op, affected:[]
@@ -139,9 +130,6 @@ export const addConstraint = defineCommand({
 });
 
 /**
- * @command delete_constraint
- * @pure
- * @layer core/commands
  * @affects removes 1 entry from document.constraints and document.constraintOrder
  * @invariant constraintOrder and constraints remain consistent after deletion
  * @failure unknown constraint id → no-op, affected:[]
@@ -179,9 +167,6 @@ export const deleteConstraint = defineCommand({
 });
 
 /**
- * @command update_constraint
- * @pure
- * @layer core/commands
  * @affects updates 1 entry in document.constraints
  * @invariant only value, a, b may be patched; kind is immutable after creation
  * @failure unknown constraint id / invalid patch → no-op, affected:[]
@@ -259,9 +244,6 @@ export const updateConstraint = defineCommand({
 });
 
 /**
- * @command solve_constraints
- * @pure
- * @layer core/commands
  * @affects updates entity positions in document.entities to satisfy all constraints
  * @invariant all entity ids and kinds are preserved; only position XY is changed
  * @failure non-convergence → best-effort positions returned; converged:false in data

@@ -1,8 +1,6 @@
 /**
  * Weight per metre of a steel process pipe from its outside diameter: standard wall (ASME B36.10M
  * STD / EN 10220 series) plus the contents.
- * @layer domain-aec
- * @pure
  */
 
 import { GRAVITY } from '../../shared/numeric';

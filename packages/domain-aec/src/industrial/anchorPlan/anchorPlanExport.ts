@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import { unitsToMm } from '../../shared/numeric';
 import type { Vec2 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
@@ -60,8 +56,6 @@ function addOffsetDimension(dims: BandDim[], drawn: Set<string>, axis: GridAxis 
 }
 
 /**
- * @command export_anchor_plan
- * @pure read-only
  * @affects none; data = { svg, filename, boltCount, plates, paper, scale, levelId }
  * @failure unknown level / paper, invalid scale or embedment, no base plates -> no data
  */

@@ -1,8 +1,4 @@
-/**
- * @layer ui
- *
- * Browser file download for exports (presentation side effect; never touches the document).
- */
+/** Browser file download for exports (presentation side effect; never touches the document). */
 
 /** Keep the object URL alive long enough for a busy browser to start reading it. */
 const REVOKE_AFTER_MS = 60_000;

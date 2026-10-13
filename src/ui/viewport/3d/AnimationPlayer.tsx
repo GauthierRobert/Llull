@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * AnimationPlayer — evaluates `document.animations` per-frame and drives
  * three.js transforms for animated entities and groups.
  *
@@ -20,8 +18,6 @@
  * - Per-frame work reuses pooled vectors / contributions (rule R9: no per-frame allocation).
  * - If the target object is not found in the scene (SceneObjectCache, a memoized getObjectByName) the
  *   animation is silently skipped that frame.
- *
- * @pure   N/A — imperative three.js mutation; by design (render-time overlay).
  */
 
 import { useMemo, useRef } from 'react';

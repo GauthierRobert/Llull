@@ -14,8 +14,6 @@
  * which cannot be rendered in jsdom; we validate the render-branch wiring by confirming
  * the entity shape the command produces matches what the components expect (R11: assert
  * observable behavior, not internals).
- *
- * @layer tests/component
  */
 
 import { resetStore } from '../helpers/componentEntities';

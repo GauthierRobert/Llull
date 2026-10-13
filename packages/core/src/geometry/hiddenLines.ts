@@ -2,8 +2,6 @@
  * Hidden-line classification of projected feature edges: each edge is split into the runs a
  * viewer sees (visible) and the runs other front faces cover (hidden), across every solid of the
  * view. A section plane removes the material in front of it and its cap hides what lies under it.
- * @layer geometry
- * @pure
  */
 
 import type { Vec2, Vec3 } from '../model/vectors';

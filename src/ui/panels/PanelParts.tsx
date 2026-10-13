@@ -1,8 +1,4 @@
-/**
- * @layer ui/panels
- *
- * PanelParts — shared panel anatomy (header, section, empty state). Presentation only.
- */
+/** PanelParts — shared panel anatomy (header, section, empty state). Presentation only. */
 
 import React, { useState } from 'react';
 import { classNames } from '@ui/classNames';

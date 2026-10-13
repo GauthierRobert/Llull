@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Live OpenCascade: smooth subdivision solids become exact B-spline solids (one bicubic face per
  * refined cage quad, sewn closed) whose volume matches the Catmull-Clark limit surface, that take
  * booleans, and that write B_SPLINE_SURFACE geometry to STEP. A faceted (level 0) cage stays

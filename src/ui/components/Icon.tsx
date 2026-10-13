@@ -1,6 +1,4 @@
 /**
- * @layer ui/components
- *
  * Icon — the single inline-SVG icon set for llull chrome (24×24 grid, stroke icons).
  * Decorative by default (aria-hidden); pair with a labelled control.
  */

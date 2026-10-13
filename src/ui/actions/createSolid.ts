@@ -1,6 +1,4 @@
 /**
- * @layer ui/actions
- *
  * Create a primitive from a preset: drop it at the nearest free spot, select it, and show it in
  * the 3D view with the move gizmo ready. Dispatch only (PRIME DIRECTIVE).
  */

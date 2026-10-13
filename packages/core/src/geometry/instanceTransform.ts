@@ -1,9 +1,4 @@
-/**
- * The affine an instance applies to its component's geometry.
- *
- * @layer core/geometry
- * @pure
- */
+/** The affine an instance applies to its component's geometry. */
 
 import type { Vec3 } from '../model/vectors';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';

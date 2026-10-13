@@ -2,8 +2,6 @@
  * Scene inspection: `computeSceneSnapshot` (pure) backs the read-only `describe_scene` command and
  * the `build_project` report. Bounds are world-space AABBs; rotated entities use their rotated OBB
  * corners and carry `oriented: true`.
- *
- * @layer core/commands
  */
 
 import type { CadDocument } from '../../model/types';
@@ -67,9 +65,6 @@ export function computeSceneSnapshot(doc: CadDocument): SceneSnapshot {
 }
 
 /**
- * @command describe_scene
- * @pure
- * @layer core/commands
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data is a SceneSnapshot; document === input doc
  */

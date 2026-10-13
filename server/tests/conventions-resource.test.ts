@@ -1,6 +1,4 @@
 /**
- * @layer server/tests
- *
  * Tests for the `cad://conventions` MCP resource and the tool-count invariant.
  *
  * Covers:

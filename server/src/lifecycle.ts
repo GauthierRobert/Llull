@@ -1,7 +1,4 @@
-/**
- * @layer server
- * Process lifecycle: bind safely, install the geometry kernel, drain on SIGTERM/SIGINT.
- */
+/** Process lifecycle: bind safely, install the geometry kernel, drain on SIGTERM/SIGINT. */
 
 import type { Server } from 'http';
 import type { Express } from 'express';

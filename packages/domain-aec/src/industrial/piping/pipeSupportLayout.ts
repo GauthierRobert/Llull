@@ -1,8 +1,6 @@
 /**
  * Pipes as absolute mm routes with their supports: arc-length stations along the centreline and
  * the ends carried by equipment nozzles or other pipes. Shared by the support loads and the span check.
- * @layer domain-aec
- * @pure
  */
 
 import type { PipeElement, PipeSupportElement } from '@core/model/building';

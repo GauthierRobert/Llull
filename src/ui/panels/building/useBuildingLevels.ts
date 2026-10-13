@@ -1,5 +1,3 @@
-/** @layer ui/panels/building Levels of the building model in storey order (stable empty list). */
-
 import { useMemo } from 'react';
 import type { BuildingLevel } from '@core/model/building';
 import { useStore } from '@ui/store';

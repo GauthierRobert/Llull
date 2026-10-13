@@ -2,8 +2,6 @@
  * DXF (R12) of every civil-generated entity on its C-* layer: survey points (POINT), contours and
  * plan linework (POLYLINE / LINE at their elevation), labels (TEXT) and meshes (one 3DFACE per
  * triangle, so the TIN opens as faces in Civil 3D / BricsCAD).
- * @layer domain-aec/civil
- * @pure
  */
 
 import { toRadians } from '@lib/angle';

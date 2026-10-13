@@ -1,8 +1,4 @@
-/**
- * Level resolution with the shared failure result of read-only checks and exports.
- * @layer domain-aec
- * @pure
- */
+/** Level resolution with the shared failure result of read-only checks and exports. */
 
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';

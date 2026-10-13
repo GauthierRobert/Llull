@@ -1,8 +1,6 @@
 /**
  * Horizontal alignment geometry: tangents through PIs joined by simple circular curves.
  * All lengths and stations are in document units; angles in radians (0 = +X, counter-clockwise).
- * @layer domain-aec/civil
- * @pure
  */
 
 import { clamp } from '@lib/clamp';

@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Writes a batch's per-instance matrices and colors into a THREE.InstancedMesh and refreshes its
  * cached bounds. Without the bounds refresh, three keeps the sphere computed from the FIRST
  * matrices, so moved instances are frustum-culled and unpickable.

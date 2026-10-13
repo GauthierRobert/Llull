@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * MeasureBBoxRect2D — renders the `measure_bounding_box` result as a rectangle outline on the XY
  * plane in the 2D orthographic viewport (the Z extent is ignored in a top-down view).
  *

@@ -3,8 +3,6 @@ import path from 'node:path';
 import type { ScenarioReport } from './contract';
 
 /**
- * @layer tests/production
- *
  * Writes graded reports to .cache/production/reports/<driver>/<scenario>.json and regenerates
  * SUMMARY.md across every driver — the "can an engineering office use llull?" page.
  */

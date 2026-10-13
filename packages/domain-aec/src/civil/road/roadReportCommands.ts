@@ -1,7 +1,6 @@
 /**
  * Read-only road queries and drawings: alignment report (stations, volumes, design-speed checks),
  * long section and cross-section SVG sheets.
- * @layer domain-aec/civil
  */
 
 import type { CadDocument } from '@core/model/types';
@@ -37,8 +36,6 @@ function checkedAlignment(
 }
 
 /**
- * @command alignment_report
- * @pure
  * @affects none (read-only)
  * @failure unknown alignment / interval <= 0 -> no-op
  */
@@ -91,8 +88,6 @@ export const alignmentReport = defineCommand({
 });
 
 /**
- * @command export_long_section
- * @pure
  * @affects none (read-only)
  * @failure unknown alignment / no valid profile -> no-op
  */
@@ -132,8 +127,6 @@ export const exportLongSection = defineCommand({
 });
 
 /**
- * @command export_cross_sections
- * @pure
  * @affects none (read-only)
  * @failure unknown alignment / no profile or road section -> no-op
  */

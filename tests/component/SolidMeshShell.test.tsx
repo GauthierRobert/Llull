@@ -2,8 +2,6 @@
  * SolidMeshShell lifecycle: BVH build + geometry disposal for every solid kind.
  * jsdom has no WebGL, so the shell is rendered with react-dom (r3f intrinsics become
  * unknown DOM elements; their warnings are silenced) and the geometry is spied on.
- *
- * @layer tests/component
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';

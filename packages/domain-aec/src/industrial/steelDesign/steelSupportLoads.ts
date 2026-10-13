@@ -3,8 +3,6 @@
  * the span to its neighbours (the full overhang to a free end, half the span to an end carried by an
  * equipment nozzle or a header) as a point load on its member — on a floor beam at the support
  * (shoe on the top flange, hanger at the rod attachment) or axially on a column.
- * @layer domain-aec
- * @pure
  */
 
 import { clamp } from '@lib/clamp';

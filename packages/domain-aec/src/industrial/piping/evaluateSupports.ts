@@ -1,8 +1,4 @@
-/**
- * Evaluated entities of a pipe support (boxes and a rod, oriented along the pipe).
- * @layer domain-aec
- * @pure
- */
+/** Evaluated entities of a pipe support (boxes and a rod, oriented along the pipe). */
 
 import type { CadDocument, CylinderEntity, Entity, Vec3 } from '@core/model/types';
 import type { BuildingLevel, PipeElement, PipeSupportElement } from '@core/model/building';

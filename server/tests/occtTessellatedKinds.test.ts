@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Live OpenCascade vs Manifold: wedge, pyramid and revolution are valid boolean operands whose
  * exact OCC volume agrees with Manifold's (a revolution finely segmented so its facets do not
  * count).

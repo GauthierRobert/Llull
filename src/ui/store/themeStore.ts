@@ -1,6 +1,4 @@
 /**
- * @layer ui/store
- *
  * Theme store — tracks the active color theme ('dark' | 'light').
  *
  * Persists the user's choice to localStorage so the preference survives

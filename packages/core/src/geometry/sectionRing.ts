@@ -1,5 +1,4 @@
 /**
- * @layer core/geometry
  * Section rings: any closed section resampled to SECTION_RING_POINTS points (counter-clockwise,
  * arc-length spaced, starting at the +x side) and read as a closed centripetal Catmull-Rom curve.
  * Every ring has the same point count, so rings can be interpolated (variable-section sweeps) or

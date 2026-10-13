@@ -1,6 +1,4 @@
 /**
- * @layer ui/components
- *
  * StatusBar — slim bottom bar: live / syncing / sync-failed indicator, last command summary,
  * entity + selection counts, units. Presentation only (PRIME DIRECTIVE).
  */

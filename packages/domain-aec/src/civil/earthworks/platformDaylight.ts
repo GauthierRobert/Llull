@@ -1,8 +1,4 @@
-/**
- * Daylight line of a graded pad: where the cut / fill batter from the pad edge meets the ground.
- * @layer domain-aec/civil
- * @pure
- */
+/** Daylight line of a graded pad: where the cut / fill batter from the pad edge meets the ground. */
 
 import type { Vec2 } from '@core/model/types';
 import { polygonPerimeter } from '@lib/polygon';

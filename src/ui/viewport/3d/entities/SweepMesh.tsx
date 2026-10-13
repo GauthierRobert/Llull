@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Render branch for `kind:'sweep'`: the core sweep tessellation (geometry/sweep.ts, the same
  * triangles export and the kernels use) built in the entity's local frame, with creased normals
  * so pipe walls shade smooth and end caps stay flat. Memoized on the path/section references,

@@ -1,7 +1,4 @@
-/**
- * Civil exchange (LandXML, DXF) commands.
- * @layer domain-aec/civil
- */
+/** Civil exchange (LandXML, DXF) commands. */
 
 import type { CommandDefinition, CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
@@ -15,8 +12,6 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const COORDINATES = z.enum(['local', 'grid']).optional();
 
 /**
- * @command export_landxml
- * @pure read-only
  * @affects none; data = { text, fileName, counts }
  * @failure empty civil model -> no data
  */
@@ -56,8 +51,6 @@ export const exportLandxml = defineCommand({
 });
 
 /**
- * @command export_civil_dxf
- * @pure read-only
  * @affects none; data = { text, fileName, entityCount, layers }
  * @failure no civil entity -> no data
  */

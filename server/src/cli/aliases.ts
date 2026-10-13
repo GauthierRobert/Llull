@@ -1,8 +1,6 @@
 /**
- * @layer server
  * The `as` aliases of a `run` plan that still name an entity in the final document, so an agent can
  * keep working with them (`llull mass_properties entityId=<id>`) after `$alias` is gone.
- * @pure reads the plan and the `build_project` report only
  */
 
 import { isRecord } from '@lib/isRecord';

@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/civil
- *
  * Pilot feedback e-mail: a `mailto:` link prefilled with the app version, anonymous document
  * statistics (entity count, unit, civil object counts per category) and the user's text. Never
  * includes document content (names, coordinates, survey data).

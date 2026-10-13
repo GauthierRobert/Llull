@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/building
- *
  * QuantitiesSection — live bill of quantities + cost estimate (read-only `quantity_takeoff` /
  * `estimate_cost`, run locally), CSV downloads of the takeoff and schedules, and a unit-rate form
  * that dispatches `set_cost_rates`.

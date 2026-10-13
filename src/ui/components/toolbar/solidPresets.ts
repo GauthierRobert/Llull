@@ -1,6 +1,4 @@
 /**
- * @layer ui/components/toolbar
- *
  * One-click 3D primitive presets for the main toolbar: which add_* command to dispatch, with
  * default dimensions, and where to drop it so it never lands inside existing geometry.
  * Param-gathering only — the entity itself is built by the command (PRIME DIRECTIVE).

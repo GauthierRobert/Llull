@@ -1,9 +1,6 @@
 /**
  * Command-side bridge to the shape kernel: operand recipes (exact tree, or the mesh fallback when
  * this kernel cannot rebuild it), evaluation, and the `mesh` result entity that carries the recipe.
- *
- * @layer core/commands
- * @pure
  */
 
 import type { CadDocument, Entity } from '../../model/types';

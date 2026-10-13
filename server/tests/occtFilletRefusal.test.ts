@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Live OpenCascade: a fillet OCC reports "done" but that would corrupt the model is refused with a
  * reason, never committed — an invalid blend next to a tangent boss (every later boolean on it
  * spun forever), and a corner where several blends meet whose mesh has a hole (STL not watertight).

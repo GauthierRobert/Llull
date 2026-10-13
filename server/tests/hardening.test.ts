@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Hardening: CORS, filename sanitizing, JSON errors, mutation guard, rate limit,
  * thrown-command handling, debounced atomic autosave, shutdown helpers.
  */

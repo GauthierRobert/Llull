@@ -1,5 +1,4 @@
 /**
- * @layer ui/hooks
  * Dispatch a command and react to its outcome, but only while the component is still mounted:
  * `onChanged` when the document changed (e.g. reset the form), `onRefused(summary)` otherwise (e.g.
  * keep the typed values and show why).

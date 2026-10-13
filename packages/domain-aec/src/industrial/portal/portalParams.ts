@@ -1,7 +1,4 @@
-/**
- * Parameter schema of add_portal_frame_building.
- * @layer domain-aec
- */
+/** Parameter schema of add_portal_frame_building. */
 
 import { vec2, z } from '@core/commands/schema';
 import { levelIdParam } from '../../building/levelParams';

@@ -1,6 +1,4 @@
 /**
- * @layer ui/components
- *
  * ThemeToggle — icon button flipping the dark / light color theme.
  * Reads/writes useThemeStore only (presentation state).
  */

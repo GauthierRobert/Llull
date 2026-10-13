@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Pure helpers for floating-origin rendering. three.js renders in float32, so geometry far from
  * world (0,0,0) jitters; the scene is rendered relative to a "render origin" that tracks the
  * camera target. Document coordinates stay double-precision; the offset is subtracted only at

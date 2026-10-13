@@ -1,6 +1,4 @@
 /**
- * @layer server
- *
  * Single mutation path for the shared live document.
  *
  * `applyCommand` is the ONLY function that mutates the live document. Both the MCP transport

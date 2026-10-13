@@ -2,7 +2,6 @@ import type { CadDocument } from './types';
 
 /**
  * History restore (undo/redo) must not rewind the step counter, or undone ids would be re-minted.
- * @pure
  * @invariant result.nextStepNumber = max(current, restored); `restored` is returned as-is when it
  * already holds the maximum
  */

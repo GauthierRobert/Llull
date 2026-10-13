@@ -1,7 +1,6 @@
 /**
  * Purlin / side-rail design: iterative up-sizing of the secondary steel against check_purlins and
  * re-seating of the resized members on the rafters / columns.
- * @layer domain-aec
  */
 
 import type { BuildingModel } from '@core/model/building';
@@ -48,8 +47,6 @@ export function nextSecondaryProfile(name: string): string | null {
 }
 
 /**
- * @command design_purlins
- * @pure
  * @affects up-sizes failing purlin / rail profiles (all members of that role and profile on the
  *          level, keeping rows uniform) and re-seats them on the rafters / columns
  * @invariant a deeper purlin moves along the rafter normal, a deeper rail outwards, by half the depth change

@@ -203,8 +203,6 @@ function applyConstraintGradient(doc: CadDocument, c: Constraint, deltas: Delta,
  * - `residual` and `converged` describe the returned document, not the previous iterate.
  * - Iterates up to MAX_ITERATIONS steps, stopping early when residual < RESIDUAL_THRESHOLD
  *   or step delta < DELTA_THRESHOLD.
- *
- * @pure — never mutates `doc`.
  */
 export function runSolver(doc: CadDocument): {
   document: CadDocument;

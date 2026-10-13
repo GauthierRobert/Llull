@@ -1,8 +1,6 @@
 /**
  * Road corridor geometry: carriageway + shoulder mesh along the design profile, side-slope batters
  * to daylight on the existing ground, and the daylight lines.
- * @layer domain-aec/civil
- * @pure
  */
 
 import type { Entity, Vec2 } from '@core/model/types';

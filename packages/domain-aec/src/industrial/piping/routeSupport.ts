@@ -1,8 +1,4 @@
-/**
- * Polyline routes of pipes and cable trays: parsing, repeated-point test, length.
- * @layer domain-aec
- * @pure
- */
+/** Polyline routes of pipes and cable trays: parsing, repeated-point test, length. */
 
 import { clamp01 } from '@lib/clamp';
 import type { Vec3 } from '@core/model/types';

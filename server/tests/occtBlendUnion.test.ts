@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Live OpenCascade: blend_union welds swept / lofted bike-frame tubes into ONE exact solid with
  * filleted joints, fillet_edge varies a radius along an edge, and
  * the Manifold kernel refuses blends gracefully.

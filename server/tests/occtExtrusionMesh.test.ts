@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Live OpenCascade vs Manifold: extrusions (either winding, concave profiles) and mesh entities
  * are valid boolean operands, placed like the other kernel, and degenerate input is rejected.
  */

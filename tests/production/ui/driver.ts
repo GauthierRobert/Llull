@@ -5,8 +5,6 @@ import { runViaPalette } from './palette';
 import type { UiSession } from './session';
 
 /**
- * @layer tests/production/ui
- *
  * Maps each scripted tool call to the control an engineer uses: Building panel forms (placement is
  * explicit: every form has its own Level selector). The command palette is the fallback when a
  * panel has no control for a call; every such detour is a `uiGap`. No document is injected and no

@@ -1,7 +1,4 @@
-/**
- * Civil object management: list the civil model, delete objects (with their dependents on request).
- * @layer domain-aec/civil
- */
+/** Civil object management: list the civil model, delete objects (with their dependents on request). */
 
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
@@ -11,11 +8,7 @@ import { getCivil, withoutObjects } from './model';
 import { dependentsOf, referencesOf } from './integrity';
 import { regenerateCivil } from './evaluate';
 
-/**
- * @command describe_civil
- * @pure
- * @affects none (read-only)
- */
+/** @affects none (read-only) */
 export const describeCivil = defineCommand({
   name: 'describe_civil',
   description:
@@ -52,8 +45,6 @@ export const describeCivil = defineCommand({
 });
 
 /**
- * @command delete_civil_object
- * @pure
  * @affects removes the object(s) and their generated entities
  * @failure unknown id / referenced without `cascade` -> no-op
  */

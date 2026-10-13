@@ -2,7 +2,6 @@
  * Feature program — the language-neutral intermediate form a document is lowered to (featureProgram.ts)
  * before it is emitted as CadQuery, build123d, OpenSCAD or FreeCAD source.
  *
- * @layer core/codegen
  * @invariant every Term's `value` equals the evaluated document geometry; `expression` (identifiers
  *   already mapped through `program.parameters`) is attached only when it evaluates to that value.
  * @invariant features follow featureHistory order; one variable per live solid.

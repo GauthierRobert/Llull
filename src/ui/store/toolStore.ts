@@ -1,6 +1,4 @@
 /**
- * @layer ui/store
- *
  * Tool store — which view is shown, which 2D draw or modify tool is armed (at most one),
  * which 3D transform gizmo mode is active, and whether the shortcut sheet is open. Shared by the main
  * toolbar, the keyboard shortcuts, the hint bar and both viewports.

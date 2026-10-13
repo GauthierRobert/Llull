@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Shared render branch of the triangle-soup solid kinds (loft, sweep, subdivision): the core
  * tessellation (`triangles`, memoized by the caller) becomes a creased-normal geometry rendered
  * through the common solid shell. Renders nothing for an empty tessellation.

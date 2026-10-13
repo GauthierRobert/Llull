@@ -1,6 +1,4 @@
 /**
- * @layer ui/components/commandPalette
- *
  * Command palette (Ctrl/Cmd+K) — one searchable entry point to every app action and every
  * registry command. ARIA combobox + listbox; arrows / Home / End move, Enter runs, Escape closes.
  * A command with parameters (or a destructive one) opens its generated form; any other runs at

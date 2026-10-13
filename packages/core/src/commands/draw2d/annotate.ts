@@ -1,8 +1,6 @@
 /**
  * Annotation commands: text labels and dimensions. Text is a 2D kind: `position` anchors the text
  * baseline on the work plane (default z=0, normal +Z; architecture L7), `rotation` orients it.
- *
- * @layer core/commands
  */
 
 import { type DimensionEntity, type Entity, type TextEntity, type Vec3 } from '../../model/types';
@@ -17,9 +15,6 @@ import { MAX_DISPLAY_PRECISION } from '../limits';
 type TextAnchor = NonNullable<TextEntity['anchor']>;
 
 /**
- * @command add_text
- * @pure
- * @layer core/commands
  * @affects creates 1 text entity
  * @invariant content is non-empty; height > 0; position is a valid [x,y,z] triple
  * @failure empty content -> no-op, affected:[]
@@ -94,9 +89,6 @@ const DIMENSION_RULES: Record<string, { ids: number; kinds: ReadonlySet<string> 
 };
 
 /**
- * @command add_dimension
- * @pure
- * @layer core/commands
  * @affects creates 1 dimension entity
  * @invariant dimensionKind is 'linear'|'aligned'|'radial'|'angular'; entityIds length matches kind; all referenced entities exist
  * @failure unknown dimensionKind -> no-op, affected:[]

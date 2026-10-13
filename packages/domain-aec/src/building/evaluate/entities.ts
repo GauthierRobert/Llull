@@ -1,8 +1,6 @@
 /**
  * Entity factory shared by the building evaluators: standard layers, material colours and the
  * common fields of every evaluated entity.
- * @layer domain-aec
- * @pure
  */
 
 import type { BaseEntity, BoxEntity, MeshData, MeshSolidEntity, Vec3 } from '@core/model/types';

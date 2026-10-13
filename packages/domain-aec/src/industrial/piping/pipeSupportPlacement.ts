@@ -1,8 +1,6 @@
 /**
  * Where supports go along a pipe for a maximum spacing: one near each free end and bend, then equal
  * subdivisions of every longer stretch. Positions are arc lengths in mm along the centreline.
- * @layer domain-aec
- * @pure
  */
 
 import { clamp } from '@lib/clamp';

@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/civil
- *
  * CivilFeedback — the pilot "Feedback" button of the Civil / Site panel header: a short text box
  * and a mailto: link prefilled with the app version and anonymous document statistics (no document
  * content). Presentation only: reads the store, never changes the document.

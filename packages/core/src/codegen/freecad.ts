@@ -1,9 +1,6 @@
 /**
  * FreeCAD macro emitter: FeatureProgram → a .FCMacro (Python, Part workbench) that rebuilds the model
  * in a new FreeCAD document with named, coloured Part::Feature objects.
- *
- * @layer core/codegen
- * @pure
  */
 
 import type { Feature, FeatureProgram } from './program';

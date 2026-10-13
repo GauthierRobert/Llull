@@ -1,5 +1,4 @@
 /**
- * @layer server
  * Worker-thread entry for the isolated OpenCascade kernel (`isolatedKernel.ts`). Emscripten turns
  * a WASM abort into `process.exit`, which in a worker thread ends only this thread; the bootstrap
  * in `isolatedKernel.ts` flags that death in shared memory so the blocked server thread wakes.

@@ -1,8 +1,4 @@
-/**
- * Rectangle clipping of plan linework in paper millimetres (Liang-Barsky).
- * @layer domain-aec/civil
- * @pure
- */
+/** Rectangle clipping of plan linework in paper millimetres (Liang-Barsky). */
 
 import type { Vec2 } from '@core/model/types';
 

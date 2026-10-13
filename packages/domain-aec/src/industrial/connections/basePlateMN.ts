@@ -1,8 +1,6 @@
 /**
  * Base plate under moment + axial force (EN 1993-1-8 §6.2.8, simplified): concrete bearing block with
  * fjd on the compression side, anchor bolts on the other, plate bending, and a catalogue sizing.
- * @layer domain-aec
- * @pure
  */
 
 import { anchorBoltResistance } from '../steelDesign/steelDesign';
@@ -54,7 +52,6 @@ function boltOffsets(geometry: PlateMnGeometry): number[] {
  * bearing block shares N and M between the two bolt groups. Utilisation = max of bolt tension,
  * bearing length against the distance between the bolt lines, and plate bending (cantilever beyond
  * the flange, t ≥ c √(3 fjd / fy), and bolt prying lever of the tension row).
- * @pure
  */
 export function checkPlateMN(geometry: PlateMnGeometry, normal: number, moment: number, yieldStrength: number): PlateMnCheck {
   const { length, width, thickness, boltDiameter, columnDepth } = geometry;
@@ -142,7 +139,6 @@ export interface PlateDemand {
 /**
  * Lightest catalogue plate (margin 100–300 mm, t 25–50 mm, 4–12 bolts M24–M36) that passes every
  * demand with utilisation ≤ `target`; the most capable one when none does.
- * @pure
  */
 export function sizeBasePlate(
   column: { readonly depth: number; readonly width: number },

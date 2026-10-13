@@ -1,7 +1,4 @@
-/**
- * Portal frame moment connections: bolted end plates at eaves (with haunch) and apex joints.
- * @layer domain-aec
- */
+/** Portal frame moment connections: bolted end plates at eaves (with haunch) and apex joints. */
 
 import type { BuildingModel, MomentConnectionElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
@@ -34,8 +31,6 @@ export function connectionMass(doc: Pick<CadDocument, 'units'>, building: Buildi
 }
 
 /**
- * @command add_moment_connections
- * @pure
  * @affects creates 1 connection per unconnected eaves / apex joint of the rafters
  * @failure bad sizes / no unconnected joints -> no-op
  */

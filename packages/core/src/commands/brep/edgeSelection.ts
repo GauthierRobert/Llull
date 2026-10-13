@@ -3,8 +3,6 @@
  * points (`edgesNear`: the roundable edge nearest each point, measured to the curve itself), and the checks
  * that reject a selection the kernel would silently drop.
  *
- * @layer core/commands
- * @pure
  * @invariant points resolve against the topology of the solid AS IT IS NOW, so a feature-history step
  *   that recorded points keeps selecting the same edge after an upstream parametric edit reorders the
  *   kernel's edge numbering (indices do not)

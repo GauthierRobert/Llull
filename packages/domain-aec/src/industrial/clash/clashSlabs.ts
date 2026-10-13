@@ -1,7 +1,4 @@
-/**
- * Equipment passing through a floor without an opening (a grating / slab not cut around it).
- * @layer domain-aec
- */
+/** Equipment passing through a floor without an opening (a grating / slab not cut around it). */
 
 import type { Vec2 } from '@core/model/types';
 import type { BuildingModel, EquipmentElement, SlabElement } from '@core/model/building';
@@ -54,7 +51,6 @@ export function slabsCrossedBy(building: BuildingModel, equipment: EquipmentElem
 /**
  * Every (equipment, slab) pair where the slab's top lies strictly inside the equipment's height
  * (more than `tolerance` from its base and top) and solid slab is under part of its footprint.
- * @pure
  * @invariant the footprint is the equipment's plan bounding rectangle (vessels included: conservative)
  */
 export function slabPenetrations(building: BuildingModel, inScope: (levelId: string) => boolean, tolerance: number): SlabPenetration[] {

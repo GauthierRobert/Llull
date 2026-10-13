@@ -3,7 +3,6 @@ import { type BaseEntity, type Entity, type Vec3, DEFAULT_LAYER_ID } from '../..
 /**
  * A fresh entity (default layer unless `layerId`): `geometry` is the kind-specific part, the shared base
  * fields (`position`, `rotation`, `layerId`, `color`, non-empty `name`) are filled in.
- * @pure
  */
 export function newEntity<K extends Entity['kind']>(
   kind: K,

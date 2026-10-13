@@ -15,8 +15,6 @@ interface ProjectFields {
 }
 
 /**
- * @layer tests/production/criteria
- *
  * Issued-deliverable acceptance, read back with independent parsers: IFC (coordination model),
  * DXF plans, plan and elevation sheets, schedules. Expected counts come from the final document,
  * so these criteria check the export, not the modelling.

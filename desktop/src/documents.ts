@@ -1,5 +1,4 @@
 /**
- * @layer desktop
  * File ⇄ live document for the desktop menus. Every change goes through the backend's command
  * bus (`load_document`, `clear_document` via POST /command — undoable, broadcast to the window);
  * Save reads `GET /live/snapshot` and writes `serializeDocument` (the format the CLI's --doc reads).

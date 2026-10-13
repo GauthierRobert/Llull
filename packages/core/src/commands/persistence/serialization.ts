@@ -1,7 +1,4 @@
 /**
- * @command load_document
- * @pure
- * @layer core/commands
  * @affects replaces all entities in the document with the loaded ones
  * @invariant parsed document satisfies CadDocument structural + value constraints
  * @failure invalid JSON / wrong format or version / structural or value validation error -> no-op, affected:[]

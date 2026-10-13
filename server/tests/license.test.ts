@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Offline Ed25519 license verification: valid, expired, tampered, wrong key, seat limit,
  * evaluation default, and the public GET /license.
  */

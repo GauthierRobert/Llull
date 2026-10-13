@@ -1,6 +1,4 @@
 /**
- * @layer ui/components/commandPalette
- *
  * The palette catalog: app actions (tools, views, panels, edit) plus EVERY registry command
  * (architecture L5 — menus iterate `listCommands()`), so each command the MCP surface exposes is
  * reachable from the UI too. Actions only call store actions; commands go through `dispatch`.

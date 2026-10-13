@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * The OCC kernel runs in a worker thread: a forced WASM-style abort (Emscripten `process.exit`) or
  * a hang kills only the worker, the call returns null, and the next call respawns it.
  */

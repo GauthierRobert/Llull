@@ -1,6 +1,4 @@
 /**
- * @layer ui/components
- *
  * MeasurementHUD — overlay showing the result of the most recent read-only query command
  * (`lastMeasure`: measure_distance / angle / area / perimeter / bounding_box,
  * mass_properties). Renders nothing without a measurement; the close button clears it.

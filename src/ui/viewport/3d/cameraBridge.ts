@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * The single camera driver. Under frameloop="demand" every programmatic camera move must call
  * BOTH `controls.update()` and `invalidate()`; `driveCamera` does that once. `CameraBridge` (mounted
  * INSIDE the Canvas) registers it so DOM overlays (view presets, named views) outside the Canvas can

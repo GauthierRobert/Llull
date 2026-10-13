@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Render branch for `kind:'wedge'` entities.
  * A right-triangular prism (ramp): full height at the front face (z=0),
  * tapering to zero height at the back face (z=depth).

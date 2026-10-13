@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * useRenderQuality — the render quality tier (per-frame shadow cost) from the entity count and the
  * user's override in the viewport store. 'auto' derives the tier from the count; an explicit
  * override pins it.
@@ -22,9 +20,6 @@ const MEDIUM_THRESHOLD = 200;
 /**
  * Derive the quality tier from entity count.
  * Pure function — no side effects; exported for unit testing.
- *
- * @pure
- * @layer ui/viewport/3d
  */
 export function deriveQualityTier(entityCount: number): QualityTier {
   if (entityCount <= HIGH_THRESHOLD) return 'high';
@@ -35,9 +30,6 @@ export function deriveQualityTier(entityCount: number): QualityTier {
 /**
  * Resolve the effective quality tier from override + entity count.
  * Pure function — exported for unit testing.
- *
- * @pure
- * @layer ui/viewport/3d
  */
 export function resolveQualityTier(override: QualityOverride, entityCount: number): QualityTier {
   if (override !== 'auto') return override;

@@ -1,8 +1,6 @@
 /**
  * Shared plumbing for plugins that derive layers and geometry from a model: layer sync, load-time
  * restore merge, and detection of direct edits to derived entities.
- * @layer domain-aec
- * @pure
  */
 
 import type { CadDocument, Entity, Layer } from '@core/model/types';

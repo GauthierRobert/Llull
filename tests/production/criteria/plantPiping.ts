@@ -6,8 +6,6 @@ import { parseCsv } from '../oracle/csv';
 import type { PlantIntent } from '../plant/intent';
 
 /**
- * @layer tests/production/criteria
- *
  * Piping acceptance: every process line between its two ends with the right size, no dangling
  * pipe end (each end inside an equipment or at a battery-limit tie-in), and a line list that a
  * piping lead can issue (line number, size, service, from, to).

@@ -1,9 +1,4 @@
-/**
- * Axis-aligned extent of flat component tuples.
- *
- * @layer lib
- * @pure
- */
+/** Axis-aligned extent of flat component tuples. */
 
 /**
  * Component-wise min/max of `values` read as consecutive `components`-tuples (a trailing partial

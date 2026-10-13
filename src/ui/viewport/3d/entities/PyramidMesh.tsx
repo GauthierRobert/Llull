@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Render branch for `kind:'pyramid'` entities.
  * Rectangular base centered at position (±baseWidth/2 in X, ±baseDepth/2 in Y),
  * apex at +Z*height (Z-up, matches core tessellation).

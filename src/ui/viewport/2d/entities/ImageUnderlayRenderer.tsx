@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * Render branch for `kind:'image'` (shared by the 2D and 3D views through Shape2DRenderer): the
  * raster as a textured plane on its work plane, drawn first (`renderOrder` −1) and without depth
  * writes so every shape and solid paints over it; `opacity` from the entity. Not raycast — picking

@@ -1,8 +1,6 @@
 /**
  * Value validation of a raw (loaded) civil model: persistence rejects files with errors, so a
  * crafted or corrupt file can never reach regeneration with values it cannot evaluate.
- * @layer domain-aec/civil
- * @pure
  */
 
 import { type ProfilePvi, CIVIL_CATEGORIES } from '@core/model/civil';

@@ -1,7 +1,4 @@
-/**
- * export_drainage_long_section: SVG long section of a pipe run with the hydraulic grade line.
- * @layer domain-aec/civil
- */
+/** export_drainage_long_section: SVG long section of a pipe run with the hydraulic grade line. */
 
 import type { CivilModel, PipeObject } from '@core/model/civil';
 import type { CommandResult } from '@core/commands/types';
@@ -40,8 +37,6 @@ function runPipes(civil: CivilModel, fromId: string, toId: string | undefined): 
 }
 
 /**
- * @command export_drainage_long_section
- * @pure
  * @affects none (read-only)
  * @failure unknown manholes / no connecting run / bad criteria -> no-op
  */

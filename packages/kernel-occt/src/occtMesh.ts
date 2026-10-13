@@ -1,5 +1,4 @@
 /**
- * @layer kernel
  * Display tessellation of an OCC shape (BRepMesh_IncrementalMesh, world space, outward winding).
  * Output only: a mesh never goes back into the kernel.
  */

@@ -1,7 +1,4 @@
-/**
- * @layer ui/panels/building
- * Steel member inspector editor: Save dispatches ONE `update_steel_member` with the changed fields.
- */
+/** Steel member inspector editor: Save dispatches ONE `update_steel_member` with the changed fields. */
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';

@@ -1,5 +1,4 @@
 /**
- * @layer server
  * Per-user audit trail: one JSONL line per applied command, written at the transport layer
  * (`commandBus` callers), never inside commands. Size-based rotation: `audit.jsonl` ->
  * `audit.jsonl.1` ... `.N`.

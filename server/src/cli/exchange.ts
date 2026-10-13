@@ -1,5 +1,4 @@
 /**
- * @layer server
  * The exchange tools (export_step, import_step, import_dwg, import_code) in the `llull` CLI. They
  * are not registry commands — Python / DWG I/O sits behind ports — so the CLI runs the same MCP-
  * layer handlers: in-process for a local --doc (document changes via `execute`), `POST /exchange`

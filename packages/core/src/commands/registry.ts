@@ -1,5 +1,4 @@
 /**
- * @layer core/commands
  * The registry: the composition point that fills the command table with every feature's catalog
  * (`<feature>/catalog.ts`) and every installed plugin's commands. UI menus, MCP tool schemas
  * (`toToolSchemas`) and `execute` all read that table — register once, every surface gains it.

@@ -1,5 +1,4 @@
 /**
- * @layer mcp
  * REST wire types shared by `server/` (producer) and the web app (consumer): one definition per
  * JSON body so the two ends cannot drift. The only runtime code is the pure `parseCommandResponse`
  * (the one reader of a command-bus body, used by every non-browser client).
@@ -65,7 +64,6 @@ export interface DwgImportResponseBody extends CommandResponseBody {
  * A `CommandOutcome` out of a command-bus JSON body (`/command`, `/undo`, `/redo`, `/exchange`).
  * A body without a `summary` (proxy page, `{ error }` reply) becomes an error outcome naming the
  * HTTP status; status >= 400 forces `isError`.
- * @pure
  */
 export function parseCommandResponse(body: unknown, status: number): CommandOutcome {
   if (!isRecord(body) || typeof body['summary'] !== 'string') {

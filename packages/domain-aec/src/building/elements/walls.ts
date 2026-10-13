@@ -1,7 +1,4 @@
-/**
- * Walls: straight, parametric, joined at corners, hosting doors and windows.
- * @layer domain-aec
- */
+/** Walls: straight, parametric, joined at corners, hosting doors and windows. */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { BuildingModel, OpeningElement, WallElement } from '@core/model/building';
@@ -149,8 +146,6 @@ function wallResult(doc: CadDocument, build: Extract<WallBuild, { ok: true }>): 
 const MAX_WALL_POINTS = 500;
 
 /**
- * @command draw_walls
- * @pure
  * @affects creates (points.length - 1) walls, +1 when closed, minus segments duplicating a wall (skipped)
  * @failure < 2 points / zero-length segment / every segment a duplicate -> no-op
  */
@@ -187,8 +182,6 @@ export const drawWalls = defineCommand({
 });
 
 /**
- * @command update_wall
- * @pure
  * @affects regenerates the wall, its openings and the walls joined to it
  * @failure unknown wall / invalid values / hosted opening would no longer fit -> no-op
  */
@@ -256,10 +249,7 @@ export const updateWall = defineCommand({
   },
 });
 
-/**
- * Every hosted opening on `levelIds` that no longer fits its wall's built extent / height.
- * @pure
- */
+/** Every hosted opening on `levelIds` that no longer fits its wall's built extent / height. */
 export function openingFitIssues(building: BuildingModel, levelIds: ReadonlySet<string>): string[] {
   const issues: string[] = [];
   for (const element of Object.values(building.elements)) {

@@ -1,6 +1,4 @@
 /**
- * @layer core/mcp
- *
  * Unit tests for `packages/mcp/src/conventions.ts`.
  *
  * Verifies the CONVENTIONS_GUIDE content covers the required modeling topics
@@ -8,8 +6,6 @@
  *
  * These tests are deliberately kept in the ROOT test suite (not the server
  * test suite) to cover the pure core/mcp module in isolation.
- *
- * @pure No DOM, fetch, or React dependencies.
  */
 
 import { describe, it, expect } from 'vitest';

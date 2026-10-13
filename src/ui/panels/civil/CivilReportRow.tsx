@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/civil
- *
  * CivilReportRow — a civil object row with its live read-only report, one number field and one
  * action button (surface contour interval, platform swell factor). Presentation only.
  */

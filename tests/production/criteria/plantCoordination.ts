@@ -5,8 +5,6 @@ import { elementsOf, elevationOf, insidePolygon } from '../oracle/geometry';
 import type { PlantIntent } from '../plant/intent';
 
 /**
- * @layer tests/production/criteria
- *
  * Coordination and engineering sign-off: clash-free model, safe access between floors, and every
  * steel member covered by a structural verification the office can sign.
  */

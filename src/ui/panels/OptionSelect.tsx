@@ -1,5 +1,3 @@
-/** @layer ui/panels Native select over a fixed list of string options (no casts on change). */
-
 import React from 'react';
 
 interface OptionSelectProps<Option extends string> {

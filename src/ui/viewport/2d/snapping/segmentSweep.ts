@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * Pairwise segment intersections via sweep-and-prune on the x axis: only pairs whose x and y
  * extents overlap reach the exact test, so scenes with thousands of segments stay near-linear.
  */
@@ -12,7 +10,6 @@ const EPSILON = 1e-9;
 
 /**
  * Every intersection point between two distinct segments of `segments`.
- * @pure
  * @invariant same point set as testing all i<j pairs with `segmentIntersection`
  */
 export function allSegmentIntersections(segments: ReadonlyArray<Segment>): Array<[number, number]> {

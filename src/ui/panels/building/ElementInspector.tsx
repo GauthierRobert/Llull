@@ -1,5 +1,4 @@
 /**
- * @layer ui/panels/building
  * Properties inspector for a selected building element (derived geometry is read-only, so the
  * element — not its mesh — is what an engineer edits). Editors dispatch update_* commands.
  */

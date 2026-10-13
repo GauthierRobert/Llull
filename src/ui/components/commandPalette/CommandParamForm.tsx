@@ -1,6 +1,4 @@
 /**
- * @layer ui/components/commandPalette
- *
  * Generated param form for one registry command: one control per `paramsSchema` property,
  * entity-id fields pre-filled from the selection; a destructive command shows a warning and a
  * danger-styled Run. Submitting parses the text and dispatches the

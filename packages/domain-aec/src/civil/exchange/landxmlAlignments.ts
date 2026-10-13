@@ -1,8 +1,6 @@
 /**
  * LandXML `<Alignments>` block: horizontal geometry (Line / Curve with N E coordinates) and the
  * design profile (PVI / ParaCurve) of every alignment, in metres.
- * @layer domain-aec/civil
- * @pure
  */
 
 import { toDegrees } from '@lib/angle';

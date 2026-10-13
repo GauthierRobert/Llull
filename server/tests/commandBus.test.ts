@@ -1,6 +1,4 @@
 /**
- * @layer server/tests
- *
  * Unit tests for commandBus.ts
  *
  * Covers:

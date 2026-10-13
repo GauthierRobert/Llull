@@ -1,6 +1,4 @@
 /**
- * @layer server/tests/production
- *
  * Production gate, scripted driver: each engineering-office scenario's tool calls are sent through
  * the real /mcp endpoint (Streamable HTTP), like an MCP agent would — the session discovers and
  * enables the toolsets it needs — then the live document is graded against the office's acceptance

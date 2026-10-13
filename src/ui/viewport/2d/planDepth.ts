@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * Depth framing for the top-down ortho camera. 2D shapes live on a work plane whose z may be
  * lifted (contours at their elevation, DXF imports keeping elevations). The camera sits a fixed
  * distance above the entity group, so the group is shifted down by the highest plane and the far
@@ -22,7 +20,6 @@ interface PlanDepth {
   readonly far: number;
 }
 
-/** @pure */
 export function computePlanDepth(order: ReadonlyArray<EntityId>, entities: Readonly<Record<EntityId, Entity>>): PlanDepth {
   let top = 0;
   let bottom = 0;

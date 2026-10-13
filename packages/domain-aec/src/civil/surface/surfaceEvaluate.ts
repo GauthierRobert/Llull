@@ -1,8 +1,6 @@
 /**
  * Evaluates survey point groups (point markers) and surfaces (TIN mesh, minor / major contours and
  * major-contour elevation labels).
- * @layer domain-aec/civil
- * @pure
  */
 
 import type { Entity, Vec2 } from '@core/model/types';

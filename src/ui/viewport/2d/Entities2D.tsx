@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * Maps `document.order` → the 2D drafting view: ONE pure render branch per Shape2DKind, and the
  * 3D solids together as their technical top view (SolidsTechnicalView2D — one projection, so a
  * solid hides the edges of those beneath it).

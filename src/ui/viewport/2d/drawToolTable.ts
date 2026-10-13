@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * ONE descriptor per interactive draw tool: how many clicks complete it, which command its points
  * dispatch, and how it previews. The click state machine (`useDrawTool`), the rubber-band preview
  * (`DrawPreview`) and the double-click handling (`DrawInteraction`) all derive from this table —

@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * Mounts a three.js Line/LineSegments at an entity's position and disposes its geometry +
  * material when the object changes or unmounts (R9).
  */

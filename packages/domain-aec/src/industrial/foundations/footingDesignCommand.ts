@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { elementAffected, getBuilding, withElement } from '../../building/model';
@@ -29,8 +25,6 @@ const footingDesignParams = z.object({
 });
 
 /**
- * @command design_footings
- * @pure
  * @affects sizes (grows, or shrinks with allowShrink) and reinforces every analysed footing; a footing
  *          with no passing size within 6 m × 6 m × 1.5 m is left unchanged
  * @failure bad loads / unknown level / no footing under an analysed frame column -> no-op

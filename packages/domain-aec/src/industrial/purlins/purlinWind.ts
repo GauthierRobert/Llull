@@ -1,7 +1,4 @@
-/**
- * Wind zone selection of one roof purlin (EN 1991-1-4 via windCoefficients).
- * @layer domain-aec
- */
+/** Wind zone selection of one roof purlin (EN 1991-1-4 via windCoefficients). */
 
 import { FLAT_ROOF_LIMIT, roofCoefficients, type ZoneCpe } from '../common/windCoefficients';
 import { DOWNWIND_ROOF_FACTOR } from '../frames/frameModelTypes';

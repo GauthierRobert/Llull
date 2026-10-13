@@ -1,6 +1,4 @@
 /**
- * @layer ui/components
- *
  * ModalDialog — the shell shared by every modal (confirm, shortcuts, command palette, MCP
  * connect): a backdrop that closes on a direct hit, a `role="dialog"` box where Escape closes and
  * Tab stays trapped, initial focus on open and focus handed back to the opener on close.

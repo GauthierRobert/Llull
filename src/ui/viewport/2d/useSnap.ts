@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * React hook: converts a raw cursor world position into a snapped position by calling the
  * pure helpers in snapping/ against the live document. Deliberately thin — no document
  * mutation, no side effects (R1, R2).

@@ -1,5 +1,4 @@
 /**
- * @layer ui/viewport
  * `useMemo` for a three.js resource (geometry, material, texture) that is disposed when it is
  * replaced or its component unmounts (R9). `deps` must list everything `create` reads.
  */

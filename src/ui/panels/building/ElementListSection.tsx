@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/building
- *
  * ElementListSection — the active level's elements (plus grids): click selects the element's
  * entities in the viewport; the delete button dispatches delete_building_element.
  */

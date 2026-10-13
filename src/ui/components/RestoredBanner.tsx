@@ -1,6 +1,4 @@
 /**
- * @layer ui/components
- *
  * RestoredBanner — tells the user their unsaved work was restored from autosave and offers
  * "Start fresh" (dispatches `clear_document`, drops the autosave). Presentation only.
  */

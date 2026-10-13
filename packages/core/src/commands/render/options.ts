@@ -1,5 +1,4 @@
 /**
- * @layer core/commands
  * Semantic validation of render_view's camera / cut / budget parameters and the summary notes
  * that report what the renderer reduced.
  */

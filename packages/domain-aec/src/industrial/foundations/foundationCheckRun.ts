@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop, report } from '@core/commands/noop';
@@ -25,8 +21,6 @@ const foundationCheckParams = z.object({
 });
 
 /**
- * @command check_foundations
- * @pure read-only
  * @affects none; data = { rows: FoundationRow[], csv, maxUtilisation, failures }
  * @failure bad params / unknown level / no footing or base plate under a frame column -> no data
  */

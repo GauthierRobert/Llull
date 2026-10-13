@@ -1,8 +1,4 @@
 /**
- * @command create_material
- * @command assign_material
- * @pure
- * @layer core/commands
  * @affects CadDocument.materials (create_material); BaseEntity.materialId (assign_material)
  * @invariant density > 0; metalness ∈ [0,1]; roughness ∈ [0,1]; color matches /^#[0-9a-fA-F]{6}$/
  * @failure blank name / density ≤ 0 / out-of-range PBR / invalid hex → no-op, affected:[]
@@ -31,9 +27,6 @@ function finishProblem(
 }
 
 /**
- * @command create_material
- * @pure
- * @layer core/commands
  * @affects adds or replaces CadDocument.materials[name]
  * @invariant existing materials with different names are untouched
  * @failure blank name → no-op; density ≤ 0 or non-finite → no-op;
@@ -163,9 +156,6 @@ export const createMaterial = defineCommand({
 });
 
 /**
- * @command assign_material
- * @pure
- * @layer core/commands
  * @affects sets BaseEntity.materialId on each target entity
  * @invariant material must exist in doc.materials; unknown entity ids → skip + note in summary
  * @failure unknown material name → no-op, affected:[]; empty entityIds → no-op

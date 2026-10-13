@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import { clamp } from '@lib/clamp';
 import type { SteelMemberElement } from '@core/model/building';
 import type { FrameMember, FrameNode } from '@lib/frame2d';

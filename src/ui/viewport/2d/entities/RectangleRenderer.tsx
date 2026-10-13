@@ -1,5 +1,4 @@
 /**
- * @layer ui/viewport/2d
  * Render branch for `kind:'rectangle'`: closed 4-corner loop, lower-left at the entity origin,
  * width along +X and height along +Y.
  */

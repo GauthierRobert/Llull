@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import { toDegrees } from '@lib/angle';
 import type { DocumentUnit, Vec2, Vec3 } from '@core/model/types';
 import { ansi31Hatch } from '@lib/hatch';

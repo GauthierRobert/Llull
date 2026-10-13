@@ -1,7 +1,4 @@
-/**
- * Steel connections: column base plates with anchor bolts.
- * @layer domain-aec
- */
+/** Steel connections: column base plates with anchor bolts. */
 
 import type { BasePlateElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
@@ -24,8 +21,6 @@ export function plateMass(doc: Pick<CadDocument, 'units'>, plate: BasePlateEleme
 }
 
 /**
- * @command add_base_plates
- * @pure
  * @affects creates 1 base plate (+ anchor bolts) per steel column without one
  * @failure bad sizes / odd bolt count / no unplated columns -> no-op
  */

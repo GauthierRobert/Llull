@@ -1,8 +1,4 @@
-/**
- * @layer ui/panels/civil
- * @pure Validation + param gathering of the civil forms (alignment, manhole, drainage storm).
- * Components render the returned `error` and dispatch the returned `params`; the commands validate.
- */
+/** Components render the returned `error` and dispatch the returned `params`; the commands validate. */
 
 import type { Vec2 } from '@core/model/types';
 import { optionalNumber, optionalText, parseNumber, parseNumberList } from '@ui/numberText';

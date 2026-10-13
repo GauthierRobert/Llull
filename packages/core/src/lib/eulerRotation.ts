@@ -1,9 +1,6 @@
 /**
  * Euler rotation matching three.js intrinsic 'XYZ' (`<mesh rotation={[rx, ry, rz]}/>`):
  * M = Rx · Ry · Rz, so Rz is applied to the vector FIRST, then Ry, then Rx.
- *
- * @layer lib
- * @pure
  */
 
 import { eulerFromMat, mulMat3, type Mat3 } from './axisRotation';

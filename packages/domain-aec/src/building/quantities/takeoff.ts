@@ -1,7 +1,4 @@
-/**
- * Quantity takeoff, schedules and cost estimate commands (read-only except set_cost_rates).
- * @layer domain-aec
- */
+/** Quantity takeoff, schedules and cost estimate commands (read-only except set_cost_rates). */
 
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
@@ -16,11 +13,7 @@ import { toCsv } from '../../shared/csv';
 const TAKEOFF_COLUMNS = ['Key', 'Description', 'Quantity', 'Unit'];
 const UNIT_LABEL = { m: 'm', m2: 'm²', m3: 'm³', ea: 'ea', kg: 'kg' } as const;
 
-/**
- * @command quantity_takeoff
- * @pure read-only
- * @affects none; data = { lines: TakeoffLine[], csv }
- */
+/** @affects none; data = { lines: TakeoffLine[], csv } */
 export const quantityTakeoff = defineCommand({
   name: 'quantity_takeoff',
   annotations: { readOnly: true, idempotent: true },
@@ -50,8 +43,6 @@ export const quantityTakeoff = defineCommand({
 });
 
 /**
- * @command building_schedule
- * @pure read-only
  * @affects none; data = { kind, columns, rows, csv }
  * @failure unknown kind -> no data
  */
@@ -78,11 +69,7 @@ function validRates(rates: Record<string, unknown>): rates is Record<string, num
   return Object.values(rates).every(isNonNegativeNumber);
 }
 
-/**
- * @command set_cost_rates
- * @pure
- * @failure rates not a map of numbers >= 0 -> no-op
- */
+/** @failure rates not a map of numbers >= 0 -> no-op */
 export const setCostRates = defineCommand({
   name: 'set_cost_rates',
   description:
@@ -119,8 +106,6 @@ export const setCostRates = defineCommand({
 });
 
 /**
- * @command estimate_cost
- * @pure read-only
  * @affects none; data = { currency, lines: CostLine[], total, unpriced, csv }
  * @failure invalid rates -> no data
  */

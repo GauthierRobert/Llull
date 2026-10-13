@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Live OpenCascade vs Manifold for lofts (BRepOffsetAPI_ThruSections) and variable-section sweeps
  * (BRepOffsetAPI_MakePipeShell): both kernels build a single closed solid and agree on volume and
  * bounds within the tessellation / blending tolerance.

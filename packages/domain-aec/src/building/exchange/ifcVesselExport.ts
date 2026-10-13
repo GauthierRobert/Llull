@@ -1,7 +1,4 @@
-/**
- * IFC body of a cylindrical vessel: extruded IfcCircleProfileDef.
- * @layer domain-aec
- */
+/** IFC body of a cylindrical vessel: extruded IfcCircleProfileDef. */
 
 import type { EquipmentElement } from '@core/model/building';
 import { circleProfile, direction, ifcReal, point3, type Context } from './ifcStep';

@@ -1,5 +1,4 @@
 /**
- * @layer kernel
  * Entity -> OCC solid: exact makers for box, cylinder, sphere, cone, torus, wedge, extrusion,
  * revolution (exact arcs / Béziers when the entity carries `curves`) and sweep, sewn triangles for pyramid and mesh entities. Every returned solid sits at the
  * entity's rotation and position; the caller owns (releases) it.

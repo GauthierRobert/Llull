@@ -2,8 +2,6 @@
  * Rewrites for retired edit/solid commands: single-entity edits folded into their batch forms, the
  * path/arc distribution family folded into `pattern_along_path`, `make_tube_between` into
  * `add_cylinder`, the three boolean_* commands into `boolean`.
- *
- * @layer core/commands
  */
 
 import type { RetiredCommandRewrite } from '../types';

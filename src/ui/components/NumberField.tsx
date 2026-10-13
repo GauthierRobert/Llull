@@ -1,6 +1,4 @@
 /**
- * @layer ui/components
- *
  * NumberField — `<input type="number">` for a numeric value owned elsewhere (a store field). It
  * keeps the typed text locally so intermediate input ("0.", "-", "1e-") is never rewritten, and
  * reports only finite parsed numbers through `onValueChange`. An external change of `value`

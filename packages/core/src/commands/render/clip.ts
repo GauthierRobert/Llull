@@ -1,9 +1,6 @@
 /**
  * Cutaway for render_view: clips solid polygons against half-spaces (split, not dropped) and
  * rebuilds the section outline as capped loops.
- *
- * @layer core/commands
- * @pure
  */
 
 import type { Vec3 } from '../../model/types';

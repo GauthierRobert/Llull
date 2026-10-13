@@ -1,5 +1,3 @@
-/** @layer ui — file `<input>` helpers (browser side; no document change). */
-
 import type React from 'react';
 
 /**

@@ -1,6 +1,4 @@
 /**
- * @layer mcp
- *
  * CAD exchange tools — STEP import/export and parametric-code import over MCP.
  *
  * These need a Python geometry kernel (CadQuery / build123d via OpenCascade), so they are not pure
@@ -373,7 +371,6 @@ const EXCHANGE_HANDLERS = new Map([
 
 /**
  * Dispatch an exchange tool call; returns null for any other tool name.
- * @layer mcp
  * @failure missing Python, disabled execution, script/bridge errors → isError result, document unchanged
  */
 export async function applyExchangeToolCall(toolName: string, rawArgs: unknown, deps: ExchangeDeps): Promise<McpShapedResult | null> {

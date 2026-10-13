@@ -2,8 +2,6 @@
  * Retired commands: tools merged into a more general command. Saved documents still name them in
  * feature-history and recipe steps (and in the actions of recorded `build_project` plans), so
  * `migrate()` rewrites every such call onto its replacement before the document is validated.
- *
- * @layer core/commands
  */
 
 import type { RetiredCommandRewrite } from '../types';
@@ -78,17 +76,13 @@ function retiredTable(): RewriteTable {
   return { ...CORE_RETIRED_COMMANDS, ...pluginRetiredCommands() };
 }
 
-/**
- * Rewrite every retired `{ command, params }` call nested in `value` (plan actions, code traces).
- * @pure
- */
+/** Rewrite every retired `{ command, params }` call nested in `value` (plan actions, code traces). */
 export function migrateRetiredCalls(value: unknown): unknown {
   return rewriteNested(value, retiredTable());
 }
 
 /**
  * Rewrite retired command calls in `featureHistory` and every recipe's `steps`.
- * @pure
  * @invariant a document naming no retired command is returned with equal content
  */
 export function migrateRetiredCommands(raw: Record<string, unknown>): Record<string, unknown> {

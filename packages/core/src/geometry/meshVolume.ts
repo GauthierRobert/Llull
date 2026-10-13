@@ -1,9 +1,4 @@
-/**
- * Mesh volume and winding helpers over flat xyz position arrays.
- *
- * @layer geometry
- * @pure
- */
+/** Mesh volume and winding helpers over flat xyz position arrays. */
 
 import type { Vec3 } from '../model/vectors';
 import { cross3, dot3, vec3At } from '../lib/vec3';

@@ -1,8 +1,6 @@
 /**
  * Coordinate reference system helpers: the 2D similarity (Helmert) between local site coordinates
  * and the projected grid, and a grid-coordinate copy of the civil model for exchange files.
- * @layer domain-aec/civil
- * @pure
  */
 
 import { toRadians } from '@lib/angle';

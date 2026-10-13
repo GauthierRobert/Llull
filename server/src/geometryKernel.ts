@@ -1,6 +1,4 @@
 /**
- * @layer server
- *
  * Inject the configured geometry kernel into the core at startup (architecture L9) so boolean and
  * fillet commands work for MCP agents exactly as in the browser app. `LLULL_KERNEL=occt` selects
  * OpenCascade (falls back to Manifold on failure); anything else is Manifold.

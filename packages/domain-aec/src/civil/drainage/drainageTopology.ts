@@ -1,8 +1,4 @@
-/**
- * Drainage network topology: plan length, slope, reachability and upstream-to-downstream order.
- * @layer domain-aec/civil
- * @pure
- */
+/** Drainage network topology: plan length, slope, reachability and upstream-to-downstream order. */
 
 import type { CivilModel, ManholeObject, PipeObject } from '@core/model/civil';
 import { civilObjectsOf, civilObject } from '../model';

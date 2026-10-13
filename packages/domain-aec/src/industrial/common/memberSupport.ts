@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { CadDocument, Vec3 } from '@core/model/types';
 import type { BaseFixity, BuildingModel, JointFixity, MemberRole, SteelMemberElement } from '@core/model/building';
 import { z } from '@core/commands/schema';

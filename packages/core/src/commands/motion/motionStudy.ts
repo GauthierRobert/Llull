@@ -61,9 +61,6 @@ function detectInterferences(bounds: Record<string, Bounds>): [string, string][]
 }
 
 /**
- * @command motion_study
- * @pure
- * @layer core/commands
  * @affects nothing — read-only query; document returned unchanged, affected:[]
  * @invariant steps clamped to [2, 360]; non-integers rounded
  * @invariant each sweep step evaluates a virtual clone; the input doc is never mutated

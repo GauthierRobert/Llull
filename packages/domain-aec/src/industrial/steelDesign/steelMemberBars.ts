@@ -1,8 +1,6 @@
 /**
  * Steel members of a document as analysis bars: absolute axis ends in mm, catalogue section, yield
  * strength and the structural kind (column / beam / brace) that decides which check applies.
- * @layer domain-aec
- * @pure
  */
 
 import type { CadDocument, Vec3 } from '@core/model/types';

@@ -1,7 +1,4 @@
-/**
- * @layer kernel
- * Minimal typings for the subset of the OCC WASM API the kernel uses, plus the two handle helpers.
- */
+/** Minimal typings for the subset of the OCC WASM API the kernel uses, plus the two handle helpers. */
 
 /** Minimal typings for the subset of the OCC WASM API this kernel uses. */
 export interface OccHandle {

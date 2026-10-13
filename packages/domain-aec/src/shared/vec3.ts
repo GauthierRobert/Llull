@@ -1,8 +1,4 @@
-/**
- * Domain-aec 3D vector helpers not in `@lib/vec3` (zero-preserving normalize, midpoint).
- * @layer domain-aec
- * @pure
- */
+/** Domain-aec 3D vector helpers not in `@lib/vec3` (zero-preserving normalize, midpoint). */
 
 import type { Vec3 } from '@core/model/types';
 

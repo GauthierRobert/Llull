@@ -2,8 +2,6 @@
  * Lower a kernel result's exact construction (`mesh.brep`) — or one fillet / chamfer / shell step —
  * to feature-program ops, so generated code rebuilds the B-rep instead of a triangle soup.
  *
- * @layer core/codegen
- * @pure the kernel is only queried (edge mid points, display triangles), never asked to change
  * @failure a node no program op expresses (a rotated placement, a scale) -> null (caller falls back)
  */
 

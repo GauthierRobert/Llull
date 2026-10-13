@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { CadDocument } from '@core/model/types';
 import type { BimCategory, BuildingElement, BuildingModel, CurvedWallElement, WallElement } from '@core/model/building';
 import { polygonArea } from '@lib/polygon';

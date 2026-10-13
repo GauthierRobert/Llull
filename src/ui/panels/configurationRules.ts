@@ -1,5 +1,3 @@
-/** @layer ui/panels Pure rules of the configurations panel (no document access). */
-
 import type { Configuration, Parameter } from '@core/model/types';
 
 export interface ParameterValueRow {

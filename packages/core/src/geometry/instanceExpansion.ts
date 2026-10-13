@@ -1,8 +1,6 @@
 /**
  * Instance expansion: bake an `InstanceEntity` into world-space copies of its component's entities
  * (scale -> rotate about origin -> translate; keep in sync with `scene.ts` `instanceBoundsFromDoc`).
- *
- * @layer core/commands
  */
 
 import { type CadDocument, type Component, type Entity, type InstanceEntity, type Vec3, is3D } from '../model/types';
@@ -82,7 +80,6 @@ function expandedId(instanceId: string, sourceEntityId: string): string {
  *   instance's Euler angles to the child's (`child.rotation + instance.rotation`), while the
  *   baked-mesh path COMPOSES them (child rotation applied by `solidTriangles`, then the instance
  *   rotation). They agree only when one of the two rotations is zero or both share one axis.
- * @pure
  */
 export function expandInstance(instance: InstanceEntity, component: Component): Entity[] {
   const [sx, sy, sz] = instance.scale ?? UNIT_SCALE;
@@ -110,7 +107,6 @@ export function expandInstance(instance: InstanceEntity, component: Component): 
  * What an entity's expanded geometry depends on beyond the entity object itself: an instance's
  * whole component map (nested instances reach any component), nothing for other entities. Caches
  * keyed by the (immutable) entity compare it to stay correct.
- * @pure
  */
 export function expansionDependency(entity: Entity, doc: Pick<CadDocument, 'components'>): CadDocument['components'] | undefined {
   return entity.kind === 'instance' ? doc.components : undefined;

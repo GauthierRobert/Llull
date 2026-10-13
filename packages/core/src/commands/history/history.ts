@@ -1,8 +1,6 @@
 /**
  * Feature-history meta-commands: edit `featureHistory`, then regenerate by replaying it.
  * They carry `annotations.metaHistory` so `execute()` appends no FeatureStep for them.
- *
- * @layer core/commands
  */
 
 import type { CadDocument, FeatureStep } from '../../model/types';
@@ -90,9 +88,6 @@ function editStep(
 }
 
 /**
- * @command replay_history
- * @pure
- * @layer core/commands
  * @affects regenerates all entities from the featureHistory list
  * @invariant featureHistory is preserved unchanged; entities are re-evaluated
  * @failure empty history -> returns doc unchanged, affected:[]
@@ -122,9 +117,6 @@ export const replayHistoryCommand = defineCommand({
 });
 
 /**
- * @command set_step_suppressed
- * @pure
- * @layer core/commands
  * @affects toggles suppressed flag on a FeatureStep then regenerates the document
  * @invariant featureHistory length is unchanged
  * @failure unknown stepId -> no-op, affected:[]
@@ -154,9 +146,6 @@ export const setStepSuppressed = defineCommand({
 });
 
 /**
- * @command edit_step_params
- * @pure
- * @layer core/commands
  * @affects replaces params of a FeatureStep then regenerates the document
  * @invariant featureHistory length is unchanged; step name is unchanged
  * @failure unknown stepId -> no-op, affected:[]
@@ -192,9 +181,6 @@ export const editStepParams = defineCommand({
 });
 
 /**
- * @command reorder_step
- * @pure
- * @layer core/commands
  * @affects moves a FeatureStep to a new index then regenerates the document
  * @invariant featureHistory length is unchanged
  * @failure unknown stepId -> no-op, affected:[]
@@ -235,9 +221,6 @@ export const reorderStep = defineCommand({
 });
 
 /**
- * @command delete_step
- * @pure
- * @layer core/commands
  * @affects removes a FeatureStep from featureHistory then regenerates the document
  * @invariant featureHistory length decreases by 1
  * @failure unknown stepId -> no-op, affected:[]
@@ -266,9 +249,6 @@ export const deleteStep = defineCommand({
 });
 
 /**
- * @command insert_step
- * @pure
- * @layer core/commands
  * @affects splices a new FeatureStep into featureHistory then regenerates the document
  * @invariant featureHistory length increases by 1
  * @failure afterStepId provided but not found -> no-op, affected:[]

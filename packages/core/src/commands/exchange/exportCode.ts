@@ -2,8 +2,6 @@
  * export_code — the document as parametric source code: CadQuery / build123d / OpenSCAD / FreeCAD
  * (parameters → variables, `=expr` dimensions → expressions, features in history order).
  * The reverse direction is apply_code_trace (code_trace.ts).
- *
- * @layer core/commands
  */
 
 import type { CommandResult } from '../types';
@@ -27,9 +25,6 @@ const FILE_EXTENSIONS: Readonly<Record<CodeLanguage, string>> = {
 };
 
 /**
- * @command export_code
- * @pure
- * @layer core/commands
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data.text regenerates the document's 3D solids; data.source tells whether it came
  *   from the feature history ('history', parametric) or the current geometry ('snapshot')

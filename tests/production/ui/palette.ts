@@ -3,8 +3,6 @@ import { humanizeName } from '@ui/components/commandPalette/paramForm';
 import type { UiSession } from './session';
 
 /**
- * @layer tests/production/ui
- *
  * Ctrl+K command palette: search a command, fill its generated form, Run. How an engineer reaches
  * a registry command (or a parameter) that no panel form offers.
  */

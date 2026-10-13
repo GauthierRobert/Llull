@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { BimCategory, BuildingLevel, OpeningElement, WallElement } from '@core/model/building';
 import { pointAlong, wallFrame } from '../geometry/wallGeometry';

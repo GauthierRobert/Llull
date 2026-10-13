@@ -1,8 +1,6 @@
 /**
  * Planar moment frames of a steel structure: columns and beams in one vertical plane joined by rigid
  * (moment) beam-to-column joints. A frame beam keeps its pinned ends (released in the frame model).
- * @layer domain-aec
- * @pure
  */
 
 import type { BeamResult } from './steelFraming';

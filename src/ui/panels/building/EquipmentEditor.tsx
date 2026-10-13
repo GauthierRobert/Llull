@@ -1,5 +1,4 @@
 /**
- * @layer ui/panels/building
  * Equipment editor form: Save dispatches `update_equipment` with only the changed fields.
  * Used by the Equipment list and the Properties inspector.
  */

@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Render branch for `kind:'extrusion'` entities.
  * Builds a THREE.ExtrudeGeometry from the 2D profile; memoized on profile + depth.
  * Lifecycle handled by SolidMeshShell.

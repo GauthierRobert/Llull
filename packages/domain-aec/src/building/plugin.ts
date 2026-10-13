@@ -2,8 +2,6 @@
  * Building plugin: the AEC domain extends the CAD core through the plugin contract — commands,
  * the `building` MCP toolset, the derivation guard and the document extension that validates the
  * building model and re-derives its geometry on load.
- *
- * @layer domain-aec/building
  */
 
 import type { CadPlugin } from '@core/plugins/plugin';

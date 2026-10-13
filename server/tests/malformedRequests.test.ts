@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Malformed HTTP and JSON-RPC input on /command and /mcp: every case gets a clean, JSON, bounded
  * error (no crash, no HTML, no stack trace) and leaves the document untouched.
  */

@@ -1,8 +1,4 @@
-/**
- * Drainage design criteria and rainfall intensity (constant or IDF curve i = a / (t + b)^c).
- * @layer domain-aec/civil
- * @pure
- */
+/** Drainage design criteria and rainfall intensity (constant or IDF curve i = a / (t + b)^c). */
 
 /** Intensity-duration-frequency curve: i (mm/h) = a / (t + b)^c, t in minutes. */
 export interface Idf {

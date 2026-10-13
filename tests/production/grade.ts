@@ -5,8 +5,6 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { CheckReport, DeliverableId, DriverId, GradeContext, Scenario, ScenarioReport } from './contract';
 
 /**
- * @layer tests/production
- *
  * Grades a driver's final document against a scenario's acceptance criteria, then applies the
  * known-issue ratchet. Deliverables the driver downloaded (UI) are graded as downloaded; the rest
  * are produced from the final document with the same export commands an engineer would run.

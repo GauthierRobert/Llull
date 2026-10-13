@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { unknownLevelFailure } from '../../building/levelLookup';
@@ -28,8 +24,6 @@ const ASSUMPTIONS: ReadonlyArray<string> = [
 ];
 
 /**
- * @command check_steel_members
- * @pure read-only
  * @affects none; data = { ok, members: MemberRow[], totals, loads, storeys, frames, warnings, csv }
  * @invariant every steel member of the model (or level filter) has exactly one row; utilisation 1.0 = at resistance
  * @failure negative loads / unknown level / no steel members -> no-op, no data

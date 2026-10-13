@@ -1,5 +1,3 @@
-/** @layer ui/store Shape of the single Zustand store and the set/get handles shared by its modules. */
-
 import type { CadDocument, EntityId } from '@core/model/types';
 import type { LiveCommandEvent, LiveSnapshotEvent } from '@mcp/liveSync';
 

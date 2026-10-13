@@ -1,9 +1,6 @@
 /**
  * Minimal PNG encoder: 8-bit RGBA, filter 0, zlib "stored" (uncompressed) deflate blocks.
  * Pure (no DOM, no zlib dependency) so core can embed textures in glTF exports.
- *
- * @layer lib
- * @pure
  */
 
 const CRC_TABLE = ((): Uint32Array => {

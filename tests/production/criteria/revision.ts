@@ -5,8 +5,6 @@ import { drawingIdentity, parseSheet } from '../oracle/svg';
 import type { PlantIntent } from '../plant/intent';
 
 /**
- * @layer tests/production/criteria
- *
  * Revision acceptance: the change is issued under the new revision, and every element of the
  * previous issue keeps its identity — id and mark (drawings, schedules, site references) and IFC
  * GlobalId (the coordination model is diffed by GlobalId).

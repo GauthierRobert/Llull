@@ -1,6 +1,4 @@
 /**
- * @layer server/tests/production
- *
  * Shared harness of the MCP-driven production gates: the real Express app on an ephemeral
  * loopback port, an MCP client over Streamable HTTP, and the live document the session edits.
  */

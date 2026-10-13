@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Name → Object3D lookup for per-frame code. `Object3D.getObjectByName` walks the whole scene on
  * every call; this memoizes hits and re-resolves when the cached object (or an ancestor) was
  * removed from the scene (entity unmounted / remounted). Misses are not cached.

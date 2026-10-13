@@ -3,9 +3,6 @@
  * view 4-byte aligned), with accessors, textures (one shared REPEAT sampler), materials, meshes and
  * nodes (roots, or children of empty parent nodes such as entity groups). Used by the export
  * scene (./gltfScene).
- *
- * @layer core/commands
- * @pure
  */
 
 import { tupleExtent } from '../../lib/extent';

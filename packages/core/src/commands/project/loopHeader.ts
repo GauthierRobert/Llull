@@ -1,9 +1,6 @@
 /**
  * Header resolution of nestable loops (`{ repeat | for, actions }`): variable name and the list of
  * values to iterate, evaluated over the document parameters and the enclosing loop variables.
- *
- * @layer core/commands
- * @pure
  */
 
 import { evaluateExpression } from '../parametric/expression';

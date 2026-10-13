@@ -1,8 +1,6 @@
 /**
  * Exact-shape queries over the kernel's B-rep: topology inspection (the edge indices fillet_edge /
  * chamfer_edge select) and STEP export straight from the kernel shapes.
- *
- * @layer core/commands
  */
 
 import { type CadDocument, type Entity, type Vec3, is3D } from '../../model/types';
@@ -40,9 +38,6 @@ function topologySummary(id: string, topology: ShapeTopology, precision: number)
 }
 
 /**
- * @command inspect_topology
- * @pure
- * @layer core/commands
  * @affects nothing — read-only
  * @invariant data = { entityId, solids, volume, faces[{index,surface,area}], edges[{index,curve,length,start,end,mid}], vertices };
  *   edge indices are exactly the ones fillet_edge / chamfer_edge accept for the same entity
@@ -121,9 +116,6 @@ function stepTargets(doc: CadDocument, entityIds: readonly string[] | undefined)
 }
 
 /**
- * @command export_step_exact
- * @pure
- * @layer core/commands
  * @affects nothing — read-only
  * @invariant data = { format:'step', step (ISO 10303-21 text), solidCount, entityIds, skipped }; every solid is
  *   written from the kernel's exact B-rep (true planes, cylinders, fillet surfaces — never triangles,

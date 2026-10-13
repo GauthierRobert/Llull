@@ -1,5 +1,4 @@
 /**
- * @layer core/commands
  * Multi-pass render_view compositions: turntable strip, isolate, section. Each re-renders
  * partial / transformed copies of the document; the input document is never mutated.
  */

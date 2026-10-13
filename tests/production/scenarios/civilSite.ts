@@ -6,8 +6,6 @@ import { civilSiteCriteria } from '../criteria/civilSite';
 import { integrityCriteria } from '../criteria/integrity';
 
 /**
- * @layer tests/production/scenarios
- *
  * Civil-office job: from the surveyor's topographic survey to a balanced building pad, an access
  * road with clothoids and superelevation, a sized storm network with its HGL check, and the
  * plan-profile sheet + LandXML issued to the contractor.

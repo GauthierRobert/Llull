@@ -2,7 +2,6 @@
  * One schema per command: a zod object is the single source of the params TS type,
  * the agent-facing `paramsSchema` (MCP JSON Schema) and runtime validation in `execute`.
  *
- * @layer core/commands
  * @invariant `toParamsSchema(schema)` emits only the `ParamSpec` vocabulary (type, description,
  *   enum, items, properties, required) — the MCP tool surface is unchanged by migration.
  */

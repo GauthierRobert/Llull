@@ -1,5 +1,4 @@
 /**
- * @layer ui/panels/building
  * Wall inspector editor: Save dispatches ONE `update_wall` with the changed thickness / height /
  * material.
  */

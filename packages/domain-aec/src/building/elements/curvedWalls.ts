@@ -1,7 +1,4 @@
-/**
- * Curved (arc) walls: centreline arc through start, a point on the arc and end.
- * @layer domain-aec
- */
+/** Curved (arc) walls: centreline arc through start, a point on the arc and end. */
 
 import { toDegrees } from '@lib/angle';
 import type { CurvedWallElement } from '@core/model/building';
@@ -16,8 +13,6 @@ import { curvedWallArc, curvedWallBand, curvedWallLength } from '../geometry/cur
 import { levelIdParam } from '../levelParams';
 
 /**
- * @command add_curved_wall
- * @pure
  * @affects creates 1 curved wall (mesh on layer A-WALL)
  * @failure collinear points / thickness >= diameter / sizes <= 0 -> no-op
  */

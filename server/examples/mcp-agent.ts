@@ -1,7 +1,5 @@
 /* eslint-disable no-console -- this is a runnable CLI demo; console output is its product. */
 /**
- * @layer server/examples
- *
  * Standalone MCP agent script — end-to-end proof that an external agent can
  * drive the llull document over the MCP Streamable HTTP transport.
  *

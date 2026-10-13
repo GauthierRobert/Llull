@@ -1,6 +1,4 @@
 /**
- * @layer ui/components
- *
  * ImageUnderlayImport — pick a PNG/JPEG (a scanned drawing) and dispatch `add_image_underlay` with
  * it as a data URL. Calibration and tracing are the commands' job (`calibrate_underlay`,
  * `image_to_world`); this component only reads the file (PRIME DIRECTIVE).

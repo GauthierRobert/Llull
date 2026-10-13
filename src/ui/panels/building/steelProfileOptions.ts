@@ -1,7 +1,4 @@
-/**
- * @layer ui/panels/building
- * Catalogue section options shared by the steel tool forms and the element inspector.
- */
+/** Catalogue section options shared by the steel tool forms and the element inspector. */
 
 import { STEEL_PROFILES } from '@aec/steel/profiles';
 

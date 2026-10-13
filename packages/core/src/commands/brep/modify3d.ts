@@ -2,8 +2,6 @@
  * Fillet, chamfer and shell: the injected GeometryKernel rounds/bevels the exact edges of a 3D solid
  * (or hollows it) — on its B-rep, never on triangles; the source entity is replaced by a `mesh` entity
  * whose `brep` records the modification recipe. A null kernel result is a no-op.
- *
- * @layer core/commands
  */
 
 import { type CadDocument, type Entity, type Vec3, is3D } from '../../model/types';
@@ -114,9 +112,6 @@ function modifyEdges(
 }
 
 /**
- * @command fillet_edge
- * @pure
- * @layer core/commands
  * @affects removes source entity; creates 1 mesh entity with rounded edges
  * @invariant target must be a 3D solid; radius > 0; geometry kernel must be injected
  * @failure missing id, 2D kind, radius ≤ 0, kernel absent, or kernel null → no-op, affected:[]
@@ -181,9 +176,6 @@ export const filletEdge = defineCommand({
 });
 
 /**
- * @command chamfer_edge
- * @pure
- * @layer core/commands
  * @affects removes source entity; creates 1 mesh entity with beveled edges
  * @invariant target must be a 3D solid; distance > 0; geometry kernel must be injected
  * @failure missing id, 2D kind, distance ≤ 0, kernel absent, or kernel null → no-op, affected:[]
@@ -232,9 +224,6 @@ export const chamferEdge = defineCommand({
 });
 
 /**
- * @command shell_solid
- * @pure
- * @layer core/commands
  * @affects removes source entity; creates 1 hollow mesh entity with walls of the given thickness
  * @invariant target must be a closed 3D solid; thickness > 0; geometry kernel must be injected
  * @failure missing id, 2D kind, thickness <= 0, kernel absent, or kernel null -> no-op, affected:[]

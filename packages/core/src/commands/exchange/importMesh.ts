@@ -1,8 +1,4 @@
-/**
- * import_mesh — create mesh solids from world-space triangle data (STEP import, code import fallback).
- *
- * @layer core/commands
- */
+/** import_mesh — create mesh solids from world-space triangle data (STEP import, code import fallback). */
 
 import type { CadDocument, Entity } from '../../model/types';
 import type { CommandResult } from '../types';
@@ -49,9 +45,6 @@ function fail(doc: CadDocument, reason: string): CommandResult {
 }
 
 /**
- * @command import_mesh
- * @pure
- * @layer core/commands
  * @affects creates 1 mesh entity per body, in body order
  * @invariant stored mesh is a world-space triangle soup: indices = 0..n-1, position = [0,0,0]
  * @failure empty bodies / malformed positions or indices / over limits -> no-op, affected:[]

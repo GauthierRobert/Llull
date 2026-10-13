@@ -1,5 +1,4 @@
 /**
- * @layer core/geometry
  * Boundary patches: a Coons surface bounded by four curves (or ruled between two), sampled on a
  * grid and thickened into a closed subdivision cage (top sheet on the curves' side, an offset
  * sheet behind it, side walls). The rim and the four patch corners are creased so the smooth

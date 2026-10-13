@@ -1,7 +1,4 @@
 /**
- * @command import_dxf
- * @pure
- * @layer core/commands
  * @affects creates the drawing's entities (lines, polylines, arcs, circles, points, texts; 3D faces
  *   as one mesh per layer) and any missing layers
  * @failure not an ASCII DXF / nothing importable -> no-op, affected:[]

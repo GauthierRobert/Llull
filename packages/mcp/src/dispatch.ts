@@ -1,8 +1,6 @@
 /**
- * @layer mcp
  * MCP result shaping. `shapeToolCallContent` is the single place CallToolResult content blocks are
  * assembled (the server calls it after `commandBus.applyCommand`).
- * @pure no network, no DOM, no SDK imports.
  */
 
 import { isRecord } from '@lib/isRecord';
@@ -69,7 +67,6 @@ function jsonText(value: unknown): string {
  * `MAX_AFFECTED_IDS_SHOWN` ids, then a count); a json block when `data` is defined, clipped past
  * `MAX_JSON_TEXT_CHARS` (a `format:'code'` record's `text` moves to its own verbatim block,
  * clipped past `MAX_CODE_TEXT_CHARS`).
- * @pure
  */
 export function shapeToolCallContent(result: { summary: string; affected: string[]; isError: boolean; data?: unknown }): McpShapedResult {
   const { summary, affected, isError, data } = result;

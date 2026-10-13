@@ -1,5 +1,4 @@
 /**
- * @layer server
  * The `llull` CLI's discovery views over the registry (+ the exchange tools): list, search,
  * describe, toolsets. Read-only projections of `listCommands()`, `buildExchangeToolDefinitions()`
  * and `@mcp/toolsets` — never a hand-written command list (L5).

@@ -1,5 +1,4 @@
 /**
- * @layer core/geometry
  * Procedural, tileable PBR maps of a material finish — albedo (sRGB RGBA), tangent-space normal
  * (OpenGL +Y convention, glTF / three.js) and glTF metallicRoughness (G = roughness, B = metal) —
  * computed from a height field per pattern. Pure and deterministic: the viewport and the glTF

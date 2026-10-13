@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Render branch for `kind:'sphere'` entities.
  * Geometry is memoized on the entity's radius; lifecycle handled by SolidMeshShell.
  */

@@ -1,5 +1,4 @@
 /**
- * @layer core/geometry
  * Shared surface-of-revolution sampling (export, render, viewport all consume this).
  * Sweep starts at +X, counter-clockwise; dominant axis component picks the frame
  * (Z: radial XY / axial Z, Y: radial XZ / axial Y, X: radial YZ / axial X).
@@ -19,7 +18,6 @@ type RevolutionProfile = ReadonlyArray<readonly [number, number]>;
 type RevolutionArgs = [profile: RevolutionProfile, axis: Vec3, angle: number, segments: number, origin?: Vec3];
 
 /**
- * @pure
  * @invariant profile.length < 3 -> []
  * @invariant side faces: one quad [A_i, A_j, B_j, B_i] per profile edge per segment, then
  *   (partial sweep only, angle < 2*PI - 1e-6) start cap (reversed ring 0) and end cap (last ring)
@@ -64,7 +62,6 @@ export function revolutionPolygons(...[profile, axis, angle, segments, origin = 
 }
 
 /**
- * @pure
  * Fan-triangulates each polygon of `revolutionPolygons` (v0,vi,vi+1).
  * Triangles are flat xyz triples: [x0,y0,z0, x1,y1,z1, x2,y2,z2, ...].
  */

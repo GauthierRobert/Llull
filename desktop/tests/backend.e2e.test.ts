@@ -1,5 +1,4 @@
 /**
- * @layer desktop/tests
  * The desktop app minus Electron: the real server bundle started the way the app starts it
  * (backendEnv + startBackend, `child_process.fork` instead of `utilityProcess.fork`), then the
  * File menu operations (DocumentSession) and the Claude Code path (`llull --app` via the

@@ -1,9 +1,6 @@
 /**
  * OpenSCAD emitter: FeatureProgram → a .scad file. Parameters become top-level variables
  * (Customizer-friendly); every feature version becomes a module so booleans and edits keep order.
- *
- * @layer core/codegen
- * @pure
  */
 
 import type { Feature, FeatureProgram, ShapeSpec, Term, Term2, Term3 } from './program';

@@ -1,8 +1,6 @@
 /**
  * add_spline_shaft (DIN 5480-style involute spline) and add_keyed_shaft (DIN 6885 keyway), built
  * directly from profiles — no booleans.
- *
- * @layer core/commands
  */
 
 import type { Entity, MeshData, Vec3 } from '../../model/types';
@@ -25,9 +23,6 @@ import { failedWith } from '../noop';
 const SHAFT_SEGMENTS = 64;
 
 /**
- * @command add_spline_shaft
- * @pure
- * @layer core/commands
  * @affects creates 1 extrusion entity (involute spline shaft along +Z)
  * @invariant referenceDiameter > 0; module > 0; teeth = round(referenceDiameter / module) - 2 unless given, integer >= 6; length > 0
  * @failure invalid params -> unchanged doc, summary names the violated param, affected:[]
@@ -181,9 +176,6 @@ export function keyedShaftMesh(radius: number, length: number, width: number, de
 }
 
 /**
- * @command add_keyed_shaft
- * @pure
- * @layer core/commands
  * @affects creates 1 mesh entity (shaft with a rectangular keyway) and optionally 1 mesh entity (parallel key)
  * @invariant diameter > 0; length > 0; keyDepth in (sagitta, 0.9·radius]; keyWidth < 1.8·radius; keyway inside [0, length]
  * @failure invalid params -> unchanged doc, summary names the violated param, affected:[]

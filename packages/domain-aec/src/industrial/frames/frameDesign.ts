@@ -1,7 +1,6 @@
 /**
  * Portal frame design: iterative up-sizing of frame sections and sizing of moment-connection bolt
  * groups against check_portal_frames.
- * @layer domain-aec
  */
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
@@ -33,8 +32,6 @@ import { designResult, finalUtilisationText, noChangeResult, utilisationStats } 
 import { sweepFrame } from '../../shared/mesh';
 
 /**
- * @command design_portal_frames
- * @pure
  * @affects up-sizes failing rafter / column profiles (all members of that role and section on the
  *          level, keeping frames uniform) and sizes the bolt groups of every moment connection
  * @failure bad loads / unknown level / no frame / no section large enough -> no-op or partial report

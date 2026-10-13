@@ -2,9 +2,6 @@
  * Parameter-expression resolution and id remapping for the regeneration pass: string params
  * starting with `=` are expressions resolved against `doc.parameters`; a failing one keeps its
  * `=expr` text and is reported in `ResolveResult.errors` (never throws).
- *
- * @layer core/commands
- * @pure
  */
 
 import type { Parameter } from '../../model/types';
@@ -37,7 +34,6 @@ export function buildParamEnv(parameters: Readonly<Record<string, Parameter>>): 
  * Rebuild `value` with every STRING leaf replaced by `mapLeaf(text, path)`; arrays and plain
  * objects are walked recursively, other primitives pass through. `path` is `size[0]` / `a.b` style.
  *
- * @pure
  * @invariant `value` is never mutated; new objects/arrays are always returned.
  */
 export function mapStringLeaves(value: unknown, mapLeaf: (text: string, path: string) => unknown, path = ''): unknown {
@@ -81,7 +77,6 @@ export function resolveStepParams(params: unknown, env: Readonly<Record<string, 
 /**
  * Replace every string in `params` that is a key of `idMap` with its mapped id (stale entity-id
  * references after earlier steps minted new ids). Blind walk: no per-command id-param allowlist.
- * @pure
  */
 export function remapIds(params: unknown, idMap: ReadonlyMap<string, string>): unknown {
   if (idMap.size === 0) return params;

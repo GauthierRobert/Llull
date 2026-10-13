@@ -2,8 +2,6 @@ import type { ToolCall } from '../contract';
 import type { CivilIntent } from './intent';
 
 /**
- * @layer tests/production/civil
- *
  * The tool calls a competent civil engineer makes for the site job, on an empty document. Ids it
  * refers to (`surface-1`, `platform-1`, `alignment-1`, `manhole-n`) are the ones llull mints in
  * creation order.

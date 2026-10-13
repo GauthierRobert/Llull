@@ -2,8 +2,6 @@ import { readFileSync } from 'node:fs';
 import { expect, type Locator, type Page } from '@playwright/test';
 
 /**
- * @layer tests/production/ui
- *
  * One browser session on the real app (offline mode, no llull server): console-error watch,
  * "did the command work" feedback read from the status bar, and file downloads read back from disk.
  */

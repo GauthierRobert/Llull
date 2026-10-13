@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Live OpenCascade: meshing releases its per-node/triangle/face handles without corrupting the
  * heap, so repeated booleans, fillets and tessellations stay correct — also after the shape cache
  * is dropped and every shape is rebuilt from its recipe.

@@ -3,8 +3,6 @@
  * jsdom, so we check the observable path: `add_subdivision_solid` through the store yields a
  * subdivision entity, and the geometry SubdivisionMesh builds from the shared core surface is
  * non-empty with normals.
- *
- * @layer tests/component
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';

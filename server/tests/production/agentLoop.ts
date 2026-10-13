@@ -1,6 +1,4 @@
 /**
- * @layer server/tests/production
- *
  * The AI-agent driver's loop: Claude receives the job brief and works it through llull's MCP
  * tools only (manual tool-use loop over an MCP session). The tool array is fixed for the whole
  * conversation (every llull tool; those outside the session's enabled toolsets are deferred and

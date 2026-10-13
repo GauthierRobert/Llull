@@ -1,6 +1,4 @@
 /**
- * @layer ui/services
- *
  * REST calls that move files or metadata to/from the optional llull server (STEP export, DWG
  * import, license badge). Components call these and only render the returned status; the wire
  * shapes are shared with `server/` through `@mcp/restProtocol`. Never throws: every failure

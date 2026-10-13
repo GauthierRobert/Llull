@@ -1,9 +1,6 @@
 /**
  * Axis-direction rotations in the repo's Euler convention (three.js intrinsic 'XYZ': M = Rx·Ry·Rz,
  * see `eulerRotation.ts`). Matrices are row-major 3x3 as 9-tuples.
- *
- * @layer lib
- * @pure
  */
 
 import type { Vec3 } from '../model/vectors';

@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/civil
- *
  * SurveySection — switch the document to metres (`set_units`) for real survey coordinates, load a
  * survey file (.csv / .txt, or paste it), choose its column format and unit, dispatch
  * `import_survey_points`; lists the point groups.

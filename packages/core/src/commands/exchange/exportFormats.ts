@@ -1,8 +1,6 @@
 /**
  * export_obj: read-only export of the world-space triangles (document returned unchanged,
  * affected: []).
- *
- * @layer core/commands
  */
 
 import type { CommandResult } from '../types';
@@ -49,9 +47,6 @@ function buildObjText(parts: readonly ExportPart[], header: string): string {
 }
 
 /**
- * @command export_obj
- * @pure
- * @layer core/commands
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data.format === 'obj'; data.triangleCount >= 0
  * @invariant data.text is valid Wavefront OBJ with v/vn/f records

@@ -1,7 +1,4 @@
-/**
- * Doors and windows hosted by walls.
- * @layer domain-aec
- */
+/** Doors and windows hosted by walls. */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { BuildingModel, CurvedWallElement, OpeningElement, WallElement } from '@core/model/building';
@@ -137,8 +134,6 @@ const windowParams = z.object(openingShape('window'));
 type AddOpeningParams = z.output<typeof doorParams>;
 
 /**
- * @command add_door
- * @pure
  * @affects creates the door (leaf + plan swing) and re-cuts the host wall
  * @failure unknown wall / does not fit / overlaps another opening -> no-op
  */
@@ -152,8 +147,6 @@ export const addDoor = defineCommand({
 });
 
 /**
- * @command add_window
- * @pure
  * @affects creates the window glazing and re-cuts the host wall
  * @failure unknown wall / does not fit / overlaps another opening -> no-op
  */
@@ -167,8 +160,6 @@ export const addWindow = defineCommand({
 });
 
 /**
- * @command update_opening
- * @pure
  * @affects regenerates the opening and its host wall
  * @failure unknown opening / invalid values / would not fit -> no-op
  */

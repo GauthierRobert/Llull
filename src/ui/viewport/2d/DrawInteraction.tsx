@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * Click-capture plane + preview compositor for the active draw tool.
  *
  * Mounted inside the r3f Canvas. Renders:

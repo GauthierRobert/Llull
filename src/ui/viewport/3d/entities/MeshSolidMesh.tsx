@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Render branch for `kind:'mesh'` entities — boolean-operation results stored as
  * arbitrary triangle meshes. `MeshSolidEntity.mesh` holds world-space geometry;
  * `position` and `rotation` are [0,0,0] for results produced by the boolean commands,

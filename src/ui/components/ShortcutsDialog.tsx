@@ -1,6 +1,4 @@
 /**
- * @layer ui/components
- *
  * Keyboard shortcut sheet — opened with `?` or the toolbar's Shortcuts button. Content comes from
  * SHORTCUT_GROUPS so it never drifts from the real key handling. Modal: focus is trapped while
  * open and restored to the opener on close. Presentation only.

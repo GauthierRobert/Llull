@@ -4,8 +4,6 @@
  * Tooth form: the heel section is the involute spur outline of `teeth` teeth on the pitch circle
  * (module·teeth/2); the toe section is that outline scaled about the pitch-cone apex, so all tooth
  * edges converge on the apex like a true straight bevel. Approximate (no Tredgold back-cone correction).
- *
- * @layer core/commands
  */
 
 import type { MeshData, Vec3 } from '../../model/types';
@@ -138,9 +136,6 @@ const sharedFields = {
 };
 
 /**
- * @command add_bevel_gear
- * @pure
- * @layer core/commands
  * @affects creates 1 mesh entity (straight bevel gear, closed solid)
  * @invariant teeth, matingTeeth integers >= 6; shaftAngle in (0, π); faceWidth <= 0.7 * coneDistance
  * @failure invalid params -> unchanged doc, summary names the violated param, affected:[]
@@ -222,9 +217,6 @@ export const addBevelGear = defineCommand({
 });
 
 /**
- * @command add_bevel_gear_pair
- * @pure
- * @layer core/commands
  * @affects creates 2 mesh entities (pinion on +Z axis, wheel on +X axis, apexes coincident at position)
  * @invariant pinionTeeth, wheelTeeth integers >= 6; shaft angle fixed at 90°
  * @failure invalid params -> unchanged doc, summary names the violated param, affected:[]

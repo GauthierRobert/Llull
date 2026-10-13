@@ -1,7 +1,4 @@
-/**
- * Wall build-ups (layered wall types): structure, insulation, membranes, finishes.
- * @layer domain-aec
- */
+/** Wall build-ups (layered wall types): structure, insulation, membranes, finishes. */
 
 import type { WallElement, WallLayer, WallLayerFunction } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
@@ -58,8 +55,6 @@ export function layerBoundaries(wall: WallElement): number[] {
 }
 
 /**
- * @command set_wall_layers
- * @pure
  * @affects the walls' build-up, thickness and structural material
  * @failure unknown wall / malformed layers -> no-op
  */

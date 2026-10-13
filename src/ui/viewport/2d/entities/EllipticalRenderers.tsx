@@ -1,5 +1,3 @@
-/** @layer ui/viewport/2d — render branches for `kind:'circle' | 'arc' | 'ellipse'`. */
-
 import type { ArcEntity, CircleEntity, EllipseEntity } from '@core/model/types';
 import { EllipticalCurve } from './EllipticalCurve';
 

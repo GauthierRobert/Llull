@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Transform gizmo for the single selected 3D entity.
  *
  * drei <TransformControls> attaches to a sibling <group> that is a real scene-graph node (so the

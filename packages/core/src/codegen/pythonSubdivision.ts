@@ -4,7 +4,6 @@
  * OCP builder that turns the patches into exact B-spline faces sewn into a solid (CadQuery and
  * build123d both run on OCP). The FreeCAD macro reuses the pure part with Part.BSplineSurface.
  *
- * @layer core/codegen
  * @invariant SUBDIVISION_PY mirrors the TypeScript rules (edge order, crease / corner rules, patch
  *   pole layout) so code and document describe the same surface
  */

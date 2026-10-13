@@ -1,7 +1,4 @@
-/**
- * render_view: fair polygon budget, cutaway, camera/title/background options.
- * @layer tests/unit
- */
+/** render_view: fair polygon budget, cutaway, camera/title/background options. */
 
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument, type CadDocument, type MeshSolidEntity } from '@core/model/types';

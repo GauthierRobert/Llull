@@ -2,8 +2,6 @@
  * Floor framing load path: each beam is simply supported between its end nodes; its end reactions
  * go to the column at the node, or as a point load to the beam it frames into (secondary on
  * primary). Beams are analysed supporters-last, so every transferred reaction is in place.
- * @layer domain-aec
- * @pure
  */
 
 import { projectOntoSegment } from '@lib/polygon';

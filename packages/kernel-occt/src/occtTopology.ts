@@ -1,5 +1,4 @@
 /**
- * @layer kernel
  * Exact B-rep topology of an OCC shape: unique sub-shapes (an edge shared by two faces counted once,
  * in explorer order — the numbering `fillet` / `chamfer` select by), face surface types and areas,
  * edge curve types, lengths and points, seam / degenerate flags, solid volume.

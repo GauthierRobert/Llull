@@ -10,8 +10,6 @@
  * meaning Rz acts on the vector first, then Ry, then Rx (verified in three.js
  * Matrix4.makeRotationFromEuler where M[0][2] = sin(y), matching Rx·Ry·Rz·ẑ).
  * render.ts applies the same Rx·Ry·Rz matrix about entity.position.
- *
- * @layer tests/unit
  */
 
 import { describe, it, expect } from 'vitest';

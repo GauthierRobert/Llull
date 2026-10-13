@@ -1,8 +1,3 @@
-/**
- * @layer domain-aec
- * @pure
- */
-
 /** RFC 4180 CSV records joined by `\n`, without a trailing newline. */
 export function csvLines(columns: ReadonlyArray<string>, rows: ReadonlyArray<ReadonlyArray<string | number | boolean>>): string {
   const cell = (value: string | number | boolean): string => {

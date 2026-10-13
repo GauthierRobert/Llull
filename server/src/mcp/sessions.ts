@@ -1,7 +1,4 @@
-/**
- * @layer server
- * MCP session registry and its idle-TTL sweep (transport bookkeeping only).
- */
+/** MCP session registry and its idle-TTL sweep (transport bookkeeping only). */
 
 import type { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { positiveInteger } from '../env';

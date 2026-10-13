@@ -1,8 +1,4 @@
-/**
- * @layer server
- * argv parsing for the `llull` CLI. No I/O.
- * @pure
- */
+/** argv parsing for the `llull` CLI. No I/O. */
 
 import { DEFAULT_DOCUMENT_PATH } from '@mcp/documentFiles';
 
@@ -146,7 +142,6 @@ export interface CliTarget {
 /**
  * Where a CLI invocation acts: `--app`, then `--server`, then `$LLULL_SERVER` choose a server;
  * otherwise the `--doc` file. The one resolution used by the supervisor, the CLI and its commands.
- * @pure
  */
 export function cliTarget(parsed: ParsedArgv, env: Readonly<Record<string, string | undefined>>): CliTarget {
   const server = booleanFlag(parsed, 'app') ? APP_SERVER : (stringFlag(parsed, 'server') ?? env['LLULL_SERVER']);

@@ -1,5 +1,4 @@
 /**
- * @layer server
  * Express entry point: middleware + route mounting only. No business logic — every document
  * change goes through the command registry (architecture L1, L6).
  *

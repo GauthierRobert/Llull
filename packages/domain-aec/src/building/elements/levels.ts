@@ -1,7 +1,4 @@
-/**
- * Building levels (storeys), project info and building inspection.
- * @layer domain-aec
- */
+/** Building levels (storeys), project info and building inspection. */
 
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
@@ -23,8 +20,6 @@ import { regenerateBuilding } from '../evaluate/evaluateElements';
 import { openingFitIssues } from './walls';
 
 /**
- * @command add_level
- * @pure
  * @affects none (levels are not entities); summary + data carry the new level id
  * @failure non-finite elevation or height <= 0 -> no-op
  */
@@ -67,8 +62,6 @@ export const addLevel = defineCommand({
 });
 
 /**
- * @command update_level
- * @pure
  * @affects regenerates every element on the level (they move with it)
  * @failure unknown level / invalid numbers -> no-op
  */
@@ -122,11 +115,7 @@ export const updateLevel = defineCommand({
   },
 });
 
-/**
- * @command delete_level
- * @pure
- * @failure level holds elements and deleteElements is not true -> no-op
- */
+/** @failure level holds elements and deleteElements is not true -> no-op */
 export const deleteLevel = defineCommand({
   name: 'delete_level',
   annotations: { destructive: true },
@@ -227,11 +216,7 @@ export const setProjectInfo = defineCommand({
   },
 });
 
-/**
- * @command describe_building
- * @pure read-only
- * @affects none; data = { project, levels[], elements[] }
- */
+/** @affects none; data = { project, levels[], elements[] } */
 export const describeBuilding = defineCommand({
   name: 'describe_building',
   annotations: { readOnly: true, idempotent: true },

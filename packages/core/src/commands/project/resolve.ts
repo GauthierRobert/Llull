@@ -170,7 +170,6 @@ export const STEP_PARAM_COMMANDS: ReadonlySet<string> = new Set(['insert_step', 
  * Params to RECORD in featureHistory for an inner step: `$alias` refs stay resolved (ids), but an
  * `=expr` whose identifiers are all document parameters is kept verbatim so replay re-evaluates it
  * (architecture L8). Expressions using loop variables (`$i`, `$as`) are recorded as their value.
- * @pure
  */
 export function recordableParams(raw: unknown, resolved: unknown, parameters: CadDocument['parameters']): unknown {
   if (typeof raw === 'string' && raw.startsWith('=') && !raw.includes('$')) {

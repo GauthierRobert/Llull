@@ -1,6 +1,4 @@
 /**
- * @layer ui/components
- *
  * McpConnect — modal dialog showing how to connect an MCP agent (McpConnectButton in the TopBar
  * opens it). Focus is trapped while open and restored to the trigger on close.
  * Presentation ONLY (PRIME DIRECTIVE).

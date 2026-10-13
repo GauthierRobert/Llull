@@ -1,5 +1,3 @@
-/** @layer ui/viewport/2d — render branch for `kind:'polyline'`: open or closed vertex chain. */
-
 import { useMemo } from 'react';
 import type { PolylineEntity } from '@core/model/types';
 import { closeLoop, flattenPoints } from '../../lineGeometry';

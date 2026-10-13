@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/building
- *
  * LevelsSection — storey list (activate / delete) + add-level form.
  * Dispatches: add_level, set_active_level, delete_level, update_level, copy_level_elements.
  */

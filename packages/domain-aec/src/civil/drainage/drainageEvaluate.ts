@@ -1,8 +1,4 @@
-/**
- * Evaluates drainage structures and pipes into mesh, plan and label entities.
- * @layer domain-aec/civil
- * @pure
- */
+/** Evaluates drainage structures and pipes into mesh, plan and label entities. */
 
 import type { Entity, MeshData, Vec3 } from '@core/model/types';
 import type { ManholeObject, PipeObject } from '@core/model/civil';

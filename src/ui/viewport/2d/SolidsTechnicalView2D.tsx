@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * SolidsTechnicalView2D — the 3D solids in the 2D drafting view as a technical top view
  * (`technicalView`, the same projection the DXF export writes): thick visible edges, dashed hidden
  * edges (hidden by every solid, not only their own), chain centre lines and, while a downward-kept

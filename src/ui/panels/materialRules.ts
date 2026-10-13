@@ -1,5 +1,3 @@
-/** @layer ui/panels Pure validation/parsing of the "new material" form (no document access). */
-
 import { isHexColor } from '@lib/isHexColor';
 import { parseNumber } from '@ui/numberText';
 

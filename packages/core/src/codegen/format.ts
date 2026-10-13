@@ -1,9 +1,4 @@
-/**
- * Source-text formatting shared by every code emitter.
- *
- * @layer core/codegen
- * @pure
- */
+/** Source-text formatting shared by every code emitter. */
 
 import { toDegrees } from '../lib/angle';
 import type { Feature, FeatureProgram, Term } from './program';

@@ -1,5 +1,4 @@
 /**
- * @layer core/geometry
  * Pure math over exact curve chains (`CurveSegment`): evaluation, tangents, sampling, centripetal
  * Catmull-Rom → cubic Bézier conversion and polyline corner filleting. 2D points are lifted to
  * z = 0 internally, so every helper works for both `Vec2` profiles and `Vec3` paths.

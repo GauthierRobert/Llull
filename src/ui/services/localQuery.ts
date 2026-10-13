@@ -1,6 +1,4 @@
 /**
- * @layer ui/services
- *
  * Read-only commands run locally on the current store document (reports, exports) and the browser
  * download of their file payload. Never changes the document.
  */

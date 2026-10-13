@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { BuildingElement, BuildingLevel, SlabElement } from '@core/model/building';
 import { wallFrame } from '../geometry/wallGeometry';
 import {

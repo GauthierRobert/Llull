@@ -1,7 +1,4 @@
-/**
- * Drainage pipe commands: connect manholes with gravity pipes and edit them.
- * @layer domain-aec/civil
- */
+/** Drainage pipe commands: connect manholes with gravity pipes and edit them. */
 
 import type { PipeObject } from '@core/model/civil';
 import type { CommandResult } from '@core/commands/types';
@@ -33,8 +30,6 @@ function slopeText(pipe: PipeObject, length: number): string {
 }
 
 /**
- * @command add_pipe
- * @pure
  * @affects creates 1 pipe (tube body, plan line, label)
  * @invariant flow runs fromId -> toId; the network stays acyclic; one pipe per ordered pair
  * @failure unknown / non-manhole end, self-loop, coincident ends, duplicate, cycle -> no-op
@@ -99,8 +94,6 @@ export const addPipe = defineCommand({
 });
 
 /**
- * @command update_pipe
- * @pure
  * @affects regenerates 1 pipe
  * @failure unknown pipe / bad value / no change -> no-op
  */

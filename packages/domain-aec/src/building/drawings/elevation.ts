@@ -1,7 +1,4 @@
-/**
- * Elevations and sections as printable SVG drawing sheets over the hidden-line projection.
- * @layer domain-aec
- */
+/** Elevations and sections as printable SVG drawing sheets over the hidden-line projection. */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { DrawingPainter, svgLine } from '../../shared/drawingSvg';
@@ -41,10 +38,7 @@ export interface ElevationSheet {
 const ANNOTATION_TOP = 14;
 const ANNOTATION_RIGHT = 34;
 
-/**
- * @pure
- * @failure no 3D geometry / invalid scale -> null
- */
+/** @failure no 3D geometry / invalid scale -> null */
 function buildElevationSheet(
   doc: CadDocument,
   options: {
@@ -152,8 +146,6 @@ function buildElevationSheet(
 }
 
 /**
- * @command export_elevation_sheet
- * @pure read-only
  * @affects none; data = { filename, svg, paper, scale, lines }
  * @failure bad direction / paper / scale / cutAt, nothing to draw -> no data
  */

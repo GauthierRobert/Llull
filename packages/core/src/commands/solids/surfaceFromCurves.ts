@@ -37,9 +37,6 @@ function boundaryPolylines(doc: CadDocument, curves: Vec3[][] | undefined, curve
 }
 
 /**
- * @command surface_from_curves
- * @pure
- * @layer core/commands
  * @affects creates 1 subdivision entity (a thickened boundary patch) at the patch centre
  * @invariant 2 opposite curves or 4 curves closing a loop; cells 1..24 per direction; thickness > 0
  * @failure wrong curve count / open loop / degenerate patch / bad sizes / duplicate id -> no-op

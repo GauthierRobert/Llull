@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Maps `document.order` → a render branch per entity `kind` (architecture L7: every kind has one).
  * Layer-hidden and render-only hidden entities (UI store) are skipped; selection state is passed
  * to each branch. 2D kinds draw on their work plane via Shape2DRenderer.
@@ -69,9 +67,6 @@ const SOLID_MESHES: { [K in SolidKind]: SolidMeshBranch<Extract<Entity, { kind: 
  *
  * The expanded entity list is memoized on (componentId, position, rotation, scale)
  * so it is only recomputed when the instance transform or component changes (R9 / R7).
- *
- * @layer ui/viewport/3d
- * @pure of props — given the same instance + components, produces the same tree.
  */
 function InstanceEntityRenderer({
   instance,

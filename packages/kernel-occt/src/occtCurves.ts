@@ -1,5 +1,4 @@
 /**
- * @layer kernel
  * Exact curve geometry for OCC: `CurveSegment` chains → edges (segment, circular arc, cubic
  * Bézier) → wires → planar faces, and sweeps (BRepOffsetAPI_MakePipe along the exact path with a
  * corrected-Frenet, i.e. twist-minimizing, trihedron). Callers own (release) returned shapes.

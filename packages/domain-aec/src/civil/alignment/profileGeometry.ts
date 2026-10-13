@@ -1,8 +1,6 @@
 /**
  * Vertical alignment geometry: straight grades between PVIs joined by symmetric parabolic curves.
  * Stations and elevations are in document units; grades are ratios (0.025 = 2.5 %).
- * @layer domain-aec/civil
- * @pure
  */
 
 import type { ProfilePvi } from '@core/model/civil';

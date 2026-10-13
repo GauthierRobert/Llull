@@ -1,7 +1,6 @@
 /**
  * Printable floor-plan sheet: SVG at a true architectural scale on ISO A paper, with title block,
  * north arrow, scale bar and dimensions. Print / save as PDF from any browser.
- * @layer domain-aec
  */
 
 import type { CadDocument } from '@core/model/types';
@@ -36,10 +35,7 @@ export interface PlanSheet {
   readonly fits: boolean;
 }
 
-/**
- * @pure
- * @failure unknown level, invalid paper or scale -> null
- */
+/** @failure unknown level, invalid paper or scale -> null */
 function buildPlanSheet(
   doc: CadDocument,
   levelId: string | undefined,
@@ -81,8 +77,6 @@ function buildPlanSheet(
 }
 
 /**
- * @command export_plan_sheet
- * @pure read-only
  * @affects none; data = { filename, svg, paper, scale, levelId }
  * @failure unknown level / paper / invalid scale -> no data
  */

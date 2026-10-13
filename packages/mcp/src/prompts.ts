@@ -1,11 +1,8 @@
 /**
- * @layer mcp
  * MCP prompt templates — guided plan skeletons that cut trial-and-error when an agent drives llull
  * via `build_project`. Every template references REAL registered tools only. The shapes below mirror
  * the MCP `PromptMessage` / `PromptArgument` / `Prompt` / `GetPromptResult` schemas (no SDK import:
  * transport wiring lives in `server/`).
- *
- * @pure only the provided args determine the output.
  */
 
 import { clamp } from '@lib/clamp';
@@ -437,14 +434,12 @@ const TEMPLATES: ReadonlyArray<PromptTemplate> = [
   designSite,
 ];
 
-/** @pure */
 export function listMcpPrompts(): McpPromptDescriptor[] {
   return TEMPLATES.map((t) => t.descriptor);
 }
 
 /**
  * Resolve a prompt template by name, substituting the provided args.
- * @pure
  * @failure unknown name -> null (the transport replies with an MCP error)
  */
 export function getMcpPrompt(name: string, args: Record<string, string> = {}): McpPromptResult | null {

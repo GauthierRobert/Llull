@@ -1,6 +1,4 @@
 /**
- * @layer core/geometry
- * @pure
  * Uniform scaling of an entity's kind-specific geometry about its local origin (scale_entity,
  * instance expansion).
  */

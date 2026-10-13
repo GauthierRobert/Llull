@@ -1,8 +1,4 @@
-/**
- * bill_of_materials: read-only count of component instances (orphan instances reported, never thrown).
- *
- * @layer core/commands
- */
+/** bill_of_materials: read-only count of component instances (orphan instances reported, never thrown). */
 
 import type { EntityKind, InstanceEntity } from '../../model/types';
 import type { CommandResult } from '../types';
@@ -33,9 +29,6 @@ interface BillOfMaterialsData {
 }
 
 /**
- * @command bill_of_materials
- * @pure
- * @layer core/commands
  * @affects nothing — read-only query, affected:[]
  * @invariant document is returned unchanged; rows are grouped by componentId
  * @failure orphan instances (componentId not in doc.components) produce a warning row with

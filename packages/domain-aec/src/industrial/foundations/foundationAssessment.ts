@@ -1,8 +1,4 @@
-/**
- * Footing and base-plate check rows of the analysed columns of a level (soil, uplift, sliding, tie, plate, settlement).
- * @layer domain-aec
- * @pure
- */
+/** Footing and base-plate check rows of the analysed columns of a level (soil, uplift, sliding, tie, plate, settlement). */
 
 import type { CadDocument } from '@core/model/types';
 import { getBuilding, levelElementsOf } from '../../building/model';
@@ -16,10 +12,7 @@ import { combine, findFooting, findPlate, hasCase, ultimateCombinations } from '
 import { footingSettlementParts } from './foundationSettlement';
 import { round } from '../../shared/numeric';
 
-/**
- * Checks footings and base plates of the columns of a level.
- * @pure
- */
+/** Checks footings and base plates of the columns of a level. */
 export function checkFoundations(
   doc: CadDocument,
   levelId: string,

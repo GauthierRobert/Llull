@@ -1,8 +1,6 @@
 /**
  * Animation commands — attach declarative motion clips to entities or groups.
  * No physics; the viewport player evaluates these per-frame as a render overlay.
- *
- * @layer core/commands
  */
 
 import type { Animation, CadDocument, Vec3 } from '../../model/types';
@@ -86,9 +84,6 @@ function withAnimation(doc: CadDocument, anim: Animation): CadDocument {
 }
 
 /**
- * @command animate
- * @pure
- * @layer core/commands
  * @affects creates 1 animation record (not an entity)
  * @invariant targetId must exist in doc.entities or doc.groups; spin needs a finite speed;
  *   oscillate needs amplitude > 0 and frequency > 0
@@ -168,9 +163,6 @@ export const animate = defineCommand({
 });
 
 /**
- * @command stop_animation
- * @pure
- * @layer core/commands
  * @affects removes animations from the document; affected:[] always (animations are not entities)
  * @invariant if animationId given, removes that one; if targetId given, removes all matching that target; if neither, clears ALL
  * @failure animationId given but not found -> no-op with explanatory summary

@@ -1,8 +1,6 @@
 /**
  * Cross-section sheet as SVG: one panel per station with the ground line, the road template with
  * batters to daylight, and the cut / fill areas, all drawn at one common 1:1 scale.
- * @layer domain-aec/civil
- * @pure
  */
 
 import type { CadDocument } from '@core/model/types';

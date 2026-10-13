@@ -2,8 +2,6 @@
  * Model-space geometry of an aligned dimension primitive — extension lines, dimension line, oblique
  * ticks and the value's placement. The one construction the 2D view and DXF draw (sheets draw the
  * same construction in paper space, `paperDimension`).
- * @layer geometry
- * @pure
  */
 
 import type { Vec2 } from '../model/vectors';

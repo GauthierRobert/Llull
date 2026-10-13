@@ -7,8 +7,6 @@ import { boundsCorners, boundsOfPoints, entityBounds, localBounds } from './boun
  * Local-space (pre-rotation, pre-position) points whose rotated hull bounds an entity.
  * Cones/pyramids use base corners + apex (tighter than the full AABB); a mesh without a full
  * triangle collapses to the origin.
- *
- * @pure
  */
 function localEntityCorners(e: Entity): Vec3[] {
   if (e.kind === 'mesh') {
@@ -33,7 +31,6 @@ function localEntityCorners(e: Entity): Vec3[] {
  * (three.js Rx·Ry·Rz, matching the live viewport), offset by `position`, then
  * compute the world-space AABB of those transformed corners.
  *
- * @pure
  * @affects nothing — read-only helper
  */
 export function rotatedEntityBounds(e: Entity): Bounds {

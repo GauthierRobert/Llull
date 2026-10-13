@@ -1,8 +1,6 @@
 /**
  * The single replay-step runner shared by `replayHistory` (history.ts) and recipe
  * instantiation (recipes.ts): resolve `=expr` params, remap stale ids, run, extend the id map.
- *
- * @layer core/commands
  */
 
 import type { CadDocument, FeatureStep } from '../../model/types';
@@ -16,8 +14,6 @@ import { buildParamEnv, extendIdMap, remapIds, resolveStepParams } from './regen
  * Params a recorded `step` receives when replayed on `doc`: `=expr` resolved against
  * `doc.parameters` (failures pushed to `warnings` as `<warningLabel> '<name>' param ...`),
  * then ids remapped through `idMap`.
- *
- * @pure
  */
 export function resolveStepForReplay(
   step: FeatureStep,

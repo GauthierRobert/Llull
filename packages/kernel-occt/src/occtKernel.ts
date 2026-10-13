@@ -6,7 +6,6 @@
  * (`kernelFromOps`); booleans, fillets, chamfers and shells run on those B-reps (true edges and faces,
  * never re-sewn triangles); meshes only come out for display; STEP is written from the B-rep.
  *
- * @layer kernel
  * @invariant exact for every solid kind but `mesh` without `brep` and `pyramid` (sewn planar triangles)
  * @failure unsupported kind / non-manifold mesh / OCC refusal or failure -> null
  */

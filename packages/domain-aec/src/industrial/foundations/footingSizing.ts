@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import { unitsToMm } from '../../shared/numeric';
 import type { FootingElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';

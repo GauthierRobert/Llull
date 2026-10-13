@@ -1,5 +1,4 @@
 /**
- * @layer server
  * Offline license verification. A license is `<base64url payload>.<base64url Ed25519 signature>`
  * over the payload bytes `{ customer, seats, expires (ISO date), features[] }`, checked against the
  * public key in `LLULL_LICENSE_PUBLIC_KEY` (PEM, `\n` escapes allowed, or a path to a PEM file).

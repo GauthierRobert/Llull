@@ -14,8 +14,6 @@ import { extractionBuilding } from './extractionBuilding';
 import { extractionIntent } from './extractionIntent';
 
 /**
- * @layer tests/production/scenarios
- *
  * Desmet-type job 2: change order on the issued extraction building (revision B). The office edits
  * the existing model — it does not redraw it — and reissues: identities (marks, ids, IFC GlobalIds)
  * of untouched elements must survive so drawings, schedules and the BIM coordination stay valid.

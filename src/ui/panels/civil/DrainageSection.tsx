@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/civil
- *
  * DrainageSection — storm network: manhole / pipe forms and lists, network check
  * (`check_drainage_network`: failures + CSV, design storm as a constant intensity or an IDF curve,
  * outfall tailwater for the HGL), automatic sizing (`size_drainage_pipes`) and the structure / pipe

@@ -1,8 +1,4 @@
-/**
- * Ground-slab weight and horizontal-thrust sharing for footing sliding.
- * @layer domain-aec
- * @pure
- */
+/** Ground-slab weight and horizontal-thrust sharing for footing sliding. */
 
 import type { BuildingModel, SteelMemberElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';

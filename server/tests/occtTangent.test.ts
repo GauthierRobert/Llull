@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Regression: a sphere tangent to a box face made an OCC boolean "succeed" with a solid whose
  * meshing aborted the WASM module (the whole worker/process died). The kernel now opens a hair
  * gap first, so every operation returns a mesh that agrees with Manifold.

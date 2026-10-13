@@ -1,5 +1,4 @@
 /**
- * @layer server
  * @sideeffect loads `<repo>/.env` (then `server/.env`) into process.env before any module reads it.
  * Existing environment variables win; missing files are ignored. Skipped under tests.
  */

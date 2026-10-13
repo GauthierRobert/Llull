@@ -1,5 +1,4 @@
 /**
- * @layer ui/panels
  * FileField — a file `<input>` (optionally in a `field` label) that hands the chosen file to the
  * caller as text or as a `File`, and clears itself so the same file can be picked again.
  */

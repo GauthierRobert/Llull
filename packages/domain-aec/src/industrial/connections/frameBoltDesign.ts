@@ -1,8 +1,6 @@
 /**
  * Bolt-group sizing of the moment connections: smallest bolt diameter / row count that passes every
  * connection of a kind (EN 1993-1-8).
- * @layer domain-aec
- * @pure
  */
 
 import type { BuildingModel, MomentConnectionElement } from '@core/model/building';

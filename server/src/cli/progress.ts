@@ -1,5 +1,4 @@
 /**
- * @layer server
  * Per-step progress, timing and the whole-run deadline of a local `build_project` run, fed by the
  * registry's `ExecutionContext.onStep` (core stays clock- and I/O-free; this is the observer).
  */

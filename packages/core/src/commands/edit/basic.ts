@@ -1,8 +1,4 @@
-/**
- * Edit commands: group, ungroup and rename operations.
- *
- * @layer core/commands
- */
+/** Edit commands: group, ungroup and rename operations. */
 
 import type { EntityGroup } from '../../model/types';
 import type { CommandResult } from '../types';
@@ -12,9 +8,6 @@ import { changed, noop } from '../noop';
 import { replaceEntity } from '../entity/entityOps';
 
 /**
- * @command group_entities
- * @pure
- * @layer core/commands
  * @affects creates 1 new EntityGroup in doc.groups; affected = [groupId]
  * @invariant requires >= 2 valid (existing) member ids
  * @failure < 2 valid members -> no-op, affected:[]
@@ -49,9 +42,6 @@ export const groupEntities = defineCommand({
 });
 
 /**
- * @command ungroup_entities
- * @pure
- * @layer core/commands
  * @affects removes group from doc.groups; affected = former member ids
  * @invariant member entities remain in doc.entities unchanged
  * @failure missing groupId -> no-op, affected:[]
@@ -81,9 +71,6 @@ export const ungroupEntities = defineCommand({
 });
 
 /**
- * @command set_entity_name
- * @pure
- * @layer core/commands
  * @affects updates name and/or tags on the target entity; affected:[id]
  * @invariant entity geometry and position are not changed
  * @failure missing id -> no-op, affected:[]

@@ -5,9 +5,6 @@
  * procedural albedo / normal / roughness maps with box-projected UVs). Colours are converted from sRGB
  * hex to the linear factors glTF requires; normals are creased (smooth below CREASE_ANGLE) so
  * curved surfaces shade smoothly in external renderers.
- *
- * @layer core/commands
- * @pure
  */
 
 import type { CadDocument, Entity, MaterialFinish, Vec3 } from '../../model/types';

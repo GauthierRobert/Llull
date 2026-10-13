@@ -1,6 +1,4 @@
 /**
- * @layer ui/store
- *
  * Command palette store — open state, the most recently run palette items (persisted, so the
  * empty-query list starts with what the user reaches for) and the result toast of the last
  * command run from the palette. Presentation-only; never CadDocument.

@@ -1,7 +1,4 @@
-/**
- * check_pipe_supports: support spacing of every pipe against the water-filled steel pipe span table.
- * @layer domain-aec
- */
+/** check_pipe_supports: support spacing of every pipe against the water-filled steel pipe span table. */
 
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
@@ -154,8 +151,6 @@ function rowOf(
 }
 
 /**
- * @command check_pipe_supports
- * @pure read-only
  * @affects none; data = { ok, pipes: PipeSupportRow[], totals, csv, assumptions }
  * @invariant every pipe (of the level / line filter) has exactly one row
  * @failure no pipes / unknown level / line without pipes / spanFactor <= 0 / overhangRatio < 0 -> no-op, no data

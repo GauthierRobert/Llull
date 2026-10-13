@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Render branch for `kind:'cylinder'` entities.
  * Geometry is memoized on the entity's geometric fields; lifecycle handled by SolidMeshShell.
  */

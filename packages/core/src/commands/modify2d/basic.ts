@@ -11,9 +11,6 @@ import { changed, noop } from '../noop';
 import { elementAt } from '../../lib/elementAt';
 
 /**
- * @command explode_polyline
- * @pure
- * @layer core/commands
  * @affects removes 1 polyline, creates N line entities (N = number of segments)
  * @invariant source entity must be kind:'polyline' with >= 2 points
  * @failure missing id / wrong kind / < 2 points -> no-op, affected:[]
@@ -61,9 +58,6 @@ export const explodePolyline = defineCommand({
 });
 
 /**
- * @command offset_2d
- * @pure
- * @layer core/commands
  * @affects creates 1 new entity (parallel copy of the source)
  * @invariant source entity must be kind:'line'|'polyline'|'circle'|'rectangle'
  * @failure missing id / unsupported kind / zero distance -> no-op, affected:[]

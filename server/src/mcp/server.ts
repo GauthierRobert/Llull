@@ -1,5 +1,4 @@
 /**
- * @layer server
  * One MCP `Server` per session over the shared live document. Tool logic lives in `@mcp`; this
  * file binds it to the SDK handlers. Every tools/call runs `execute` exactly once, through
  * `commandBus.applyCommand` (shared undo history + `/live` broadcast).

@@ -1,7 +1,4 @@
-/**
- * Civil drawing-sheet commands: plan sheet and plan-and-profile sheet (printable SVG).
- * @layer domain-aec/civil
- */
+/** Civil drawing-sheet commands: plan sheet and plan-and-profile sheet (printable SVG). */
 
 import type { CommandDefinition, CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
@@ -15,8 +12,6 @@ import { buildCivilPlanSheet } from './civilPlanSheet';
 import { buildPlanProfileSheet } from './planProfileSheet';
 
 /**
- * @command export_civil_plan_sheet
- * @pure read-only
  * @affects none; data = { text, fileName, paper, scale, counts, layers, clipped }
  * @failure no civil entity / scale <= 0 / no matching layer -> no data
  */
@@ -68,8 +63,6 @@ export const exportCivilPlanSheet = defineCommand({
 });
 
 /**
- * @command export_plan_profile_sheet
- * @pure read-only
  * @affects none; data = { text, fileName, paper, scale, fits }
  * @failure unknown alignment / no valid profile / invalid scale -> no data
  */

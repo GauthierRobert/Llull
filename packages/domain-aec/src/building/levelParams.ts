@@ -1,7 +1,4 @@
-/**
- * Shared `levelId` parameter schemas.
- * @layer domain-aec
- */
+/** Shared `levelId` parameter schemas. */
 
 import { z } from '@core/commands/schema';
 

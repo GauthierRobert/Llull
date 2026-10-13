@@ -1,7 +1,6 @@
 /**
  * The one SVG painter of technical-drawing primitives on a sheet (plans, elevations, sections,
  * anchor plans): ISO line weights and patterns come from the sheet style classes (`sheetFrame`).
- * @layer domain-aec
  */
 
 import { clamp } from '@lib/clamp';

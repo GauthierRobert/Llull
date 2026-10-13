@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/building
- *
  * Form specs for the grid framing tools (columns / beams / bracing laid out from the structural
  * grid): each maps form values to ONE command (param-gathering only, react R1).
  */

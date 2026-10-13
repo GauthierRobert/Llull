@@ -3,8 +3,6 @@
  * step routes through `execute`; steps bind results with `as` and reference them as `$alias` /
  * `$alias[N]`. `onError: "abort"` rolls the whole document back; `validate` is a dry run.
  * `data` carries the per-step report and the final SceneSnapshot.
- *
- * @layer core/commands
  */
 
 import type { CommandResult } from '../types';
@@ -16,9 +14,6 @@ import { rejectPlan } from './resolve';
 import { runProject } from './run';
 
 /**
- * @command build_project
- * @pure
- * @layer core/commands
  * @affects runs an ordered list of commands; affected = union of created/changed ids
  * @invariant onError:'abort' on failure returns the input doc unchanged (full rollback)
  * @failure empty/invalid actions -> no-op, affected:[]; validate:true never mutates

@@ -9,9 +9,6 @@ import { DEFAULT_DRAW_COLOR, drawPointSeries, workPlaneStyleFields } from './sha
 import { noop } from '../noop';
 
 /**
- * @command draw_polyline
- * @pure
- * @layer core/commands
  * @affects creates 1 polyline entity, or 1 line entity for an open 2-point series
  * @invariant points.length >= 2; each point is a 2-element [x,y] array
  * @failure fewer than 2 points -> no-op, affected:[]
@@ -46,9 +43,6 @@ export const drawPolyline = defineCommand({
 });
 
 /**
- * @command draw_arc
- * @pure
- * @layer core/commands
  * @affects creates 1 arc entity, or 1 circle entity when both angles are omitted
  * @invariant radius > 0; a sweep |endAngle - startAngle| > 2π is stored wrapped into (0, 2π] (the
  *   CCW sweep every consumer — render, measure, extrude — reads)
@@ -110,9 +104,6 @@ export const drawArc = defineCommand({
 });
 
 /**
- * @command draw_rectangle
- * @pure
- * @layer core/commands
  * @affects creates 1 rectangle entity
  * @invariant width > 0 and height > 0
  * @failure width <= 0 or height <= 0 -> no-op, affected:[]
@@ -140,9 +131,6 @@ export const drawRectangle = defineCommand({
 });
 
 /**
- * @command draw_point
- * @pure
- * @layer core/commands
  * @affects creates 1 point entity
  * @invariant position is a 3-element [x,y,z] array (defaults to [0,0,0])
  */

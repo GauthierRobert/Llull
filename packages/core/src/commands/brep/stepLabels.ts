@@ -4,8 +4,6 @@
  * the entity label and tags with a STYLED_ITEM color chain. Text-level on purpose: kernels expose
  * only `exportStep(shapes)`, and the label data lives in the document, not in the shape.
  *
- * @layer core/commands
- * @pure
  * @failure text that is not recognizably kernel STEP, or a product/solid count that does not match
  *   the labels -> that part is left untouched (never throws, never corrupts)
  */

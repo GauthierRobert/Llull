@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Pure three.js geometry builders for primitive solids, in the model's +Z-up local frame
  * (same placement as core/geometry/tessellation + export). Local origin = entity.position.
  * Memoized and disposed by the mesh components.

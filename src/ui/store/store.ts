@@ -1,5 +1,4 @@
 /**
- * @layer ui/store
  * Single Zustand store (the app's one source of truth). Every change goes through
  * `execute(doc, name, params)`.
  * - ONLINE (`./onlineMode`): `dispatch` POSTs /command; /live events are re-run on `liveBase`

@@ -7,9 +7,6 @@ import { instanceFrameRef, instanceRefsProblem } from '../assembly/instanceFrame
 import { isValidAxis } from '../../lib/axis';
 import { changed, noop, report } from '../noop';
 /**
- * @command add_joint
- * @pure
- * @layer core/commands
  * @affects appends 1 entry to doc.joints and doc.jointOrder
  * @invariant both a.instanceId and b.instanceId must exist as InstanceEntity in doc.entities
  * @invariant axis must be 'x'|'y'|'z' or a [number,number,number] Vec3
@@ -89,9 +86,6 @@ export const addJoint = defineCommand({
 });
 
 /**
- * @command delete_joint
- * @pure
- * @layer core/commands
  * @affects removes 1 joint from doc.joints and doc.jointOrder; cascade-removes dependent DriveRelations
  * @invariant jointOrder and joints remain consistent after deletion
  * @failure unknown joint id → no-op, affected:[]
@@ -136,9 +130,6 @@ export const deleteJoint = defineCommand({
 });
 
 /**
- * @command set_joint_value
- * @pure
- * @layer core/commands
  * @affects updates angle (revolute) or displacement (prismatic) on the specified joint
  * @invariant joint must exist in doc.joints
  * @failure unknown joint id → no-op, affected:[]

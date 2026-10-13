@@ -1,10 +1,8 @@
 /**
- * @layer server
  * The exchange tools (export_step, import_step, import_dwg, import_code) are written against the
  * MCP layer and return MCP-shaped results. REST (`POST /exchange`) and the CLI want the command
  * bus shape `{ summary, affected, isError, data }`; this recovers it from `structuredContent`,
  * which carries the full data and every affected id.
- * @pure
  */
 
 import type { McpShapedResult } from '@mcp/dispatch';

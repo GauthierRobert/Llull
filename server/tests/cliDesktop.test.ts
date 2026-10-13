@@ -1,7 +1,4 @@
-/**
- * @layer server/tests
- * The CLI ⇄ desktop app hand-off: the discovery file (~/.llull/desktop.json) and `--app` / `status`.
- */
+/** The CLI ⇄ desktop app hand-off: the discovery file (~/.llull/desktop.json) and `--app` / `status`. */
 
 import { describe, expect, it } from 'vitest';
 import { mkdtempSync, statSync, writeFileSync, existsSync } from 'node:fs';

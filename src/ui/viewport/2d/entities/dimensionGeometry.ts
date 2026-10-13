@@ -1,5 +1,4 @@
 /**
- * @layer ui/viewport/2d
  * Pure drawing of 2D dimension entities: the measured value, the label anchor and the
  * LineSegments (dimension / extension lines, arrowheads) for each dimension kind.
  */

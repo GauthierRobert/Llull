@@ -1,5 +1,4 @@
 /**
- * @layer ui/panels/building
  * LevelSelect — native select over building levels (by id, shown by name), optionally with a blank
  * first choice and a visible field label.
  */

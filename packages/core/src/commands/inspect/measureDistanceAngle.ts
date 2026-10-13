@@ -9,9 +9,6 @@ import { noop, report } from '../noop';
 import { angleFromCosine, toDegrees } from '../../lib/angle';
 
 /**
- * @command measure_distance
- * @pure
- * @layer core/commands
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data is { distance: number, unit: string }
  * @failure missing entity id or neither point nor entity provided -> no-op, affected:[], no data
@@ -63,9 +60,6 @@ export const measureDistance = defineCommand({
 export const POINT_3D = z.tuple([z.number(), z.number(), z.number()]);
 
 /**
- * @command measure_angle
- * @pure
- * @layer core/commands
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data is { degrees: number, radians: number }
  * @failure degenerate vectors (zero-length) or missing entity ids -> no-op, affected:[], no data

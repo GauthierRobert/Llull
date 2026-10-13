@@ -1,6 +1,4 @@
 /**
- * @layer tests/production/oracle
- *
  * Drawing-sheet reader for issued SVG sheets: paper size, the texts printed on the sheet and the
  * title block — what a checker (vérificateur) reads before a sheet is signed off.
  */

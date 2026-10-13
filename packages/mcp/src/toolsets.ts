@@ -1,6 +1,4 @@
 /**
- * @layer mcp
- *
  * MCP toolsets — named domain groups of tools. A host exposes a subset of the registry
  * (e.g. `core,3d,measure`) to keep `tools/list` small for clients that load every schema.
  * Filtering is a VIEW of the registry: commands stay registered and callable through
@@ -8,7 +6,6 @@
  *
  * @invariant every registered command + exchange tool belongs to exactly one toolset
  * @invariant `core` is always enabled
- * @pure
  */
 
 import { pluginToolNames } from '@core/plugins/host';

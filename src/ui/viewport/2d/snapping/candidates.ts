@@ -1,8 +1,4 @@
-/**
- * @layer ui/viewport/2d
- *
- * Derive snap candidate points from the 2D entities of a document.
- */
+/** Derive snap candidate points from the 2D entities of a document. */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { wrapAngle } from '@lib/angle';
@@ -29,8 +25,6 @@ import {
  *
  * Advanced snaps (perpendicular, tangent, extension, nearest) require a
  * `fromPoint` — the last placed point in an ongoing draw operation.
- *
- * @pure deterministic, no side effects
  */
 export function collectSnapCandidates(
   document: Pick<CadDocument, 'entities' | 'order' | 'components'>,

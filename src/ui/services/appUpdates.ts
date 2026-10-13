@@ -1,6 +1,4 @@
 /**
- * @layer ui/services
- *
  * The ONE owner of the service worker (serviceWorker/sw.js): registration, periodic update
  * checks, "a new version is waiting" state, and applying it. Components read the state through
  * `useAppUpdateAvailable()` and call `applyAppUpdate()` — nothing else touches

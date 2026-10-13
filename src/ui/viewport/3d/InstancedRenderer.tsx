@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Renders batches of identical-geometry entities (box / cylinder / sphere, see grouping.ts) as
  * one THREE.InstancedMesh per batch — one draw call instead of one per entity. Everything else
  * stays on the per-entity mesh path in Entities.tsx.
@@ -29,8 +27,6 @@ import { XRAY_OPACITY } from '../viewportPalette';
  * Creates the THREE geometry for a given batchable kind + representative entity.
  * The entity is the first in the batch; all entities in the batch share the same
  * geometric params (guaranteed by the grouping key).
- *
- * @pure (called inside useMemo — no side effects)
  */
 export function makeGeometry(batch: InstanceBatch): THREE.BufferGeometry {
   const first = batch.entities[0];

@@ -1,8 +1,6 @@
 /**
  * Steel a pipe support bears on: the nearest member below (shoe / guide / anchor) or above
  * (hanger) the pipe, found by plan distance and vertical reach.
- * @layer domain-aec
- * @pure
  */
 
 import type { PipeSupportType } from '@core/model/building';

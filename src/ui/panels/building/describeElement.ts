@@ -1,7 +1,4 @@
-/**
- * @layer ui/panels/building
- * Category labels and one-line descriptors of building elements (element list + inspector).
- */
+/** Category labels and one-line descriptors of building elements (element list + inspector). */
 
 import type { BuildingElement } from '@core/model/building';
 import type { DocumentUnit } from '@core/model/types';

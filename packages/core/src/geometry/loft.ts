@@ -1,5 +1,4 @@
 /**
- * @layer core/geometry
  * Loft tessellation: each section ring is sampled as its closed curve (./sectionRing), then the
  * rings are skinned (./skin). A smooth loft also blends between sections along every vertex
  * column with a centripetal Catmull-Rom curve (LOFT_SPAN_STEPS rings per span); a ruled loft joins

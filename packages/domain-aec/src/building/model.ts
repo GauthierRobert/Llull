@@ -1,7 +1,4 @@
-/**
- * Shared helpers for the building (AEC/BIM) commands.
- * @layer domain-aec
- */
+/** Shared helpers for the building (AEC/BIM) commands. */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { BimCategory, BuildingElement, BuildingLevel, BuildingModel } from '@core/model/building';

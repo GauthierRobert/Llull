@@ -2,8 +2,6 @@
  * Steel section catalogue (European standard sections, dimensions in mm) and exact outlines.
  * Masses: catalogue values for hot-rolled I / U sections, computed (ρ = 7850 kg/m³, sharp corners)
  * for hollow sections, angles and cold-formed channels.
- * @layer domain-aec
- * @pure
  */
 
 import type { Vec2 } from '@core/model/types';
@@ -394,7 +392,6 @@ const addMoments = (sum: Moments, m: Moments): Moments => ({
 /**
  * Exact section properties from the profile outline (bending about the axis perpendicular to
  * the depth h). Units: mm.
- * @pure
  */
 export function sectionProperties(profile: SteelProfile): SectionProperties {
   const { outer, holes } = profileOutline(profile);

@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { Vec2 } from '@core/model/types';
 import { n, svgPoints, svgText, type Viewport } from '../../shared/sheetFrame';
 import { paperDimension, svgLine } from '../../shared/drawingSvg';

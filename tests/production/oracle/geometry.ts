@@ -2,8 +2,6 @@ import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
 import type { BuildingElement, BuildingLevel, BuildingModel, EquipmentElement } from '@core/model/building';
 
 /**
- * @layer tests/production/oracle
- *
  * Plain-maths geometry over the building model (absolute coordinates, document units = mm).
  * Criteria compare the model with the design intent through these helpers only.
  */

@@ -1,8 +1,4 @@
-/**
- * Evaluation of bolted steel connections: base plates with anchor bolts and moment end-plate joints.
- * @layer domain-aec
- * @pure
- */
+/** Evaluation of bolted steel connections: base plates with anchor bolts and moment end-plate joints. */
 
 import { planPoint } from '@lib/vec2';
 import type { CadDocument, CylinderEntity, Entity, Vec2, Vec3 } from '@core/model/types';

@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * The one place the 2D view's plan-section depth is derived from the viewport clip plane: a
  * downward-kept horizontal plane (axis z, flipped keeps z <= -offset) is a plan section. Drawing,
  * picking, box selection and snapping all read it, so interaction sees exactly the drawn view.

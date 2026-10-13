@@ -1,9 +1,7 @@
 /**
- * @layer mcp
  * The agent modeling conventions guide an MCP agent should read BEFORE modeling, exposed as the
  * `cad://conventions` resource. A RESOURCE, never a registry command: the
  * `buildMcpTools().length === listCommands().length` invariant must hold.
- * @pure
  */
 
 export const CONVENTIONS_GUIDE: string = `# llull CAD — Agent Modeling Conventions

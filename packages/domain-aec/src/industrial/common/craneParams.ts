@@ -1,8 +1,4 @@
-/**
- * Crane parameters shared by the runway, bracing and portal-frame checks: schema fields and validation.
- * @layer domain-aec
- * @pure
- */
+/** Crane parameters shared by the runway, bracing and portal-frame checks: schema fields and validation. */
 
 import { z } from '@core/commands/schema';
 import { isNonNegativeNumber } from '@lib/isFiniteNumber';

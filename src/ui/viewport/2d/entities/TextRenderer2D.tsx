@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * Render branch for `kind:'text'` entities in the 2D orthographic drafting viewport, using
  * drei's <Text> SDF renderer (it manages its own geometry and disposal).
  * - Anchored at entity.position; only rotation[2] applies (2D entities rotate within the work plane).

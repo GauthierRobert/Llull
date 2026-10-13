@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Auth/guard hardening: remote-peer guard, bearer verifier, Host allowlist, bind safety,
  * autosave stop mode, browser mutation guard.
  */

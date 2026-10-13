@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Placement of the ground contact-shadow patch. A fixed 40-unit patch at the origin drowns a tiny
  * part in a grey slab and misses a large or off-origin model entirely; this sizes the patch from
  * the scene footprint and keeps it on the ground (z = 0, or lower when the scene dips below it).
@@ -27,7 +25,6 @@ export interface ContactShadowPlane {
   readonly far: number;
 }
 
-/** @pure @invariant bounds null -> the original fixed patch at the origin */
 export function computeContactShadowPlane(bounds: Bounds | null, renderOrigin: Vec3): ContactShadowPlane {
   if (!bounds) return { position: [0, 0, -0.001], scale: DEFAULT_SCALE, far: DEFAULT_FAR };
   const extentX = bounds.max[0] - bounds.min[0];

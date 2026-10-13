@@ -1,8 +1,4 @@
-/**
- * Lifetime helpers for native (WASM heap) objects of the geometry kernels, freed with `delete()`.
- *
- * @layer core/geometry
- */
+/** Lifetime helpers for native (WASM heap) objects of the geometry kernels, freed with `delete()`. */
 
 /** A native object the kernel must free explicitly. */
 export interface NativeObject {

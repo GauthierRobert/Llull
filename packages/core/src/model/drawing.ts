@@ -1,7 +1,6 @@
 /**
  * Technical-drawing primitives (ISO 128 line types) — the one 2D drawing vocabulary shared by the
  * building plan, the solids' orthographic views, the 2D viewport, DXF and sheet exporters.
- * @layer model
  */
 
 import type { Vec2 } from './vectors';

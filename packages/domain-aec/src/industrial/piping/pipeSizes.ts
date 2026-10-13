@@ -4,7 +4,6 @@
  * pipe (MSS SP-69 Table 3 / ASME B31.1 Table 121.5, water service, ft converted to m, one decimal:
  * NPS ≤ 1¼ 7 ft, 1½ 9, 2 10, 2½ 11, 3 12, 4 14, 5 16, 6 17, 8 19, 10 22, 12 23, 14 25, 16 27, 18 28,
  * 20 30, 24 32 ft).
- * @layer domain-aec
  */
 
 /** [DN, outside diameter mm, standard wall mm, maximum support span m]. */

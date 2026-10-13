@@ -1,6 +1,4 @@
 /**
- * @layer server
- *
  * Node loader for the OCC kernel. `opencascade.js`'s index imports the .wasm as an ES module
  * (unsupported by Node), so evaluate the Emscripten glue directly and feed it the WASM bytes.
  */

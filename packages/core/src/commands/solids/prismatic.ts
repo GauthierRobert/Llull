@@ -4,9 +4,6 @@ import { ORIGIN } from '../../lib/vec3';
 import { DEFAULT_SOLID_COLOR, placeSolid, placedSolidFields, placeSizedSolid, rejectNonPositive } from './shared';
 
 /**
- * @command add_wedge
- * @pure
- * @layer core/commands
  * @affects creates 1 wedge entity; stored position is the lower-front-left corner of the bounding box
  * @invariant all size components > 0
  * @failure any size component <= 0 -> no-op, affected:[]
@@ -45,9 +42,6 @@ export const addWedge = defineCommand({
 });
 
 /**
- * @command add_pyramid
- * @pure
- * @layer core/commands
  * @affects creates 1 pyramid entity; stored position is the center of the rectangular base
  * @invariant baseWidth > 0; baseDepth > 0; height > 0
  * @failure any dimension <= 0 -> no-op, affected:[]

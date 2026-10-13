@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { SteelMemberElement } from '@core/model/building';
 import { sectionProperties, type SteelProfile } from '../../steel/profiles';
 import { bucklingReduction, eulerForce } from '../steelDesign/steelDesign';

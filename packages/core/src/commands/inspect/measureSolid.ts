@@ -15,9 +15,6 @@ interface MeasureBoundingBoxData {
 }
 
 /**
- * @command measure_bounding_box
- * @pure
- * @layer core/commands
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data is { min: Vec3, max: Vec3, size: Vec3 }
  * @failure missing entity id, empty document -> no-op, affected:[], no data
@@ -118,9 +115,6 @@ function instanceMass(
 }
 
 /**
- * @command mass_properties
- * @pure
- * @layer core/commands
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data is { volume, volumeUnit, method? } plus { density, mass, unit: 'g' } when a density is known
  * @failure non-solid entity, missing id, or a given density <= 0 -> no-op, affected:[], no data

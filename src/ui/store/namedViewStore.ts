@@ -1,6 +1,4 @@
 /**
- * @layer ui/store
- *
  * Named-view store — user-named camera bookmarks (position + target) for the 3D viewport,
  * persisted to localStorage. UI-only presentation state, intentionally NOT part of CadDocument.
  *

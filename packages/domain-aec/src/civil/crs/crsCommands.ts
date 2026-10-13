@@ -1,7 +1,6 @@
 /**
  * Coordinate reference system commands: declare the CRS, calibrate the site (local <-> grid) and
  * transform points between the two.
- * @layer domain-aec/civil
  */
 
 import type { CadDocument } from '@core/model/types';
@@ -18,8 +17,6 @@ const withCrs = (doc: CadDocument, crs: CivilCrs): CadDocument => ({
 });
 
 /**
- * @command set_coordinate_system
- * @pure
  * @affects sets civil.crs (keeps an existing calibration)
  * @failure empty name / invalid epsg -> no-op
  */
@@ -56,8 +53,6 @@ export const setCoordinateSystem = defineCommand({
 });
 
 /**
- * @command set_site_calibration
- * @pure
  * @affects sets civil.crs.calibration (creates an "Unnamed" CRS when none is set)
  * @failure scaleFactor <= 0 / non-finite value -> no-op
  */
@@ -94,8 +89,6 @@ export const setSiteCalibration = defineCommand({
 });
 
 /**
- * @command transform_coordinates
- * @pure read-only
  * @affects none; data = { points, direction }
  * @failure no calibration / no points -> no data
  */

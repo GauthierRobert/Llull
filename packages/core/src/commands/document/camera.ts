@@ -2,8 +2,6 @@
  * Camera commands: write `document.camera` (view state, `metaHistory`: no FeatureStep).
  * Convention (+Z up, matches Viewport3D): polar 0 = above along +Z, π/2 = in the XY plane; the eye
  * sits at target + distance·(sin p·sin a, sin p·cos a, cos p), azimuth measured from +Y toward +X.
- *
- * @layer core/commands
  */
 
 import type { CameraState } from '../../model/types';
@@ -32,9 +30,6 @@ const MAX_POLAR = Math.PI - 0.01;
 const clampPolar = (polar: number): number => clamp(polar, MIN_POLAR, MAX_POLAR);
 
 /**
- * @command set_camera
- * @pure
- * @layer core/commands
  * @affects nothing — writes only document.camera; affected:[]
  * @invariant distance, if provided, must be > 0
  * @failure distance <= 0 → no-op with explanatory summary
@@ -95,9 +90,6 @@ export const setCamera = defineCommand({
 type FitDirection = 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom' | 'iso' | 'current';
 
 /**
- * @command fit_view
- * @pure
- * @layer core/commands
  * @affects nothing — writes only document.camera; affected:[]
  * @invariant target = scene-bounds centre; distance = boundsRadius / sin(fov/2) * padding
  * @failure empty doc → falls back to sensible default framing; unknown direction → no-op

@@ -1,6 +1,4 @@
 /**
- * @layer server/tests
- *
  * Integration tests for GET /export/stl.
  *
  * Covers:

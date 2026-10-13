@@ -2,8 +2,6 @@
  * Modified rational method down the pipe DAG: time of concentration (entry time + travel times),
  * IDF intensity at that time, accumulated C*A and point inflow. A manhole with several outgoing
  * pipes splits its accumulated flow by full-bore capacity share.
- * @layer domain-aec/civil
- * @pure
  */
 
 import type { CadDocument } from '@core/model/types';

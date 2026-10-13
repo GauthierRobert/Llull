@@ -1,7 +1,4 @@
-/**
- * Clash detection between structure, equipment and pipes (oriented-box separating-axis test).
- * @layer domain-aec
- */
+/** Clash detection between structure, equipment and pipes (oriented-box separating-axis test). */
 
 import { clamp01 } from '@lib/clamp';
 import type { CadDocument, Vec3 } from '@core/model/types';
@@ -158,8 +155,6 @@ function findClashes(doc: CadDocument, levelIds: ReadonlySet<string> | null, tol
 }
 
 /**
- * @command check_clashes
- * @pure read-only
  * @affects none; data = { clashes: Clash[] }
  * @failure unknown level / negative tolerance -> no data
  */

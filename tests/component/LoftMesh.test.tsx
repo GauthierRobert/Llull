@@ -2,8 +2,6 @@
  * Component tests for the `kind:'loft'` 3D viewport render branch. WebGL does not run in jsdom,
  * so we check the observable path: `loft_sections` through the store yields a loft entity, and the
  * geometry LoftMesh builds from the shared core tessellation is non-empty with normals.
- *
- * @layer tests/component
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';

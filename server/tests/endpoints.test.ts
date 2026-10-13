@@ -1,6 +1,4 @@
 /**
- * @layer server/tests
- *
  * Integration tests for the REST command-bus endpoints.
  *
  * Covers:

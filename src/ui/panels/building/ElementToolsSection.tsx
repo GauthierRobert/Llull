@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/building
- *
  * ElementToolsSection — pick a building tool (grid, walls, doors, windows, slabs…), fill its
  * parameters, dispatch the single command it maps to (see elementTools.ts).
  */

@@ -1,5 +1,3 @@
-/** @layer ui/panels/building Pure rules of the element list: which rows show and which are selected. */
-
 import type { BuildingElement, BuildingModel } from '@core/model/building';
 import { orderedValues } from '@ui/panels/orderedValues';
 

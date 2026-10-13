@@ -9,8 +9,6 @@ import { gradeUiRun } from './ui/grading';
 import { UiSession } from './ui/session';
 
 /**
- * @layer tests/production
- *
  * Production-scenario UI gate: each scenario is driven through the real app in Chromium (offline
  * mode) the way an engineer works, the downloads are graded by the same criteria as the scripted
  * and agent drivers, and the knownIssues.ui ratchet applies.

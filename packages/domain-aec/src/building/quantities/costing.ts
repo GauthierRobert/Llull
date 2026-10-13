@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import { round } from '../../shared/numeric';
 import type { TakeoffLine } from './takeoffBasics';
 

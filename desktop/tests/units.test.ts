@@ -1,7 +1,4 @@
-/**
- * @layer desktop/tests
- * Electron-free desktop modules: layout, backend env, port choice, CLI shim, menu.
- */
+/** Electron-free desktop modules: layout, backend env, port choice, CLI shim, menu. */
 
 import { describe, expect, it } from 'vitest';
 import { mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';

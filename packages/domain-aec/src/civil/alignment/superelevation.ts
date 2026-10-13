@@ -4,8 +4,6 @@
  * rotation rate, then the whole section tilts as one plane about the centreline, outer side raised.
  * Entry / exit ramps end at the SC / CS (spiral) or 30 % of the runoff into the circle (no spiral).
  * Slopes are ratios "falling away from the centreline" (negative = rising).
- * @layer domain-aec/civil
- * @pure
  */
 
 import type { AlignmentObject } from '@core/model/civil';

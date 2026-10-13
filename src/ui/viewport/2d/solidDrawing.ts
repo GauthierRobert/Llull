@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * The 2D drawing of ONE solid, as the interaction layer sees it: the same `technicalView` the
  * viewport renders (frame `TOP_VIEW`, same section `cutDepth`), taken on its own — occlusion by
  * other solids is irrelevant to picking, box selection and snapping. Snapping, picking and box

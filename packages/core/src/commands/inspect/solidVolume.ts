@@ -52,7 +52,6 @@ function closedMeshVolume(positions: number[]): number {
 
 /**
  * Volume of one solid entity (instances: the sum of their baked solid children).
- * @pure
  * @failure instance with a missing component, or a non-solid kind -> { error }
  */
 export function solidVolume(doc: CadDocument, e: Entity, ctx: ExecutionContext | undefined): SolidVolume {

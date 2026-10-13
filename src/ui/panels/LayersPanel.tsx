@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels
- *
  * LayersPanel — layer list (name, visibility, lock, color swatch, entity count) with controls that
  * dispatch the layer commands: add_layer, update_layer, delete_layer.
  * The eye toggle is a LOCAL viewport filter (`useViewportStore.hiddenLayerIds`): it dispatches no

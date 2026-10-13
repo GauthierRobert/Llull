@@ -1,5 +1,4 @@
 /**
- * @layer ui/viewport/2d
  * Keeps annotation text readable when zoomed out: scales the referenced object (per frame, no
  * React state) so text of `worldHeight` never appears smaller than `minPixels` on screen.
  */

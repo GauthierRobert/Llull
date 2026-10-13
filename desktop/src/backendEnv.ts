@@ -1,10 +1,8 @@
 /**
- * @layer desktop
  * The environment the desktop app gives its local backend (server/dist/index.js). The backend is
  * the unchanged llull server: same routes, same command bus. Hardening for a single-user desktop:
  * loopback only, a per-launch token required on every REST call (other local processes and
  * websites cannot drive the document), and the app's own origin as the only browser origin.
- * @pure
  */
 
 import path from 'path';

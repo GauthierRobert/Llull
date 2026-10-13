@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { Vec2 } from '@core/model/types';
 import type { BuildingModel, CurvedWallElement, OpeningElement, WallElement } from '@core/model/building';
 import { projectOntoSegment, distance } from '@lib/polygon';

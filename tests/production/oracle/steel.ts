@@ -1,6 +1,4 @@
 /**
- * @layer tests/production/oracle
- *
  * Independent steel section table: nominal depth h (mm) and mass (kg/m) from the producers'
  * published tables (EN 10365 rolled I/H sections, EN 10210 hot-finished CHS). Deliberately NOT
  * read from llull's catalogue, so a catalogue error shows up as a tonnage mismatch.

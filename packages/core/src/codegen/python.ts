@@ -1,8 +1,6 @@
 /**
  * CadQuery / build123d emitter: FeatureProgram → a standalone, traced Python script.
  *
- * @layer core/codegen
- * @pure
  * @invariant running the script records LLULL_TRACE, which apply_code_trace turns back into the same
  *   llull feature history (parameters + expressions + order) — the code is a round-trippable recipe.
  */

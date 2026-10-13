@@ -1,8 +1,4 @@
-/**
- * @layer ui/components/toolbar
- *
- * The 2D draw tools offered by the toolbar and the command palette: tool kind, label, icon, tip.
- */
+/** The 2D draw tools offered by the toolbar and the command palette: tool kind, label, icon, tip. */
 
 import type { DrawToolKind } from '@ui/store';
 import type { IconName } from '@ui/components/Icon';

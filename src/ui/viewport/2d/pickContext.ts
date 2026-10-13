@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * The inputs every 2D click-pick shares: the live document, the pick tolerance in world units for
  * the current zoom, and the "is this entity drawn" filter (layers + local hiding, same as
  * Entities2D). Read at click time from the stores, so handlers never close over stale state.

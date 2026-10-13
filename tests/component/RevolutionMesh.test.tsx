@@ -9,8 +9,6 @@
  * Additionally, we unit-test the geometry-building path by instantiating
  * THREE.LatheGeometry directly with a valid profile and asserting vertex count > 0,
  * mirroring what RevolutionMesh.tsx does at render time.
- *
- * @layer tests/component
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';

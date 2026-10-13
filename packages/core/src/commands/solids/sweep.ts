@@ -122,9 +122,6 @@ function tightestBend(path: ReadonlyArray<CurveSegment<Vec3>>): number {
 }
 
 /**
- * @command sweep_profile
- * @pure
- * @layer core/commands
  * @affects creates 1 sweep entity positioned at the path start
  * @invariant path is open, connected and tangent-continuous (G1); bends are wider than the section
  * @failure bad / ambiguous section or path, sharp corner, bend tighter than the section,

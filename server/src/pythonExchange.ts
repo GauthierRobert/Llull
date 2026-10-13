@@ -1,6 +1,4 @@
 /**
- * @layer server
- *
  * `CadExchangePort` backed by a Python child process (server/python/llull_bridge.py) running
  * CadQuery / build123d on OpenCascade. One short-lived process per request: no shared state,
  * a hard timeout, and script stdout kept out of the JSON response.

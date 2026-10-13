@@ -1,5 +1,4 @@
 /**
- * @layer server
  * Process entry of the `llull` CLI (launched by `server/bin/llull.cjs`). A local run with
  * `--timeout` is supervised: the CLI re-runs itself as a child and kills it shortly after the
  * deadline, because a single slow step (an OCC boolean) blocks the child's event loop and could

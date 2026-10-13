@@ -1,7 +1,4 @@
-/**
- * Pure involute tooth-outline generator shared by spur, internal, planetary and spline commands.
- * @layer lib
- */
+/** Pure involute tooth-outline generator shared by spur, internal, planetary and spline commands. */
 
 import { polar as polarAbout } from './arc';
 import type { Point2 } from './polygon';

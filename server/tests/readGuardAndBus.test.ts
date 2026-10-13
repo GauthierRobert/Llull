@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * guardRead (token / loopback / proxy), SSE backpressure + subscriber cap, idempotency cache rules,
  * MCP session cap, unreadable-autosave quarantine.
  */

@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { BuildingModel } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import { solveFrame, type FrameResult } from '@lib/frame2d';
@@ -58,10 +54,7 @@ export interface BaseReaction {
 
 const LOAD_CASES: ReadonlyArray<LoadCase> = ['G', 'S', 'WL', 'WR', 'WLs', 'WRs', 'WLp', 'WRp', 'CL', 'CR', 'CL5', 'CR5'];
 
-/**
- * Characteristic base reactions of every analysed frame column, per load case (first-order).
- * @pure
- */
+/** Characteristic base reactions of every analysed frame column, per load case (first-order). */
 export function baseReactions(
   doc: Pick<CadDocument, 'units'>,
   building: BuildingModel,

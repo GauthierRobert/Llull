@@ -1,5 +1,4 @@
 /**
- * @layer ui/store
  * Offline outbox: queued local commands, their replay to the server on reconnect, and the
  * sync retry/backoff bookkeeping. On failure syncState='failed' and the flush retries with
  * exponential backoff. Live events received during a flush are superseded by the post-flush snapshot.

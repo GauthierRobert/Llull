@@ -1,5 +1,4 @@
 /**
- * @layer server
  * The `llull` CLI process body (loaded by `bin.ts`): installs the default
  * plugins, wires real stdio, and installs the geometry kernel only when a local command runs.
  */

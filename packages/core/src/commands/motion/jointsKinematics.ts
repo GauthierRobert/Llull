@@ -5,10 +5,7 @@ import { axisVector } from '../../lib/axis';
 import { topologicalSort } from '../../lib/topologicalSort';
 import { add3, scale3, sub3 } from '../../lib/vec3';
 
-/**
- * Rotate a Vec3 about an axis by an angle (Rodrigues' rotation formula).
- * @pure
- */
+/** Rotate a Vec3 about an axis by an angle (Rodrigues' rotation formula). */
 function rotateAboutAxis(v: Vec3, axis: Vec3, angle: number): Vec3 {
   const [ux, uy, uz] = axis;
   const cos = Math.cos(angle);
@@ -44,7 +41,6 @@ function driveOrder(driveRelations: Record<string, DriveRelation>): string[] {
 /**
  * Check whether adding a drive relation from `driverJointId` to `drivenJointId`
  * would create a cycle. Returns the cycle path as a string, or null if no cycle.
- * @pure
  */
 export function detectCycleOnAdd(
   driveRelations: Record<string, DriveRelation>,
@@ -101,8 +97,6 @@ interface EvaluatedMotion {
  * 3. Apply each joint to instance b's position/rotation relative to instance a.
  *
  * Returns EvaluatedMotion. Never mutates doc.
- *
- * @pure
  */
 export function evaluateMotionInternal(doc: CadDocument, overrides: Readonly<Record<string, number>> = {}): EvaluatedMotion {
   // Step 1: collect base joint values

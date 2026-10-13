@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Pure math helpers for the AnimationPlayer.
  * No React, no DOM — testable in isolation (rule W3).
  *
@@ -20,8 +18,6 @@ import type { Animation, Vec3 } from '@core/model/types';
  * The returned value is an angle (radians) for `rotation` animations and a
  * distance (world units) for `position` animations — callers interpret the
  * channel themselves.
- *
- * @pure
  */
 export function evaluateAnimationScalar(anim: Pick<Animation, 'mode' | 'speed' | 'amplitude' | 'frequency'>, phase: number): number {
   if (anim.mode === 'spin') return anim.speed * phase;

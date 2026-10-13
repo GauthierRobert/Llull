@@ -1,5 +1,4 @@
 /**
- * @layer ui
  * Build-time server configuration (Vite env, see `.env.example`).
  *
  * @invariant SERVER_BASE has no trailing slash

@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/building
- *
  * Declarative form specs for the industrial (steel hall / plant) tools: each maps form values to
  * ONE command + params (param-gathering only, react R1).
  */

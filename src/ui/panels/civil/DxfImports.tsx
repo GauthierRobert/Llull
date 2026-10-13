@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/civil
- *
  * DXF file inputs: survey points from a DXF (`import_survey_dxf`: POINTs, blocks, 3D polylines)
  * and a general drawing import (`import_dxf`). Reads the file as text, then dispatches.
  */

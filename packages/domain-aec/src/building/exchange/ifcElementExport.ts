@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { BuildingModel, CurvedWallElement, OpeningElement, WallElement } from '@core/model/building';
 import { orderedElements } from '../model';
 import { openingsOf, wallExtent, wallFrame } from '../geometry/wallGeometry';

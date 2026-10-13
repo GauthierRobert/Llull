@@ -1,5 +1,3 @@
-/** @layer ui/panels CheckboxGroup — a legend + one checkbox per `[value, label]` option. */
-
 import React from 'react';
 
 interface CheckboxGroupProps {

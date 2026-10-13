@@ -1,8 +1,3 @@
-/**
- * @layer ui/panels/civil
- * @pure Text-field parsing for the civil forms (param gathering only; the commands validate).
- */
-
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { fixedNumber } from '@lib/compactNumber';
 import { parseNumberRow } from '@ui/numberText';

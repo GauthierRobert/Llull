@@ -1,9 +1,4 @@
-/**
- * Entity-local to world placement.
- *
- * @layer geometry
- * @pure
- */
+/** Entity-local to world placement. */
 
 import type { Entity, Vec2, Vec3 } from '../model/types';
 import { applyEulerXYZ } from '../lib/eulerRotation';

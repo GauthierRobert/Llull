@@ -1,7 +1,4 @@
-/**
- * @layer ui/viewport/2d
- * Render branch for `kind:'spline'`: centripetal Catmull-Rom curve through the entity's points.
- */
+/** Render branch for `kind:'spline'`: centripetal Catmull-Rom curve through the entity's points. */
 
 import { useMemo } from 'react';
 import * as THREE from 'three';

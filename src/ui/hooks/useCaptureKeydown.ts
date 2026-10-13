@@ -1,6 +1,4 @@
 /**
- * @layer ui/hooks
- *
  * Window `keydown` listener in the capture phase: it runs before the global shortcut handler,
  * which skips keys a tool consumed (preventDefault). Pass a memoized handler, or null to listen
  * to nothing; the listener is re-attached whenever the handler changes.

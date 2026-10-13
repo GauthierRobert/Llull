@@ -1,8 +1,4 @@
-/**
- * New survey point group shared by every survey import command.
- * @layer domain-aec/civil
- * @pure
- */
+/** New survey point group shared by every survey import command. */
 
 import type { CadDocument } from '@core/model/types';
 import type { CivilModel, PointGroupObject, SurveyPoint } from '@core/model/civil';

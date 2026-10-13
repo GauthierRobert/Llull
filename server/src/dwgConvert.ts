@@ -1,6 +1,4 @@
 /**
- * @layer server
- *
  * DWG -> ASCII DXF through an external converter (optional, like the Python STEP bridge). The core
  * only understands ASCII DXF (`import_dxf`); proprietary DWG bytes are converted here, then the
  * DXF text goes through the normal command path.

@@ -3,8 +3,6 @@
  * Every load is rastered into small cells; a cell bears on the NEAREST supporting beam in plan,
  * which for a rectangular bay is the 45° tributary rule (two triangles on the short sides, two
  * trapezoids on the long sides). Cells equidistant from two beams split between them.
- * @layer domain-aec
- * @pure
  */
 
 import { clamp } from '@lib/clamp';

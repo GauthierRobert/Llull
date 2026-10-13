@@ -1,12 +1,8 @@
 /**
- * @layer ui/viewport/2d
- *
  * Pure geometry helpers for the interactive 2D modify tools.
  *
  * All functions are deterministic and side-effect free — they compute
  * dispatch params from raw pick coordinates. Unit-tested in tests/unit/.
- *
- * @pure
  */
 
 import { ellipsePoint } from '@lib/arc';
@@ -41,7 +37,6 @@ interface NearestVertexResult {
  *
  * Returns null when the points array is empty.
  *
- * @pure
  * @failure returns null when points is empty
  */
 export function nearestVertex(points: ReadonlyArray<Vec2>, pick: Vec2): NearestVertexResult | null {
@@ -63,8 +58,6 @@ export function nearestVertex(points: ReadonlyArray<Vec2>, pick: Vec2): NearestV
  * Positive → the pick point is to the LEFT of start→end (same as offset_2d convention).
  * Negative → to the RIGHT.
  * Zero → pick is on the line; returns +1 by default.
- *
- * @pure
  */
 export function offsetSideSign(start: Vec2, end: Vec2, pick: Vec2): 1 | -1 {
   // Cross product of (end-start) × (pick-start)
@@ -80,8 +73,6 @@ export function offsetSideSign(start: Vec2, end: Vec2, pick: Vec2): 1 | -1 {
  * `distance` signed by the side of the entity's first segment on which `worldPick` lies
  * (offset_2d convention: positive = left of start→end). Unsigned when there is no pick, no
  * entity, or the entity has no first segment.
- *
- * @pure
  */
 export function signedOffsetDistance(entity: Entity | undefined, worldPick: Vec2 | null, distance: number): number {
   if (entity === undefined || worldPick === null) return distance;
@@ -107,8 +98,6 @@ function pointToSegDistSq(p: Vec2, a: Vec2, b: Vec2): number {
  * Handles: line, polyline, circle, rectangle, point, arc (swept range only),
  * ellipse (sampled), spline (through its control points), image (its frame, unless locked).
  * Returns Infinity for unsupported kinds.
- *
- * @pure
  */
 export function entityDistSq(entity: Entity, worldPick: Vec2): number {
   // Shift pick into local frame — same for every kind.
@@ -166,7 +155,6 @@ export function entityDistSq(entity: Entity, worldPick: Vec2): number {
 /**
  * World-XY frame (4 corners, pixel order) of an image underlay; null when it is locked, so a locked
  * underlay is never picked or box-selected while tracing over it.
- * @pure
  */
 export function underlayFrame(entity: ImageEntity): Vec2[] | null {
   if (entity.locked) return null;
@@ -176,7 +164,6 @@ export function underlayFrame(entity: ImageEntity): Vec2[] | null {
 /**
  * Entity-local pick box of a text entity, projected from core `textLocalBounds` (the one layout
  * estimate); the block is centred vertically on the entity origin.
- * @pure
  */
 export function textLocalBox(entity: TextEntity): { left: number; width: number; height: number } {
   const { min, max } = textLocalBounds(entity);
@@ -283,7 +270,6 @@ function lowestScoringEntityId(
 /**
  * Id of the entity nearest to `worldPick` within `tolerance` world units, or null.
  * Entities rejected by `isPickable` (e.g. hidden ones) are ignored.
- * @pure
  */
 export function nearestEntityId(
   document: CadDocument,
@@ -307,7 +293,6 @@ export function nearestEntityId(
 /**
  * Enclosed area of a closed 2D entity when `worldPick` lies inside it, else null.
  * Closed kinds: rectangle, circle, ellipse, closed polyline.
- * @pure
  */
 export function enclosingArea(entity: Entity, worldPick: Vec2): number | null {
   const pick: Vec2 = [worldPick[0] - entity.position[0], worldPick[1] - entity.position[1]];
@@ -342,7 +327,6 @@ export function enclosingArea(entity: Entity, worldPick: Vec2): number | null {
 /**
  * Selection pick: the nearest outline within `tolerance` wins; otherwise the smallest closed
  * shape containing the point; otherwise null.
- * @pure
  */
 export function pickEntityId(
   document: CadDocument,

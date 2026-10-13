@@ -1,8 +1,4 @@
-/**
- * @layer ui/viewport/3d
- * @pure Object snapping for the transform gizmo: AABB corners/face centres/edge midpoints of
- * solids (cylinder and sphere use disc/pole points), then grid fallback.
- */
+/** solids (cylinder and sphere use disc/pole points), then grid fallback. */
 
 import { type Entity, type CadDocument, is3D } from '@core/model/types';
 import { rotatedEntityBounds } from '@core/geometry/rotatedBounds';
@@ -127,7 +123,6 @@ function sphereSnapPoints(entity: Entity & { kind: 'sphere' }): SnapPoint3D[] {
  * Returns world-space 3D snap points for all 3D entities except the one
  * being dragged (identified by `excludeId`).
  *
- * @pure deterministic, no side effects
  * @invariant Returns [] when document has no 3D entities (or only the excluded one).
  */
 export function collectSnapCandidates3D(document: CadDocument, excludeId: string | undefined): SnapPoint3D[] {
@@ -164,7 +159,6 @@ export function collectSnapCandidates3D(document: CadDocument, excludeId: string
  * geometric candidate is within tolerance. When gridStep <= 0 and no geometric snap
  * is found, returns the raw candidate position with type 'none'.
  *
- * @pure deterministic, no side effects
  * @invariant Does not mutate the candidates array or the candidate positions.
  */
 export function snap3d(

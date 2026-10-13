@@ -1,7 +1,6 @@
 /**
  * Building / industrial commands folded into a more general one: old name -> rewrite onto the
  * replacement, applied to saved feature-history and recipe steps on load.
- * @layer domain-aec
  */
 
 import type { RetiredCommandRewrite } from '@core/commands/types';

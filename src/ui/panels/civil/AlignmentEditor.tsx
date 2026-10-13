@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/civil
- *
  * AlignmentEditor — one road alignment: design profile PVIs (`set_alignment_profile`), road
  * template (`set_road_section`), superelevation (`set_superelevation`) and its deliverables
  * (report CSV, long / cross section SVG, plan-profile sheet on the chosen paper).

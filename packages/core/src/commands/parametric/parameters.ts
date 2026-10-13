@@ -1,8 +1,6 @@
 /**
  * set_parameter / delete_parameter: the parameter table is document INPUT state (architecture L8),
  * so both are `metaHistory`; dependents re-evaluate in topological order after any change.
- *
- * @layer core/commands
  */
 
 import type { CadDocument, Parameter } from '../../model/types';
@@ -31,7 +29,6 @@ function topoSort(parameters: Readonly<Record<string, Parameter>>): {
 /**
  * Re-evaluate every parameter in dependency order; cycles and unknown references get an `error`
  * (the last good value is kept). Shared with `activate_configuration`.
- * @pure
  */
 export function reEvaluateAll(parameters: Readonly<Record<string, Parameter>>): Record<string, Parameter> {
   const { sorted, cycleSet } = topoSort(parameters);
@@ -69,9 +66,6 @@ export function withParameterExpression(
 }
 
 /**
- * @command set_parameter
- * @pure
- * @layer core/commands
  * @affects updates document.parameters[name] and re-evaluates all dependents
  * @invariant all parameter names remain valid after the operation
  * @failure invalid expression → parameter stored with error field, dependents re-evaluated; never throws
@@ -153,9 +147,6 @@ export const setParameter = defineCommand({
 });
 
 /**
- * @command delete_parameter
- * @pure
- * @layer core/commands
  * @affects removes document.parameters[name]; dependents are re-evaluated and marked with error
  * @invariant dependent parameters remain in the document with error set
  * @failure name does not exist → no-op with descriptive summary

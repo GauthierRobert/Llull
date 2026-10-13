@@ -1,12 +1,8 @@
 /**
- * @layer ui/viewport/2d
- *
  * Pure geometry helpers for the interactive 2D draw tools.
  *
  * All functions are deterministic and side-effect free — they compute
  * dispatch params from raw click coordinates. Unit-tested in tests/unit/.
- *
- * @pure
  */
 
 import type { Vec2, Vec3 } from '@core/model/types';
@@ -23,7 +19,6 @@ interface RectParams {
  * The lower-left corner becomes the work-plane origin (position).
  * Width is always positive (|x2-x1|), height always positive (|y2-y1|).
  *
- * @pure
  * @failure returns null when the two corners are identical (zero area)
  */
 export function rectParamsFromCorners(a: Vec2, b: Vec2): RectParams | null {
@@ -44,7 +39,6 @@ export function rectParamsFromCorners(a: Vec2, b: Vec2): RectParams | null {
 /**
  * Compute the radius for a full-circle draw_arc from a center point and a rim point.
  *
- * @pure
  * @failure returns null when center and rim are identical (radius = 0)
  */
 export function circleRadiusFromPoints(center: Vec2, rim: Vec2): number | null {
@@ -57,8 +51,6 @@ export function circleRadiusFromPoints(center: Vec2, rim: Vec2): number | null {
 /**
  * Drop consecutive near-duplicate vertices (a double-click to finish a chain records its last
  * point twice). "Near" = within 0.1% of the chain's bounding diagonal.
- *
- * @pure
  */
 export function dropRepeatedPoints(points: ReadonlyArray<Vec2>): Vec2[] {
   const tolerance = chainTolerance(points);
@@ -88,7 +80,6 @@ interface EllipseParams {
  * The corner defines the bounding box half-extents: radiusX = |dx|, radiusY = |dy|.
  * Both axes must be non-zero (the two clicks must differ on both axes).
  *
- * @pure
  * @failure returns null when the corner is collinear with the center on either axis
  */
 export function ellipseParamsFromCenterCorner(center: Vec2, corner: Vec2): EllipseParams | null {

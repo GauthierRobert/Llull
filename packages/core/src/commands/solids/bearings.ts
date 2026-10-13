@@ -1,8 +1,4 @@
-/**
- * add_bearing: rolling bearing (inner ring, outer ring, rolling elements) grouped under one name.
- *
- * @layer core/commands
- */
+/** add_bearing: rolling bearing (inner ring, outer ring, rolling elements) grouped under one name. */
 
 import type { CadDocument, Entity, EntityGroup, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
@@ -157,9 +153,6 @@ function resolveSection(
 }
 
 /**
- * @command add_bearing
- * @pure
- * @layer core/commands
  * @affects creates 2 revolution rings + N rolling elements (sphere/cylinder) and 1 group
  * @invariant bore < outerDiameter; rolling elements sit between the raceways; affected = member ids then group id
  * @failure unknown designation, type mismatch, bad dimensions or zero axis -> no-op, affected:[]

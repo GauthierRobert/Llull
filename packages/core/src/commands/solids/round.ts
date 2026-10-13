@@ -13,9 +13,6 @@ import {
 } from './shared';
 
 /**
- * @command add_cylinder
- * @pure
- * @layer core/commands
  * @affects creates 1 cylinder entity; stored position is the geometric center of the cylinder
  * @invariant radius > 0; height > 0
  * @failure radius <= 0 or height <= 0 -> no-op, affected:[]
@@ -46,9 +43,6 @@ export const addCylinder = defineCommand({
 });
 
 /**
- * @command add_sphere
- * @pure
- * @layer core/commands
  * @affects creates 1 sphere entity; stored position is the center of the sphere
  * @invariant radius > 0
  * @failure radius <= 0 -> no-op, affected:[]
@@ -88,9 +82,6 @@ export const addSphere = defineCommand({
 });
 
 /**
- * @command add_cone
- * @pure
- * @layer core/commands
  * @affects creates 1 cone entity; stored position is the center of the base circle (base-center)
  * @invariant radius > 0; height > 0
  * @failure radius <= 0 or height <= 0 -> no-op, affected:[]
@@ -135,9 +126,6 @@ export const addCone = defineCommand({
 });
 
 /**
- * @command add_torus
- * @pure
- * @layer core/commands
  * @affects creates 1 torus entity; stored position is the geometric center of the torus
  * @invariant ringRadius > 0; tubeRadius > 0
  * @failure ringRadius <= 0 or tubeRadius <= 0 -> no-op, affected:[]

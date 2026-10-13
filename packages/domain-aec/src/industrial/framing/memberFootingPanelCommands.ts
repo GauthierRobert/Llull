@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { Vec3 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, vec2, z } from '@core/commands/schema';
@@ -14,8 +10,6 @@ import { toVec3 } from '../common/memberSupport';
 import { levelIdParam } from '../../building/levelParams';
 
 /**
- * @command add_footing
- * @pure
  * @affects creates 1 pad footing, or one under every column of the level
  * @failure no location / location already has a footing / no columns / sizes <= 0 -> no-op
  */
@@ -78,8 +72,6 @@ export const addFooting = defineCommand({
 const MAX_PANEL_CORNERS = 500;
 
 /**
- * @command add_panel
- * @pure
  * @affects creates 1 cladding panel (mesh on layer A-CLAD)
  * @failure < 3 corners / degenerate plane / thickness <= 0 -> no-op
  */

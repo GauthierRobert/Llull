@@ -1,6 +1,4 @@
 /**
- * @layer ui/components/toolbar
- *
  * Main toolbar — the one place a user creates and edits things: labeled groups for selection,
  * 2D drawing, 3D solids, transforms and edit actions. Drawing arms a 2D tool (switching to the
  * 2D view); a solid button creates the primitive in view, selects it and shows the move gizmo.

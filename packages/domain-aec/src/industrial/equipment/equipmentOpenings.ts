@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { Vec2 } from '@core/model/types';
 import type { SlabElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
@@ -16,8 +12,6 @@ import { slabOpeningError } from '../../building/elements/slabOpenings';
 import { slabsCrossedBy } from '../clash/clashSlabs';
 
 /**
- * @command add_equipment_openings
- * @pure
  * @affects cuts one opening in every floor / grating the equipment passes through
  * @failure unknown equipment, negative margin, no floor crossed, every cut refused -> no-op
  * @invariant opening = equipment plan rectangle (rotated) grown by `margin` on each side

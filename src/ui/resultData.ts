@@ -1,8 +1,4 @@
-/**
- * @layer ui
- * @pure Runtime type guards for `CommandResult.data` (`unknown` at the registry boundary).
- * A failed guard means the command refused or returned another shape: callers show `summary`.
- */
+/** A failed guard means the command refused or returned another shape: callers show `summary`. */
 
 import type { CostLine } from '@aec/index';
 import type { Clash } from '@aec/industrial/clash/clash';

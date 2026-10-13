@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/civil
- *
  * EarthworksSection — `add_platform` (outline typed or taken from the selected polyline), each
  * platform's cut / fill (`platform_earthworks`) with a Balance button (`balance_platform`), and a
  * surface-to-surface volume comparison (`compare_surfaces`).

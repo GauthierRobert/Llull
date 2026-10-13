@@ -1,7 +1,4 @@
-/**
- * Stair plan frame.
- * @layer domain-aec
- */
+/** Stair plan frame. */
 
 import type { StairElement } from '@core/model/building';
 import type { Vec2 } from '@core/model/types';

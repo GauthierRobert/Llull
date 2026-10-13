@@ -1,8 +1,4 @@
-/**
- * Footing / panel / column-foot helpers shared by the generators and the add_footing / add_panel commands.
- * @layer domain-aec
- * @pure
- */
+/** Footing / panel / column-foot helpers shared by the generators and the add_footing / add_panel commands. */
 
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
 import type { BuildingModel, FootingElement, PanelElement } from '@core/model/building';

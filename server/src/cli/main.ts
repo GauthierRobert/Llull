@@ -1,5 +1,4 @@
 /**
- * @layer server
  * The `llull` CLI: the command registry from a shell, for agents with a terminal (Claude Code) and
  * scripts/CI. A third caller of `execute` beside the UI and MCP (L1) — argument parsing and
  * printing only; every document change is a registry command, locally or through the server.

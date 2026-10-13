@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Live OpenCascade vs Manifold for exact curves: sweeps (round, hollow and polygon sections along
  * bent / smooth paths) and extrusions / revolutions whose profile carries `curves`. OCC builds the
  * exact B-rep (arcs, Béziers, pipe surfaces — visible in STEP); Manifold works from the shared

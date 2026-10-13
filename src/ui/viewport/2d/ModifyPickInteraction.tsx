@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * Click-capture plane for the active 2D modify tool.
  *
  * Mounted inside the r3f Canvas. Renders an invisible plane that captures pointer events in

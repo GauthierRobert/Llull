@@ -1,7 +1,4 @@
-/**
- * Portal hall plan/roof geometry shared by the member and cladding phases.
- * @layer domain-aec
- */
+/** Portal hall plan/roof geometry shared by the member and cladding phases. */
 
 import type { SteelProfile } from '../../steel/profiles';
 

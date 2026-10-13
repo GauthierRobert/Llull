@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/building
- *
  * ClashSection — runs the read-only check_clashes command and lists hard clashes / clearance
  * violations; clicking a row selects both elements' geometry. Presentation only.
  */

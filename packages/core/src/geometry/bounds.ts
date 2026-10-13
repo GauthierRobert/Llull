@@ -57,7 +57,6 @@ const LINE_SPACING_RATIO = 1.2;
  * `anchor` (left by default) places that width relative to `position`, lines stack at 1.2 em and
  * the whole block is centred vertically on `position` (drei `anchorY="middle"`).
  * Single source of the text layout estimate for core bounds and UI picking.
- * @pure
  */
 export function textLocalBounds(e: TextEntity): Bounds {
   const lines = e.content.split('\n');
@@ -200,8 +199,6 @@ const MAX_NESTING = 8;
  * `entityBounds` for `instance` kind entities.
  *
  * Falls back to a point at the instance position when the component is empty or missing.
- *
- * @pure — reads only; does not mutate
  */
 export function instanceBoundsFromDoc(instance: InstanceEntity, doc: CadDocument, depth = 0): Bounds {
   const component = doc.components[instance.componentId];
@@ -225,7 +222,6 @@ export function instanceBoundsFromDoc(instance: InstanceEntity, doc: CadDocument
 /**
  * World AABB of `e`. Unlike `entityBounds` it resolves instances through their component in `doc`
  * (a bare `entityBounds` call on an instance yields a zero-size box at the origin).
- * @pure
  */
 export function entityBoundsInDoc(doc: CadDocument, e: Entity, depth = 0): Bounds {
   if (e.kind === 'instance') return instanceBoundsFromDoc(e, doc, depth);
@@ -237,7 +233,6 @@ export function entityBoundsInDoc(doc: CadDocument, e: Entity, depth = 0): Bound
  * A dimension has no geometry of its own: its extent is the referenced geometry grown by the
  * witness-line `offset` (default 5) in X and Y. With no resolvable reference it falls back to
  * `entityBounds` (a small box around its own position).
- * @pure
  */
 function dimensionBoundsFromDoc(dimension: DimensionEntity, doc: CadDocument): Bounds {
   const referenced = dimension.entityIds.flatMap((id): Bounds[] => {

@@ -70,9 +70,6 @@ function loftRingsOf(placed: readonly PlacedSection[]): Vec3[][] | string {
 }
 
 /**
- * @command loft_sections
- * @pure
- * @layer core/commands
  * @affects creates 1 loft entity positioned at the first section's centre
  * @invariant >= 2 sections with distinct centres; rings share point count, winding and start
  * @failure fewer than 2 / ambiguous / invalid sections, coincident centres, duplicate id -> no-op

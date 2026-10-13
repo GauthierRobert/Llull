@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Named users and roles: 401 unknown token, 403 insufficient role, viewer read-only (REST + MCP),
  * editor commands, admin endpoints, token hashing, license seat refusal, live event attribution.
  */

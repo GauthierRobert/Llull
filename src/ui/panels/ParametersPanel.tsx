@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels
- *
  * ParametersPanel — lists `document.parameters` with their evaluated value; edits expressions
  * (set_parameter), adds parameters (set_parameter) and deletes them (delete_parameter).
  * A parameter `error` is shown under its row in an aria-live region.

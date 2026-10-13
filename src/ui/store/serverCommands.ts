@@ -1,6 +1,4 @@
 /**
- * @layer ui/store
- *
  * Typed fetch helpers for the server command bus.
  *
  * The server is the single source of truth. Every document mutation is sent here;

@@ -3,8 +3,6 @@
  * pipe underside and the steel below, with side stops (guide, anchor) and a cap (anchor); a hanger is
  * a clamp on the pipe top and a rod up to the steel above. On a riser every type is a clamp collar
  * with a horizontal bracket to the steel beside the pipe.
- * @layer domain-aec
- * @pure
  */
 
 import type { CadDocument } from '@core/model/types';

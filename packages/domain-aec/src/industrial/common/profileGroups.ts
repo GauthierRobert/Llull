@@ -1,7 +1,6 @@
 /**
  * Shared profile-group mechanics of the iterative design commands (design_portal_frames,
  * design_purlins): members of one role and section are up-sized together so rows stay uniform.
- * @layer domain-aec
  */
 
 import { z } from '@core/commands/schema';
@@ -38,7 +37,6 @@ export function addProfileGroup(groups: ProfileGroups, member: SteelMemberElemen
 /**
  * Re-profile every member of the group accepted by `isTarget`; `resize` returns the building with
  * the resized member applied (it may also refit dependents).
- * @pure
  */
 export function resizeProfileGroup(
   building: BuildingModel,
@@ -61,7 +59,6 @@ export function resizeProfileGroup(
  * One design iteration: up-size every group to `nextSize(profile)` via `resizeGroup` (which also
  * re-seats dependents). Groups without a larger size set `limited`; `progressed` is false when no
  * group could grow.
- * @pure
  */
 export function upsizeProfileGroups(
   building: BuildingModel,

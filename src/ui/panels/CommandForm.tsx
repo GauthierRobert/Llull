@@ -1,5 +1,4 @@
 /**
- * @layer ui/panels
  * CommandForm — the `<form>` chrome shared by the panel forms that gather one command's params:
  * fields, inline error, submit button.
  */

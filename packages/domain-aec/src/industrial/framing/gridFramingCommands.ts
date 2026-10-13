@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
 import type { BuildingModel, GridElement, SteelMemberElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
@@ -89,8 +85,6 @@ const selected = (lines: ReadonlyArray<GridElement>, axes: ReadonlyArray<string>
   axes === undefined ? [...lines] : lines.filter((line) => axes.includes(line.mark));
 
 /**
- * @command add_grid_columns
- * @pure
  * @affects creates one column member per grid intersection (exact section meshes)
  * @invariant skips intersections already holding a column on the level or a column of any level whose vertical span covers the base level elevation (same plan xy, 1 mm)
  * @failure no grid / unknown profile, axis, level / topLevel not above base / no intersections -> no-op
@@ -212,8 +206,6 @@ export const addGridColumns = defineCommand({
 });
 
 /**
- * @command add_grid_beams
- * @pure
  * @affects creates one beam member per bay between consecutive intersections on each grid line
  * @invariant beam axis z = topOffset - section depth / 2 relative to the level FFL
  * @failure no grid / unknown profile, axis, level / nothing to frame -> no-op
@@ -304,8 +296,6 @@ export const addGridBeams = defineCommand({
 });
 
 /**
- * @command add_grid_bracing
- * @pure
  * @affects creates 2 (x) or 1 (diagonal) brace members in one bay of one grid line
  * @invariant skips braces whose end points (either direction, 1 mm) already exist on the level
  * @failure unknown profile / label / level, from == to, axis parallel or not crossing, zero height, all braces exist -> no-op

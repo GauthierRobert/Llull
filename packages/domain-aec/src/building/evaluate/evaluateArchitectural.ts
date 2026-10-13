@@ -1,7 +1,6 @@
 /**
  * Evaluators of the architectural building elements: wall, opening, slab, column, beam, stair,
  * room and grid → document entities.
- * @layer domain-aec
  */
 
 import type {

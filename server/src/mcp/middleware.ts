@@ -1,8 +1,4 @@
-/**
- * @layer server
- *
- * Auth and rate-limit middleware for the /mcp router.
- */
+/** Auth and rate-limit middleware for the /mcp router. */
 
 import type { Request, RequestHandler, Response } from 'express';
 import { buildRateLimiter, hasValidBearer } from '../security';

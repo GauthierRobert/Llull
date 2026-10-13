@@ -13,7 +13,6 @@ import { resolveStepForReplay, runReplayStep, unresolvedExpressionsNote } from '
  * steps mint; `=expr` params resolve against `base.parameters`. Steps naming an unknown command
  * (or whose `run` throws) are skipped. `allAffected` lists the entities created, not ones that
  * pre-existed and were merely modified.
- * @pure
  */
 function replayRecipeAdditive(
   base: CadDocument,
@@ -48,9 +47,6 @@ function replayRecipeAdditive(
 }
 
 /**
- * @command save_recipe
- * @pure
- * @layer core/commands
  * @affects adds or replaces an entry in CadDocument.recipes; does NOT change geometry
  * @invariant featureHistory is not modified; existing recipes with other names are untouched
  * @failure blank/whitespace-only name → no-op, affected:[]
@@ -94,9 +90,6 @@ export const saveRecipe = defineCommand({
 });
 
 /**
- * @command instantiate_recipe
- * @pure
- * @layer core/commands
  * @affects all entity ids created by replaying the recipe's steps (returned in affected)
  * @invariant existing entities are untouched; recipe steps are applied additively
  * @failure unknown recipe name → no-op, affected:[]

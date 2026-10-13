@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels
- *
  * MechanismsPanel — collapsible sections for constraints (solve_constraints, delete_constraint),
  * joints (set_joint_value, delete_joint) and drive relations (delete_drive_relation).
  * Selecting a constraint / joint row highlights it in `mechanismSelection` so `MechanismOverlay`

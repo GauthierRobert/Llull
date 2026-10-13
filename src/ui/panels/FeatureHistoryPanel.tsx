@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels
- *
  * FeatureHistoryPanel — timeline of `document.featureHistory` steps.
  * Dispatches: set_step_suppressed, reorder_step, delete_step, replay_history, edit_step_params
  * (a refused edit keeps the form open and shows the command's summary).

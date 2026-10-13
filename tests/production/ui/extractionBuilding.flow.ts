@@ -8,8 +8,6 @@ import type { UiRun } from './grading';
 import type { UiSession } from './session';
 
 /**
- * @layer tests/production/ui
- *
  * desmet-extraction-building through the UI: from an empty app, the engineer creates the project,
  * levels, grid, steel, gratings, equipment, openings, stairs and lines with the Building panel
  * forms, issues the package and saves the project.

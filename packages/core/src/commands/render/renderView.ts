@@ -30,9 +30,6 @@ function withoutEntities2D(doc: CadDocument): CadDocument {
 const clampPixels = (value: number | undefined, fallback: number): number => clamp(Math.round(value ?? fallback), 64, 2000);
 
 /**
- * @command render_view
- * @pure
- * @layer core/commands
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data.svg is a self-contained <svg> string; document === input doc (referential equality)
  * @invariant turntable wins over isolate over section; turntable output carries no overlays

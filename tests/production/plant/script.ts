@@ -4,8 +4,6 @@ import type { ToolCall } from '../contract';
 import { levelId, type IntentEquipment, type PlantIntent } from './intent';
 
 /**
- * @layer tests/production/plant
- *
  * The tool calls a competent engineer makes to model a plant intent, on an empty document.
  * Ids it refers to (`level-n`, `slab-n`, `stair-n`) are the ones llull mints in creation order.
  */

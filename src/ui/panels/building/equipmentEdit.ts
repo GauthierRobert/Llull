@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/building
- *
  * Equipment editor form spec: element → field texts, field texts → the `update_equipment` params
  * that changed (param-gathering only, react R1). Untouched fields are omitted so the history
  * step records exactly the revision.

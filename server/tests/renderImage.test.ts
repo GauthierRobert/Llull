@@ -1,6 +1,4 @@
 /**
- * @layer server/tests
- *
  * Unit tests for renderImage.ts — SVG rasterization helper and MCP image block builder.
  *
  * Covers:

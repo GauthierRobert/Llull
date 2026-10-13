@@ -8,8 +8,6 @@ import type { Provided } from './exports';
 import type { UiSession } from './session';
 
 /**
- * @layer tests/production/ui
- *
  * Grade what the UI produced with the same criteria as the other drivers, archive the downloads,
  * and apply the known-issue ratchet.
  */

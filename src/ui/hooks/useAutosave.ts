@@ -1,6 +1,4 @@
 /**
- * @layer ui/hooks
- *
  * useAutosave — debounced autosave of the working document, restore at startup, and the
  * unsaved-changes tracking behind the `beforeunload` warning and the TopBar indicator.
  *

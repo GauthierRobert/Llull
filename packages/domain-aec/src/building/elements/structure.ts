@@ -1,7 +1,4 @@
-/**
- * Slabs, columns, beams and stairs.
- * @layer domain-aec
- */
+/** Slabs, columns, beams and stairs. */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { BeamElement, BuildingModel, ColumnElement, SlabElement, StairElement, WallElement } from '@core/model/building';
@@ -106,8 +103,6 @@ export function outlineOrNoop(
 }
 
 /**
- * @command add_slab
- * @pure
  * @affects creates 1 slab (extrusion on layer S-SLAB)
  * @failure no valid boundary / walls not a closed loop / thickness <= 0 -> no-op
  */
@@ -200,8 +195,6 @@ export function gridIntersections(building: BuildingModel): Vec2[] {
 }
 
 /**
- * @command add_column
- * @pure
  * @affects creates 1 column, or one per grid intersection
  * @failure no location and no grid intersections / invalid size -> no-op
  */
@@ -284,8 +277,6 @@ export const addColumn = defineCommand({
 });
 
 /**
- * @command add_beam
- * @pure
  * @affects creates 1 beam (box on layer S-BEAM)
  * @failure zero length / size <= 0 -> no-op
  */
@@ -344,8 +335,6 @@ export const addBeam = defineCommand({
 const MAX_RISERS = 200;
 
 /**
- * @command add_stair
- * @pure
  * @affects creates riserCount step solids on layer A-FLOR-STRS
  * @failure invalid start / riserCount < 2 / sizes <= 0 -> no-op
  */

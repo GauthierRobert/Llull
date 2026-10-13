@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * three.js textures of a material finish, built from the same core procedural maps the glTF export
  * embeds (`@core/geometry/finishMaps`), plus the box-projected UV attribute a mesh needs to show
  * them. Textures are memoized per finish and disposed when it changes (R9).

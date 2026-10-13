@@ -2,8 +2,6 @@
  * 2D model of a moment frame for the direct-stiffness solver: column pieces between the levels
  * where beams join, beams meshed at their point loads, the loads split into permanent / imposed.
  * Units: N, mm; vertical loads positive downward.
- * @layer domain-aec
- * @pure
  */
 
 import { clamp } from '@lib/clamp';

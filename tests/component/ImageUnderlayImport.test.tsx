@@ -1,8 +1,6 @@
 /**
  * The underlay import button reads the chosen PNG/JPEG as a data URL and dispatches
  * `add_image_underlay` (locked, named after the file); the command does the rest.
- *
- * @layer tests/component
  */
 
 import { describe, expect, it } from 'vitest';

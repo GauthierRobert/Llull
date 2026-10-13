@@ -1,8 +1,4 @@
-/**
- * Design of one footing under one analysed column: smallest passing pad + reinforcement (EN 1992-1-1).
- * @layer domain-aec
- * @pure
- */
+/** Design of one footing under one analysed column: smallest passing pad + reinforcement (EN 1992-1-1). */
 
 import type { BuildingModel, FootingElement, SteelMemberElement } from '@core/model/building';
 import { fromMm } from '@core/model/units';

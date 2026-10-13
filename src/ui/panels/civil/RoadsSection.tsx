@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/civil
- *
  * RoadsSection — `add_alignment` (PIs typed or taken from the selected polyline, curve radii,
  * clothoid spiral lengths, ground surface) and one AlignmentEditor per alignment.
  */

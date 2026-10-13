@@ -1,7 +1,4 @@
-/**
- * @layer core/commands
- * The engine: the single choke point every surface calls (architecture L1, L5, L8).
- */
+/** The engine: the single choke point every surface calls (architecture L1, L5, L8). */
 
 import type { CadDocument, FeatureStep } from '../model/types';
 import type { CommandResult, ExecutionContext } from './types';

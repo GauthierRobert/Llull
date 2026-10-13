@@ -1,6 +1,4 @@
 /**
- * @layer ui/hooks
- *
  * useMcpLiveDocument — subscribes to the server-side SSE command log.
  *
  * Opens `GET <SERVER_BASE>/live` as an EventSource (URL + optional `?access_token=` from

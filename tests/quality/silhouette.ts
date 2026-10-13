@@ -1,8 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 
 /**
- * @layer tests/quality
- *
  * Where the model is on screen: pixels that differ between a canvas shot WITH the model and one
  * WITHOUT it from the same camera (pixel work runs in the page via canvas 2D decode, so Node
  * needs no image library).

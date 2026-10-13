@@ -1,6 +1,4 @@
 /**
- * @layer server/tests
- *
  * Unit tests for pythonExchange.ts — config parsing, path confinement, bridge failure modes
  * (driven by a fake "python": node running a tiny script) and the exchange-directory I/O.
  */

@@ -1,5 +1,4 @@
 /**
- * @layer desktop
  * Lifecycle of the local backend process: pick a port (stable across launches, so the web app's
  * origin — and its localStorage preferences — stay the same), start the server bundle in its own
  * process, wait for `/health`, stop it on quit. The process launcher is injected: Electron's

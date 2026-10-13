@@ -1,9 +1,4 @@
-/**
- * Entity lookup with a uniform refusal text: the entity of the wanted kind(s), else the reason.
- *
- * @layer core/commands
- * @pure
- */
+/** Entity lookup with a uniform refusal text: the entity of the wanted kind(s), else the reason. */
 
 import type { CadDocument, Entity } from '../../model/types';
 

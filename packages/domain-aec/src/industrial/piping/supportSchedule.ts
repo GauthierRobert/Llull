@@ -1,8 +1,6 @@
 /**
  * Pipe support schedule: one row per support with its pipe, line, type, steel it bears on, position
  * and hanger rod length.
- * @layer domain-aec
- * @pure
  */
 
 import type { CadDocument } from '@core/model/types';

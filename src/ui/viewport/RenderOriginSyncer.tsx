@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport
- *
  * Per-frame floating-origin rebase shared by the 2D and 3D viewports. When the controls target
  * (render-space) drifts beyond the rebase threshold, the camera + target shift with the entity
  * group and `renderOrigin` is updated once. Mount inside a Canvas with `makeDefault` controls.

@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/building
- *
  * StructuralSection — roof / wind loads → the read-only structural checks (frames, bracing,
  * foundations, crane runways; utilisation list, click selects the element) and
  * design_portal_frames / design_purlins (dispatched; up-size sections, bolt groups, purlins and rails).

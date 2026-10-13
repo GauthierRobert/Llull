@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport
- *
  * Calls r3f `invalidate()` whenever watched store state changes, so the 2D and 3D Canvases repaint
  * under `frameloop="demand"` (architecture L7: one model, two views). Subscribes outside React
  * (no re-render); commands are pure (L3), so reference equality is a sufficient change test.

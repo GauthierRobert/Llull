@@ -1,7 +1,4 @@
-/**
- * render_view enrichments (turntable, isolate, section, overlays) through the core command.
- * @layer tests/unit
- */
+/** render_view enrichments (turntable, isolate, section, overlays) through the core command. */
 
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';

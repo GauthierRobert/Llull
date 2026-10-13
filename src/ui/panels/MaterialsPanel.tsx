@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels
- *
  * MaterialsPanel — lists `document.materials` (swatch, name, density); creates
  * (create_material) and assigns them to the selection (assign_material).
  */

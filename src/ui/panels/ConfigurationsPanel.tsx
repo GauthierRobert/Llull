@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels
- *
  * ConfigurationsPanel — lists `document.configurations`; creates (create_configuration) and
  * activates (activate_configuration) them.
  */

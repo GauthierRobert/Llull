@@ -2,8 +2,6 @@
  * Plan symbols of pipe supports on layer P-SUPP, drawn on the plan of the support's level (as its
  * pipe): shoe = filled (cut-style) square, hanger = circle with a cross, guide = square with a tick along each
  * side of the pipe, anchor = hatched square with both diagonals; the support mark beside it.
- * @layer domain-aec
- * @pure
  */
 
 import { planPoint } from '@lib/vec2';

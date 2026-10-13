@@ -9,8 +9,6 @@
  *
  * We also test `sphericalToCartesian` logic directly: given the new CameraState,
  * the derived eye position is correct.
- *
- * @layer tests/component
  */
 
 import { resetStore } from '../helpers/componentEntities';

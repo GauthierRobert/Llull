@@ -1,7 +1,4 @@
-/**
- * Voids through slabs: stair wells, shafts, risers.
- * @layer domain-aec
- */
+/** Voids through slabs: stair wells, shafts, risers. */
 
 import type { Vec2 } from '@core/model/types';
 import type { BuildingModel, SlabElement, StairElement } from '@core/model/building';
@@ -76,8 +73,6 @@ function slabAboveStair(building: BuildingModel, stair: StairElement, footprint:
 }
 
 /**
- * @command add_slab_opening
- * @pure
  * @affects re-evaluates the slab as a mesh with the void
  * @failure unknown slab / stair, opening outside the slab or overlapping another -> no-op
  */
@@ -137,11 +132,7 @@ export const addSlabOpening = defineCommand({
   },
 });
 
-/**
- * @command delete_slab_opening
- * @pure
- * @failure unknown slab / index out of range -> no-op
- */
+/** @failure unknown slab / index out of range -> no-op */
 export const deleteSlabOpening = defineCommand({
   name: 'delete_slab_opening',
   annotations: { destructive: true },

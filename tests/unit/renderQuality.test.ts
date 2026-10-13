@@ -3,8 +3,6 @@
  *
  * Covers deriveQualityTier (auto thresholds) and resolveQualityTier (override
  * path + auto path) — pure functions with no side effects.
- *
- * @layer tests/unit
  */
 
 import { describe, it, expect } from 'vitest';

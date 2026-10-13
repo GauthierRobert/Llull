@@ -1,8 +1,6 @@
 /**
  * ASCII DXF reader: header units, layer table, blocks and entities, flattened into world-space
  * primitives (block inserts expanded, LWPOLYLINE bulges and mirrored OCS handled).
- * @layer core/lib
- * @pure
  */
 
 import type { Vec3 } from '../model/vectors';

@@ -1,6 +1,4 @@
 /**
- * @layer ui/hooks
- *
  * useAutoFrame — frames the camera (`fit_view`, same path as Zoom extents) when the document goes
  * from empty to non-empty (first shape, template, opened project, live snapshot). Quiet: the
  * status bar keeps the summary of the command that added the content, and the framing joins that

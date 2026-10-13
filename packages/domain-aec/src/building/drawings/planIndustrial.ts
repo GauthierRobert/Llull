@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import { planPoint } from '@lib/vec2';
 import { shapeOf } from '../../industrial/equipment/equipmentShape';
 import type { Vec2 } from '@core/model/types';
@@ -227,7 +223,6 @@ export function industrialPrimitives(
 /**
  * Cut symbol, on the plan of `level`, of a concrete or vertical steel column that belongs to ANOTHER
  * level but whose vertical extent crosses the plan cut (`level.elevation + cutHeight`).
- * @pure
  */
 export function crossingColumnPrimitives(
   doc: PlanSource,

@@ -1,5 +1,4 @@
 /**
- * @layer ui/viewport/2d
  * Minor + major line grids on the XY plane. Each is a finite patch sized to the visible viewport
  * (`localGridPatch`) and re-centred on the step-snapped camera every frame, so it appears infinite
  * while the line count stays bounded at any zoom. Geometry is rebuilt only when the step or

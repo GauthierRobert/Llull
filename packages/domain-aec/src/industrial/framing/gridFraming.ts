@@ -1,8 +1,4 @@
-/**
- * Grid geometry shared by the grid-framing commands.
- * @layer domain-aec
- * @pure
- */
+/** Grid geometry shared by the grid-framing commands. */
 
 import type { Vec2 } from '@core/model/types';
 import type { BuildingModel, GridElement } from '@core/model/building';

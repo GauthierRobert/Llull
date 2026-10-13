@@ -1,7 +1,4 @@
-/**
- * @layer server/tests
- * Shared fixtures for the named-user / audit / license tests: temp dir, users file, tokens.
- */
+/** Shared fixtures for the named-user / audit / license tests: temp dir, users file, tokens. */
 import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';

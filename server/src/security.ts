@@ -1,6 +1,4 @@
 /**
- * @layer server
- *
  * HTTP hardening helpers for the non-MCP routes: origin allowlist, mutation guard,
  * JSON error handler. No business logic (architecture L6).
  */

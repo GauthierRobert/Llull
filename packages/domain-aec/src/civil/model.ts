@@ -1,8 +1,4 @@
-/**
- * Civil model access: id minting, object insert / remove, typed lookups and `affected` lists.
- * @layer domain-aec/civil
- * @pure
- */
+/** Civil model access: id minting, object insert / remove, typed lookups and `affected` lists. */
 
 import type { CadDocument, DocumentUnit } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';

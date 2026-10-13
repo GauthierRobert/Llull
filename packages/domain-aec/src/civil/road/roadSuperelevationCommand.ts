@@ -1,7 +1,4 @@
-/**
- * Superelevation design command for a road alignment (the geometry lives in superelevation.ts).
- * @layer domain-aec/civil
- */
+/** Superelevation design command for a road alignment (the geometry lives in superelevation.ts). */
 
 import type { AlignmentObject } from '@core/model/civil';
 import type { CommandResult } from '@core/commands/types';
@@ -15,8 +12,6 @@ import { commitCivil } from '../evaluate';
 export const MAX_SUPERELEVATION_RATE = 0.15;
 
 /**
- * @command set_superelevation
- * @pure
  * @affects sets or removes the superelevation design of 1 alignment (corridor regenerates)
  * @invariant maxRate 0 removes the design; geometry and profile are unchanged
  * @failure unknown alignment / maxRate outside 0..0.15 / runoffLength <= 0 -> no-op

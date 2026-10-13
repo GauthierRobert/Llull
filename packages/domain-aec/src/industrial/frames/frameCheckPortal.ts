@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop, report } from '@core/commands/noop';
@@ -11,8 +7,6 @@ import { checkTable, failureSummary } from '../reports/checkReport';
 import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameLoadParams';
 
 /**
- * @command check_portal_frames
- * @pure read-only
  * @affects none; data = { rows: CheckRow[], csv, maxUtilisation, failures, combinations, alphaCritical }
  * @failure negative loads / unknown level / no frame -> no data
  */

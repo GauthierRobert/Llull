@@ -1,8 +1,6 @@
 /**
  * Retired draw / solid / inspect / document commands, each a special case of a general command.
  * Same-parameter merges are plain renames; `draw_line` becomes the open 2-point `draw_polyline`.
- *
- * @layer core/commands
  */
 
 import type { RetiredCommandRewrite } from '../types';

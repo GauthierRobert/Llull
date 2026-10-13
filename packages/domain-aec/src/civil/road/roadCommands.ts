@@ -1,7 +1,6 @@
 /**
  * Road alignment, profile and cross-section commands (create / edit); queries and drawings live in
  * roadReportCommands.ts.
- * @layer domain-aec/civil
  */
 
 import { compactNumber } from '@lib/compactNumber';
@@ -44,8 +43,6 @@ function surfaceProblem(doc: CadDocument, surfaceId: string | undefined): string
 }
 
 /**
- * @command add_alignment
- * @pure
  * @affects creates 1 alignment: centreline, station ticks + labels, curve annotations
  * @failure fewer than 2 points / radii count mismatch / curves that do not fit / unknown surface -> no-op
  */
@@ -115,8 +112,6 @@ export const addAlignment = defineCommand({
 });
 
 /**
- * @command update_alignment
- * @pure
  * @affects regenerates 1 alignment (centreline, ticks, corridor, daylight)
  * @failure unknown alignment / invalid geometry / unknown surface / no change -> no-op
  */
@@ -198,8 +193,6 @@ function gradeSummary(doc: CadDocument, profile: ReadonlyArray<ProfilePvi>): str
 const PVI_END_SNAP_M = 0.05;
 
 /**
- * @command set_alignment_profile
- * @pure
  * @affects replaces the design profile of 1 alignment (corridor, batters regenerate)
  * @failure unknown alignment / fewer than 2 PVIs / unordered or overlapping PVIs / PVIs more than 5 cm outside the alignment -> no-op
  */
@@ -256,8 +249,6 @@ export const setAlignmentProfile = defineCommand({
 });
 
 /**
- * @command set_road_section
- * @pure
  * @affects sets the road template of 1 alignment (corridor, batters regenerate)
  * @failure unknown alignment / non-positive width or slope / crossfall outside 0..0.3 -> no-op
  */

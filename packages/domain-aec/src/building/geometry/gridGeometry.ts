@@ -1,7 +1,4 @@
-/**
- * @layer aec/building
- * Pure geometry of grid axes, shared by evaluation (3D bubbles) and plan drawings.
- */
+/** Pure geometry of grid axes, shared by evaluation (3D bubbles) and plan drawings. */
 
 import type { Vec2 } from '@core/model/types';
 import type { GridElement } from '@core/model/building';

@@ -1,8 +1,6 @@
 /**
  * Watertight prism meshes: a planar outline (with holes) swept straight between two placements.
  * Used for slabs with openings, steel members, pipes and cladding panels.
- * @layer domain-aec
- * @pure
  */
 
 import type { MeshData, Vec2, Vec3 } from '@core/model/types';

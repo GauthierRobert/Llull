@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * Edge geometry of a solid's drawing primitives — what the user sees as outline: visible, hidden
  * and cut edges (centre lines overshoot the part and are not edges). Pure helpers shared by
  * picking, box selection and snapping.

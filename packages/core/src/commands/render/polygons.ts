@@ -1,9 +1,6 @@
 /**
  * Entity → painter's-algorithm polygons for render_view: filled faces for 3D solids (rotated about
  * their position, three.js intrinsic XYZ order) and stroked paths for 2D shapes (Z-up throughout).
- *
- * @layer core/commands
- * @pure
  */
 
 import type {

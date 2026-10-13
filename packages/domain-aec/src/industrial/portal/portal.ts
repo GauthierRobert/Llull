@@ -1,7 +1,4 @@
-/**
- * Pre-engineered steel hall generator (portal frames) and crane runways.
- * @layer domain-aec
- */
+/** Pre-engineered steel hall generator (portal frames) and crane runways. */
 import { toRadians } from '@lib/angle';
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { BuildingModel, SlabElement } from '@core/model/building';
@@ -34,8 +31,6 @@ function steelMass(doc: CadDocument, building: BuildingModel, ids: ReadonlyArray
 }
 
 /**
- * @command add_crane_runway
- * @pure
  * @affects creates runway beam segments + brackets to nearby steel columns
  * @failure bad points / railHeight <= 0 / unknown profile -> no-op
  */
@@ -100,8 +95,6 @@ export const addCraneRunway = defineCommand({
 });
 
 /**
- * @command add_portal_frame_building
- * @pure
  * @affects creates a complete steel hall (members, footings, cladding, slab) — all-or-nothing
  * @failure invalid dimensions / unknown profiles / crane above eaves -> no-op
  */

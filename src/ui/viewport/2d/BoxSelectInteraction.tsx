@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * Shift + drag in the 2D view while no draw or modify tool is armed: a rubber-band box selects
  * entities — drag left -> right = window (solid outline, fully inside), right -> left = crossing
  * (dashed outline, touching). The selection is ADDED to the current one (Shift = additive).

@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { CadDocument } from '@core/model/types';
 import type { BuildingElement } from '@core/model/building';
 import { distance, polygonArea } from '@lib/polygon';

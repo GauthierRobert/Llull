@@ -1,5 +1,4 @@
 /**
- * @layer ui/viewport/3d
  * 3D perspective viewport: one r3f <Canvas frameloop="demand"> repainted by the store
  * invalidators. Quality tier (useRenderQuality) scales shadows/environment to the entity count.
  * Entities + gizmo sit in a group offset by -renderOrigin (float32-safe floating origin).

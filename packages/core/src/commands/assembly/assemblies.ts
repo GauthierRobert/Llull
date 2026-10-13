@@ -2,8 +2,6 @@
  * Assembly commands: create_component, insert_instance, explode_instance.
  * Instances reference a component by id; `expandInstance` (./instanceExpansion) bakes one into
  * world-space entities.
- *
- * @layer core/commands
  */
 
 import { type Component, type Entity, type InstanceEntity, type Vec3, DEFAULT_LAYER_ID } from '../../model/types';
@@ -54,9 +52,6 @@ export function findComponentCycle(components: Readonly<Record<string, Component
 }
 
 /**
- * @command create_component
- * @pure
- * @layer core/commands
  * @affects [instanceId] — the single InstanceEntity that replaces the promoted entities
  * @invariant component stored in doc.components; source entity ids removed from doc.entities/order
  * @invariant instance at position [0,0,0] references the new component
@@ -137,9 +132,6 @@ export const createComponent = defineCommand({
 });
 
 /**
- * @command insert_instance
- * @pure
- * @layer core/commands
  * @affects [newInstanceId]
  * @invariant componentId must exist in doc.components
  * @failure unknown componentId -> no-op, affected:[]
@@ -175,9 +167,6 @@ export const insertInstance = defineCommand({
 });
 
 /**
- * @command explode_instance
- * @pure
- * @layer core/commands
  * @affects [newEntityIds...] — the fresh concrete entities produced by the bake
  * @invariant instance is replaced in doc.entities/order by its expanded child entities
  * @invariant each produced entity has a fresh id; the component definition is unchanged

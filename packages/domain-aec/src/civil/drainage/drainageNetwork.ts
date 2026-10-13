@@ -1,8 +1,6 @@
 /**
  * Drainage network analysis: plan geometry, flow accumulation down the pipe DAG and per-pipe /
  * per-manhole design checks (SI units in the result rows).
- * @layer domain-aec/civil
- * @pure
  */
 
 import type { CadDocument } from '@core/model/types';

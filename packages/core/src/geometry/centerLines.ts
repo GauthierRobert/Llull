@@ -4,8 +4,6 @@
  * spaced evenly about a common centre get their pitch circle (PCD). Round features are found in the
  * entity itself, in the leaves of its B-rep recipe (holes cut by a boolean included) and in the
  * children of an instance.
- * @layer geometry
- * @pure
  */
 
 import type { CadDocument, Entity, ShapeRecipe, Vec2, Vec3 } from '../model/types';

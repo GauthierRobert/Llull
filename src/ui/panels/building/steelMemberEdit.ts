@@ -1,5 +1,4 @@
 /**
- * @layer ui/panels/building
  * Steel member inspector form spec: element → field texts, field texts → the changed
  * `update_steel_member` params (param-gathering only, react R1).
  */

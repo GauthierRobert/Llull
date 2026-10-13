@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { BasePlateElement, BuildingLevel, GridElement, SteelMemberElement } from '@core/model/building';
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { elementsOf, getBuilding } from '../../building/model';

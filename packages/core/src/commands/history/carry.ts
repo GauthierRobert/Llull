@@ -9,8 +9,6 @@
  * ORPHANS: entries in a regenerated table that no base history step produced (e.g. loaded
  * or seeded outside history). They would be lost by replay, so they are seeded into the
  * fresh document.
- *
- * @layer core/commands
  */
 
 import type { CadDocument, FeatureStep } from '../../model/types';
@@ -38,7 +36,6 @@ function orphanRecords<T>(
   return { records: Object.fromEntries(ids.map((id) => [id, table[id] as T])), order: ids };
 }
 
-/** @pure returns the regenerated-table seed (orphans only) to merge into a fresh document. */
 export function orphanState(
   base: CadDocument,
 ): Pick<

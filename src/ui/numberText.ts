@@ -1,8 +1,4 @@
-/**
- * @layer ui
- * @pure Form text -> command params: numbers and optional strings (param gathering only; the
- * commands validate).
- */
+/** commands validate). */
 
 /** A finite number, or undefined for blank / invalid text. */
 export function parseNumber(text: string): number | undefined {

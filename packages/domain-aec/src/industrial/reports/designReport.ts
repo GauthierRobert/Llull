@@ -1,8 +1,4 @@
-/**
- * Result reporting shared by the iterative design commands (design_portal_frames, design_purlins).
- * @layer domain-aec
- * @pure
- */
+/** Result reporting shared by the iterative design commands (design_portal_frames, design_purlins). */
 
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';

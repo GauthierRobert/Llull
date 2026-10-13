@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Render branch for `kind:'cone'` entities.
  * Apex at +Z*height, base centered on position (Z-up, matches core tessellation).
  * Geometry is memoized on the entity's geometric fields; lifecycle handled by SolidMeshShell.

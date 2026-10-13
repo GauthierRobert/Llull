@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Shadow-casting key light placement that follows the scene. The original rig was fixed at
  * +-30 units around the origin, so models far larger or farther away (mm-scale buildings) cast no
  * shadows. The rig scales with the scene radius and aims at the scene centre in RENDER space
@@ -29,10 +27,7 @@ export interface KeyLightRig {
   readonly far: number;
 }
 
-/**
- * @pure
- * @invariant bounds null (empty scene) -> the original fixed rig at the origin
- */
+/** @invariant bounds null (empty scene) -> the original fixed rig at the origin */
 export function computeKeyLightRig(bounds: Bounds | null, renderOrigin: Vec3): KeyLightRig {
   const centre: Vec3 = bounds ? toRenderPosition(boundsCenter(bounds), renderOrigin) : [0, 0, 0];
   const radius = bounds ? boundsDiagonalRadius(bounds) : 0;

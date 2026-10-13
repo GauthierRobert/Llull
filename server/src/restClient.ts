@@ -1,5 +1,4 @@
 /**
- * @layer server
  * The Node-side REST client of an llull server (CLI backend, desktop documents, health probes):
  * one place for the auth header, the timeout and the JSON-or-error-text body. Bodies become a
  * `CommandOutcome` through `parseCommandResponse` (`@mcp/restProtocol`).

@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Render branch for `kind:'loft'`: the core loft tessellation (geometry/loft.ts, shared with export
  * and the kernels) in the entity's local frame, with creased normals. Memoized on the ring /
  * ruled inputs, which change only when the loft does (pure commands, L3).

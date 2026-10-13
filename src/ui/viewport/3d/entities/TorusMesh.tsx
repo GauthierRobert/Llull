@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Render branch for `kind:'torus'` entities.
  * Ring lies in the XY plane (hole faces +Z), centered on position (Z-up, matches core tessellation).
  * Geometry is memoized on the entity's geometric fields; lifecycle handled by SolidMeshShell.

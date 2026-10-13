@@ -2,8 +2,6 @@
  * Whole-structure load path and member verification behind check_steel_members:
  * loads → beams → columns, notional horizontal forces → bracing and moment frames, one row per
  * steel member.
- * @layer domain-aec
- * @pure
  */
 
 import type { CadDocument } from '@core/model/types';

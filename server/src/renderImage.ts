@@ -1,6 +1,4 @@
 /**
- * @layer server
- *
  * SVG → PNG rasterization for MCP image content blocks, via @resvg/resvg-js (napi-rs, prebuilt
  * binaries). Server-side because it is a native-binary side effect: it MUST NOT move to core/mcp (L2).
  */
@@ -40,7 +38,6 @@ export function rasterizeSvg(svg: string, width?: number): string | null {
 /**
  * Drop `svg` from a data record once it is rasterized: the multi-KB markup burns agent context while
  * the other fields (`bounds`, `camera`, `width`, …) stay for non-multimodal clients.
- * @pure returns a new record; non-record data is returned unchanged
  */
 export function stripSvgFromData(data: unknown): unknown {
   if (!isRecord(data)) return data;

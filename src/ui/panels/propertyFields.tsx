@@ -1,5 +1,3 @@
-/** @layer ui/panels Presentational field primitives for the properties inspector. */
-
 import React, { useRef, useState } from 'react';
 import { fixedNumber } from '@lib/compactNumber';
 import { parseNumber } from '@ui/numberText';

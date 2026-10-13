@@ -1,6 +1,4 @@
 /**
- * @layer ui/components
- *
  * TopBar — application header: sidebar toggle, brand, file breadcrumbs, command-palette trigger
  * (Ctrl/Cmd+K), agent pill (liveStatus), project / export / connect actions, theme and inspector
  * toggles. Presentation only (react R1).

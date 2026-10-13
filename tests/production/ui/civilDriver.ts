@@ -6,8 +6,6 @@ import { runViaPalette } from './palette';
 import type { UiSession } from './session';
 
 /**
- * @layer tests/production/ui
- *
  * Maps each scripted civil tool call to the Civil / Site panel control an engineer uses: the survey
  * file input, the terrain, platform, alignment, manhole and pipe forms, the alignment editor
  * (profile, template, superelevation, report, plan-profile sheet) and the drainage check / sizing

@@ -1,7 +1,4 @@
 /**
- * @command clear_document
- * @pure
- * @layer core/commands
  * @affects nothing surfaced; affected:[]
  * @invariant keeps units, camera, displayPrecision; resets layers to the default unless keepLayers
  * @failure already-empty document -> no-op, affected:[]

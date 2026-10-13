@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { CadDocument } from '@core/model/types';
 import type { BuildingElement, BuildingLevel } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
@@ -69,7 +65,6 @@ function exportElement(
   }
 }
 
-/** @pure */
 function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
   const building = getBuilding(doc);
   const writer = new StepWriter();
@@ -169,8 +164,6 @@ function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
 }
 
 /**
- * @command export_ifc
- * @pure read-only
  * @affects none; data = { filename, ifc, entityCount, productCount }
  * @failure no levels -> no data
  */

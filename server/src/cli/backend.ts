@@ -1,5 +1,4 @@
 /**
- * @layer server
  * Where the `llull` CLI runs a command: a local document file (offline, the registry in-process)
  * or a running llull server (`POST /command` on the shared live document, so the open app updates).
  * Transport glue only (L6): every change goes through `execute` here or the server's command bus.

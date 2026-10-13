@@ -1,6 +1,4 @@
 /**
- * @layer ui/components
- *
  * EmptyState — a centered "start here" card over the viewport while the document has no entities.
  * Offers one-click starts (add a box, draw a rectangle) and explains how to move things and how to
  * let an MCP agent build the model. Auto-hides once any entity exists; dismissal is local state.

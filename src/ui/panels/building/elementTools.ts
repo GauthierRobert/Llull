@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/building
- *
  * Declarative form specs for the building element tools: each tool maps form values to ONE
  * command + params (param-gathering only — the command does all document work, react R1).
  */

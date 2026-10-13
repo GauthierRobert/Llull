@@ -1,7 +1,4 @@
-/**
- * @layer server/tests
- * Shape-kernel shorthands for the live-kernel tests: entity -> leaf recipe -> display mesh.
- */
+/** Shape-kernel shorthands for the live-kernel tests: entity -> leaf recipe -> display mesh. */
 
 import { beforeAll, expect } from 'vitest';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';

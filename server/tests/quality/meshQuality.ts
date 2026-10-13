@@ -1,6 +1,4 @@
 /**
- * @layer server/tests/quality
- *
  * Pure triangle-soup diagnostics for the import quality gates. Not a test file.
  * @invariant input is a flat world-space triangle soup [x0,y0,z0, ...] (9 numbers per triangle)
  */

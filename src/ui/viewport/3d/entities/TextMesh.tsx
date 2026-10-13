@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Render branch for `kind:'text'` entities in the 3D perspective viewport.
  *
  * Uses drei's <Text> SDF renderer for crisp text at any zoom level.

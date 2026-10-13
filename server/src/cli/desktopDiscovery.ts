@@ -1,5 +1,4 @@
 /**
- * @layer server
  * How the `llull` CLI finds the running desktop app: the app writes `<home>/.llull/desktop.json`
  * (owner-only) when its backend is up and removes it on quit; `llull --app` reads it for the URL
  * and the per-launch bearer token. Written by `desktop/`, read by the CLI — one format, here.

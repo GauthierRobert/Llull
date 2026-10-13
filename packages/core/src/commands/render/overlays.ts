@@ -28,7 +28,6 @@ export function composeOverlays(svg: string, baseData: RenderViewData, doc: CadD
 /**
  * Append the bounding-box dimension labels (W/D/H) to an SVG, placed in screen space near the
  * box edges. An empty scene (no bounds) is returned unchanged.
- * @pure
  */
 function appendDimensionLabels(svgString: string, data: RenderViewData): string {
   if (!data.bounds) return svgString;
@@ -131,7 +130,6 @@ function worldAxesLines(project: Projector, data: RenderViewData, units: string,
 /**
  * Append a Z=0 ground grid and/or a world-frame axis triad to an SVG, projected like
  * `appendDimensionLabels`. The scale label uses the document `units`.
- * @pure
  */
 function appendAxesAndGrid(svgString: string, data: RenderViewData, units: string, showAxes: boolean, showGrid: boolean): string {
   const { camera, width, height } = data;

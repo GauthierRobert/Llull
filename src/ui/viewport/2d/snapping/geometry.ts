@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * Pure 2D geometry helpers for snapping: segment extraction, intersections, and the
  * advanced snap constructions (perpendicular, tangent, extension, nearest).
  */
@@ -77,8 +75,6 @@ function footParameter(px: number, py: number, ax: number, ay: number, bx: numbe
  * Snap perpendicular to a segment from reference point `from`.
  * Returns the foot point only when it lies within the segment extents (0 ≤ t ≤ 1).
  * When `from` is null the snap is skipped (no previous point).
- *
- * @pure
  */
 export function snapPerpendicular(from: Vec2 | null, ax: number, ay: number, bx: number, by: number): SnapPoint | null {
   if (from === null) return null;
@@ -100,7 +96,6 @@ export function snapPerpendicular(from: Vec2 | null, ax: number, ay: number, bx:
  *
  * Returns [] when the point is strictly inside the circle (no real tangent).
  *
- * @pure
  * @invariant Returns [] when px,py is strictly inside the circle.
  */
 export function tangentPointsToCircle(px: number, py: number, cx: number, cy: number, r: number): Array<[number, number]> {
@@ -121,7 +116,6 @@ export function tangentPointsToCircle(px: number, py: number, cx: number, cy: nu
  * Snap candidates: tangent points from `from` to a circle (cx,cy,r).
  * Returns 0, 1, or 2 SnapPoints of type 'tangent'.
  *
- * @pure
  * @invariant Returns [] when from is null or strictly inside the circle.
  */
 export function snapTangentToCircle(from: Vec2 | null, cx: number, cy: number, r: number): SnapPoint[] {
@@ -137,8 +131,6 @@ export function snapTangentToCircle(from: Vec2 | null, cx: number, cy: number, r
  * Snap along the extension of a segment (ax,ay)→(bx,by) beyond both endpoints.
  * Returns a snap point on the extended line closest to the cursor, but only
  * when the projection falls OUTSIDE the segment (t < 0 or t > 1).
- *
- * @pure
  */
 export function snapExtension(cursorX: number, cursorY: number, ax: number, ay: number, bx: number, by: number): SnapPoint | null {
   const t = footParameter(cursorX, cursorY, ax, ay, bx, by);
@@ -149,8 +141,6 @@ export function snapExtension(cursorX: number, cursorY: number, ax: number, ay: 
 /**
  * Find the nearest point on a segment (ax,ay)→(bx,by) to cursor (px,py).
  * Returns the clamped foot point (t ∈ [0,1]).
- *
- * @pure
  */
 export function nearestOnSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number): [number, number] {
   const { t } = projectOntoSegment([px, py], [ax, ay], [bx, by]);
@@ -161,8 +151,6 @@ export function nearestOnSegment(px: number, py: number, ax: number, ay: number,
  * Find the nearest point on a circle arc (or full circle) to cursor (px,py).
  * For a full circle (isFullCircle=true) returns the radial foot.
  * For an arc, clamps to the swept angle range.
- *
- * @pure
  */
 export function nearestOnArc(
   px: number,

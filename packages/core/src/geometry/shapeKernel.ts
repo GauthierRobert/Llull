@@ -4,7 +4,6 @@
  * `GeometryKernel` that walks recipes, caches native shapes by `recipeKey` (so an unchanged prefix of
  * the feature tree is never rebuilt) and hands out opaque `ShapeHandle`s.
  *
- * @layer core/geometry
  * @invariant a handle carries its recipe: an evicted (or restarted-kernel) shape is rebuilt on use
  * @invariant a native shape is released exactly once, never while a call still reads it: eviction is
  *   deferred to the end of the outermost call (the cache may exceed `capacity` by that call's nodes)

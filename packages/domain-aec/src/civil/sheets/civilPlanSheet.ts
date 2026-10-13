@@ -2,8 +2,6 @@
  * Civil plan sheet: every civil entity in plan at a true scale on ISO paper, clipped to the
  * drawing viewport, with grid ticks (calibrated sites), layer legend, north arrow, scale bar and
  * the shared title block.
- * @layer domain-aec/civil
- * @pure
  */
 
 import { clamp } from '@lib/clamp';
@@ -132,7 +130,6 @@ function legend(x: number, y: number, layers: ReadonlyArray<{ name: string; colo
 /**
  * Plan sheet of the civil entities of `doc`; null when there is nothing to draw, the scale is
  * not positive or no entity lies on the requested layers.
- * @pure
  */
 export function buildCivilPlanSheet(doc: CadDocument, options: CivilSheetOptions): CivilPlanSheet | null {
   const items = civilPlanEntities(doc, options.layers);

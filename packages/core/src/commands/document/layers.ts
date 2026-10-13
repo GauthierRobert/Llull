@@ -2,8 +2,6 @@
  * Layer management commands.
  * Locked-layer policy: only `set_entity_layer` honours locks (it refuses to move an entity OFF a
  * locked layer); layer operations and geometry edits are never blocked.
- *
- * @layer core/commands
  */
 
 import { type CadDocument, type Layer, DEFAULT_LAYER_ID } from '../../model/types';
@@ -20,9 +18,6 @@ const withLayer = (doc: CadDocument, layer: Layer): CadDocument => ({
 });
 
 /**
- * @command add_layer
- * @pure
- * @layer core/commands
  * @affects creates 1 new Layer; affected = [newLayerId]
  * @invariant new layer is visible, unlocked, appended to layerOrder
  * @failure empty name or non-#rrggbb color -> no-op, affected:[]
@@ -62,9 +57,6 @@ export const addLayer = defineCommand({
 });
 
 /**
- * @command update_layer
- * @pure
- * @layer core/commands
  * @affects updates the given fields (name, visible, locked, color) on the target layer; affected = [id]
  * @invariant fields not given, and entities, are unchanged
  * @failure missing id, no field given, empty name, or non-#rrggbb color -> no-op, affected:[]
@@ -109,9 +101,6 @@ export const updateLayer = defineCommand({
 });
 
 /**
- * @command set_entity_layer
- * @pure
- * @layer core/commands
  * @affects updates layerId on the target entity; affected = [entityId]
  * @invariant entity geometry is unchanged; entity.layerId ∈ doc.layers after the op
  * @failure missing entityId -> no-op; missing layerId -> no-op;
@@ -154,9 +143,6 @@ export const setEntityLayer = defineCommand({
 });
 
 /**
- * @command delete_layer
- * @pure
- * @layer core/commands
  * @affects removes 1 layer from doc.layers and doc.layerOrder; affected = [id];
  *          all entities on the deleted layer are reassigned to DEFAULT_LAYER_ID
  * @invariant DEFAULT_LAYER_ID cannot be deleted; entity count is unchanged

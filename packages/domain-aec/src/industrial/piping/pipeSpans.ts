@@ -1,8 +1,6 @@
 /**
  * Maximum support spacing of horizontal, water-filled, standard-wall steel pipe per nominal size
  * (the span column of `PIPE_SIZES`).
- * @layer domain-aec
- * @pure
  */
 
 import { OUTSIDE_DIAMETER_TOLERANCE_MM, PIPE_SIZES } from './pipeSizes';

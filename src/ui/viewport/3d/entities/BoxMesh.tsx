@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Render branch for `kind:'box'` entities.
  * Geometry is memoized on the entity's size fields; lifecycle handled by SolidMeshShell.
  */

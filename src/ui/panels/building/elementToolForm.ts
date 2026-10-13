@@ -1,6 +1,4 @@
 /**
- * @layer ui/panels/building
- *
  * Form-spec types and field-reading helpers shared by the element and industrial tool
  * specs (param-gathering only, react R1).
  */

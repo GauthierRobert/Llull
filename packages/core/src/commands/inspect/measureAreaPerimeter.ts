@@ -8,9 +8,6 @@ import { elementAt } from '../../lib/elementAt';
 import { positiveSweep } from '../../lib/angle';
 
 /**
- * @command measure_area
- * @pure
- * @layer core/commands
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data is { area: number, unit: string } where unit is derived (e.g. "mm²")
  * @failure open profile, non-2D entity, < 3 points, or missing id -> no-op, affected:[], no data
@@ -71,9 +68,6 @@ export const measureArea = defineCommand({
 });
 
 /**
- * @command measure_perimeter
- * @pure
- * @layer core/commands
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data is { perimeter: number, unit: string }
  * @failure non-2D entity or missing id -> no-op, affected:[], no data

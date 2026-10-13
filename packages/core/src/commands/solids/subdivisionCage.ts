@@ -74,9 +74,6 @@ function subdivisionTarget(doc: CadDocument, id: string): SubdivisionEntity | st
 }
 
 /**
- * @command edit_subdivision_cage
- * @pure
- * @layer core/commands
  * @affects modifies 1 subdivision entity (cage vertices, creases, levels; topology unchanged)
  * @failure missing / non-subdivision id, bad indices, empty selection, nothing to do, bad levels -> no-op
  */

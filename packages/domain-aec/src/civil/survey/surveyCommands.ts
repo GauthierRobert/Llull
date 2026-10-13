@@ -1,7 +1,4 @@
-/**
- * Survey and terrain commands: import survey points, build / edit existing-ground TIN surfaces.
- * @layer domain-aec/civil
- */
+/** Survey and terrain commands: import survey points, build / edit existing-ground TIN surfaces. */
 
 import { type Vec2, type Vec3, DOCUMENT_UNITS } from '@core/model/types';
 import type { SurfaceObject, SurveyPoint } from '@core/model/civil';
@@ -43,8 +40,6 @@ const pointInput = z.object({
 });
 
 /**
- * @command import_survey_points
- * @pure
  * @affects creates 1 point group (+ a marker per point when <= 2000 points)
  * @failure no valid point / too many points -> no-op
  */
@@ -128,8 +123,6 @@ function surfaceSummary(doc: Parameters<typeof getCivil>[0], surface: SurfaceObj
 }
 
 /**
- * @command create_surface
- * @pure
  * @affects creates 1 surface: TIN mesh, minor / major contours, major contour labels
  * @failure unknown point group / fewer than 3 points / invalid boundary -> no-op
  */
@@ -207,8 +200,6 @@ function checkSurfaceOptions(options: {
 }
 
 /**
- * @command update_surface
- * @pure
  * @affects regenerates 1 surface (and every object graded against it)
  * @failure unknown surface / invalid option / no change -> no-op
  */

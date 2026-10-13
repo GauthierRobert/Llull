@@ -1,6 +1,4 @@
 /**
- * @layer ui/components/commandPalette
- *
  * Result toast for commands run from the palette: the palette closes on run, so the command's
  * `summary` (its feedback signal) is shown here until dismissed or timed out (paused on hover /
  * focus). The live region stays mounted so screen readers announce each new result.

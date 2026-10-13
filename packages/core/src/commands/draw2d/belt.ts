@@ -48,9 +48,6 @@ function ccwSweep(startAngle: number, endAngle: number): number {
 }
 
 /**
- * @command draw_belt_around
- * @pure
- * @layer core/commands
  * @affects creates 1 closed polyline entity tracing the belt/chain centerline
  * @invariant pulleys.length >= 2; each radius > 0; no coincident centers; no pulley inside another
  * @failure pulleys < 2, non-positive radius, non-finite inputs, coincident centers, pulley-inside-pulley -> no-op, affected:[]

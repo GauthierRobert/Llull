@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * BuildingPlan2D — draws the active level's floor plan (walls cut at 1.2 m and hatched, glazing, door
  * swings, columns, beams dashed, stairs, room tags, grid bubbles, dimensions) in the 2D drafting
  * view. Pure presentation of `buildPlanDrawing` (the same plan the DXF / sheet exporters use)

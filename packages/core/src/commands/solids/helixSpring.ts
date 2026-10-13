@@ -1,8 +1,4 @@
-/**
- * add_helix_spring: compression spring as one `sweep` entity (round wire along a smooth helix spline).
- *
- * @layer core/commands
- */
+/** add_helix_spring: compression spring as one `sweep` entity (round wire along a smooth helix spline). */
 
 import type { CadDocument, Vec3 } from '../../model/types';
 import { catmullRomBeziers, mapSegment } from '../../geometry/curveSegments';
@@ -81,9 +77,6 @@ function resolveRise(
 }
 
 /**
- * @command add_helix_spring
- * @pure
- * @layer core/commands
  * @affects creates 1 sweep entity (circular wire along a helix spline); position = world start of the wire centerline
  * @invariant coilRadius > wireRadius; pitch >= wire diameter; 0 < turns <= MAX_SPRING_TURNS
  * @failure bad dimensions / fewer than two of pitch,turns,length / zero axis -> no-op, affected:[]

@@ -1,7 +1,4 @@
-/**
- * @layer ui/store
- * Status-bar and measurement feedback rules shared by local and online dispatch. Presentation only.
- */
+/** Status-bar and measurement feedback rules shared by local and online dispatch. Presentation only. */
 
 import { getCommand } from '@core/commands/registry';
 import type { DispatchOptions, LastMeasure } from './storeTypes';

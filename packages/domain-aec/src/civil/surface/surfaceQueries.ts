@@ -1,7 +1,4 @@
-/**
- * Read-only terrain queries: spot elevations / slopes and a surface statistics report.
- * @layer domain-aec/civil
- */
+/** Read-only terrain queries: spot elevations / slopes and a surface statistics report. */
 
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
@@ -13,8 +10,6 @@ import { toMetres } from '@core/model/units';
 import { round } from '../../shared/numeric';
 
 /**
- * @command surface_elevation
- * @pure
  * @affects none (read-only)
  * @failure unknown surface -> no-op
  */
@@ -58,8 +53,6 @@ export const surfaceElevation = defineCommand({
 });
 
 /**
- * @command surface_report
- * @pure
  * @affects none (read-only)
  * @failure unknown surface -> no-op
  */

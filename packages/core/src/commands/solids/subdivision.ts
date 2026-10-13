@@ -99,9 +99,6 @@ export function sizeProblem(cage: Cage, levels: number): string | null {
 }
 
 /**
- * @command add_subdivision_solid
- * @pure
- * @layer core/commands
  * @affects creates 1 subdivision entity at `position`
  * @invariant cage is a closed, consistently wound 2-manifold; creases are cage edges
  * @failure no / several cage sources, bad sizes, open or mis-wound cage, bad levels, duplicate id -> no-op

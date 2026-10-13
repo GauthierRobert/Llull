@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * `llull` CLI end to end through `runCli` with an in-memory I/O port: local document files
  * (exec, run, new, undo/redo, --save, --dry-run) and the --server backend over a fake fetch.
  */

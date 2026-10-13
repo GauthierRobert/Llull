@@ -3,8 +3,6 @@
  * thin dashed hidden edges, chain centre lines and — under a section plane — the cut faces
  * outlined thick and hatched at 45° (hidden edges are omitted from a section view, per ISO 128-50).
  * The 2D viewport and the DXF export draw solids through this one function.
- * @layer geometry
- * @pure
  */
 
 import { type CadDocument, type Entity, type EntityId, type Vec2, is3D } from '../model/types';

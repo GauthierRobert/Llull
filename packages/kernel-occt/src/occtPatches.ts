@@ -1,5 +1,4 @@
 /**
- * @layer kernel
  * Exact freeform solids: each bicubic Bézier patch of a subdivision solid (core
  * subdivisionPatches) becomes one B-spline face; neighbours share their boundary poles, so the
  * faces sew into a closed shell and a solid with true B_SPLINE_SURFACE geometry (STEP, booleans).

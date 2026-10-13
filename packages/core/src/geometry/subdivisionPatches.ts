@@ -1,5 +1,4 @@
 /**
- * @layer core/geometry
  * Exact-surface form of a subdivision solid: one bicubic Bézier patch per quad of the once-refined
  * cage (Loop & Schaefer geometry patches). Around regular vertices (four smooth edges) the patch
  * IS the Catmull-Clark limit surface (uniform bicubic B-spline converted to Bézier form); near

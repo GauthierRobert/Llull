@@ -1,6 +1,4 @@
 /**
- * @layer ui/components
- *
  * ConfirmDialog — small modal asking to confirm a destructive action. Focus moves to the cancel
  * button on open, Tab is trapped, Escape / backdrop cancel, focus returns to the opener on close.
  * Presentation only.

@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * SnapIndicator3D — a small wireframe octahedron marking the active snap point during a translate
  * gizmo drag. The colour encodes the snap type:
  *   vertex      → gold  (#f5c842)

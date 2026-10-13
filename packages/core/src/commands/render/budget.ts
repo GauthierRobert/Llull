@@ -1,9 +1,6 @@
 /**
  * Fair polygon budget for render_view: every entity keeps a share of the budget (water-filling),
  * large meshes are decimated instead of starving the entities that follow them.
- *
- * @layer core/commands
- * @pure
  */
 
 import type { PreDepthPolygon } from './types';

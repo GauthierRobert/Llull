@@ -3,8 +3,6 @@
  * entity whose `brep` is the boolean recipe of their exact shapes (so later fillets/booleans see real
  * edges and faces); the mesh is the kernel's display tessellation. A missing kernel or a null result
  * is a no-op.
- *
- * @layer core/commands
  */
 
 import { type CadDocument, type Entity, is3D } from '../../model/types';
@@ -73,8 +71,6 @@ const SOLID_OPERANDS_NOTE =
   'Both operands must be 3D solids (any solid kind: box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, mesh); 2D shapes are rejected.';
 
 /**
- * @command boolean
- * @pure
  * @affects removes entities a and b; creates 1 mesh entity (a ∪ b, a − b or a ∩ b)
  * @invariant both a and b must be 3D solids; geometry kernel must be injected; subtract keeps a − b
  * @failure missing id, 2D operand, same id, kernel absent, empty result or kernel failure -> no-op, affected:[]

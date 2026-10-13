@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/3d
- *
  * Manages the three.js global clipping plane for the section-cut feature. Mount INSIDE the r3f
  * <Canvas> so that `useThree` resolves.
  *

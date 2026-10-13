@@ -45,7 +45,6 @@ const POINT_SERIES_ID_PREFIX = { polyline: 'poly', spline: 'spline' } as const;
  * Body of `draw_polyline` / `draw_spline`: an unrotated `kind` entity through `points` (components beyond
  * [x, y] ignored, missing ones read as 0).
  * @failure fewer than 2 points -> no-op, affected:[]
- * @pure
  */
 export function drawPointSeries(
   doc: CadDocument,

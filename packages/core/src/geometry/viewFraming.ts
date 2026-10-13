@@ -1,9 +1,4 @@
-/**
- * Camera framing of an AABB for the perspective viewport.
- *
- * @layer geometry
- * @pure
- */
+/** Camera framing of an AABB for the perspective viewport. */
 
 import { VIEWPORT_FOV_DEGREES } from '../model/viewport';
 import { toRadians } from '../lib/angle';

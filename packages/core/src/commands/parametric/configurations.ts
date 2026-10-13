@@ -1,8 +1,6 @@
 /**
  * create_configuration / activate_configuration: design-table variants. Configurations are document
  * INPUT state, so both are `metaHistory`.
- *
- * @layer core/commands
  */
 
 import type { CadDocument, Configuration } from '../../model/types';
@@ -16,9 +14,6 @@ import { unresolvedExpressionsNote } from '../history/replayStep';
 import { changed, noop, report } from '../noop';
 
 /**
- * @command create_configuration
- * @pure
- * @layer core/commands
  * @affects adds or replaces an entry in CadDocument.configurations
  * @invariant existing configurations with different names are not touched
  * @failure blank name → no-op; parameterValues not an object of strings → no-op
@@ -78,9 +73,6 @@ export const createConfiguration = defineCommand({
 });
 
 /**
- * @command activate_configuration
- * @pure
- * @layer core/commands
  * @affects parameters record + all entities (via featureHistory replay)
  * @invariant featureHistory is preserved unchanged after replay
  * @failure unknown config name → no-op; unknown parameter in config → summary note, no throw

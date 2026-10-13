@@ -1,6 +1,4 @@
 /**
- * @layer server
- *
  * Debounced, atomic autosave writer. Transport/state glue only (architecture L6).
  *
  * - `schedule(doc)` coalesces bursts of mutations into one write after `debounceMs`.

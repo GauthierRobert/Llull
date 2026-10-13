@@ -1,7 +1,4 @@
 /**
- * @layer ui/components/commandPalette
- * @pure
- *
  * Ranking for the command palette: every query token must match the haystack (as a substring or,
  * failing that, as an in-order subsequence). Prefix and word-start hits outrank scattered ones.
  */

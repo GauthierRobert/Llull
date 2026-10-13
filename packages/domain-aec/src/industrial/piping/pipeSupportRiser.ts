@@ -7,8 +7,6 @@
  * in equipment / on a header (nozzle), a shoe or anchor clamp on the riser, or an attached support of
  * the pipe within overhangRatio × that span (along the pipe) of one of its elbows — the riser hangs on
  * the elbow like a free end, so the leg to the next support is limited as an overhang is.
- * @layer domain-aec
- * @pure
  */
 
 import { round, roundedMetres } from '../../shared/numeric';

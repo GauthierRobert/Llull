@@ -2,8 +2,6 @@
  * Section behaviour of a member bent in the vertical plane of a moment frame: which principal axis
  * the plane bends (from the roll), weak-axis resistance and the §6.3.3 interaction for it, and the
  * moment resistance reduced by high shear (§6.2.8).
- * @layer domain-aec
- * @pure
  */
 
 import { toRadians } from '@lib/angle';

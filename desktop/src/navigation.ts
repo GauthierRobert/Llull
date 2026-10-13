@@ -1,9 +1,7 @@
 /**
- * @layer desktop
  * Navigation policy for the app window: only the local backend's own origin loads in the window;
  * other http(s) links open in the system browser; everything else is denied. Compares parsed
  * origins — a prefix test would let `http://127.0.0.1:47827@evil.example/` through.
- * @pure
  */
 
 function originOf(url: string): string | null {

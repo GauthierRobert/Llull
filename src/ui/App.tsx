@@ -1,6 +1,4 @@
 /**
- * @layer ui
- *
  * App shell: top bar, toolbar, content row (sidebar | viewport with hint bar | inspector), status
  * bar. View mode (2D / 3D) lives in useToolStore (architecture L7); the theme is mirrored to
  * `data-theme` on <html> so portals inherit it. Edits go through the command layer.

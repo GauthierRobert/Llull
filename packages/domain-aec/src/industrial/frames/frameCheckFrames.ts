@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { CadDocument } from '@core/model/types';
 import { getBuilding } from '../../building/model';
 import { findProfile } from '../../steel/profiles';
@@ -14,10 +10,7 @@ import { type CheckRow, SLS_CRANE, SLS_SWAY, SLS_VERTICAL, connectionCheck, solv
 /** Forces of a row that reports a stability or deflection limit rather than member forces. */
 const NO_FORCES = { axial: 0, moment: 0, shear: 0 } as const;
 
-/**
- * Analyses and checks every portal frame of a level: worst row per element over all combinations.
- * @pure
- */
+/** Analyses and checks every portal frame of a level: worst row per element over all combinations. */
 export function checkFrames(
   doc: CadDocument,
   levelId: string,

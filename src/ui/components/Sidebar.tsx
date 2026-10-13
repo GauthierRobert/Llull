@@ -1,6 +1,4 @@
 /**
- * @layer ui/components
- *
  * Sidebar — vertical icon rail + the one document browser panel it selects
  * (building, civil, layers, assembly, mechanisms, parameters, history, configurations, materials).
  * Tab state lives in useLayoutStore (presentation only — never document state).

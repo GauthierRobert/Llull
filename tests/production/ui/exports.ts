@@ -4,8 +4,6 @@ import type { Locator } from '@playwright/test';
 import type { UiSession } from './session';
 
 /**
- * @layer tests/production/ui
- *
  * Issue the coordination package through the Building panel's Deliverables and Quantities
  * sections: every file is the one the browser downloaded. Per-level files are issued by picking
  * the level in the "Export level" selector (the active level is not touched).

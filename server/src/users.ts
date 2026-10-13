@@ -1,5 +1,4 @@
 /**
- * @layer server
  * Named users and roles (opt-in via `LLULL_USERS_FILE`). Transport-level authentication only:
  * the bearer token resolves to a user, the role gates routes / MCP tools. No business logic (L6).
  *

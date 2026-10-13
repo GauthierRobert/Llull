@@ -1,8 +1,4 @@
-/**
- * Structural validation of a loaded building model (persistence boundary).
- * @layer domain-aec
- * @pure
- */
+/** Structural validation of a loaded building model (persistence boundary). */
 
 import { isStringArray } from '@lib/isStringArray';
 import { isFiniteNumber, isPositiveNumber } from '@lib/isFiniteNumber';

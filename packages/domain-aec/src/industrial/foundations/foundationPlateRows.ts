@@ -1,8 +1,4 @@
-/**
- * Base-plate and anchor check rows (concrete bearing, anchor tension / shear, M+N) of one column.
- * @layer domain-aec
- * @pure
- */
+/** Base-plate and anchor check rows (concrete bearing, anchor tension / shear, M+N) of one column. */
 
 import { unitsToMm } from '../../shared/numeric';
 import type { BasePlateElement, BuildingModel } from '@core/model/building';

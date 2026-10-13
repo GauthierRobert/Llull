@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { Vec2, Vec3 } from '@core/model/types';
 import { toCounterClockwise } from '@lib/polygon';
 import { round } from '../../shared/numeric';

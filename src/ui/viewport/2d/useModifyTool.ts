@@ -1,6 +1,4 @@
 /**
- * @layer ui/viewport/2d
- *
  * State machine for interactive 2D modify tools.
  *
  * Collects entity-picks and numeric inputs, then calls store.dispatch with

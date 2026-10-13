@@ -1,8 +1,4 @@
-/**
- * @layer ui/viewport/2d
- *
- * Snap types and option shapes for the 2D drafting viewport.
- */
+/** Snap types and option shapes for the 2D drafting viewport. */
 
 import type { Entity } from '@core/model/types';
 

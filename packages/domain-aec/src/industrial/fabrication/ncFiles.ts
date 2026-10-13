@@ -1,8 +1,4 @@
-/**
- * DSTV NC1 text rendering and grouping of identical pieces into files.
- * @layer domain-aec
- * @pure
- */
+/** DSTV NC1 text rendering and grouping of identical pieces into files. */
 
 import { fileSlug } from '../../building/model';
 import type { NcPiece } from './ncMemberPieces';
