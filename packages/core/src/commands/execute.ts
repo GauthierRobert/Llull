@@ -12,7 +12,7 @@ import { stepIdSource } from '../lib/id';
  * @invariant a mutating command (not `readOnly` / `metaHistory`) that changes the document appends FeatureStep `step-<n>` (n =
  *   doc.nextStepNumber) and mints ids `<prefix>-<n>.<k>`, so replay re-mints identical ids; an execute nested inside a running step joins
  *   it (no extra step)
- * @failure unknown command, or `requiresKernel` while ctx.kernel is null -> no-op, affected:[], rejected:true
+ * @failure nextStepNumber not a safe integer >= 1 (a mutating command would re-mint ids), unknown command, or `requiresKernel` while ctx.kernel is null -> no-op, affected:[], rejected:true
  */
 export function execute(doc: CadDocument, commandName: string, params: unknown, ctx: ExecutionContext = currentContext()): CommandResult {
   const def = getCommand(commandName);
@@ -25,6 +25,11 @@ export function execute(doc: CadDocument, commandName: string, params: unknown, 
     return runInContext(ctx, () => def.run(doc, params, ctx));
   }
   const stepNumber = doc.nextStepNumber ?? 1;
+  if (!Number.isSafeInteger(stepNumber) || stepNumber < 1)
+    return rejection(
+      doc,
+      `${commandName} rejected: document nextStepNumber ${String(stepNumber)} is not a safe integer >= 1 (ids would collide).`,
+    );
   const stepKey = String(stepNumber);
   const stepContext: ExecutionContext = { ...ctx, ids: stepIdSource(stepKey), stepKey };
   const result = runInContext(stepContext, () => def.run(doc, params, stepContext));

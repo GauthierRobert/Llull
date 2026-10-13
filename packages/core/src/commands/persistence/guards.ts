@@ -1,4 +1,13 @@
-import { type Layer, type CameraState, type Vec2, type Vec3, SHAPE2D_KINDS, SOLID_KINDS, FINISH_PATTERNS } from '../../model/types';
+import {
+  type Layer,
+  type CameraState,
+  type EntityKind,
+  type Vec2,
+  type Vec3,
+  SHAPE2D_KINDS,
+  SOLID_KINDS,
+  FINISH_PATTERNS,
+} from '../../model/types';
 import { isRecord } from '../../lib/isRecord';
 import { isFiniteNumber, isPositiveNumber } from '../../lib/isFiniteNumber';
 import { isVec3 } from '../../lib/vec3';
@@ -8,7 +17,14 @@ import { chainIssue } from '../../geometry/curveSegments';
 import { MAX_SUBDIVISION_LEVELS, type Cage, cageProblem } from '../../geometry/subdivision';
 import type { CurveSegment } from '../../model/curve';
 import { isVec2 } from '../../lib/vec2';
-import { MAX_IMAGE_DATA_URL_LENGTH } from '../limits';
+import {
+  MAX_DISPLAY_PRECISION,
+  MAX_IMAGE_DATA_URL_LENGTH,
+  MAX_IMPORT_TRIANGLES,
+  MAX_PROFILE_POINTS,
+  MAX_REVOLVE_SEGMENTS,
+  MAX_SPLINE_CONTROL_POINTS,
+} from '../limits';
 import { POSITIVE_FIELDS } from '../../model/positiveFields';
 
 /** First problem of a saved image underlay's raster fields, or null (the payload is not decoded). */
@@ -155,7 +171,9 @@ export function validateEntityValue(v: unknown): string | null {
     const value = v[field];
     if (!isPositiveNumber(value)) return `entity ${id} (${kind}): ${field} must be finite and > 0, got ${String(value)}`;
   }
-  const problem = KIND_PROBLEMS[kind]?.(v) ?? null;
+  const optional = baseOptionalProblem(v);
+  if (optional !== null) return `entity ${id} (${kind}): ${optional}`;
+  const problem = KIND_PROBLEMS[kind as EntityKind](v);
   return problem === null ? null : `entity ${id} (${kind}): ${problem}`;
 }
 
@@ -169,20 +187,119 @@ function tupleProblem(v: Record<string, unknown>, key: string, ok: (c: unknown) 
 
 const sizeProblem = (v: Record<string, unknown>): string | null => tupleProblem(v, 'size', isPositiveNumber, 'finite and > 0');
 
-/** Kind-specific structural checks (message tail after `entity <id> (<kind>): `). */
-const KIND_PROBLEMS: Readonly<Record<string, (v: Record<string, unknown>) => string | null>> = {
+const noProblem = (): null => null;
+
+/** Optional BaseEntity fields (`name`, `tags`, `materialId`) must have their declared types, or null. */
+function baseOptionalProblem(v: Record<string, unknown>): string | null {
+  if (v['name'] !== undefined && typeof v['name'] !== 'string') return 'name must be a string';
+  if (v['materialId'] !== undefined && typeof v['materialId'] !== 'string') return 'materialId must be a string';
+  const tags = v['tags'];
+  if (tags !== undefined && !(Array.isArray(tags) && tags.every((t) => typeof t === 'string'))) return 'tags must be an array of strings';
+  return null;
+}
+
+/** `v[key]` must be a Vec2 of finite numbers, or null. */
+function vec2Problem(v: Record<string, unknown>, key: string): string | null {
+  return isVec2(v[key]) ? null : `${key} must be [x, y] of finite numbers`;
+}
+
+/** `v[key]` must be a list of `min..max` finite Vec2, or null. */
+function pointListProblem(v: Record<string, unknown>, key: string, min: number, max: number): string | null {
+  const list = v[key];
+  if (!Array.isArray(list) || list.length < min || list.length > max || !list.every(isVec2))
+    return `${key} must be ${min}..${max} [x, y] points of finite numbers`;
+  return null;
+}
+
+/** First problem among the checks (stops at the first non-null). */
+function firstProblem(...checks: ReadonlyArray<string | null>): string | null {
+  return checks.find((problem) => problem !== null) ?? null;
+}
+
+const finiteField =
+  (key: string) =>
+  (v: Record<string, unknown>): string | null =>
+    isFiniteNumber(v[key]) ? null : `${key} must be a finite number, got ${String(v[key])}`;
+
+const closedFlagProblem = (v: Record<string, unknown>): string | null =>
+  v['closed'] === undefined || typeof v['closed'] === 'boolean' ? null : 'closed must be a boolean';
+
+function revolutionProblem(v: Record<string, unknown>): string | null {
+  const { segments, axis, angle } = v;
+  if (!Number.isInteger(segments) || (segments as number) < 3 || (segments as number) > MAX_REVOLVE_SEGMENTS)
+    return `segments must be an integer 3..${MAX_REVOLVE_SEGMENTS}, got ${String(segments)}`;
+  if (!isVec3(axis) || Math.hypot(...axis) < 1e-12) return 'axis must be a non-zero [x, y, z] of finite numbers';
+  if (!isFiniteNumber(angle) || angle <= 0 || angle > 2 * Math.PI + 1e-9) return `angle must be in (0, 2π], got ${String(angle)}`;
+  return firstProblem(pointListProblem(v, 'profile', 3, MAX_PROFILE_POINTS), curvesProblem(v['curves']));
+}
+
+function meshProblem(v: Record<string, unknown>): string | null {
+  const mesh = v['mesh'];
+  if (!isRecord(mesh)) return 'mesh must be { positions, indices }';
+  const { positions, indices } = mesh;
+  if (!Array.isArray(positions) || positions.length % 3 !== 0 || !positions.every(isFiniteNumber))
+    return 'mesh.positions must be a flat array of finite numbers (length divisible by 3)';
+  const vertexCount = positions.length / 3;
+  if (!Array.isArray(indices) || indices.length % 3 !== 0 || indices.length / 3 > MAX_IMPORT_TRIANGLES)
+    return `mesh.indices must be a flat array of triangle indices (at most ${MAX_IMPORT_TRIANGLES} triangles)`;
+  if (!indices.every((i) => Number.isInteger(i) && (i as number) >= 0 && (i as number) < vertexCount))
+    return `mesh.indices must be integers in [0, ${vertexCount})`;
+  const problem = v['brep'] === undefined ? null : validateShapeRecipe(v['brep'], validateEntityValue);
+  return problem === null ? null : `brep recipe invalid — ${problem}`;
+}
+
+function textProblem(v: Record<string, unknown>): string | null {
+  if (typeof v['content'] !== 'string' || v['content'] === '') return 'content must be a non-empty string';
+  const anchor = v['anchor'];
+  return anchor === undefined || anchor === 'left' || anchor === 'center' || anchor === 'right'
+    ? null
+    : "anchor must be 'left' | 'center' | 'right'";
+}
+
+const DIMENSION_KINDS: ReadonlySet<unknown> = new Set(['linear', 'aligned', 'radial', 'angular']);
+
+function dimensionProblem(v: Record<string, unknown>): string | null {
+  if (!DIMENSION_KINDS.has(v['dimensionKind'])) return "dimensionKind must be 'linear' | 'aligned' | 'radial' | 'angular'";
+  const ids = v['entityIds'];
+  if (!Array.isArray(ids) || ids.length > 3 || !ids.every((x) => typeof x === 'string'))
+    return 'entityIds must be up to 3 entity id strings';
+  if (v['offset'] !== undefined && !isFiniteNumber(v['offset'])) return 'offset must be a finite number';
+  const precision = v['precision'];
+  if (
+    precision !== undefined &&
+    !(Number.isInteger(precision) && (precision as number) >= 0 && (precision as number) <= MAX_DISPLAY_PRECISION)
+  )
+    return `precision must be an integer 0..${MAX_DISPLAY_PRECISION}`;
+  return v['label'] === undefined || typeof v['label'] === 'string' ? null : 'label must be a string';
+}
+
+/** Kind-specific structural checks (message tail after `entity <id> (<kind>): `); exhaustive over `EntityKind`. */
+const KIND_PROBLEMS: Readonly<Record<EntityKind, (v: Record<string, unknown>) => string | null>> = {
   box: sizeProblem,
   wedge: sizeProblem,
-  extrusion: (v) => (isFiniteNumber(v['depth']) ? curvesProblem(v['curves']) : `depth must be a finite number, got ${String(v['depth'])}`),
-  revolution: (v) => curvesProblem(v['curves']),
+  cylinder: noProblem,
+  sphere: noProblem,
+  cone: noProblem,
+  torus: noProblem,
+  pyramid: noProblem,
+  extrusion: (v) =>
+    firstProblem(finiteField('depth')(v), pointListProblem(v, 'profile', 3, MAX_PROFILE_POINTS), curvesProblem(v['curves'])),
+  revolution: revolutionProblem,
   sweep: sweepProblem,
   loft: (v) => ringsProblem(v['rings'], 3, 2) ?? (typeof v['ruled'] === 'boolean' ? null : 'ruled must be a boolean'),
   subdivision: subdivisionProblem,
   image: imageProblem,
-  mesh: (v) => {
-    const problem = v['brep'] === undefined ? null : validateShapeRecipe(v['brep'], validateEntityValue);
-    return problem === null ? null : `brep recipe invalid — ${problem}`;
-  },
+  mesh: meshProblem,
+  line: (v) => firstProblem(vec2Problem(v, 'start'), vec2Problem(v, 'end')),
+  polyline: (v) => firstProblem(pointListProblem(v, 'points', 2, MAX_PROFILE_POINTS), closedFlagProblem(v)),
+  spline: (v) => firstProblem(pointListProblem(v, 'points', 2, MAX_SPLINE_CONTROL_POINTS), closedFlagProblem(v)),
+  arc: (v) => firstProblem(vec2Problem(v, 'center'), finiteField('startAngle')(v), finiteField('endAngle')(v)),
+  circle: (v) => vec2Problem(v, 'center'),
+  ellipse: (v) => vec2Problem(v, 'center'),
+  rectangle: noProblem,
+  point: noProblem,
+  text: textProblem,
+  dimension: dimensionProblem,
   instance: (v) => {
     const componentId = v['componentId'];
     if (typeof componentId !== 'string' || componentId.length === 0)

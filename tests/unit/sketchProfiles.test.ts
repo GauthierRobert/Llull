@@ -144,7 +144,14 @@ describe('exact curves survive edits and persistence', () => {
     const loaded = execute(createEmptyDocument(), 'load_document', { json: serializeDocument(withExt) });
     expect(loaded.document.entities[ext.id]).toEqual(ext);
     for (const kind of ['extrusion', 'revolution'] as const) {
-      const broken = { ...ext, kind, curves: [{ type: 'bezier', points: [[0, 0]] }] } as unknown as Entity;
+      const broken = {
+        ...ext,
+        kind,
+        segments: 8,
+        axis: [0, 1, 0],
+        angle: 1,
+        curves: [{ type: 'bezier', points: [[0, 0]] }],
+      } as unknown as Entity;
       const result = execute(createEmptyDocument(), 'load_document', {
         json: serializeDocument({ ...withExt, entities: { [ext.id]: broken } }),
       });

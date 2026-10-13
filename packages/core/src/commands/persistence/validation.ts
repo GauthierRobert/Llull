@@ -5,6 +5,9 @@ import { isRecord } from '../../lib/isRecord';
 import { isFiniteNumber } from '../../lib/isFiniteNumber';
 import { isVec3 } from '../../lib/vec3';
 import { documentExtensions } from '../../plugins/host';
+import { corruptionReason } from '../guard';
+import { getCommand } from '../commandTable';
+import { validateAnimationValue, validateComponentValue, validateConfigurationValue, validateGroupValue } from './collections';
 import { validateCamera, validateLayer, validateEntityValue, validateMaterialValue, validateParameterValue } from './guards';
 
 const VALID_CONSTRAINT_KINDS: ReadonlySet<string> = new Set(CONSTRAINT_KINDS);
@@ -85,6 +88,55 @@ function validateRecipeValue(name: string, v: unknown): string | null {
   return null;
 }
 
+const PROTOTYPE_KEYED_RECORDS = [
+  'entities',
+  'layers',
+  'materials',
+  'parameters',
+  'animations',
+  'configurations',
+  'groups',
+  'recipes',
+  'components',
+  'constraints',
+  'joints',
+  'driveRelations',
+] as const;
+
+/** Commands that rewrite or replay `featureHistory`; recorded as a step they would re-enter replay. Other legacy meta/read-only steps replay inertly. */
+const HISTORY_CONTROL_COMMANDS: ReadonlySet<string> = new Set([
+  'replay_history',
+  'set_step_suppressed',
+  'edit_step_params',
+  'reorder_step',
+  'delete_step',
+  'insert_step',
+  'load_document',
+]);
+
+/** Feature history steps are replayed by name/params: each must be well-formed, unique, and name a replayable registered command. */
+function historyProblems(history: ReadonlyArray<unknown>): string[] {
+  const errors: string[] = [];
+  const seen = new Set<string>();
+  history.forEach((step, index) => {
+    if (!isRecord(step) || typeof step['id'] !== 'string' || typeof step['name'] !== 'string') {
+      errors.push(`featureHistory[${index}] is malformed (needs string id and name)`);
+      return;
+    }
+    const where = `featureHistory[${index}] (${step['id']})`;
+    if (seen.has(step['id'])) errors.push(`${where}: duplicate step id`);
+    seen.add(step['id']);
+    const command = getCommand(step['name']);
+    if (!command) errors.push(`${where}: unknown command '${step['name']}'`);
+    else if (HISTORY_CONTROL_COMMANDS.has(step['name']))
+      errors.push(`${where}: '${step['name']}' edits the history itself and cannot be a history step`);
+    if (!isRecord(step['params'])) errors.push(`${where}: params must be an object`);
+    if (step['affected'] !== undefined && !isStringArray(step['affected'])) errors.push(`${where}: affected must be an array of strings`);
+    if (step['suppressed'] !== undefined && typeof step['suppressed'] !== 'boolean') errors.push(`${where}: suppressed must be a boolean`);
+  });
+  return errors;
+}
+
 /** Structural validation of the raw document record (shape-only, no value checks). Value checks are done in `validateDocumentValues`. */
 export function validateDocumentShape(v: unknown): v is Record<string, unknown> {
   if (!isRecord(v)) return false;
@@ -110,6 +162,10 @@ export function validateDocumentValues(v: Record<string, unknown>): string[] {
   for (const [eid, entity] of Object.entries(entities)) {
     const err = validateEntityValue(entity);
     if (err !== null) errors.push(err);
+    else {
+      const corruption = corruptionReason(entity);
+      if (corruption !== null) errors.push(`entity ${eid}: contains ${corruption}`);
+    }
     if (isRecord(entity) && entity['id'] !== eid)
       errors.push(`entity record key '${eid}' does not match entity.id '${String(entity['id'])}'`);
     const layerIdVal = isRecord(entity) ? entity['layerId'] : undefined;
@@ -120,6 +176,9 @@ export function validateDocumentValues(v: Record<string, unknown>): string[] {
   for (const orderedId of v['order'] as string[]) {
     if (!Object.hasOwn(entities, orderedId)) errors.push(`order: '${orderedId}' does not reference a known entity`);
   }
+  // `order` is exactly the entity key set: an entity missing from it would dodge every order-driven scan
+  const ordered = new Set(v['order'] as string[]);
+  for (const eid of Object.keys(entities)) if (!ordered.has(eid)) errors.push(`order is missing entity '${eid}'`);
   // Duplicate ids in order would render/process an entity twice
   const orderIds = v['order'] as string[];
   if (new Set(orderIds).size !== orderIds.length) errors.push('order contains duplicate entity ids');
@@ -127,23 +186,14 @@ export function validateDocumentValues(v: Record<string, unknown>): string[] {
   for (const selectedId of v['selection'] as string[]) {
     if (!Object.hasOwn(entities, selectedId)) errors.push(`selection: '${selectedId}' does not reference a known entity`);
   }
-  // Component definitions must not reference themselves (renderers and bounds walk them recursively)
-  const components = v['components'];
-  if (isRecord(components)) {
-    for (const id of Object.keys(components)) {
-      const cycle = findComponentCycle(components as Record<string, Component>, id);
-      if (cycle) errors.push(`component '${id}' contains itself (${cycle.join(' -> ')})`);
-    }
+  for (const key of PROTOTYPE_KEYED_RECORDS) {
+    const record = v[key];
+    if (!isRecord(record)) continue;
+    for (const id of Object.keys(record))
+      if (id in Object.prototype) errors.push(`${key}: id '${id}' is a reserved JavaScript property name`);
   }
-  // Feature history steps are replayed by name/params — each must be a well-formed record
-  if (Array.isArray(v['featureHistory']))
-    v['featureHistory'].forEach((step: unknown, index: number) => {
-      if (!isRecord(step) || typeof step['id'] !== 'string' || typeof step['name'] !== 'string')
-        errors.push(`featureHistory[${index}] is malformed (needs string id and name)`);
-    });
-  for (const layer of Object.values(layers)) {
-    if (!validateLayer(layer)) errors.push(`layer entry is malformed: ${JSON.stringify(layer)}`);
-  }
+  for (const layerId of v['layerOrder'] as string[])
+    if (!Object.hasOwn(layers, layerId)) errors.push(`layerOrder: '${layerId}' does not reference a known layer`);
   const validateSection = (section: unknown, validate: (key: string, value: unknown) => string | null): void => {
     if (!isRecord(section)) return;
     for (const [key, value] of Object.entries(section)) {
@@ -151,6 +201,23 @@ export function validateDocumentValues(v: Record<string, unknown>): string[] {
       if (err !== null) errors.push(err);
     }
   };
+  validateSection(v['groups'], validateGroupValue);
+  validateSection(v['animations'], validateAnimationValue);
+  validateSection(v['configurations'], validateConfigurationValue);
+  validateSection(v['components'], validateComponentValue);
+  // Component definitions must not reference themselves (renderers and bounds walk them recursively); only well-formed ones are walked
+  const components = v['components'];
+  if (isRecord(components) && errors.length === 0) {
+    for (const id of Object.keys(components)) {
+      const cycle = findComponentCycle(components as Record<string, Component>, id);
+      if (cycle) errors.push(`component '${id}' contains itself (${cycle.join(' -> ')})`);
+    }
+  }
+  const history = v['featureHistory'];
+  if (Array.isArray(history)) errors.push(...historyProblems(history));
+  for (const layer of Object.values(layers)) {
+    if (!validateLayer(layer)) errors.push(`layer entry is malformed: ${JSON.stringify(layer)}`);
+  }
   validateSection(v['materials'], validateMaterialValue);
   validateSection(v['parameters'], validateParameterValue);
   validateSection(v['recipes'], validateRecipeValue);

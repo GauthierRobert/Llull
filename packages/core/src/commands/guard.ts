@@ -60,7 +60,7 @@ function warnAndDescribe(message: string, error: unknown): string {
   return errorMessage(error);
 }
 
-function corruptionReason(entity: unknown): string | null {
+export function corruptionReason(entity: unknown): string | null {
   if (containsNonFinite(entity)) return 'non-finite numbers (NaN/Infinity/undefined components)';
   if (hasMalformedPosition(entity)) return 'a malformed position (must be a 3-number [x, y, z])';
   return null;

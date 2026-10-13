@@ -143,3 +143,14 @@ describe('array_polar axis', () => {
     expect(bad.summary).toMatch(/axis/);
   });
 });
+
+describe('array_polar zero angle', () => {
+  it('rejects an angle that would stack every copy on the original', () => {
+    const base = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1], position: [5, 0, 0] });
+    const id = base.affected[0] as string;
+    const r = execute(base.document, 'array_polar', { id, count: 4, center: [0, 0, 0], angle: 0 });
+    expect(r.document).toBe(base.document);
+    expect(r.affected).toEqual([]);
+    expect(r.summary).toContain('angle must be non-zero');
+  });
+});

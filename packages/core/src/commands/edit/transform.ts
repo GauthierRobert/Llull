@@ -13,6 +13,9 @@ import { replaceEntity } from '../entity/entityOps';
 import { rotateEulerAboutWorldZ } from '../../lib/eulerRotation';
 import { toDegrees } from '../../lib/angle';
 
+/** Smallest |angle| (radians) that still spreads array_polar copies apart. */
+const MIN_POLAR_ANGLE = 1e-9;
+
 const arrayCountField = z.number().int().describe('Total number of instances including the original. Must be an integer >= 2.');
 
 /**
@@ -195,6 +198,11 @@ export const arrayPolar = defineCommand({
       return noop(
         doc,
         `array_polar: center must be 3 finite numbers and angle finite (got center [${center.join(', ')}], angle ${angle}); entity ${id} unchanged.`,
+      );
+    if (Math.abs(angle) < MIN_POLAR_ANGLE)
+      return noop(
+        doc,
+        `array_polar: angle must be non-zero (|angle| >= ${MIN_POLAR_ANGLE} rad; got ${angle}) or every copy stacks on entity ${id}; unchanged.`,
       );
     const unitAxis = axis === undefined ? ([0, 0, 1] as Vec3) : unitAxisOrNull(axis);
     if (!unitAxis) return noop(doc, `array_polar: axis must be 3 finite numbers with non-zero length; entity ${id} unchanged.`);
