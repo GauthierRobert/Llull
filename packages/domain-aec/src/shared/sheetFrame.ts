@@ -6,6 +6,7 @@
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
+import { LINE_PATTERNS, dashArray } from '@core/model/drawing';
 import { z } from '@core/commands/schema';
 import { toDegrees, toRadians } from '@lib/angle';
 import { escapeXml } from '@lib/escapeXml';
@@ -138,7 +139,7 @@ export function fitScale(widthMm: number, heightMm: number, viewport: Viewport):
 const SHEET_STYLE = [
   `<style>`,
   `.cut{fill:#4a4a4a;stroke:#000;stroke-width:0.35}.cut-line{fill:none;stroke:#000;stroke-width:0.35}`,
-  `.thin{fill:none;stroke:#000;stroke-width:0.18}.hidden{fill:none;stroke:#000;stroke-width:0.18;stroke-dasharray:1.5 1}`,
+  `.thin{fill:none;stroke:#000;stroke-width:0.18}.hidden{fill:none;stroke:#000;stroke-width:0.18;stroke-dasharray:${dashArray(LINE_PATTERNS.hidden, 0.75)}}.center{fill:none;stroke:#000;stroke-width:0.18;stroke-dasharray:${dashArray(LINE_PATTERNS.center, 1)}}`,
   `.dim{stroke:#000;stroke-width:0.13}.frame{fill:none;stroke:#000;stroke-width:0.5}.frame-thin{fill:none;stroke:#000;stroke-width:0.25}`,
   `.solid{fill:#000;stroke:#000;stroke-width:0.25}.label{fill:#555}text{fill:#000}`,
   `.cut-hatch{fill:url(#hatch-concrete);stroke:#000;stroke-width:0.35}`,

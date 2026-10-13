@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { portalHall } from '../../helpers/portalHall';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { buildElevationDrawing, chainLoops } from '@aec/building/drawings/elevationProjection';
+import { buildElevationDrawing } from '@aec/building/drawings/elevationProjection';
+import { chainLoops } from '@core/geometry/planeEdges';
 import type { ElevationSheet } from '@aec/building/drawings/elevation';
 
 function hall(): CadDocument {
@@ -126,28 +127,31 @@ describe('export_elevation_sheet', () => {
 
 describe('section poché', () => {
   it('chains cut segments into closed loops', () => {
-    const loops = chainLoops([
+    const loops = chainLoops(
       [
-        [0, 0],
-        [1, 0],
+        [
+          [0, 0],
+          [1, 0],
+        ],
+        [
+          [1, 1],
+          [0, 1],
+        ],
+        [
+          [1, 0],
+          [1, 1],
+        ],
+        [
+          [0, 1],
+          [0, 0],
+        ],
+        [
+          [5, 5],
+          [6, 5],
+        ],
       ],
-      [
-        [1, 1],
-        [0, 1],
-      ],
-      [
-        [1, 0],
-        [1, 1],
-      ],
-      [
-        [0, 1],
-        [0, 0],
-      ],
-      [
-        [5, 5],
-        [6, 5],
-      ],
-    ]);
+      0.01,
+    );
     expect(loops).toEqual([
       [
         [0, 0],

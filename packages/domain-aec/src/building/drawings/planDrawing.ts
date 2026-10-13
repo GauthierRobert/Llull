@@ -6,15 +6,9 @@ import type { WallElement } from '@core/model/building';
 import { fromMm } from '@core/model/units';
 import { elementsOf, existingLevelId, getBuilding, orderedElements } from '../model';
 import { wallFrame } from '../geometry/wallGeometry';
+import { type PlanDrawing, type PlanSource, band, layerName } from './planModel';
+import { type DrawingPrimitive, drawingBounds } from '@core/model/drawing';
 import {
-  type PlanDrawing,
-  type PlanPrimitive,
-  type PlanSource,
-  band,
-  layerName,
-} from './planModel';
-import {
-  boundsOf,
   columnPrimitive,
   curvedWallPrimitives,
   dimensionPrimitives,
@@ -41,7 +35,7 @@ export function buildPlanDrawing(
   const level = resolvedId !== undefined ? building.levels[resolvedId] : undefined;
   if (!level) return null;
   const cutHeight = fromMm(doc, 1200);
-  const primitives: PlanPrimitive[] = [];
+  const primitives: DrawingPrimitive[] = [];
   const walls: WallElement[] = [];
   for (const element of orderedElements(building)) {
     if (!('levelId' in element)) continue;
@@ -93,5 +87,5 @@ export function buildPlanDrawing(
   }
   for (const grid of elementsOf(building, 'grid')) primitives.push(...gridPrimitives(doc, grid));
   if (options.dimensions !== false) primitives.push(...dimensionPrimitives(doc, building, walls));
-  return { level, primitives, bounds: boundsOf(primitives) };
+  return { level, primitives, bounds: drawingBounds(primitives) };
 }

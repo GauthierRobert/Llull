@@ -4,6 +4,7 @@
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
+import { LINE_PATTERNS, dashArray } from '@core/model/drawing';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { toMetres, toMm } from '@core/model/units';
@@ -163,7 +164,9 @@ function buildElevationSheet(
     bodyId: 'view',
     body: view.join(''),
     style:
-      '.edge{stroke:#000;stroke-width:0.18;stroke-linecap:round}.section{stroke:#000;stroke-width:0.5;stroke-linecap:round}.ground{stroke:#000;stroke-width:0.7}.grid{stroke:#000;stroke-width:0.13;stroke-dasharray:4 1 1 1}.poche-steel{fill:#1a1a1a}.poche-concrete{fill:url(#hatch-concrete)}.poche-other{fill:#9a9a9a}',
+      '.edge{stroke:#000;stroke-width:0.18;stroke-linecap:round}.section{stroke:#000;stroke-width:0.5;stroke-linecap:round}.ground{stroke:#000;stroke-width:0.7}' +
+      `.grid{stroke:#000;stroke-width:0.13;stroke-dasharray:${dashArray(LINE_PATTERNS.center, 1)}}` +
+      '.poche-steel{fill:#1a1a1a}.poche-concrete{fill:url(#hatch-concrete)}.poche-other{fill:#9a9a9a}',
     overlays: [`<g id="annotations">${annotations.join('')}</g>`],
   });
   const project = fileSlug(building.project.name, 'project');

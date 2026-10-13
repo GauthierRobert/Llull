@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { buildPlanDrawing } from '@aec/building/drawings/planDrawing';
-import type { PlanPrimitive } from '@aec/building/drawings/planModel';
+import type { DrawingPrimitive } from '@core/model/drawing';
 import type { DxfExport } from '@aec/building/exchange/dxfExport';
 import type { PlanSheet } from '@aec/building/drawings/sheet';
 import { step, twoLevels } from './steelFixtures';
@@ -29,11 +29,11 @@ function plantWithSupports(): CadDocument {
   return doc;
 }
 
-const supportPrimitives = (doc: CadDocument, levelId = 'level-1'): PlanPrimitive[] =>
+const supportPrimitives = (doc: CadDocument, levelId = 'level-1'): DrawingPrimitive[] =>
   (buildPlanDrawing(doc, levelId)?.primitives ?? []).filter((p) => p.layer === 'P-SUPP');
 
 /** Primitives of one symbol: those whose points lie within 600 mm of the support x. */
-const near = (primitives: PlanPrimitive[], x: number): PlanPrimitive[] =>
+const near = (primitives: DrawingPrimitive[], x: number): DrawingPrimitive[] =>
   primitives.filter((primitive) => {
     const xs =
       primitive.type === 'polygon'

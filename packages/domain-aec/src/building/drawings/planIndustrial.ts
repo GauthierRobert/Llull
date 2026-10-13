@@ -13,13 +13,9 @@ import { MEMBER_LAYER } from '../evaluate/entities';
 import { sweepFrame } from '../../shared/mesh';
 import { findProfile, profileOutline } from '../../steel/profiles';
 import { plateLayout } from '../../industrial/connections/evaluateConnections';
-import {
-  type PlanPrimitive,
-  type PlanSource,
-  annotationText,
-  layerName,
-  thinLine,
-} from './planModel';
+import { type PlanSource, annotationText, layerName, thinLine } from './planModel';
+import type { DrawingPrimitive } from '@core/model/drawing';
+import { centreMarkLines } from '@core/geometry/centerLines';
 import { columnPrimitive } from './planArchitectural';
 
 /** Both edges of a plan polyline offset by ±`half` (mitred at the bends). */
@@ -70,7 +66,7 @@ export function industrialPrimitives(
     { category: 'member' | 'footing' | 'panel' | 'equipment' | 'pipe' | 'tray' | 'plate' }
   >,
   cutHeight: number,
-): PlanPrimitive[] {
+): DrawingPrimitive[] {
   const flat = (point: readonly [number, number, ...number[]]): Vec2 => [point[0], point[1]];
   switch (element.category) {
     case 'member': {
@@ -102,7 +98,7 @@ export function industrialPrimitives(
             holes: holes.map(section),
           },
           ...holes.map(
-            (hole): PlanPrimitive => ({
+            (hole): DrawingPrimitive => ({
               type: 'polygon',
               layer,
               style: 'thin',
@@ -146,14 +142,13 @@ export function industrialPrimitives(
       const round = shapeOf(element) === 'vertical_vessel';
       const [cx, cy] = element.location;
       const arm = length / 2;
-      const outline: PlanPrimitive[] = round
+      const outline: DrawingPrimitive[] = round
         ? [
             { type: 'circle', layer, style: 'thin', center: [cx, cy], radius: arm },
-            thinLine(layer, [cx - arm / 2, cy], [cx + arm / 2, cy]),
-            thinLine(layer, [cx, cy - arm / 2], [cx, cy + arm / 2]),
+            ...centreMarkLines([cx, cy], arm, layer),
           ]
         : [{ type: 'polygon', layer, style: 'thin', points: rectangle(length / 2, width / 2) }];
-      const zone: PlanPrimitive[] =
+      const zone: DrawingPrimitive[] =
         element.clearance <= 0
           ? []
           : round
@@ -216,7 +211,7 @@ export function industrialPrimitives(
           points: rectangleAt(layout.center, element.length / 2, element.width / 2, layout.angle),
         },
         ...layout.bolts.map(
-          (center): PlanPrimitive => ({
+          (center): DrawingPrimitive => ({
             type: 'circle',
             layer,
             style: 'thin',
@@ -249,7 +244,7 @@ export function industrialPrimitives(
       }
       return [
         ...offsetPolyline(points, element.width / 2).map(
-          (side): PlanPrimitive => ({ type: 'polyline', layer, style: 'hidden', points: side }),
+          (side): DrawingPrimitive => ({ type: 'polyline', layer, style: 'hidden', points: side }),
         ),
         annotationText(
           layer,
@@ -272,7 +267,7 @@ export function crossingColumnPrimitives(
   element: BuildingElement,
   level: BuildingLevel,
   cutHeight: number,
-): PlanPrimitive[] {
+): DrawingPrimitive[] {
   if (element.category !== 'column' && element.category !== 'member') return [];
   const home = getBuilding(doc).levels[element.levelId];
   if (!home) return [];

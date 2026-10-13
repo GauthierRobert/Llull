@@ -3,7 +3,8 @@
  */
 
 import { ellipsePoint } from '@lib/arc';
-import { type CadDocument, type Vec2, is2D } from '@core/model/types';
+import { type CadDocument, type Entity, type Vec2, is2D, is3D } from '@core/model/types';
+import { LINE_PATTERNS } from '@core/model/drawing';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { fromMm } from '@core/model/units';
@@ -11,7 +12,16 @@ import { fileSlug, getBuilding } from '../model';
 import { noop, report } from '@core/commands/noop';
 import { buildPlanDrawing } from '../drawings/planDrawing';
 import { entityPlanPoint } from '@core/geometry/entityFrame';
-import { DxfWriter, HIDDEN_LAYERS, INSUNITS, fmt, writePrimitive } from './dxfWriter';
+import { technicalView } from '@core/geometry/technicalView';
+import { TOP_VIEW } from '@core/geometry/viewProjection';
+import {
+  CENTER_LAYERS,
+  DxfWriter,
+  HIDDEN_LAYERS,
+  INSUNITS,
+  fmt,
+  writePrimitive,
+} from './dxfWriter';
 
 function writeDrafting(writer: DxfWriter, doc: CadDocument): void {
   for (const id of doc.order) {
@@ -80,6 +90,18 @@ function writeDrafting(writer: DxfWriter, doc: CadDocument): void {
   }
 }
 
+/** Non-building 3D solids as their technical top view — the drawing the 2D view shows. */
+function writeSolids(writer: DxfWriter, doc: CadDocument, hatchSpacing: number): void {
+  const solids = doc.order
+    .map((id) => doc.entities[id])
+    .filter(
+      (entity): entity is Entity => !!entity && is3D(entity) && !entity.tags?.includes('bim'),
+    );
+  for (const { primitives } of technicalView(doc, solids, { frame: TOP_VIEW })) {
+    for (const primitive of primitives) writePrimitive(writer, primitive, hatchSpacing);
+  }
+}
+
 type Group = readonly [code: number, value: string | number];
 
 const flatten = (groups: ReadonlyArray<Group>): string[] =>
@@ -108,13 +130,31 @@ function header(
   ]);
 }
 
+/** Pattern unit of the DXF line types, drawing units (scaled further by LTSCALE). */
+const LTYPE_UNIT = 0.25;
+
+/** An LTYPE table entry for an ISO pattern (dashes positive, gaps negative). */
+function lineType(name: string, description: string, pattern: ReadonlyArray<number>): Group[] {
+  const lengths = pattern.map((length, index) => length * LTYPE_UNIT * (index % 2 === 0 ? 1 : -1));
+  return [
+    [0, 'LTYPE'],
+    [2, name],
+    [70, 0],
+    [3, description],
+    [72, 65],
+    [73, pattern.length],
+    [40, fmt(lengths.reduce((sum, length) => sum + Math.abs(length), 0))],
+    ...lengths.map((length): Group => [49, fmt(length)]),
+  ];
+}
+
 function tables(layers: ReadonlyMap<string, number>): string[] {
   const groups: Group[] = [
     [0, 'SECTION'],
     [2, 'TABLES'],
     [0, 'TABLE'],
     [2, 'LTYPE'],
-    [70, 2],
+    [70, 3],
     [0, 'LTYPE'],
     [2, 'CONTINUOUS'],
     [70, 0],
@@ -122,15 +162,8 @@ function tables(layers: ReadonlyMap<string, number>): string[] {
     [72, 65],
     [73, 0],
     [40, '0.0'],
-    [0, 'LTYPE'],
-    [2, 'DASHED'],
-    [70, 0],
-    [3, '__ __ __'],
-    [72, 65],
-    [73, 2],
-    [40, '0.75'],
-    [49, '0.5'],
-    [49, '-0.25'],
+    ...lineType('DASHED', '__ __ __', LINE_PATTERNS.hidden),
+    ...lineType('CENTER', '____ _ ____ _', LINE_PATTERNS.center),
     [0, 'ENDTAB'],
     [0, 'TABLE'],
     [2, 'LAYER'],
@@ -148,7 +181,7 @@ function tables(layers: ReadonlyMap<string, number>): string[] {
       [2, name],
       [70, 0],
       [62, color],
-      [6, HIDDEN_LAYERS.has(name) ? 'DASHED' : 'CONTINUOUS'],
+      [6, HIDDEN_LAYERS.has(name) ? 'DASHED' : CENTER_LAYERS.has(name) ? 'CENTER' : 'CONTINUOUS'],
     );
   }
   groups.push([0, 'ENDTAB'], [0, 'ENDSEC']);
@@ -191,14 +224,17 @@ function buildDxf(
   const building = getBuilding(doc);
   const writer = new DxfWriter();
   let levelLabel = 'drafting';
+  const hatchSpacing = fromMm(doc, 150);
   if (building.levelOrder.length > 0 || levelId !== undefined) {
     const plan = buildPlanDrawing(doc, levelId);
     if (!plan) return null;
-    const hatchSpacing = fromMm(doc, 150);
     for (const primitive of plan.primitives) writePrimitive(writer, primitive, hatchSpacing);
     levelLabel = plan.level.name;
   }
-  if (includeDrafting) writeDrafting(writer, doc);
+  if (includeDrafting) {
+    writeDrafting(writer, doc);
+    writeSolids(writer, doc, hatchSpacing);
+  }
   const dxf = assembleDxf(doc, writer);
   return {
     filename: `${fileSlug(building.project.name, 'project')}_${fileSlug(levelLabel, 'plan')}.dxf`,
@@ -221,21 +257,25 @@ export const exportDxf = defineCommand({
     'Export a DXF (AutoCAD R12 ASCII, opens in AutoCAD, BricsCAD, DraftSight, LibreCAD, Revit…) of a ' +
     'level floor plan: wall poché cut at 1.2 m, door swings, windows, columns, beams (dashed), stairs, ' +
     'room tags, grid bubbles and overall / grid dimensions on AIA layers (A-WALL, A-DOOR, A-GLAZ, S-GRID…), ' +
-    'plus the document’s own 2D drafting. data.dxf holds the file text.',
+    'plus the document’s own 2D drafting and its 3D solids as a technical top view (visible edges on ' +
+    'OBJ-VISIBLE, hidden edges dashed on OBJ-HIDDEN, centre lines on OBJ-CENTER). data.dxf holds the file text.',
   params: z.object({
     levelId: z.string().optional().describe('Level to plot. Default: the active level.'),
     includeDrafting: z
       .boolean()
       .optional()
       .describe(
-        'Also export non-building 2D entities (lines, polylines, circles, text…). Default true.',
+        'Also export non-building 2D entities (lines, polylines, circles, text…) and the top view of non-building 3D solids. Default true.',
       ),
   }),
   run: (doc, { levelId, includeDrafting = true }): CommandResult => {
     const result = buildDxf(doc, levelId, includeDrafting);
     if (!result) return noop(doc, `export_dxf failed: no level '${levelId ?? ''}'.`);
     if (result.entityCount === 0)
-      return noop(doc, 'export_dxf: nothing to export (no building elements or 2D drafting).');
+      return noop(
+        doc,
+        'export_dxf: nothing to export (no building elements, 2D drafting or 3D solids).',
+      );
     return report(
       doc,
       `DXF ${result.filename}: ${result.entityCount} entities on layers ${result.layers.join(', ')}.`,

@@ -5707,11 +5707,11 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "Export a DXF (AutoCAD R12 ASCII, opens in AutoCAD, BricsCAD, DraftSight, LibreCAD, Revit…) of a level floor plan: wall poché cut at 1.2 m, door swings, windows, columns, beams (dashed), stairs, room tags, grid bubbles and overall / grid dimensions on AIA layers (A-WALL, A-DOOR, A-GLAZ, S-GRID…), plus the document’s own 2D drafting. data.dxf holds the file text.",
+    "description": "Export a DXF (AutoCAD R12 ASCII, opens in AutoCAD, BricsCAD, DraftSight, LibreCAD, Revit…) of a level floor plan: wall poché cut at 1.2 m, door swings, windows, columns, beams (dashed), stairs, room tags, grid bubbles and overall / grid dimensions on AIA layers (A-WALL, A-DOOR, A-GLAZ, S-GRID…), plus the document’s own 2D drafting and its 3D solids as a technical top view (visible edges on OBJ-VISIBLE, hidden edges dashed on OBJ-HIDDEN, centre lines on OBJ-CENTER). data.dxf holds the file text.",
     "input_schema": {
       "properties": {
         "includeDrafting": {
-          "description": "Also export non-building 2D entities (lines, polylines, circles, text…). Default true.",
+          "description": "Also export non-building 2D entities (lines, polylines, circles, text…) and the top view of non-building 3D solids. Default true.",
           "type": "boolean"
         },
         "levelId": {

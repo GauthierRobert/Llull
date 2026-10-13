@@ -1,7 +1,8 @@
 /**
  * @layer ui/viewport/2d
  *
- * Top-view outlines of 3D solids for the 2D drafting view, as closed rings of world XY points
+ * Top-view footprints of 3D solids — the 2D view's pick / box-select / snap region (the drawing
+ * itself is the technical view, SolidsTechnicalView2D) — as closed rings of world XY points
  * (the closing segment is implicit). Local geometry comes from core (`localBounds`) and is
  * placed with the entity's full Euler rotation + position, so a tilted solid gets the hull of
  * its projected vertices. Upright solids are exact: circle (cylinder, sphere, cone), outer + inner
@@ -244,14 +245,4 @@ export function ringsDistSq(rings: ReadonlyArray<OutlineRing>, point: Vec2): num
     }
   }
   return best;
-}
-
-/** Flat xyz segment-pair list (closed rings) for LineSegments rendering. @pure */
-export function ringsToSegmentPositions(rings: ReadonlyArray<OutlineRing>): number[] {
-  return rings.flatMap((ring) =>
-    ring.flatMap((a, i) => {
-      const b = ring[(i + 1) % ring.length] as Vec2;
-      return [a[0], a[1], 0, b[0], b[1], 0];
-    }),
-  );
 }

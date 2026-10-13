@@ -1,14 +1,21 @@
 /**
  * Hidden-line projection of the 3D model onto an elevation / section plane (painter's algorithm
- * over front-facing triangles, feature + silhouette edges, cut outlines).
+ * over the core view projection: front faces, feature + silhouette edges, cut outlines).
  * @layer domain-aec
  */
 
-import { toRadians } from '@lib/angle';
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
-import { type Triangle } from '@core/geometry/triangles';
 import { entityToTriangles } from '@core/geometry/entityTriangles';
-import { cross3, dot3, sub3 } from '@lib/vec3';
+import {
+  type ProjectedFace,
+  type Segment2,
+  type ViewFrame,
+  cutSegments,
+  facesOf,
+  projectFaces,
+  weldTolerance,
+} from '@core/geometry/viewProjection';
+import { chainLoops } from '@core/geometry/planeEdges';
 
 export const ELEVATION_DIRECTIONS = ['north', 'south', 'east', 'west'] as const;
 export type ElevationDirection = (typeof ELEVATION_DIRECTIONS)[number];
@@ -29,13 +36,6 @@ const PROJECTIONS: Readonly<Record<ElevationDirection, Projection>> = {
   west: { axis: 0, sign: -1, u: (p) => -p[1] },
 };
 
-interface DrawItem {
-  readonly depth: number;
-  readonly polygon: Vec2[];
-  readonly shade: number;
-  readonly edges: Array<readonly [Vec2, Vec2]>;
-}
-
 /** Poché class of a cut region. */
 type CutMaterial = 'steel' | 'concrete' | 'other';
 
@@ -46,91 +46,12 @@ interface CutRegion {
 }
 
 interface ElevationDrawing {
-  readonly items: DrawItem[];
-  readonly cutLines: Array<readonly [Vec2, Vec2]>;
+  readonly items: ProjectedFace[];
+  readonly cutLines: Segment2[];
   readonly cutRegions: CutRegion[];
   /** [minU, minZ, maxU, maxZ] of the projected geometry. */
   readonly bounds: readonly [number, number, number, number];
   readonly projection: Projection;
-}
-
-const FEATURE_COS = Math.cos(toRadians(25));
-
-const lerp = (a: Vec3, b: Vec3, t: number): Vec3 => [
-  a[0] + (b[0] - a[0]) * t,
-  a[1] + (b[1] - a[1]) * t,
-  a[2] + (b[2] - a[2]) * t,
-];
-
-function unitNormal(triangle: Triangle): Vec3 | null {
-  const normal = cross3(sub3(triangle[1], triangle[0]), sub3(triangle[2], triangle[0]));
-  const length = Math.hypot(normal[0], normal[1], normal[2]);
-  return length > 1e-12 ? [normal[0] / length, normal[1] / length, normal[2] / length] : null;
-}
-
-/** Sutherland–Hodgman clip of a convex polygon to depth(p) <= limit. */
-function clipPolygon(points: Vec3[], depth: (p: Vec3) => number, limit: number): Vec3[] {
-  const result: Vec3[] = [];
-  points.forEach((current, index) => {
-    const next = points[(index + 1) % points.length] as Vec3;
-    const [dc, dn] = [depth(current) - limit, depth(next) - limit];
-    if (dc <= 0) result.push(current);
-    if ((dc < 0 && dn > 0) || (dc > 0 && dn < 0)) result.push(lerp(current, next, dc / (dc - dn)));
-  });
-  return result;
-}
-
-function clipSegment(
-  a: Vec3,
-  b: Vec3,
-  depth: (p: Vec3) => number,
-  limit: number,
-): readonly [Vec3, Vec3] | null {
-  const [da, db] = [depth(a) - limit, depth(b) - limit];
-  if (da > 0 && db > 0) return null;
-  if (da <= 0 && db <= 0) return [a, b];
-  const crossing = lerp(a, b, da / (da - db));
-  return da <= 0 ? [a, crossing] : [crossing, b];
-}
-
-const pointKey = (p: Vec3): string => p.map((value) => Math.round(value * 1000)).join(',');
-
-interface Face {
-  readonly triangle: Triangle;
-  readonly normal: Vec3;
-  readonly front: boolean;
-}
-
-/** Feature (crease > 25°), boundary and silhouette edges, each assigned to one front face. */
-function faceEdges(faces: ReadonlyArray<Face>): Map<number, Array<readonly [Vec3, Vec3]>> {
-  const byEdge = new Map<string, { a: Vec3; b: Vec3; faces: number[] }>();
-  faces.forEach((face, index) => {
-    for (let corner = 0; corner < 3; corner++) {
-      const a = face.triangle[corner] as Vec3;
-      const b = face.triangle[(corner + 1) % 3] as Vec3;
-      const [ka, kb] = [pointKey(a), pointKey(b)];
-      const key = ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
-      const entry = byEdge.get(key);
-      if (entry) entry.faces.push(index);
-      else byEdge.set(key, { a, b, faces: [index] });
-    }
-  });
-  const edges = new Map<number, Array<readonly [Vec3, Vec3]>>();
-  for (const { a, b, faces: adjacent } of byEdge.values()) {
-    const fronts = adjacent.filter((index) => (faces[index] as Face).front);
-    const owner = fronts[0];
-    if (owner === undefined) continue;
-    const [first, second] = [faces[adjacent[0] as number], faces[adjacent[1] as number]];
-    const feature =
-      adjacent.length !== 2 ||
-      fronts.length === 1 ||
-      (first !== undefined &&
-        second !== undefined &&
-        dot3(first.normal, second.normal) < FEATURE_COS);
-    if (!feature) continue;
-    edges.set(owner, [...(edges.get(owner) ?? []), [a, b]]);
-  }
-  return edges;
 }
 
 const CONCRETE_CATEGORIES: ReadonlySet<string> = new Set([
@@ -146,35 +67,6 @@ const CONCRETE_CATEGORIES: ReadonlySet<string> = new Set([
 function cutMaterial(category: string | null): CutMaterial {
   if (category === 'member' || category === 'plate') return 'steel';
   return category !== null && CONCRETE_CATEGORIES.has(category) ? 'concrete' : 'other';
-}
-
-/** Chains cut segments into loops by shared endpoints (open chains are kept as polygons). */
-export function chainLoops(segments: ReadonlyArray<readonly [Vec2, Vec2]>): Vec2[][] {
-  const key = (p: Vec2): string => `${Math.round(p[0] * 100)},${Math.round(p[1] * 100)}`;
-  const byPoint = new Map<string, number[]>();
-  segments.forEach(([a, b], index) => {
-    for (const point of [a, b])
-      byPoint.set(key(point), [...(byPoint.get(key(point)) ?? []), index]);
-  });
-  const used = new Set<number>();
-  const loops: Vec2[][] = [];
-  segments.forEach(([a, b], start) => {
-    if (used.has(start)) return;
-    used.add(start);
-    const loop: Vec2[] = [a, b];
-    let current = b;
-    for (;;) {
-      const next = (byPoint.get(key(current)) ?? []).find((index) => !used.has(index));
-      if (next === undefined) break;
-      used.add(next);
-      const [p, q] = segments[next] as readonly [Vec2, Vec2];
-      current = key(p) === key(current) ? q : p;
-      if (key(current) === key(a)) break;
-      loop.push(current);
-    }
-    if (loop.length >= 3) loops.push(loop);
-  });
-  return loops;
 }
 
 function categoryOf(tags: ReadonlyArray<string> | undefined): string | null {
@@ -194,18 +86,19 @@ export function buildElevationDrawing(
   },
 ): ElevationDrawing | null {
   const projection = PROJECTIONS[options.direction];
-  const toViewer: Vec3 = projection.axis === 0 ? [projection.sign, 0, 0] : [0, projection.sign, 0];
-  const depth = (p: Vec3): number => projection.sign * p[projection.axis];
+  const frame: ViewFrame = {
+    toViewer: projection.axis === 0 ? [projection.sign, 0, 0] : [0, projection.sign, 0],
+    project: (p) => [projection.u(p), p[2]],
+  };
   const limit = options.cutAt !== undefined ? projection.sign * options.cutAt : Infinity;
-  const project = (p: Vec3): Vec2 => [projection.u(p), p[2]];
   const excluded = new Set(options.exclude ?? []);
   const hiddenLayers = new Set(
     Object.values(doc.layers)
       .filter((layer) => !layer.visible)
       .map((layer) => layer.id),
   );
-  const items: DrawItem[] = [];
-  const cutLines: Array<readonly [Vec2, Vec2]> = [];
+  const items: ProjectedFace[] = [];
+  const cutLines: Segment2[] = [];
   const cutRegions: CutRegion[] = [];
   const bounds: [number, number, number, number] = [Infinity, Infinity, -Infinity, -Infinity];
   const grow = (point: Vec2): void => {
@@ -219,48 +112,15 @@ export function buildElevationDrawing(
     if (!entity || hiddenLayers.has(entity.layerId)) continue;
     const category = categoryOf(entity.tags);
     if (category !== null && excluded.has(category)) continue;
-    const faces: Face[] = [];
-    for (const triangle of entityToTriangles(entity, doc)) {
-      const normal = unitNormal(triangle);
-      if (normal) faces.push({ triangle, normal, front: dot3(normal, toViewer) > 1e-6 });
+    const faces = facesOf(entityToTriangles(entity, doc), frame);
+    const entityCuts = limit !== Infinity ? cutSegments(faces, frame, limit) : [];
+    for (const segment of entityCuts) segment.forEach(grow);
+    cutLines.push(...entityCuts);
+    for (const face of projectFaces(faces, frame, limit)) {
+      face.polygon.forEach(grow);
+      items.push(face);
     }
-    const edges = faceEdges(faces);
-    const entityCuts: Array<readonly [Vec2, Vec2]> = [];
-    faces.forEach((face, index) => {
-      if (limit !== Infinity) {
-        const crossing: Vec3[] = [];
-        for (let corner = 0; corner < 3; corner++) {
-          const a = face.triangle[corner] as Vec3;
-          const b = face.triangle[(corner + 1) % 3] as Vec3;
-          const [da, db] = [depth(a) - limit, depth(b) - limit];
-          if ((da < 0 && db > 0) || (da > 0 && db < 0)) crossing.push(lerp(a, b, da / (da - db)));
-        }
-        const [a, b] = crossing;
-        if (a && b && crossing.length === 2) {
-          const segment = [project(a), project(b)] as const;
-          segment.forEach(grow);
-          cutLines.push(segment);
-          entityCuts.push(segment);
-        }
-      }
-      if (!face.front) return;
-      const clipped = clipPolygon([...face.triangle], depth, limit);
-      if (clipped.length < 3) return;
-      const polygon = clipped.map(project);
-      polygon.forEach(grow);
-      const visibleEdges: Array<readonly [Vec2, Vec2]> = [];
-      for (const [a, b] of edges.get(index) ?? []) {
-        const segment = clipSegment(a, b, depth, limit);
-        if (segment) visibleEdges.push([project(segment[0]), project(segment[1])]);
-      }
-      items.push({
-        depth: clipped.reduce((sum, point) => sum + depth(point), 0) / clipped.length,
-        polygon,
-        shade: Math.round(225 + 30 * dot3(face.normal, toViewer)),
-        edges: visibleEdges,
-      });
-    });
-    const loops = chainLoops(entityCuts);
+    const loops = chainLoops(entityCuts, weldTolerance(faces));
     if (loops.length > 0) cutRegions.push({ material: cutMaterial(category), loops });
   }
   if (items.length === 0 && cutLines.length === 0) return null;

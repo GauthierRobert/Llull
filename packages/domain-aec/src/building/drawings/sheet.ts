@@ -11,7 +11,8 @@ import { defineCommand, z } from '@core/commands/schema';
 import { toMm } from '@core/model/units';
 import { fileSlug, getBuilding } from '../model';
 import { noop, report } from '@core/commands/noop';
-import { type PlanDrawing, type PlanPrimitive } from './planModel';
+import type { DrawingPrimitive } from '@core/model/drawing';
+import { type PlanDrawing } from './planModel';
 import { buildPlanDrawing } from './planDrawing';
 import { wrapAngle } from '@lib/angle';
 import {
@@ -55,12 +56,16 @@ class SheetPainter {
     return svgPoints(points.map((point) => this.map(point)));
   }
 
-  private styleOf(style: PlanPrimitive['style'], filled: boolean): string {
+  private styleOf(style: DrawingPrimitive['style'], filled: boolean): string {
     switch (style) {
       case 'cut':
         return filled ? 'class="cut"' : 'class="cut-line"';
+      case 'visible':
+        return 'class="cut-line"';
       case 'hidden':
         return 'class="hidden"';
+      case 'center':
+        return 'class="center"';
       case 'annotation':
       case 'thin':
         return 'class="thin"';
@@ -71,7 +76,7 @@ class SheetPainter {
     this.parts.push(svgText(at[0], at[1], sizeMm, 'middle', content, rotationDeg));
   }
 
-  paint(primitive: PlanPrimitive): void {
+  paint(primitive: DrawingPrimitive): void {
     switch (primitive.type) {
       case 'polygon': {
         if (primitive.fill === 'hatch') {
@@ -134,7 +139,7 @@ class SheetPainter {
     }
   }
 
-  private dimension(primitive: Extract<PlanPrimitive, { type: 'dimension' }>): void {
+  private dimension(primitive: Extract<DrawingPrimitive, { type: 'dimension' }>): void {
     const a = this.map(primitive.a);
     const b = this.map(primitive.b);
     const dx = b[0] - a[0];

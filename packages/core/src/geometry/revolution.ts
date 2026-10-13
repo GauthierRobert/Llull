@@ -8,6 +8,13 @@
 import type { Vec3 } from '../model/types';
 import { elementAt } from '../lib/elementAt';
 
+/** The world axis a revolution actually spins about: the dominant component of `axis`, sign ignored. */
+export function revolutionAxisIndex(axis: Vec3): 0 | 1 | 2 {
+  const [absX, absY, absZ] = axis.map(Math.abs) as [number, number, number];
+  if (absZ >= absX && absZ >= absY) return 2;
+  return absY >= absX ? 1 : 0;
+}
+
 type RevolutionProfile = ReadonlyArray<readonly [number, number]>;
 type RevolutionArgs = [
   profile: RevolutionProfile,
@@ -29,15 +36,13 @@ export function revolutionPolygons(
 ): Vec3[][] {
   if (profile.length < 3) return [];
   const [px, py, pz] = origin;
-  const absX = Math.abs(axis[0]);
-  const absY = Math.abs(axis[1]);
-  const absZ = Math.abs(axis[2]);
+  const axial = revolutionAxisIndex(axis);
 
   const toWorld = (r: number, a: number, theta: number): Vec3 => {
     const cosT = Math.cos(theta);
     const sinT = Math.sin(theta);
-    if (absZ >= absX && absZ >= absY) return [px + r * cosT, py + r * sinT, pz + a];
-    if (absY >= absX) return [px + r * cosT, py + a, pz + r * sinT];
+    if (axial === 2) return [px + r * cosT, py + r * sinT, pz + a];
+    if (axial === 1) return [px + r * cosT, py + a, pz + r * sinT];
     return [px + a, py + r * cosT, pz + r * sinT];
   };
 

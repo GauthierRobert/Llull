@@ -1,12 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { type CadDocument, type Entity, type Vec2, createEmptyDocument } from '@core/model/types';
 import { add } from '../helpers/addEntity';
-import {
-  convexHull,
-  ringsDistSq,
-  ringsToSegmentPositions,
-  solidOutline,
-} from '../../src/ui/viewport/2d/solidOutline';
+import { convexHull, ringsDistSq, solidOutline } from '../../src/ui/viewport/2d/solidOutline';
 import { entitiesInBox } from '../../src/ui/viewport/2d/boxSelect';
 import { nearestEntityId } from '../../src/ui/viewport/2d/modifyHelpers';
 
@@ -123,7 +118,6 @@ describe('ring helpers and 2D interaction', () => {
     ];
     expect(ringsDistSq([square], [5, 1])).toBe(1);
     expect(ringsDistSq([square], [2, 1.5])).toBeCloseTo(0.25);
-    expect(ringsToSegmentPositions([square])).toHaveLength(4 * 6);
   });
 
   it('lets selection picking hit a cylinder outline, but not its interior', () => {

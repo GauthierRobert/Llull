@@ -7,9 +7,9 @@
  */
 
 import type { Vec3 } from '../../model/types';
-import { dot3, normalize3, sub3 } from '../../lib/vec3';
+import { normalize3 } from '../../lib/vec3';
 import type { CutSpec, PreDepthPolygon } from './types';
-import { type UnitPlane, edgeCrossing, forEachEdge } from '../../geometry/planeEdges';
+import { type UnitPlane, chainLoops, clipToSide, planeChords } from '../../geometry/planeEdges';
 
 /** True when every plane has a finite, non-zero normal and a finite offset. */
 export function isValidCut(cut: CutSpec): boolean {
@@ -30,17 +30,6 @@ export function unitPlanes(cut: CutSpec): UnitPlane[] {
     const length = Math.hypot(normal[0], normal[1], normal[2]);
     return { normal: normalize3(normal), offset: offset / length };
   });
-}
-
-/** Sutherland–Hodgman clip of a polygon to one side of `plane` (`keepCut` ⇒ the cut side). */
-export function clipToSide(verts: Vec3[], plane: UnitPlane, keepCut: boolean): Vec3[] {
-  const out: Vec3[] = [];
-  const inside = (s: number): boolean => (keepCut ? s > 0 : s <= 0);
-  forEachEdge(verts, plane, (a, b, sa, sb) => {
-    if (inside(sa)) out.push(a);
-    if (inside(sa) !== inside(sb)) out.push(edgeCrossing(a, b, sa, sb));
-  });
-  return out.length >= 3 ? out : [];
 }
 
 /** The parts of `verts` that survive the cut. */
@@ -65,54 +54,6 @@ export function surviving(verts: Vec3[], planes: UnitPlane[], mode: CutSpec['mod
   return pieces;
 }
 
-/** Chord segments where polygons cross `plane` (a vertex exactly on the plane counts as cut side). */
-function chords(polygons: readonly PreDepthPolygon[], plane: UnitPlane): [Vec3, Vec3][] {
-  const segments: [Vec3, Vec3][] = [];
-  for (const { verts } of polygons) {
-    const hits: Vec3[] = [];
-    forEachEdge(verts, plane, (a, b, sa, sb) => {
-      if (sa > 0 !== sb > 0) hits.push(edgeCrossing(a, b, sa, sb));
-    });
-    // Pair crossings along the plane (convex faces have exactly two).
-    if (hits.length === 2) segments.push([hits[0] as Vec3, hits[1] as Vec3]);
-    else if (hits.length > 2) {
-      const axis = sub3(hits[hits.length - 1] as Vec3, hits[0] as Vec3);
-      hits.sort((p, q) => dot3(axis, p) - dot3(axis, q));
-      for (let i = 0; i + 1 < hits.length; i += 2)
-        segments.push([hits[i] as Vec3, hits[i + 1] as Vec3]);
-    }
-  }
-  return segments;
-}
-
-/** Chain unordered segments into loops (open chains are kept and implicitly closed). */
-function chain(segments: readonly [Vec3, Vec3][], tolerance: number): Vec3[][] {
-  const key = (p: Vec3): string => p.map((c) => Math.round(c / tolerance)).join(',');
-  const byEnd = new Map<string, number[]>();
-  segments.forEach(([a, b], index) => {
-    for (const k of [key(a), key(b)]) byEnd.set(k, [...(byEnd.get(k) ?? []), index]);
-  });
-  const used = new Array<boolean>(segments.length).fill(false);
-  const loops: Vec3[][] = [];
-  for (let start = 0; start < segments.length; start++) {
-    if (used[start]) continue;
-    used[start] = true;
-    const [first, second] = segments[start] as [Vec3, Vec3];
-    const loop: Vec3[] = [first, second];
-    let tail = second;
-    for (;;) {
-      const next = (byEnd.get(key(tail)) ?? []).find((i) => !used[i]);
-      if (next === undefined) break;
-      used[next] = true;
-      const [a, b] = segments[next] as [Vec3, Vec3];
-      tail = key(a) === key(tail) ? b : a;
-      loop.push(tail);
-    }
-    if (loop.length >= 3) loops.push(loop);
-  }
-  return loops;
-}
-
 /** Cap polygon: the section outline of one entity on one cut plane, clipped to the true cut face. */
 function capFor(
   source: readonly PreDepthPolygon[],
@@ -123,7 +64,13 @@ function capFor(
   tolerance: number,
 ): PreDepthPolygon | null {
   const loops: Vec3[][] = [];
-  for (const loop of chain(chords(source, plane), tolerance)) {
+  for (const loop of chainLoops(
+    planeChords(
+      source.map((p) => p.verts),
+      plane,
+    ),
+    tolerance,
+  )) {
     // The removed region's face on this plane lies inside every other cut side (intersection)
     // or outside all of them (union).
     let clipped: Vec3[] = loop;

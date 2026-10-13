@@ -4,10 +4,12 @@
 
 import { toDegrees } from '@lib/angle';
 import type { DocumentUnit, Vec2, Vec3 } from '@core/model/types';
-import { hatchSegments } from '@lib/hatch';
+import { ansi31Hatch } from '@lib/hatch';
 import { triangulatePolygon } from '@lib/triangulate';
 import { round } from '../../shared/numeric';
-import { DIMENSION_LAYER, type PlanFill, type PlanPrimitive } from '../drawings/planModel';
+import type { DrawingFill, DrawingPrimitive } from '@core/model/drawing';
+import { TECHNICAL_LAYERS } from '@core/geometry/technicalView';
+import { DIMENSION_LAYER } from '../drawings/planModel';
 
 /** AutoCAD $INSUNITS codes. */
 export const INSUNITS: Readonly<Record<DocumentUnit, number>> = {
@@ -30,9 +32,14 @@ const LAYER_COLOR: Readonly<Record<string, number>> = {
   'A-FLOR-STRS': 6,
   'A-AREA': 3,
   [DIMENSION_LAYER]: 2,
+  [TECHNICAL_LAYERS.visible]: 7,
+  [TECHNICAL_LAYERS.hidden]: 8,
+  [TECHNICAL_LAYERS.center]: 1,
+  [TECHNICAL_LAYERS.cut]: 7,
 };
 
-export const HIDDEN_LAYERS: ReadonlySet<string> = new Set(['S-BEAM']);
+export const HIDDEN_LAYERS: ReadonlySet<string> = new Set(['S-BEAM', TECHNICAL_LAYERS.hidden]);
+export const CENTER_LAYERS: ReadonlySet<string> = new Set(['S-GRID', TECHNICAL_LAYERS.center]);
 
 /** DXF-safe layer name (R12: letters, digits, $, -, _). */
 export function dxfLayerName(name: string): string {
@@ -191,7 +198,7 @@ export class DxfWriter {
 
 function writeDimension(
   writer: DxfWriter,
-  primitive: Extract<PlanPrimitive, { type: 'dimension' }>,
+  primitive: Extract<DrawingPrimitive, { type: 'dimension' }>,
 ): void {
   const dx = primitive.b[0] - primitive.a[0];
   const dy = primitive.b[1] - primitive.a[1];
@@ -235,27 +242,17 @@ function writeDimension(
 /** Pattern layer of a cut layer, e.g. A-WALL → A-WALL-PATT (AIA / NCS). */
 const patternLayer = (layer: string): string => `${layer}-PATT`;
 
-/** Hatch lines across a cut polygon's diagonal at most: coarser spacing for very large polygons. */
-const MAX_HATCH_LINES_ACROSS = 300;
-
 /** ANSI31 (45° lines) for concrete / masonry, SOLID triangles for steel. */
 function writeFill(
   writer: DxfWriter,
   layer: string,
   outer: ReadonlyArray<Vec2>,
   holes: ReadonlyArray<ReadonlyArray<Vec2>>,
-  fill: PlanFill,
+  fill: DrawingFill,
   hatchSpacing: number,
 ): void {
   if (fill === 'hatch') {
-    const xs = outer.map((point) => point[0]);
-    const ys = outer.map((point) => point[1]);
-    const diagonal = Math.hypot(
-      Math.max(...xs) - Math.min(...xs),
-      Math.max(...ys) - Math.min(...ys),
-    );
-    const spacing = Math.max(hatchSpacing, diagonal / MAX_HATCH_LINES_ACROSS);
-    for (const [a, b] of hatchSegments([outer, ...holes], Math.PI / 4, spacing)) {
+    for (const [a, b] of ansi31Hatch([outer, ...holes], hatchSpacing)) {
       writer.line(patternLayer(layer), a, b);
     }
     return;
@@ -273,7 +270,7 @@ function writeFill(
 
 export function writePrimitive(
   writer: DxfWriter,
-  primitive: PlanPrimitive,
+  primitive: DrawingPrimitive,
   hatchSpacing: number,
 ): void {
   switch (primitive.type) {
