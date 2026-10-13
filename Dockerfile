@@ -4,7 +4,7 @@
 
 # ---- build ---------------------------------------------------------------------------------
 # Base images are pinned by digest (Dependabot bumps them, .github/dependabot.yml).
-FROM node:22-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392 AS build
+FROM node:26-bookworm-slim@sha256:86f07bc9c5dce4578cf37e5a418b7bfc7f817cda25cde66e2b66e95ed86c4567 AS build
 WORKDIR /src
 COPY package.json package-lock.json ./
 COPY packages ./packages
@@ -38,7 +38,7 @@ RUN mkdir -p /out/bin /out/lib && if [ "$WITH_DWG" = "1" ]; then \
     fi
 
 # ---- runtime -------------------------------------------------------------------------------
-FROM node:22-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392
+FROM node:26-bookworm-slim@sha256:86f07bc9c5dce4578cf37e5a418b7bfc7f817cda25cde66e2b66e95ed86c4567
 COPY --from=dwg /out/bin/ /usr/local/bin/
 COPY --from=dwg /out/lib/ /usr/local/lib/
 RUN ldconfig
