@@ -41,6 +41,7 @@ import {
   placePlates,
 } from './anchorPlanLayout';
 import { PlanCanvas, mmText, scheduleTable } from './anchorPlanCanvas';
+import { pointsExtent } from '@lib/extent';
 
 /** Offset dimension of a plate centre from its grid line, drawn once per (line, offset) pair. */
 function addOffsetDimension(dims: BandDim[], drawn: Set<string>, axis: GridAxis | null, centre: number, offsetMm: number): void {
@@ -105,13 +106,10 @@ export const exportAnchorPlan = defineCommand({
       width: area.width - TABLE_WIDTH - 2 * INSET,
       height: area.height - 2 * INSET - 6,
     };
-    const extent: Vec2[] = [
+    const { minX, minY, maxX, maxY } = pointsExtent([
       ...plates.flatMap((placed) => [...placed.corners, ...placed.bolts]),
       ...[...vertical, ...horizontal].flatMap((axis): Vec2[] => [axis.from, axis.to]),
-    ];
-    const xs = extent.map((point) => point[0]);
-    const ys = extent.map((point) => point[1]);
-    const [minX, maxX, minY, maxY] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+    ]);
     const sheetScale = scale ?? fitScale(maxX - minX, maxY - minY, viewport);
     const canvas = new PlanCanvas([(minX + maxX) / 2, (minY + maxY) / 2], sheetScale, viewport);
 

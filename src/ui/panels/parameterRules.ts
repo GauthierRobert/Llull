@@ -1,4 +1,4 @@
-const PARAMETER_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+import { isIdentifier } from '@lib/identifier';
 
 export interface ParameterDraft {
   readonly name: string;
@@ -8,7 +8,7 @@ export interface ParameterDraft {
 /** An empty name is "not yet typed", so it is not flagged as invalid. */
 export function isParameterNameValid(name: string): boolean {
   const trimmed = name.trim();
-  return trimmed === '' || PARAMETER_NAME.test(trimmed);
+  return trimmed === '' || isIdentifier(trimmed);
 }
 
 /** The trimmed `set_parameter` params, or null while either field is blank. */

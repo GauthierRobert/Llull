@@ -5,12 +5,11 @@ import { catmullRomBeziers, mapSegment } from '../../geometry/curveSegments';
 import type { CommandResult } from '../types';
 import { defineCommand, z, looseVec3 as vec3, colorField } from '../schema';
 import { nextId } from '../../lib/id';
-import { ORIGIN, add3, sub3 } from '../../lib/vec3';
-import { applyMat3, eulerFromMat, matFromAxis, unitAxisOrNull } from '../../lib/axisRotation';
+import { ORIGIN, sub3 } from '../../lib/vec3';
 import { compactNumber as fmt, vecText } from '../../lib/compactNumber';
-import { commitSolid, positionField } from './shared';
+import { axisFrame, commitSolid, positionField } from './shared';
 import { newEntity } from '../entity/newEntity';
-import { noop } from '../noop';
+import { failedWith } from '../noop';
 
 const SAMPLES_PER_TURN = 16;
 const MAX_SPRING_TURNS = 200;
@@ -100,7 +99,7 @@ export const addHelixSpring = defineCommand({
     doc,
     { wireRadius, wireDiameter, coilRadius, pitch, turns, length, closedEnds = false, position = ORIGIN, axis, color = '#8a8f98', name },
   ): CommandResult => {
-    const fail = (reason: string): CommandResult => noop(doc, `add_helix_spring failed: ${reason}; no-op.`);
+    const fail = failedWith(doc, 'add_helix_spring');
     const r = wireRadiusOf(wireRadius, wireDiameter);
     if (typeof r === 'string') return fail(r);
     if (!Number.isFinite(coilRadius) || coilRadius <= r)
@@ -109,28 +108,22 @@ export const addHelixSpring = defineCommand({
     if (typeof resolved === 'string') return fail(resolved);
     if (resolved.turns > MAX_SPRING_TURNS || resolved.turns <= 0)
       return fail(`turns must be in (0, ${MAX_SPRING_TURNS}], got ${fmt(resolved.turns)}`);
-    const unitAxis = axis === undefined ? ([0, 0, 1] as Vec3) : unitAxisOrNull(axis);
-    if (!unitAxis) return fail('axis must be 3 finite numbers with non-zero length');
-    if (position.length !== 3 || !position.every(Number.isFinite)) return fail('position must be 3 finite numbers');
+    const frame = axisFrame(axis, position);
+    if (typeof frame === 'string') return fail(frame);
     const shape: SpringShape = { wireRadius: r, coilRadius, closedEnds, ...resolved };
     const pitchOut = resolved.rise / resolved.turns;
     const middlePitch = closedEnds ? (resolved.rise - 4 * r) / (resolved.turns - 2) : pitchOut;
     if (closedEnds && resolved.turns <= 2) return fail('closedEnds needs turns > 2');
     if (resolved.rise <= 0 || middlePitch < 2 * r * 0.999)
       return fail(`pitch ${fmt(middlePitch)} is below the wire diameter ${fmt(2 * r)} (coils would overlap) or length is too short`);
-    const matrix = matFromAxis(unitAxis);
     const points = helixPoints(shape);
     const startLocal = points[0] as Vec3;
     const path = catmullRomBeziers(points, false).map((segment) => mapSegment(segment, (p: Vec3): Vec3 => sub3(p, startLocal)));
     const id = nextId('spring');
-    const entity = newEntity(
-      'sweep',
-      id,
-      { path, section: { shape: 'circle', radius: r } },
-      add3(position, applyMat3(matrix, startLocal)),
-      color,
-      { rotation: eulerFromMat(matrix), name },
-    );
+    const entity = newEntity('sweep', id, { path, section: { shape: 'circle', radius: r } }, frame.worldAt(startLocal), color, {
+      rotation: frame.rotation,
+      name,
+    });
     const freeLength = resolved.rise + 2 * r;
     const data = { freeLength, turns: resolved.turns, pitch: middlePitch, wireDiameter: 2 * r, outerDiameter: 2 * (coilRadius + r) };
     return {
@@ -138,7 +131,7 @@ export const addHelixSpring = defineCommand({
         doc,
         entity,
         `Added helix spring ${id}: ${fmt(resolved.turns)} turns, pitch ${fmt(middlePitch)}, wire Ø${fmt(2 * r)}, ` +
-          `mean coil radius ${fmt(coilRadius)}, free length ${fmt(freeLength)} along ${vecText(unitAxis)}`,
+          `mean coil radius ${fmt(coilRadius)}, free length ${fmt(freeLength)} along ${vecText(frame.unitAxis)}`,
       ),
       data,
     };

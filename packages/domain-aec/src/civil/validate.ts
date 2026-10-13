@@ -11,6 +11,7 @@ import { isValidPolygon } from '@lib/polygon';
 import { validateHorizontal } from './alignment/alignmentGeometry';
 import { validateProfile } from './alignment/profileGeometry';
 import { MAX_SURFACE_POINTS } from './model';
+import { isStringArray } from '@lib/isStringArray';
 
 type Check = (object: Record<string, unknown>) => string | null;
 
@@ -22,10 +23,6 @@ function isVecList(value: unknown, size: number, minimum: number): boolean {
     value.length >= minimum &&
     value.every((item) => Array.isArray(item) && item.length === size && item.every(isFiniteNumber))
   );
-}
-
-function isStringList(value: unknown): boolean {
-  return Array.isArray(value) && value.every((item) => typeof item === 'string');
 }
 
 function demand(condition: boolean, message: string): string | null {
@@ -81,7 +78,7 @@ const CHECKS: Readonly<Record<(typeof CIVIL_CATEGORIES)[number], readonly Check[
       ),
   ],
   surface: [
-    (o) => demand(isStringList(o['pointGroupIds']), 'pointGroupIds must be strings'),
+    (o) => demand(isStringArray(o['pointGroupIds']), 'pointGroupIds must be strings'),
     (o) => demand(isVecList(o['extraPoints'], 3, 0), 'extraPoints must be [x, y, z] points'),
     (o) => demand(isPositiveNumber(o['contourInterval']), 'contourInterval must be > 0'),
     (o) => demand(isFiniteNumber(o['majorEvery']) && (o['majorEvery'] as number) >= 0, 'bad majorEvery'),
@@ -207,7 +204,7 @@ export function civilErrors(raw: unknown): string[] {
   const objects = raw['objects'];
   const order = raw['order'];
   if (!isRecord(objects)) return ['civil.objects must be an object'];
-  if (!isStringList(order)) return ['civil.order must be an array of ids'];
+  if (!isStringArray(order)) return ['civil.order must be an array of ids'];
   const counters = raw['counters'];
   if (!isRecord(counters) || !Object.values(counters).every(isFiniteNumber)) return ['civil.counters must map prefixes to numbers'];
   const errors: string[] = crsErrors(raw['crs']);
@@ -228,7 +225,7 @@ export function civilErrors(raw: unknown): string[] {
       errors.push(`${where}.category is unknown`);
       continue;
     }
-    if (typeof object['name'] !== 'string' || !isStringList(object['entityIds'])) {
+    if (typeof object['name'] !== 'string' || !isStringArray(object['entityIds'])) {
       errors.push(`${where} needs a name and entityIds`);
       continue;
     }

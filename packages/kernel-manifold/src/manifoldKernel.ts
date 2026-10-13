@@ -17,6 +17,7 @@ import { orientOutward, soupIndices } from '@core/geometry/meshVolume';
 import { entityTrianglePositions } from '@core/geometry/entityTriangles';
 import { toCounterClockwise } from '@lib/polygon';
 import { release, withOwned } from '@core/geometry/nativeObject';
+import { toDegrees } from '@lib/angle';
 
 // The subset of the Manifold WASM module we call (one cast at the boundary).
 interface ManifoldMesh {
@@ -68,8 +69,6 @@ async function getManifoldModule(): Promise<ManifoldModule> {
   return (_cachedModule = loaded);
 }
 
-const RAD_TO_DEG = 180 / Math.PI;
-
 function applyTransform(
   solid: ManifoldShape,
   position: readonly [number, number, number],
@@ -78,9 +77,9 @@ function applyTransform(
   const [rx, ry, rz] = rotation;
   // llull rotation is M = Rx·Ry·Rz (Rz applied first); Manifold's rotate([x,y,z]) applies X
   // first, so compose the three axes explicitly: Z, then Y, then X (degrees).
-  const aboutZ = solid.rotate([0, 0, rz * RAD_TO_DEG]);
-  const aboutY = aboutZ.rotate([0, ry * RAD_TO_DEG, 0]);
-  const aboutX = aboutY.rotate([rx * RAD_TO_DEG, 0, 0]);
+  const aboutZ = solid.rotate([0, 0, toDegrees(rz)]);
+  const aboutY = aboutZ.rotate([0, toDegrees(ry), 0]);
+  const aboutX = aboutY.rotate([toDegrees(rx), 0, 0]);
   const translated = aboutX.translate([...position]);
   [aboutZ, aboutY, aboutX].forEach((step) => step.delete());
   return translated;

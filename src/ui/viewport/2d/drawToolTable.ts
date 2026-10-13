@@ -12,6 +12,7 @@ import {
   ellipseParamsFromCenterCorner,
   rectParamsFromCorners,
 } from './drawHelpers';
+import { distance } from '@lib/polygon';
 
 const OUTLINE_SEGMENTS = 32;
 
@@ -37,10 +38,7 @@ export function wallChainParams(points: ReadonlyArray<Vec2>, closed: boolean): {
   const first = distinct[0];
   const last = distinct[distinct.length - 1];
   const returnsToStart =
-    distinct.length >= 4 &&
-    first !== undefined &&
-    last !== undefined &&
-    Math.hypot(first[0] - last[0], first[1] - last[1]) <= chainTolerance(points);
+    distinct.length >= 4 && first !== undefined && last !== undefined && distance(last, first) <= chainTolerance(points);
   return returnsToStart ? { points: distinct.slice(0, -1), closed: true } : { points: distinct, closed };
 }
 

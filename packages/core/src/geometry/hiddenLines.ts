@@ -5,9 +5,10 @@
  */
 
 import type { Vec2, Vec3 } from '../model/vectors';
-import { pointInPolygon, projectOntoSegment } from '../lib/polygon';
+import { distance, pointInPolygon, projectOntoSegment } from '../lib/polygon';
+import { clamp } from '../lib/clamp';
 import { lerp3 } from '../lib/vec3';
-import { pointsExtent } from './bounds';
+import { pointsExtent } from '../lib/extent';
 import { clipSegmentToSide } from './planeEdges';
 import { type Face, type FeatureEdge, type Segment2, type ViewFrame, depthOf, sectionPlane } from './viewProjection';
 
@@ -53,7 +54,7 @@ class Occluders {
   constructor(triangles: ReadonlyArray<ProjectedTriangle>, bounds: readonly [number, number, number, number]) {
     this.min = [bounds[0], bounds[1]];
     const extent = Math.max(bounds[2] - bounds[0], bounds[3] - bounds[1], 1e-9);
-    this.size = Math.min(256, Math.max(1, Math.ceil(Math.sqrt(triangles.length / 4))));
+    this.size = clamp(Math.ceil(Math.sqrt(triangles.length / 4)), 1, 256);
     this.cell = extent / this.size;
     for (const triangle of triangles) {
       const xs = [triangle.a[0], triangle.b[0], triangle.c[0]];
@@ -72,7 +73,7 @@ class Occluders {
   }
 
   private index(point: Vec2): [number, number] {
-    const clampIndex = (value: number): number => Math.min(this.size - 1, Math.max(0, Math.floor(value / this.cell)));
+    const clampIndex = (value: number): number => clamp(Math.floor(value / this.cell), 0, this.size - 1);
     return [clampIndex(point[0] - this.min[0]), clampIndex(point[1] - this.min[1])];
   }
 
@@ -168,11 +169,11 @@ export function classifyEdges(sources: ReadonlyArray<ViewSource>, frame: ViewFra
 /** Splits a→b into visible / hidden runs (pieces of ~`step`, transitions refined by bisection). */
 function splitEdge(a: Vec3, b: Vec3, frame: ViewFrame, step: number, hiddenAt: (point: Vec3, side: Vec2) => boolean, runs: EdgeRuns): void {
   const [pa, pb] = [frame.project(a), frame.project(b)];
-  const length = Math.hypot(pb[0] - pa[0], pb[1] - pa[1]);
+  const length = distance(pa, pb);
   if (length <= step * 1e-6) return;
   const side: Vec2 = [(pa[1] - pb[1]) / length, (pb[0] - pa[0]) / length];
   const at = (t: number): Vec3 => lerp3(a, b, t);
-  const pieces = Math.min(MAX_PIECES, Math.max(1, Math.ceil(length / step)));
+  const pieces = clamp(Math.ceil(length / step), 1, MAX_PIECES);
   const states = Array.from({ length: pieces }, (_, i) => hiddenAt(at((i + 0.5) / pieces), side));
   let start = 0;
   for (let i = 1; i <= pieces; i++) {

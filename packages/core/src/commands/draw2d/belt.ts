@@ -10,7 +10,7 @@ import { MAX_CURVE_SAMPLES } from '../limits';
 import { DEFAULT_DRAW_COLOR, workPlaneNamedFields } from './shared';
 import { commitEntity } from '../entity/commitEntity';
 import { newEntity } from '../entity/newEntity';
-import { pointsExtent } from '../../geometry/bounds';
+import { pointsExtent } from '../../lib/extent';
 import { noop } from '../noop';
 import { elementAt } from '../../lib/elementAt';
 import type { Vec2 as Point } from '../../model/vectors';

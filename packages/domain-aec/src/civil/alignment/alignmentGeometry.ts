@@ -9,6 +9,7 @@ import type { Vec2 } from '@core/model/types';
 import type { AlignmentObject } from '@core/model/civil';
 import { normalize2, sub2 } from '@lib/vec2';
 import { nearestAlongSpiral, spiralCurve, spiralPointAt, spiralSweep, type SpiralCurve, type SpiralElement } from './alignmentSpiral';
+import { distance } from '@lib/polygon';
 
 export type { SpiralElement } from './alignmentSpiral';
 
@@ -158,7 +159,7 @@ export function validateHorizontal(
   for (let i = 0; i + 1 < points.length; i++) {
     const a = points[i] as Vec2;
     const b = points[i + 1] as Vec2;
-    if (Math.hypot(b[0] - a[0], b[1] - a[1]) < EPS) return `points ${i} and ${i + 1} coincide.`;
+    if (distance(a, b) < EPS) return `points ${i} and ${i + 1} coincide.`;
   }
   if (radii.length !== points.length - 2) return `radii needs ${points.length - 2} value(s) (one per interior PI), got ${radii.length}.`;
   if (!radii.every((radius) => Number.isFinite(radius) && radius >= 0)) return 'radii must be finite numbers >= 0 (0 = no curve).';
@@ -180,7 +181,7 @@ export function validateHorizontal(
   for (let leg = 0; leg + 1 < points.length; leg++) {
     const a = points[leg] as Vec2;
     const b = points[leg + 1] as Vec2;
-    const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const length = distance(a, b);
     const used = (tangents[leg] ?? 0) + (tangents[leg + 1] ?? 0);
     if (used > length * (1 + 1e-9) + 1e-9) {
       const culprit = (tangents[leg] ?? 0) > 0 ? leg : leg + 1;
@@ -202,7 +203,7 @@ export function horizontalElements(alignment: HorizontalInput): HorizontalElemen
   let station = alignment.startStation;
   let cursor = points[0] as Vec2;
   const lineTo = (to: Vec2): void => {
-    const length = Math.hypot(to[0] - cursor[0], to[1] - cursor[1]);
+    const length = distance(cursor, to);
     if (length > EPS) {
       const direction = Math.atan2(to[1] - cursor[1], to[0] - cursor[0]);
       elements.push({ kind: 'line', start: cursor, end: to, startStation: station, length, direction });

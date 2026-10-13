@@ -4,7 +4,7 @@ import type { PipeSupportElement } from '@core/model/building';
 import type { Vec3 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { noop } from '@core/commands/noop';
+import { failedWith } from '@core/commands/noop';
 import { isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
 import { fromMm } from '@core/model/units';
 import { nextElementId, nextMark, elementAffected, withElement } from '../../building/model';
@@ -99,7 +99,7 @@ export const addPipeSupport = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const { pipeId, line, at, spacing, memberId, type = 'shoe' } = params;
-    const fail = (reason: string): CommandResult => noop(doc, `add_pipe_support failed: ${reason}`);
+    const fail = failedWith(doc, 'add_pipe_support');
     if ((pipeId === undefined) === (line === undefined)) return fail('give exactly one of pipeId or line.');
     if ((at === undefined) === (spacing === undefined)) return fail('give exactly one of at (list of points) or spacing.');
     const below = type !== 'hanger';

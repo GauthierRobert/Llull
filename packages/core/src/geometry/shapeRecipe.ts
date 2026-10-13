@@ -82,7 +82,7 @@ export function meshRecipeOf(entity: Entity): ShapeRecipe | null {
 }
 
 /** Max nesting accepted from a loaded document (a deeper tree is rejected, not evaluated). */
-const MAX_RECIPE_DEPTH = 256;
+export const MAX_RECIPE_DEPTH = 256;
 
 /** Checks one leaf entity of an untrusted recipe; returns an error text or null. */
 export type LeafValidator = (entity: Record<string, unknown>) => string | null;

@@ -4,7 +4,7 @@
  */
 
 import type { Vec2 } from '@core/model/types';
-import { pointsExtent } from '@core/geometry/bounds';
+import { pointsExtent } from '@lib/extent';
 
 /** Counter-clockwise triangles as flat vertex-index triples into the input array. */
 export type Triangles = number[];

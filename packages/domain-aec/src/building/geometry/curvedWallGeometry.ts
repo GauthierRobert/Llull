@@ -23,12 +23,8 @@ export function arcThrough(start: Vec2, through: Vec2, end: Vec2): Arc | null {
   const c2 = cx * cx + cy * cy;
   const center: Vec2 = [(a2 * (by - cy) + b2 * (cy - ay) + c2 * (ay - by)) / d, (a2 * (cx - bx) + b2 * (ax - cx) + c2 * (bx - ax)) / d];
   const angle = ([x, y]: Vec2): number => Math.atan2(y - center[1], x - center[0]);
-  const turn = (from: number, to: number): number => {
-    const delta = (to - from) % (2 * Math.PI);
-    return delta < 0 ? delta + 2 * Math.PI : delta;
-  };
   const startAngle = angle(start);
-  const counterClockwise = turn(startAngle, angle(end));
+  const counterClockwise = wrapAngle(angle(end) - startAngle);
   // The arc runs the way that passes through `through` (d > 0 ⇔ counter-clockwise).
   const sweep = d > 0 ? counterClockwise : counterClockwise - 2 * Math.PI;
   return { center, radius: distance(start, center), startAngle, sweep };

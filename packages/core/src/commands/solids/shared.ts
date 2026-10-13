@@ -11,7 +11,7 @@ import { noop } from '../noop';
 import { compactNumber } from '../../lib/compactNumber';
 import { isVec2 } from '../../lib/vec2';
 import { polygonArea, polygonPerimeter } from '../../lib/polygon';
-import { eulerFromAxis } from '../../lib/axisRotation';
+import { applyMat3, eulerFromAxis, eulerFromMat, matFromAxis, unitAxisOrNull } from '../../lib/axisRotation';
 
 type Field<F extends (...args: never[]) => unknown> = ReturnType<F>;
 type ColorField = ReturnType<typeof colorField>;
@@ -164,6 +164,28 @@ export function resolveRotation(
   if (axis === undefined) return { rotation: finiteVec3OrZero(rotation) };
   const euler = eulerFromAxis(axis);
   return euler ? { rotation: euler } : { error: `axis must be 3 finite numbers with non-zero length, got ${JSON.stringify(axis)}` };
+}
+
+/** World frame of an assembly built along `axis` (default +Z) at `position`: local +Z maps onto the unit axis. */
+interface AxisFrame {
+  readonly unitAxis: Vec3;
+  /** Stored Euler rotation of the frame. */
+  readonly rotation: Vec3;
+  /** Local point → world point. */
+  readonly worldAt: (local: Vec3) => Vec3;
+  /** Local direction → world direction. */
+  readonly directionAt: (local: Vec3) => Vec3;
+}
+
+/** {@link AxisFrame} for `axis` / `position` params, or the failure reason when either is malformed. */
+export function axisFrame(axis: unknown, position: readonly number[]): AxisFrame | string {
+  const unitAxis = axis === undefined ? ([0, 0, 1] as Vec3) : unitAxisOrNull(axis);
+  if (!unitAxis) return 'axis must be 3 finite numbers with non-zero length';
+  if (position.length !== 3 || !position.every(Number.isFinite)) return 'position must be 3 finite numbers';
+  const origin = position as Vec3;
+  const matrix = matFromAxis(unitAxis);
+  const directionAt = (local: Vec3): Vec3 => applyMat3(matrix, local);
+  return { unitAxis, rotation: eulerFromMat(matrix), worldAt: (local) => add3(origin, directionAt(local)), directionAt };
 }
 
 /**

@@ -5,7 +5,7 @@ import { chainSegments, type SegmentChain } from '@core/geometry/planeEdges';
 import type { Segment2 } from '@core/geometry/viewProjection';
 import { type DrawingPrimitive, drawingTolerance } from '@core/model/drawing';
 import type { Vec2 } from '@core/model/types';
-import { projectOntoSegment } from '@lib/polygon';
+import { distance, projectOntoSegment } from '@lib/polygon';
 
 type EdgeStyle = 'visible' | 'hidden' | 'cut';
 
@@ -33,7 +33,7 @@ function segmentsByStyle(primitives: ReadonlyArray<DrawingPrimitive>, tolerance:
   for (const [style, segments] of byStyle) {
     byStyle.set(
       style,
-      segments.filter(([a, b]) => Math.hypot(b[0] - a[0], b[1] - a[1]) > tolerance),
+      segments.filter(([a, b]) => distance(a, b) > tolerance),
     );
   }
   return byStyle;

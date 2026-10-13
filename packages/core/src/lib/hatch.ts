@@ -1,6 +1,7 @@
 /** Hatch pattern lines: parallel lines clipped to a region (even-odd over all loops). */
 
 import type { Vec2 as Point } from '../model/vectors';
+import { pointsDiagonal } from './extent';
 
 /**
  * Segments of lines at `angle` (radians), `spacing` apart, inside the region bounded by `loops` (outer boundary + holes, even-odd). Empty
@@ -44,9 +45,5 @@ const MAX_HATCH_LINES_ACROSS = 300;
  * the hatch every drawing output shares.
  */
 export function ansi31Hatch(loops: ReadonlyArray<ReadonlyArray<Point>>, spacing: number): Array<[[number, number], [number, number]]> {
-  const points = loops.flat();
-  const xs = points.map((point) => point[0]);
-  const ys = points.map((point) => point[1]);
-  const diagonal = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
-  return hatchSegments(loops, Math.PI / 4, Math.max(spacing, diagonal / MAX_HATCH_LINES_ACROSS));
+  return hatchSegments(loops, Math.PI / 4, Math.max(spacing, pointsDiagonal(loops.flat()) / MAX_HATCH_LINES_ACROSS));
 }
