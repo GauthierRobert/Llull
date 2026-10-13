@@ -32,7 +32,7 @@ RUN mkdir -p /out/bin /out/lib && if [ "$WITH_DWG" = "1" ]; then \
       && curl -fsSL -o /tmp/libredwg.tar.xz "$LIBREDWG_URL" \
       && echo "$LIBREDWG_SHA256  /tmp/libredwg.tar.xz" | sha256sum -c - \
       && mkdir /tmp/src && tar -xJf /tmp/libredwg.tar.xz -C /tmp/src --strip-components=1 \
-      && cd /tmp/src && ./configure --prefix=/usr/local --disable-bindings --disable-static \
+      && cd /tmp/src && ./configure --prefix=/usr/local --disable-bindings --disable-python --disable-docs --disable-static \
       && make -j"$(nproc)" && make install \
       && cp /usr/local/bin/dwg2dxf /out/bin/ && cp -P /usr/local/lib/libredwg.so* /out/lib/; \
     fi
