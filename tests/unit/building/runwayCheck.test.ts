@@ -6,6 +6,7 @@ import { GRAVITY } from '@aec/shared/numeric';
 import { runwayCheck } from '@aec/industrial/runway/runwayCheckRun';
 import { bufferForce, wheelMoment, wheelShear, type RunwayCheckRow } from '@aec/industrial/runway/runwayCheckModel';
 import { craneActions } from '@aec/industrial/frames/frameModelTypes';
+import { expectNoOp } from '../../helpers/expectNoOp';
 
 function hall(capacity = 10): CadDocument {
   return portalHall({ span: 24000, length: 30000, crane: { capacity, railHeight: 6000 } });
@@ -24,8 +25,7 @@ const find = (rows: RunwayCheckRow[], kind: string, check = ''): RunwayCheckRow 
 
 const expectFailed = (doc: CadDocument, params: Record<string, unknown>, summary: RegExp): void => {
   const result = runwayCheck.run(doc, params);
-  expect(result.document).toBe(doc);
-  expect(result.affected).toEqual([]);
+  expectNoOp(result, doc);
   expect(result.data).toBeUndefined();
   expect(result.summary).toMatch(summary);
 };
@@ -34,14 +34,8 @@ describe('check_crane_runways', () => {
   it('checks the default 10 t runway with realistic utilisations', () => {
     const doc = hall();
     const result = runwayCheck.run(doc, {});
-    const data = result.data as {
-      rows: RunwayCheckRow[];
-      csv: string;
-      maxUtilisation: number;
-      failures: string[];
-    };
-    expect(result.document).toBe(doc);
-    expect(result.affected).toEqual([]);
+    const data = result.data as { rows: RunwayCheckRow[]; csv: string; maxUtilisation: number; failures: string[] };
+    expectNoOp(result, doc);
     expect(data.failures).toEqual([]);
     expect(data.rows.length % 12).toBe(0);
     for (const kind of ['strength', 'ltb', 'deflection', 'fatigue', 'local']) {
@@ -59,7 +53,6 @@ describe('check_crane_runways', () => {
     expect(result.summary).toMatch(/Checked \d+ crane runway beam\(s\).*10 t, class S3.*all OK/);
     expect(runwayCheck.annotations).toEqual({ readOnly: true, idempotent: true });
   });
-
   it('fails a 32 t crane on the same beams, and the override matches the real one', () => {
     const result = runwayCheck.run(hall(), { craneCapacity: 32 });
     const data = result.data as { maxUtilisation: number; failures: string[] };
@@ -69,14 +62,12 @@ describe('check_crane_runways', () => {
     const built = hall(32);
     expect(runwayCheck.run(built, {}).data).toEqual(result.data);
   });
-
   it('gives class S4 a higher fatigue utilisation than S2', () => {
     const doc = hall();
     const s2 = find(rowsOf(doc, { craneClass: 'S2' }), 'fatigue').utilisation;
     const s4 = find(rowsOf(doc, { craneClass: 'S4' }), 'fatigue').utilisation;
     expect(s4 / s2).toBeCloseTo(0.5 / 0.315, 2);
   });
-
   it('increases moment with a short wheelBase and uses single-wheel PL/4 when long', () => {
     const doc = hall();
     const short = find(rowsOf(doc, { wheelBase: 1000 }), 'strength', 'bending').utilisation;
@@ -87,7 +78,6 @@ describe('check_crane_runways', () => {
     expect(wheelShear(10, 1000, 6000)).toBeCloseTo(18.33, 1);
     expect(wheelShear(10, 9000, 6000)).toBe(10);
   });
-
   it('reports non-I profiles as not susceptible to LTB and skips unknown profiles', () => {
     const doc = hall();
     const members = Object.values(doc.building?.elements ?? {}).filter(
@@ -111,7 +101,6 @@ describe('check_crane_runways', () => {
     expect(unknown.data).toBeUndefined();
     expect(unknown.summary).toMatch(/no crane runway beam/);
   });
-
   it('applies the EN 1991-3 load groups: hoisting class, hook approach, HT / HS and HL', () => {
     const doc = hall();
     const base = rowsOf(doc);
@@ -129,21 +118,16 @@ describe('check_crane_runways', () => {
     const spanned = rowsOf(doc, { craneSpan: 12000, craneSelfWeight: 30 });
     expect(find(spanned, 'strength', 'shear').value).not.toBe(find(base, 'strength', 'shear').value);
   });
-
   it('falls back to a 20 m bridge span for a runway without a paired beam', () => {
     const doc = hall();
     const kept = Object.values(doc.building!.elements).filter(
       (element) => !(element.category === 'member' && element.role === 'crane' && element.start[0] > 10000),
     );
-    const single = {
-      ...doc,
-      building: { ...doc.building!, elements: Object.fromEntries(kept.map((e) => [e.id, e])) },
-    };
+    const single = { ...doc, building: { ...doc.building!, elements: Object.fromEntries(kept.map((e) => [e.id, e])) } };
     const actions = craneActions(10, 20000);
     const lonely = rowsOf(single);
     expect(find(lonely, 'strength', 'longitudinal').value).toBeCloseTo(1.35 * actions.group1.longitudinal, -1);
   });
-
   it('is a graceful no-op for bad input', () => {
     const doc = hall();
     for (const params of [
@@ -159,7 +143,6 @@ describe('check_crane_runways', () => {
       expectFailed(doc, params, /^check_crane_runways failed/);
     }
   });
-
   it('is a graceful no-op without cranes', () => {
     const plain = portalHall({ span: 24000, length: 30000 });
     const result = runwayCheck.run(plain, {});
@@ -173,7 +156,6 @@ describe('check_crane_runways', () => {
 describe('local wheel stresses (EN 1993-6 §5.7.1)', () => {
   const stress = (rows: RunwayCheckRow[]): RunwayCheckRow => find(rows, 'local', 'σoz');
   const fatigue = (rows: RunwayCheckRow[]): RunwayCheckRow => find(rows, 'local', 'fatigue');
-
   it('matches a hand calculation for HEB300 + A55', () => {
     const rows = rowsOf(hall());
     expect(rows[0]?.profile).toBe('HEB300');
@@ -189,14 +171,12 @@ describe('local wheel stresses (EN 1993-6 §5.7.1)', () => {
     expect(stress(rows).check).toContain('leff 166 mm');
     expect(stress(rows).check).toContain('EN 1993-6 §5.7.1');
   });
-
   it('lowers σoz with a heavier rail', () => {
     const doc = hall();
     const light = stress(rowsOf(doc, { railSize: 'flat50x30' })).value;
     const heavy = stress(rowsOf(doc, { railSize: 'A100' })).value;
     expect(heavy).toBeLessThan(light);
   });
-
   it('uses category 71 / 36 for welded girders, raising the local fatigue utilisation', () => {
     const doc = hall();
     const rolled = fatigue(rowsOf(doc));
@@ -208,7 +188,6 @@ describe('local wheel stresses (EN 1993-6 §5.7.1)', () => {
     expect(full.utilisation / rolled.utilisation).toBeCloseTo(160 / 71, 1);
     expect(fillet.utilisation / rolled.utilisation).toBeCloseTo(160 / 36, 1);
   });
-
   it('passes the local checks for a 32 t crane on HEB300 (the beam fails elsewhere)', () => {
     // 32 t: σoz ≈ 158 N/mm² vs fy 355 (util ~0.45): the 11 mm web is not governing; LTB is.
     const rows = rowsOf(hall(), { craneCapacity: 32 });
@@ -217,7 +196,6 @@ describe('local wheel stresses (EN 1993-6 §5.7.1)', () => {
     expect(fatigue(rows).utilisation).toBeLessThan(1);
     expect(find(rows, 'ltb').utilisation).toBeGreaterThan(1);
   });
-
   it('rejects enum values outside the schema', () => {
     const doc = hall();
     for (const params of [{ girder: 'cast' }, { railSize: 'X9' }, { craneClass: 'S9' }, { hoistingClass: 'HC9' }]) {
@@ -255,7 +233,6 @@ describe('check_crane_runways longitudinal actions (EN 1991-3 groups 7 and 8)', 
     expect(find(rows, 'strength', 'buffer end-bay').utilisation).toBeGreaterThan(0);
     expect(rows.some((row) => row.check.startsWith('longitudinal stop force'))).toBe(true);
   });
-
   it('scales the buffer rows with travelSpeed and bufferStiffness', () => {
     const doc = hall();
     const slow = find(rowsOf(doc, { travelSpeed: 0.3 }), 'strength', 'buffer stop').value;
@@ -268,7 +245,6 @@ describe('check_crane_runways longitudinal actions (EN 1991-3 groups 7 and 8)', 
     const eccFast = find(rowsOf(doc, { travelSpeed: 0.6 }), 'strength', 'buffer end-bay');
     expect(eccFast.utilisation).toBeGreaterThan(eccSlow.utilisation);
   });
-
   it('adds a test load bending row governed by max(φ6·1.1, 1.25) Qh with γ 1.1', () => {
     const rows = rowsOf(hall());
     const test = find(rows, 'strength', 'test load');
@@ -279,7 +255,6 @@ describe('check_crane_runways longitudinal actions (EN 1991-3 groups 7 and 8)', 
     const heavier = find(rowsOf(hall(), { craneCapacity: 16 }), 'strength', 'test load');
     expect(heavier.utilisation).toBeGreaterThan(test.utilisation);
   });
-
   it('is a no-op on bad travelSpeed / bufferStiffness', () => {
     const doc = hall();
     for (const params of [{ travelSpeed: 0 }, { travelSpeed: -1 }, { bufferStiffness: 0 }, { bufferStiffness: Number.NaN }]) {

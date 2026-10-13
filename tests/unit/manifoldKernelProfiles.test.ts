@@ -4,17 +4,11 @@ import type { GeometryKernel } from '@core/geometry/kernel';
 import type { MeshData } from '@core/model/types';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { meshOf, booleanMesh } from '../helpers/manifoldMesh';
+import { xy } from '../helpers/xy';
 
 const base = { layerId: 'layer-default', color: '#888888', rotation: [0, 0, 0] };
 const extrusion = (profile: number[][], depth: number): Entity =>
-  ({
-    id: 'e',
-    kind: 'extrusion',
-    position: [0, 0, 0],
-    profile,
-    depth,
-    ...base,
-  }) as unknown as Entity;
+  ({ id: 'e', kind: 'extrusion', position: [0, 0, 0], profile, depth, ...base }) as unknown as Entity;
 const box = (position: number[]): Entity => ({ id: 'b', kind: 'box', position, size: [2, 2, 2], ...base }) as unknown as Entity;
 
 function volume(mesh: MeshData): number {
@@ -36,15 +30,8 @@ describe('manifold kernel extrusion profile winding', () => {
   beforeAll(async () => {
     kernel = await createManifoldKernel();
   });
-
-  const counterClockwise = [
-    [0, 0],
-    [3, 0],
-    [3, 2],
-    [0, 2],
-  ];
+  const counterClockwise = xy(0, 0, 3, 0, 3, 2, 0, 2);
   const clockwise = [...counterClockwise].reverse();
-
   it('extrudes a clockwise profile to the same solid as a counter-clockwise one', () => {
     const ccw = meshOf(kernel, extrusion(counterClockwise, 4));
     const cw = meshOf(kernel, extrusion(clockwise, 4));
@@ -53,27 +40,13 @@ describe('manifold kernel extrusion profile winding', () => {
     expect(volume(ccw!)).toBeCloseTo(24, 6);
     expect(volume(cw!)).toBeCloseTo(24, 6);
   });
-
   it('boolean operations accept a clockwise extrusion operand', () => {
     // The 2x2x2 box spans x 2..4; the extrusion covers x 0..3, so a 1x2x2 slab is removed.
     const cut = booleanMesh(kernel, 'subtract', box([3, 1, 2]), extrusion(clockwise, 4));
     expect(cut).not.toBeNull();
     expect(volume(cut!)).toBeCloseTo(4, 6);
   });
-
   it('still rejects a degenerate (zero-area) profile', () => {
-    expect(
-      meshOf(
-        kernel,
-        extrusion(
-          [
-            [0, 0],
-            [1, 0],
-            [2, 0],
-          ],
-          1,
-        ),
-      ),
-    ).toBeNull();
+    expect(meshOf(kernel, extrusion(xy(0, 0, 1, 0, 2, 0), 1))).toBeNull();
   });
 });

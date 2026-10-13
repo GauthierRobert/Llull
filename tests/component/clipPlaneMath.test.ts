@@ -12,14 +12,12 @@ describe('renderClipPlane', () => {
     expect(plane.normal).toEqual([0, 0, 1]);
     expect(plane.constant).toBe(-5);
   });
-
   it('passes through the world cut point after the floating origin shifts', () => {
     const plane = renderClipPlane('x', false, 10042, [10000, 2000, 300]);
     // world x=10042 is render x=42
     expect(side(plane, [42, 7, 7])).toBeCloseTo(0);
     expect(side(plane, [50, 0, 0])).toBeGreaterThan(0);
   });
-
   it('flipped planes cut at the mirrored world position', () => {
     const plane = renderClipPlane('y', true, 3, [0, 400, 0]);
     expect(plane.normal).toEqual([0, -1, 0]);

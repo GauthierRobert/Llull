@@ -67,9 +67,7 @@ const NATIVE: Record<View, string[]> = {
   ],
 };
 /** Native-document checks expected to fail today (same ratchet as quality/corpus.json). */
-const NATIVE_KNOWN_ISSUES: Record<string, CheckId[]> = {
-  '2d_arcs_circles': ['aspect'],
-};
+const NATIVE_KNOWN_ISSUES: Record<string, CheckId[]> = { '2d_arcs_circles': ['aspect'] };
 
 interface StepEntry {
   id: string;
@@ -81,9 +79,7 @@ interface StepEntry {
 
 /** STEP entries of the selected tier whose import is expected to produce a document. */
 function stepEntries(): StepEntry[] {
-  const manifest = JSON.parse(readFileSync(path.join(ROOT, 'quality', 'corpus.json'), 'utf8')) as {
-    files: StepEntry[];
-  };
+  const manifest = JSON.parse(readFileSync(path.join(ROOT, 'quality', 'corpus.json'), 'utf8')) as { files: StepEntry[] };
   return manifest.files.filter(
     (entry) =>
       entry.format === 'step' &&
@@ -126,9 +122,7 @@ function nativeCases(): DisplayCase[] {
 }
 
 /** Complex-document checks expected to fail today (same ratchet). */
-const COMPLEX_KNOWN_ISSUES: Record<string, CheckId[]> = {
-  '3d_rotated_beam': ['aspect'],
-};
+const COMPLEX_KNOWN_ISSUES: Record<string, CheckId[]> = { '3d_rotated_beam': ['aspect'] };
 
 /** A complex plan must build completely: a failed step would hide what the case is about. */
 function built(name: string, actions: GoldenAction[]): CadDocument {
@@ -208,7 +202,6 @@ test.describe('display quality gate', () => {
     expect(stepEntries().length).toBeGreaterThan(0);
     expect(missing.map((entry) => entry.id)).toEqual([]);
   });
-
   for (const displayCase of cases) {
     test(`${displayCase.id} renders without errors or deformation`, async ({ page }) => {
       const problems: string[] = [];
@@ -224,7 +217,6 @@ test.describe('display quality gate', () => {
       await page.goto('/');
       await page.evaluate(() => window.localStorage.clear());
       await page.reload();
-
       // Open the Layers panel first: the canvas keeps one size for every screenshot.
       const showPanel = page.getByRole('button', { name: 'Show browser panel' });
       if (await showPanel.isVisible()) await showPanel.click();
@@ -237,9 +229,7 @@ test.describe('display quality gate', () => {
       mkdirSync(path.dirname(upload), { recursive: true });
       writeFileSync(upload, serializeDocument(displayCase.document));
       await page.locator('[aria-label="Project file"] input[type="file"]').setInputFiles(upload);
-      await expect(page.getByLabel(/^Last command: Loaded document/)).toBeVisible({
-        timeout: 120_000,
-      });
+      await expect(page.getByLabel(/^Last command: Loaded document/)).toBeVisible({ timeout: 120_000 });
       if (displayCase.view === '2D') {
         await page.getByRole('button', { name: '2D', exact: true }).click();
       }
@@ -255,7 +245,6 @@ test.describe('display quality gate', () => {
       const imageFile = path.join(path.dirname(REPORT_FILE), 'display', `${displayCase.id}.png`);
       const shape = await measure(page, canvas, imageFile);
       const loadMs = Date.now() - started;
-
       const expected = expectedAspect(displayCase.document);
       const framed = isFramed(shape, MIN_SPAN);
       const aspectError = shape.rect === null || expected === null ? null : Math.abs(aspectOf(shape.rect) / expected - 1);
@@ -277,17 +266,13 @@ test.describe('display quality gate', () => {
       }
       const metrics = { loadMs, rect: shape.rect, expected, aspectError, results, problems };
       record(displayCase.id, metrics);
-
       const failed = Object.entries(results)
         .filter(([, ok]) => !ok)
         .map(([id]) => id as CheckId);
       const unexpectedFailures = failed.filter((id) => !displayCase.knownIssues.includes(id));
       // A known issue that passed, or that no longer runs for this case, is stale.
       const fixedKnownIssues = displayCase.knownIssues.filter((id) => results[id] !== false);
-      expect({ unexpectedFailures, fixedKnownIssues }, JSON.stringify(metrics)).toEqual({
-        unexpectedFailures: [],
-        fixedKnownIssues: [],
-      });
+      expect({ unexpectedFailures, fixedKnownIssues }, JSON.stringify(metrics)).toEqual({ unexpectedFailures: [], fixedKnownIssues: [] });
     });
   }
 });

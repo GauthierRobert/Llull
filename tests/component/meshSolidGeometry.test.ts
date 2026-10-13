@@ -16,7 +16,6 @@ describe('buildMeshSolidGeometry', () => {
       expect(Math.max(...components)).toBeCloseTo(1);
     }
   });
-
   it('keeps the triangle positions', () => {
     const geometry = buildMeshSolidGeometry(CUBE);
     expect(geometry.getAttribute('position').count).toBe(36);

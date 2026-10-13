@@ -97,13 +97,7 @@ export function BuildingExportsSection(): React.ReactElement {
           primary
           label={cutAt.trim() === '' ? 'Elevation sheet' : 'Section sheet'}
           command="export_elevation_sheet"
-          params={{
-            direction,
-            paper,
-            ...scaleParams,
-            ...optionalNumber('cutAt', cutAt),
-            ...(hideCladding ? { exclude: ['panel'] } : {}),
-          }}
+          params={{ direction, paper, ...scaleParams, ...optionalNumber('cutAt', cutAt), ...(hideCladding ? { exclude: ['panel'] } : {}) }}
           field="svg"
           fallbackName={null}
           mimeType="image/svg+xml"

@@ -52,7 +52,6 @@ function normalizeJson(parsed: unknown): unknown {
     return token;
   };
   const replaceIds = (text: string): string => text.replace(pattern, (m) => tokenFor(m));
-
   const walk = (value: unknown): unknown => {
     if (typeof value === 'string') return replaceIds(value);
     if (typeof value === 'number') return roundNumber(value);

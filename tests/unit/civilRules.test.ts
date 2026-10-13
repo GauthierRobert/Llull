@@ -1,42 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { alignmentParamsOf, failuresOf, manholeParamsOf, stormParams } from '@ui/panels/civil/civilRules';
+import { xy } from '../helpers/xy';
 
-const alignment = {
-  points: '0,0; 10,0; 10,10',
-  radii: '5',
-  spirals: '',
-  surfaceId: '',
-  interval: '',
-  name: '',
-};
+const alignment = { points: '0,0; 10,0; 10,10', radii: '5', spirals: '', surfaceId: '', interval: '', name: '' };
 
 describe('alignmentParamsOf', () => {
   it('gathers points and optional lists', () => {
     expect(alignmentParamsOf({ ...alignment, surfaceId: 's1', interval: '20', name: 'A' })).toEqual({
       ok: true,
-      params: {
-        points: [
-          [0, 0],
-          [10, 0],
-          [10, 10],
-        ],
-        radii: [5],
-        surfaceId: 's1',
-        stationInterval: 20,
-        name: 'A',
-      },
+      params: { points: xy(0, 0, 10, 0, 10, 10), radii: [5], surfaceId: 's1', stationInterval: 20, name: 'A' },
     });
   });
   it('reports the first malformed field', () => {
     expect(alignmentParamsOf({ ...alignment, points: '0,0' })).toMatchObject({ ok: false });
-    expect(alignmentParamsOf({ ...alignment, radii: 'x' })).toMatchObject({
-      ok: false,
-      error: expect.stringContaining('Radii'),
-    });
-    expect(alignmentParamsOf({ ...alignment, spirals: 'x' })).toMatchObject({
-      ok: false,
-      error: expect.stringContaining('Spirals'),
-    });
+    expect(alignmentParamsOf({ ...alignment, radii: 'x' })).toMatchObject({ ok: false, error: expect.stringContaining('Radii') });
+    expect(alignmentParamsOf({ ...alignment, spirals: 'x' })).toMatchObject({ ok: false, error: expect.stringContaining('Spirals') });
   });
 });
 

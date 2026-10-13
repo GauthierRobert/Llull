@@ -62,10 +62,7 @@ function ifcStoreysCheck({ document, deliverable }: GradeContext): CheckOutcome 
   const file = parseIfc(deliverable('ifc'));
   const building = buildingOf(document);
   const problems: string[] = [];
-  const storeyNames = ofType(file, 'IFCBUILDINGSTOREY').map((s) => ({
-    name: stepString(s.args[2]),
-    elevation: Number(s.args[9]),
-  }));
+  const storeyNames = ofType(file, 'IFCBUILDINGSTOREY').map((s) => ({ name: stepString(s.args[2]), elevation: Number(s.args[9]) }));
   for (const level of levelsByElevation(document)) {
     const storey = storeyNames.find((s) => s.name === level.name);
     if (!storey) problems.push(`no storey "${level.name}"`);
@@ -131,11 +128,7 @@ function dxfPlansCheck({ document, deliverable }: GradeContext): CheckOutcome {
   const problems: string[] = [];
   const columns = elementsOf(document, 'member')
     .filter((m) => m.role === 'column')
-    .map((m) => ({
-      mark: m.mark,
-      start: absolute(document, m.levelId, m.start),
-      end: absolute(document, m.levelId, m.end),
-    }));
+    .map((m) => ({ mark: m.mark, start: absolute(document, m.levelId, m.start), end: absolute(document, m.levelId, m.end) }));
   for (const level of levelsByElevation(document)) {
     const file = parseDxf(deliverable(`dxf:${level.id}`));
     problems.push(...file.errors.slice(0, 2).map((e) => `${level.name}: ${e}`));
@@ -224,9 +217,7 @@ function schedulesCheck(ctx: GradeContext): CheckOutcome {
   const memberCount = elementsOf(document, 'member').length;
   if (members.length - 1 !== memberCount) problems.push(`member schedule ${members.length - 1} rows, model ${memberCount}`);
   const scheduleKg = column(members, 'Mass (kg)').reduce((a, b) => a + b, 0);
-  const takeoff = JSON.parse(ctx.deliverable('takeoff')) as {
-    lines?: { key: string; unit: string; quantity: number }[];
-  };
+  const takeoff = JSON.parse(ctx.deliverable('takeoff')) as { lines?: { key: string; unit: string; quantity: number }[] };
   const takeoffKg = (takeoff.lines ?? []).filter((l) => l.key.startsWith('member.') && l.unit === 'kg').reduce((s, l) => s + l.quantity, 0);
   if (Math.abs(scheduleKg - takeoffKg) > 0.005 * Math.max(takeoffKg, 1)) {
     problems.push(`member schedule ${round(scheduleKg)} kg ≠ takeoff ${round(takeoffKg)} kg`);

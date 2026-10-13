@@ -1,8 +1,3 @@
-/**
- * useMcpLiveDocument degrades quietly when the server is down: reconnects with
- * exponential backoff instead of the native fixed-interval retry.
- */
-
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, act } from '@testing-library/react';
 import { useStore } from '@ui/store';
@@ -41,26 +36,22 @@ describe('useMcpLiveDocument', () => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });
-
   it('reconnects with exponential backoff and marks disconnected', () => {
     render(<Harness />);
     expect(FakeEventSource.instances).toHaveLength(1);
     FakeEventSource.instances[0]?.onerror?.();
     expect(useStore.getState().liveStatus).toBe('disconnected');
     expect(FakeEventSource.instances[0]?.closed).toBe(true);
-
     vi.advanceTimersByTime(999);
     expect(FakeEventSource.instances).toHaveLength(1);
     vi.advanceTimersByTime(1);
     expect(FakeEventSource.instances).toHaveLength(2);
-
     FakeEventSource.instances[1]?.onerror?.();
     vi.advanceTimersByTime(1999);
     expect(FakeEventSource.instances).toHaveLength(2);
     vi.advanceTimersByTime(1);
     expect(FakeEventSource.instances).toHaveLength(3);
   });
-
   it('stops retrying after unmount', () => {
     const { unmount } = render(<Harness />);
     FakeEventSource.instances[0]?.onerror?.();
@@ -68,16 +59,10 @@ describe('useMcpLiveDocument', () => {
     vi.advanceTimersByTime(60000);
     expect(FakeEventSource.instances).toHaveLength(1);
   });
-
   it('coalesces resyncs: one snapshot fetch in flight, one follow-up for failures meanwhile', async () => {
     vi.useRealTimers();
     const resolvers: (() => void)[] = [];
-    const snapshot = {
-      epoch: 'e',
-      seq: 1,
-      stateHash: 'h',
-      document: useStore.getState().document,
-    };
+    const snapshot = { epoch: 'e', seq: 1, stateHash: 'h', document: useStore.getState().document };
     const fetchSpy = vi.fn(
       () =>
         new Promise((resolve) => {
@@ -87,9 +72,7 @@ describe('useMcpLiveDocument', () => {
     vi.stubGlobal('fetch', fetchSpy);
     render(<Harness />);
     const listener = FakeEventSource.instances[0]?.listeners.get('command');
-    const gapEvent = {
-      data: JSON.stringify({ epoch: 'e', seq: 9, name: 'x', params: {}, stateHash: 'h' }),
-    };
+    const gapEvent = { data: JSON.stringify({ epoch: 'e', seq: 9, name: 'x', params: {}, stateHash: 'h' }) };
     act(() => {
       listener?.(gapEvent as MessageEvent);
       listener?.(gapEvent as MessageEvent);

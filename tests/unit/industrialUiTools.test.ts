@@ -22,11 +22,7 @@ function apply(doc: CadDocument, id: string, overrides: Record<string, string> =
 
 describe('industrial tools', () => {
   it('the default forms build a working steel hall with process plant', () => {
-    let doc = apply(createEmptyDocument(), 'hall', {
-      span: '18000',
-      length: '24000',
-      craneRailHeight: '5000',
-    });
+    let doc = apply(createEmptyDocument(), 'hall', { span: '18000', length: '24000', craneRailHeight: '5000' });
     doc = apply(doc, 'hall', { basePlates: 'false', x: '40000', span: '12000', length: '12000' });
     for (const id of ['member', 'footing', 'panel', 'craneRunway', 'equipment', 'pipe', 'tray', 'basePlates']) {
       doc = apply(doc, id, id === 'footing' ? { underColumns: 'false', x: '9000', y: '-3000' } : {});
@@ -38,42 +34,29 @@ describe('industrial tools', () => {
     const crane = Object.values(doc.building!.elements).filter((element) => element.category === 'member' && element.role === 'crane');
     expect(crane.length).toBeGreaterThan(0);
   });
-
   it('builds a multi-span hall from a list of widths', () => {
     const hall = tool('hall').build({ ...defaultValues(tool('hall')), spans: '20000, 25000' }, context);
     expect(hall.ok && hall.params).toMatchObject({ spans: [20000, 25000] });
     expect(hall.ok && 'span' in hall.params).toBe(false);
   });
-
   it('passes the column base fixity and the roof type to the hall generator', () => {
     const defaults = tool('hall').build(defaultValues(tool('hall')), context);
-    expect(defaults.ok && defaults.params).toMatchObject({
-      columnBase: 'pinned',
-      roofType: 'duopitch',
-    });
+    expect(defaults.ok && defaults.params).toMatchObject({ columnBase: 'pinned', roofType: 'duopitch' });
     const hall = tool('hall').build({ ...defaultValues(tool('hall')), columnBase: 'fixed', roofType: 'monopitch' }, context);
     expect(hall.ok && hall.params).toMatchObject({ columnBase: 'fixed', roofType: 'monopitch' });
-    const doc = apply(createEmptyDocument(), 'hall', {
-      columnBase: 'fixed',
-      roofType: 'monopitch',
-    });
+    const doc = apply(createEmptyDocument(), 'hall', { columnBase: 'fixed', roofType: 'monopitch' });
     expect(Object.values(doc.building!.elements).some((element) => element.category === 'plate' && element.fixity === 'fixed')).toBe(true);
   });
-
   it('converts degrees and omits blank optional fields', () => {
     const member = tool('member').build({ ...defaultValues(tool('member')), roll: '90' }, context);
     expect(member.ok && member.params['roll']).toBeCloseTo(Math.PI / 2);
-    const hall = tool('hall').build(defaultValues(tool('hall')), {
-      ...context,
-      levelId: 'level-1',
-    });
+    const hall = tool('hall').build(defaultValues(tool('hall')), { ...context, levelId: 'level-1' });
     expect(hall.ok && hall.params).toMatchObject({ levelId: 'level-1', cladding: true });
     expect(hall.ok && 'crane' in hall.params).toBe(false);
     const equipment = tool('equipment').build(defaultValues(tool('equipment')), context);
     expect(equipment.ok && 'weight' in equipment.params).toBe(false);
     expect(equipment.ok && 'shape' in equipment.params).toBe(false);
   });
-
   it('the footing form has no default location: X/Y show and are required only off-column', () => {
     const footing = tool('footing');
     const defaults = defaultValues(footing);
@@ -83,20 +66,13 @@ describe('industrial tools', () => {
       footing.fields.filter((field) => isFieldShown(field, values)).map((field) => field.key);
     expect(shown(defaults)).not.toContain('x');
     expect(shown({ ...defaults, underColumns: 'false' })).toEqual(expect.arrayContaining(['x', 'y']));
-    expect(footing.build(defaults, context)).toMatchObject({
-      ok: true,
-      params: { underColumns: true },
-    });
-    expect(footing.build({ ...defaults, underColumns: 'false' }, context)).toEqual({
-      ok: false,
-      reason: 'Check: x, y',
-    });
+    expect(footing.build(defaults, context)).toMatchObject({ ok: true, params: { underColumns: true } });
+    expect(footing.build({ ...defaults, underColumns: 'false' }, context)).toEqual({ ok: false, reason: 'Check: x, y' });
     expect(footing.build({ ...defaults, underColumns: 'false', x: '1000', y: '2000' }, context)).toMatchObject({
       ok: true,
       params: { location: [1000, 2000] },
     });
   });
-
   it('places a vertical vessel from the equipment form', () => {
     const doc = apply(createEmptyDocument(), 'equipment', {
       name: 'Desolventizer-toaster',
@@ -107,7 +83,6 @@ describe('industrial tools', () => {
     const vessel = Object.values(doc.building?.elements ?? {}).find((element) => element.category === 'equipment');
     expect(vessel).toMatchObject({ shape: 'vertical_vessel', size: [4000, 4000, 12000] });
   });
-
   it('reports malformed point lists and a missing equipment name', () => {
     expect(tool('pipe').build({ ...defaultValues(tool('pipe')), points: '0,0,0' }, context)).toEqual({
       ok: false,

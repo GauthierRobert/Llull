@@ -50,11 +50,7 @@ async function request<Body>(path: string, postBody?: unknown): Promise<Body> {
       `${SERVER_BASE}${path}`,
       postBody === undefined
         ? { headers: serverAuthHeaders() }
-        : {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...serverAuthHeaders() },
-            body: JSON.stringify(postBody),
-          },
+        : { method: 'POST', headers: { 'Content-Type': 'application/json', ...serverAuthHeaders() }, body: JSON.stringify(postBody) },
     );
   } catch (cause) {
     throw new ServerCommandError(`Network error: ${errorMessage(cause)}`);

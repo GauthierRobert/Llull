@@ -24,24 +24,13 @@ function runScript(scenario: Scenario, from: CadDocument): CadDocument {
 export async function extractionRevisionFlow(session: UiSession): Promise<UiRun> {
   const baseline = runScript(extractionBuilding, createEmptyDocument());
   const revA = writeArtifact('ui', extractionRevision.id, 'rev-a-issued-project.json', serializeDocument(baseline));
-
   await session.start();
   await session.openProject(revA);
   const driver = new UiDriver(session);
   const levels = Object.values(baseline.building?.levels ?? {});
   driver.startFromProject(levels);
   for (const call of extractionRevision.script) await driver.perform(call);
-
   const { provided, fileNames } = await exportPackage(session, baseline.building?.levelOrder ?? []);
   const saved = await saveProject(session);
-  return {
-    scenario: extractionRevision,
-    session,
-    baseline,
-    saved,
-    provided,
-    fileNames,
-    uiGaps: driver.uiGaps,
-    steps: driver.steps,
-  };
+  return { scenario: extractionRevision, session, baseline, saved, provided, fileNames, uiGaps: driver.uiGaps, steps: driver.steps };
 }

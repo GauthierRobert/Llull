@@ -6,47 +6,28 @@ import { buildFeatureProgram } from '@core/codegen/featureProgram';
 const triangle = [0, 0, 0, 1, 0, 0, 0, 1, 0];
 
 function box(ref?: string): Record<string, unknown> {
-  return {
-    command: 'add_box',
-    ...(ref !== undefined ? { ref } : {}),
-    params: { size: [{ value: 1 }, { value: 2 }, { value: 3 }] },
-  };
+  return { command: 'add_box', ...(ref !== undefined ? { ref } : {}), params: { size: [{ value: 1 }, { value: 2 }, { value: 3 }] } };
 }
 
 describe('apply_code_trace validation', () => {
   it('rejects an unknown mode instead of treating it as replace', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'apply_code_trace', {
-      trace: { parameters: [], features: [box('f1')] },
-      mode: 'merge',
-    });
+    const result = execute(doc, 'apply_code_trace', { trace: { parameters: [], features: [box('f1')] }, mode: 'merge' });
     expect(result.document).toBe(doc);
     expect(result.summary).toMatch(/apply_code_trace rejected: invalid params — mode/);
   });
-
   it('rejects duplicate refs and non-string names', () => {
     const doc = createEmptyDocument();
-    const duplicate = execute(doc, 'apply_code_trace', {
-      trace: { parameters: [], features: [box('f1'), box('f1')] },
-    });
+    const duplicate = execute(doc, 'apply_code_trace', { trace: { parameters: [], features: [box('f1'), box('f1')] } });
     expect(duplicate.summary).toMatch(/ref must be a unique string/);
-    const badName = execute(doc, 'apply_code_trace', {
-      trace: { parameters: [], features: [{ ...box('f1'), name: 7 }] },
-    });
+    const badName = execute(doc, 'apply_code_trace', { trace: { parameters: [], features: [{ ...box('f1'), name: 7 }] } });
     expect(badName.summary).toMatch(/name must be a string/);
   });
-
   it('reports every created solid, including ref-less features and multi-body meshes', () => {
     const result = execute(createEmptyDocument(), 'apply_code_trace', {
       trace: {
         parameters: [],
-        features: [
-          box(),
-          {
-            command: 'import_mesh',
-            params: { bodies: [{ positions: triangle }, { positions: triangle }] },
-          },
-        ],
+        features: [box(), { command: 'import_mesh', params: { bodies: [{ positions: triangle }, { positions: triangle }] } }],
       },
     });
     expect(result.affected).toHaveLength(3);
@@ -54,10 +35,7 @@ describe('apply_code_trace validation', () => {
   });
   it('accepts traces from older generated code that still names retired commands', () => {
     const result = execute(createEmptyDocument(), 'apply_code_trace', {
-      trace: {
-        parameters: [],
-        features: [box('f1'), { command: 'move_entity', params: { id: { ref: 'f1' }, delta: [5, 0, 0] } }],
-      },
+      trace: { parameters: [], features: [box('f1'), { command: 'move_entity', params: { id: { ref: 'f1' }, delta: [5, 0, 0] } }] },
     });
     const [id] = result.affected;
     expect(result.document.entities[id!]?.position).toEqual([5, 0, 0]);
@@ -79,7 +57,6 @@ describe('buildFeatureProgram history check', () => {
     const solid = program.features[0];
     expect(solid?.op === 'solid' && solid.shape.kind === 'box' && solid.shape.size[0].value).toBe(9);
   });
-
   it('keeps the history when it reproduces the document', () => {
     const built = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
     expect(buildFeatureProgram(built, getCommand).source).toBe('history');

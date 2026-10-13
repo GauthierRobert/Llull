@@ -34,7 +34,6 @@ describe('solveFrame', () => {
     expect(result.displacements[1]![1]).toBeCloseTo((5 * q * L ** 4) / (384 * E * I), 6);
     expect(result.members[0]!.maxMoment).toBeCloseTo((-q * L * L) / 8, 3);
   });
-
   it('reproduces a fixed-fixed beam (end moments −qL²/12)', () => {
     const [L, q] = [8000, -5];
     const result = solveFrame(
@@ -49,7 +48,6 @@ describe('solveFrame', () => {
     expect(Mb).toBeCloseTo((q * L * L) / 12, 3);
     expect(result.members[0]!.maxMoment).toBeCloseTo((-q * L * L) / 12, 3);
   });
-
   it('matches the closed-form pinned-base portal frame (flat roof) moment', () => {
     // Pinned-base rectangular portal, column height h, span L, uniform load q on the beam:
     // M_corner = q L² / (4 (2k + 3)) with k = (Ib h) / (Ic L)  (Kleinlogel).
@@ -74,12 +72,10 @@ describe('solveFrame', () => {
     // Columns carry the vertical reaction qL/2 in compression.
     expect(result.members[0]!.axial[0]).toBeCloseTo((q * L) / 2, 3);
   });
-
   it('reports the in-span deflection of a single member (5qL⁴/384EI)', () => {
     const result = udlBeam(pinned, {});
     expect(result.members[0]!.maxDisplacement.y).toBeCloseTo(Math.abs((5 * q * L ** 4) / (384 * E * I)), 3);
   });
-
   it('applies node loads: cantilever tip force (PL³/3EI) and moment (ML²/2EI)', () => {
     const [L, P, M, I] = [3000, -2000, 5e6, 1e7];
     const tip = (load: { fx: number; fy: number; mz: number }): number =>
@@ -102,7 +98,6 @@ describe('solveFrame', () => {
     expect(sway.displacements[1]![0]).toBeCloseTo((P * L ** 3) / (3 * E * I), 6);
     expect(sway.members[0]!.maxDisplacement.x).toBeCloseTo(Math.abs((P * L ** 3) / (3 * E * I)), 6);
   });
-
   it('returns null for a mechanism or a degenerate member', () => {
     expect(
       solveFrame(
@@ -134,7 +129,6 @@ describe('solveFrame', () => {
       expect(member.maxMoment).toBeCloseTo((-q * L * L) / 8, 3);
       expect(member.shear[0]).toBeCloseTo((-5 * q * L) / 8, 3);
     });
-
     it('simply supports a beam released at both ends without a singular rotation', () => {
       const result = udlBeam(pinned, { releaseA: true, releaseB: true });
       const member = result.members[0]!;
@@ -144,7 +138,6 @@ describe('solveFrame', () => {
       // Mid-span deflection 5qL⁴/384EI from the Hermite field with the recovered end rotations.
       expect(member.maxDisplacement.y).toBeCloseTo((5 * Math.abs(q) * L ** 4) / (384 * E * I), 4);
     });
-
     it('lets a pin-jointed beam tie two fixed-base cantilever columns: base moment H h / 2 each', () => {
       const [h, L, H, I] = [4000, 6000, 20000, 2e8];
       const result = solveFrame(
@@ -165,7 +158,6 @@ describe('solveFrame', () => {
       expect(result.members[1]!.moment[0]).toBeCloseTo(0, 3);
       expect(result.members[1]!.moment[1]).toBeCloseTo(0, 3);
     });
-
     it('is a mechanism when a moment is applied where every member end is released', () => {
       const nodes = [
         { x: 0, y: 0, restraint: pinned },

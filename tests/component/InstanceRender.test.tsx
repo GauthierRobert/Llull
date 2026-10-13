@@ -1,17 +1,3 @@
-/**
- * Component tests for instance rendering in the 3D viewport.
- *
- * Since jsdom has no WebGL, we cannot render the full r3f Canvas. Instead we:
- *   1. Verify that `expandInstance` produces the expected world-space entities
- *      for a given instance + component (pure function test, verifiable in jsdom).
- *   2. Verify that the selection routing maps sub-entity clicks → instance id,
- *      by inspecting the data flow through the store.
- *
- * These tests cover the OBSERVABLE contract (workflow W3): a scene with an
- * instance entity results in geometry being derived from the component, and
- * selection routes to the instance id.
- */
-
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '@ui/store';
 import { type Component, type InstanceEntity } from '@core/model/types';
@@ -35,12 +21,10 @@ function insertInstanceOf(
 
 describe('InstanceRender — expandInstance produces geometry', () => {
   beforeEach(resetStore);
-
   it('expandInstance returns > 0 entities for a component with 1 box', () => {
     const { instance, comp } = insertInstanceOf('Block', [['add_box', { size: [2, 2, 2] }]]);
     expect(expandInstance(instance, comp).length).toBeGreaterThan(0);
   });
-
   it('expandInstance returns 2 entities for a component with 2 children', () => {
     const { instance, comp } = insertInstanceOf('Multi', [
       ['add_box', { size: [1, 1, 1] }],
@@ -48,12 +32,9 @@ describe('InstanceRender — expandInstance produces geometry', () => {
     ]);
     expect(expandInstance(instance, comp)).toHaveLength(2);
   });
-
   it('expandInstance applies instance position to child world positions', () => {
     // The box starts at origin [0,0,0] inside the component.
-    const { instance, comp } = insertInstanceOf('Shifted', [['add_box', { size: [1, 1, 1] }]], {
-      position: [10, 20, 30],
-    });
+    const { instance, comp } = insertInstanceOf('Shifted', [['add_box', { size: [1, 1, 1] }]], { position: [10, 20, 30] });
     const expanded = expandInstance(instance, comp);
     expect(expanded).toHaveLength(1);
     const child = expanded[0]!;
@@ -65,13 +46,10 @@ describe('InstanceRender — expandInstance produces geometry', () => {
 
 describe('InstanceRender — selection routing to instance id', () => {
   beforeEach(resetStore);
-
   it('instance id is selectable from the document selection', () => {
     const { instanceId } = insertInstanceOf('SelectTest', [['add_box', { size: [3, 3, 3] }]]);
-
     // Simulate selecting the instance id (as the viewport would do on sub-mesh click).
     useStore.getState().select([instanceId]);
-
     const selection = useStore.getState().document.selection;
     expect(selection).toContain(instanceId);
     // The expanded child ids are NOT in the selection — only the instance itself.
@@ -81,7 +59,6 @@ describe('InstanceRender — selection routing to instance id', () => {
       expect(selection).not.toContain(childId);
     }
   });
-
   it('instance entity has kind === instance after insert_instance', () => {
     const { instance } = insertInstanceOf('KindCheck', [['add_box', { size: [1, 2, 3] }]]);
     expect(instance).toBeDefined();

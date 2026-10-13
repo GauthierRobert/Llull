@@ -26,15 +26,12 @@ test.describe('production scenarios (UI driver)', () => {
   test('desmet-extraction-building', async ({ page }) => {
     gradeUiRun(await extractionBuildingFlow(new UiSession(page)));
   });
-
   test('desmet-extraction-revision-b', async ({ page }) => {
     gradeUiRun(await extractionRevisionFlow(new UiSession(page)));
   });
-
   test('desmet-pipe-rack', async ({ page }) => {
     gradeUiRun(await pipeRackFlow(new UiSession(page)));
   });
-
   test('civil-site-development', async ({ page }) => {
     gradeUiRun(await civilSiteFlow(new UiSession(page)));
   });

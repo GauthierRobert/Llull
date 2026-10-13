@@ -136,12 +136,7 @@ export function Viewport3D(): React.ReactElement {
       <Canvas
         frameloop="demand"
         shadows
-        gl={{
-          antialias: true,
-          alpha: false,
-          toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.1,
-        }}
+        gl={{ antialias: true, alpha: false, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
         dpr={[1, 2]}
         style={{ width: '100%', height: '100%' }}
         onPointerMissed={handlePointerMissed}

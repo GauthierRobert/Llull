@@ -25,9 +25,9 @@ export async function runViaPalette(session: UiSession, command: string, params:
   await expect(dialog.locator('.palette-form__tool')).toHaveText(command);
   for (const [key, value] of Object.entries(params)) {
     const label = humanizeName(key);
-    const field = dialog.locator('.palette-field').filter({
-      has: page.locator('label', { hasText: new RegExp(`^${label}(\\*|optional)?$`) }),
-    });
+    const field = dialog
+      .locator('.palette-field')
+      .filter({ has: page.locator('label', { hasText: new RegExp(`^${label}(\\*|optional)?$`) }) });
     const control = field.locator('input, textarea, select');
     const tag = await control.evaluate((element) => element.tagName);
     if (tag === 'SELECT') await control.selectOption(String(value));

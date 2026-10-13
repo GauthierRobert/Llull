@@ -42,10 +42,7 @@ function replayCheck({ document }: GradeContext): CheckOutcome {
   const before = canonical(definition(document));
   const after = canonical(definition(replayed.document));
   if (before === after) {
-    return {
-      pass: true,
-      detail: `${document.featureHistory.length} history steps replay to the same model`,
-    };
+    return { pass: true, detail: `${document.featureHistory.length} history steps replay to the same model` };
   }
   const a = JSON.parse(before) as { document: Record<string, unknown> };
   const b = JSON.parse(after) as { document: Record<string, unknown> };

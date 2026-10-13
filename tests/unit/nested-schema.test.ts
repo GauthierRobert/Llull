@@ -19,7 +19,6 @@ function objectParams(name: string, path: string, node: SchemaNode): Array<[stri
 
 describe('nested parameter schemas', () => {
   const all = listCommands().flatMap((command) => objectParams(command.name, '', command.paramsSchema as unknown as SchemaNode));
-
   it('declare the required fields of every object parameter (patch objects are all-optional)', () => {
     const missing = all
       .filter(([path, node]) => (path.includes('.') || path.includes('[]') ? !node.required : false))
@@ -27,7 +26,6 @@ describe('nested parameter schemas', () => {
       .filter((path) => !/\.patch$/.test(path));
     expect(missing).toEqual([]);
   });
-
   it('only require fields that exist', () => {
     for (const [path, node] of all) {
       for (const field of node.required ?? []) {
@@ -35,7 +33,6 @@ describe('nested parameter schemas', () => {
       }
     }
   });
-
   it('emit the nested required lists into the MCP tool schemas', () => {
     const constraint = toToolSchemas().find((schema) => schema.name === 'add_constraint');
     const properties = (constraint?.input_schema as unknown as SchemaNode).properties;

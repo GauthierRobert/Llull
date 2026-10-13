@@ -1,7 +1,3 @@
-/**
- * Every command a module defines is reachable: listed in its feature catalog (core) or its
- * plugin's command list, hence registered. Catches a `defineCommand` export nobody registered.
- */
 import { describe, it, expect } from 'vitest';
 import { getCommand, listCommands } from '@core/commands/registry';
 import { commandCatalog } from '@core/commands/schema';
@@ -30,12 +26,10 @@ describe('command catalogs', () => {
     );
     expect(unregistered).toEqual([]);
   });
-
   it('registers each command name once', () => {
     const names = listCommands().map((definition) => definition.name);
     expect(new Set(names).size).toBe(names.length);
   });
-
   it('commandCatalog keeps the given commands in order', () => {
     const [first, second] = listCommands();
     expect(commandCatalog(first as never, second as never)).toEqual([first, second]);

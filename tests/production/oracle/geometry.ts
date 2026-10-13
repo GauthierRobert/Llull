@@ -12,15 +12,7 @@ export interface Box3 {
 }
 
 const EMPTY_BUILDING: BuildingModel = {
-  project: {
-    name: '',
-    client: '',
-    address: '',
-    author: '',
-    drawingNumber: '',
-    revision: '',
-    date: '',
-  },
+  project: { name: '', client: '', address: '', author: '', drawingNumber: '', revision: '', date: '' },
   levels: {},
   levelOrder: [],
   activeLevelId: null,

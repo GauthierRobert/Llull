@@ -10,12 +10,7 @@ export function applyToolCall(
 ): McpShapedResult & { affected: string[]; document: CadDocument; data?: unknown } {
   const result = execute(doc, toolName, args);
   return {
-    ...shapeToolCallContent({
-      summary: result.summary,
-      affected: result.affected,
-      isError: result.rejected === true,
-      data: result.data,
-    }),
+    ...shapeToolCallContent({ summary: result.summary, affected: result.affected, isError: result.rejected === true, data: result.data }),
     affected: result.affected,
     document: result.document,
     ...(result.data !== undefined ? { data: result.data } : {}),

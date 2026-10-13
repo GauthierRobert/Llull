@@ -1,8 +1,3 @@
-/**
- * Tests for the autosave storage adapter, the debounced save, the startup restore through
- * `load_document`, the restore banner, and unsaved-changes tracking.
- */
-
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { useStore } from '@ui/store';
@@ -14,9 +9,7 @@ import { AUTOSAVE_KEY, clearAutosave, readAutosave, writeAutosave, type KeyValue
 import { AUTOSAVE_DELAY_MS, useAutosave } from '@ui/hooks/useAutosave';
 import { RestoredBanner } from '@ui/components/RestoredBanner';
 
-function fakeStorage(initial: Record<string, string> = {}): KeyValueStorage & {
-  data: Record<string, string>;
-} {
+function fakeStorage(initial: Record<string, string> = {}): KeyValueStorage & { data: Record<string, string> } {
   const data = { ...initial };
   return {
     data,
@@ -41,7 +34,6 @@ describe('autosave storage adapter', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   });
   afterEach(() => vi.restoreAllMocks());
-
   it('round-trips a record', () => {
     const storage = fakeStorage();
     expect(writeAutosave(storage, { savedAt: 5, json: '{}' })).toBe(true);
@@ -49,7 +41,6 @@ describe('autosave storage adapter', () => {
     clearAutosave(storage);
     expect(readAutosave(storage)).toBeNull();
   });
-
   it('never throws when storage is full or broken', () => {
     const broken: KeyValueStorage = {
       getItem: () => {
@@ -66,7 +57,6 @@ describe('autosave storage adapter', () => {
     expect(readAutosave(broken)).toBeNull();
     expect(() => clearAutosave(broken)).not.toThrow();
   });
-
   it('ignores and clears a corrupted record', () => {
     const storage = fakeStorage({ [AUTOSAVE_KEY]: '{not json' });
     expect(readAutosave(storage)).toBeNull();
@@ -98,7 +88,6 @@ describe('useAutosave', () => {
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
-
   it('saves the document after the debounce and marks it unsaved', () => {
     const storage = fakeStorage();
     render(<Harness storage={storage} />);
@@ -110,17 +99,14 @@ describe('useAutosave', () => {
     });
     expect(readAutosave(storage)?.json).toContain('box');
   });
-
   it('restores an autosaved document through load_document and shows the banner', () => {
     renderWithAutosave(Date.now());
     expect(useStore.getState().document.order.length).toBe(1);
     expect(screen.getByText(/restored your unsaved work/i)).toBeDefined();
-
     fireEvent.click(screen.getByRole('button', { name: /start fresh/i }));
     expect(useStore.getState().document.order.length).toBe(0);
     expect(screen.queryByText(/restored your unsaved work/i)).toBeNull();
   });
-
   it('hides the restore notice by itself after a while, keeping the work', () => {
     renderWithAutosave(Date.now());
     expect(screen.getByText(/restored your unsaved work/i)).toBeDefined();
@@ -130,13 +116,11 @@ describe('useAutosave', () => {
     expect(screen.queryByText(/restored your unsaved work/i)).toBeNull();
     expect(useStore.getState().document.order.length).toBe(1);
   });
-
   it('does not restore when a live server is connected', () => {
     useStore.setState({ liveStatus: 'connected' });
     renderWithAutosave(1);
     expect(useStore.getState().document.order.length).toBe(0);
   });
-
   it('waits for the connection attempt, then restores when it fails', () => {
     useStore.setState({ liveStatus: 'connecting' });
     renderWithAutosave(1);
@@ -144,7 +128,6 @@ describe('useAutosave', () => {
     act(() => useStore.getState().setLiveStatus('disconnected'));
     expect(useStore.getState().document.order.length).toBe(1);
   });
-
   it('restores a clean autosave (equal to the saved file) silently and not dirty', () => {
     const storage = fakeStorage();
     writeAutosave(storage, { savedAt: Date.now(), json: savedBoxJson(), clean: true });
@@ -154,7 +137,6 @@ describe('useAutosave', () => {
     expect(screen.queryByText(/restored your unsaved work/i)).toBeNull();
     expect(useSessionStore.getState().dirty).toBe(false);
   });
-
   it('does not flag an autosave written while the document was unsaved as clean', () => {
     const storage = fakeStorage();
     render(<Harness storage={storage} />);
@@ -164,7 +146,6 @@ describe('useAutosave', () => {
     });
     expect(readAutosave(storage)?.clean).toBeUndefined();
   });
-
   it('discards an autosave that cannot be loaded', () => {
     const storage = fakeStorage();
     writeAutosave(storage, { savedAt: 1, json: 'not a document' });

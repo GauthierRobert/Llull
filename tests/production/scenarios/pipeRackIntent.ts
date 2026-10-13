@@ -80,13 +80,7 @@ function members(): IntentMember[] {
       }
       const z = axisZ(tos, TIER_BEAM);
       const mid = (x1 + x2) / 2;
-      result.push({
-        role: 'beam',
-        profile: TIER_BEAM,
-        start: [mid, 0, z],
-        end: [mid, WIDTH, z],
-        level: 0,
-      });
+      result.push({ role: 'beam', profile: TIER_BEAM, start: [mid, 0, z], end: [mid, WIDTH, z], level: 0 });
     }
   }
   // Bay 1 (bents 1–2): X-bracing below the lower tier and between the tiers in both column planes
@@ -99,20 +93,8 @@ function members(): IntentMember[] {
     result.push({ role: 'brace', profile: BRACE, start: b, end: [a[0], y, top], level: 0 });
     // Between the tiers (struts as chords), in the column-line planes outside the pipes.
     const upper = axisZ(TIERS[1], STRUT);
-    result.push({
-      role: 'brace',
-      profile: BRACE,
-      start: [a[0], y, top],
-      end: [b[0], y, upper],
-      level: 0,
-    });
-    result.push({
-      role: 'brace',
-      profile: BRACE,
-      start: [b[0], y, top],
-      end: [a[0], y, upper],
-      level: 0,
-    });
+    result.push({ role: 'brace', profile: BRACE, start: [a[0], y, top], end: [b[0], y, upper], level: 0 });
+    result.push({ role: 'brace', profile: BRACE, start: [b[0], y, top], end: [a[0], y, upper], level: 0 });
   }
   return result;
 }

@@ -1,7 +1,3 @@
-/**
- * CommitInput: Enter/blur commits, Esc reverts, and a rejected edit shows the stored value again
- * instead of leaving the bad text in the field.
- */
 import { describe, it, expect } from 'vitest';
 import { useState } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
@@ -37,7 +33,6 @@ describe('CommitInput', () => {
     expect(screen.getByLabelText('stored').textContent).toBe('0.5');
     expect(input().value).toBe('0.5');
   });
-
   it('reverts to the stored value when the edit is rejected', () => {
     render(<Harness />);
     fireEvent.change(input(), { target: { value: 'abc' } });
@@ -45,7 +40,6 @@ describe('CommitInput', () => {
     expect(screen.getByLabelText('stored').textContent).toBe('2');
     expect(input().value).toBe('2');
   });
-
   it('Escape reverts the draft without committing', () => {
     render(<Harness />);
     fireEvent.change(input(), { target: { value: '9' } });
@@ -55,7 +49,6 @@ describe('CommitInput', () => {
     expect(screen.getByLabelText('stored').textContent).toBe('2');
     expect(input().value).toBe('2');
   });
-
   it('keeps the typed draft while focused when the value changes externally', () => {
     const { rerender } = render(<CommitInput className="x" label="size" value="2" onCommit={() => undefined} />);
     act(() => input().focus());

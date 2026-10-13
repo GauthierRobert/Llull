@@ -15,13 +15,7 @@ export interface Sheet {
 }
 
 /** ISO 216 landscape sheets, mm. */
-const ISO_PAPER: Record<string, [number, number]> = {
-  A4: [297, 210],
-  A3: [420, 297],
-  A2: [594, 420],
-  A1: [841, 594],
-  A0: [1189, 841],
-};
+const ISO_PAPER: Record<string, [number, number]> = { A4: [297, 210], A3: [420, 297], A2: [594, 420], A1: [841, 594], A0: [1189, 841] };
 
 /** Standard drawing scales (1:N) a European office plots at. */
 export const STANDARD_SCALES = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000];
@@ -108,11 +102,7 @@ export function titleBlockField(sheet: Sheet, label: string): string {
 }
 
 /** Drawing number, revision and date from the "DWG NO · REV · DATE" cell, compared as whole tokens. */
-export function drawingIdentity(sheet: Sheet): {
-  drawingNumber: string;
-  revision: string;
-  date: string;
-} {
+export function drawingIdentity(sheet: Sheet): { drawingNumber: string; revision: string; date: string } {
   const [drawingNumber = '', revision = '', date = ''] = titleBlockField(sheet, 'DWG NO · REV · DATE')
     .split('·')
     .map((part) => part.trim());

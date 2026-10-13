@@ -1,10 +1,3 @@
-/**
- * Outbox vs permanent HTTP errors (architecture L6): a command the server refuses (400/413/422)
- * is dropped from the outbox and reported, so it can never wedge the flush; transient failures
- * (5xx, 429, 408) keep the entry and retry with backoff; connection refusals (401/403/404) keep
- * the whole outbox and the local document.
- */
-
 import { httpFail } from '../helpers/integrationFetch';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { Mock } from 'vitest';
@@ -50,11 +43,7 @@ function scriptedServer(
     serverDoc = result.document;
     applied.push(name);
     const body = { summary: result.summary, affected: result.affected, isError: false };
-    return {
-      ok: true,
-      status: 200,
-      json: () => Promise.resolve({ ...body, canUndo: true, canRedo: false }),
-    };
+    return { ok: true, status: 200, json: () => Promise.resolve({ ...body, canUndo: true, canRedo: false }) };
   };
   const fetch = vi.fn((url: string, init?: RequestInit): Promise<FakeResponse> => {
     if (url.endsWith('/live/snapshot')) {
@@ -66,13 +55,7 @@ function scriptedServer(
     holding = false;
     return new Promise((resolve) => (held = () => resolve(answer(body.name, body.params))));
   });
-  return {
-    fetch,
-    applied: () => applied,
-    doc: () => serverDoc,
-    holdNext: () => (holding = true),
-    release: () => held?.(),
-  };
+  return { fetch, applied: () => applied, doc: () => serverDoc, holdNext: () => (holding = true), release: () => held?.() };
 }
 
 function resetStore(liveStatus: 'connecting' | 'disconnected'): void {
@@ -116,30 +99,24 @@ describe('outbox — permanent HTTP errors', () => {
     vi.unstubAllGlobals();
     state().setDocument(createEmptyDocument());
   });
-
   it('a grace-run command later refused with 413 leaves the outbox, and later commands sync', async () => {
     resetStore('connecting');
     const server = scriptedServer(refuseAddBox);
     vi.stubGlobal('fetch', server.fetch);
-
     await graceRunAddBox(server);
     expect(state().localOutbox.map((entry) => entry.name)).toEqual(['add_box']);
-
     server.release();
     await vi.advanceTimersByTimeAsync(0);
     expect(state().localOutbox).toHaveLength(0);
     expect(state().lastSummary).toContain('HTTP 413');
-
     state().dispatch('add_sphere', { radius: 1 });
     expect(state().localOutbox.map((entry) => entry.name)).toEqual(['add_sphere']);
-
     await connectAndFlush();
     expect(server.applied()).toEqual(['add_sphere']);
     expect(state().syncState).toBe('idle');
     expect(state().hasUnsyncedLocalEdits).toBe(false);
     expect(state().document.order).toEqual(server.doc().order);
   });
-
   it('flushOutbox drops a permanently refused entry, reports it, and syncs the rest', async () => {
     resetStore('disconnected');
     state().dispatch('add_box', { size: [1, 1, 1] });
@@ -147,9 +124,7 @@ describe('outbox — permanent HTTP errors', () => {
     expect(state().localOutbox).toHaveLength(2);
     const server = scriptedServer(refuseAddBox);
     vi.stubGlobal('fetch', server.fetch);
-
     await connectAndFlush();
-
     expect(server.applied()).toEqual(['add_sphere']);
     expect(state().localOutbox).toHaveLength(0);
     expect(state().syncState).toBe('idle');
@@ -158,23 +133,19 @@ describe('outbox — permanent HTTP errors', () => {
     expect(state().lastSummary).toContain("'add_box'");
     expect(state().document.order).toEqual(server.doc().order);
   });
-
   it.each([500, 429, 408])('a transient HTTP %i keeps the entry and retries', async (status) => {
     resetStore('disconnected');
     state().dispatch('add_box', { size: [1, 1, 1] });
     const server = scriptedServer((_name, attempt) => (attempt === 1 ? status : undefined));
     vi.stubGlobal('fetch', server.fetch);
-
     await connectAndFlush();
     expect(state().syncState).toBe('failed');
     expect(state().localOutbox).toHaveLength(1);
-
     await vi.advanceTimersByTimeAsync(1000);
     expect(server.applied()).toEqual(['add_box']);
     expect(state().localOutbox).toHaveLength(0);
     expect(state().syncState).toBe('idle');
   });
-
   it('drops later entries that reference an id created by a refused entry (no server edit)', async () => {
     const { seeded, serverBoxId } = seedServerBox();
     resetStore('disconnected');
@@ -185,9 +156,7 @@ describe('outbox — permanent HTTP errors', () => {
     state().dispatch('add_sphere', { radius: 1 });
     const server = scriptedServer(refuseAddBox, seeded.document);
     vi.stubGlobal('fetch', server.fetch);
-
     await connectAndFlush();
-
     expect(server.applied()).toEqual(['add_sphere']);
     expect(server.doc().entities[serverBoxId]?.position).toEqual(seeded.document.entities[serverBoxId]?.position);
     expect(state().localOutbox).toHaveLength(0);
@@ -195,29 +164,24 @@ describe('outbox — permanent HTTP errors', () => {
     expect(state().lastSummary).toContain('refused 2');
     expect(state().lastSummary).toContain("'move_entities' (depends on refused 'add_box')");
   });
-
   it('a refused grace-run add_box poisons its id for the queued move_entities', async () => {
     const { seeded, serverBoxId } = seedServerBox();
     resetStore('connecting');
     const server = scriptedServer(refuseAddBox, seeded.document);
     vi.stubGlobal('fetch', server.fetch);
-
     await graceRunAddBox(server);
     const localBoxId = state().localOutbox[0]?.affected[0];
     expect(localBoxId).toBe(serverBoxId);
     server.release();
     await vi.advanceTimersByTimeAsync(0);
     expect(state().localOutbox).toHaveLength(0);
-
     state().dispatch('move_entities', { ids: [localBoxId], delta: [5, 0, 0] });
     expect(state().localOutbox.map((entry) => entry.name)).toEqual(['move_entities']);
     await connectAndFlush();
-
     expect(server.applied()).toEqual([]);
     expect(server.doc().entities[serverBoxId]?.position).toEqual(seeded.document.entities[serverBoxId]?.position);
     expect(state().lastSummary).toContain("depends on refused 'add_box'");
   });
-
   it('a refused edit of a server-held entity does not poison it for later entries', async () => {
     const { seeded, serverBoxId } = seedServerBox();
     resetStore('disconnected');
@@ -226,13 +190,10 @@ describe('outbox — permanent HTTP errors', () => {
     state().dispatch('move_entities', { ids: [serverBoxId], delta: [0, 1, 0] });
     const server = scriptedServer((name, attempt) => (name === 'move_entities' && attempt === 1 ? 422 : undefined), seeded.document);
     vi.stubGlobal('fetch', server.fetch);
-
     await connectAndFlush();
-
     expect(server.applied()).toEqual(['move_entities']);
     expect(state().lastSummary).toContain('refused 1');
   });
-
   it('a refused edit does not poison an entity an earlier entry of the same flush delivered', async () => {
     resetStore('disconnected');
     state().dispatch('add_box', { size: [1, 1, 1] });
@@ -241,14 +202,11 @@ describe('outbox — permanent HTTP errors', () => {
     state().dispatch('move_entities', { ids: [localBoxId], delta: [0, 1, 0] });
     const server = scriptedServer((name, attempt) => (name === 'move_entities' && attempt === 1 ? 422 : undefined));
     vi.stubGlobal('fetch', server.fetch);
-
     await connectAndFlush();
-
     expect(server.applied()).toEqual(['add_box', 'move_entities']);
     expect(state().lastSummary).toContain('refused 1');
     expect(state().lastSummary).not.toContain('depends on refused');
   });
-
   it('a refused grace-run edit does not poison the box an earlier grace run created', async () => {
     resetStore('connecting');
     const settle: Array<(response: FakeResponse) => void> = [];
@@ -262,32 +220,21 @@ describe('outbox — permanent HTTP errors', () => {
     await vi.advanceTimersByTimeAsync(CONNECT_GRACE_MS);
     expect(state().localOutbox.map((entry) => entry.name)).toEqual(['add_box', 'move_entities']);
     expect(state().localOutbox[0]?.affected).toEqual([boxId]);
-
     settle[0]?.({
       ok: true,
       status: 200,
-      json: () =>
-        Promise.resolve({
-          summary: 'ok',
-          affected: [boxId],
-          isError: false,
-          canUndo: true,
-          canRedo: false,
-        }),
+      json: () => Promise.resolve({ summary: 'ok', affected: [boxId], isError: false, canUndo: true, canRedo: false }),
     });
     settle[1]?.(httpFail(422));
     await vi.advanceTimersByTimeAsync(0);
     expect(state().localOutbox.map((entry) => entry.name)).toEqual(['add_box']);
-
     state().dispatch('move_entities', { ids: [boxId], delta: [0, 1, 0] });
     const server = scriptedServer(() => undefined);
     vi.stubGlobal('fetch', server.fetch);
     await connectAndFlush();
-
     expect(server.applied()).toEqual(['add_box', 'move_entities']);
     expect(state().lastSummary).not.toContain('depends on refused');
   });
-
   it.each([403, 401, 404])('a %i on every POST keeps both entries and the local document', async (status) => {
     resetStore('disconnected');
     state().dispatch('add_box', { size: [1, 1, 1] });
@@ -296,7 +243,6 @@ describe('outbox — permanent HTTP errors', () => {
     expect(localOrder).toHaveLength(2);
     const server = scriptedServer(() => status);
     vi.stubGlobal('fetch', server.fetch);
-
     await connectAndFlush();
     expect(state().localOutbox.map((entry) => entry.name)).toEqual(['add_box', 'add_sphere']);
     expect(state().document.order).toEqual(localOrder);
@@ -304,7 +250,6 @@ describe('outbox — permanent HTTP errors', () => {
     expect(state().syncState).toBe('failed');
     expect(state().lastSummary).toContain('refused the connection (auth/origin)');
     expect(state().lastSummary).toContain('offline edits kept');
-
     const callsBeforeRetry = server.fetch.mock.calls.length;
     await vi.advanceTimersByTimeAsync(1000);
     expect(server.fetch.mock.calls.length).toBeGreaterThan(callsBeforeRetry);
@@ -312,12 +257,10 @@ describe('outbox — permanent HTTP errors', () => {
     expect(state().document.order).toEqual(localOrder);
     expect(server.applied()).toEqual([]);
   });
-
   it('a grace-run command answered with 403 stays queued and the edit is kept', async () => {
     resetStore('connecting');
     const server = scriptedServer(() => 403);
     vi.stubGlobal('fetch', server.fetch);
-
     await graceRunAddBox(server);
     server.release();
     await vi.advanceTimersByTimeAsync(0);
@@ -325,17 +268,14 @@ describe('outbox — permanent HTTP errors', () => {
     expect(state().document.order).toHaveLength(1);
     expect(state().lastSummary).toContain('offline edits kept');
   });
-
   it('a grace-run command answered with a transient 500 stays queued for the flush', async () => {
     resetStore('connecting');
     const server = scriptedServer((_name, attempt) => (attempt === 1 ? 500 : undefined));
     vi.stubGlobal('fetch', server.fetch);
-
     await graceRunAddBox(server);
     server.release();
     await vi.advanceTimersByTimeAsync(0);
     expect(state().localOutbox).toHaveLength(1);
-
     await connectAndFlush();
     expect(server.applied()).toEqual(['add_box']);
     expect(state().syncState).toBe('idle');

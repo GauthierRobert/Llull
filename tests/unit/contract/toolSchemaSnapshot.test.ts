@@ -1,8 +1,3 @@
-/**
- * Agent-facing schema snapshot. `toToolSchemas()` is exactly what MCP agents read;
- * any change to a name, description, param shape or annotation must show up as a reviewed
- * snapshot diff (`npx vitest -u` to accept an intended change).
- */
 import { describe, it, expect } from 'vitest';
 import { toToolSchemas } from '@core/commands/registry';
 import { compactJson } from '../../helpers/compactJson';

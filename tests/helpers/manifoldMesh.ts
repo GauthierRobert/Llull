@@ -9,11 +9,6 @@ export function meshOf(kernel: GeometryKernel, entity: Entity): MeshData | null 
 }
 
 export function booleanMesh(kernel: GeometryKernel, boolean: BooleanOp, a: Entity, b: Entity): MeshData | null {
-  const shape = kernel.evaluate({
-    op: 'boolean',
-    boolean,
-    a: { op: 'solid', entity: a },
-    b: { op: 'solid', entity: b },
-  });
+  const shape = kernel.evaluate({ op: 'boolean', boolean, a: { op: 'solid', entity: a }, b: { op: 'solid', entity: b } });
   return shape === null ? null : kernel.tessellate(shape);
 }

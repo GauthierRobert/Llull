@@ -1,21 +1,3 @@
-/**
- * Unit tests for TransformGizmo pure helpers and gizmo target resolution.
- *
- * These tests run in jsdom — they do NOT mount r3f. They validate:
- *   1. The pure math helpers (computeDelta,
- *      computeScaleFactor) return correct values.
- *   2. The "children" attach pattern: a group in the scene tree has a non-null
- *      parent — so TransformControls.attach() would succeed (no "must be part
- *      of the scene graph" error).
- *   3. A group NOT in the scene tree has parent === null — confirming the
- *      original bug (detached object) would have triggered the error.
- *
- * Regression guard: ensures the target Object3D used by the gizmo is
- * always scene-parented before attach() is called. If targetRef.current.parent
- * is null at attach time, three-stdlib logs an error every frame and keeps
- * calling invalidate(), breaking the demand frameloop.
- */
-
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { computeDelta, computeScaleFactor } from '@ui/viewport/3d/gizmoCommit';
@@ -25,14 +7,12 @@ describe('TransformGizmo pure delta helpers', () => {
     const delta = computeDelta(new THREE.Vector3(1, 2, 3), new THREE.Vector3(4, 0, -1));
     expect(delta).toEqual([3, -2, -4]);
   });
-
   it('computeDelta returns the signed Euler difference in radians', () => {
     const delta = computeDelta(new THREE.Euler(0, 0.5, 1), new THREE.Euler(0.25, 0.5, 0));
     expect(delta[0]).toBeCloseTo(0.25);
     expect(delta[1]).toBeCloseTo(0);
     expect(delta[2]).toBeCloseTo(-1);
   });
-
   it('computeScaleFactor is the arithmetic mean of the three axes (uniform projection)', () => {
     expect(computeScaleFactor(new THREE.Vector3(2, 2, 2))).toBeCloseTo(2);
     // Single-axis drag is a deliberate lossy projection onto the uniform contract.
@@ -50,7 +30,6 @@ describe('TransformGizmo scene-graph attachment invariant (regression)', () => {
     const detached = new THREE.Object3D();
     expect(detached.parent).toBeNull();
   });
-
   it('a group added as a scene child has a non-null parent — attach() succeeds', () => {
     // The new implementation renders <group ref={targetRef}> inside
     // <TransformControls> so the group is a scene-graph node. This test
@@ -62,7 +41,6 @@ describe('TransformGizmo scene-graph attachment invariant (regression)', () => {
     expect(group.parent).toBe(scene);
     expect(group.parent).not.toBeNull();
   });
-
   it('a group nested inside a floating-origin group also has a non-null parent', () => {
     // Entities + gizmo live inside a <group position={groupOffset}> for the
     // floating-origin offset. The target group is a child of that wrapper —
@@ -70,13 +48,10 @@ describe('TransformGizmo scene-graph attachment invariant (regression)', () => {
     const scene = new THREE.Scene();
     const floatingOriginGroup = new THREE.Group();
     scene.add(floatingOriginGroup);
-
     const targetGroup = new THREE.Group();
     floatingOriginGroup.add(targetGroup);
-
     expect(targetGroup.parent).toBe(floatingOriginGroup);
     expect(targetGroup.parent).not.toBeNull();
-
     // Verify matrixWorld update propagates correctly through nested parents.
     floatingOriginGroup.position.set(100, 200, 300);
     targetGroup.position.set(1, 0, 0);
@@ -88,7 +63,6 @@ describe('TransformGizmo scene-graph attachment invariant (regression)', () => {
     expect(worldPos.y).toBeCloseTo(200);
     expect(worldPos.z).toBeCloseTo(300);
   });
-
   it('computeDelta is zero for a no-op drag', () => {
     const pos = new THREE.Vector3(5, 3, -2);
     const delta = computeDelta(pos, pos.clone());
@@ -99,7 +73,6 @@ describe('TransformGizmo scene-graph attachment invariant (regression)', () => {
     // The gizmo skips dispatch when mag < 1e-6 — this would be skipped.
     expect(mag).toBeLessThan(1e-6);
   });
-
   it('computeScaleFactor returns 1 for identity scale — no dispatch', () => {
     const identityScale = new THREE.Vector3(1, 1, 1);
     const factor = computeScaleFactor(identityScale);

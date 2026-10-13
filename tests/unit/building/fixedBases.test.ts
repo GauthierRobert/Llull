@@ -12,6 +12,7 @@ import type { FootingDesignRow } from '@aec/industrial/foundations/footingModel'
 import { findProfile } from '@aec/steel/profiles';
 import { buildingErrors } from '@aec/building/validate';
 import { HALL, hall } from './hallFixtures';
+import { expectNoOp } from '../../helpers/expectNoOp';
 
 const LOADS: FrameLoads = { deadLoad: 0.5, snowLoad: 0.8, windPressure: 0.7 };
 const CRANE_HALL = { ...HALL, crane: { capacity: 10, railHeight: 6000 } };
@@ -58,12 +59,8 @@ describe('add_portal_frame_building columnBase', () => {
     }
     expect(plates(hall({ columnBase: 'pinned' })).every((plate) => plate.fixity === undefined)).toBe(true);
   });
-
   it('stores fixity on every base plate and reports it in the summary', () => {
-    const result = execute(createEmptyDocument(), 'add_portal_frame_building', {
-      ...HALL,
-      columnBase: 'fixed',
-    });
+    const result = execute(createEmptyDocument(), 'add_portal_frame_building', { ...HALL, columnBase: 'fixed' });
     expect(result.summary).toContain('fixed column bases');
     const list = plates(result.document);
     const members = result.document.building!.elements;
@@ -74,30 +71,19 @@ describe('add_portal_frame_building columnBase', () => {
     expect(list.filter((plate) => plate.fixity === undefined)).toHaveLength(list.length - 12);
     expect(buildingErrors(result.document.building)).toEqual([]);
   });
-
   it('rejects an unknown columnBase and fixed bases without base plates (no-op)', () => {
     const doc = createEmptyDocument();
-    const bad = execute(doc, 'add_portal_frame_building', { ...HALL, columnBase: 'hinged' });
-    expect(bad.document).toBe(doc);
-    expect(bad.affected).toEqual([]);
-    expect(bad.summary).toContain('add_portal_frame_building rejected: invalid params');
-    const noPlates = execute(doc, 'add_portal_frame_building', {
-      ...HALL,
-      columnBase: 'fixed',
-      basePlates: false,
-    });
-    expect(noPlates.document).toBe(doc);
-    expect(noPlates.affected).toEqual([]);
-    expect(noPlates.summary).toContain('needs base plates');
+    expectNoOp(
+      execute(doc, 'add_portal_frame_building', { ...HALL, columnBase: 'hinged' }),
+      doc,
+      'add_portal_frame_building rejected: invalid params',
+    );
+    expectNoOp(execute(doc, 'add_portal_frame_building', { ...HALL, columnBase: 'fixed', basePlates: false }), doc, 'needs base plates');
   });
-
   it('flags an invalid stored fixity', () => {
     const doc = hall({ columnBase: 'fixed' });
     const plate = plates(doc)[0]!;
-    const broken = {
-      ...doc.building!,
-      elements: { ...doc.building!.elements, [plate.id]: { ...plate, fixity: 'rigid' } },
-    };
+    const broken = { ...doc.building!, elements: { ...doc.building!.elements, [plate.id]: { ...plate, fixity: 'rigid' } } };
     expect(buildingErrors(broken).join(' ')).toContain('fixity must be pinned or fixed');
   });
 });
@@ -107,7 +93,6 @@ describe('fixed column bases in the frame analysis', () => {
     const building = doc.building!;
     return framesOf(doc, building, building.levelOrder[0]!, LOADS).frames[0]!;
   };
-
   it('restrains the base rotation: lower apex deflection and eaves sway', () => {
     const pinned = frameOf(hall());
     const fixed = frameOf(hall({ columnBase: 'fixed' }));
@@ -125,7 +110,6 @@ describe('fixed column bases in the frame analysis', () => {
     expect(apex(fixed)).toBeLessThan(apex(pinned));
     expect(sway(fixed)).toBeLessThan(0.5 * sway(pinned));
   });
-
   it('lowers the rail-level sway of a crane hall', () => {
     const rail = (doc: CadDocument): number => {
       const frame = frameOf(doc);
@@ -136,7 +120,6 @@ describe('fixed column bases in the frame analysis', () => {
     expect(pinned).toBeGreaterThan(0);
     expect(rail(hall({ ...CRANE_HALL, columnBase: 'fixed' }))).toBeLessThan(pinned);
   });
-
   it('reports the base moment per case, counter-clockwise +', () => {
     const doc = hall({ columnBase: 'fixed' });
     const building = doc.building!;
@@ -154,12 +137,9 @@ describe('fixed column bases in the frame analysis', () => {
     expect(left.cases.WL!.moment).toBeGreaterThan(0);
     expect(left.cases.WL!.horizontal + right.cases.WL!.horizontal).toBeLessThan(0);
   });
-
   it('designs a lighter crane hall with fixed bases than with pinned bases', () => {
     const design = (columnBase: 'pinned' | 'fixed'): ReturnType<typeof sections> => {
-      const result = execute(hall({ ...CRANE_HALL, columnBase }), 'design_portal_frames', {
-        windPressure: 0.7,
-      });
+      const result = execute(hall({ ...CRANE_HALL, columnBase }), 'design_portal_frames', { windPressure: 0.7 });
       expect((result.data as { failures: number }).failures).toBe(0);
       return sections(result.document);
     };
@@ -174,13 +154,11 @@ describe('fixed column bases in the frame analysis', () => {
 describe('footing eccentricity and overturning with a base moment', () => {
   const worstOf = (list: FoundationRow[], check: string): number =>
     Math.max(...list.filter((row) => row.check.startsWith(check)).map((row) => row.utilisation));
-
   it('adds the base moment to H·lever (both add under wind) in the footing moment', () => {
     expect(footingMoment(0, -10, 1.5)).toBeCloseTo(15, 9);
     expect(footingMoment(40, -10, 1.5)).toBeCloseTo(55, 9);
     expect(footingMoment(40, 10, 1.5)).toBeCloseTo(25, 9);
   });
-
   it('raises the soil bearing pressure and adds an overturning EQU row only for fixed bases', () => {
     const pinned = foundationRows(hall());
     const fixed = foundationRows(hall({ columnBase: 'fixed' }));
@@ -191,7 +169,6 @@ describe('footing eccentricity and overturning with a base moment', () => {
     expect(overturning.combination).toContain('0.9G');
     expect(overturning.utilisation).toBeCloseTo(overturning.value / overturning.limit, 6);
   });
-
   it('passes overturning and bearing once the pads are wide enough', () => {
     const doc = hall({ columnBase: 'fixed' });
     expect(worstOf(foundationRows(doc), 'overturning')).toBeGreaterThan(1);
@@ -199,7 +176,6 @@ describe('footing eccentricity and overturning with a base moment', () => {
     expect(worstOf(wide, 'overturning')).toBeLessThan(1);
     expect(worstOf(wide, 'soil bearing')).toBeLessThan(1);
   });
-
   it('designs the footing mat for the eccentric pressure (more steel than pinned)', () => {
     const required = (doc: CadDocument): number => {
       const data = execute(withPads(doc, 4000, 900), 'design_footings', { windPressure: 0.7 }).data as { footings: FootingDesignRow[] };
@@ -216,7 +192,6 @@ describe('design_footings pad sizing', () => {
     Object.values(doc.building!.elements).flatMap((element) =>
       element.category === 'footing' ? [[element.width, element.length, element.thickness]] : [],
     );
-
   it('sizes the pads of the fixed-base crane hall so every footing check passes', () => {
     const doc = hall({ columnBase: 'fixed', crane: CRANE_HALL.crane });
     const before = foundationRows(doc).filter((row) => row.check.startsWith('soil bearing'));
@@ -234,14 +209,11 @@ describe('design_footings pad sizing', () => {
       expect(row.sizeAfter[0]).toBe(row.sizeAfter[1]);
     }
     const volume = (document: CadDocument): number =>
-      (
-        execute(document, 'quantity_takeoff', {}).data as {
-          lines: Array<{ group: string; unit: string; quantity: number }>;
-        }
-      ).lines.find((line) => line.group === 'footing' && line.unit === 'm3')?.quantity ?? 0;
+      (execute(document, 'quantity_takeoff', {}).data as { lines: Array<{ group: string; unit: string; quantity: number }> }).lines.find(
+        (line) => line.group === 'footing' && line.unit === 'm3',
+      )?.quantity ?? 0;
     expect(volume(result.document)).toBeGreaterThan(volume(doc));
   });
-
   it('leaves the pinned default hall pads unchanged (reinforcement only)', () => {
     const doc = hall({ crane: CRANE_HALL.crane });
     const result = execute(doc, 'design_footings', { windPressure: 0.7 });
@@ -252,22 +224,13 @@ describe('design_footings pad sizing', () => {
 });
 
 describe('base plate under M + N', () => {
-  const geometry = {
-    length: 500,
-    width: 450,
-    thickness: 40,
-    boltCount: 4,
-    boltDiameter: 24,
-    columnDepth: 300,
-  };
-
+  const geometry = { length: 500, width: 450, thickness: 40, boltCount: 4, boltDiameter: 24, columnDepth: 300 };
   it('carries a small eccentricity by bearing alone (no bolt tension)', () => {
     const verdict = checkPlateMN(geometry, 500, 10, 355);
     expect(verdict.boltTension).toBe(0);
     expect(verdict.bearingLength).toBeCloseTo(500e3 / (450 * BEARING_STRENGTH), 3);
     expect(verdict.utilisation).toBeLessThan(1);
   });
-
   it('satisfies Ft z + N zc = M and C = N + Ft with tension bolts', () => {
     const [normal, moment] = [200, 150];
     const verdict = checkPlateMN(geometry, normal, moment, 355);
@@ -280,7 +243,6 @@ describe('base plate under M + N', () => {
     expect(block * 450 * BEARING_STRENGTH).toBeCloseTo(normal * 1000 + tension, -1);
     expect(verdict.check).toContain('bolt Ft');
   });
-
   it('is symmetric in the moment sign and shares uplift with a moment between the bolt groups', () => {
     expect(checkPlateMN(geometry, 200, -150, 355).utilisation).toBeCloseTo(checkPlateMN(geometry, 200, 150, 355).utilisation, 9);
     const uplift = checkPlateMN(geometry, -100, 10, 355);
@@ -288,11 +250,9 @@ describe('base plate under M + N', () => {
     const lever = 500 / 2 - 48;
     expect(uplift.boltTension * 1000 * 2).toBeCloseTo((100e3 + 10e6 / lever) / 2, 0);
   });
-
   it('fails plates without tension bolts that need them', () => {
     expect(checkPlateMN({ ...geometry, boltCount: 2 }, 100, 300, 355).utilisation).toBeGreaterThan(1);
   });
-
   it('sizes the lightest catalogue plate that passes and grows with the demand', () => {
     const column = { depth: 390, width: 300 };
     const demand = { normal: 130, moment: 270 };
@@ -319,7 +279,6 @@ describe('base plate under M + N', () => {
     expect(verdict.utilisation).toBeLessThanOrEqual(1);
     expect(sizeBasePlate(column, [{ normal: 50, moment: 5000 }], 355).passes).toBe(false);
   });
-
   it('is sized by design_portal_frames and reported as "base plate M+N" by check_foundations', () => {
     const doc = hall({ columnBase: 'fixed' });
     const before = plates(doc).find((plate) => plate.fixity === 'fixed')!;
@@ -335,7 +294,6 @@ describe('base plate under M + N', () => {
     expect(rows.every((row) => row.utilisation <= 1)).toBe(true);
     expect(foundationRows(doc).some((row) => row.check.startsWith('base plate M+N') && row.utilisation > 1)).toBe(true);
   });
-
   it('adds no M+N row for pinned bases', () => {
     expect(foundationRows(hall()).some((row) => row.check.includes('M+N'))).toBe(false);
   });

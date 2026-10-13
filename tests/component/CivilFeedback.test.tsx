@@ -1,9 +1,3 @@
-/**
- * Component tests for the Civil / Site panel "Feedback" button (react R11): it composes a mailto:
- * link with the app version, anonymous document statistics and the user's text — never document
- * content — and never changes the document.
- */
-
 import { resetStore } from '../helpers/componentEntities';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
@@ -32,12 +26,9 @@ describe('CivilFeedback', () => {
     localDispatch('create_surface', {});
     const before = useStore.getState().document;
     render(<CivilPanel />);
-
     expect(screen.queryByLabelText('Feedback text')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Feedback' }));
-    fireEvent.change(screen.getByLabelText('Feedback text'), {
-      target: { value: 'Volumes match our tool within 1 %.' },
-    });
+    fireEvent.change(screen.getByLabelText('Feedback text'), { target: { value: 'Volumes match our tool within 1 %.' } });
     const link = screen.getByRole('link', { name: 'Send by e-mail' });
     const href = link.getAttribute('href') ?? '';
     expect(href).toMatch(/^mailto:/);
@@ -49,14 +40,12 @@ describe('CivilFeedback', () => {
     expect(body).toContain('pointGroup 1, surface 1, platform 0, alignment 0, manhole 0, pipe 0');
     expect(body).not.toContain('Secret client site');
     expect(body).not.toContain('TOPO');
-
     // jsdom cannot navigate to mailto:; the app's own click handler still runs.
     link.addEventListener('click', (event) => event.preventDefault());
     fireEvent.click(link);
     expect(screen.queryByLabelText('Feedback text')).toBeNull();
     expect(useStore.getState().document).toBe(before);
   });
-
   it('counts civil objects per category and addresses the configured recipient', () => {
     const stats = feedbackStats(createEmptyDocument());
     expect(stats.entityCount).toBe(0);

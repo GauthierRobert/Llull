@@ -24,18 +24,15 @@ export class CivilUiDriver {
   readonly provided: Record<DeliverableId, string> = {};
   readonly fileNames: Record<string, string> = {};
   private readonly building: BuildingPanel;
-
   constructor(
     private readonly session: UiSession,
     private readonly intent: CivilIntent,
   ) {
     this.building = new BuildingPanel(session);
   }
-
   get uiGaps(): string[] {
     return [...this.gaps];
   }
-
   async perform(call: ToolCall): Promise<string> {
     const paletteBefore = this.steps.palette;
     const summary = await this.route(call);
@@ -45,42 +42,34 @@ export class CivilUiDriver {
     }
     return summary;
   }
-
   private get page(): UiSession['page'] {
     return this.session.page;
   }
-
   private button(name: string): Locator {
     return this.page.getByRole('button', { name, exact: true });
   }
-
   private async fill(label: string, value: string): Promise<void> {
     await this.page.getByLabel(label, { exact: true }).fill(value);
   }
-
   private act(what: string, name: string): Promise<string> {
     return this.session.acting(what, () => this.button(name).click());
   }
-
   private async openSite(): Promise<void> {
     const panel = this.page.getByTestId('civil-panel');
     if (!(await panel.isVisible())) await this.page.getByRole('tab', { name: /site/i }).click();
     await expect(panel).toBeVisible();
   }
-
   private async take(id: DeliverableId, name: string): Promise<string> {
     const file = await this.session.download(() => this.button(name).click());
     this.provided[id] = file.text;
     this.fileNames[id] = file.name;
     return file.name;
   }
-
   private unsupported(tool: string, keys: string[], args: Record<string, unknown>): void {
     for (const key of keys) {
       if (args[key] !== undefined) this.gaps.add(`Civil panel: ${tool} has no field for ${key}.`);
     }
   }
-
   private async route(call: ToolCall): Promise<string> {
     const args = call.args;
     if (call.tool === 'set_project_info') {
@@ -181,7 +170,6 @@ export class CivilUiDriver {
         return runViaPalette(this.session, call.tool, args);
     }
   }
-
   private async fillStorm(args: Record<string, unknown>): Promise<void> {
     const idf = (args['idf'] ?? {}) as Record<string, unknown>;
     for (const key of ['a', 'b', 'c']) await this.fill(`IDF ${key}`, text(idf[key]));

@@ -3,6 +3,7 @@ import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { rotatedEntityBounds } from '@core/geometry/rotatedBounds';
 import { lookupBearing } from '@core/commands/solids/bearingTable';
+import { expectNoOp, expectPure } from '../helpers/expectNoOp';
 
 interface BearingData {
   groupId: string;
@@ -20,12 +21,7 @@ describe('add_bearing', () => {
     const doc = createEmptyDocument();
     const r = execute(doc, 'add_bearing', { designation: '6205' });
     const data = r.data as BearingData;
-    expect(data).toMatchObject({
-      type: 'deep_groove_ball',
-      bore: 25,
-      outerDiameter: 52,
-      width: 15,
-    });
+    expect(data).toMatchObject({ type: 'deep_groove_ball', bore: 25, outerDiameter: 52, width: 15 });
     expect(r.document.entities[data.innerRingId]!.kind).toBe('revolution');
     expect(r.document.entities[data.outerRingId]!.kind).toBe('revolution');
     expect(data.rollingElementIds.length).toBeGreaterThanOrEqual(6);
@@ -39,15 +35,9 @@ describe('add_bearing', () => {
     expect(outer.max[0] - outer.min[0]).toBeCloseTo(52, 0);
     expect(outer.max[2] - outer.min[2]).toBeCloseTo(15);
   });
-
   it('places roller bearings and honors axis, position and explicit dimensions', () => {
     const doc = createEmptyDocument();
-    const r = execute(doc, 'add_bearing', {
-      designation: 'nu 210',
-      axis: [1, 0, 0],
-      position: [5, 0, 0],
-      name: 'Shaft bearing',
-    });
+    const r = execute(doc, 'add_bearing', { designation: 'nu 210', axis: [1, 0, 0], position: [5, 0, 0], name: 'Shaft bearing' });
     const data = r.data as BearingData;
     expect(data.type).toBe('cylindrical_roller');
     expect(r.document.groups[data.groupId]!.name).toBe('Shaft bearing');
@@ -56,33 +46,22 @@ describe('add_bearing', () => {
     expect(outer.max[1] - outer.min[1]).toBeCloseTo(90, 0);
     expect((outer.max[0] + outer.min[0]) / 2).toBeCloseTo(5);
     expect(r.document.entities[data.rollingElementIds[0]!]!.kind).toBe('cylinder');
-
-    const explicit = execute(doc, 'add_bearing', {
-      type: 'tapered_roller',
-      bore: 40,
-      outerDiameter: 80,
-      width: 20,
-    });
+    const explicit = execute(doc, 'add_bearing', { type: 'tapered_roller', bore: 40, outerDiameter: 80, width: 20 });
     expect((explicit.data as BearingData).type).toBe('tapered_roller');
     const spherical = execute(doc, 'add_bearing', { designation: '22220' });
     expect((spherical.data as BearingData).outerDiameter).toBe(180);
     const tapered = execute(doc, 'add_bearing', { designation: '30210-A' });
     expect((tapered.data as BearingData).width).toBe(21.75);
   });
-
   it('scales table dimensions to the document units', () => {
     const doc = { ...createEmptyDocument(), units: 'cm' as const };
     const r = execute(doc, 'add_bearing', { designation: '6205' });
     expect((r.data as BearingData).outerDiameter).toBeCloseTo(5.2);
   });
-
   it('is pure', () => {
     const doc = createEmptyDocument();
-    const before = JSON.stringify(doc);
-    execute(doc, 'add_bearing', { designation: '6205' });
-    expect(JSON.stringify(doc)).toBe(before);
+    expectPure(doc, () => execute(doc, 'add_bearing', { designation: '6205' }));
   });
-
   it('rejects unknown designation, mismatched type and bad dimensions as no-ops', () => {
     const doc = createEmptyDocument();
     const cases: Array<[Record<string, unknown>, RegExp]> = [
@@ -97,12 +76,10 @@ describe('add_bearing', () => {
     ];
     for (const [params, message] of cases) {
       const r = execute(doc, 'add_bearing', params);
-      expect(r.affected).toEqual([]);
-      expect(r.document).toBe(doc);
+      expectNoOp(r, doc);
       expect(r.summary).toMatch(message);
     }
   });
-
   it('table lookup is case/space tolerant', () => {
     expect(lookupBearing(' 6205-2RS ')?.bore).toBe(25);
     expect(lookupBearing('xyz')).toBeUndefined();

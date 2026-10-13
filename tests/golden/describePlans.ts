@@ -18,7 +18,6 @@ export function describePlans(plans: Record<string, GoldenAction[]>): void {
         expect(outcome.affected.length).toBeGreaterThan(0);
         await expect(compactJson(normalize(outcome.document), 4)).toMatchFileSnapshot(`./__snapshots__/${name}.json`);
       });
-
       const replayTest = name in REPLAY_DIVERGES ? it.fails : it;
       replayTest('replay_history reproduces entities and order', () => {
         const outcome = runPlan(actions);

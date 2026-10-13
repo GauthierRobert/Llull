@@ -76,13 +76,7 @@ export function gradeScenario(scenario: Scenario, driver: DriverId, context: Gra
     } catch (error) {
       outcome = { pass: false, detail: `criterion threw: ${(error as Error).message}` };
     }
-    return {
-      id: criterion.id,
-      area: criterion.area,
-      requirement: criterion.requirement,
-      known: known.has(criterion.id),
-      ...outcome,
-    };
+    return { id: criterion.id, area: criterion.area, requirement: criterion.requirement, known: known.has(criterion.id), ...outcome };
   });
   const unknownKnown = [...known].filter((id) => !checks.some((check) => check.id === id));
   if (unknownKnown.length > 0) {

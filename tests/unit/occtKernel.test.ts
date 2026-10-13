@@ -1,26 +1,8 @@
-/**
- * OcctKernel unit tests.
- *
- * Live WASM tests (BRepAlgoAPI_Fuse, BRepFilletAPI_MakeFillet) require the
- * 63 MB opencascade.js binary and a Node.js environment with WASM support.
- * They are marked `describe.skip` because Vitest runs in jsdom where WASM of
- * this size cannot be loaded. Live coverage: server/tests/kernelChoice.test.ts;
- * measurements are recorded in docs/decisions/KI4-occt-spike.md.
- *
- * @invariant unconditional `describe.skip`, not `skipIf(!isNodeEnv)`: `process.versions.node`
- *   exists in jsdom too, so a Node check would load the 63 MB WASM binary in CI.
- *
- * Always-run tests verify:
- *   - Entity structure contracts (used by kernel internals).
- *   - GeometryKernel interface conformance (TypeScript compile-time gate).
- *   - evaluate / tessellate / topology / exportStep exist on the interface.
- *   - occtOps exposes the native ops and refuses non-positive sizes.
- */
-
-import { describe, it, expect } from 'vitest';
-import type { BoxEntity } from '@core/model/types';
+import { describe, it, expect, vi } from 'vitest';
+import type { BoxEntity, ShapeRecipe, Entity } from '@core/model/types';
 import type { GeometryKernel } from '@core/geometry/kernel';
-import type { ShapeRecipe } from '@core/model/types';
+import type { CachingKernel } from '@core/geometry/shapeKernel';
+import type { OcctFactory } from '@kernel-occt/occtKernel';
 
 // Test entities — two 2×2×2 boxes (as in docs/decisions/KI4-occt-spike.md).
 
@@ -54,12 +36,10 @@ describe('OcctKernel — static contract tests (always run)', () => {
     expect(BOX_A.position).toHaveLength(3);
     expect(BOX_A.rotation).toHaveLength(3);
   });
-
   it('BOX_B entity satisfies BoxEntity shape contract', () => {
     expect(BOX_B.kind).toBe('box');
     expect(BOX_B.size.every((v) => v > 0)).toBe(true);
   });
-
   it('documents skip reason: WASM binary is 63MB — not viable in jsdom CI', () => {
     // The opencascade.js WASM is 63 MB. Loading it in Vitest/jsdom would require
     // a Node-env vitest config; live coverage is server/tests/kernelChoice.test.ts.
@@ -80,13 +60,11 @@ describe('GeometryKernel — interface conformance', () => {
       topology: () => null,
       exportStep: () => null,
     } satisfies GeometryKernel;
-
     expect(typeof stub.evaluate).toBe('function');
     expect(typeof stub.tessellate).toBe('function');
     expect(typeof stub.topology).toBe('function');
     expect(typeof stub.exportStep).toBe('function');
   });
-
   it('evaluate accepts a recipe tree (boolean over two solid leaves) and may refuse with null', () => {
     const recipes: ShapeRecipe[] = [];
     const stub: GeometryKernel = {
@@ -101,12 +79,7 @@ describe('GeometryKernel — interface conformance', () => {
     };
     const recipe: ShapeRecipe = {
       op: 'fillet',
-      source: {
-        op: 'boolean',
-        boolean: 'union',
-        a: { op: 'solid', entity: BOX_A },
-        b: { op: 'solid', entity: BOX_B },
-      },
+      source: { op: 'boolean', boolean: 'union', a: { op: 'solid', entity: BOX_A }, b: { op: 'solid', entity: BOX_B } },
       edges: [],
       size: 0.2,
     };
@@ -137,7 +110,6 @@ describe('occtOps — static / contract tests', () => {
       expect(typeof ops[name], name).toBe('function');
     }
   });
-
   it('fillet / chamfer / shell refuse a non-positive size without touching OCC', async () => {
     const { occtOps } = await import('@kernel-occt/occtKernel');
     const ops = occtOps({} as never);
@@ -147,7 +119,6 @@ describe('occtOps — static / contract tests', () => {
     expect(ops.chamfer(shape, [], 0)).toBeNull();
     expect(ops.shell(shape, 0)).toBeNull();
   });
-
   it('createOcctKernel is exported from occtKernel module (import check)', async () => {
     // This confirms the module compiles and the named export exists.
     // We do NOT call createOcctKernel() here — that would load 63 MB WASM.
@@ -162,23 +133,16 @@ describe('occtOps — static / contract tests', () => {
 
 describe.skip('OcctKernel live WASM (requires node env + 63 MB opencascade.js)', () => {
   const solid = (entity: BoxEntity): ShapeRecipe => ({ op: 'solid', entity });
-
   it('boolean union of two boxes evaluates and tessellates', async () => {
     const { createOcctKernel } = await import('@kernel-occt/occtKernel');
     const kernel = await createOcctKernel();
-    const shape = kernel.evaluate({
-      op: 'boolean',
-      boolean: 'union',
-      a: solid(BOX_A),
-      b: solid(BOX_B),
-    });
+    const shape = kernel.evaluate({ op: 'boolean', boolean: 'union', a: solid(BOX_A), b: solid(BOX_B) });
     expect(shape).not.toBeNull();
     const result = kernel.tessellate(shape!);
     expect(result).not.toBeNull();
     expect(result!.positions.length).toBeGreaterThan(0);
     expect(result!.indices.length).toBeGreaterThan(0);
   });
-
   it('fillet of a box on the exact B-rep adds geometry', async () => {
     const { createOcctKernel } = await import('@kernel-occt/occtKernel');
     const kernel = await createOcctKernel();
@@ -187,10 +151,129 @@ describe.skip('OcctKernel live WASM (requires node env + 63 MB opencascade.js)',
     // Fillet of a box adds significant geometry — measured 628 triangles.
     expect(kernel.tessellate(shape!)!.indices.length / 3).toBeGreaterThan(12);
   });
-
   it('fillet with an oversized radius is refused with null', async () => {
     const { createOcctKernel } = await import('@kernel-occt/occtKernel');
     const kernel = await createOcctKernel();
     expect(kernel.evaluate({ op: 'fillet', source: solid(BOX_A), edges: [], size: 50 })).toBeNull();
+  });
+});
+
+interface Fake {
+  readonly kernel: CachingKernel;
+  readonly leaked: () => number;
+}
+
+/** Fake OCC API: every handle it hands out is tracked; `leaked()` counts the ones never deleted. */
+async function makeFakeKernel(): Promise<Fake> {
+  vi.resetModules(); // the real module caches the first API it loads
+  const { createOcctKernel } = await import('@kernel-occt/occtKernel');
+  const created: object[] = [];
+  const deleted = new Set<object>();
+  const handle = <T extends object>(fields: T): T & { delete(): void } => {
+    const object = {
+      ...fields,
+      delete(): void {
+        deleted.add(object);
+      },
+    };
+    created.push(object);
+    return object;
+  };
+  const construct = (fields: object = {}) =>
+    function (): object {
+      return handle(fields);
+    };
+  // Walks one face / edge; the fake shapes hold no solid, so the one-triangle mesh may stay open.
+  const oneShotExplorer = function (_shape: unknown, kind: unknown): object {
+    let visited = kind === 'solid';
+    return handle({
+      More: (): boolean => !visited,
+      Current: () => handle({ HashCode: (): number => 1, IsSame: (): boolean => true }),
+      Next: (): void => {
+        visited = true;
+      },
+    });
+  };
+  const triangulation = {
+    IsNull: (): boolean => false,
+    get: () => ({
+      NbNodes: (): number => 3,
+      NbTriangles: (): number => 1,
+      Node: (i: number) => handle({ X: (): number => i, Y: (): number => 0, Z: (): number => 0, Transform: (): void => undefined }),
+      Triangle: () => handle({ Value: (j: number): number => j }),
+    }),
+    delete: (): void => undefined,
+  };
+  const builder = (extra: object = {}) =>
+    function (): object {
+      return handle({
+        Build: (): void => undefined,
+        IsDone: (): boolean => true,
+        Shape: () => handle({}),
+        Add_2: (): void => undefined,
+        ...extra,
+      });
+    };
+  const api = {
+    TopAbs_ShapeEnum: { TopAbs_FACE: 'face', TopAbs_EDGE: 'edge', TopAbs_SOLID: 'solid', TopAbs_SHAPE: 'shape' },
+    TopAbs_Orientation: { TopAbs_REVERSED: { value: 1 } },
+    ChFi3d_FilletShape: { ChFi3d_Rational: 0 },
+    gp_Pnt_3: construct(),
+    BRepPrimAPI_MakeBox_2: construct({ Shape: () => handle({}) }),
+    BRepMesh_IncrementalMesh_2: construct({ Perform: (): void => undefined }),
+    TopExp_Explorer_2: oneShotExplorer,
+    TopLoc_Location_1: construct({ Transformation: () => handle({}) }),
+    TopoDS: { Face_1: () => handle({ Orientation_1: () => ({ value: 0 }) }), Shell_1: () => handle({}), Edge_1: () => handle({}) },
+    BRep_Tool: { Triangulation: () => handle(triangulation) },
+    BRepBuilderAPI_MakePolygon_1: construct({
+      Add_1: (): void => undefined,
+      Close: (): void => undefined,
+      IsDone: (): boolean => true,
+      Wire: () => handle({}),
+    }),
+    BRepBuilderAPI_MakeFace_15: construct({ IsDone: (): boolean => true, Face: () => handle({}) }),
+    BRepBuilderAPI_Sewing: construct({ Add: (): void => undefined, Perform: (): void => undefined, SewedShape: () => handle({}) }),
+    Handle_Message_ProgressIndicator_1: construct(),
+    BRepBuilderAPI_MakeSolid_1: builder({ Add: (): void => undefined }),
+    BRepFilletAPI_MakeFillet: builder(),
+    BRepCheck_Analyzer: construct({ IsValid_2: (): boolean => true }),
+  };
+  const factory: OcctFactory = () => Promise.resolve(api as never);
+  const kernel = await createOcctKernel({ factory });
+  return { kernel, leaked: () => created.filter((object) => !deleted.has(object)).length };
+}
+
+const box = {
+  id: 'b',
+  kind: 'box',
+  position: [0, 0, 0],
+  rotation: [0, 0, 0],
+  size: [1, 1, 1],
+  layerId: 'layer-default',
+  color: '#888888',
+} as unknown as Entity;
+
+describe('occt kernel releases WASM handles', () => {
+  it('deletes the nodes, triangles, faces and triangulations read while meshing', async () => {
+    const fake = await makeFakeKernel();
+    const shape = fake.kernel.evaluate({ op: 'solid', entity: box });
+    const mesh = shape === null ? null : fake.kernel.tessellate(shape);
+    expect(mesh?.positions).toEqual([1, 0, 0, 2, 0, 0, 3, 0, 0]);
+    expect(mesh?.indices).toEqual([0, 1, 2]);
+    // The cache owns the built solid until it is cleared; everything else is already released.
+    expect(fake.kernel.cachedShapeCount()).toBe(1);
+    expect(fake.leaked()).toBe(1);
+    fake.kernel.clear();
+    expect(fake.leaked()).toBe(0);
+  });
+  it('deletes the explorers, edges, builders and intermediate shapes of a fillet', async () => {
+    const fake = await makeFakeKernel();
+    const shape = fake.kernel.evaluate({ op: 'fillet', source: { op: 'solid', entity: box }, edges: [], size: 0.1 });
+    expect(shape).not.toBeNull();
+    // Only the two cached shapes (source box, fillet result) stay alive; builders/edges are freed.
+    expect(fake.kernel.cachedShapeCount()).toBe(2);
+    expect(fake.leaked()).toBe(2);
+    fake.kernel.clear();
+    expect(fake.leaked()).toBe(0);
   });
 });

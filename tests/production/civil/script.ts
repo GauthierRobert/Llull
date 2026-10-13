@@ -11,10 +11,7 @@ export function civilScript(intent: CivilIntent): ToolCall[] {
   const calls: ToolCall[] = [
     { tool: 'set_units', args: { units: 'm' } },
     { tool: 'set_project_info', args: { ...intent.project } },
-    {
-      tool: 'import_survey_points',
-      args: { name: 'Survey', text: intent.surveyText, format: 'PENZD', sourceUnit: 'm' },
-    },
+    { tool: 'import_survey_points', args: { name: 'Survey', text: intent.surveyText, format: 'PENZD', sourceUnit: 'm' } },
     { tool: 'create_surface', args: { name: 'EG', contourInterval: 0.5, majorEvery: 5 } },
     { tool: 'surface_report', args: { surfaceId: 'surface-1' } },
     {
@@ -43,21 +40,10 @@ export function civilScript(intent: CivilIntent): ToolCall[] {
     { tool: 'set_alignment_profile', args: { alignmentId: 'alignment-1', pvis: road.pvis } },
     {
       tool: 'set_road_section',
-      args: {
-        alignmentId: 'alignment-1',
-        laneWidth: road.laneWidth,
-        shoulderWidth: road.shoulderWidth,
-        crossfall: road.crossfall,
-      },
+      args: { alignmentId: 'alignment-1', laneWidth: road.laneWidth, shoulderWidth: road.shoulderWidth, crossfall: road.crossfall },
     },
-    {
-      tool: 'set_superelevation',
-      args: { alignmentId: 'alignment-1', maxRate: road.maxSuperelevation },
-    },
-    {
-      tool: 'alignment_report',
-      args: { alignmentId: 'alignment-1', designSpeedKmh: road.designSpeedKmh },
-    },
+    { tool: 'set_superelevation', args: { alignmentId: 'alignment-1', maxRate: road.maxSuperelevation } },
+    { tool: 'alignment_report', args: { alignmentId: 'alignment-1', designSpeedKmh: road.designSpeedKmh } },
   ];
   for (const manhole of drainage.manholes) {
     calls.push({
@@ -67,47 +53,20 @@ export function civilScript(intent: CivilIntent): ToolCall[] {
         location: manhole.location,
         invertElevation: manhole.invert,
         surfaceId: 'surface-1',
-        ...(manhole.catchment
-          ? {
-              catchmentAreaHa: manhole.catchment.areaHa,
-              runoffCoefficient: manhole.catchment.runoffCoefficient,
-            }
-          : {}),
+        ...(manhole.catchment ? { catchmentAreaHa: manhole.catchment.areaHa, runoffCoefficient: manhole.catchment.runoffCoefficient } : {}),
       },
     });
   }
   for (const [from, to] of drainage.pipes) {
-    calls.push({
-      tool: 'add_pipe',
-      args: {
-        fromId: `manhole-${from + 1}`,
-        toId: `manhole-${to + 1}`,
-        manningN: drainage.manningN,
-      },
-    });
+    calls.push({ tool: 'add_pipe', args: { fromId: `manhole-${from + 1}`, toId: `manhole-${to + 1}`, manningN: drainage.manningN } });
   }
   calls.push(
-    {
-      tool: 'size_drainage_pipes',
-      args: {
-        idf: drainage.idf,
-        minVelocity: drainage.minVelocity,
-        diameters: drainage.diametersMm,
-      },
-    },
+    { tool: 'size_drainage_pipes', args: { idf: drainage.idf, minVelocity: drainage.minVelocity, diameters: drainage.diametersMm } },
     {
       tool: 'check_drainage_network',
-      args: {
-        idf: drainage.idf,
-        outfallLevel: drainage.outfallLevel,
-        minCoverM: drainage.minCoverM,
-        minVelocity: drainage.minVelocity,
-      },
+      args: { idf: drainage.idf, outfallLevel: drainage.outfallLevel, minCoverM: drainage.minCoverM, minVelocity: drainage.minVelocity },
     },
-    {
-      tool: 'export_plan_profile_sheet',
-      args: { alignmentId: 'alignment-1', paper: intent.sheetPaper },
-    },
+    { tool: 'export_plan_profile_sheet', args: { alignmentId: 'alignment-1', paper: intent.sheetPaper } },
     { tool: 'export_landxml', args: { date: intent.project.date } },
   );
   return calls;

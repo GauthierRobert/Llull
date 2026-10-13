@@ -120,12 +120,7 @@ function CreateMaterialForm(): React.ReactElement {
         onChange={setField('density')}
         placeholder="e.g. 0.00785"
         ariaLabel="Material density (g/mm³)"
-        inputProps={{
-          step: 'any',
-          min: '0',
-          className: 'material-create-input',
-          autoComplete: 'off',
-        }}
+        inputProps={{ step: 'any', min: '0', className: 'material-create-input', autoComplete: 'off' }}
       />
       <LabeledInput
         label="Color"
@@ -148,14 +143,7 @@ function CreateMaterialForm(): React.ReactElement {
           value={form[field]}
           onChange={setField(field)}
           ariaLabel={`Material ${field} (0 to 1)`}
-          inputProps={{
-            min: '0',
-            max: '1',
-            step: '0.01',
-            className: 'material-create-range',
-            'aria-valuemin': 0,
-            'aria-valuemax': 1,
-          }}
+          inputProps={{ min: '0', max: '1', step: '0.01', className: 'material-create-range', 'aria-valuemin': 0, 'aria-valuemax': 1 }}
         >
           <span className="field__value">{(parseNumber(form[field]) ?? 0).toFixed(2)}</span>
         </LabeledInput>

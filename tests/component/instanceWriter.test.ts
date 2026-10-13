@@ -1,7 +1,3 @@
-/**
- * writeBatchInstances: after instances move, the InstancedMesh bounds must follow them, otherwise
- * three keeps the stale first-write sphere and frustum-culls / fails to raycast moved instances.
- */
 import { resetStore } from '../helpers/componentEntities';
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as THREE from 'three';
@@ -27,18 +23,15 @@ describe('writeBatchInstances', () => {
   beforeEach(() => {
     resetStore();
   });
-
   it('refreshes the bounding sphere when an instance moves', () => {
     const id = localDispatch('add_box', { size: [1, 1, 1] }).affected[0]!;
     const mesh = newMesh();
     writeBatchInstances(mesh, onlyBatch(), new Set());
     expect(mesh.boundingSphere?.center.x).toBeCloseTo(0);
-
     localDispatch('move_entities', { ids: [id], delta: [100, 0, 0] });
     writeBatchInstances(mesh, onlyBatch(), new Set());
     expect(mesh.boundingSphere?.center.x).toBeCloseTo(100);
   });
-
   it('tints selected instances', () => {
     localDispatch('add_box', { size: [1, 1, 1] });
     const batch = onlyBatch();

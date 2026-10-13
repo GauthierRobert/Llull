@@ -184,10 +184,7 @@ function JointRow({
             label={`Joint value for ${joint.id} (${unit})`}
             onCommit={commitInput}
             testId={`joint-value-${joint.id}`}
-            inputProps={{
-              type: 'number',
-              title: `Current ${revolute ? 'angle' : 'displacement'} in ${unit}`,
-            }}
+            inputProps={{ type: 'number', title: `Current ${revolute ? 'angle' : 'displacement'} in ${unit}` }}
           />
           <span className="panel__row-meta">{unit}</span>
         </>

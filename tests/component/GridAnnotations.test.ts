@@ -6,10 +6,7 @@ import { minScreenScale } from '@ui/viewport/2d/useMinScreenSize';
 
 describe('collectGridAnnotations', () => {
   it('turns add_grid_system entities into axes and labelled bubbles at readable size', () => {
-    const doc = execute(createEmptyDocument(), 'add_grid_system', {
-      xSpacings: [6000, 6000],
-      ySpacings: [8000],
-    }).document;
+    const doc = execute(createEmptyDocument(), 'add_grid_system', { xSpacings: [6000, 6000], ySpacings: [8000] }).document;
     const gridEntities = Object.values(doc.entities).filter((entity) => doc.layers[entity.layerId]?.name === GRID_LAYER_NAME);
     expect(gridEntities.length).toBeGreaterThan(0);
     const { axes, bubbles } = collectGridAnnotations(gridEntities);

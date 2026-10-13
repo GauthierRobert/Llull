@@ -1,9 +1,9 @@
-/** export_civil_plan_sheet / export_plan_profile_sheet: content, true scale, clipping, purity. */
-
 import { describe, expect, it } from 'vitest';
 import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { metricDocument, surveyedDocument } from './fixtures';
+import { expectNoOp } from '../../helpers/expectNoOp';
+import { xy } from '../../helpers/xy';
 
 interface SheetData {
   text: string;
@@ -20,13 +20,7 @@ const flat = (): number => 100;
 function site(): CadDocument {
   const base = surveyedDocument(flat, 21, 20);
   const named = execute(base, 'set_project_info', { name: 'Site <A&B>' }).document;
-  const aligned = execute(named, 'add_alignment', {
-    points: [
-      [50, 200],
-      [150, 200],
-    ],
-    surfaceId: 'surface-1',
-  }).document;
+  const aligned = execute(named, 'add_alignment', { points: xy(50, 200, 150, 200), surfaceId: 'surface-1' }).document;
   return execute(aligned, 'set_alignment_profile', {
     alignmentId: 'alignment-1',
     pvis: [
@@ -66,7 +60,6 @@ describe('export_civil_plan_sheet', () => {
     expect(data.counts.texts).toBeGreaterThan(0);
     expect(data.layers.map((layer) => layer.name)).toContain('C-ROAD-CNTR');
   });
-
   it('is pure', () => {
     const doc = site();
     const before = JSON.stringify(doc);
@@ -74,7 +67,6 @@ describe('export_civil_plan_sheet', () => {
     expect(JSON.stringify(doc)).toBe(before);
     expect(result.document).toBe(doc);
   });
-
   it('draws at true scale: a 100 m centreline is 200 mm at 1:500', () => {
     const data = sheet(site(), { paper: 'A1', scale: 500, layers: ['C-ROAD-CNTR'] });
     const [run] = polylinePoints(data.text, '#d04a4a');
@@ -84,7 +76,6 @@ describe('export_civil_plan_sheet', () => {
     expect(Math.hypot((last[0] ?? 0) - (first[0] ?? 0), (last[1] ?? 0) - (first[1] ?? 0))).toBeCloseTo(200, 1);
     expect(data.layers.map((layer) => layer.name)).toEqual(['C-ROAD-CNTR']);
   });
-
   it('clips to the viewport and counts what falls outside', () => {
     const full = sheet(site(), { paper: 'A3', scale: 500 });
     const zoomed = sheet(site(), { paper: 'A3', scale: 100, center: [0, 0] });
@@ -101,7 +92,6 @@ describe('export_civil_plan_sheet', () => {
       }
     }
   });
-
   it('auto-fits the scale and adds grid ticks with grid coordinates when calibrated', () => {
     const plain = sheet(site(), { paper: 'A4' });
     expect(plain.scale).toBeGreaterThan(0);
@@ -115,7 +105,6 @@ describe('export_civil_plan_sheet', () => {
     expect(data.text).toContain('class="grid-tick"');
     expect(data.text).toMatch(/E 652\d{3}\s+N 686\d{4}/);
   });
-
   it('fails without civil entities, bad scale or unknown layers', () => {
     const empty = metricDocument();
     for (const [doc, params] of [
@@ -125,8 +114,7 @@ describe('export_civil_plan_sheet', () => {
     ] as const) {
       const result = execute(doc, 'export_civil_plan_sheet', params);
       expect(result.data).toBeUndefined();
-      expect(result.affected).toEqual([]);
-      expect(result.document).toBe(doc);
+      expectNoOp(result, doc);
     }
   });
 });
@@ -152,26 +140,17 @@ describe('export_plan_profile_sheet', () => {
     const ticks = [...data.text.matchAll(/class="station-tick" x1="([\d.]+)"/g)].map((m) => Number(m[1]));
     expect(ticks.length).toBeGreaterThan(1);
     expect(ticks[0]).toBeCloseTo(24 + 90 * 0.25, 1);
-    const interval = (
-      execute(doc, 'describe_civil', {}).document.civil?.objects['alignment-1'] as {
-        stationInterval: number;
-      }
-    ).stationInterval;
+    const interval = (execute(doc, 'describe_civil', {}).document.civil?.objects['alignment-1'] as { stationInterval: number })
+      .stationInterval;
     const spacing = (ticks[1] ?? 0) - (ticks[0] ?? 0);
     expect(spacing / (interval * 2)).toBeCloseTo(Math.round(spacing / (interval * 2)), 2);
     expect(data.fileName).toMatch(/_plan_profile_A3_1-500\.svg$/);
     expect(data.fits).toBe(true);
   });
-
   it('auto-fits the scale and fails on unknown alignment, missing profile or bad numbers', () => {
     const doc = site();
     expect((execute(doc, 'export_plan_profile_sheet', { alignmentId: 'alignment-1' }).data as SheetData).scale).toBeGreaterThan(0);
-    const bare = execute(surveyedDocument(flat, 21, 20), 'add_alignment', {
-      points: [
-        [50, 200],
-        [150, 200],
-      ],
-    }).document;
+    const bare = execute(surveyedDocument(flat, 21, 20), 'add_alignment', { points: xy(50, 200, 150, 200) }).document;
     for (const [target, params] of [
       [doc, { alignmentId: 'nope' }],
       [bare, { alignmentId: 'alignment-1' }],

@@ -9,8 +9,9 @@ import { SECTION_RING_POINTS, alignRing, resampleRing, sampleRing } from '@core/
 import { skinTriangles } from '@core/geometry/skin';
 import { loftRings } from '@core/geometry/loft';
 import { frameAtFraction, stationRingAt } from '@core/geometry/sweep';
-import { expectNoOp } from '../helpers/expectNoOp';
+import { expectNoOp, expectPure } from '../helpers/expectNoOp';
 import { docWith, createdEntity as created, volumeOf, isWatertight } from '../helpers/fixtureDocument';
+import { xy, xyz } from '../helpers/xy';
 
 const empty = createEmptyDocument();
 
@@ -29,7 +30,6 @@ describe('section rings', () => {
     expect(ring[0]?.[1]).toBeCloseTo(0, 9);
     expect(ring[1]?.[1]).toBeGreaterThan(0);
   });
-
   it('align cyclically to the closest start and sample to a fixed density', () => {
     const ring = resampleRing(square);
     const shifted = [...ring.slice(5), ...ring.slice(0, 5)];
@@ -56,7 +56,6 @@ describe('loft_sections', () => {
     ],
     ruled: true,
   };
-
   it('a ruled loft of two circles approximates the frustum volume', () => {
     const cone = created<LoftEntity>(empty, 'loft_sections', twoCircles);
     expect(cone.kind).toBe('loft');
@@ -68,7 +67,6 @@ describe('loft_sections', () => {
     const b = entityBounds(cone);
     expect(b.max[2] - b.min[2]).toBeCloseTo(4, 6);
   });
-
   it('a smooth loft blends through three tilted sections without twisting', () => {
     const duct = created<LoftEntity>(empty, 'loft_sections', {
       sections: [
@@ -83,23 +81,15 @@ describe('loft_sections', () => {
     expect(isWatertight(solidTriangles(duct))).toBe(true);
     expect(tessellateEntity(duct).length).toBe(solidTriangles(duct).length);
   });
-
   it('lofts sketched sections placed by their own work planes (reversed winding is fixed)', () => {
     const doc = docWith(
       { id: 'base', kind: 'circle', center: [0, 0], radius: 2 },
-      {
-        id: 'top',
-        kind: 'polyline',
-        closed: true,
-        points: [...square].reverse(),
-        position: [0, 0, 5],
-      },
+      { id: 'top', kind: 'polyline', closed: true, points: [...square].reverse(), position: [0, 0, 5] },
     );
     const body = created<LoftEntity>(doc, 'loft_sections', { sectionIds: ['base', 'top'] });
     expect(isWatertight(solidTriangles(body))).toBe(true);
     expect(volumeOf(body)).toBeGreaterThan(0);
   });
-
   it.each([
     ['neither', {}, 'exactly one of sectionIds or sections'],
     ['both', { sectionIds: ['a', 'b'], sections: twoCircles.sections }, 'exactly one'],
@@ -140,13 +130,7 @@ describe('loft_sections', () => {
       'short polygon',
       {
         sections: [
-          {
-            center: [0, 0, 0],
-            section: [
-              [0, 0],
-              [1, 0],
-            ],
-          },
+          { center: [0, 0, 0], section: xy(0, 0, 1, 0) },
           { center: [0, 0, 1], radius: 1 },
         ],
       },
@@ -156,14 +140,7 @@ describe('loft_sections', () => {
       'flat polygon',
       {
         sections: [
-          {
-            center: [0, 0, 0],
-            section: [
-              [0, 0],
-              [1, 0],
-              [2, 0],
-            ],
-          },
+          { center: [0, 0, 0], section: xy(0, 0, 1, 0, 2, 0) },
           { center: [0, 0, 1], radius: 1 },
         ],
       },
@@ -182,29 +159,20 @@ describe('loft_sections', () => {
   ])('%s → no-op', (_label, params, text) => {
     expectNoOp(execute(empty, 'loft_sections', params), empty, text);
   });
-
   it('rejects a duplicate explicit id and is pure', () => {
     const first = execute(empty, 'loft_sections', { ...twoCircles, id: 'L' }).document;
     expectNoOp(execute(first, 'loft_sections', { ...twoCircles, id: 'L' }), first, 'already exists');
-    const snapshot = JSON.stringify(first);
-    execute(first, 'loft_sections', twoCircles);
-    expect(JSON.stringify(first)).toBe(snapshot);
+    expectPure(first, () => execute(first, 'loft_sections', twoCircles));
   });
-
   it('scales, round-trips and refuses corrupt saved lofts', () => {
     const cone = created<LoftEntity>(empty, 'loft_sections', twoCircles);
     const doc = { ...empty, entities: { [cone.id]: cone }, order: [cone.id] };
     const big = execute(doc, 'scale_entity', { id: cone.id, factor: 2 }).document.entities[cone.id] as LoftEntity;
     expect(big.rings[1]?.[0]?.[2]).toBeCloseTo(8, 9);
-    const loaded = execute(createEmptyDocument(), 'load_document', {
-      json: serializeDocument(doc),
-    });
+    const loaded = execute(createEmptyDocument(), 'load_document', { json: serializeDocument(doc) });
     expect(loaded.document.entities[cone.id]).toEqual(cone);
     for (const patch of [{ rings: [[[0, 0, 0]]] }, { ruled: 'yes' }]) {
-      const json = serializeDocument({
-        ...doc,
-        entities: { [cone.id]: { ...cone, ...patch } as unknown as Entity },
-      });
+      const json = serializeDocument({ ...doc, entities: { [cone.id]: { ...cone, ...patch } as unknown as Entity } });
       const result = execute(createEmptyDocument(), 'load_document', { json });
       expect(result.affected).toHaveLength(0);
       expect(result.summary).toContain('loft');
@@ -213,11 +181,7 @@ describe('loft_sections', () => {
 });
 
 describe('sweep_profile stations (variable section)', () => {
-  const path = [
-    [0, 0, 0],
-    [10, 0, 0],
-  ];
-
+  const path = xyz(0, 0, 0, 10, 0, 0);
   it('tapers between stations with a smoothstep blend', () => {
     const tube = created<SweepEntity>(empty, 'sweep_profile', {
       path,
@@ -243,21 +207,10 @@ describe('sweep_profile stations (variable section)', () => {
     expect(volumeOf(tube) / expected).toBeCloseTo(1, 1);
     expect(isWatertight(solidTriangles(tube))).toBe(true);
   });
-
   it('blends round → oval → sketched rectangle along a bent path and scales stations', () => {
-    const doc = docWith({
-      id: 'rect',
-      kind: 'rectangle',
-      width: 2,
-      height: 1,
-      position: [9, 9, 0],
-    });
+    const doc = docWith({ id: 'rect', kind: 'rectangle', width: 2, height: 1, position: [9, 9, 0] });
     const tube = created<SweepEntity>(doc, 'sweep_profile', {
-      path: [
-        [0, 0, 0],
-        [20, 0, 0],
-        [20, 0, 15],
-      ],
+      path: xyz(0, 0, 0, 20, 0, 0, 20, 0, 15),
       bendRadius: 6,
       stations: [
         { at: 0, radius: 1.5 },
@@ -272,7 +225,6 @@ describe('sweep_profile stations (variable section)', () => {
       .document.entities[tube.id] as SweepEntity;
     expect(Math.hypot(...((scaled.stations?.[0]?.ring[0] ?? [0, 0]) as Vec2))).toBeCloseTo(3, 6);
   });
-
   it.each([
     ['one station', { stations: [{ at: 0, radius: 1 }] }, '>= 2'],
     [
@@ -330,7 +282,6 @@ describe('sweep_profile stations (variable section)', () => {
   ])('%s → no-op', (_label, params, text) => {
     expectNoOp(execute(empty, 'sweep_profile', { path, ...params }), empty, text);
   });
-
   it('round-trips and refuses corrupt saved stations', () => {
     const tube = created<SweepEntity>(empty, 'sweep_profile', {
       path,
@@ -352,10 +303,7 @@ describe('sweep_profile stations (variable section)', () => {
         { at: 1, ring: [[0, 0]] },
       ],
     ]) {
-      const json = serializeDocument({
-        ...doc,
-        entities: { [tube.id]: { ...tube, stations } as unknown as Entity },
-      });
+      const json = serializeDocument({ ...doc, entities: { [tube.id]: { ...tube, stations } as unknown as Entity } });
       expect(execute(createEmptyDocument(), 'load_document', { json }).affected).toHaveLength(0);
     }
   });

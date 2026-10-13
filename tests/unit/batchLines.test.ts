@@ -26,29 +26,19 @@ describe('buildLineBatch', () => {
     expect(batch.colors.slice(6, 9)).toEqual([0, 1, 0]);
     expect(batch.colors).toHaveLength(batch.positions.length);
   });
-
   it('applies entity position, z and Z rotation in world space', () => {
-    const batch = buildLineBatch([
-      line('a', {
-        start: [1, 0],
-        end: [3, 0],
-        position: [100, 50, 2],
-        rotation: [0, 0, Math.PI / 2],
-      }),
-    ]);
+    const batch = buildLineBatch([line('a', { start: [1, 0], end: [3, 0], position: [100, 50, 2], rotation: [0, 0, Math.PI / 2] })]);
     expect(batch.anchor[0]).toBeCloseTo(100);
     expect(batch.anchor[1]).toBeCloseTo(51);
     expect(batch.anchor[2]).toBe(2);
     expect(batch.positions[3]).toBeCloseTo(0);
     expect(batch.positions[4]).toBeCloseTo(2);
   });
-
   it('keeps sub-0.06 precision for lines at x about 1e6', () => {
     const base = 1_000_000;
     const batch = buildLineBatch([line('a', { start: [base + 0.01, 0], end: [base + 0.02, 0] })]);
     expect(Math.fround(batch.positions[3] as number)).toBeCloseTo(0.01, 6);
   });
-
   it('is empty for no lines', () => {
     expect(buildLineBatch([])).toEqual({ anchor: [0, 0, 0], positions: [], colors: [] });
   });

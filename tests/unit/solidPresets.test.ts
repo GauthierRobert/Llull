@@ -18,11 +18,9 @@ describe('solid presets', () => {
       expect(rotatedEntityBounds(entity).min[2], preset.command).toBeCloseTo(0, 6);
     }
   });
-
   it('drops the first solid at the origin', () => {
     expect(nextPlacement(createEmptyDocument())).toEqual([0, 0, 0]);
   });
-
   it('never overlaps existing solids and stays near the origin', () => {
     let doc = createEmptyDocument();
     for (let i = 0; i < 12; i++) doc = addPreset(doc, i % SOLID_PRESETS.length);
@@ -38,14 +36,12 @@ describe('solid presets', () => {
     }
     for (const box of boxes) expect(Math.abs(box.min[0])).toBeLessThan(10);
   });
-
   it('falls back past the +X edge when the area around the origin is full', () => {
     const doc = execute(createEmptyDocument(), 'add_box', { size: [200, 200, 1] }).document;
     const [x, y, z] = nextPlacement(doc);
     expect(x).toBeGreaterThan(100);
     expect([y, z]).toEqual([0, 0]);
   });
-
   it('treats reserved drop points as occupied', () => {
     const doc = createEmptyDocument();
     const first = nextPlacement(doc);

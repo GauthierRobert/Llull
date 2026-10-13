@@ -26,9 +26,7 @@ export function gridSurvey(f: (x: number, y: number) => number, n = 11, step = 1
 
 /** Metric document with point group `pointGroup-1` and surface `surface-1` of z = f(x, y). */
 export function surveyedDocument(f: (x: number, y: number) => number = (x) => 100 + x * 0.05, n = 11, step = 10): CadDocument {
-  const imported = execute(metricDocument(), 'import_survey_points', {
-    text: gridSurvey(f, n, step),
-  });
+  const imported = execute(metricDocument(), 'import_survey_points', { text: gridSurvey(f, n, step) });
   return execute(imported.document, 'create_surface', {}).document;
 }
 

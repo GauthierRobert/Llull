@@ -6,16 +6,13 @@ describe('downloadText', () => {
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
-
   it('keeps the object URL alive while a busy browser starts the download', () => {
     vi.useFakeTimers();
     const create = vi.fn(() => 'blob:llull');
     const revoke = vi.fn();
     Object.assign(URL, { createObjectURL: create, revokeObjectURL: revoke });
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
-
     downloadText('a,b', 'member-schedule.csv', 'text/csv');
-
     expect(click).toHaveBeenCalledTimes(1);
     vi.advanceTimersByTime(1000);
     expect(revoke).not.toHaveBeenCalled();

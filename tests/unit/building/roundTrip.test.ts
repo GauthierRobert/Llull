@@ -3,13 +3,9 @@ import { execute } from '@core/commands/registry';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { applySteps } from './applySteps';
+import { xy, xyz } from '../../helpers/xy';
 
-const SQUARE = [
-  [0, 0],
-  [6000, 0],
-  [6000, 5000],
-  [0, 5000],
-];
+const SQUARE = xy(0, 0, 6000, 0, 6000, 5000, 0, 5000);
 
 type Step = [name: string, params: Record<string, unknown>];
 
@@ -20,18 +16,7 @@ const STEPS: Step[] = [
   ['add_window', { wallId: 'wall-2', offset: 2500 }],
   ['add_curved_wall', { start: [7000, 0], through: [8000, 1000], end: [9000, 0], thickness: 200 }],
   ['add_slab', { wallIds: ['wall-1', 'wall-2', 'wall-3', 'wall-4'] }],
-  [
-    'add_slab_opening',
-    {
-      slabId: 'slab-1',
-      boundary: [
-        [1000, 1000],
-        [2000, 1000],
-        [2000, 2000],
-        [1000, 2000],
-      ],
-    },
-  ],
+  ['add_slab_opening', { slabId: 'slab-1', boundary: xy(1000, 1000, 2000, 1000, 2000, 2000, 1000, 2000) }],
   ['add_column', { location: [3000, 2500] }],
   ['add_beam', { start: [0, 2500], end: [6000, 2500] }],
   ['add_stair', { start: [4000, 500], angle: 0 }],
@@ -42,26 +27,8 @@ const STEPS: Step[] = [
   ['add_base_plates', {}],
   ['add_footing', { underColumns: true }],
   ['add_equipment', { name: 'Pump', mark: 'P-1', location: [3000, 9500], size: [1500, 800, 900] }],
-  [
-    'add_pipe_run',
-    {
-      points: [
-        [0, 9500, 1000],
-        [3000, 9500, 1000],
-        [3000, 9500, 4000],
-      ],
-      dn: 100,
-    },
-  ],
-  [
-    'add_cable_tray',
-    {
-      points: [
-        [0, 7000, 3000],
-        [6000, 7000, 3000],
-      ],
-    },
-  ],
+  ['add_pipe_run', { points: xyz(0, 9500, 1000, 3000, 9500, 1000, 3000, 9500, 4000), dn: 100 }],
+  ['add_cable_tray', { points: xyz(0, 7000, 3000, 6000, 7000, 3000) }],
 ];
 
 const build = (): CadDocument => applySteps(createEmptyDocument(), STEPS);
@@ -108,15 +75,11 @@ describe('feature history replay reproduces the building', () => {
     expect(replayed.document.order).toEqual(doc.order);
     expect(replayed.document.building).toEqual(doc.building);
   });
-
   it('editing a step re-evaluates the building: a thicker wall changes only what depends on it', () => {
     const doc = build();
     const wallStep = doc.featureHistory.find((step) => step.name === 'draw_walls');
     expect(wallStep).toBeDefined();
-    const edited = execute(doc, 'edit_step_params', {
-      stepId: wallStep?.id,
-      params: { points: SQUARE, closed: true, thickness: 300 },
-    });
+    const edited = execute(doc, 'edit_step_params', { stepId: wallStep?.id, params: { points: SQUARE, closed: true, thickness: 300 } });
     expect(edited.summary, edited.summary).not.toMatch(/rejected|failed|refused/i);
     const wall = edited.document.building?.elements['wall-1'];
     expect(wall?.category === 'wall' && wall.thickness).toBe(300);
@@ -166,7 +129,6 @@ describe('save -> load round trip of derived building geometry', () => {
     expect(loaded.building).toEqual(doc.building);
     expect(loaded.layers).toEqual(doc.layers);
   });
-
   it('still restores identically after update, move and delete edits', () => {
     let doc = build();
     const edits: Step[] = [

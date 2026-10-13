@@ -57,12 +57,7 @@ function wallTool(
 }
 
 /** Shared by door and window; null without a host wall. */
-function hostedOpening(reader: FieldReader): {
-  wallId: string;
-  offset: number | undefined;
-  width: number;
-  height: number;
-} | null {
+function hostedOpening(reader: FieldReader): { wallId: string; offset: number | undefined; width: number; height: number } | null {
   const wallId = reader.text('wallId');
   if (wallId === '') return null;
   return { wallId, offset: reader.optionalNumber('offset'), width: reader.number('width'), height: reader.number('height') };

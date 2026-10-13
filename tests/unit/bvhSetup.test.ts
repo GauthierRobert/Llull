@@ -1,14 +1,3 @@
-/**
- * Unit tests for the BVH prototype-patch helper in `src/ui/viewport/3d/bvhSetup.ts`.
- *
- * Verifies:
- * - ensureBvhSetup() patches THREE.Mesh.prototype.raycast to acceleratedRaycast.
- * - ensureBvhSetup() adds computeBoundsTree / disposeBoundsTree to BufferGeometry.prototype.
- * - Calling ensureBvhSetup() twice is idempotent (no error, no double-application).
- * - computeBoundsTree() populates geometry.boundsTree on a real geometry.
- * - disposeBoundsTree() clears geometry.boundsTree.
- */
-
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from 'three-mesh-bvh';
@@ -30,12 +19,10 @@ describe('ensureBvhSetup — prototype patch', () => {
     ensureBvhSetup();
     expect(THREE.Mesh.prototype.raycast).toBe(acceleratedRaycast);
   });
-
   it('adds computeBoundsTree to THREE.BufferGeometry.prototype', () => {
     ensureBvhSetup();
     expect(THREE.BufferGeometry.prototype.computeBoundsTree).toBe(computeBoundsTree);
   });
-
   it('adds disposeBoundsTree to THREE.BufferGeometry.prototype', () => {
     ensureBvhSetup();
     expect(THREE.BufferGeometry.prototype.disposeBoundsTree).toBe(disposeBoundsTree);
@@ -61,7 +48,6 @@ describe('BVH lifecycle on a real geometry', () => {
     geo.disposeBoundsTree();
     geo.dispose();
   });
-
   it('disposeBoundsTree() clears boundsTree', () => {
     ensureBvhSetup();
     const geo = new THREE.BoxGeometry(2, 2, 2);

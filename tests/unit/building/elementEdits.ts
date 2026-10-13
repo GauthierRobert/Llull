@@ -17,14 +17,7 @@ export function mapElements(doc: CadDocument, change: (element: BuildingElement)
 export function withoutElements(doc: CadDocument, drop: (element: BuildingElement) => boolean): CadDocument {
   const building = buildingOf(doc);
   const elements = Object.fromEntries(Object.entries(building.elements).filter(([, element]) => !drop(element)));
-  return {
-    ...doc,
-    building: {
-      ...building,
-      elements,
-      elementOrder: building.elementOrder.filter((id) => id in elements),
-    },
-  };
+  return { ...doc, building: { ...building, elements, elementOrder: building.elementOrder.filter((id) => id in elements) } };
 }
 
 /** A deep, untyped copy of the building for corrupting fields the types forbid. */

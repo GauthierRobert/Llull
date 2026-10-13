@@ -17,10 +17,7 @@ function SurfaceRow({ surface }: { surface: SurfaceObject }): React.ReactElement
     <CivilReportRow
       object={surface}
       report={{ command: 'surface_report', idKey: 'surfaceId' }}
-      field={{
-        hint: String(surface.contourInterval),
-        label: `Contour interval of ${surface.name}`,
-      }}
+      field={{ hint: String(surface.contourInterval), label: `Contour interval of ${surface.name}` }}
       action={{
         label: 'Set interval',
         run: (text) => {

@@ -27,9 +27,6 @@ export const extractionBuilding: Scenario = {
     ...deliverableCriteria(extractionIntent),
     ...integrityCriteria(),
   ],
-  knownIssues: {
-    scripted: [],
-    ui: [],
-  },
+  knownIssues: { scripted: [], ui: [] },
   agentBaseline: 0.6,
 };

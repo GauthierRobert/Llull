@@ -8,9 +8,7 @@ import { defineConfig } from 'vitest/config';
 import { workspaceAliases } from '../workspaceAliases.ts';
 
 export default defineConfig({
-  resolve: {
-    alias: workspaceAliases(),
-  },
+  resolve: { alias: workspaceAliases() },
   test: {
     globals: true,
     environment: 'node',

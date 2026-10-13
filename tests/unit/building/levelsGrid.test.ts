@@ -3,6 +3,8 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { gridLetter } from '@aec/building/elements/grid';
 import { run } from '../../helpers/runFixtures';
+import { expectNoOp } from '../../helpers/expectNoOp';
+import { xy } from '../../helpers/xy';
 
 describe('add_level / update_level / delete_level / set_active_level', () => {
   it('adds stacked levels with default 3 m height and makes the newest active', () => {
@@ -14,7 +16,6 @@ describe('add_level / update_level / delete_level / set_active_level', () => {
     expect(building.levels['level-2']).toMatchObject({ name: 'First', elevation: 3000 });
     expect(building.activeLevelId).toBe('level-2');
   });
-
   it('respects explicit elevation, unit-aware default height and makeActive false', () => {
     let doc = run(createEmptyDocument(), 'set_units', { units: 'm' });
     doc = run(doc, 'add_level', {});
@@ -23,7 +24,6 @@ describe('add_level / update_level / delete_level / set_active_level', () => {
     expect(doc.building!.levelOrder).toEqual(['level-2', 'level-1']);
     expect(doc.building!.activeLevelId).toBe('level-1');
   });
-
   it('rejects invalid height and is pure', () => {
     const doc = createEmptyDocument();
     const snapshot = structuredClone(doc);
@@ -32,66 +32,38 @@ describe('add_level / update_level / delete_level / set_active_level', () => {
     expect(result.summary).toMatch(/failed/);
     expect(doc).toEqual(snapshot);
   });
-
   it('update_level moves the walls on it', () => {
     let doc = run(createEmptyDocument(), 'add_level', {});
-    doc = run(doc, 'draw_walls', {
-      points: [
-        [0, 0],
-        [4000, 0],
-      ],
-    });
+    doc = run(doc, 'draw_walls', { points: xy(0, 0, 4000, 0) });
     const before = doc.entities['wall-1:body-0']!.position[2];
-    const result = execute(doc, 'update_level', {
-      levelId: 'level-1',
-      elevation: 500,
-      name: 'Raised',
-    });
+    const result = execute(doc, 'update_level', { levelId: 'level-1', elevation: 500, name: 'Raised' });
     expect(result.document.entities['wall-1:body-0']!.position[2]).toBeCloseTo(before + 500);
     expect(result.affected).toContain('wall-1:body-0');
     expect(result.document.building!.levels['level-1']!.name).toBe('Raised');
   });
-
   it('update_level failure paths', () => {
     const doc = run(createEmptyDocument(), 'add_level', {});
     expect(execute(doc, 'update_level', { levelId: 'nope' }).summary).toMatch(/no level/);
     expect(execute(doc, 'update_level', { levelId: 'level-1', height: 0 }).summary).toMatch(/height/);
     expect(execute(doc, 'update_level', { levelId: 'level-1', elevation: Number.NaN }).affected).toEqual([]);
   });
-
   it('falls back to the first level when the stored active level no longer exists', () => {
     const base = run(createEmptyDocument(), 'add_level', {});
-    const doc: CadDocument = {
-      ...base,
-      building: { ...base.building!, activeLevelId: 'level-99' },
-    };
-    const result = execute(doc, 'draw_walls', {
-      points: [
-        [0, 0],
-        [3000, 0],
-      ],
-    });
+    const doc: CadDocument = { ...base, building: { ...base.building!, activeLevelId: 'level-99' } };
+    const result = execute(doc, 'draw_walls', { points: xy(0, 0, 3000, 0) });
     expect(Object.keys(result.document.building!.levels)).toEqual(['level-1']);
     expect(result.document.building!.elements['wall-1']).toMatchObject({ levelId: 'level-1' });
     expect(execute(doc, 'check_clashes', {}).summary).toBe('No clashes found.');
   });
-
   it('update_level with unchanged values is a no-op that records nothing', () => {
     const doc = run(createEmptyDocument(), 'add_level', { name: 'Ground' });
     const result = execute(doc, 'update_level', { levelId: 'level-1', name: ' ' });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toEqual([]);
+    expectNoOp(result, doc);
     expect(result.summary).toMatch(/already has these values/);
   });
-
   it('delete_level refuses when occupied unless deleteElements, then removes hosted openings', () => {
     let doc = run(createEmptyDocument(), 'add_level', {});
-    doc = run(doc, 'draw_walls', {
-      points: [
-        [0, 0],
-        [5000, 0],
-      ],
-    });
+    doc = run(doc, 'draw_walls', { points: xy(0, 0, 5000, 0) });
     doc = run(doc, 'add_door', { wallId: 'wall-1' });
     expect(execute(doc, 'delete_level', { levelId: 'level-1' }).summary).toMatch(/refused/);
     const result = execute(doc, 'delete_level', { levelId: 'level-1', deleteElements: true });
@@ -100,14 +72,12 @@ describe('add_level / update_level / delete_level / set_active_level', () => {
     expect(result.document.building!.activeLevelId).toBeNull();
     expect(execute(doc, 'delete_level', { levelId: 'x' }).summary).toMatch(/no level/);
   });
-
   it('delete_level of an empty level keeps the active level when another one was active', () => {
     let doc = run(createEmptyDocument(), 'add_level', {});
     doc = run(doc, 'add_level', { makeActive: false });
     const result = execute(doc, 'delete_level', { levelId: 'level-2' });
     expect(result.document.building!.activeLevelId).toBe('level-1');
   });
-
   it('set_active_level switches, no-ops on same / unknown', () => {
     let doc = run(createEmptyDocument(), 'add_level', {});
     doc = run(doc, 'add_level', {});
@@ -120,25 +90,15 @@ describe('add_level / update_level / delete_level / set_active_level', () => {
 
 describe('set_project_info / describe_building', () => {
   it('merges project fields and reports them', () => {
-    const doc = run(createEmptyDocument(), 'set_project_info', {
-      name: 'Maison Dupont',
-      client: 'Dupont',
-    });
+    const doc = run(createEmptyDocument(), 'set_project_info', { name: 'Maison Dupont', client: 'Dupont' });
     expect(doc.building!.project).toMatchObject({ name: 'Maison Dupont', client: 'Dupont' });
     const described = execute(doc, 'describe_building', {});
     expect(described.document).toBe(doc);
     expect(described.summary).toMatch(/Maison Dupont.*0 level/);
     expect(execute(doc, 'set_project_info', {}).summary).toMatch(/no fields/);
   });
-
   it('describe_building lists levels with element counts', () => {
-    let doc = run(createEmptyDocument(), 'draw_walls', {
-      points: [
-        [0, 0],
-        [4000, 0],
-        [4000, 3000],
-      ],
-    });
+    let doc = run(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 4000, 0, 4000, 3000) });
     doc = run(doc, 'add_grid_line', { start: [0, -1000], end: [0, 4000] });
     const data = execute(doc, 'describe_building', {}).data as {
       levels: Array<{ elementCount: number; active: boolean }>;
@@ -153,45 +113,28 @@ describe('structural grid', () => {
   it('gridLetter skips I and O and rolls over', () => {
     expect([0, 7, 8, 12, 13, 23, 24].map(gridLetter)).toEqual(['A', 'H', 'J', 'N', 'P', 'Z', 'AA']);
   });
-
   it('add_grid_line creates axis, bubbles and labels on S-GRID', () => {
-    const result = execute(createEmptyDocument(), 'add_grid_line', {
-      start: [0, 0],
-      end: [0, 10000],
-      label: 'A',
-    });
+    const result = execute(createEmptyDocument(), 'add_grid_line', { start: [0, 0], end: [0, 10000], label: 'A' });
     expect(result.affected).toHaveLength(6);
     expect(result.document.layers['layer-S-GRID']?.name).toBe('S-GRID');
-    expect(result.document.entities['grid-1:axis']).toMatchObject({
-      kind: 'line',
-      layerId: 'layer-S-GRID',
-    });
+    expect(result.document.entities['grid-1:axis']).toMatchObject({ kind: 'line', layerId: 'layer-S-GRID' });
     expect(execute(result.document, 'add_grid_line', { start: [5, 0], end: [5, 9], label: 'A' }).summary).toMatch(/already exists/);
     expect(execute(result.document, 'add_grid_line', { start: [0, 0], end: [0, 0] }).summary).toMatch(/distinct/);
     const auto = execute(result.document, 'add_grid_line', { start: [9, 0], end: [9, 9] });
     expect(auto.document.building!.elements['grid-2']!.mark).toBe('1');
   });
-
   it('add_grid_system lays out numbered and lettered axes', () => {
-    const result = execute(createEmptyDocument(), 'add_grid_system', {
-      xSpacings: [6000, 6000],
-      ySpacings: [5000],
-    });
+    const result = execute(createEmptyDocument(), 'add_grid_system', { xSpacings: [6000, 6000], ySpacings: [5000] });
     expect((result.data as { labels: string[] }).labels).toEqual(['1', '2', '3', 'A', 'B']);
     const axis3 = result.document.building!.elements['grid-3']!;
     expect(axis3).toMatchObject({ start: [12000, -1500], end: [12000, 6500] });
     expect(result.summary).toMatch(/12000 × 5000/);
   });
-
   it('add_grid_system failure paths', () => {
     const doc = createEmptyDocument();
     expect(execute(doc, 'add_grid_system', { xSpacings: [0], ySpacings: [] }).document).toBe(doc);
     expect(execute(doc, 'add_grid_system', { xSpacings: [], ySpacings: [] }).document).toBe(doc);
-    const flat = execute(doc, 'add_grid_system', {
-      xSpacings: [5000],
-      ySpacings: [],
-      extension: 0,
-    });
+    const flat = execute(doc, 'add_grid_system', { xSpacings: [5000], ySpacings: [], extension: 0 });
     expect(flat.document).toBe(doc);
     expect(flat.summary).toMatch(/zero length/);
     expect(execute(doc, 'add_grid_system', { xSpacings: [5000], ySpacings: [], extension: 100 }).affected).not.toEqual([]);
@@ -202,38 +145,20 @@ describe('structural grid', () => {
 
 describe('integration with document-level commands', () => {
   it('clear_document removes the building model', () => {
-    const doc = run(createEmptyDocument(), 'draw_walls', {
-      points: [
-        [0, 0],
-        [1000, 0],
-      ],
-    });
+    const doc = run(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 1000, 0) });
     const cleared = execute(doc, 'clear_document', {});
     expect(cleared.document.building).toBeUndefined();
     expect(doc.building).toBeDefined();
   });
-
   it('building survives a save/load round trip', async () => {
     const { serializeDocument, deserializeDocument } = await import('@core/commands/persistence/serialization');
-    const doc = run(createEmptyDocument(), 'draw_walls', {
-      points: [
-        [0, 0],
-        [3000, 0],
-        [3000, 3000],
-      ],
-    });
+    const doc = run(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 3000, 0, 3000, 3000) });
     const restored = deserializeDocument(serializeDocument(doc));
     expect(restored.building).toEqual(doc.building);
     expect(restored.entities['wall-1:body-0']).toEqual(doc.entities['wall-1:body-0']);
   });
-
   it('undo-style history replay regenerates the same building', () => {
-    let doc = run(createEmptyDocument(), 'draw_walls', {
-      points: [
-        [0, 0],
-        [4000, 0],
-      ],
-    });
+    let doc = run(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 4000, 0) });
     doc = run(doc, 'add_door', { wallId: 'wall-1' });
     const replayed = execute(doc, 'replay_history', {});
     expect(replayed.document.building?.elements['door-1']).toEqual(doc.building?.elements['door-1']);
@@ -242,12 +167,7 @@ describe('integration with document-level commands', () => {
 
 describe('building integrity guard', () => {
   it('rejects generic commands that edit generated building geometry', () => {
-    const doc = run(createEmptyDocument(), 'draw_walls', {
-      points: [
-        [0, 0],
-        [4000, 0],
-      ],
-    });
+    const doc = run(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 4000, 0) });
     for (const [name, params] of [
       ['delete_entities', { ids: ['wall-1:body-0'] }],
       ['move_entities', { ids: ['wall-1:body-0'], delta: [100, 0, 0] }],
@@ -259,14 +179,8 @@ describe('building integrity guard', () => {
       expect(result.summary, name).toMatch(/rejected: it would edit geometry generated by building element\(s\) wall-1/);
     }
   });
-
   it('still allows unrelated edits and building commands', () => {
-    let doc = run(createEmptyDocument(), 'draw_walls', {
-      points: [
-        [0, 0],
-        [4000, 0],
-      ],
-    });
+    let doc = run(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 4000, 0) });
     doc = run(doc, 'add_box', { size: [1, 1, 1] });
     const boxId = doc.order[doc.order.length - 1]!;
     expect(execute(doc, 'move_entities', { ids: [boxId], delta: [1, 0, 0] }).document).not.toBe(doc);

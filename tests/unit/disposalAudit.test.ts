@@ -1,18 +1,3 @@
-/**
- * Disposal regression tests — verifies that geometry and material objects
- * created by the 3D viewport mesh components are properly disposed.
- *
- * Since jsdom cannot run WebGL (no Canvas / THREE.WebGLRenderer), we test the
- * dispose pattern directly by exercising the THREE geometry/material constructors
- * the same way the mesh components do it in useMemo, then calling dispose() the
- * same way the useEffect cleanups do it. Spies on prototype.dispose confirm the
- * call paths that React's useEffect cleanup hooks exercise on unmount.
- *
- * This is a regression net: if a future change moves geometry/material
- * construction out of useMemo and forgets the useEffect cleanup, this test
- * documents the expected contract.
- */
-
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 
@@ -113,7 +98,6 @@ describe('Disposal audit — ExtrudeGeometry', () => {
     shape.lineTo(1, 0);
     shape.lineTo(1, 1);
     shape.closePath();
-
     const result = withDisposeSpy(
       () => new THREE.ExtrudeGeometry(shape, { depth: 2, bevelEnabled: false }),
       () => {
@@ -154,7 +138,6 @@ describe('Disposal audit — SnapIndicator3D geometry', () => {
       geoCalled = true;
       geoOriginal();
     };
-
     const mat = new THREE.MeshBasicMaterial({ color: '#f5c842', wireframe: true });
     let matCalled = false;
     const matOriginal = mat.dispose.bind(mat);
@@ -162,12 +145,10 @@ describe('Disposal audit — SnapIndicator3D geometry', () => {
       matCalled = true;
       matOriginal();
     };
-
     // Simulate: colour changes → material recreated → OLD material dispose called.
     mat.dispose();
     // Geometry must NOT be disposed yet (it has no colour dep).
     expect(geoCalled).toBe(false);
-
     // Simulate: component unmounts → geometry dispose called.
     geo.dispose();
     expect(geoCalled).toBe(true);
@@ -201,7 +182,6 @@ describe('Disposal audit — InstancedRenderer MeshStandardMaterial', () => {
     );
     expect(result.disposeCalled).toBe(true);
   });
-
   it('geometry.dispose() is called when batch unmounts', () => {
     const result = withDisposeSpy(
       () => new THREE.BoxGeometry(10, 20, 30),

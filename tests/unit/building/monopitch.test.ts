@@ -9,6 +9,7 @@ import type { PurlinRow, ZoneSummary } from '@aec/industrial/purlins/purlinModel
 import type { ElevationSheet } from '@aec/building/drawings/elevation';
 import type { IfcExport } from '@aec/building/exchange/ifcBuild';
 import { membersOf } from './elementEdits';
+import { expectNoOp } from '../../helpers/expectNoOp';
 
 const HALL = { span: 24000, length: 30000 };
 const PITCH = (6 * Math.PI) / 180;
@@ -26,30 +27,23 @@ const topOf = (member: SteelMemberElement): number => Math.max(member.start[2], 
 describe('add_portal_frame_building roofType', () => {
   it('keeps duopitch as the default (explicit duopitch gives the identical document)', () => {
     const defaulted = execute(createEmptyDocument(), 'add_portal_frame_building', HALL);
-    const explicit = execute(createEmptyDocument(), 'add_portal_frame_building', {
-      ...HALL,
-      roofType: 'duopitch',
-    });
+    const explicit = execute(createEmptyDocument(), 'add_portal_frame_building', { ...HALL, roofType: 'duopitch' });
     expect(explicit.document.building!.elements).toEqual(defaulted.document.building!.elements);
     expect(explicit.document.building!.elementOrder).toEqual(defaulted.document.building!.elementOrder);
     expect(explicit.summary).toBe(defaulted.summary);
     expect(defaulted.summary).toContain('ridge 8.26 m');
     expect(membersOf(defaulted.document, 'rafter')).toHaveLength(12);
   });
-
   it('rejects an unknown roofType (no-op)', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'add_portal_frame_building', { ...HALL, roofType: 'sawtooth' });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toEqual([]);
-    expect(result.summary).toContain('add_portal_frame_building rejected: invalid params');
+    expectNoOp(
+      execute(doc, 'add_portal_frame_building', { ...HALL, roofType: 'sawtooth' }),
+      doc,
+      'add_portal_frame_building rejected: invalid params',
+    );
   });
-
   it('generates one rafter per frame rising from the low eaves (left) to the high eaves', () => {
-    const result = execute(createEmptyDocument(), 'add_portal_frame_building', {
-      ...HALL,
-      roofType: 'monopitch',
-    });
+    const result = execute(createEmptyDocument(), 'add_portal_frame_building', { ...HALL, roofType: 'monopitch' });
     expect(result.summary).toContain('eaves 7.00 m, high eaves 9.52 m');
     expect(result.summary).toContain('monopitch roof');
     const rafters = membersOf(result.document, 'rafter');
@@ -63,7 +57,6 @@ describe('add_portal_frame_building roofType', () => {
       expect(slope).toBeCloseTo(PITCH, 9);
     }
   });
-
   it('gives the columns different heights: eaves at the left, eaves + rise at the right', () => {
     const doc = hall();
     const frameColumns = membersOf(doc, 'column').filter((column) => column.roll === 0);
@@ -82,7 +75,6 @@ describe('add_portal_frame_building roofType', () => {
       expect(topOf(post)).toBeCloseTo(expected, 6);
     }
   });
-
   it('has two eaves connections per frame and no apex', () => {
     const doc = hall();
     const connections = elementsOf(doc).filter((element): element is MomentConnectionElement => element.category === 'connection');
@@ -91,7 +83,6 @@ describe('add_portal_frame_building roofType', () => {
     expect(connections.filter((connection) => connection.end === 'start')).toHaveLength(6);
     expect(connections.filter((connection) => connection.end === 'end')).toHaveLength(6);
   });
-
   it('places purlins on the single slope and rails up to each side’s own eaves', () => {
     const doc = hall();
     const purlins = membersOf(doc, 'purlin');
@@ -116,7 +107,6 @@ describe('add_portal_frame_building roofType', () => {
     expect(topRight).toBeLessThan(7000 + RISE);
     expect(rails.filter((rail) => rail.start[0] > 24000).length).toBeGreaterThan(rails.filter((rail) => rail.start[0] < 0).length);
   });
-
   it('braces the single roof slope in an X and the walls to their own heights', () => {
     const doc = hall();
     const braces = membersOf(doc, 'brace');
@@ -132,7 +122,6 @@ describe('add_portal_frame_building roofType', () => {
       expect(Math.max(brace.start[0], brace.end[0])).toBe(24000);
     }
   });
-
   it('generates base plates, footings, crane runway and cladding that fit the roof', () => {
     const doc = hall({ crane: { capacity: 10, railHeight: 5000 }, columnBase: 'fixed' });
     const elements = elementsOf(doc);
@@ -149,7 +138,6 @@ describe('add_portal_frame_building roofType', () => {
     expect(slope).toBeCloseTo(PITCH, 9);
     expect(elements.filter((element) => element.category === 'panel')).toHaveLength(5);
   });
-
   it('supports several spans: the slope continues across the internal column line', () => {
     const doc = hall({ spans: [12000, 12000] });
     const columns = membersOf(doc, 'column').filter((column) => column.roll === 0);
@@ -181,7 +169,6 @@ describe('monopitch frames and wind', () => {
     const rechecked = execute(designed.document, 'check_portal_frames', { windPressure: 0.7 });
     expect((rechecked.data as { failures: string[] }).failures).toEqual([]);
   });
-
   it('lifts the roof more with wind on the high eaves (zone H −0.81 vs −0.57 at 6°); duopitch is symmetric', () => {
     const uplift = (doc: CadDocument, key: 'WL' | 'WR' | 'WLs' | 'WRs'): number => {
       const building = doc.building!;
@@ -201,14 +188,9 @@ describe('monopitch frames and wind', () => {
 
 describe('check_purlins on a monopitch roof (EN 1991-1-4 Tab. 7.3a)', () => {
   const data = (doc: CadDocument): { rows: PurlinRow[]; zones: ZoneSummary[]; roofType: string } =>
-    execute(doc, 'check_purlins', { windPressure: 0.7 }).data as {
-      rows: PurlinRow[];
-      zones: ZoneSummary[];
-      roofType: string;
-    };
+    execute(doc, 'check_purlins', { windPressure: 0.7 }).data as { rows: PurlinRow[]; zones: ZoneSummary[]; roofType: string };
   const roofZones = (zones: ZoneSummary[]): Array<[string, number]> =>
     zones.filter((zone) => zone.surface === 'roof').map((zone) => [zone.zone, zone.cpe]);
-
   it('uses the monopitch coefficients per wind direction and zone', () => {
     const result = data(hall());
     expect(result.roofType).toBe('monopitch');
@@ -226,7 +208,6 @@ describe('check_purlins on a monopitch roof (EN 1991-1-4 Tab. 7.3a)', () => {
     // Duopitch values are not used on a monopitch roof.
     expect(zones.some(([zone]) => zone === 'H/I' || zone === 'J')).toBe(false);
   });
-
   it('puts the strongest uplift on the purlins at the high eaves', () => {
     const result = data(hall());
     const doc = hall();
@@ -243,7 +224,6 @@ describe('check_purlins on a monopitch roof (EN 1991-1-4 Tab. 7.3a)', () => {
     const cornerHigh = result.rows.filter((row) => row.check.includes('cpe -2.32')).every((row) => row.zone === 'F');
     expect(cornerHigh).toBe(true);
   });
-
   it('keeps the duopitch zones on a duopitch roof', () => {
     const result = data(hall({ roofType: 'duopitch' }));
     expect(result.roofType).toBe('duopitch');
@@ -265,11 +245,7 @@ describe('monopitch hall in the drawing, IFC and quantity exports', () => {
     for (const entity of ['IFCCOLUMN(', 'IFCBEAM(', 'IFCMEMBER(', 'IFCPLATE(', 'IFCFOOTING(']) {
       expect(ifc, entity).toContain(entity);
     }
-    const lines = (
-      execute(doc, 'quantity_takeoff', {}).data as {
-        lines: Array<{ key: string; quantity: number }>;
-      }
-    ).lines;
+    const lines = (execute(doc, 'quantity_takeoff', {}).data as { lines: Array<{ key: string; quantity: number }> }).lines;
     const quantity = (key: string): number => lines.find((line) => line.key === key)!.quantity;
     // One roof plane: (span + overhang) / cos(pitch) × (length + 2 × 200).
     const expectedRoof = ((24000 + 2 * 450) / Math.cos(PITCH) / 1000) * (HALL.length / 1000 + 0.4);
@@ -279,7 +255,6 @@ describe('monopitch hall in the drawing, IFC and quantity exports', () => {
     expect(lines.some((line) => line.key === 'connection.eaves.ea' && line.quantity === 12)).toBe(true);
     expect(lines.some((line) => line.key.startsWith('connection.apex'))).toBe(false);
   });
-
   it('checks bracing, foundations and the crane runway of a monopitch hall', () => {
     const doc = hall({ crane: { capacity: 10, railHeight: 5000 } });
     expect(execute(doc, 'check_bracing', { windPressure: 0.7 }).summary).toContain('all OK');

@@ -29,7 +29,6 @@ describe('allSegmentIntersections', () => {
     expect(points[0]?.[0]).toBeCloseTo(5);
     expect(points[0]?.[1]).toBeCloseTo(5);
   });
-
   it('matches brute force on a pseudo-random scene (including touching endpoints)', () => {
     let seed = 7;
     const random = (): number => {
@@ -44,7 +43,6 @@ describe('allSegmentIntersections', () => {
     const expected = bruteForce(segments).map(key).sort();
     expect(allSegmentIntersections(segments).map(key).sort()).toEqual(expected);
   });
-
   it('handles an empty or single-segment input', () => {
     expect(allSegmentIntersections([])).toEqual([]);
     expect(allSegmentIntersections([[0, 0, 1, 1]])).toEqual([]);

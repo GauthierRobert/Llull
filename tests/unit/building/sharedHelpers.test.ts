@@ -22,7 +22,6 @@ describe('utilisation reductions', () => {
     expect(maxUtilisation([{ utilisation: 0.4 }, { utilisation: 1.2 }, { utilisation: 0.9 }])).toBe(1.2);
     expect(maxUtilisation([])).toBe(0);
   });
-
   it('failingRows keeps only utilisation above 1', () => {
     const rows = [{ utilisation: 1 }, { utilisation: 1.01 }, { utilisation: 0.2 }];
     expect(failingRows(rows)).toEqual([{ utilisation: 1.01 }]);
@@ -40,7 +39,6 @@ describe('horneAlphaCritical', () => {
     ]);
     expect(result).toEqual({ alpha: 1.5, id: 'b' });
   });
-
   it('is Infinity with no id when nothing sways under compression', () => {
     expect(horneAlphaCritical([])).toEqual({ alpha: Infinity, id: null });
   });
@@ -83,13 +81,11 @@ describe('civil helpers', () => {
     expect(batterLevel(10, 4, 'cut', 2, 3)).toBe(12);
     expect(batterLevel(10, 6, 'fill', 2, 3)).toBe(8);
   });
-
   it('entityPlanPoint rotates about Z then translates', () => {
     const point = entityPlanPoint({ position: [10, 20, 0], rotation: [0, 0, Math.PI / 2] }, [1, 0]);
     expect(point[0]).toBeCloseTo(10, 12);
     expect(point[1]).toBeCloseTo(21, 12);
   });
-
   it('stationText formats a document-unit station', () => {
     expect(stationText({ units: 'mm' }, 1_234_500)).toBe('1+234.50');
   });
@@ -106,12 +102,10 @@ describe('second-pass shared helpers', () => {
     expect(planAreaM2(createEmptyDocument(), square)).toBeCloseTo(6);
     expect(planAreaM2(createEmptyDocument(), [])).toBe(0);
   });
-
   it('svgText escapes content and rotates only when asked', () => {
     expect(svgText(1, 2, 3, 'middle', 'a<b')).toBe('<text x="1" y="2" font-size="3" text-anchor="middle">a&lt;b</text>');
     expect(svgText(1, 2, 3, 'start', 'x', 90)).toContain('transform="rotate(90 1 2)"');
   });
-
   it('shear and deflection check lines carry utilisation and detail', () => {
     const shear = shearCheckLine('B1', 'ULS 1', 0.5, 50, 100);
     expect(shear).toMatchObject({ name: 'shear (§6.2.6)', utilisation: 0.5, combination: 'ULS 1' });
@@ -129,13 +123,11 @@ describe('final-pass shared helpers', () => {
     expect(briefList([1, 2, 3], label, 2, ' | ')).toBe('#1 | #2 | …');
     expect(briefList([], label)).toBe('');
   });
-
   it('craneValueProblem reports the first non-positive, then the first negative value', () => {
     expect(craneValueProblem({ craneCapacity: 10, hoistingSpeed: 0 })).toBeUndefined();
     expect(craneValueProblem({ craneCapacity: 0, hoistingSpeed: -1 })).toBe('craneCapacity must be a number > 0');
     expect(craneValueProblem({ craneCapacity: 10, minHookApproach: -1 })).toBe('minHookApproach must be a number >= 0');
   });
-
   it('levelOrFailure resolves an existing level and fails on an unknown one', () => {
     const doc = run(createEmptyDocument(), 'add_level', { name: 'L1', elevation: 0 });
     const levelId = getBuilding(doc).levelOrder[0] as string;

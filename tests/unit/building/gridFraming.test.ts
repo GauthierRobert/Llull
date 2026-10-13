@@ -52,7 +52,6 @@ describe('add_grid_columns', () => {
     expect(result.affected).toEqual(expect.arrayContaining(data(result).elementIds));
     expect(result.document.building?.elementOrder).toEqual(expect.arrayContaining(data(result).elementIds));
   });
-
   it('runs continuously to topLevelId and applies roll, fixity, material', () => {
     const result = execute(gridded(), 'add_grid_columns', {
       profile: 'HEB300',
@@ -66,7 +65,6 @@ describe('add_grid_columns', () => {
     expect(first.end[2]).toBe(3000);
     expect(first).toMatchObject({ roll: Math.PI / 2, baseFixity: 'fixed', material: 'S235' });
   });
-
   it('honours axes and exclude (either order)', () => {
     const result = execute(gridded(), 'add_grid_columns', {
       profile: 'HEB300',
@@ -78,70 +76,38 @@ describe('add_grid_columns', () => {
     const xy = members(result.document).map((c) => [c.start[0], c.start[1]]);
     expect(xy).not.toContainEqual([0, 6000]);
     expect(xy).not.toContainEqual([10000, 0]);
-    const inverse = execute(gridded(), 'add_grid_columns', {
-      profile: 'HEB300',
-      levelId: 'level-1',
-      exclude: ['A/1', '2/B'],
-    });
+    const inverse = execute(gridded(), 'add_grid_columns', { profile: 'HEB300', levelId: 'level-1', exclude: ['A/1', '2/B'] });
     expect(data(inverse).elementIds).toHaveLength(4);
   });
-
   it('skips intersections that already hold a column and no-ops when all do', () => {
-    const first = execute(gridded(), 'add_grid_columns', {
-      profile: 'HEB300',
-      levelId: 'level-1',
-      axes: ['A', '1', '2'],
-    });
+    const first = execute(gridded(), 'add_grid_columns', { profile: 'HEB300', levelId: 'level-1', axes: ['A', '1', '2'] });
     expect(data(first).elementIds).toHaveLength(2);
-    const second = execute(first.document, 'add_grid_columns', {
-      profile: 'HEB300',
-      levelId: 'level-1',
-    });
+    const second = execute(first.document, 'add_grid_columns', { profile: 'HEB300', levelId: 'level-1' });
     expect(data(second)).toMatchObject({ skipped: 2 });
     expect(data(second).elementIds).toHaveLength(4);
     expect(second.summary).toMatch(/skipped 2 existing/);
     expect(rejects(second.document, 'add_grid_columns', { profile: 'HEB300', levelId: 'level-1' })).toMatch(/already hold a column/);
   });
-
   it('skips crossings covered by a continuous column from a lower level', () => {
     const doc = step(gridded(), 'add_level', { name: 'Roof', elevation: 6000, height: 3000 });
-    const tall = execute(doc, 'add_grid_columns', {
-      profile: 'HEB300',
-      levelId: 'level-1',
-      topLevelId: 'level-3',
-    });
+    const tall = execute(doc, 'add_grid_columns', { profile: 'HEB300', levelId: 'level-1', topLevelId: 'level-3' });
     expect(data(tall).elementIds).toHaveLength(6);
     expect(rejects(tall.document, 'add_grid_columns', { profile: 'HEB300', levelId: 'level-2' })).toMatch(
       /all 6 intersection\(s\) already hold a column/,
     );
-    const top = execute(tall.document, 'add_grid_columns', {
-      profile: 'HEB300',
-      levelId: 'level-3',
-    });
+    const top = execute(tall.document, 'add_grid_columns', { profile: 'HEB300', levelId: 'level-3' });
     expect(data(top).elementIds).toHaveLength(6);
   });
-
   it('reports all-excluded intersections distinctly', () => {
-    expect(
-      rejects(gridded(), 'add_grid_columns', {
-        profile: 'HEB300',
-        levelId: 'level-1',
-        axes: ['A', '1'],
-        exclude: ['A/1'],
-      }),
-    ).toMatch(/all 1 intersection\(s\) excluded/);
+    expect(rejects(gridded(), 'add_grid_columns', { profile: 'HEB300', levelId: 'level-1', axes: ['A', '1'], exclude: ['A/1'] })).toMatch(
+      /all 1 intersection\(s\) excluded/,
+    );
   });
-
   it('formats lengths per unit in summaries', () => {
     const metres = { ...gridded(), units: 'm' as const };
-    const result = execute(metres, 'add_grid_columns', {
-      profile: 'HEB300',
-      levelId: 'level-1',
-      axes: ['A', '1'],
-    });
+    const result = execute(metres, 'add_grid_columns', { profile: 'HEB300', levelId: 'level-1', axes: ['A', '1'] });
     expect(result.summary).toMatch(/3000 m high/);
   });
-
   it('works on non-orthogonal grid lines', () => {
     let doc = twoLevels();
     doc = step(doc, 'add_grid_line', { start: [0, 0], end: [10000, 10000], label: 'D' });
@@ -151,7 +117,6 @@ describe('add_grid_columns', () => {
     expect(column.start[0]).toBeCloseTo(5000);
     expect(column.start[1]).toBeCloseTo(5000);
   });
-
   it('rejects bad input without changing the document', () => {
     const doc = gridded();
     const call = (extra: Record<string, unknown>): string =>
@@ -177,12 +142,7 @@ describe('add_grid_beams', () => {
   it('frames one beam per bay with axis z = topOffset - depth / 2', () => {
     const doc = gridded();
     const before = structuredClone(doc);
-    const result = execute(doc, 'add_grid_beams', {
-      profile: 'IPE400',
-      levelId: 'level-2',
-      topOffset: -30,
-      startJoint: 'rigid',
-    });
+    const result = execute(doc, 'add_grid_beams', { profile: 'IPE400', levelId: 'level-2', topOffset: -30, startJoint: 'rigid' });
     expect(doc).toEqual(before);
     // 2 lines with 3 crossings -> 2 bays each; 3 lines with 2 crossings -> 1 bay each.
     expect(data(result).elementIds).toHaveLength(7);
@@ -195,35 +155,21 @@ describe('add_grid_beams', () => {
     ]);
     expect(result.summary).toMatch(/Added 7 beams IPE400 .*total length 38000 mm.*skipped 0/);
   });
-
   it('filters axes and skips bays that already hold a beam (either direction)', () => {
     const first = execute(gridded(), 'add_grid_beams', { profile: 'IPE300', axes: ['A'] });
     expect(data(first).elementIds).toHaveLength(2);
-    const second = execute(first.document, 'add_grid_beams', {
-      profile: 'IPE300',
-      axes: ['A', 'B'],
-    });
+    const second = execute(first.document, 'add_grid_beams', { profile: 'IPE300', axes: ['A', 'B'] });
     expect(data(second)).toMatchObject({ skipped: 2 });
     expect(data(second).elementIds).toHaveLength(2);
-    const reversed = step(gridded(), 'add_steel_member', {
-      role: 'beam',
-      profile: 'IPE300',
-      start: [5000, 0, -150],
-      end: [0, 0, -150],
-    });
+    const reversed = step(gridded(), 'add_steel_member', { role: 'beam', profile: 'IPE300', start: [5000, 0, -150], end: [0, 0, -150] });
     const third = execute(reversed, 'add_grid_beams', { profile: 'IPE300', axes: ['A'] });
     expect(data(third)).toMatchObject({ skipped: 1 });
     // Another section with the same top of steel is the same beam; a lower tier is not.
     const resized = execute(first.document, 'add_grid_beams', { profile: 'IPE500', axes: ['A'] });
     expect(resized.summary).toMatch(/all 2 bay\(s\) already hold a beam/);
-    const lowerTier = execute(first.document, 'add_grid_beams', {
-      profile: 'IPE300',
-      axes: ['A'],
-      topOffset: -1000,
-    });
+    const lowerTier = execute(first.document, 'add_grid_beams', { profile: 'IPE300', axes: ['A'], topOffset: -1000 });
     expect(data(lowerTier)).toMatchObject({ skipped: 0 });
   });
-
   it('rejects bad input without changing the document', () => {
     const doc = gridded();
     expect(rejects(doc, 'add_grid_beams', { profile: 'NOPE' })).toMatch(/unknown steel profile/);
@@ -243,13 +189,7 @@ describe('add_grid_bracing', () => {
   it('adds an X pair rising one storey between the bay nodes', () => {
     const doc = gridded();
     const before = structuredClone(doc);
-    const result = execute(doc, 'add_grid_bracing', {
-      profile: 'CHS76.1x3.6',
-      axis: 'A',
-      from: '1',
-      to: '2',
-      levelId: 'level-1',
-    });
+    const result = execute(doc, 'add_grid_bracing', { profile: 'CHS76.1x3.6', axis: 'A', from: '1', to: '2', levelId: 'level-1' });
     expect(doc).toEqual(before);
     expect(data(result).elementIds).toHaveLength(2);
     const braces = members(result.document);
@@ -266,30 +206,17 @@ describe('add_grid_bracing', () => {
     ]);
     expect(result.summary).toMatch(/Added 2 X brace\(s\) BR1, BR2 .* in grid A between 1 and 2/);
   });
-
   it('skips braces that already exist (either direction), individually for x', () => {
-    const params = {
-      profile: 'CHS76.1x3.6',
-      axis: 'A',
-      from: '1',
-      to: '2',
-      levelId: 'level-1',
-    };
+    const params = { profile: 'CHS76.1x3.6', axis: 'A', from: '1', to: '2', levelId: 'level-1' };
     const diagonal = execute(gridded(), 'add_grid_bracing', { ...params, pattern: 'diagonal' });
     const both = execute(diagonal.document, 'add_grid_bracing', params);
     expect(data(both).elementIds).toHaveLength(1);
     expect(both.summary).toMatch(/skipped 1 existing/);
     expect(members(both.document)).toHaveLength(2);
-    const reversed = execute(diagonal.document, 'add_grid_bracing', {
-      ...params,
-      from: '2',
-      to: '1',
-      pattern: 'diagonal',
-    });
+    const reversed = execute(diagonal.document, 'add_grid_bracing', { ...params, from: '2', to: '1', pattern: 'diagonal' });
     expect(data(reversed).elementIds).toHaveLength(1);
     expect(rejects(both.document, 'add_grid_bracing', params)).toMatch(/2 brace\(s\) with the same end points already exist/);
   });
-
   it('adds one diagonal from bottom at from to top at to with offsets', () => {
     const result = execute(gridded(), 'add_grid_bracing', {
       profile: 'CHS76.1x3.6',
@@ -307,18 +234,10 @@ describe('add_grid_bracing', () => {
     expect(brace?.end).toEqual([5000, 0, 2750]);
     expect(result.summary).toMatch(/diagonal/);
   });
-
   it('rejects bad input without changing the document', () => {
     const doc = gridded();
     const call = (extra: Record<string, unknown>): string =>
-      rejects(doc, 'add_grid_bracing', {
-        profile: 'CHS76.1x3.6',
-        axis: 'A',
-        from: '1',
-        to: '2',
-        levelId: 'level-1',
-        ...extra,
-      });
+      rejects(doc, 'add_grid_bracing', { profile: 'CHS76.1x3.6', axis: 'A', from: '1', to: '2', levelId: 'level-1', ...extra });
     expect(call({ profile: 'NOPE' })).toMatch(/unknown steel profile/);
     expect(call({ levelId: 'x' })).toMatch(/unknown level/);
     expect(call({ to: 'Q' })).toMatch(/unknown grid label.*Q/);
@@ -326,14 +245,9 @@ describe('add_grid_bracing', () => {
     expect(call({ to: 'B' })).toMatch(/must both cross axis/);
     expect(call({ to: 'A' })).toMatch(/must both cross axis/);
     expect(call({ topOffset: -3000 })).toMatch(/zero or negative/);
-    expect(
-      rejects(twoLevels(), 'add_grid_bracing', {
-        profile: 'CHS76.1x3.6',
-        axis: 'A',
-        from: '1',
-        to: '2',
-      }),
-    ).toMatch(/at least 2 grid lines/);
+    expect(rejects(twoLevels(), 'add_grid_bracing', { profile: 'CHS76.1x3.6', axis: 'A', from: '1', to: '2' })).toMatch(
+      /at least 2 grid lines/,
+    );
   });
 });
 
@@ -346,7 +260,6 @@ describe('grid framing geometry', () => {
     start,
     end,
   });
-
   it('requires crossings inside both segments within tolerance', () => {
     const a = line('A', [0, 0], [10, 0]);
     expect(crossGridLines(a, line('1', [10.0005, -5], [10.0005, 5]), 0.001)?.along).toBeCloseTo(10);
@@ -355,7 +268,6 @@ describe('grid framing geometry', () => {
     expect(crossGridLines(a, line('4', [0, 1], [10, 1]), 0.001)).toBeNull();
     expect(crossGridLines(a, line('5', [3, 3], [3, 3]), 0.001)).toBeNull();
   });
-
   it('merges coincident crossings and parses names', () => {
     const a = line('A', [0, 0], [10, 0]);
     const crossings = crossingsOnLine(a, [a, line('1', [5, -1], [5, 1]), line('2', [5, -2], [5, 2]), line('3', [8, -1], [8, 1])], 0.001);

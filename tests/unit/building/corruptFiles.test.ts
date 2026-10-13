@@ -3,6 +3,7 @@ import { execute } from '@core/commands/registry';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { applySteps } from './applySteps';
+import { xyz } from '../../helpers/xy';
 
 type Json = Record<string, unknown>;
 
@@ -19,28 +20,9 @@ function industrialModel(): CadDocument {
   }).document;
   const steps: Array<[string, Json]> = [
     ['add_equipment', { name: 'Pump', mark: 'P-1', location: [3000, 3000], size: [1500, 800, 900] }],
-    [
-      'add_pipe_run',
-      {
-        points: [
-          [1000, 3000, 1500],
-          [9000, 3000, 1500],
-        ],
-        dn: 100,
-        line: 'L-1',
-        from: 'P-1',
-      },
-    ],
+    ['add_pipe_run', { points: xyz(1000, 3000, 1500, 9000, 3000, 1500), dn: 100, line: 'L-1', from: 'P-1' }],
     ['add_pipe_support', { pipeId: 'pipe-1', spacing: 4000 }],
-    [
-      'add_cable_tray',
-      {
-        points: [
-          [1000, 5000, 3000],
-          [9000, 5000, 3000],
-        ],
-      },
-    ],
+    ['add_cable_tray', { points: xyz(1000, 5000, 3000, 9000, 5000, 3000) }],
     ['add_curved_wall', { start: [14000, 0], through: [15000, 1000], end: [16000, 0] }],
   ];
   return applySteps(hall, steps);
@@ -103,7 +85,6 @@ function fuzzBuilding(file: { version: number; document: Json }, label: string, 
 
 describe('corrupt industrial building data never crashes load', () => {
   const doc = industrialModel();
-
   it('covers every industrial category in the model', () => {
     const categories = new Set(Object.values(doc.building?.elements ?? {}).map((e) => e.category));
     for (const category of [
@@ -121,18 +102,13 @@ describe('corrupt industrial building data never crashes load', () => {
       expect(categories.has(category as never), category).toBe(true);
     }
   });
-
   it('v2 file: single-field corruption (3 levels deep) of one element per category', () => {
     const file = JSON.parse(serializeDocument(doc)) as { version: number; document: Json };
     expect(file.version).toBe(2);
     expect(fuzzBuilding(file, 'v2', 3).slice(0, 10)).toEqual([]);
   });
-
   it('v1 file (derived entities stored, no step counter): field-level corruption sweep', () => {
-    const full = JSON.parse(serializeDocument(doc, { includeDerived: true })) as {
-      version: number;
-      document: Json;
-    };
+    const full = JSON.parse(serializeDocument(doc, { includeDerived: true })) as { version: number; document: Json };
     const legacy = { ...full, version: 1, document: { ...full.document } };
     delete legacy.document['nextStepNumber'];
     expect(rawCrash(JSON.stringify(legacy))).toBeNull();

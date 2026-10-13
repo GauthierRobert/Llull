@@ -88,14 +88,7 @@ interface IntentStair {
 }
 
 export interface PlantIntent {
-  project: {
-    name: string;
-    client: string;
-    author: string;
-    drawingNumber: string;
-    revision: string;
-    date: string;
-  };
+  project: { name: string; client: string; author: string; drawingNumber: string; revision: string; date: string };
   levels: IntentLevel[];
   grid: { xSpacings: number[]; ySpacings: number[] };
   members: IntentMember[];

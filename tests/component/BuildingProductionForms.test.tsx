@@ -1,9 +1,3 @@
-/**
- * Component tests for the Building panel forms an engineering office needs end to end:
- * project info on an empty document, slab material, equipment tag / level / editor, pipe line
- * list data, level-explicit placement and the export level picker (param-gathering → dispatch).
- */
-
 import { resetStore } from '../helpers/componentEntities';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
@@ -12,6 +6,7 @@ import { BuildingPanel } from '@ui/panels/building/BuildingPanel';
 import { downloadText } from '@ui/download';
 import { localDispatch, spyDispatch } from '../helpers/storeTestHelpers';
 import { pickTool, setField } from '../helpers/buildingForm';
+import { xy, xyz } from '../helpers/xy';
 
 vi.mock('@ui/download', () => ({ downloadText: vi.fn(), downloadBlob: vi.fn() }));
 
@@ -27,10 +22,7 @@ describe('project information on an empty document', () => {
     fireEvent.change(screen.getByTestId('project-name'), { target: { value: 'Pipe rack PR-1' } });
     fireEvent.change(screen.getByTestId('project-revision'), { target: { value: 'A' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save project info' }));
-    expect(dispatch).toHaveBeenCalledWith('set_project_info', {
-      name: 'Pipe rack PR-1',
-      revision: 'A',
-    });
+    expect(dispatch).toHaveBeenCalledWith('set_project_info', { name: 'Pipe rack PR-1', revision: 'A' });
   });
 });
 
@@ -39,7 +31,6 @@ describe('level-explicit placement', () => {
     localDispatch('add_level', { name: 'Ground' });
     localDispatch('add_level', { name: 'Upper', makeActive: false });
   });
-
   it('slab form carries a material and the chosen level', () => {
     const dispatch = spyDispatch();
     render(<BuildingPanel />);
@@ -49,12 +40,7 @@ describe('level-explicit placement', () => {
     setField('levelId', 'level-2');
     fireEvent.click(screen.getByTestId('tool-submit'));
     expect(dispatch).toHaveBeenLastCalledWith('add_slab', {
-      boundary: [
-        [0, 0],
-        [5000, 0],
-        [5000, 4000],
-        [0, 4000],
-      ],
+      boundary: xy(0, 0, 5000, 0, 5000, 4000, 0, 4000),
       thickness: 200,
       offset: 0,
       role: 'floor',
@@ -62,7 +48,6 @@ describe('level-explicit placement', () => {
       levelId: 'level-2',
     });
   });
-
   it('a blank level selector means the active level and a blank material is left out', () => {
     const dispatch = spyDispatch();
     render(<BuildingPanel />);
@@ -74,7 +59,6 @@ describe('level-explicit placement', () => {
     expect(params).not.toHaveProperty('material');
     expect(params['levelId']).toBe('level-1');
   });
-
   it('equipment form carries the tag and the level', () => {
     const dispatch = spyDispatch();
     render(<BuildingPanel />);
@@ -95,7 +79,6 @@ describe('level-explicit placement', () => {
       levelId: 'level-2',
     });
   });
-
   it.each([
     ['member', 'add_steel_member'],
     ['stair', 'add_stair'],
@@ -109,7 +92,6 @@ describe('level-explicit placement', () => {
     fireEvent.click(screen.getByTestId('tool-submit'));
     expect(dispatch).toHaveBeenLastCalledWith(command, expect.objectContaining({ levelId: 'level-2' }));
   });
-
   it('slab opening offers the stairs of every level', () => {
     localDispatch('add_stair', { levelId: 'level-2', start: [0, 0], angle: 0 });
     render(<BuildingPanel />);
@@ -132,10 +114,7 @@ describe('pipe run line list data', () => {
     setField('points', '0,0,500; 6000,0,500');
     fireEvent.click(screen.getByTestId('tool-submit'));
     expect(dispatch).toHaveBeenLastCalledWith('add_pipe_run', {
-      points: [
-        [0, 0, 500],
-        [6000, 0, 500],
-      ],
+      points: xyz(0, 0, 500, 6000, 0, 500),
       line: 'L-101',
       dn: 200,
       from: 'BL1-L-101',
@@ -144,7 +123,6 @@ describe('pipe run line list data', () => {
       levelId: 'level-1',
     });
   });
-
   it('an explicit outside diameter overrides the DN; neither is refused', () => {
     const dispatch = spyDispatch();
     render(<BuildingPanel />);
@@ -172,7 +150,6 @@ describe('equipment editor', () => {
       clearance: 800,
     });
   });
-
   it('lists the equipment of every level and edits only what changed', () => {
     const dispatch = spyDispatch();
     render(<BuildingPanel />);
@@ -181,32 +158,19 @@ describe('equipment editor', () => {
     expect(useStore.getState().document.selection).toEqual(['equipment-1:body']);
     const editor = screen.getByTestId('equipment-editor');
     expect(within(editor).getByTestId('equipment-edit-weight')).toHaveValue(62000);
-    fireEvent.change(within(editor).getByTestId('equipment-edit-length'), {
-      target: { value: '18000' },
-    });
-    fireEvent.change(within(editor).getByTestId('equipment-edit-weight'), {
-      target: { value: '72000' },
-    });
+    fireEvent.change(within(editor).getByTestId('equipment-edit-length'), { target: { value: '18000' } });
+    fireEvent.change(within(editor).getByTestId('equipment-edit-weight'), { target: { value: '72000' } });
     fireEvent.click(screen.getByTestId('equipment-save'));
-    expect(dispatch).toHaveBeenCalledWith('update_equipment', {
-      elementId: 'equipment-1',
-      size: [18000, 4000, 9000],
-      weight: 72000,
-    });
-    fireEvent.change(within(editor).getByTestId('equipment-edit-shape'), {
-      target: { value: 'vertical_vessel' },
-    });
+    expect(dispatch).toHaveBeenCalledWith('update_equipment', { elementId: 'equipment-1', size: [18000, 4000, 9000], weight: 72000 });
+    fireEvent.change(within(editor).getByTestId('equipment-edit-shape'), { target: { value: 'vertical_vessel' } });
     fireEvent.click(screen.getByTestId('equipment-save'));
     expect(dispatch).toHaveBeenLastCalledWith(
       'update_equipment',
       expect.objectContaining({ elementId: 'equipment-1', shape: 'vertical_vessel' }),
     );
     fireEvent.click(within(editor).getByTestId('equipment-cut-openings'));
-    expect(dispatch).toHaveBeenLastCalledWith('add_equipment_openings', {
-      equipmentId: 'equipment-1',
-    });
+    expect(dispatch).toHaveBeenLastCalledWith('add_equipment_openings', { equipmentId: 'equipment-1' });
   });
-
   it('retags, renames, moves and rotates; refuses an empty edit and bad numbers', () => {
     const dispatch = spyDispatch();
     render(<BuildingPanel />);
@@ -218,14 +182,10 @@ describe('equipment editor', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Check: x');
     fireEvent.change(screen.getByTestId('equipment-edit-x'), { target: { value: '7000' } });
     fireEvent.change(screen.getByTestId('equipment-edit-mark'), { target: { value: 'E-310' } });
-    fireEvent.change(screen.getByTestId('equipment-edit-name'), {
-      target: { value: 'Extractor 2' },
-    });
+    fireEvent.change(screen.getByTestId('equipment-edit-name'), { target: { value: 'Extractor 2' } });
     fireEvent.change(screen.getByTestId('equipment-edit-angle'), { target: { value: '90' } });
     fireEvent.change(screen.getByTestId('equipment-edit-clearance'), { target: { value: '600' } });
-    fireEvent.change(screen.getByTestId('equipment-edit-levelId'), {
-      target: { value: 'level-2' },
-    });
+    fireEvent.change(screen.getByTestId('equipment-edit-levelId'), { target: { value: 'level-2' } });
     fireEvent.click(screen.getByTestId('equipment-save'));
     expect(dispatch).toHaveBeenCalledWith('update_equipment', {
       elementId: 'equipment-1',
@@ -237,7 +197,6 @@ describe('equipment editor', () => {
       levelId: 'level-2',
     });
   });
-
   it('keeps the element id and tag across the update through the real command', () => {
     useStore.setState({
       dispatch: ((name: string, params: unknown) => localDispatch(name, params)) as ReturnType<typeof useStore.getState>['dispatch'],
@@ -255,13 +214,7 @@ describe('export level picker', () => {
   it('prints the chosen level without changing the active one', () => {
     localDispatch('add_level', { name: 'Ground' });
     localDispatch('add_level', { name: 'Upper', makeActive: false });
-    localDispatch('draw_walls', {
-      points: [
-        [0, 0],
-        [4000, 0],
-      ],
-      levelId: 'level-2',
-    });
+    localDispatch('draw_walls', { points: xy(0, 0, 4000, 0), levelId: 'level-2' });
     render(<BuildingPanel />);
     fireEvent.change(screen.getByLabelText('Export level'), { target: { value: 'level-2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Plan sheet' }));
@@ -273,7 +226,6 @@ describe('export level picker', () => {
     ]);
     expect(useStore.getState().document.building?.activeLevelId).toBe('level-1');
   });
-
   it('defaults to the active level', () => {
     localDispatch('add_level', { name: 'Ground' });
     localDispatch('add_level', { name: 'Upper', makeActive: false });
@@ -288,19 +240,9 @@ describe('steel members check', () => {
   it('runs the model-derived structural check and lists the worst members', () => {
     localDispatch('add_level', { name: 'Ground', height: 8000 });
     for (const x of [0, 6000]) {
-      localDispatch('add_steel_member', {
-        role: 'column',
-        profile: 'HEB240',
-        start: [x, 0, 0],
-        end: [x, 0, 5000],
-      });
+      localDispatch('add_steel_member', { role: 'column', profile: 'HEB240', start: [x, 0, 0], end: [x, 0, 5000] });
     }
-    localDispatch('add_steel_member', {
-      role: 'beam',
-      profile: 'IPE300',
-      start: [0, 0, 4850],
-      end: [6000, 0, 4850],
-    });
+    localDispatch('add_steel_member', { role: 'beam', profile: 'IPE300', start: [0, 0, 4850], end: [6000, 0, 4850] });
     render(<BuildingPanel />);
     fireEvent.click(screen.getByTestId('steel-members-check'));
     expect(screen.getByTestId('frame-check-summary')).toHaveTextContent(/member/i);

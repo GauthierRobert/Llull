@@ -35,7 +35,6 @@ describe('duopitch Tab. 7.4a (θ = 0°) interpolated on the pitch', () => {
     expect(cpe('duopitch', 30, 0, 'H', 'pressure')).toBe(0.4);
     expect(cpe('duopitch', 45, 0, 'J')).toBe(-0.3);
   });
-
   it('interpolates linearly at 6, 10, 22.5 and 40°', () => {
     expect(cpe('duopitch', 6, 0, 'F')).toBeCloseTo(-1.62, 9);
     expect(cpe('duopitch', 6, 0, 'F', 'pressure')).toBeCloseTo(0.02, 9);
@@ -51,14 +50,12 @@ describe('duopitch Tab. 7.4a (θ = 0°) interpolated on the pitch', () => {
     expect(cpe('duopitch', 40, 0, 'H', 'pressure')).toBeCloseTo(0.4 + (2 / 3) * 0.2, 9);
     expect(cpe('duopitch', 40, 0, 'J')).toBeCloseTo(-0.5 + (2 / 3) * 0.2, 9);
   });
-
   it('uses the -5° row for negative pitches and clamps outside the table', () => {
     expect(cpe('duopitch', -5, 0, 'F')).toBe(-2.3);
     expect(cpe('duopitch', -20, 0, 'F')).toBe(-2.3);
     expect(cpe('duopitch', -2.5, 0, 'F')).toBeCloseTo(-2.15, 9);
     expect(cpe('duopitch', 60, 0, 'F', 'pressure')).toBe(0.7);
   });
-
   it('uses Tab. 7.4b for wind along the ridge, held at the 5° values below 5°', () => {
     expect(cpe('duopitch', 10, 90, 'F')).toBeCloseTo(-1.45, 9);
     expect(cpe('duopitch', 10, 90, 'G')).toBeCloseTo(-1.3, 9);
@@ -84,7 +81,6 @@ describe('flat roofs (§7.2.3 Tab. 7.2, sharp eaves)', () => {
     expect(roofCoefficients('flat', 30, 90)).toEqual(roofCoefficients('flat', 0, 0));
     expect(roofCoefficients('monopitch', 0, 180)).toEqual(roofCoefficients('flat', 0, 0));
   });
-
   it('averages the flat roof as H windward and I leeward', () => {
     expect(frameRoofAverage('flat', 0, 0, 'suction', 'windward')).toBe(-0.7);
     expect(frameRoofAverage('flat', 0, 0, 'suction', 'leeward')).toBe(-0.2);
@@ -98,7 +94,6 @@ describe('monopitch Tab. 7.3a', () => {
     expect(['F', 'G', 'H'].map((zone) => cpe('monopitch', 5, 180, zone as RoofZone))).toEqual([-2.3, -1.3, -0.8]);
     expect(['Fup', 'Flow', 'G', 'H', 'I'].map((zone) => cpe('monopitch', 5, 90, zone as RoofZone))).toEqual([-1.6, -1.6, -1.8, -0.6, -0.5]);
   });
-
   it('stays within 0.05 of the former values at 10° where the standard keeps them, and follows the table elsewhere', () => {
     // θ = 90° (approximate rows) and θ = 180° zone G are constant over 5-15°.
     for (const [zone, former] of [
@@ -115,13 +110,11 @@ describe('monopitch Tab. 7.3a', () => {
     expect(cpe('monopitch', 10, 0, 'H')).toBeCloseTo(-0.45, 9);
     expect(cpe('monopitch', 10, 180, 'F')).toBeCloseTo(-2.4, 9);
   });
-
   it('has a pressure set on the low eaves only', () => {
     expect(cpe('monopitch', 30, 0, 'F', 'pressure')).toBe(0.7);
     expect(cpe('monopitch', 30, 180, 'F', 'pressure')).toBe(cpe('monopitch', 30, 180, 'F'));
     expect(cpe('monopitch', 45, 0, 'H', 'pressure')).toBe(0.6);
   });
-
   it('takes zone H as the monopitch frame average, whatever the slope', () => {
     expect(frameRoofAverage('monopitch', 10, 0, 'suction', 'leeward')).toBeCloseTo(-0.45, 9);
     expect(frameRoofAverage('monopitch', 10, 180, 'suction')).toBeCloseTo(-0.85, 9);
@@ -156,12 +149,9 @@ describe('frame roof wind loads', () => {
     const frame = framesOfHall(hall())[0]!;
     expect(frame.windCases.map((windCase) => windCase.loadCase)).toEqual(['WL', 'WR', 'WLs', 'WRs']);
     expect(windCasesOf(framesOfHall(hall()))).toEqual([...WIND_CASES]);
-    const check = execute(hall(), 'check_portal_frames', { windPressure: 0.9 }).data as {
-      combinations: string[];
-    };
+    const check = execute(hall(), 'check_portal_frames', { windPressure: 0.9 }).data as { combinations: string[] };
     expect(check.combinations).toHaveLength(10);
   });
-
   it('loads the windward slope with H and the leeward slope with I / J at 6°', () => {
     const frame = framesOfHall(hall())[0]!;
     const [windward, leeward] = rafterLoads(frame, 'WL') as [number, number];
@@ -172,7 +162,6 @@ describe('frame roof wind loads', () => {
     expect(windward).toBeGreaterThan(0);
     expect(leeward / windward).toBeCloseTo((0.2 - leewardAverage) / (0.2 - h), 6);
   });
-
   it('adds a downward windward-rafter pressure case on a 30° duopitch hall', () => {
     const doc = hall({ roofPitch: 30 });
     const frames = framesOfHall(doc);
@@ -187,14 +176,11 @@ describe('frame roof wind loads', () => {
     // Mirrored for wind from the right: the right slope is windward.
     expect(rafterLoads(frame, 'WRp')[1]).toBeCloseTo(windwardPressure, 9);
     expect(windCasesOf(frames).map((windCase) => windCase.loadCase)).toContain('WLp');
-    const check = execute(doc, 'check_portal_frames', { windPressure: 0.9 }).data as {
-      combinations: string[];
-    };
+    const check = execute(doc, 'check_portal_frames', { windPressure: 0.9 }).data as { combinations: string[] };
     expect(check.combinations).toHaveLength(14);
     expect(check.combinations).toContain('1.35G+1.5W→(roof pressure)+0.75S');
     expect(check.combinations).toContain('1.0G+1.5W←(roof pressure)');
   });
-
   it('adds the pressure case on a flat roof (leeward I +0.2)', () => {
     const frame = framesOfHall(hall({ roofPitch: 0 }))[0]!;
     expect(frame.windCases.map((windCase) => windCase.loadCase)).toContain('WLp');
@@ -206,14 +192,12 @@ describe('frame roof wind loads', () => {
     expect(pressureWindward).toBeGreaterThan(0);
     expect(pressureLeeward).toBeLessThan(0);
   });
-
   it('gives a monopitch roof the pressure case for wind on the low eaves only', () => {
     const frames = framesOfHall(hall({ roofType: 'monopitch', roofPitch: 30 }));
     expect(windCasesOf(frames).map((windCase) => windCase.loadCase)).toEqual(['WL', 'WR', 'WLs', 'WRs', 'WLp']);
     const [rafter] = rafterLoads(frames[0]!, 'WLp');
     expect(rafter).toBeLessThan(0);
   });
-
   it('keeps monopitch loads from the table at 6°', () => {
     const frame = framesOfHall(hall({ roofType: 'monopitch' }))[0]!;
     const [low] = rafterLoads(frame, 'WL') as [number];
@@ -233,7 +217,6 @@ const purlinData = (doc: CadDocument, params: Record<string, unknown> = {}): Pur
 describe('purlin wind zones per pitch', () => {
   const roofCpes = (data: PurlinData, zone: string): number[] =>
     data.zones.filter((entry) => entry.surface === 'roof' && entry.zone === zone).map((entry) => entry.cpe);
-
   it('reads the zone values from the tables at the roof pitch', () => {
     const shallow = purlinData(hall());
     const steep = purlinData(hall({ roofPitch: 30 }));
@@ -242,7 +225,6 @@ describe('purlin wind zones per pitch', () => {
     expect(Math.min(...roofCpes(shallow, 'F'))).not.toBeCloseTo(Math.min(...roofCpes(steep, 'F')));
     expect(roofCpes(steep, 'H')).toContain(-0.8);
   });
-
   it('uses the flat-roof table below 5° (perimeter F / G / H, I inside)', () => {
     const flat = purlinData(hall({ roofPitch: 0 }));
     const zones = new Set(flat.zones.filter((entry) => entry.surface === 'roof').map((e) => e.zone));
@@ -251,13 +233,11 @@ describe('purlin wind zones per pitch', () => {
     expect(roofCpes(flat, 'G')).toEqual([-1.2]);
     expect(roofCpes(flat, 'H/I').sort()).toEqual([-0.7, -0.2].sort());
   });
-
   it('puts the ridge strip J on the leeward purlins next to the ridge', () => {
     const data = purlinData(hall({ roofPitch: 20 }));
     const ridgeRows = data.rows.filter((row) => row.zone === 'J');
     expect(ridgeRows.length).toBeGreaterThan(0);
   });
-
   it('checks downward wind pressure with snow on a steep roof, not on a shallow one', () => {
     const params = { windPressure: 1.5, snowLoad: 0, roofDeadLoad: 1.5 };
     const steep = purlinData(hall({ roofPitch: 30 }), params);
@@ -271,7 +251,6 @@ describe('purlin wind zones per pitch', () => {
     const calm = purlinData(hall({ roofPitch: 30 }), { ...params, windPressure: 0 });
     expect(maxPurlin(steep)).toBeGreaterThan(maxPurlin(calm));
   });
-
   it('keeps the default hall within 5% of the former purlin utilisation (1.100)', () => {
     const data = purlinData(hall(), { windPressure: 0.9 });
     const worst = Math.max(...data.rows.filter((row) => row.kind === 'purlin').map((r) => r.utilisation));

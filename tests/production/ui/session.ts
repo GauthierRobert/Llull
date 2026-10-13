@@ -23,7 +23,6 @@ export class UiSession {
   /** Off while the app boots: the reload that clears storage aborts the first wasm download. */
   private watching = false;
   private lastDownload = 0;
-
   constructor(readonly page: Page) {
     page.on('console', (message) => {
       if (!this.watching || message.type() !== 'error') return;
@@ -50,9 +49,7 @@ export class UiSession {
   /** "Open project" with a project file picked from disk. */
   async openProject(file: string): Promise<void> {
     await this.page.locator('[aria-label="Project file"] input[type="file"]').setInputFiles(file);
-    await expect(this.page.getByLabel(/^Last command: Loaded document/)).toBeVisible({
-      timeout: 120_000,
-    });
+    await expect(this.page.getByLabel(/^Last command: Loaded document/)).toBeVisible({ timeout: 120_000 });
   }
 
   /** Click out of any field and press Esc: the palette leaves its result selected. */
@@ -61,11 +58,9 @@ export class UiSession {
     await this.page.keyboard.press('Escape');
     await expect(this.page.getByLabel('Selection: None')).toBeVisible();
   }
-
   private status(): Locator {
     return this.page.locator('.status-summary');
   }
-
   async summary(): Promise<string> {
     return (
       (await this.status()

@@ -60,13 +60,7 @@ async function main() {
     `llull guard blocked edit to ${filePath}:\n- ${violations.join('\n- ')}\n` +
     `See .claude/rules/. If this is a genuine exception, ask the user.`;
   process.stdout.write(
-    JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: 'PreToolUse',
-        permissionDecision: 'deny',
-        permissionDecisionReason: reason,
-      },
-    }),
+    JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason } }),
   );
   process.stderr.write(reason + '\n');
   process.exit(2);

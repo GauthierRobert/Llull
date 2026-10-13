@@ -33,9 +33,10 @@ export const idfField = z
       'each pipe uses i at its own Tc (modified rational method). Do not combine with `rainfallIntensityMmH`.',
   );
 
-type CriteriaInput = {
-  [K in keyof Omit<DrainageCriteria, 'idf' | 'outfallLevel'>]?: number | undefined;
-} & { idf?: Idf | undefined; outfallLevel?: number | undefined };
+type CriteriaInput = { [K in keyof Omit<DrainageCriteria, 'idf' | 'outfallLevel'>]?: number | undefined } & {
+  idf?: Idf | undefined;
+  outfallLevel?: number | undefined;
+};
 
 export function criteriaFrom(params: CriteriaInput): DrainageCriteria | string {
   const criteria: DrainageCriteria = {

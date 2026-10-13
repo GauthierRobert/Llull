@@ -9,11 +9,9 @@ describe('computeFitFraming', () => {
   beforeEach(() => {
     resetStore();
   });
-
   it('returns null when no id exists', () => {
     expect(computeFitFraming(useStore.getState().document, ['nope'])).toBeNull();
   });
-
   it('scales the camera distance with the real entity size', () => {
     const small = localDispatch('add_box', { size: [2, 2, 2] }).affected[0]!;
     const big = localDispatch('add_box', { size: [4000, 4000, 4000] }).affected[0]!;
@@ -22,7 +20,6 @@ describe('computeFitFraming', () => {
     const bigFit = computeFitFraming(doc, [big])!;
     expect(bigFit.distance).toBeGreaterThan(smallFit.distance * 100);
   });
-
   it('centres on the merged extent of several entities', () => {
     const a = localDispatch('add_box', { size: [2, 2, 2], position: [0, 0, 0] }).affected[0]!;
     const b = localDispatch('add_box', { size: [2, 2, 2], position: [10, 0, 0] }).affected[0]!;
@@ -30,7 +27,6 @@ describe('computeFitFraming', () => {
     // boxes are centred on `position`: extent x spans -1..11
     expect(fit.center[0]).toBeCloseTo(5);
   });
-
   it('fits the bounding sphere inside the real camera FOV, more distant for portrait viewports', () => {
     const id = localDispatch('add_box', { size: [10, 10, 10] }).affected[0]!;
     const doc = useStore.getState().document;
@@ -42,21 +38,15 @@ describe('computeFitFraming', () => {
     const portrait = computeFitFraming(doc, [id], 0.5)!;
     expect(portrait.distance).toBeGreaterThan(landscape.distance);
   });
-
   it('frames a tiny part at its real size instead of a fixed minimum radius', () => {
     const id = localDispatch('add_box', { size: [0.02, 0.02, 0.02] }).affected[0]!;
     const fit = computeFitFraming(useStore.getState().document, [id])!;
     expect(fit.distance).toBeLessThan(0.2);
   });
-
   it('frames a dimension with the geometry it measures, like fit_view', () => {
     const a = localDispatch('draw_point', { position: [0, 0, 0] }).affected[0]!;
     const b = localDispatch('draw_point', { position: [100, 0, 0] }).affected[0]!;
-    const dim = localDispatch('add_dimension', {
-      dimensionKind: 'linear',
-      entityIds: [a, b],
-      offset: 5,
-    }).affected[0]!;
+    const dim = localDispatch('add_dimension', { dimensionKind: 'linear', entityIds: [a, b], offset: 5 }).affected[0]!;
     const framing = computeFitFraming(useStore.getState().document, [dim]);
     expect(framing?.center[0]).toBeCloseTo(50);
   });

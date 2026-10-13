@@ -1,9 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { volumeOf } from '../helpers/fixtureDocument';
-import { createEmptyDocument } from '@core/model/types';
-import type { BoxEntity, CadDocument, CylinderEntity, Entity, InstanceEntity, MeshSolidEntity, Vec3 } from '@core/model/types';
+import {
+  createEmptyDocument,
+  type BoxEntity,
+  type CadDocument,
+  type CylinderEntity,
+  type Entity,
+  type InstanceEntity,
+  type MeshSolidEntity,
+  type Vec3,
+} from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { expandInstance } from '@core/geometry/instanceExpansion';
+import { boxInstance } from '../helpers/boxInstance';
+import { xyz } from '../helpers/xy';
 
 function withComponent(): { doc: ReturnType<typeof createEmptyDocument>; componentId: string } {
   const box = execute(createEmptyDocument(), 'add_box', { size: [2, 4, 6], position: [1, 0, 0] });
@@ -30,17 +40,8 @@ function singleChildInstance(
   rotation: Vec3 = [0, 0, 0],
 ): { doc: CadDocument; instanceId: string; children: Entity[] } {
   const added = execute(createEmptyDocument(), add[0], add[1]);
-  const created = execute(added.document, 'create_component', {
-    name: 'One',
-    entityIds: [added.affected[0]!],
-    componentId: 'comp-one',
-  });
-  const inserted = execute(created.document, 'insert_instance', {
-    componentId: 'comp-one',
-    position: [0, 0, 0],
-    rotation,
-    scale,
-  });
+  const created = execute(added.document, 'create_component', { name: 'One', entityIds: [added.affected[0]!], componentId: 'comp-one' });
+  const inserted = execute(created.document, 'insert_instance', { componentId: 'comp-one', position: [0, 0, 0], rotation, scale });
   const instanceId = inserted.affected[0]!;
   const instance = inserted.document.entities[instanceId] as InstanceEntity;
   const component = inserted.document.components['comp-one']!;
@@ -59,10 +60,7 @@ function meshPoints(entity: Entity): Vec3[] {
 
 function extents(points: readonly Vec3[]): { min: Vec3; max: Vec3 } {
   const axis = (k: 0 | 1 | 2, pick: (...values: number[]) => number): number => pick(...points.map((point) => point[k]));
-  return {
-    min: [axis(0, Math.min), axis(1, Math.min), axis(2, Math.min)],
-    max: [axis(0, Math.max), axis(1, Math.max), axis(2, Math.max)],
-  };
+  return { min: [axis(0, Math.min), axis(1, Math.min), axis(2, Math.min)], max: [axis(0, Math.max), axis(1, Math.max), axis(2, Math.max)] };
 }
 
 function expectVecClose(actual: Vec3, expected: Vec3): void {
@@ -79,7 +77,6 @@ describe('explode_instance bakes the instance scale into the geometry', () => {
     expect(cylinder.radius).toBeCloseTo(2);
     expect(cylinder.height).toBeCloseTo(4);
   });
-
   it('non-uniform scale stretches an unrotated box per axis and bakes round kinds into a mesh', () => {
     const baked = bakedEntities([1, 2, 4]);
     expect((baked.find((e) => e.kind === 'box') as BoxEntity).size).toEqual([2, 8, 24]);
@@ -89,7 +86,6 @@ describe('explode_instance bakes the instance scale into the geometry', () => {
     expectVecClose(min, [10 - 1, -2, -4]);
     expectVecClose(max, [10 + 1, 2, 4]);
   });
-
   it('a negative component mirrors the geometry through a baked mesh', () => {
     const baked = bakedEntities([-1, 1, 1]);
     expect(baked.map((e) => e.kind)).toEqual(['mesh', 'mesh']);
@@ -99,7 +95,6 @@ describe('explode_instance bakes the instance scale into the geometry', () => {
     expect(min[0]).toBeCloseTo(8);
     expect(max[0]).toBeCloseTo(10);
   });
-
   it('unit scale leaves geometry untouched and a zero scale does not produce NaN', () => {
     const unit = bakedEntities([1, 1, 1]);
     expect((unit.find((e) => e.kind === 'box') as BoxEntity).size).toEqual([2, 4, 6]);
@@ -122,7 +117,6 @@ describe('expandInstance bakes non-uniform / mirrored scale exactly', () => {
     // 24-segment tessellation: polygon/circle area ratio = 12·sin(π/12)/π ≈ 0.9886
     expect(sectionArea / ellipseArea).toBeCloseTo((12 * Math.sin(Math.PI / 12)) / Math.PI, 6);
   });
-
   it('a rotated box under a non-uniform scale is scaled along the instance axes', () => {
     // size [2, 4, 2] rotated 90° about Z occupies x ±2, y ±1; scale x2 → x ±4, y ±1.
     const { doc, instanceId, children } = singleChildInstance(['add_box', { size: [2, 4, 2], rotation: [0, 0, Math.PI / 2] }], [2, 1, 1]);
@@ -131,7 +125,6 @@ describe('expandInstance bakes non-uniform / mirrored scale exactly', () => {
     expectVecClose(max, [4, 1, 1]);
     expect(volumeOf(doc, instanceId)).toBeCloseTo(2 * 4 * 2 * 2, 9);
   });
-
   it('an instance rotation is applied after the scale', () => {
     const { children } = singleChildInstance(
       ['add_box', { size: [2, 4, 2], rotation: [0, 0, Math.PI / 2] }],
@@ -143,7 +136,6 @@ describe('expandInstance bakes non-uniform / mirrored scale exactly', () => {
     expectVecClose(min, [-3, -2, -1]);
     expectVecClose(max, [3, 2, 1]);
   });
-
   it('a negative scale mirrors a wedge and keeps its volume positive', () => {
     const size: Vec3 = [2, 3, 4];
     const { doc, instanceId, children } = singleChildInstance(['add_wedge', { size, position: [1, 0, 0] }], [-1, 1, 1]);
@@ -156,9 +148,51 @@ describe('expandInstance bakes non-uniform / mirrored scale exactly', () => {
     expect(points.some(([, y, z]) => y === 3 && z === 4)).toBe(false);
     expect(volumeOf(doc, instanceId)).toBeCloseTo((2 * 3 * 4) / 2, 9);
   });
-
   it('a uniform positive scale keeps parametric children', () => {
     const { children } = singleChildInstance(['add_cylinder', { radius: 1, height: 2 }], [3, 3, 3]);
     expect(children[0]).toMatchObject({ kind: 'cylinder', radius: 3, height: 6 });
+  });
+});
+
+/** A 2x2x2 component box instanced at x=100 (world bounds x 99..101) plus a 2x2x2 box at the origin. */
+function scene(): { doc: CadDocument; instanceId: string; boxId: string } {
+  const { doc: withInstance, instanceId } = boxInstance([100, 0, 0]);
+  const box = execute(withInstance, 'add_box', { size: [2, 2, 2] });
+  return { doc: box.document, instanceId, boxId: box.affected[0]! };
+}
+
+const matchIds = (result: { data?: unknown }): string[] =>
+  (result.data as { matches: Array<{ id: string }> }).matches.map((match) => match.id);
+
+describe('bounds-based commands see an instance at its real extent', () => {
+  const { doc, instanceId, boxId } = scene();
+  it('align moves a box onto the instance max-x edge', () => {
+    const result = execute(doc, 'align', { targetIds: [boxId], edge: 'max-x', referenceId: instanceId });
+    expect(result.affected).toEqual([boxId]);
+    expect(result.document.entities[boxId]!.position[0]).toBeCloseTo(100);
+  });
+  it('stack_on rests a box against the instance max-x face', () => {
+    const result = execute(doc, 'stack_on', { movingId: boxId, baseId: instanceId, axis: 'x' });
+    expect(result.document.entities[boxId]!.position[0]).toBeCloseTo(102);
+  });
+  it('distribute treats the instance as the far anchor', () => {
+    const middle = execute(doc, 'add_box', { size: [2, 2, 2], position: [10, 0, 0] });
+    const result = execute(middle.document, 'distribute', { targetIds: [boxId, middle.affected[0]!, instanceId], axis: 'x' });
+    expect(result.document.entities[middle.affected[0]!]!.position[0]).toBeCloseTo(50);
+  });
+  it('find_entities locates the instance by bounding box and by proximity', () => {
+    const inBox = execute(doc, 'find_entities', { kind: 'instance', overlapsBBox: xyz(98, -5, -5, 102, 5, 5) });
+    expect(matchIds(inBox)).toEqual([instanceId]);
+    const near = execute(doc, 'find_entities', { nearPoint: { point: [100, 0, 0], radius: 3 } });
+    expect(matchIds(near)).toEqual([instanceId]);
+  });
+  it('measure_distance between box and instance uses the instance center', () => {
+    const result = execute(doc, 'measure_distance', { entityId1: boxId, entityId2: instanceId });
+    expect((result.data as { distance: number }).distance).toBeCloseTo(100);
+  });
+  it('check_model flags an instance far from the origin', () => {
+    const result = execute(doc, 'check_model', { farThreshold: 50 });
+    const issues = (result.data as { issues: Array<{ entityId?: string; code: string }> }).issues;
+    expect(issues.map((issue) => issue.entityId)).toEqual([instanceId]);
   });
 });

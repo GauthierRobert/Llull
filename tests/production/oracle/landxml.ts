@@ -47,14 +47,7 @@ function blocks(xml: string, tag: string): string[] {
 
 export function parseLandXml(xml: string): LandXmlSummary {
   if (xml.trim() === '') {
-    return {
-      errors: ['empty file'],
-      cgPoints: 0,
-      surfaces: [],
-      alignments: [],
-      structs: 0,
-      pipes: [],
-    };
+    return { errors: ['empty file'], cgPoints: 0, surfaces: [], alignments: [], structs: 0, pipes: [] };
   }
   const count = (text: string, pattern: RegExp): number => (text.match(pattern) ?? []).length;
   return {

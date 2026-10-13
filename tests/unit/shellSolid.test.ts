@@ -4,11 +4,10 @@ import { execute, getCommand } from '@core/commands/registry';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import type { MeshData } from '@core/model/types';
 import { fakeKernel, type FakeKernel } from '../helpers/fakeKernel';
+import { expectNoOp } from '../helpers/expectNoOp';
+import { xy } from '../helpers/xy';
 
-const SHELL_MESH: MeshData = {
-  positions: [0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 1],
-  indices: [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3],
-};
+const SHELL_MESH: MeshData = { positions: [0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 1], indices: [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3] };
 
 function thicknessesOf(fake: FakeKernel): (number | undefined)[] {
   return fake.calls.filter((call) => call.op === 'shell').map((call) => call.size);
@@ -16,15 +15,12 @@ function thicknessesOf(fake: FakeKernel): (number | undefined)[] {
 
 describe('shell_solid', () => {
   afterEach(() => setGeometryKernel(null));
-
   const created = execute(createEmptyDocument(), 'add_box', { size: [4, 4, 4], color: '#aabbcc' });
   const id = created.affected[0]!;
   const doc = created.document;
-
   it('is registered and requires a kernel', () => {
     expect(getCommand('shell_solid')?.annotations?.requiresKernel).toBe(true);
   });
-
   it('replaces the solid with the kernel shell mesh', () => {
     const fake = fakeKernel({ shell: SHELL_MESH });
     setGeometryKernel(fake);
@@ -34,45 +30,34 @@ describe('shell_solid', () => {
     expect(shell.kind).toBe('mesh');
     expect(shell.mesh).toEqual(SHELL_MESH);
     expect(shell.color).toBe('#aabbcc');
-    expect(shell.brep).toMatchObject({
-      op: 'shell',
-      source: { op: 'solid', entity: doc.entities[id] },
-      thickness: 0.5,
-    });
+    expect(shell.brep).toMatchObject({ op: 'shell', source: { op: 'solid', entity: doc.entities[id] }, thickness: 0.5 });
     expect(result.document.entities[id]).toBeUndefined();
     expect(thicknessesOf(fake)).toEqual([0.5]);
     expect(result.summary).toContain('shelled');
   });
-
   it('is a no-op when the kernel refuses this shell (invalid offset)', () => {
     setGeometryKernel(fakeKernel({ shell: null }));
     const result = execute(doc, 'shell_solid', { id, thickness: 0.5 });
     expect(result.document).toBe(doc);
     expect(result.summary).toContain('could not hollow this solid');
   });
-
   it('is a no-op when the kernel cannot shell (e.g. Manifold)', () => {
     setGeometryKernel(fakeKernel({ unsupported: ['shell'] }));
     const result = execute(doc, 'shell_solid', { id, thickness: 0.5 });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toEqual([]);
-    expect(result.summary).toContain('does not support shell_solid');
+    expectNoOp(result, doc, 'does not support shell_solid');
     expect(result.summary).toContain('?kernel=occt in the browser');
     expect(result.summary).toContain('LLULL_KERNEL=occt on the server');
   });
-
   it('is a no-op when the kernel cannot build the source solid', () => {
     setGeometryKernel(fakeKernel({ solid: null }));
     const result = execute(doc, 'shell_solid', { id, thickness: 0.5 });
     expect(result.document).toBe(doc);
     expect(result.summary).toContain('kernel could not build entity');
   });
-
   it('refuses without a kernel', () => {
     const result = execute(doc, 'shell_solid', { id, thickness: 0.5 });
     expect(result.document).toBe(doc);
   });
-
   it.each([0, -1])('rejects thickness %s without calling the kernel', (thickness) => {
     const fake = fakeKernel({ shell: SHELL_MESH });
     setGeometryKernel(fake);
@@ -81,16 +66,10 @@ describe('shell_solid', () => {
     expect(result.summary).toContain('thickness must be > 0');
     expect(thicknessesOf(fake)).toEqual([]);
   });
-
   it('rejects missing ids and 2D shapes', () => {
     setGeometryKernel(fakeKernel({ shell: SHELL_MESH }));
     expect(execute(doc, 'shell_solid', { id: 'ghost', thickness: 1 }).summary).toContain('not found');
-    const line = execute(doc, 'draw_polyline', {
-      points: [
-        [0, 0],
-        [1, 0],
-      ],
-    });
+    const line = execute(doc, 'draw_polyline', { points: xy(0, 0, 1, 0) });
     const result = execute(line.document, 'shell_solid', { id: line.affected[0]!, thickness: 1 });
     expect(result.document).toBe(line.document);
     expect(result.summary).toContain('2D shape');

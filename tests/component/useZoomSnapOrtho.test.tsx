@@ -1,4 +1,3 @@
-/** Holding Shift while drafting constrains the snapped cursor to the axis from the last point. */
 import { describe, it, expect } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useStore } from '@ui/store';
@@ -13,7 +12,6 @@ describe('useZoomSnap — ortho', () => {
     const vertical = renderHook(() => useZoomSnap([1.3, 9.7], 50, [0, 0], true));
     expect(vertical.result.current?.x).toBeCloseTo(0);
   });
-
   it('leaves the cursor free when ortho is off', () => {
     useStore.setState({ document: createEmptyDocument() });
     const free = renderHook(() => useZoomSnap([9.7, 1.3], 50, [0, 0], false));

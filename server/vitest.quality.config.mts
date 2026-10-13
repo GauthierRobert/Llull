@@ -9,10 +9,5 @@ import base from './vitest.config.mts';
 
 export default defineConfig({
   ...base,
-  test: {
-    ...base.test,
-    include: ['tests/quality/**/*.gate.ts'],
-    testTimeout: 600_000,
-    hookTimeout: 600_000,
-  },
+  test: { ...base.test, include: ['tests/quality/**/*.gate.ts'], testTimeout: 600_000, hookTimeout: 600_000 },
 });

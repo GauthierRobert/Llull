@@ -68,12 +68,7 @@ export async function silhouette(page: Page, shot: Buffer, baseline: Buffer): Pr
           maxY = Math.max(maxY, y);
         }
       }
-      return {
-        pixels,
-        canvasWidth: first.width,
-        canvasHeight: first.height,
-        rect: pixels === 0 ? null : { minX, minY, maxX, maxY },
-      };
+      return { pixels, canvasWidth: first.width, canvasHeight: first.height, rect: pixels === 0 ? null : { minX, minY, maxX, maxY } };
     },
     [shot.toString('base64'), baseline.toString('base64')] as const,
   );

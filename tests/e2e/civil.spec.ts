@@ -23,10 +23,8 @@ test('survey -> terrain -> LandXML in the Civil / Site panel', async ({ page }) 
   await page.getByLabel('Survey points text').fill(survey());
   await page.getByRole('button', { name: 'Import points' }).click();
   await expect(page.getByText('121 points')).toBeVisible();
-
   await page.getByRole('button', { name: 'Create surface' }).click();
   await expect(page.getByText(/121 points, 200 triangles, 10000 m²/)).toBeVisible();
-
   const landxml = await downloadText(page, () => page.getByRole('button', { name: /LandXML/ }).click());
   expect(landxml.name).toMatch(/\.xml$/);
   expect(landxml.text).toContain('<Surface name="EG 1">');

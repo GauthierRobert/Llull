@@ -4,6 +4,7 @@
  */
 
 import { pngDataUrl } from '../helpers/imageFixtures';
+import { xy, xyz } from '../helpers/xy';
 
 export interface GoldenAction {
   command?: string;
@@ -18,10 +19,7 @@ export interface GoldenAction {
 
 const CUBE_COMPONENT: GoldenAction[] = [
   { command: 'add_box', params: { size: [1, 1, 1] }, as: 'b' },
-  {
-    command: 'create_component',
-    params: { name: 'Cube', entityIds: ['$b'], componentId: 'comp-cube' },
-  },
+  { command: 'create_component', params: { name: 'Cube', entityIds: ['$b'], componentId: 'comp-cube' } },
 ];
 
 const cubeInstance = (x: number, as: string): GoldenAction => ({
@@ -32,45 +30,13 @@ const cubeInstance = (x: number, as: string): GoldenAction => ({
 
 export const plans: Record<string, GoldenAction[]> = {
   '2d_lines_polylines': [
-    {
-      command: 'draw_polyline',
-      params: {
-        points: [
-          [0, 0],
-          [10, 5],
-        ],
-      },
-    },
-    {
-      command: 'draw_polyline',
-      params: {
-        points: [
-          [0, 0],
-          [4, 0],
-          [4, 3],
-        ],
-        closed: false,
-      },
-    },
-    {
-      command: 'draw_polyline',
-      params: {
-        points: [
-          [0, 0],
-          [5, 0],
-          [5, 5],
-          [0, 5],
-        ],
-        closed: true,
-      },
-    },
+    { command: 'draw_polyline', params: { points: xy(0, 0, 10, 5) } },
+    { command: 'draw_polyline', params: { points: xy(0, 0, 4, 0, 4, 3), closed: false } },
+    { command: 'draw_polyline', params: { points: xy(0, 0, 5, 0, 5, 5, 0, 5), closed: true } },
     { command: 'draw_point', params: { position: [1, 1, 0] } },
   ],
   '2d_arcs_circles': [
-    {
-      command: 'draw_arc',
-      params: { center: [0, 0], radius: 5, startAngle: 0, endAngle: Math.PI },
-    },
+    { command: 'draw_arc', params: { center: [0, 0], radius: 5, startAngle: 0, endAngle: Math.PI } },
     { command: 'draw_arc', params: { center: [3, 3], radius: 2 } },
     { command: 'draw_arc', params: { center: [-3, 3], radius: 1.5, color: '#ff0000' } },
   ],
@@ -79,29 +45,8 @@ export const plans: Record<string, GoldenAction[]> = {
     { command: 'draw_rectangle', params: { width: 2, height: 2, position: [5, 5, 0] } },
   ],
   '2d_spline_ellipse': [
-    {
-      command: 'draw_spline',
-      params: {
-        points: [
-          [0, 0],
-          [2, 3],
-          [5, 1],
-          [8, 4],
-        ],
-      },
-    },
-    {
-      command: 'draw_spline',
-      params: {
-        points: [
-          [0, 0],
-          [3, 0],
-          [3, 3],
-          [0, 3],
-        ],
-        closed: true,
-      },
-    },
+    { command: 'draw_spline', params: { points: xy(0, 0, 2, 3, 5, 1, 8, 4) } },
+    { command: 'draw_spline', params: { points: xy(0, 0, 3, 0, 3, 3, 0, 3), closed: true } },
     { command: 'draw_ellipse', params: { center: [0, 0], radiusX: 6, radiusY: 3 } },
   ],
   '2d_image_underlay': [
@@ -123,109 +68,25 @@ export const plans: Record<string, GoldenAction[]> = {
     { command: 'draw_point', params: { position: [0, 0, 0] }, as: 'p1' },
     { command: 'draw_point', params: { position: [10, 0, 0] }, as: 'p2' },
     { command: 'add_text', params: { content: 'Hello', position: [0, 5, 0], height: 2 } },
-    {
-      command: 'add_dimension',
-      params: { dimensionKind: 'linear', entityIds: ['$p1', '$p2'], offset: 3 },
-    },
-    {
-      command: 'add_dimension',
-      params: { dimensionKind: 'aligned', entityIds: ['$p1', '$p2'] },
-    },
+    { command: 'add_dimension', params: { dimensionKind: 'linear', entityIds: ['$p1', '$p2'], offset: 3 } },
+    { command: 'add_dimension', params: { dimensionKind: 'aligned', entityIds: ['$p1', '$p2'] } },
   ],
   modify2d_offset_trim_extend: [
-    {
-      command: 'draw_polyline',
-      params: {
-        points: [
-          [0, 0],
-          [10, 0],
-        ],
-      },
-      as: 'a',
-    },
-    {
-      command: 'draw_polyline',
-      params: {
-        points: [
-          [5, -5],
-          [5, 5],
-        ],
-      },
-      as: 'b',
-    },
-    {
-      command: 'draw_polyline',
-      params: {
-        points: [
-          [0, 3],
-          [3, 3],
-        ],
-      },
-      as: 'c',
-    },
-    {
-      command: 'draw_polyline',
-      params: {
-        points: [
-          [8, -4],
-          [8, 8],
-        ],
-      },
-      as: 'd',
-    },
+    { command: 'draw_polyline', params: { points: xy(0, 0, 10, 0) }, as: 'a' },
+    { command: 'draw_polyline', params: { points: xy(5, -5, 5, 5) }, as: 'b' },
+    { command: 'draw_polyline', params: { points: xy(0, 3, 3, 3) }, as: 'c' },
+    { command: 'draw_polyline', params: { points: xy(8, -4, 8, 8) }, as: 'd' },
     { command: 'trim', params: { id: '$a', boundaryId: '$b' } },
     { command: 'extend', params: { id: '$c', boundaryId: '$d' } },
-    {
-      command: 'draw_polyline',
-      params: {
-        points: [
-          [0, 10],
-          [5, 10],
-          [5, 15],
-        ],
-      },
-      as: 'pl',
-    },
+    { command: 'draw_polyline', params: { points: xy(0, 10, 5, 10, 5, 15) }, as: 'pl' },
     { command: 'offset_2d', params: { id: '$pl', distance: 1 } },
   ],
   modify2d_fillet_chamfer_explode: [
-    {
-      command: 'draw_polyline',
-      params: {
-        points: [
-          [0, 0],
-          [10, 0],
-          [10, 10],
-        ],
-      },
-      as: 'f',
-    },
+    { command: 'draw_polyline', params: { points: xy(0, 0, 10, 0, 10, 10) }, as: 'f' },
     { command: 'fillet_2d', params: { id: '$f', radius: 2, vertexIndex: 1 } },
-    {
-      command: 'draw_polyline',
-      params: {
-        points: [
-          [20, 0],
-          [30, 0],
-          [30, 10],
-        ],
-      },
-      as: 'c',
-    },
+    { command: 'draw_polyline', params: { points: xy(20, 0, 30, 0, 30, 10) }, as: 'c' },
     { command: 'chamfer_2d', params: { id: '$c', distance: 2, vertexIndex: 1 } },
-    {
-      command: 'draw_polyline',
-      params: {
-        points: [
-          [0, 20],
-          [5, 20],
-          [5, 25],
-          [0, 25],
-        ],
-        closed: true,
-      },
-      as: 'e',
-    },
+    { command: 'draw_polyline', params: { points: xy(0, 20, 5, 20, 5, 25, 0, 25), closed: true }, as: 'e' },
     { command: 'explode_polyline', params: { id: '$e' } },
   ],
   '3d_box_cylinder_sphere': [
@@ -237,65 +98,22 @@ export const plans: Record<string, GoldenAction[]> = {
     { command: 'add_cone', params: { radius: 2, height: 4 } },
     { command: 'add_torus', params: { ringRadius: 3, tubeRadius: 0.5, position: [8, 0, 0] } },
     { command: 'add_wedge', params: { size: [2, 2, 2], position: [0, 8, 0] } },
-    {
-      command: 'add_pyramid',
-      params: { baseWidth: 3, baseDepth: 3, height: 4, position: [8, 8, 0] },
-    },
+    { command: 'add_pyramid', params: { baseWidth: 3, baseDepth: 3, height: 4, position: [8, 8, 0] } },
   ],
   extrude_profile_from_sketch_and_points: [
     { command: 'draw_rectangle', params: { width: 4, height: 2 }, as: 'r' },
     { command: 'extrude_profile', params: { id: '$r', depth: 3 } },
-    {
-      command: 'extrude_profile',
-      params: {
-        profile: [
-          [0, 0],
-          [4, 0],
-          [2, 3],
-        ],
-        depth: 2,
-        position: [10, 0, 0],
-      },
-    },
+    { command: 'extrude_profile', params: { profile: xy(0, 0, 4, 0, 2, 3), depth: 2, position: [10, 0, 0] } },
   ],
   revolve_profile: [
-    {
-      command: 'revolve_profile',
-      params: {
-        profile: [
-          [1, 0],
-          [2, 0],
-          [2, 1],
-          [1, 1],
-        ],
-        axis: 'z',
-        angle: Math.PI * 2,
-        segments: 8,
-      },
-    },
-    {
-      command: 'revolve_profile',
-      params: {
-        profile: [
-          [1, 0],
-          [3, 0],
-          [3, 2],
-        ],
-        axis: 'y',
-        angle: Math.PI,
-        segments: 6,
-        position: [10, 0, 0],
-      },
-    },
+    { command: 'revolve_profile', params: { profile: xy(1, 0, 2, 0, 2, 1, 1, 1), axis: 'z', angle: Math.PI * 2, segments: 8 } },
+    { command: 'revolve_profile', params: { profile: xy(1, 0, 3, 0, 3, 2), axis: 'y', angle: Math.PI, segments: 6, position: [10, 0, 0] } },
   ],
   closed_sweep_and_chain_pattern: [
     { command: 'draw_arc', params: { center: [0, 0], radius: 40 }, as: 'loop' },
     { command: 'sweep_profile', params: { pathId: '$loop', radius: 3, innerRadius: 2 } },
     { command: 'add_box', params: { size: [8, 2, 4] }, as: 'link' },
-    {
-      command: 'pattern_along_path',
-      params: { sourceId: '$link', count: 12, pathId: '$loop', rollStep: Math.PI / 2 },
-    },
+    { command: 'pattern_along_path', params: { sourceId: '$link', count: 12, pathId: '$loop', rollStep: Math.PI / 2 } },
   ],
   subdivision_saddle: [
     {
@@ -305,46 +123,19 @@ export const plans: Record<string, GoldenAction[]> = {
     },
     {
       command: 'edit_subdivision_cage',
-      params: {
-        id: '$saddle',
-        region: { min: [60, -100, -50], max: [200, 100, 50] },
-        scale: [1, 0.3, 0.7],
-        falloff: 60,
-      },
+      params: { id: '$saddle', region: { min: [60, -100, -50], max: [200, 100, 50] }, scale: [1, 0.3, 0.7], falloff: 60 },
     },
     {
       command: 'edit_subdivision_cage',
-      params: {
-        id: '$saddle',
-        region: { min: [-200, -100, -50], max: [-100, 100, 50] },
-        translate: [0, 0, 12],
-      },
+      params: { id: '$saddle', region: { min: [-200, -100, -50], max: [-100, 100, 50] }, translate: [0, 0, 12] },
     },
-    {
-      command: 'edit_subdivision_cage',
-      params: {
-        id: '$saddle',
-        region: { min: [-200, -100, -50], max: [200, 100, -1] },
-        crease: true,
-      },
-    },
+    { command: 'edit_subdivision_cage', params: { id: '$saddle', region: { min: [-200, -100, -50], max: [200, 100, -1] }, crease: true } },
   ],
   surface_from_curves_hood: [
     {
       command: 'surface_from_curves',
       params: {
-        curves: [
-          [
-            [0, 0, 0],
-            [40, 0, 18],
-            [80, 0, 0],
-          ],
-          [
-            [0, 50, 0],
-            [40, 50, 10],
-            [80, 50, 0],
-          ],
-        ],
+        curves: [xyz(0, 0, 0, 40, 0, 18, 80, 0, 0), xyz(0, 50, 0, 40, 50, 10, 80, 50, 0)],
         thickness: 2,
         cells: [6, 4],
         name: 'hood',
@@ -353,12 +144,7 @@ export const plans: Record<string, GoldenAction[]> = {
     },
     {
       command: 'edit_subdivision_cage',
-      params: {
-        id: '$hood',
-        region: { min: [30, -10, 0], max: [50, 60, 40] },
-        translate: [0, 0, 4],
-        falloff: 20,
-      },
+      params: { id: '$hood', region: { min: [30, -10, 0], max: [50, 60, 40] }, translate: [0, 0, 4], falloff: 20 },
     },
   ],
   loft_and_variable_sweep: [
@@ -367,15 +153,7 @@ export const plans: Record<string, GoldenAction[]> = {
       params: {
         sections: [
           { center: [0, 0, 0], radius: 2 },
-          {
-            center: [0, 0, 4],
-            section: [
-              [-1.5, -1.5],
-              [1.5, -1.5],
-              [1.5, 1.5],
-              [-1.5, 1.5],
-            ],
-          },
+          { center: [0, 0, 4], section: xy(-1.5, -1.5, 1.5, -1.5, 1.5, 1.5, -1.5, 1.5) },
           { center: [1, 0, 8], radiusX: 2.5, radiusY: 0.8, rotation: [0, 0.25, 0] },
         ],
       },
@@ -383,11 +161,7 @@ export const plans: Record<string, GoldenAction[]> = {
     {
       command: 'sweep_profile',
       params: {
-        path: [
-          [6, 0, 0],
-          [16, 0, 0],
-          [16, 0, 10],
-        ],
+        path: xyz(6, 0, 0, 16, 0, 0, 16, 0, 10),
         bendRadius: 4,
         stations: [
           { at: 0, radius: 1.2 },
@@ -398,81 +172,17 @@ export const plans: Record<string, GoldenAction[]> = {
     },
   ],
   bell_nozzle_and_plumbing: [
-    {
-      command: 'draw_spline',
-      params: {
-        points: [
-          [3, 0],
-          [1.5, 3],
-          [4, 7],
-          [6, 10],
-        ],
-      },
-      as: 'wall',
-    },
-    {
-      command: 'draw_polyline',
-      params: {
-        points: [
-          [6, 10],
-          [5.6, 10],
-        ],
-      },
-      as: 'lip',
-    },
-    {
-      command: 'draw_spline',
-      params: {
-        points: [
-          [5.6, 10],
-          [3.7, 7],
-          [1.2, 3],
-          [2.6, 0],
-        ],
-      },
-      as: 'inner',
-    },
-    {
-      command: 'draw_polyline',
-      params: {
-        points: [
-          [2.6, 0],
-          [3, 0],
-        ],
-      },
-      as: 'base',
-    },
-    {
-      command: 'revolve_profile',
-      params: { profileIds: ['$wall', '$lip', '$inner', '$base'], segments: 24 },
-      as: 'bell',
-    },
+    { command: 'draw_spline', params: { points: xy(3, 0, 1.5, 3, 4, 7, 6, 10) }, as: 'wall' },
+    { command: 'draw_polyline', params: { points: xy(6, 10, 5.6, 10) }, as: 'lip' },
+    { command: 'draw_spline', params: { points: xy(5.6, 10, 3.7, 7, 1.2, 3, 2.6, 0) }, as: 'inner' },
+    { command: 'draw_polyline', params: { points: xy(2.6, 0, 3, 0) }, as: 'base' },
+    { command: 'revolve_profile', params: { profileIds: ['$wall', '$lip', '$inner', '$base'], segments: 24 }, as: 'bell' },
     {
       command: 'sweep_profile',
-      params: {
-        path: [
-          [3.5, 0, 1],
-          [8, 0, 1],
-          [8, 0, 9],
-        ],
-        radius: 0.4,
-        innerRadius: 0.3,
-        bendRadius: 1.5,
-      },
+      params: { path: xyz(3.5, 0, 1, 8, 0, 1, 8, 0, 9), radius: 0.4, innerRadius: 0.3, bendRadius: 1.5 },
       as: 'feed',
     },
-    {
-      command: 'sweep_profile',
-      params: {
-        path: [
-          [-3, 0, 2],
-          [-6, 2, 4],
-          [-5, 4, 8],
-        ],
-        smooth: true,
-        radius: 0.25,
-      },
-    },
+    { command: 'sweep_profile', params: { path: xyz(-3, 0, 2, -6, 2, 4, -5, 4, 8), smooth: true, radius: 0.25 } },
   ],
   transforms_move_rotate_scale_mirror: [
     { command: 'add_box', params: { size: [1, 1, 1] }, as: 'b' },
@@ -504,10 +214,7 @@ export const plans: Record<string, GoldenAction[]> = {
   ],
   materials_assign: [
     { command: 'add_box', params: { size: [1, 1, 1] }, as: 'b' },
-    {
-      command: 'create_material',
-      params: { name: 'steel', density: 0.00785, color: '#808080', metalness: 0.9, roughness: 0.3 },
-    },
+    { command: 'create_material', params: { name: 'steel', density: 0.00785, color: '#808080', metalness: 0.9, roughness: 0.3 } },
     { command: 'assign_material', params: { materialName: 'steel', entityIds: ['$b'] } },
   ],
   parameters_expressions: [
@@ -518,14 +225,8 @@ export const plans: Record<string, GoldenAction[]> = {
   ],
   loops_repeat_for_each: [
     { command: 'set_parameter', params: { name: 'n', expression: '4' } },
-    {
-      repeat: { count: '=n' },
-      step: { command: 'add_box', params: { size: [1, 1, 1], position: ['=$i * 3', 0, 0] } },
-    },
-    {
-      for_each: { values: [1, 2, 3], as: 'r' },
-      step: { command: 'add_sphere', params: { radius: '=$r', position: ['=$r * 10', 5, 0] } },
-    },
+    { repeat: { count: '=n' }, step: { command: 'add_box', params: { size: [1, 1, 1], position: ['=$i * 3', 0, 0] } } },
+    { for_each: { values: [1, 2, 3], as: 'r' }, step: { command: 'add_sphere', params: { radius: '=$r', position: ['=$r * 10', 5, 0] } } },
   ],
   loops_polar_pattern: [
     { command: 'set_parameter', params: { name: 'n', expression: '7' } },
@@ -536,11 +237,7 @@ export const plans: Record<string, GoldenAction[]> = {
         {
           command: 'add_cylinder',
           as: 'piston{i}',
-          params: {
-            radius: 4,
-            height: 30,
-            position: ['=r*cos(2*pi*i/n)', '=r*sin(2*pi*i/n)', 80],
-          },
+          params: { radius: 4, height: 30, position: ['=r*cos(2*pi*i/n)', '=r*sin(2*pi*i/n)', 80] },
         },
       ],
     },
@@ -559,74 +256,33 @@ export const plans: Record<string, GoldenAction[]> = {
     { command: 'instantiate_recipe', params: { name: 'cube' } },
   ],
   constraints_add_solve: [
-    {
-      command: 'draw_polyline',
-      params: {
-        points: [
-          [0, 0],
-          [10, 0],
-        ],
-      },
-      as: 'a',
-    },
-    {
-      command: 'draw_polyline',
-      params: {
-        points: [
-          [0, 1],
-          [10, 4],
-        ],
-      },
-      as: 'b',
-    },
-    {
-      command: 'add_constraint',
-      params: { constraint: { kind: 'parallel', a: { entityId: '$a' }, b: { entityId: '$b' } } },
-    },
-    {
-      command: 'add_constraint',
-      params: {
-        constraint: { kind: 'distance', a: { entityId: '$a' }, b: { entityId: '$b' }, value: 4 },
-      },
-    },
+    { command: 'draw_polyline', params: { points: xy(0, 0, 10, 0) }, as: 'a' },
+    { command: 'draw_polyline', params: { points: xy(0, 1, 10, 4) }, as: 'b' },
+    { command: 'add_constraint', params: { constraint: { kind: 'parallel', a: { entityId: '$a' }, b: { entityId: '$b' } } } },
+    { command: 'add_constraint', params: { constraint: { kind: 'distance', a: { entityId: '$a' }, b: { entityId: '$b' }, value: 4 } } },
     { command: 'solve_constraints', params: {} },
   ],
   assembly_components_instances: [
     ...CUBE_COMPONENT,
     { command: 'insert_instance', params: { componentId: 'comp-cube', position: [5, 0, 0] } },
-    {
-      command: 'insert_instance',
-      params: { componentId: 'comp-cube', position: [10, 0, 0], rotation: [0, 0, 1] },
-    },
+    { command: 'insert_instance', params: { componentId: 'comp-cube', position: [10, 0, 0], rotation: [0, 0, 1] } },
   ],
   assembly_mates: [
     ...CUBE_COMPONENT,
     cubeInstance(5, 'ia'),
     cubeInstance(20, 'ib'),
-    {
-      command: 'add_constraint',
-      params: {
-        constraint: { kind: 'distance', a: { entityId: '$ia' }, b: { entityId: '$ib' }, value: 5 },
-      },
-    },
+    { command: 'add_constraint', params: { constraint: { kind: 'distance', a: { entityId: '$ia' }, b: { entityId: '$ib' }, value: 5 } } },
   ],
   assembly_joints: [
     ...CUBE_COMPONENT,
     cubeInstance(0, 'ia'),
     cubeInstance(3, 'ib'),
-    {
-      command: 'add_joint',
-      params: { kind: 'revolute', a: { instanceId: '$ia' }, b: { instanceId: '$ib' }, axis: 'z' },
-      as: 'j',
-    },
+    { command: 'add_joint', params: { kind: 'revolute', a: { instanceId: '$ia' }, b: { instanceId: '$ib' }, axis: 'z' }, as: 'j' },
     { command: 'set_joint_value', params: { id: '$j', value: 0.5 } },
   ],
   gears_spur_and_belt: [
     { command: 'add_spur_gear', params: { module: 2, teeth: 20, faceWidth: 5 } },
-    {
-      command: 'add_spur_gear',
-      params: { module: 2, teeth: 30, faceWidth: 5, position: [50, 0, 0], name: 'big' },
-    },
+    { command: 'add_spur_gear', params: { module: 2, teeth: 30, faceWidth: 5, position: [50, 0, 0], name: 'big' } },
     {
       command: 'draw_belt_around',
       params: {
@@ -672,32 +328,9 @@ export const plans: Record<string, GoldenAction[]> = {
       },
     },
     { command: 'create_surface', params: { contourInterval: 1, majorEvery: 2 } },
-    {
-      command: 'add_platform',
-      params: {
-        surfaceId: 'surface-1',
-        boundary: [
-          [20, 20],
-          [35, 20],
-          [35, 35],
-          [20, 35],
-        ],
-        elevation: 102,
-      },
-    },
+    { command: 'add_platform', params: { surfaceId: 'surface-1', boundary: xy(20, 20, 35, 20, 35, 35, 20, 35), elevation: 102 } },
     { command: 'balance_platform', params: { platformId: 'platform-1' } },
-    {
-      command: 'add_alignment',
-      params: {
-        points: [
-          [5, 5],
-          [50, 5],
-          [50, 55],
-        ],
-        radii: [15],
-        surfaceId: 'surface-1',
-      },
-    },
+    { command: 'add_alignment', params: { points: xy(5, 5, 50, 5, 50, 55), radii: [15], surfaceId: 'surface-1' } },
     {
       command: 'set_alignment_profile',
       params: {
@@ -710,56 +343,18 @@ export const plans: Record<string, GoldenAction[]> = {
       },
     },
     { command: 'set_road_section', params: { alignmentId: 'alignment-1' } },
-    {
-      command: 'add_manhole',
-      params: { location: [10, 50], invertElevation: 99.5, surfaceId: 'surface-1' },
-    },
-    {
-      command: 'add_manhole',
-      params: { location: [40, 50], invertElevation: 99.2, surfaceId: 'surface-1' },
-    },
+    { command: 'add_manhole', params: { location: [10, 50], invertElevation: 99.5, surfaceId: 'surface-1' } },
+    { command: 'add_manhole', params: { location: [40, 50], invertElevation: 99.2, surfaceId: 'surface-1' } },
     { command: 'add_pipe', params: { fromId: 'manhole-1', toId: 'manhole-2' } },
     { command: 'size_drainage_pipes', params: {} },
   ],
   building_walls_openings_slab: [
     { command: 'set_units', params: { units: 'mm' } },
     { command: 'add_grid_system', params: { xSpacings: [5000, 5000], ySpacings: [4000] } },
-    {
-      command: 'draw_walls',
-      params: {
-        points: [
-          [0, 0],
-          [10000, 0],
-        ],
-      },
-    },
-    {
-      command: 'draw_walls',
-      params: {
-        points: [
-          [10000, 0],
-          [10000, 8000],
-        ],
-      },
-    },
-    {
-      command: 'draw_walls',
-      params: {
-        points: [
-          [10000, 8000],
-          [0, 8000],
-        ],
-      },
-    },
-    {
-      command: 'draw_walls',
-      params: {
-        points: [
-          [0, 8000],
-          [0, 0],
-        ],
-      },
-    },
+    { command: 'draw_walls', params: { points: xy(0, 0, 10000, 0) } },
+    { command: 'draw_walls', params: { points: xy(10000, 0, 10000, 8000) } },
+    { command: 'draw_walls', params: { points: xy(10000, 8000, 0, 8000) } },
+    { command: 'draw_walls', params: { points: xy(0, 8000, 0, 0) } },
     { command: 'add_door', params: { wallId: 'wall-1', offset: 1500 } },
     { command: 'add_window', params: { wallId: 'wall-2', offset: 3000 } },
     { command: 'add_slab', params: { wallIds: ['wall-1', 'wall-2', 'wall-3', 'wall-4'] } },
@@ -770,45 +365,16 @@ export const plans: Record<string, GoldenAction[]> = {
   ],
   building_mixed_model_edited: [
     { command: 'add_level', params: { name: 'Ground', height: 4000 } },
-    {
-      command: 'draw_walls',
-      params: {
-        points: [
-          [0, 0],
-          [6000, 0],
-          [6000, 5000],
-          [0, 5000],
-        ],
-        closed: true,
-        thickness: 200,
-      },
-    },
+    { command: 'draw_walls', params: { points: xy(0, 0, 6000, 0, 6000, 5000, 0, 5000), closed: true, thickness: 200 } },
     { command: 'add_door', params: { wallId: 'wall-1', offset: 1500 } },
     { command: 'add_window', params: { wallId: 'wall-2', offset: 2500 } },
-    {
-      command: 'add_curved_wall',
-      params: { start: [7000, 0], through: [8000, 1000], end: [9000, 0], thickness: 200 },
-    },
+    { command: 'add_curved_wall', params: { start: [7000, 0], through: [8000, 1000], end: [9000, 0], thickness: 200 } },
     { command: 'add_slab', params: { wallIds: ['wall-1', 'wall-2', 'wall-3', 'wall-4'] } },
-    {
-      command: 'add_slab_opening',
-      params: {
-        slabId: 'slab-1',
-        boundary: [
-          [1000, 1000],
-          [2000, 1000],
-          [2000, 2000],
-          [1000, 2000],
-        ],
-      },
-    },
+    { command: 'add_slab_opening', params: { slabId: 'slab-1', boundary: xy(1000, 1000, 2000, 1000, 2000, 2000, 1000, 2000) } },
     { command: 'add_column', params: { location: [3000, 2500] } },
     { command: 'add_beam', params: { start: [0, 2500], end: [6000, 2500] } },
     { command: 'add_stair', params: { start: [4000, 500], angle: 0 } },
-    {
-      command: 'add_room',
-      params: { name: 'Hall', wallIds: ['wall-1', 'wall-2', 'wall-3', 'wall-4'] },
-    },
+    { command: 'add_room', params: { name: 'Hall', wallIds: ['wall-1', 'wall-2', 'wall-3', 'wall-4'] } },
     { command: 'update_wall', params: { wallId: 'wall-3', thickness: 250 } },
     { command: 'update_opening', params: { openingId: 'door-1', width: 1000 } },
     { command: 'move_building_element', params: { elementIds: ['column-1'], delta: [200, 0] } },
@@ -831,39 +397,14 @@ export const plans: Record<string, GoldenAction[]> = {
         basePlates: false,
       },
     },
-    {
-      command: 'add_equipment',
-      params: { name: 'Pump', mark: 'P-1', location: [3000, 3000], size: [1500, 800, 900] },
-    },
-    {
-      command: 'add_pipe_run',
-      params: {
-        points: [
-          [1000, 3000, 1500],
-          [9000, 3000, 1500],
-        ],
-        dn: 100,
-        line: 'L-1',
-        from: 'P-1',
-      },
-    },
+    { command: 'add_equipment', params: { name: 'Pump', mark: 'P-1', location: [3000, 3000], size: [1500, 800, 900] } },
+    { command: 'add_pipe_run', params: { points: xyz(1000, 3000, 1500, 9000, 3000, 1500), dn: 100, line: 'L-1', from: 'P-1' } },
     { command: 'add_pipe_support', params: { pipeId: 'pipe-1', spacing: 4000 } },
-    {
-      command: 'add_cable_tray',
-      params: {
-        points: [
-          [1000, 5000, 3000],
-          [9000, 5000, 3000],
-        ],
-      },
-    },
+    { command: 'add_cable_tray', params: { points: xyz(1000, 5000, 3000, 9000, 5000, 3000) } },
     { command: 'update_equipment', params: { elementId: 'equipment-1', location: [3500, 3000] } },
   ],
   industrial_portal_frame: [
-    {
-      command: 'add_portal_frame_building',
-      params: { span: 18000, length: 30000, baySpacing: 6000, eaveHeight: 6000, roofPitch: 6 },
-    },
+    { command: 'add_portal_frame_building', params: { span: 18000, length: 30000, baySpacing: 6000, eaveHeight: 6000, roofPitch: 6 } },
   ],
   industrial_portal_crane: [
     {
@@ -886,32 +427,8 @@ export const plans: Record<string, GoldenAction[]> = {
 /** Plans needing the Manifold geometry kernel (booleans). */
 export const kernelPlans: Record<string, GoldenAction[]> = {
   kernel_sweep_welded_to_revolution: [
-    {
-      command: 'revolve_profile',
-      params: {
-        profile: [
-          [0, 0],
-          [3, 0],
-          [3, 4],
-          [0, 4],
-        ],
-        segments: 24,
-      },
-      as: 'drum',
-    },
-    {
-      command: 'sweep_profile',
-      params: {
-        path: [
-          [2, 0, 2],
-          [7, 0, 2],
-          [7, 0, 8],
-        ],
-        radius: 0.5,
-        bendRadius: 2,
-      },
-      as: 'pipe',
-    },
+    { command: 'revolve_profile', params: { profile: xy(0, 0, 3, 0, 3, 4, 0, 4), segments: 24 }, as: 'drum' },
+    { command: 'sweep_profile', params: { path: xyz(2, 0, 2, 7, 0, 2, 7, 0, 8), radius: 0.5, bendRadius: 2 }, as: 'pipe' },
     { command: 'boolean', params: { op: 'union', a: '$drum', b: '$pipe' } },
   ],
   kernel_boolean_union: [

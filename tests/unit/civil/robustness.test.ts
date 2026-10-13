@@ -8,6 +8,7 @@ import { drawnInterval, MAX_CONTOUR_LEVELS } from '@aec/civil/surface/surfaceEva
 import { buildTin } from '@aec/civil/surface/tin';
 import { MAX_SURFACE_POINTS } from '@aec/civil/model';
 import { metricDocument, surveyedDocument } from './fixtures';
+import { xy, xyz } from '../../helpers/xy';
 
 function dxf(pairs: Array<[number, string | number]>): string {
   return pairs.map(([code, value]) => `${code}\n${value}`).join('\n') + '\n';
@@ -43,7 +44,6 @@ describe('DXF resource limits', () => {
     expect(skipped.get('over limit')).toBeGreaterThan(0);
     expect(performance.now() - started).toBeLessThan(2000);
   });
-
   it('drops non-finite LWPOLYLINE vertices', () => {
     const text = dxf([
       [0, 'SECTION'],
@@ -61,10 +61,7 @@ describe('DXF resource limits', () => {
     const drawing = parseDxf(text);
     if (!drawing) throw new Error('unparsed');
     const [polyline] = flattenDxf(drawing).primitives;
-    expect(polyline?.kind === 'polyline' && polyline.points).toEqual([
-      [0, 0, 5],
-      [2, 2, 5],
-    ]);
+    expect(polyline?.kind === 'polyline' && polyline.points).toEqual(xyz(0, 0, 5, 2, 2, 5));
     const imported = execute(metricDocument(), 'import_survey_dxf', { text });
     const group = imported.document.civil?.objects['pointGroup-1'];
     const positions = group?.category === 'pointGroup' ? group.points.map((p) => p.position) : [];
@@ -86,12 +83,7 @@ describe('earthworks grid cap', () => {
 
 describe('contours over a tall surface', () => {
   it('widens the interval so the whole range is contoured', () => {
-    const tin = buildTin([
-      [0, 0, 0],
-      [10, 0, 1000],
-      [0, 10, 0],
-      [10, 10, 1000],
-    ]);
+    const tin = buildTin(xyz(0, 0, 0, 10, 0, 1000, 0, 10, 0, 10, 10, 1000));
     expect(drawnInterval(tin, 1)).toBe(Math.ceil(1000 / MAX_CONTOUR_LEVELS));
     expect(drawnInterval(tin, 10)).toBe(10);
     expect(drawnInterval(buildTin([]), 1)).toBe(1);
@@ -102,12 +94,7 @@ describe('affected lists regenerated dependents', () => {
   it('update_surface reports the platform it regraded', () => {
     const doc = execute(surveyedDocument(), 'add_platform', {
       surfaceId: 'surface-1',
-      boundary: [
-        [30, 30],
-        [50, 30],
-        [50, 50],
-        [30, 50],
-      ],
+      boundary: xy(30, 30, 50, 30, 50, 50, 30, 50),
       elevation: 102,
     }).document;
     const result = execute(doc, 'update_surface', { surfaceId: 'surface-1', contourInterval: 0.5 });
@@ -132,7 +119,6 @@ describe('surface point limit', () => {
 
 describe('civil file validation', () => {
   const base = (): Record<string, unknown> => JSON.parse(JSON.stringify(surveyedDocument().civil)) as Record<string, unknown>;
-
   function withObject(object: Record<string, unknown>): Record<string, unknown> {
     const civil = base();
     const objects = civil['objects'] as Record<string, unknown>;
@@ -140,27 +126,21 @@ describe('civil file validation', () => {
     civil['order'] = [...(civil['order'] as string[]), object['id']];
     return civil;
   }
-
   const alignment = {
     id: 'alignment-1',
     category: 'alignment',
     name: 'A',
     entityIds: [],
-    points: [
-      [0, 0],
-      [10, 0],
-    ],
+    points: xy(0, 0, 10, 0),
     radii: [],
     startStation: 0,
     stationInterval: 20,
     profile: [],
   };
-
   it('accepts a valid model', () => {
     expect(civilErrors(base())).toEqual([]);
     expect(civilErrors(withObject(alignment))).toEqual([]);
   });
-
   it('rejects malformed profiles, sections, radii and orders', () => {
     const cases: Array<[Record<string, unknown>, RegExp]> = [
       [withObject({ ...alignment, profile: [null, null] }), /profile entries/],
@@ -188,7 +168,6 @@ describe('civil file validation', () => {
       expect(civilErrors(civil).join('\n')).toMatch(message);
     }
   });
-
   it('rejects such a file on load with a clean error', () => {
     const doc = surveyedDocument();
     const envelope = JSON.parse(serializeDocument(doc)) as { document: Record<string, unknown> };

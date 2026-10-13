@@ -11,19 +11,14 @@ import { drawingSnapPoints } from '../../src/ui/viewport/2d/solidDrawingSnaps';
 import { collectSnapCandidates } from '../../src/ui/viewport/2d/snapping/candidates';
 import { entitiesInBox } from '../../src/ui/viewport/2d/boxSelect';
 import { nearestEntityId } from '../../src/ui/viewport/2d/modifyHelpers';
+import { xy } from '../helpers/xy';
 
 const entityOf = (doc: CadDocument, id: string): Entity => doc.entities[id] as Entity;
 const snapsOf = (doc: CadDocument, id: string): ReturnType<typeof drawingSnapPoints> =>
   drawingSnapPoints(solidDrawing(doc, entityOf(doc, id)));
 const has = (snaps: ReturnType<typeof drawingSnapPoints>, type: string, x: number, y: number): boolean =>
   snaps.some((s) => s.type === type && Math.hypot(s.x - x, s.y - y) < 1e-3);
-const line = (a: Vec2, b: Vec2, style: 'visible' | 'center' = 'visible'): DrawingPrimitive => ({
-  type: 'line',
-  layer: 'L',
-  style,
-  a,
-  b,
-});
+const line = (a: Vec2, b: Vec2, style: 'visible' | 'center' = 'visible'): DrawingPrimitive => ({ type: 'line', layer: 'L', style, a, b });
 
 describe('solidDrawing', () => {
   it('is the top-view technical drawing of the solid alone, memoized per entity', () => {
@@ -32,7 +27,6 @@ describe('solidDrawing', () => {
     expect(first.some((p) => p.style === 'visible')).toBe(true);
     expect(solidDrawing(doc, entityOf(doc, id))).toBe(first);
   });
-
   it('is empty for 2D shapes and derived bim geometry', () => {
     const arc = add(createEmptyDocument(), 'draw_arc', { center: [0, 0], radius: 1 });
     expect(solidDrawing(arc.doc, entityOf(arc.doc, arc.id))).toEqual([]);
@@ -40,7 +34,6 @@ describe('solidDrawing', () => {
     const tagged = { ...entityOf(box.doc, box.id), tags: ['bim'] } as Entity;
     expect(solidDrawing(box.doc, tagged)).toEqual([]);
   });
-
   it('re-expands an instance when its component changes', () => {
     const box = add(createEmptyDocument(), 'add_box', { size: [2, 2, 2] });
     const comp = add(box.doc, 'create_component', { name: 'C', entityIds: [box.id] });
@@ -50,7 +43,6 @@ describe('solidDrawing', () => {
     const emptied = { ...comp.doc, components: {} };
     expect(solidDrawing(emptied, instance)).toEqual([]);
   });
-
   it('re-expands an instance when a nested component changes', () => {
     const box = add(createEmptyDocument(), 'add_box', { size: [2, 2, 2] });
     const inner = add(box.doc, 'create_component', { name: 'Inner', entityIds: [box.id] });
@@ -62,7 +54,6 @@ describe('solidDrawing', () => {
     expect(Object.keys(rest).length).toBeLessThan(Object.keys(outer.doc.components).length);
     expect(solidDrawing({ ...outer.doc, components: rest }, instance)).not.toBe(solidDrawing(outer.doc, instance));
   });
-
   it('keys the memo on the section depth: the cut view is a different, cached drawing', () => {
     const { doc, id } = add(createEmptyDocument(), 'add_box', { size: [4, 2, 4] });
     const solid = entityOf(doc, id);
@@ -85,7 +76,6 @@ describe('drawing edges', () => {
     expect(segmentsDistSq(segments, [5, 1])).toBeCloseTo(2);
     expect(segmentsDistSq([], [0, 0])).toBe(Infinity);
   });
-
   it('chains segments through degree-2 vertices only', () => {
     const chains = drawingChains([
       line([0, 0], [1, 0]),
@@ -100,20 +90,8 @@ describe('drawing edges', () => {
     expect(chains.find((c) => c.closed)?.points).toHaveLength(4);
     expect(chains.filter((c) => !c.closed)).toHaveLength(3);
   });
-
   it('turns a polygon primitive into a closed ring', () => {
-    const [chain] = drawingChains([
-      {
-        type: 'polygon',
-        layer: 'L',
-        style: 'cut',
-        points: [
-          [0, 0],
-          [2, 0],
-          [2, 2],
-        ],
-      },
-    ]);
+    const [chain] = drawingChains([{ type: 'polygon', layer: 'L', style: 'cut', points: xy(0, 0, 2, 0, 2, 2) }]);
     expect(chain?.closed).toBe(true);
     expect(chain?.points).toHaveLength(3);
   });
@@ -131,13 +109,8 @@ describe('drawing snap points', () => {
     expect(has(snaps, 'endpoint', px - 2, py - 1)).toBe(true);
     expect(has(snaps, 'midpoint', px, py - 1)).toBe(true);
   });
-
   it('gives a cylinder its centre and exactly four quadrants, not one snap per chord', () => {
-    const { doc, id } = add(createEmptyDocument(), 'add_cylinder', {
-      radius: 3,
-      height: 2,
-      position: [10, 5, 0],
-    });
+    const { doc, id } = add(createEmptyDocument(), 'add_cylinder', { radius: 3, height: 2, position: [10, 5, 0] });
     const snaps = snapsOf(doc, id);
     expect(has(snaps, 'center', 10, 5)).toBe(true);
     const quadrants = snaps.filter((s) => s.type === 'endpoint');
@@ -148,15 +121,9 @@ describe('drawing snap points', () => {
     expect(has(snaps, 'endpoint', 10, 2)).toBe(true);
     expect(snaps.some((s) => s.type === 'midpoint')).toBe(false);
   });
-
   it.each([12, 16])('gives a %i-segment revolved ring centre-free quadrants only', (segments) => {
     const { doc, id } = add(createEmptyDocument(), 'revolve_profile', {
-      profile: [
-        [2, 0],
-        [3, 0],
-        [3, 1],
-        [2, 1],
-      ],
+      profile: xy(2, 0, 3, 0, 3, 1, 2, 1),
       axis: 'z',
       angle: Math.PI * 2,
       segments,
@@ -170,14 +137,12 @@ describe('drawing snap points', () => {
       expect(has(snaps, 'endpoint', e.position[0], e.position[1] - radius)).toBe(true);
     }
   });
-
   it('gives a sphere four quadrants and no per-chord snaps', () => {
     const { doc, id } = add(createEmptyDocument(), 'add_sphere', { radius: 2 });
     const snaps = snapsOf(doc, id);
     expect(snaps.filter((s) => s.type === 'endpoint')).toHaveLength(4);
     expect(snaps.some((s) => s.type === 'midpoint')).toBe(false);
   });
-
   it('keeps the corners of a hexagonal prism and of a bend between unequal segments', () => {
     const hex = add(createEmptyDocument(), 'extrude_profile', {
       profile: Array.from({ length: 6 }, (_, k): Vec2 => [3 * Math.cos((k * Math.PI) / 3), 3 * Math.sin((k * Math.PI) / 3)]),
@@ -194,31 +159,22 @@ describe('drawing snap points', () => {
     ]);
     expect(bend.filter((s) => s.type === 'endpoint')).toHaveLength(4);
   });
-
   it('follows a tilted solid and snaps to its drawn corners', () => {
-    const { doc, id } = add(createEmptyDocument(), 'add_box', {
-      size: [2, 2, 2],
-      rotation: [0, 0, Math.PI / 4],
-    });
+    const { doc, id } = add(createEmptyDocument(), 'add_box', { size: [2, 2, 2], rotation: [0, 0, Math.PI / 4] });
     const snaps = snapsOf(doc, id);
     const r = Math.SQRT2;
     const e = entityOf(doc, id);
     expect(has(snaps, 'endpoint', e.position[0] + r, e.position[1])).toBe(true);
     expect(has(snaps, 'endpoint', e.position[0], e.position[1] - r)).toBe(true);
-    const tilted = add(createEmptyDocument(), 'add_box', {
-      size: [2, 2, 2],
-      rotation: [Math.PI / 4, 0, 0],
-    });
+    const tilted = add(createEmptyDocument(), 'add_box', { size: [2, 2, 2], rotation: [Math.PI / 4, 0, 0] });
     expect(snapsOf(tilted.doc, tilted.id).filter((s) => s.type === 'endpoint').length).toBeGreaterThanOrEqual(4);
   });
-
   it('gives crossing centre lines a centre snap but a lone axis line none', () => {
     const cross = drawingSnapPoints([line([-2, 1], [2, 1], 'center'), line([0, -1], [0, 3], 'center')]);
     expect(cross).toEqual([{ x: 0, y: 1, type: 'center' }]);
     expect(drawingSnapPoints([line([0, 0], [4, 0], 'center')])).toEqual([]);
     expect(drawingSnapPoints([line([-2, 1], [2, 1], 'center'), line([0, 2], [0, 6], 'center')])).toEqual([]);
   });
-
   it('is empty for empty geometry', () => {
     expect(drawingSnapPoints([])).toEqual([]);
     expect(drawingSegments([])).toEqual([]);
@@ -232,7 +188,6 @@ describe('boolean plate with a hole (Manifold kernel)', () => {
     setGeometryKernel(await createManifoldKernel());
   }, 60_000);
   afterAll(() => setGeometryKernel(previous));
-
   it('snaps to the hole centre and quadrants and picks the hole edge', () => {
     let doc = createEmptyDocument();
     const plate = add(doc, 'add_box', { size: [10, 10, 2], position: [0, 0, 0] });
@@ -255,13 +210,11 @@ describe('2D interaction derived from the drawing', () => {
     const none = collectSnapCandidates(doc, { endpoints: false, midpoints: false, centers: false });
     expect(none.filter((s) => s.type !== 'perpendicular' && s.type !== 'tangent')).toHaveLength(0);
   });
-
   it('picks a cylinder outline but not its interior', () => {
     const { doc, id } = add(createEmptyDocument(), 'add_cylinder', { radius: 3, height: 2 });
     expect(nearestEntityId(doc, [3.05, 0], 0.2)).toBe(id);
     expect(nearestEntityId(doc, [0, 0], 0.2)).toBeNull();
   });
-
   it('box-selects by window (whole drawing inside) and crossing (touching)', () => {
     const { doc, id } = add(createEmptyDocument(), 'add_cylinder', { radius: 3, height: 2 });
     expect(entitiesInBox(doc, [-4, -4], [4, 4])).toEqual([id]);

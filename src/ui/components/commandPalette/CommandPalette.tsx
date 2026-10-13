@@ -11,11 +11,13 @@ import { CommandParamForm } from './CommandParamForm';
 
 function runCommand(command: CommandDefinition<unknown>, params: Record<string, unknown>): void {
   const readOnly = command.annotations?.readOnly === true;
-  useStore.getState().dispatch(command.name, params, {
-    selectAffected: true,
-    onResult: ({ summary, changed }) =>
-      usePaletteStore.getState().showResult({ commandName: command.name, summary, failed: !changed && !readOnly }),
-  });
+  useStore
+    .getState()
+    .dispatch(command.name, params, {
+      selectAffected: true,
+      onResult: ({ summary, changed }) =>
+        usePaletteStore.getState().showResult({ commandName: command.name, summary, failed: !changed && !readOnly }),
+    });
 }
 
 /** Takes input or would destroy content. */

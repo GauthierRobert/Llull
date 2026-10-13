@@ -13,6 +13,7 @@ import { type IfcExport } from '@aec/building/exchange/ifcBuild';
 import { ifcGuid, ifcReal, ifcString } from '@aec/building/exchange/ifcStep';
 import { fileSlug } from '@aec/building/model';
 import { drawHouseWalls, run } from '../../helpers/runFixtures';
+import { xy } from '../../helpers/xy';
 
 /** True for code points XML 1.0 forbids (C0 controls other than tab, LF, CR; U+FFFE; U+FFFF). */
 function isIllegalXmlCharacter(character: string): boolean {
@@ -21,11 +22,7 @@ function isIllegalXmlCharacter(character: string): boolean {
 }
 
 function house(): CadDocument {
-  let doc = run(createEmptyDocument(), 'set_project_info', {
-    name: 'Maison Dupont',
-    author: 'BTP Martin',
-    date: '2026-10-01',
-  });
+  let doc = run(createEmptyDocument(), 'set_project_info', { name: 'Maison Dupont', author: 'BTP Martin', date: '2026-10-01' });
   doc = run(doc, 'add_level', { name: 'Rez-de-chaussée' });
   doc = run(doc, 'add_grid_system', { xSpacings: [5000, 5000], ySpacings: [8000] });
   doc = drawHouseWalls(doc);
@@ -38,15 +35,7 @@ function house(): CadDocument {
   doc = run(doc, 'add_column', { location: [2000, 4000], shape: 'circular' });
   doc = run(doc, 'add_beam', { start: [0, 4000], end: [10000, 4000] });
   doc = run(doc, 'add_stair', { start: [6000, 1000], riserCount: 12 });
-  doc = run(doc, 'add_room', {
-    name: 'Séjour',
-    boundary: [
-      [150, 150],
-      [9850, 150],
-      [9850, 7850],
-      [150, 7850],
-    ],
-  });
+  doc = run(doc, 'add_room', { name: 'Séjour', boundary: xy(150, 150, 9850, 150, 9850, 7850, 150, 7850) });
   return doc;
 }
 
@@ -66,13 +55,11 @@ describe('plan drawing', () => {
     const dims = plan.primitives.filter((p) => p.type === 'dimension').map((p) => p.type === 'dimension' && p.label);
     expect(dims).toEqual(['10300', '8300', '5000', '5000', '8000']);
   });
-
   it('draws grid lines as chain (centre) lines', () => {
     const grids = buildPlanDrawing(house(), undefined)!.primitives.filter((p) => p.layer === 'S-GRID' && p.type === 'line');
     expect(grids.length).toBeGreaterThan(0);
     expect(grids.every((p) => p.style === 'center')).toBe(true);
   });
-
   it('returns null for an unknown level and can skip dimensions', () => {
     const doc = house();
     expect(buildPlanDrawing(doc, 'level-9')).toBeNull();
@@ -80,17 +67,11 @@ describe('plan drawing', () => {
     const plain = buildPlanDrawing(doc, 'level-1', { dimensions: false })!;
     expect(plain.primitives.some((p) => p.type === 'dimension')).toBe(false);
   });
-
   it('helpers', () => {
     expect(drawingBounds([])).toEqual([0, 0, 0, 0]);
     let metres = run(createEmptyDocument(), 'set_units', { units: 'm' });
     expect(dimensionLabel(metres, 2.45)).toBe('2450');
-    metres = run(metres, 'draw_walls', {
-      points: [
-        [0, 0],
-        [4, 0],
-      ],
-    });
+    metres = run(metres, 'draw_walls', { points: xy(0, 0, 4, 0) });
     expect(buildPlanDrawing(metres, undefined)!.primitives.flatMap((p) => (p.type === 'dimension' ? [p.label] : []))).toEqual([
       '4200',
       '200',
@@ -103,30 +84,13 @@ describe('plan drawing', () => {
 describe('export_dxf', () => {
   it('writes an R12 DXF with AIA layers, entities and the 2D drafting', () => {
     let doc = house();
-    doc = run(doc, 'draw_polyline', {
-      points: [
-        [0, -3000],
-        [10000, -3000],
-      ],
-    });
+    doc = run(doc, 'draw_polyline', { points: xy(0, -3000, 10000, -3000) });
     doc = run(doc, 'draw_rectangle', { width: 1000, height: 500, position: [0, -5000] });
     doc = run(doc, 'draw_arc', { center: [0, 0], radius: 300, position: [12000, 0] });
     doc = run(doc, 'draw_arc', { center: [0, 0], radius: 300, startAngle: 0, endAngle: 1.5 });
-    doc = run(doc, 'draw_polyline', {
-      points: [
-        [0, 0],
-        [1, 1],
-        [2, 0],
-      ],
-    });
+    doc = run(doc, 'draw_polyline', { points: xy(0, 0, 1, 1, 2, 0) });
     doc = run(doc, 'draw_ellipse', { center: [0, 0], radiusX: 2, radiusY: 1 });
-    doc = run(doc, 'draw_spline', {
-      points: [
-        [0, 0],
-        [1, 2],
-        [3, 1],
-      ],
-    });
+    doc = run(doc, 'draw_spline', { points: xy(0, 0, 1, 2, 3, 1) });
     doc = run(doc, 'draw_point', { position: [5, 5] });
     doc = run(doc, 'add_text', { content: 'Note ²', position: [0, -6000, 0], height: 200 });
     const snapshot = structuredClone(doc);
@@ -138,9 +102,7 @@ describe('export_dxf', () => {
     expect(data.dxf.startsWith('0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1009')).toBe(true);
     expect(data.dxf.trimEnd().endsWith('0\nEOF')).toBe(true);
     expect(data.layers).toEqual(expect.arrayContaining(['A-WALL', 'A-DOOR', 'A-GLAZ', 'S-GRID', 'A-ANNO-DIMS', 'Layer_0']));
-    expect(data.dxf).toContain('\nARC\n');
-    expect(data.dxf).toContain('\nPOINT\n');
-    expect(data.dxf).toContain('Note \\U+00B2');
+    for (const s of ['\nARC\n', '\nPOINT\n', 'Note \\U+00B2']) expect(data.dxf).toContain(s);
     expect(data.dxf).toMatch(/\nLAYER\n2\nS-BEAM\n70\n0\n62\n4\n6\nDASHED/);
     expect(data.dxf).toMatch(/\nLAYER\n2\nS-GRID\n70\n0\n62\n1\n6\nCENTER/);
     // DXF is a strict alternation of group codes and values.
@@ -148,7 +110,6 @@ describe('export_dxf', () => {
     expect(lines.length % 2).toBe(0);
     for (let index = 0; index < lines.length; index += 2) expect(lines[index]).toMatch(/^\d+$/);
   });
-
   it('exports 3D solids as their technical top view (visible, hidden dashed, centre chain)', () => {
     let doc = run(createEmptyDocument(), 'add_box', { size: [10, 10, 1], position: [0, 0, 5] });
     doc = run(doc, 'add_cylinder', { radius: 2, height: 2, position: [0, 0, 0] });
@@ -159,21 +120,14 @@ describe('export_dxf', () => {
     expect(data.dxf).toContain('\nLTYPE\n2\nCENTER\n');
     expect(execute(doc, 'export_dxf', { includeDrafting: false }).summary).toMatch(/nothing/);
   });
-
   it('exports drafting-only documents and fails cleanly', () => {
-    const drafting = run(createEmptyDocument(), 'draw_polyline', {
-      points: [
-        [0, 0],
-        [1, 0],
-      ],
-    });
+    const drafting = run(createEmptyDocument(), 'draw_polyline', { points: xy(0, 0, 1, 0) });
     const result = execute(drafting, 'export_dxf', {});
     expect((result.data as DxfExport).filename).toBe('Untitled_project_drafting.dxf');
     expect(execute(drafting, 'export_dxf', { levelId: 'level-1' }).summary).toMatch(/no level/);
     expect(execute(createEmptyDocument(), 'export_dxf', {}).summary).toMatch(/nothing to export/);
     expect(execute(drafting, 'export_dxf', { includeDrafting: false }).summary).toMatch(/nothing/);
   });
-
   it('name and text helpers', () => {
     expect(dxfLayerName('Layer 0 / walls')).toBe('Layer_0___walls');
     expect(dxfLayerName('')).toBe('0');
@@ -187,19 +141,14 @@ describe('export_plan_sheet', () => {
     const sheet = result.data as PlanSheet;
     expect(sheet).toMatchObject({ paper: 'A3', scale: 100, levelId: 'level-1' });
     expect(sheet.filename).toBe('Maison_Dupont_Rez-de-chaussee_A3_1-100.svg');
-    expect(sheet.svg).toContain('width="420mm" height="297mm"');
-    expect(sheet.svg).toContain('id="title-block"');
-    expect(sheet.svg).toContain('Maison Dupont');
-    expect(sheet.svg).toContain('1:100 @ A3');
-    // Concrete cuts (walls, square and round columns) are hatched.
-    expect(sheet.svg).toContain('class="cut-hatch"');
+    for (const s of ['width="420mm" height="297mm"', 'id="title-block"', 'Maison Dupont', '1:100 @ A3', 'class="cut-hatch"'])
+      expect(sheet.svg).toContain(s);
     expect(sheet.svg).toMatch(/<circle [^>]*class="cut-hatch"/);
     expect(sheet.svg).toContain('class="hidden"');
     expect(sheet.svg).toMatch(/<path d="M [\d.]+ [\d.]+ A /);
     expect(sheet.svg).toContain('id="north-arrow"');
     expect(sheet.svg).toContain('id="scale-bar"');
   });
-
   it('honours paper, scale and title; rejects bad input', () => {
     const doc = house();
     const sheet = execute(doc, 'export_plan_sheet', { paper: 'A1', scale: 50, title: 'Plan <RDC>' }).data as PlanSheet;
@@ -209,7 +158,6 @@ describe('export_plan_sheet', () => {
     expect(execute(doc, 'export_plan_sheet', { scale: 0 }).summary).toMatch(/invalid scale/);
     expect(execute(createEmptyDocument(), 'export_plan_sheet', {}).data).toBeUndefined();
   });
-
   it('fitScale extends past the standard scales (1-2-5) and escapeXml escapes', () => {
     expect(fitScale(1e9, 1e9, { x: 0, y: 0, width: 100, height: 100 })).toBe(20_000_000);
     expect(fitScale(1000, 1000, { x: 0, y: 0, width: 100, height: 100 })).toBe(20);
@@ -221,14 +169,7 @@ describe('export_ifc', () => {
   it('writes a schema-shaped IFC4 file with spatial structure, voids and fills', () => {
     let doc = house();
     doc = run(doc, 'add_level', { name: 'Toit' });
-    doc = run(doc, 'add_slab', {
-      boundary: [
-        [0, 0],
-        [10000, 0],
-        [10000, 8000],
-      ],
-      role: 'roof',
-    });
+    doc = run(doc, 'add_slab', { boundary: xy(0, 0, 10000, 0, 10000, 8000), role: 'roof' });
     const result = execute(doc, 'export_ifc', {});
     const data = result.data as IfcExport;
     expect(data.filename).toBe('Maison_Dupont.ifc');
@@ -270,7 +211,6 @@ describe('export_ifc', () => {
     expect((execute(doc, 'export_ifc', {}).data as IfcExport).ifc).toBe(data.ifc);
     expect(result.summary).toMatch(/2 storey/);
   });
-
   it('fails without levels; honours an explicit timestamp', () => {
     expect(execute(createEmptyDocument(), 'export_ifc', {}).summary).toMatch(/no levels/);
     const doc = run(createEmptyDocument(), 'add_level', {});
@@ -278,7 +218,6 @@ describe('export_ifc', () => {
     expect(data.ifc).toContain("'2027-01-02T03:04:05'");
     expect((execute(doc, 'export_ifc', {}).data as IfcExport).ifc).toContain("'1970-01-01T00:00:00'");
   });
-
   it('encoding helpers', () => {
     expect(ifcGuid('a')).toHaveLength(22);
     expect(ifcGuid('a')).not.toBe(ifcGuid('b'));
@@ -293,52 +232,25 @@ describe('export_ifc', () => {
 
 describe('identity', () => {
   it('two projects never share IFC GlobalIds; one project keeps them stable', () => {
-    const a = run(createEmptyDocument(), 'draw_walls', {
-      points: [
-        [0, 0],
-        [1000, 0],
-      ],
-    });
-    const b = run(createEmptyDocument(), 'draw_walls', {
-      points: [
-        [0, 0],
-        [1000, 0],
-      ],
-    });
+    const a = run(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 1000, 0) });
+    const b = run(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 1000, 0) });
     const guids = (doc: CadDocument): string[] =>
       [...(execute(doc, 'export_ifc', {}).data as IfcExport).ifc.matchAll(/\('([0-9A-Za-z_$]{22})'/g)].map((match) => match[1]!);
     const shared = guids(a).filter((guid) => guids(b).includes(guid));
     expect(shared).toEqual([]);
     expect(guids(a)).toEqual(guids(run(a, 'set_project_info', { client: 'X' })));
   });
-
   it('element and level numbers are never reused after a delete', () => {
-    let doc = run(createEmptyDocument(), 'draw_walls', {
-      points: [
-        [0, 0],
-        [1000, 0],
-      ],
-    });
-    doc = run(doc, 'draw_walls', {
-      points: [
-        [0, 500],
-        [1000, 500],
-      ],
-    });
+    let doc = run(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 1000, 0) });
+    doc = run(doc, 'draw_walls', { points: xy(0, 500, 1000, 500) });
     doc = run(doc, 'delete_building_element', { elementIds: ['wall-2'] });
-    doc = run(doc, 'draw_walls', {
-      points: [
-        [0, 900],
-        [1000, 900],
-      ],
-    });
+    doc = run(doc, 'draw_walls', { points: xy(0, 900, 1000, 900) });
     expect(Object.keys(doc.building!.elements)).toEqual(['wall-1', 'wall-3']);
     doc = run(doc, 'add_level', {});
     doc = run(doc, 'delete_level', { levelId: 'level-2' });
     doc = run(doc, 'add_level', {});
     expect(doc.building!.levelOrder).toEqual(['level-1', 'level-3']);
   });
-
   it('escapes astral characters with \\X4\\', () => {
     expect(ifcString('🏠')).toBe("'\\X4\\0001F3E0\\X0\\'");
   });
@@ -346,12 +258,7 @@ describe('identity', () => {
 
 describe('DXF drafting text and extents', () => {
   it('keeps text rotation / alignment and covers drafting in $EXTMAX', () => {
-    let doc = run(createEmptyDocument(), 'draw_walls', {
-      points: [
-        [0, 0],
-        [1000, 0],
-      ],
-    });
+    let doc = run(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 1000, 0) });
     doc = run(doc, 'add_text', {
       content: 'Far note',
       position: [50000, 20000, 0],
@@ -371,15 +278,7 @@ describe('DXF layer names', () => {
     writer.line('A B', [0, 0], [1, 0]);
     writer.line('A_B', [0, 0], [1, 1]);
     writer.line('A B', [0, 0], [0, 1]);
-    writer.polyline(
-      'A/B',
-      [
-        [0, 0],
-        [1, 0],
-        [1, 1],
-      ],
-      false,
-    );
+    writer.polyline('A/B', xy(0, 0, 1, 0, 1, 1), false);
     writer.line('S-GRID', [0, 0], [1, 0]);
     expect([...writer.layers.keys()]).toEqual(['A_B', 'A_B_2', 'A_B_3', 'S-GRID']);
     const layerOfEntity = (type: string): string[] =>
@@ -396,15 +295,7 @@ describe('SVG sheets stay well-formed XML for hostile names', () => {
     const nasty = `<A&B> "q" 'x' \u0001\u000b é`;
     let doc = run(createEmptyDocument(), 'set_project_info', { name: nasty, author: nasty });
     doc = run(doc, 'add_level', { name: nasty });
-    doc = run(doc, 'draw_walls', {
-      points: [
-        [0, 0],
-        [6000, 0],
-        [6000, 5000],
-        [0, 5000],
-      ],
-      closed: true,
-    });
+    doc = run(doc, 'draw_walls', { points: xy(0, 0, 6000, 0, 6000, 5000, 0, 5000), closed: true });
     doc = run(doc, 'add_room', { name: nasty, wallIds: ['wall-1', 'wall-2', 'wall-3', 'wall-4'] });
     for (const name of ['export_plan_sheet', 'export_elevation_sheet']) {
       const svg = (execute(doc, name, {}).data as { svg: string }).svg;
@@ -417,7 +308,6 @@ describe('SVG sheets stay well-formed XML for hostile names', () => {
 
 describe('extreme model sizes', () => {
   const viewport = { x: 0, y: 0, width: 400, height: 250 };
-
   it('fitScale goes beyond the standard scales so the drawing always fits', () => {
     expect(fitScale(10, 10, viewport)).toBeLessThanOrEqual(20);
     for (const extent of [5_000_000, 500_000_000, 123_456_789_012]) {
@@ -428,7 +318,6 @@ describe('extreme model sizes', () => {
     }
     expect(fitScale(Infinity, 1, viewport)).toBe(2000);
   });
-
   it('plan sheet warns when a requested scale does not fit the paper, not when auto-fitted', () => {
     const doc = house();
     const auto = execute(doc, 'export_plan_sheet', {});
@@ -439,7 +328,6 @@ describe('extreme model sizes', () => {
     expect(tooBig.summary).toMatch(/WARNING: the drawing is larger than the paper at this scale/);
     expect(execute(doc, 'export_plan_sheet', { scale: 100 }).summary).not.toMatch(/WARNING/);
   });
-
   it('elevation sheet warns when a requested scale does not fit, not when auto-fitted', () => {
     const doc = house();
     const auto = execute(doc, 'export_elevation_sheet', {});
@@ -449,16 +337,9 @@ describe('extreme model sizes', () => {
     expect((tooBig.data as { fits: boolean }).fits).toBe(false);
     expect(tooBig.summary).toMatch(/WARNING: the view is larger than the paper at this scale/);
   });
-
   it('DXF hatch density is capped for a 500 km wall', () => {
     let doc = run(createEmptyDocument(), 'add_level', { name: 'L' });
-    doc = run(doc, 'draw_walls', {
-      points: [
-        [0, 0],
-        [500_000_000, 0],
-      ],
-      thickness: 10_000_000,
-    });
+    doc = run(doc, 'draw_walls', { points: xy(0, 0, 500_000_000, 0), thickness: 10_000_000 });
     const data = execute(doc, 'export_dxf', {}).data as DxfExport;
     expect(data.entityCount).toBeLessThan(5000);
   });
@@ -466,11 +347,7 @@ describe('extreme model sizes', () => {
 
 describe('export_ifc counts', () => {
   it('reports elements and IFC products separately and truthfully', () => {
-    const hall = execute(createEmptyDocument(), 'add_portal_frame_building', {
-      span: 12000,
-      length: 12000,
-      baySpacing: 6000,
-    }).document;
+    const hall = execute(createEmptyDocument(), 'add_portal_frame_building', { span: 12000, length: 12000, baySpacing: 6000 }).document;
     const result = execute(hall, 'export_ifc', {});
     const data = result.data as IfcExport;
     const modelled = Object.keys(hall.building?.elements ?? {}).length;
@@ -502,12 +379,7 @@ describe('cut fills (hatches)', () => {
   it('marks wall and column cuts as hatched and steel sections as solid with holes', () => {
     let doc = house();
     doc = run(doc, 'add_column', { location: [20000, 20000] });
-    doc = run(doc, 'add_steel_member', {
-      profile: 'SHS100x5',
-      role: 'column',
-      start: [25000, 20000, 0],
-      end: [25000, 20000, 3000],
-    });
+    doc = run(doc, 'add_steel_member', { profile: 'SHS100x5', role: 'column', start: [25000, 20000, 0], end: [25000, 20000, 3000] });
     const primitives = buildPlanDrawing(doc, undefined)!.primitives;
     const fills = (layer: string): Array<string | undefined> =>
       primitives.flatMap((p) => (p.type === 'polygon' && p.layer === layer ? [p.fill] : []));
@@ -516,32 +388,18 @@ describe('cut fills (hatches)', () => {
     const steel = primitives.find((p) => p.type === 'polygon' && p.fill === 'solid');
     expect(steel?.type === 'polygon' && steel.holes).toHaveLength(1);
   });
-
   it('writes ANSI31 lines and SOLID fills on -PATT layers in the DXF', () => {
     let doc = house();
-    doc = run(doc, 'add_steel_member', {
-      profile: 'HEA300',
-      role: 'column',
-      start: [25000, 20000, 0],
-      end: [25000, 20000, 3000],
-    });
+    doc = run(doc, 'add_steel_member', { profile: 'HEA300', role: 'column', start: [25000, 20000, 0], end: [25000, 20000, 3000] });
     doc = run(doc, 'add_column', { location: [30000, 20000], shape: 'circular', width: 400 });
     const data = execute(doc, 'export_dxf', { levelId: 'level-1' }).data as DxfExport;
     expect(data.layers).toEqual(expect.arrayContaining(['A-WALL-PATT', 'S-COLS-PATT']));
-    expect(data.dxf).toMatch(/0\nSOLID\n8\nS-COLS-PATT\n/);
-    expect(data.dxf).toMatch(/0\nLINE\n8\nA-WALL-PATT\n/);
-    // Pattern layers are grey (ACI 8) in the layer table.
-    expect(data.dxf).toMatch(/2\nA-WALL-PATT\n70\n0\n62\n8\n/);
+    for (const s of [/0\nSOLID\n8\nS-COLS-PATT\n/, /0\nLINE\n8\nA-WALL-PATT\n/, /2\nA-WALL-PATT\n70\n0\n62\n8\n/])
+      expect(data.dxf).toMatch(s);
   });
-
   it('hatches cut walls and keeps steel section holes open on the SVG sheet', () => {
     let doc = house();
-    doc = run(doc, 'add_steel_member', {
-      profile: 'SHS100x5',
-      role: 'column',
-      start: [2000, 2000, 0],
-      end: [2000, 2000, 3000],
-    });
+    doc = run(doc, 'add_steel_member', { profile: 'SHS100x5', role: 'column', start: [2000, 2000, 0], end: [2000, 2000, 3000] });
     const sheet = execute(doc, 'export_plan_sheet', {}).data as PlanSheet;
     expect(sheet.svg).toContain('id="hatch-concrete"');
     expect(sheet.svg).toContain('class="cut-hatch"');

@@ -85,12 +85,7 @@ async function main(): Promise<void> {
     date: '2026-10-01',
   });
   await call('add_level', { name: 'Ground floor', elevation: 0, height: 4000 });
-  await call('add_level', {
-    name: 'Office first floor',
-    elevation: 4000,
-    height: 3500,
-    makeActive: false,
-  });
+  await call('add_level', { name: 'Office first floor', elevation: 4000, height: 3500, makeActive: false });
 
   // ── 2. Two-span portal-frame hall with a 16 t crane in each span ──────────────
   const hall = await call('add_portal_frame_building', {
@@ -164,24 +159,13 @@ async function main(): Promise<void> {
     }
   }
   console.log('• add_window ×9 (north, west, south façades)');
-  await call('add_slab', {
-    wallIds: perimeter,
-    wallFace: 'outer',
-    role: 'floor',
-    thickness: 250,
-    offset: 0,
-  });
+  await call('add_slab', { wallIds: perimeter, wallFace: 'outer', role: 'floor', thickness: 250, offset: 0 });
   await call('copy_level_elements', {
     sourceLevelId: 'level-1',
     targetLevelIds: ['level-2'],
     categories: ['wall', 'slab', 'door', 'window'],
   });
-  const stair = await call('add_stair', {
-    start: [-12500, 16000],
-    angle: 0,
-    width: 1200,
-    levelId: 'level-1',
-  });
+  const stair = await call('add_stair', { start: [-12500, 16000], angle: 0, width: 1200, levelId: 'level-1' });
   await call('add_slab_opening', { stairId: stair['elementId'] as string, margin: 100 });
   await call('add_slab', {
     boundary: [
@@ -246,13 +230,7 @@ async function main(): Promise<void> {
     [-11000, 3200],
     [-3000, 3200],
   ] as const) {
-    await call('add_window', {
-      wallId: lobby['elementId'] as string,
-      at,
-      width: 2400,
-      height: 2400,
-      sillHeight: 300,
-    });
+    await call('add_window', { wallId: lobby['elementId'] as string, at, width: 2400, height: 2400, sillHeight: 300 });
   }
 
   // ── 5. Process: machines, utilities ───────────────────────────────────────────
@@ -392,12 +370,7 @@ async function main(): Promise<void> {
   saveImage('frame-elevation-east.png', await call('export_elevation_sheet', { direction: 'east', exclude: ['panel'], paper: 'A1' }));
   saveImage(
     'section-frame-3.png',
-    await call('export_elevation_sheet', {
-      direction: 'south',
-      cutAt: 12000,
-      exclude: ['equipment'],
-      paper: 'A1',
-    }),
+    await call('export_elevation_sheet', { direction: 'south', cutAt: 12000, exclude: ['equipment'], paper: 'A1' }),
   );
   save('plant.ifc', (await call('export_ifc'))['ifc']);
   save('ground-floor.dxf', (await call('export_dxf', { levelId: 'level-1' }))['dxf']);

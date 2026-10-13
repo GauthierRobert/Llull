@@ -1,7 +1,3 @@
-/**
- * Selection actions that issue several commands are one local undo step: a mixed
- * (building element + plain entity) delete / move, and a held arrow key's repeated nudges.
- */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
@@ -20,7 +16,6 @@ describe('selection actions and undo steps', () => {
     state().setDocument(createEmptyDocument());
     useStore.setState({ liveStatus: 'disconnected' });
   });
-
   it('repeated nudges marked joinPrevious (held arrow key) undo in one step', () => {
     state().dispatch('add_box', { size: [1, 1, 1] });
     const id = state().document.order[0]!;
@@ -32,17 +27,14 @@ describe('selection actions and undo steps', () => {
     state().undo();
     expect(state().document.entities[id]?.position[0]).toBeCloseTo(0);
   });
-
   it('a mixed delete (building element + plain entity) is one undo step', () => {
     state().dispatch('add_building_template', { template: 'house' });
     state().dispatch('add_box', { size: [1, 1, 1], position: [50, 50, 0] });
     const boxId = state().document.order[state().document.order.length - 1]!;
     const before = state().document.order.length;
     state().select([buildingEntityId(), boxId]);
-
     deleteSelection();
     expect(state().document.order.length).toBeLessThan(before);
-
     state().undo();
     expect(state().document.order.length).toBe(before);
   });

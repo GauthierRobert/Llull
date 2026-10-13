@@ -83,9 +83,7 @@ async function main(): Promise<void> {
     headers['Authorization'] = `Bearer ${authToken}`;
   }
 
-  const transport = new StreamableHTTPClientTransport(new URL(mcpUrl), {
-    requestInit: { headers },
-  });
+  const transport = new StreamableHTTPClientTransport(new URL(mcpUrl), { requestInit: { headers } });
 
   const client = new Client({ name: 'llull-example-agent', version: '0.1.0' }, { capabilities: {} });
 
@@ -118,10 +116,7 @@ async function main(): Promise<void> {
     await client.callTool({ name: 'enable_toolset', arguments: { toolset } });
   }
 
-  const boxResult = await callAndParse(client, 'add_box', {
-    size: [2, 2, 2],
-    position: [0, 0, 0],
-  });
+  const boxResult = await callAndParse(client, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
   printStep(1, 'add_box', boxResult);
 
   const circleResult = await callAndParse(client, 'draw_arc', { center: [0, 0], radius: 1 });

@@ -18,10 +18,7 @@ function absoluteRoute(ctx: GradeContext, levelId: string, points: Vec3[]): Vec3
 }
 
 function linesCheck(intent: PlantIntent, ctx: GradeContext): CheckOutcome {
-  const pipes = elementsOf(ctx.document, 'pipe').map((pipe) => ({
-    pipe,
-    route: absoluteRoute(ctx, pipe.levelId, pipe.points),
-  }));
+  const pipes = elementsOf(ctx.document, 'pipe').map((pipe) => ({ pipe, route: absoluteRoute(ctx, pipe.levelId, pipe.points) }));
   const problems: string[] = [];
   for (const line of intent.pipes) {
     const found = pipes.find(({ route }) => sameEnds(route, line.route, END_TOLERANCE));
@@ -46,10 +43,7 @@ function linesCheck(intent: PlantIntent, ctx: GradeContext): CheckOutcome {
 }
 
 function connectivityCheck(intent: PlantIntent, ctx: GradeContext): CheckOutcome {
-  const boxes = elementsOf(ctx.document, 'equipment').map((e) => ({
-    mark: e.mark,
-    box: equipmentBox(ctx.document, e),
-  }));
+  const boxes = elementsOf(ctx.document, 'equipment').map((e) => ({ mark: e.mark, box: equipmentBox(ctx.document, e) }));
   const tieIns = Object.entries(intent.tieIns);
   const dangling: string[] = [];
   let ends = 0;

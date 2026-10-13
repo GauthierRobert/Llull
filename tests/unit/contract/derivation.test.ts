@@ -1,8 +1,8 @@
-/** Derivation guards: derived geometry is read-only; edit its source. */
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { type DerivationGuard, derivationViolation } from '@core/commands/derivation';
+import { xy } from '../../helpers/xy';
 
 const alwaysRejects: DerivationGuard = { domain: 'test', check: () => 'nope.' };
 const alwaysAllows: DerivationGuard = { domain: 'ok', check: () => null };
@@ -15,14 +15,8 @@ describe('derivationViolation', () => {
     expect(derivationViolation([alwaysRejects], 'x_cmd', before, before)).toBeNull();
     expect(derivationViolation([alwaysAllows], 'x_cmd', before, after)).toBeNull();
   });
-
   it('execute rejects a direct edit of building-generated geometry', () => {
-    const doc = execute(createEmptyDocument(), 'draw_walls', {
-      points: [
-        [0, 0],
-        [5000, 0],
-      ],
-    }).document;
+    const doc = execute(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 5000, 0) }).document;
     const generatedId = doc.order[0] ?? '';
     const moved = execute(doc, 'move_entities', { ids: [generatedId], delta: [10, 0, 0] });
     expect(moved.document).toBe(doc);

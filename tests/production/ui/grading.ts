@@ -32,12 +32,7 @@ export function gradeUiRun(run: UiRun): void {
   for (const [id, text] of Object.entries(provided)) {
     writeArtifact('ui', run.scenario.id, `${id.replace(/[^\w.-]/g, '_')}.txt`, text);
   }
-  writeReport(report, {
-    uiGaps: run.uiGaps,
-    downloads: run.fileNames,
-    steps: run.steps,
-    browserProblems: run.session.problems,
-  });
+  writeReport(report, { uiGaps: run.uiGaps, downloads: run.fileNames, steps: run.steps, browserProblems: run.session.problems });
   const failing = report.checks.filter((check) => !check.pass).map((c) => `${c.id}: ${c.detail}`);
   expect(run.session.problems, 'browser console / page errors').toEqual([]);
   expect(report.regressions, `${formatReport(report)}\n${failing.join('\n')}`).toEqual([]);

@@ -12,6 +12,7 @@ import {
   traceContour,
   triangleCount,
 } from '@aec/civil/surface/tin';
+import { xy, xyz } from '../../helpers/xy';
 
 function random(seed: number): () => number {
   let state = seed;
@@ -32,20 +33,13 @@ function circumcircleContains(points: Vec2[], tri: number[], p: Vec2): boolean {
 describe('delaunay', () => {
   it('returns no triangle for fewer than 3 points', () => {
     expect(delaunay([])).toEqual([]);
-    expect(
-      delaunay([
-        [0, 0],
-        [1, 1],
-      ]),
-    ).toEqual([]);
+    expect(delaunay(xy(0, 0, 1, 1))).toEqual([]);
   });
-
   it('triangulates a square grid with 2(n-1)² triangles', () => {
     const points: Vec2[] = [];
     for (let i = 0; i < 12; i++) for (let j = 0; j < 12; j++) points.push([i * 3, j * 3]);
     expect(delaunay(points).length / 3).toBe(2 * 11 * 11);
   });
-
   it('produces counter-clockwise triangles with empty circumcircles', () => {
     const next = random(7);
     const points: Vec2[] = Array.from({ length: 300 }, () => [650000 + next() * 500, 6800000 + next() * 500]);
@@ -63,16 +57,8 @@ describe('delaunay', () => {
       }
     }
   });
-
   it('gives nothing for collinear points', () => {
-    expect(
-      delaunay([
-        [0, 0],
-        [1, 0],
-        [2, 0],
-        [3, 0],
-      ]),
-    ).toEqual([]);
+    expect(delaunay(xy(0, 0, 1, 0, 2, 0, 3, 0))).toEqual([]);
   });
 });
 
@@ -96,30 +82,14 @@ describe('tin', () => {
     expect(tinPlanArea(tin)).toBeCloseTo(100, 9);
     expect(triangleCount(tin)).toBe(200);
   });
-
   it('merges duplicate plan points and filters by boundary and edge length', () => {
-    const tin = buildTin([
-      [0, 0, 1],
-      [0, 0, 5],
-      [10, 0, 1],
-      [0, 10, 1],
-      [10, 10, 1],
-      [100, 100, 1],
-    ]);
+    const tin = buildTin(xyz(0, 0, 1, 0, 0, 5, 10, 0, 1, 0, 10, 1, 10, 10, 1, 100, 100, 1));
     expect(tin.points).toHaveLength(5);
     const short = buildTin(tin.points, { maxEdgeLength: 20 });
     expect(triangleCount(short)).toBe(2);
-    const clipped = buildTin(tin.points, {
-      boundary: [
-        [-1, -1],
-        [11, -1],
-        [11, 11],
-        [-1, 11],
-      ],
-    });
+    const clipped = buildTin(tin.points, { boundary: xy(-1, -1, 11, -1, 11, 11, -1, 11) });
     expect(triangleCount(clipped)).toBe(2);
   });
-
   it('reports bounds, levels and a compact mesh', () => {
     const tin = planeTin();
     const bounds = tinBounds(tin);
@@ -134,7 +104,6 @@ describe('tin', () => {
     expect(mesh.positions).toHaveLength(121 * 3);
     expect(mesh.indices).toHaveLength(600);
   });
-
   it('traces straight contours across a plane and closed loops around a hill', () => {
     const lines = traceContour(planeTin(), 10.25);
     expect(lines).toHaveLength(1);

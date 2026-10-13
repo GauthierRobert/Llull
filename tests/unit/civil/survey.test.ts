@@ -6,6 +6,8 @@ import { parseSurvey } from '@aec/civil/survey/surveyParse';
 import { formatStation } from '@aec/civil/model';
 import { civilObjectOf } from '@aec/civil/integrity';
 import { gridSurvey, metricDocument, surveyedDocument } from './fixtures';
+import { expectPure } from '../../helpers/expectNoOp';
+import { xy, xyz } from '../../helpers/xy';
 
 describe('parseSurvey', () => {
   it('reads PENZD with a header, comments and descriptions', () => {
@@ -16,13 +18,8 @@ describe('parseSurvey', () => {
     ]);
     expect(parsed.rejectedLines).toEqual([6]);
   });
-
   it('swaps northing / easting for PNEZ and numbers unnumbered formats', () => {
-    expect(parseSurvey('7;200;100;5', 'PNEZ').points[0]).toMatchObject({
-      number: '7',
-      easting: 100,
-      northing: 200,
-    });
+    expect(parseSurvey('7;200;100;5', 'PNEZ').points[0]).toMatchObject({ number: '7', easting: 100, northing: 200 });
     const tabbed = parseSurvey('100\t200\t3\n101\t201\t4', 'ENZ').points;
     expect(tabbed.map((point) => point.number)).toEqual(['1', '2']);
     expect(parseSurvey('200 100 3', 'NEZ').points[0]?.easting).toBe(100);
@@ -48,17 +45,13 @@ describe('import_survey_points', () => {
     const group = result.document.civil?.objects['pointGroup-1'];
     expect(group?.category).toBe('pointGroup');
     if (group?.category !== 'pointGroup') return;
-    expect(group.points.map((point) => point.position)).toEqual([
-      [1000, 2000, 3000],
-      [4000, 5000, 6000],
-    ]);
+    expect(group.points.map((point) => point.position)).toEqual(xyz(1000, 2000, 3000, 4000, 5000, 6000));
     expect(group.points[1]).toMatchObject({ number: '2', code: 'TREE' });
     expect(result.affected[0]).toBe('pointGroup-1');
     expect(result.affected).toContain('pointGroup-1:p0');
     expect(result.summary).toMatch(/Imported 2 survey points as Topo/);
     expect(result.document.layers['layer-C-TOPO-PNTS']).toBeDefined();
   });
-
   it('reports skipped lines and refuses files without points', () => {
     const doc = metricDocument();
     const partial = execute(doc, 'import_survey_points', { text: '1,0,0,0\nx,y\n2,1,1,1' });
@@ -68,26 +61,19 @@ describe('import_survey_points', () => {
     expect(none.summary).toMatch(/no valid point found .*unreadable lines 2/);
     expect(execute(doc, 'import_survey_points', {}).summary).toMatch(/format PENZD\)/);
   });
-
   it('keeps large groups as data only', () => {
-    const result = execute(metricDocument(), 'import_survey_points', {
-      text: gridSurvey(() => 1, 46, 1),
-    });
+    const result = execute(metricDocument(), 'import_survey_points', { text: gridSurvey(() => 1, 46, 1) });
     expect(result.summary).toMatch(/2116 survey points.*Markers not drawn/);
     expect(result.document.civil?.objects['pointGroup-1']?.entityIds).toEqual([]);
   });
-
   it('refuses more than 50000 points', () => {
     const points = Array.from({ length: 50001 }, (_, index) => ({ x: index, y: 0, z: 0 }));
     const doc = metricDocument();
     expect(execute(doc, 'import_survey_points', { points }).summary).toMatch(/50000-point limit/);
   });
-
   it('is pure', () => {
     const doc = metricDocument();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'import_survey_points', { text: '1,0,0,0' });
-    expect(JSON.stringify(doc)).toBe(snapshot);
+    expectPure(doc, () => execute(doc, 'import_survey_points', { text: '1,0,0,0' }));
   });
 });
 
@@ -106,24 +92,13 @@ describe('create_surface', () => {
     expect(civilObjectOf(doc, 'surface-1:tin')).toBe('surface-1');
     expect(civilObjectOf(doc, 'nope')).toBeNull();
   });
-
   it('accepts explicit groups, extra points, boundary and edge limit', () => {
     const base = metricDocument();
     const result = execute(base, 'create_surface', {
       name: 'Design',
-      points: [
-        [0, 0, 1],
-        [10, 0, 2],
-        [0, 10, 3],
-        [10, 10, 4],
-      ],
+      points: xyz(0, 0, 1, 10, 0, 2, 0, 10, 3, 10, 10, 4),
       pointGroupIds: [],
-      boundary: [
-        [-1, -1],
-        [11, -1],
-        [11, 11],
-        [-1, 11],
-      ],
+      boundary: xy(-1, -1, 11, -1, 11, 11, -1, 11),
       maxEdgeLength: 50,
       contourInterval: 0.5,
       majorEvery: 0,
@@ -131,33 +106,15 @@ describe('create_surface', () => {
     expect(result.summary).toMatch(/Created surface Design \(surface-1\): 4 points, 2 triangles; contours every 0.5 m/);
     expect(result.data).toEqual({ surfaceId: 'surface-1' });
   });
-
   it('refuses unknown groups, bad options and degenerate input', () => {
     const doc = metricDocument();
     const cases: Array<[Record<string, unknown>, RegExp]> = [
       [{ pointGroupIds: ['pointGroup-9'] }, /unknown point group\(s\) pointGroup-9/],
-      [
-        {
-          boundary: [
-            [0, 0],
-            [1, 1],
-          ],
-        },
-        /boundary must be a simple polygon/,
-      ],
+      [{ boundary: xy(0, 0, 1, 1) }, /boundary must be a simple polygon/],
       [{ maxEdgeLength: 0 }, /maxEdgeLength must be > 0/],
       [{ contourInterval: -1 }, /contourInterval must be > 0/],
       [{ majorEvery: -1 }, /majorEvery must be >= 0/],
-      [
-        {
-          points: [
-            [0, 0, 0],
-            [1, 1, 1],
-            [2, 2, 2],
-          ],
-        },
-        /no triangle/,
-      ],
+      [{ points: xyz(0, 0, 0, 1, 1, 1, 2, 2, 2) }, /no triangle/],
     ];
     for (const [params, message] of cases) {
       const result = execute(doc, 'create_surface', params);
@@ -175,28 +132,18 @@ describe('update_surface', () => {
       name: 'EG',
       contourInterval: 0.5,
       majorEvery: 2,
-      boundary: [
-        [0, 0],
-        [50, 0],
-        [50, 50],
-        [0, 50],
-      ],
+      boundary: xy(0, 0, 50, 0, 50, 50, 0, 50),
       maxEdgeLength: 30,
       addPoints: [[200, 200, 0]],
     });
     expect(updated.summary).toMatch(/Updated surface EG \(surface-1\): 122 points/);
     const surface = updated.document.civil?.objects['surface-1'];
     expect(surface?.category === 'surface' && surface.contourInterval).toBe(0.5);
-    const cleared = execute(updated.document, 'update_surface', {
-      surfaceId: 'surface-1',
-      boundary: [],
-      maxEdgeLength: 0,
-    });
+    const cleared = execute(updated.document, 'update_surface', { surfaceId: 'surface-1', boundary: [], maxEdgeLength: 0 });
     const after = cleared.document.civil?.objects['surface-1'];
     expect(after && 'boundary' in after).toBe(false);
     expect(after && 'maxEdgeLength' in after).toBe(false);
   });
-
   it('refuses unknown surfaces, bad options, no-ops and empty results', () => {
     const doc = surveyedDocument();
     const cases: Array<[Record<string, unknown>, RegExp]> = [
@@ -218,18 +165,9 @@ describe('surface queries', () => {
     const doc = surveyedDocument((x) => 100 + x * 0.05);
     const result = execute(doc, 'surface_elevation', {
       surfaceId: 'surface-1',
-      points: [
-        [50, 50],
-        [500, 0],
-        [10, 10],
-        [20, 20],
-        [30, 30],
-        [40, 40],
-      ],
+      points: xy(50, 50, 500, 0, 10, 10, 20, 20, 30, 30, 40, 40),
     });
-    const data = result.data as {
-      points: Array<{ elevation: number | null; slopePercent: number | null }>;
-    };
+    const data = result.data as { points: Array<{ elevation: number | null; slopePercent: number | null }> };
     expect(data.points[0]?.elevation).toBeCloseTo(102.5, 6);
     expect(data.points[0]?.slopePercent).toBeCloseTo(5, 2);
     expect(data.points[1]).toMatchObject({ elevation: null, slopePercent: null });
@@ -237,7 +175,6 @@ describe('surface queries', () => {
     expect(result.document).toBe(doc);
     expect(execute(doc, 'surface_elevation', { surfaceId: 'x', points: [[0, 0]] }).summary).toMatch(/no surface x/);
   });
-
   it('reports surface statistics', () => {
     const doc = surveyedDocument((x) => 100 + x * 0.05);
     const result = execute(doc, 'surface_report', { surfaceId: 'surface-1' });
@@ -261,17 +198,10 @@ describe('civil model management', () => {
     expect(all.summary).toMatch(/1 pointGroup, 1 surface/);
     const surfaces = execute(doc, 'describe_civil', { category: 'surface' });
     expect((surfaces.data as { objects: unknown[] }).objects).toEqual([
-      {
-        id: 'surface-1',
-        category: 'surface',
-        name: 'EG 1',
-        references: ['pointGroup-1'],
-        entities: expect.any(Number),
-      },
+      { id: 'surface-1', category: 'surface', name: 'EG 1', references: ['pointGroup-1'], entities: expect.any(Number) },
     ]);
     expect(execute(metricDocument(), 'describe_civil', {}).summary).toBe('The civil model is empty.');
   });
-
   it('deletes objects, refusing referenced ones unless cascading', () => {
     const doc = surveyedDocument();
     expect(execute(doc, 'delete_civil_object', { id: 'nope' }).summary).toMatch(/no civil object/);
@@ -285,7 +215,6 @@ describe('civil model management', () => {
     const again = execute(cascaded.document, 'import_survey_points', { text: '1,0,0,0' });
     expect(again.affected[0]).toBe('pointGroup-2');
   });
-
   it('guards generated geometry and clears with the document', () => {
     const doc = surveyedDocument();
     const refused = execute(doc, 'delete_entities', { ids: ['surface-1:tin'] });
@@ -293,7 +222,6 @@ describe('civil model management', () => {
     const cleared = execute(doc, 'clear_document', {});
     expect(cleared.document.civil).toBeUndefined();
   });
-
   it('round-trips through save / load without storing derived geometry', () => {
     const doc = surveyedDocument();
     const json = serializeDocument(doc);
@@ -303,12 +231,9 @@ describe('civil model management', () => {
     expect(Object.keys(loaded.entities).sort()).toEqual(Object.keys(doc.entities).sort());
     expect(loaded.civil).toEqual(doc.civil);
   });
-
   it('rejects files with an invalid civil model', () => {
     const doc = surveyedDocument();
-    const envelope = JSON.parse(serializeDocument(doc)) as {
-      document: { civil: { objects: Record<string, Record<string, unknown>> } };
-    };
+    const envelope = JSON.parse(serializeDocument(doc)) as { document: { civil: { objects: Record<string, Record<string, unknown>> } } };
     const surface = envelope.document.civil.objects['surface-1'];
     if (surface) surface['contourInterval'] = -1;
     expect(() => deserializeDocument(JSON.stringify(envelope))).toThrow(/contourInterval must be > 0/);

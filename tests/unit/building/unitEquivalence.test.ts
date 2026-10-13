@@ -33,24 +33,8 @@ const STEPS: Record<string, Step[]> = {
   ],
   'standalone crane runway on columns': [
     ['add_steel_member', (k) => ({ profile: 'HEA400', role: 'column', start: [0, 0, 0], end: [0, 0, 6000 * k] })],
-    [
-      'add_steel_member',
-      (k) => ({
-        profile: 'HEA400',
-        role: 'column',
-        start: [0, 6000 * k, 0],
-        end: [0, 6000 * k, 6000 * k],
-      }),
-    ],
-    [
-      'add_crane_runway',
-      (k) => ({
-        start: [700 * k, 0],
-        end: [700 * k, 12000 * k],
-        railHeight: 5000 * k,
-        capacity: 5,
-      }),
-    ],
+    ['add_steel_member', (k) => ({ profile: 'HEA400', role: 'column', start: [0, 6000 * k, 0], end: [0, 6000 * k, 6000 * k] })],
+    ['add_crane_runway', (k) => ({ start: [700 * k, 0], end: [700 * k, 12000 * k], railHeight: 5000 * k, capacity: 5 })],
   ],
 };
 

@@ -11,7 +11,6 @@ type FieldValues = Record<string, string>;
 export class BuildingPanel {
   private tool = '';
   private typed: FieldValues = {};
-
   constructor(private readonly session: UiSession) {}
 
   /** Pick an "Add element" tool, set its fields (selects by value) and press its Add button. */
@@ -47,14 +46,12 @@ export class BuildingPanel {
     }
     return this.session.acting(`edit equipment ${mark}`, () => section.getByTestId('equipment-save').click());
   }
-
   async addLevel(name: string, height: number): Promise<string> {
     const { page } = this.session;
     await page.getByLabel('New level name').fill(name);
     await page.getByLabel('New level height').fill(String(height));
     return this.session.acting(`add level ${name}`, () => page.getByRole('button', { name: 'Add level', exact: true }).click());
   }
-
   async setProjectInfo(info: Record<string, string>): Promise<string> {
     const { page } = this.session;
     for (const [key, value] of Object.entries(info)) {

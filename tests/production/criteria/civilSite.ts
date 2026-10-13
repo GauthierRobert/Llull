@@ -149,10 +149,7 @@ function roadGeometryCheck(intent: CivilIntent, { document }: GradeContext): Che
 function roadReportCheck(intent: CivilIntent, { document, run }: GradeContext): CheckOutcome {
   const road = roadOf(intent, document);
   if (!road) return fail('no alignment through the brief PIs');
-  const report = run('alignment_report', {
-    alignmentId: road.id,
-    designSpeedKmh: intent.road.designSpeedKmh,
-  });
+  const report = run('alignment_report', { alignmentId: road.id, designSpeedKmh: intent.road.designSpeedKmh });
   const data = report.data as
     | {
         rows: { station: number; designM: number | null; superelevationPercent: number | null }[];

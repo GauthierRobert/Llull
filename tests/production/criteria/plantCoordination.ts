@@ -73,11 +73,7 @@ function memberRows(value: unknown, ids: ReadonlySet<string>, rows: MemberRow[] 
     const utilisation = record['utilisation'] ?? record['utilization'];
     const ok = record['ok'];
     if (typeof id === 'string' && ids.has(id) && (typeof utilisation === 'number' || typeof ok === 'boolean')) {
-      rows.push({
-        id,
-        utilisation: typeof utilisation === 'number' ? utilisation : null,
-        ok: typeof ok === 'boolean' ? ok : null,
-      });
+      rows.push({ id, utilisation: typeof utilisation === 'number' ? utilisation : null, ok: typeof ok === 'boolean' ? ok : null });
     }
     for (const inner of Object.values(record)) memberRows(inner, ids, rows);
   }
@@ -153,12 +149,7 @@ function stabilityCheck({ run }: GradeContext): CheckOutcome {
 
 export function coordinationCriteria(intent: PlantIntent): Criterion[] {
   return [
-    {
-      id: 'clash-free',
-      area: 'coordination',
-      requirement: 'No hard clash and no clearance violation (check_clashes).',
-      check: clashCheck,
-    },
+    { id: 'clash-free', area: 'coordination', requirement: 'No hard clash and no clearance violation (check_clashes).', check: clashCheck },
     {
       id: 'access',
       area: 'coordination',

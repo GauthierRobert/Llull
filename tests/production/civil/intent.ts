@@ -107,24 +107,9 @@ export const civilSiteIntent: CivilIntent = {
   },
   drainage: {
     manholes: [
-      {
-        name: 'MH1',
-        location: at(178, 100),
-        invert: 107.0,
-        catchment: { areaHa: 0.2, runoffCoefficient: 0.9 },
-      },
-      {
-        name: 'MH2',
-        location: at(180, 40),
-        invert: 104.3,
-        catchment: { areaHa: 0.12, runoffCoefficient: 0.85 },
-      },
-      {
-        name: 'MH3',
-        location: at(120, 12),
-        invert: 101.8,
-        catchment: { areaHa: 0.6, runoffCoefficient: 0.4 },
-      },
+      { name: 'MH1', location: at(178, 100), invert: 107.0, catchment: { areaHa: 0.2, runoffCoefficient: 0.9 } },
+      { name: 'MH2', location: at(180, 40), invert: 104.3, catchment: { areaHa: 0.12, runoffCoefficient: 0.85 } },
+      { name: 'MH3', location: at(120, 12), invert: 101.8, catchment: { areaHa: 0.6, runoffCoefficient: 0.4 } },
       { name: 'Outfall', location: at(72, 12), invert: 100.45 },
     ],
     pipes: [

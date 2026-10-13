@@ -1,9 +1,3 @@
-/**
- * SolidMeshShell lifecycle: BVH build + geometry disposal for every solid kind.
- * jsdom has no WebGL, so the shell is rendered with react-dom (r3f intrinsics become
- * unknown DOM elements; their warnings are silenced) and the geometry is spied on.
- */
-
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { render, cleanup } from '@testing-library/react';
@@ -12,16 +6,9 @@ import { SolidMeshShell } from '@ui/viewport/3d/entities/SolidMeshShell';
 
 ensureBvhSetup();
 
-vi.mock('@ui/viewport/3d/useMaterialProps', () => ({
-  useMaterialProps: (): Record<string, unknown> => ({ color: '#fff' }),
-}));
+vi.mock('@ui/viewport/3d/useMaterialProps', () => ({ useMaterialProps: (): Record<string, unknown> => ({ color: '#fff' }) }));
 
-const entity = {
-  id: 'box-1',
-  position: [0, 0, 0],
-  rotation: [0, 0, 0],
-  color: '#ffffff',
-} as const;
+const entity = { id: 'box-1', position: [0, 0, 0], rotation: [0, 0, 0], color: '#ffffff' } as const;
 
 function spiedGeometry(): THREE.BufferGeometry {
   const geometry = new THREE.BoxGeometry(1, 1, 1);
@@ -36,7 +23,6 @@ describe('SolidMeshShell', () => {
     cleanup();
     vi.restoreAllMocks();
   });
-
   it('builds a BVH on mount and disposes geometry + BVH on unmount', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const geometry = spiedGeometry();
@@ -53,7 +39,6 @@ describe('SolidMeshShell', () => {
     expect(geometry.disposeBoundsTree).toHaveBeenCalledOnce();
     expect(geometry.dispose).toHaveBeenCalledOnce();
   });
-
   it('skips the BVH when boundsTree is false but still disposes', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const geometry = spiedGeometry();

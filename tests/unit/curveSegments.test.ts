@@ -16,6 +16,7 @@ import {
   segmentSteps,
   segmentTangent,
 } from '@core/geometry/curveSegments';
+import { xy, xyz } from '../helpers/xy';
 
 const close = (a: readonly number[], b: readonly number[], digits = 9): void =>
   a.forEach((v, k) => expect(v).toBeCloseTo(b[k] ?? 0, digits));
@@ -37,12 +38,10 @@ describe('arcGeometry', () => {
     expect(g?.radius).toBeCloseTo(1, 12);
     expect(g?.sweep).toBeCloseTo(Math.PI / 2, 12);
   });
-
   it('takes the long way round when the through point is on the far side', () => {
     const g = arcGeometry([1, 0], [-1, 0], [0, 1]);
     expect(g?.sweep).toBeCloseTo((3 * Math.PI) / 2, 12);
   });
-
   it('works in 3D planes and rejects collinear points', () => {
     const g = arcGeometry([0, 0, 1], [0, 1, 0], [0, 0, -1]);
     expect(g?.radius).toBeCloseTo(1, 12);
@@ -77,7 +76,6 @@ describe('segment evaluation', () => {
     close(segmentTangent(bezier, 0), [1, 0, 0]);
     close(segmentTangent(bezier, 1), [0, 1, 0]);
   });
-
   it('a Bézier with a collapsed handle still has a tangent', () => {
     const cusp: CurveSegment<Vec2> = {
       type: 'bezier',
@@ -92,7 +90,6 @@ describe('segment evaluation', () => {
     expect(Math.hypot(...t)).toBeCloseTo(1, 9);
     expect(t[0]).toBeGreaterThan(0);
   });
-
   it('a degenerate arc falls back to its chord', () => {
     const flat: CurveSegment<Vec2> = {
       type: 'arc',
@@ -106,7 +103,6 @@ describe('segment evaluation', () => {
     close(segmentTangent(flat, 0.5), [1, 0, 0]);
     expect(segmentSteps(flat)).toBe(1);
   });
-
   it('samples arcs finely, lines once and closes profiles without repeating the start', () => {
     expect(segmentSteps(quarterArc)).toBe(8);
     const square: CurveSegment<Vec2>[] = [
@@ -139,15 +135,9 @@ describe('segment evaluation', () => {
         ],
       },
     ];
-    expect(sampleProfile(square)).toEqual([
-      [0, 0],
-      [1, 0],
-      [1, 1],
-      [0, 1],
-    ]);
+    expect(sampleProfile(square)).toEqual(xy(0, 0, 1, 0, 1, 1, 0, 1));
     expect(sampleChain(square.slice(0, 2), false)).toHaveLength(3);
   });
-
   it('chain length is exact for lines and arcs', () => {
     const chain: CurveSegment<Vec2>[] = [
       quarterArc,
@@ -190,17 +180,12 @@ describe('chain checks', () => {
       ],
     },
   ];
-
   it('accepts connected chains and reverses them faithfully', () => {
     expect(chainIssue(open, false)).toBeNull();
     const back = reverseChain(open);
-    expect(back[0]?.points).toEqual([
-      [1, 1],
-      [1, 0],
-    ]);
+    expect(back[0]?.points).toEqual(xy(1, 1, 1, 0));
     expect(chainIssue(back, false)).toBeNull();
   });
-
   it.each([
     [[], false, 'no segments'],
     [
@@ -301,7 +286,6 @@ describe('chain checks', () => {
   ] as Array<[CurveSegment<Vec2>[], boolean, string]>)('reports %#: %s', (chain, closed, text) => {
     expect(chainIssue(chain, closed)).toContain(text);
   });
-
   it('finds the first non-tangent joint', () => {
     expect(firstCorner(open)).toBe(1);
     expect(firstCorner([open[0] as CurveSegment<Vec2>])).toBe(-1);
@@ -330,30 +314,15 @@ describe('catmullRomBeziers', () => {
       }
     });
   });
-
   it('keeps 2D points 2D and survives repeated points', () => {
-    const segments = catmullRomBeziers<Vec2>(
-      [
-        [0, 0],
-        [0, 0],
-        [3, 1],
-      ],
-      false,
-    );
+    const segments = catmullRomBeziers<Vec2>(xy(0, 0, 0, 0, 3, 1), false);
     expect(segments[1]?.points.every((p) => p.length === 2)).toBe(true);
   });
 });
 
 describe('filletPolyline', () => {
   it('rounds a right-angle corner with a tangent arc of the bend radius', () => {
-    const chain = filletPolyline(
-      [
-        [0, 0, 0],
-        [10, 0, 0],
-        [10, 10, 0],
-      ],
-      2,
-    );
+    const chain = filletPolyline(xyz(0, 0, 0, 10, 0, 0, 10, 10, 0), 2);
     expect(Array.isArray(chain)).toBe(true);
     const segments = chain as CurveSegment<Vec3>[];
     expect(segments.map((s) => s.type)).toEqual(['line', 'arc', 'line']);
@@ -363,49 +332,14 @@ describe('filletPolyline', () => {
     expect(firstCorner(segments)).toBe(-1);
     expect(chainIssue(segments, false)).toBeNull();
   });
-
   it('keeps collinear points straight and lets consecutive bends share a run', () => {
-    const chain = filletPolyline(
-      [
-        [0, 0, 0],
-        [5, 0, 0],
-        [10, 0, 0],
-        [10, 4, 0],
-        [14, 4, 0],
-      ],
-      2,
-    ) as CurveSegment<Vec3>[];
+    const chain = filletPolyline(xyz(0, 0, 0, 5, 0, 0, 10, 0, 0, 10, 4, 0, 14, 4, 0), 2) as CurveSegment<Vec3>[];
     expect(chain.map((s) => s.type)).toEqual(['line', 'line', 'arc', 'arc', 'line']);
   });
-
   it.each([
-    [
-      [
-        [0, 0, 0],
-        [5, 0, 0],
-        [0, 0, 0],
-      ],
-      1,
-      'doubles back',
-    ],
-    [
-      [
-        [0, 0, 0],
-        [2, 0, 0],
-        [2, 2, 0],
-      ],
-      5,
-      'too large',
-    ],
-    [
-      [
-        [0, 0, 0],
-        [0, 0, 0],
-        [1, 0, 0],
-      ],
-      1,
-      'coincide',
-    ],
+    [xyz(0, 0, 0, 5, 0, 0, 0, 0, 0), 1, 'doubles back'],
+    [xyz(0, 0, 0, 2, 0, 0, 2, 2, 0), 5, 'too large'],
+    [xyz(0, 0, 0, 0, 0, 0, 1, 0, 0), 1, 'coincide'],
   ] as Array<[Vec3[], number, string]>)('rejects %#', (points, radius, text) => {
     expect(filletPolyline(points, radius)).toContain(text);
   });

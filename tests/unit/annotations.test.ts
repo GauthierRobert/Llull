@@ -1,18 +1,8 @@
-/**
- * Unit tests for MCP tool annotations.
- *
- * Covers:
- *   1. CommandDefinition.annotations fields are present on the right commands.
- *   2. toToolSchemas() emits `annotations` with the correct MCP hint names.
- *   3. buildMcpTools() mirrors toToolSchemas() annotations.
- *   4. readOnly commands return the SAME document reference (smoke test, table-driven).
- *   5. Unannotated commands produce no `annotations` field in toToolSchemas().
- */
-
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { listCommands, toToolSchemas, execute } from '@core/commands/registry';
 import { buildMcpTools } from '@mcp/tools';
+import { xyz } from '../helpers/xy';
 
 // Helpers
 
@@ -49,13 +39,11 @@ describe('CommandDefinition.annotations — readOnly commands', () => {
     'find_entities',
     'render_view',
   ] as const;
-
   for (const name of READ_ONLY_NAMES) {
     it(`${name} has annotations.readOnly === true`, () => {
       const cmd = findCommand(name);
       expect(cmd.annotations?.readOnly).toBe(true);
     });
-
     it(`${name} does not set destructive`, () => {
       const cmd = findCommand(name);
       expect(cmd.annotations?.destructive).toBeUndefined();
@@ -65,13 +53,11 @@ describe('CommandDefinition.annotations — readOnly commands', () => {
 
 describe('CommandDefinition.annotations — destructive commands', () => {
   const DESTRUCTIVE_NAMES = ['delete_entities', 'delete_layer', 'delete_parameter'] as const;
-
   for (const name of DESTRUCTIVE_NAMES) {
     it(`${name} has annotations.destructive === true`, () => {
       const cmd = findCommand(name);
       expect(cmd.annotations?.destructive).toBe(true);
     });
-
     it(`${name} does not set readOnly`, () => {
       const cmd = findCommand(name);
       expect(cmd.annotations?.readOnly).toBeUndefined();
@@ -81,7 +67,6 @@ describe('CommandDefinition.annotations — destructive commands', () => {
 
 describe('CommandDefinition.annotations — idempotent commands', () => {
   const IDEMPOTENT_NAMES = ['set_units', 'set_parameter', 'update_layer', 'set_entity_layer', 'set_entity_name', 'stop_animation'] as const;
-
   for (const name of IDEMPOTENT_NAMES) {
     it(`${name} has annotations.idempotent === true`, () => {
       const cmd = findCommand(name);
@@ -95,7 +80,6 @@ describe('CommandDefinition.annotations — unannotated command', () => {
     const cmd = findCommand('add_box');
     expect(cmd.annotations).toBeUndefined();
   });
-
   it('move_entities has no annotations field', () => {
     const cmd = findCommand('move_entities');
     expect(cmd.annotations).toBeUndefined();
@@ -109,12 +93,10 @@ describe('toToolSchemas() — annotations on readOnly command', () => {
     const schema = findSchema('measure_distance');
     expect(schema.annotations?.readOnlyHint).toBe(true);
   });
-
   it('measure_distance schema does not have destructiveHint', () => {
     const schema = findSchema('measure_distance');
     expect(schema.annotations?.destructiveHint).toBeUndefined();
   });
-
   it('describe_scene schema has annotations.readOnlyHint === true', () => {
     expect(findSchema('describe_scene').annotations?.readOnlyHint).toBe(true);
   });
@@ -125,11 +107,9 @@ describe('toToolSchemas() — annotations on destructive command', () => {
     const schema = findSchema('delete_entities');
     expect(schema.annotations?.destructiveHint).toBe(true);
   });
-
   it('delete_entities schema does not have readOnlyHint', () => {
     expect(findSchema('delete_entities').annotations?.readOnlyHint).toBeUndefined();
   });
-
   it('delete_layer schema has annotations.destructiveHint === true', () => {
     expect(findSchema('delete_layer').annotations?.destructiveHint).toBe(true);
   });
@@ -139,7 +119,6 @@ describe('toToolSchemas() — annotations on idempotent command', () => {
   it('set_units schema has annotations.idempotentHint === true', () => {
     expect(findSchema('set_units').annotations?.idempotentHint).toBe(true);
   });
-
   it('set_entity_name schema has annotations.idempotentHint === true', () => {
     expect(findSchema('set_entity_name').annotations?.idempotentHint).toBe(true);
   });
@@ -150,7 +129,6 @@ describe('toToolSchemas() — no annotations on plain command', () => {
     const schema = findSchema('add_box');
     expect(schema.annotations).toBeUndefined();
   });
-
   it('extrude_profile schema has no annotations field', () => {
     const schema = findSchema('extrude_profile');
     expect(schema.annotations).toBeUndefined();
@@ -163,7 +141,6 @@ describe('buildMcpTools() — annotations on readOnly command', () => {
   it('measure_distance tool has annotations.readOnlyHint === true', () => {
     expect(findTool('measure_distance').annotations?.readOnlyHint).toBe(true);
   });
-
   it('check_model tool has annotations.readOnlyHint === true', () => {
     expect(findTool('check_model').annotations?.readOnlyHint).toBe(true);
   });
@@ -173,7 +150,6 @@ describe('buildMcpTools() — annotations on destructive command', () => {
   it('delete_entities tool has annotations.destructiveHint === true', () => {
     expect(findTool('delete_entities').annotations?.destructiveHint).toBe(true);
   });
-
   it('delete_parameter tool has annotations.destructiveHint === true', () => {
     expect(findTool('delete_parameter').annotations?.destructiveHint).toBe(true);
   });
@@ -183,7 +159,6 @@ describe('buildMcpTools() — annotations on idempotent command', () => {
   it('set_units tool has annotations.idempotentHint === true', () => {
     expect(findTool('set_units').annotations?.idempotentHint).toBe(true);
   });
-
   it('update_layer tool has annotations.idempotentHint === true', () => {
     expect(findTool('update_layer').annotations?.idempotentHint).toBe(true);
   });
@@ -203,26 +178,15 @@ describe('readOnly commands — document reference unchanged', () => {
     ['check_model', {}],
     ['find_entities', {}],
     ['measure_distance', { point1: [0, 0, 0], point2: [1, 0, 0] }],
-    [
-      'measure_angle',
-      {
-        points: [
-          [0, 0, 0],
-          [1, 0, 0],
-          [0, 1, 0],
-        ],
-      },
-    ],
+    ['measure_angle', { points: xyz(0, 0, 0, 1, 0, 0, 0, 1, 0) }],
     ['measure_bounding_box', {}],
   ];
-
   for (const [name, params] of READ_ONLY_CASES) {
     it(`${name}: result.document === input doc (same reference)`, () => {
       const doc = createEmptyDocument();
       const result = execute(doc, name, params);
       expect(result.document).toBe(doc);
     });
-
     it(`${name}: affected is empty`, () => {
       const doc = createEmptyDocument();
       const result = execute(doc, name, params);
@@ -243,7 +207,6 @@ describe('annotations invariant', () => {
       expect(atLeastOne, `${cmd.name} has an annotations object but no flag is true`).toBe(true);
     }
   });
-
   it('no command is both readOnly and destructive', () => {
     for (const cmd of listCommands()) {
       if (!cmd.annotations) continue;
@@ -253,7 +216,6 @@ describe('annotations invariant', () => {
       ).toBe(false);
     }
   });
-
   it('toToolSchemas() annotation keys map correctly from CommandDefinition flags', () => {
     const schemas = toToolSchemas();
     for (const cmd of listCommands()) {

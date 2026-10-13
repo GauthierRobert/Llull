@@ -1,4 +1,3 @@
-/** Regression tests for the final migration review (S2, S3, S4, S7, N2, N5). */
 import { describe, it, expect, afterEach } from 'vitest';
 import { type BoxEntity, type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
@@ -9,6 +8,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import type { CommandDefinition } from '@core/commands/types';
 import { nextId, withIdSource } from '@lib/id';
 import { triangleKernel } from '../../helpers/fakeKernel';
+import { xy } from '../../helpers/xy';
 
 function boxOf(doc: CadDocument): BoxEntity {
   return Object.values(doc.entities).find((e) => e.kind === 'box') as BoxEntity;
@@ -19,15 +19,7 @@ afterEach(() => setGeometryKernel(null));
 describe('S2: replay cache never shares a minted building uid between documents', () => {
   it('two fresh documents inserting the same wall get different uids', () => {
     const insert = (): CadDocument =>
-      execute(createEmptyDocument(), 'insert_step', {
-        name: 'draw_walls',
-        params: {
-          points: [
-            [0, 0],
-            [5000, 0],
-          ],
-        },
-      }).document;
+      execute(createEmptyDocument(), 'insert_step', { name: 'draw_walls', params: { points: xy(0, 0, 5000, 0) } }).document;
     const a = insert();
     const b = insert();
     expect(a.building?.uid).toBeDefined();
@@ -38,13 +30,8 @@ describe('S2: replay cache never shares a minted building uid between documents'
 
 describe('S3: set_parameter regenerates through recipes and constraints', () => {
   it('a recipe instance that reads the parameter is regenerated', () => {
-    let doc = execute(createEmptyDocument(), 'set_parameter', {
-      name: 'w',
-      expression: '2',
-    }).document;
-    doc = execute(doc, 'build_project', {
-      actions: [{ command: 'add_box', params: { size: ['=w', 1, 1] } }],
-    }).document;
+    let doc = execute(createEmptyDocument(), 'set_parameter', { name: 'w', expression: '2' }).document;
+    doc = execute(doc, 'build_project', { actions: [{ command: 'add_box', params: { size: ['=w', 1, 1] } }] }).document;
     doc = execute(doc, 'save_recipe', { name: 'bar' }).document;
     doc = execute(doc, 'delete_step', { stepId: doc.featureHistory[0]?.id ?? '' }).document;
     doc = execute(doc, 'instantiate_recipe', { name: 'bar' }).document;
@@ -64,7 +51,6 @@ describe('S4/S7: history operations refuse without a kernel instead of reporting
     doc = b.document;
     return execute(doc, 'boolean', { op: 'union', a: a.affected[0], b: b.affected[0] }, ctx).document;
   }
-
   it('edit_step_params / set_step_suppressed / insert_step no-op with an explicit summary', () => {
     const doc = unionHistory();
     const first = doc.featureHistory[0]?.id ?? '';
@@ -78,7 +64,6 @@ describe('S4/S7: history operations refuse without a kernel instead of reporting
       expect(result.summary, name).toContain('needs the geometry kernel');
     }
   });
-
   it('instantiate_recipe refuses a recipe containing a kernel step', () => {
     const saved = execute(unionHistory(), 'save_recipe', { name: 'u' }).document;
     const result = execute(saved, 'instantiate_recipe', { name: 'u' });

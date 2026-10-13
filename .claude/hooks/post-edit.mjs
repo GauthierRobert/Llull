@@ -43,12 +43,7 @@ async function main() {
 
   if (notes.length === 0) return;
   process.stdout.write(
-    JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: 'PostToolUse',
-        additionalContext: 'llull:\n- ' + notes.join('\n- '),
-      },
-    }),
+    JSON.stringify({ hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: 'llull:\n- ' + notes.join('\n- ') } }),
   );
 }
 

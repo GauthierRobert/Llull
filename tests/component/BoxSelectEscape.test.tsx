@@ -1,4 +1,3 @@
-/** Esc during a Shift+drag box cancels it: releasing the pointer selects nothing. */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, act, fireEvent } from '@testing-library/react';
 import { useStore } from '@ui/store';
@@ -20,7 +19,6 @@ describe('BoxSelectInteraction — Esc', () => {
     const drawn = execute(createEmptyDocument(), 'draw_arc', { center: [2, 2], radius: 1 });
     useStore.setState({ document: drawn.document, select });
   });
-
   const drag = (escape: boolean): void => {
     render(<BoxSelectInteraction zoom={50} />);
     act(() => captured.handlers['onPointerDown']?.(pointer(0, 0)));
@@ -28,12 +26,10 @@ describe('BoxSelectInteraction — Esc', () => {
     if (escape) act(() => void fireEvent.keyDown(window, { key: 'Escape' }));
     act(() => captured.handlers['onPointerUp']?.(pointer(5, 5)));
   };
-
   it('selects the enclosed entities on release', () => {
     drag(false);
     expect(select).toHaveBeenCalledTimes(1);
   });
-
   it('selects nothing when Esc is pressed mid-drag', () => {
     drag(true);
     expect(select).not.toHaveBeenCalled();

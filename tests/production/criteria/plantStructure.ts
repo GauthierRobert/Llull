@@ -76,10 +76,7 @@ function levelsCheck(intent: PlantIntent, { document }: GradeContext): CheckOutc
   if (model.length !== intent.levels.length) {
     problems.push(`${model.length} levels, expected ${intent.levels.length}`);
   }
-  return {
-    pass: problems.length === 0,
-    detail: problems.length === 0 ? `${model.length} levels at the design FFLs` : problems.join('; '),
-  };
+  return { pass: problems.length === 0, detail: problems.length === 0 ? `${model.length} levels at the design FFLs` : problems.join('; ') };
 }
 
 function gridCheck(intent: PlantIntent, { document }: GradeContext): CheckOutcome {
@@ -175,9 +172,7 @@ function tonnageCheck(intent: PlantIntent, ctx: GradeContext): CheckOutcome {
   const model = absoluteMembers(ctx.document);
   const oracleModel = oracleMass(model.map((m) => ({ ...m, profile: m.element.profile })));
   const oracleDesign = oracleMass(intent.members) ?? 0;
-  const takeoff = ctx.run('quantity_takeoff').data as {
-    lines?: { key: string; unit: string; quantity: number }[];
-  };
+  const takeoff = ctx.run('quantity_takeoff').data as { lines?: { key: string; unit: string; quantity: number }[] };
   const takeoffKg = (takeoff.lines ?? [])
     .filter((line) => line.key.startsWith('member.') && line.unit === 'kg')
     .reduce((sum, line) => sum + line.quantity, 0);
@@ -186,10 +181,7 @@ function tonnageCheck(intent: PlantIntent, ctx: GradeContext): CheckOutcome {
   const detail =
     `takeoff ${round(takeoffKg / 1000, 2)} t, oracle on the model ${round(oracleModel / 1000, 2)} t, ` +
     `design ${round(oracleDesign / 1000, 2)} t`;
-  return {
-    pass: off(takeoffKg, oracleModel) <= TONNAGE_TOLERANCE && off(oracleModel, oracleDesign) <= TONNAGE_TOLERANCE,
-    detail,
-  };
+  return { pass: off(takeoffKg, oracleModel) <= TONNAGE_TOLERANCE && off(oracleModel, oracleDesign) <= TONNAGE_TOLERANCE, detail };
 }
 
 export function structureCriteria(intent: PlantIntent): Criterion[] {

@@ -71,10 +71,7 @@ export function anchoredGeometry(
  * Vertices relative to the first vertex's XY: GPU attributes are float32 (~0.06 units at 1e6), the anchor is re-added
  * in float64 by the object transform. @invariant local[i] + anchor reproduces positions[i] (x, y); z unchanged
  */
-export function rebaseToAnchor(positions: ReadonlyArray<number>): {
-  anchor: [number, number, number];
-  local: number[];
-} {
+export function rebaseToAnchor(positions: ReadonlyArray<number>): { anchor: [number, number, number]; local: number[] } {
   const anchorX = positions[0] ?? 0;
   const anchorY = positions[1] ?? 0;
   const local = positions.map((value, index) => (index % 3 === 0 ? value - anchorX : index % 3 === 1 ? value - anchorY : value));

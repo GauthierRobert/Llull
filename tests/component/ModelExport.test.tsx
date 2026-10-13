@@ -22,26 +22,21 @@ describe('ModelExport', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
-
   it('downloads CadQuery code by default', () => {
     render(<ModelExport />);
     fireEvent.click(screen.getByRole('button', { name: /export the model/i }));
     expect(downloads).toEqual(['model.py']);
   });
-
   it('downloads an OpenSCAD file when that format is chosen', () => {
     render(<ModelExport />);
     fireEvent.change(screen.getByLabelText('Export format'), { target: { value: 'openscad' } });
     fireEvent.click(screen.getByRole('button', { name: /export the model/i }));
     expect(downloads).toEqual(['model.scad']);
   });
-
   it('fetches STEP from the server and reports a failure without downloading', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ error: 'export_step requires the llull Python bridge.' }), {
-        status: 503,
-      }),
-    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ error: 'export_step requires the llull Python bridge.' }), { status: 503 }));
     vi.stubGlobal('fetch', fetchMock);
     render(<ModelExport />);
     fireEvent.change(screen.getByLabelText('Export format'), { target: { value: 'step' } });

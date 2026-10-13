@@ -27,12 +27,14 @@ export function buildAdminRouter(restLimiter: RequestHandler): Router {
     const license = getLicense();
     const users = loadUsers();
     const licensed = licensedUserIds(users, license.seats);
-    res.status(200).json({
-      ...license,
-      namedUsers: users.length,
-      seatsUsed: licensed.size,
-      usersWithoutSeat: users.filter((user) => !licensed.has(user.id)).map((user) => user.id),
-    });
+    res
+      .status(200)
+      .json({
+        ...license,
+        namedUsers: users.length,
+        seatsUsed: licensed.size,
+        usersWithoutSeat: users.filter((user) => !licensed.has(user.id)).map((user) => user.id),
+      });
   });
 
   router.get('/admin/users', restLimiter, adminGuard, (_req, res) => {

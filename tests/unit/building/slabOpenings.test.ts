@@ -7,13 +7,9 @@ import type { TakeoffLine } from '@aec/building/quantities/takeoffBasics';
 import type { IfcExport } from '@aec/building/exchange/ifcBuild';
 import { segmentsIntersect, pointInPolygon } from '@lib/polygon';
 import { run } from '../../helpers/runFixtures';
+import { xy } from '../../helpers/xy';
 
-const rect = (x0: number, y0: number, x1: number, y1: number): number[][] => [
-  [x0, y0],
-  [x1, y0],
-  [x1, y1],
-  [x0, y1],
-];
+const rect = (x0: number, y0: number, x1: number, y1: number): number[][] => xy(x0, y0, x1, y0, x1, y1, x0, y1);
 
 /** Two levels, a ground slab, a stair and the first-floor slab. */
 function twoStoreys(): CadDocument {
@@ -72,12 +68,7 @@ describe('add_slab_opening / delete_slab_opening', () => {
     expect(result.document.entities['slab-1:body']?.kind).toBe('extrusion');
     const slab = result.document.building!.elements['slab-2'];
     // 18 risers × 280 run + 2 × 100 margin, 1000 width + 2 × 100.
-    expect(slab?.category === 'slab' && slab.openings?.[0]).toEqual([
-      [900, 400],
-      [6140, 400],
-      [6140, 1600],
-      [900, 1600],
-    ]);
+    expect(slab?.category === 'slab' && slab.openings?.[0]).toEqual(xy(900, 400, 6140, 400, 6140, 1600, 900, 1600));
     const lines = (execute(result.document, 'quantity_takeoff', {}).data as { lines: TakeoffLine[] }).lines;
     const area = lines.find((line) => line.key === 'slab-floor.concrete.m2')!.quantity;
     expect(area).toBeCloseTo(160 - 5.24 * 1.2);
@@ -86,49 +77,31 @@ describe('add_slab_opening / delete_slab_opening', () => {
     const ifc = (execute(result.document, 'export_ifc', {}).data as IfcExport).ifc;
     expect(ifc).toContain("'SL2 opening 1'");
   });
-
   it('cuts by boundary, refuses overlaps / outside / bad input, and fills openings back', () => {
     let doc = twoStoreys();
-    doc = run(doc, 'add_slab_opening', {
-      slabId: 'slab-1',
-      boundary: rect(7000, 5000, 8000, 6000),
-    });
+    doc = run(doc, 'add_slab_opening', { slabId: 'slab-1', boundary: rect(7000, 5000, 8000, 6000) });
     const refuse = (params: unknown): string => execute(doc, 'add_slab_opening', params).summary;
     expect(refuse({ slabId: 'slab-1', boundary: rect(7500, 5500, 8500, 6500) })).toMatch(/overlaps opening #0/);
     expect(refuse({ slabId: 'slab-1', boundary: rect(9500, 7500, 10500, 8500) })).toMatch(/not strictly inside/);
-    expect(
-      refuse({
-        slabId: 'slab-1',
-        boundary: [
-          [1, 1],
-          [2, 2],
-          [3, 3],
-        ],
-      }),
-    ).toMatch(/non-collinear/);
+    expect(refuse({ slabId: 'slab-1', boundary: xy(1, 1, 2, 2, 3, 3) })).toMatch(/non-collinear/);
     expect(refuse({ slabId: 'nope', boundary: rect(1, 1, 2, 2) })).toMatch(/no slab 'nope'/);
     expect(refuse({ boundary: rect(1, 1, 2, 2) })).toMatch(/pass slabId/);
     expect(refuse({ stairId: 'x' })).toMatch(/no stair/);
     expect(refuse({ stairId: 'stair-1', margin: -1 })).toMatch(/margin/);
     expect(refuse({})).toMatch(/boundary of ≥ 3/);
     expect(refuse({ stairId: 'stair-1', slabId: 'slab-1' })).toMatch(/opening index 1/);
-
     expect(execute(doc, 'delete_slab_opening', { slabId: 'slab-1', index: 3 }).summary).toMatch(/has 1 opening/);
     expect(execute(doc, 'delete_slab_opening', { slabId: 'x', index: 0 }).summary).toMatch(/no slab/);
     const filled = execute(doc, 'delete_slab_opening', { slabId: 'slab-1', index: 0 });
     expect(filled.document.entities['slab-1:body']?.kind).toBe('extrusion');
   });
-
   it('finds no slab above a stair on the top level', () => {
     let doc = run(createEmptyDocument(), 'add_level', {});
     doc = run(doc, 'add_stair', { start: [0, 0] });
     expect(execute(doc, 'add_slab_opening', { stairId: 'stair-1' }).summary).toMatch(/no floor slab/);
   });
-
   it('templates cut their stair wells', () => {
-    const house = execute(createEmptyDocument(), 'add_building_template', {
-      template: 'house',
-    }).document;
+    const house = execute(createEmptyDocument(), 'add_building_template', { template: 'house' }).document;
     const slabs = Object.values(house.building!.elements).filter((element) => element.category === 'slab');
     expect(slabs.some((slab) => slab.category === 'slab' && (slab.openings?.length ?? 0) === 1)).toBe(true);
   });
@@ -149,25 +122,13 @@ describe('slab opening clearances', () => {
     expect(execute(doc, 'add_slab_opening', { slabId: 'slab-1', boundary: rect(0, 5000, 1000, 6000) }).summary).toMatch(
       /not strictly inside|keep a gap/,
     );
-    doc = run(doc, 'add_slab_opening', {
-      slabId: 'slab-1',
-      boundary: rect(2000, 2000, 3000, 3000),
-    });
+    doc = run(doc, 'add_slab_opening', { slabId: 'slab-1', boundary: rect(2000, 2000, 3000, 3000) });
     expect(execute(doc, 'add_slab_opening', { slabId: 'slab-1', boundary: rect(3000, 2000, 4000, 3000) }).summary).toMatch(
       /keep a gap|overlaps/,
     );
   });
-
   it('drops repeated boundary vertices', () => {
-    const doc = run(createEmptyDocument(), 'add_slab', {
-      boundary: [
-        [0, 0],
-        [1000, 0],
-        [1000, 0],
-        [1000, 1000],
-        [0, 1000],
-      ],
-    });
+    const doc = run(createEmptyDocument(), 'add_slab', { boundary: xy(0, 0, 1000, 0, 1000, 0, 1000, 1000, 0, 1000) });
     const slab = doc.building!.elements['slab-1']!;
     expect(slab.category === 'slab' && slab.boundary).toHaveLength(4);
   });

@@ -1,8 +1,3 @@
-/**
- * serviceWorker/sw.js run in a fake worker scope: precache per build, old caches dropped on
- * activate, cache-first for hashed assets, network-first navigations with the shell fallback,
- * API calls untouched, and SKIP_WAITING only on request.
- */
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 
@@ -18,10 +13,7 @@ interface FakeRequest {
 type Handler = (event: Record<string, unknown>) => void;
 
 interface WorkerScope {
-  readonly self: {
-    readonly skipWaiting: ReturnType<typeof vi.fn>;
-    readonly clients: { readonly claim: ReturnType<typeof vi.fn> };
-  };
+  readonly self: { readonly skipWaiting: ReturnType<typeof vi.fn>; readonly clients: { readonly claim: ReturnType<typeof vi.fn> } };
   readonly stores: Map<string, Map<string, Response>>;
   readonly fetchMock: ReturnType<typeof vi.fn>;
   waitFor(type: string, data?: Record<string, unknown>): Promise<void>;
@@ -63,7 +55,6 @@ function workerScope(network: (url: string) => Promise<Response>): WorkerScope {
   };
   const fetchMock = vi.fn((request: FakeRequest) => network(request.url));
   new Function('self', 'caches', 'fetch', 'URL', SOURCE)(self, caches, fetchMock, URL);
-
   const waitFor = async (type: string, data: Record<string, unknown> = {}): Promise<void> => {
     let pending: Promise<unknown> = Promise.resolve();
     handlers.get(type)?.({ ...data, waitUntil: (p: Promise<unknown>) => (pending = p) });
@@ -91,7 +82,6 @@ describe('service worker runtime', () => {
     expect([...scope.stores.keys()].sort()).toEqual(['llull-v2', 'other-app']);
     expect(scope.self.clients.claim).toHaveBeenCalled();
   });
-
   it('serves hashed assets cache-first and caches what it fetches', async () => {
     const scope = workerScope(async (url) => new Response(`net:${url}`));
     await scope.waitFor('install');
@@ -101,7 +91,6 @@ describe('service worker runtime', () => {
     await scope.request('/assets/lazy-b2.js').response;
     expect(scope.fetchMock).toHaveBeenCalledTimes(1);
   });
-
   it('leaves API calls, WASM, non-GET and cross-origin requests to the network', () => {
     const scope = workerScope(async () => new Response('net'));
     expect(scope.request('/command', 'cors', 'POST').handled).toBe(false);
@@ -110,7 +99,6 @@ describe('service worker runtime', () => {
     expect(scope.request('https://cdn.example.com/assets/a.js').handled).toBe(false);
     expect(scope.request('/mcp', 'navigate').handled).toBe(false);
   });
-
   it('navigations go to the network first and fall back to the cached shell offline', async () => {
     let online = true;
     const scope = workerScope(async () => {
@@ -122,7 +110,6 @@ describe('service worker runtime', () => {
     online = false;
     expect(await (await scope.request('/', 'navigate').response)?.text()).toBe('index.html');
   });
-
   it('activates a waiting build only when the page asks', async () => {
     const scope = workerScope(async () => new Response('net'));
     await scope.waitFor('message', { data: 'hello' });

@@ -1,25 +1,3 @@
-/**
- * Component tests for the `kind:'extrusion'` render path with high-point-count
- * concave profiles — the verification suite for spur-gear extrusions.
- *
- * Context: `add_spur_gear` produces an `extrusion` entity whose profile
- * can exceed 840 points for a 42-tooth gear. THREE.ExtrudeGeometry internally
- * uses earcut for triangulation; this suite verifies:
- *   1. A synthetic 840-point concave profile triangulates without producing
- *      zero vertices (no silent earcut failure).
- *   2. The vertex count is in the right order of magnitude (face + side tris).
- *   3. The geometry is disposed cleanly without error.
- *   4. The profileKey memo-key function produces distinct keys for distinct
- *      profiles (guards against geometry-sharing bugs for multi-gear scenes).
- *   5. The `add_spur_gear` command produces an entity with kind 'extrusion'
- *      and the profile/depth fields are non-trivially populated.
- *
- * We do NOT import `buildSpurGearProfile` from `gears.ts` — this test generates
- * its own synthetic concave profile inline to stay decoupled from core math.
- * The THREE.ExtrudeGeometry path is exercised directly (jsdom can run THREE
- * without WebGL) mirroring the pattern in RevolutionMesh.test.tsx.
- */
-
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { useStore } from '@ui/store';
@@ -99,18 +77,15 @@ describe('ExtrusionMesh — THREE.ExtrudeGeometry with 840-point concave profile
     // Expect thousands of vertices (two triangulated faces + side walls).
     expect(extrudedVertexCount(profile, 2)).toBeGreaterThan(500);
   });
-
   it('earcut triangulates an ~1380-point 42-tooth gear-like profile (closer to real gear)', () => {
     // 42 teeth × 33 points/tooth ≈ 1386 points — mirrors the real gear profile density.
     const profile = buildSyntheticGearProfile(42, 10, 7.5, 33);
     expect(profile.length).toBeGreaterThanOrEqual(1380);
     expect(extrudedVertexCount(profile, 5)).toBeGreaterThan(1000);
   });
-
   it('small gear (8 teeth, ~160 points) also triangulates correctly', () => {
     expect(extrudedVertexCount(buildSyntheticGearProfile(8, 5, 3.5, 20), 3)).toBeGreaterThan(0);
   });
-
   it('geometry disposes cleanly without throwing', () => {
     const shape = shapeFromProfile(buildSyntheticGearProfile(20, 8, 6, 20));
     const geo = new THREE.ExtrudeGeometry(shape, { depth: 2, bevelEnabled: false });
@@ -135,18 +110,15 @@ describe('profileKey — memo stability for multi-gear scenes', () => {
     const p2 = buildSyntheticGearProfile(20, 8, 6, 10);
     expect(profileKey(p1)).not.toBe(profileKey(p2));
   });
-
   it('same profile produces the same key across calls', () => {
     const p = buildSyntheticGearProfile(12, 5, 3.5, 10);
     expect(profileKey(p)).toBe(profileKey(p));
   });
-
   it('profiles differing only in depth produce the same profile key (depth is tracked separately)', () => {
     // Depth is a separate memo dep in ExtrusionMesh — only profile content determines profileKey.
     const p = buildSyntheticGearProfile(12, 5, 3.5, 10);
     expect(profileKey(p)).toBe(profileKey(p));
   });
-
   it('key encodes every point — single changed vertex produces different key', () => {
     const p1 = buildSyntheticGearProfile(12, 5, 3.5, 10);
     const p2 = [...p1.slice(0, -1), [99, 99] as readonly [number, number], p1[p1.length - 1]!];
@@ -158,7 +130,6 @@ describe('profileKey — memo stability for multi-gear scenes', () => {
 
 describe('add_spur_gear — extrusion entity in the store', () => {
   beforeEach(resetStore);
-
   const gear = (teeth: number, module: number, faceWidth: number): DispatchedEntity =>
     dispatchEntity('add_spur_gear', { teeth, module, faceWidth });
   const extrusion = (teeth: number, module: number, faceWidth: number): ExtrusionEntity => {
@@ -166,30 +137,24 @@ describe('add_spur_gear — extrusion entity in the store', () => {
     if (entity.kind !== 'extrusion') throw new Error('Expected extrusion entity');
     return entity;
   };
-
   it('produces an entity with kind "extrusion"', () => {
     const { entity, affected } = gear(42, 1, 8);
     expect(affected).toHaveLength(1);
     expect(entity.kind).toBe('extrusion');
   });
-
   it('42-tooth gear profile has > 500 points (high-point-count path)', () => {
     expect(extrusion(42, 1, 8).profile.length).toBeGreaterThan(500);
   });
-
   it('extrusion entity carries a positive depth equal to faceWidth', () => {
     expect(extrusion(20, 2, 10).depth).toBeGreaterThan(0);
   });
-
   it('gear entity appears in document.order', () => {
     const { id } = gear(10, 1, 5);
     expect(useStore.getState().document.order).toContain(id);
   });
-
   it('gear entity has a valid 3-component position', () => {
     expect(gear(10, 1, 5).entity.position).toHaveLength(3);
   });
-
   it('ExtrudeGeometry built from the real gear profile yields > 1000 vertices', () => {
     const { profile, depth } = extrusion(42, 1, 8);
     expect(extrudedVertexCount(profile, depth)).toBeGreaterThan(1000);

@@ -33,7 +33,6 @@ export async function exportPackage(
     fileNames[id] = file.name;
   };
   const button = (name: string): Locator => page.getByRole('button', { name, exact: true });
-
   await take('ifc', () => button('IFC (BIM)').click());
   for (const levelId of levelIds) {
     await page.getByLabel('Export level').selectOption(levelId);

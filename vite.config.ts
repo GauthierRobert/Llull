@@ -21,21 +21,9 @@ export default defineConfig(({ command }) => ({
         // theirs before vendor-r3f pulls its dependencies in recursively.
         codeSplitting: {
           groups: [
-            {
-              name: 'vendor-react',
-              test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/,
-              priority: 2,
-            },
-            {
-              name: 'vendor-r3f',
-              test: /node_modules[\\/](@react-three|postprocessing)[\\/]/,
-              priority: 1,
-            },
-            {
-              name: 'vendor-three',
-              test: /node_modules[\\/](three|three-stdlib|three-mesh-bvh)[\\/]/,
-              priority: 3,
-            },
+            { name: 'vendor-react', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/, priority: 2 },
+            { name: 'vendor-r3f', test: /node_modules[\\/](@react-three|postprocessing)[\\/]/, priority: 1 },
+            { name: 'vendor-three', test: /node_modules[\\/](three|three-stdlib|three-mesh-bvh)[\\/]/, priority: 3 },
           ],
         },
       },

@@ -45,12 +45,7 @@ if (command === 'keygen') {
   const keyFile = flag('--key', process.env.LLULL_LICENSE_PRIVATE_KEY_FILE ?? 'license-private.pem');
   const privateKey = crypto.createPrivateKey(fs.readFileSync(keyFile, 'utf8'));
   const bytes = Buffer.from(
-    JSON.stringify({
-      customer: payload.customer,
-      seats: payload.seats,
-      expires: payload.expires,
-      features: payload.features,
-    }),
+    JSON.stringify({ customer: payload.customer, seats: payload.seats, expires: payload.expires, features: payload.features }),
   );
   const signature = crypto.sign(null, bytes, privateKey);
   process.stdout.write(`${bytes.toString('base64url')}.${signature.toString('base64url')}\n`);

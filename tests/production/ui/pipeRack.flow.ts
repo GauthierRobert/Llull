@@ -18,7 +18,6 @@ export async function pipeRackFlow(session: UiSession): Promise<UiRun> {
   await session.start();
   const driver = new UiDriver(session);
   for (const call of pipeRack.script) await driver.perform(call);
-
   const levelIds = pipeRackIntent.levels.map((_, index) => levelId(index));
   const { provided, fileNames } = await exportPackage(session, levelIds);
   const saved = await saveProject(session);

@@ -26,10 +26,7 @@ export function PointRenderer({ entity: { position, color }, selected }: { entit
     if (!marker) return;
     const scale =
       (camera as THREE.OrthographicCamera).isOrthographicCamera === true
-        ? worldUnitsForPixels(POINT_MARKER_HALF_PIXELS, {
-            kind: 'orthographic',
-            zoom: (camera as THREE.OrthographicCamera).zoom,
-          })
+        ? worldUnitsForPixels(POINT_MARKER_HALF_PIXELS, { kind: 'orthographic', zoom: (camera as THREE.OrthographicCamera).zoom })
         : worldUnitsForPixels(POINT_MARKER_HALF_PIXELS, {
             kind: 'perspective',
             fovDegrees: (camera as THREE.PerspectiveCamera).fov,

@@ -5,6 +5,7 @@ import { type TakeoffLine } from '@aec/building/quantities/takeoffBasics';
 import { toCsv } from '@aec/shared/csv';
 import { rateFor, type CostLine } from '@aec/building/quantities/costing';
 import { drawHouseWalls, run } from '../../helpers/runFixtures';
+import { xy } from '../../helpers/xy';
 
 /** A 10 m × 8 m single-storey house shell. */
 function house(): CadDocument {
@@ -17,10 +18,7 @@ function house(): CadDocument {
   doc = run(doc, 'add_column', { location: [5000, 4000], height: 3000 });
   doc = run(doc, 'add_beam', { start: [0, 4000], end: [10000, 4000] });
   doc = run(doc, 'add_stair', { start: [1000, 1000] });
-  doc = run(doc, 'add_room', {
-    name: 'Open space',
-    wallIds: ['wall-1', 'wall-2', 'wall-3', 'wall-4'],
-  });
+  doc = run(doc, 'add_room', { name: 'Open space', wallIds: ['wall-1', 'wall-2', 'wall-3', 'wall-4'] });
   return doc;
 }
 
@@ -50,16 +48,10 @@ describe('quantity_takeoff', () => {
     expect(result.summary).toMatch(/Walls, concrete: 30\.969 m³/);
     expect((result.data as { csv: string }).csv.split('\n')[0]).toBe('Key,Description,Quantity,Unit');
   });
-
   it('reports an empty model and converts from metre documents', () => {
     expect(execute(createEmptyDocument(), 'quantity_takeoff', {}).summary).toMatch(/empty/);
     let doc = run(createEmptyDocument(), 'set_units', { units: 'm' });
-    doc = run(doc, 'draw_walls', {
-      points: [
-        [0, 0],
-        [5, 0],
-      ],
-    });
+    doc = run(doc, 'draw_walls', { points: xy(0, 0, 5, 0) });
     const lines = (execute(doc, 'quantity_takeoff', {}).data as { lines: TakeoffLine[] }).lines;
     expect(line(lines, 'wall.concrete.m3').quantity).toBeCloseTo(5 * 3 * 0.2);
   });
@@ -81,20 +73,16 @@ describe('building_schedule', () => {
     expect(data.rows).toHaveLength(rows);
     expect(data.csv.split('\n')[0]).toBe(data.columns.map((c) => (c.includes(',') ? `"${c}"` : c)).join(','));
   });
-
   it('door schedule lists host wall and swing; window lists area', () => {
     const doc = house();
     const door = execute(doc, 'building_schedule', { kind: 'door' }).data as { rows: unknown[][] };
     expect(door.rows[0]).toEqual(['D1', 'Ground floor', 'W1', 900, 2100, 0, 'left', 'timber']);
-    const windows = execute(doc, 'building_schedule', { kind: 'window' }).data as {
-      rows: unknown[][];
-    };
+    const windows = execute(doc, 'building_schedule', { kind: 'window' }).data as { rows: unknown[][] };
     expect(windows.rows[0]?.[6]).toBeCloseTo(1.44);
     const columns = execute(run(doc, 'add_column', { location: [1, 1], shape: 'circular' }), 'building_schedule', { kind: 'column' })
       .data as { rows: unknown[][] };
     expect(columns.rows[1]?.[3]).toBe('Ø300');
   });
-
   it('rejects an unknown kind', () => {
     const doc = house();
     const result = execute(doc, 'building_schedule', { kind: 'roof' });
@@ -106,18 +94,10 @@ describe('building_schedule', () => {
 describe('cost estimate', () => {
   it('prices takeoff lines from stored + override rates with wildcard fallbacks', () => {
     let doc = house();
-    doc = run(doc, 'set_cost_rates', {
-      rates: { 'wall.concrete.m3': 200, 'door.*.ea': 500 },
-      currency: 'EUR',
-    });
+    doc = run(doc, 'set_cost_rates', { rates: { 'wall.concrete.m3': 200, 'door.*.ea': 500 }, currency: 'EUR' });
     expect(doc.building!.costRates).toEqual({ 'wall.concrete.m3': 200, 'door.*.ea': 500 });
     const result = execute(doc, 'estimate_cost', { rates: { '*.glass.ea': 300 } });
-    const data = result.data as {
-      total: number;
-      lines: CostLine[];
-      unpriced: string[];
-      csv: string;
-    };
+    const data = result.data as { total: number; lines: CostLine[]; unpriced: string[]; csv: string };
     expect(data.total).toBeCloseTo(30.969 * 200 + 500 + 600, 1);
     expect(data.unpriced).toContain('slab-floor.concrete.m3');
     expect(result.summary).toMatch(/EUR/);
@@ -127,7 +107,6 @@ describe('cost estimate', () => {
     });
     expect(allPriced.summary).not.toMatch(/unpriced/);
   });
-
   it('replace mode and validation', () => {
     let doc = run(house(), 'set_cost_rates', { rates: { a: 1 } });
     doc = run(doc, 'set_cost_rates', { rates: { b: 2 }, replace: true });
@@ -137,7 +116,6 @@ describe('cost estimate', () => {
     expect(execute(doc, 'set_cost_rates', { rates: { a: -1 } }).document).toBe(doc);
     expect(execute(doc, 'estimate_cost', { rates: [] }).summary).toMatch(/rejected/);
   });
-
   it('rateFor and toCsv helpers', () => {
     const takeoffLine: TakeoffLine = {
       key: 'wall.brick.m2',

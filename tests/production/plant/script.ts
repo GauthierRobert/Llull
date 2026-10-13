@@ -61,12 +61,7 @@ export function plantScript(intent: PlantIntent): ToolCall[] {
   for (const floor of intent.floors) {
     calls.push({
       tool: 'add_slab',
-      args: {
-        levelId: levelId(floor.level),
-        boundary: floor.boundary,
-        thickness: floor.thickness,
-        material: floor.material,
-      },
+      args: { levelId: levelId(floor.level), boundary: floor.boundary, thickness: floor.thickness, material: floor.material },
     });
   }
   for (const equipment of intent.equipment) {
@@ -83,22 +78,11 @@ export function plantScript(intent: PlantIntent): ToolCall[] {
       },
     });
     for (const floorIndex of floorsCrossed(intent, equipment)) {
-      calls.push({
-        tool: 'add_slab_opening',
-        args: { slabId: `slab-${floorIndex + 1}`, boundary: openingAround(equipment) },
-      });
+      calls.push({ tool: 'add_slab_opening', args: { slabId: `slab-${floorIndex + 1}`, boundary: openingAround(equipment) } });
     }
   }
   intent.stairs.forEach((stair, index) => {
-    calls.push({
-      tool: 'add_stair',
-      args: {
-        levelId: levelId(stair.level),
-        start: stair.start,
-        angle: stair.angle,
-        width: stair.width,
-      },
-    });
+    calls.push({ tool: 'add_stair', args: { levelId: levelId(stair.level), start: stair.start, angle: stair.angle, width: stair.width } });
     calls.push({ tool: 'add_slab_opening', args: { stairId: `stair-${index + 1}` } });
   });
   for (const pipe of intent.pipes) {
@@ -128,10 +112,7 @@ export function plantScript(intent: PlantIntent): ToolCall[] {
     });
   }
   for (const support of intent.supports ?? []) {
-    calls.push({
-      tool: 'add_pipe_support',
-      args: { line: support.line, type: support.type, at: support.at },
-    });
+    calls.push({ tool: 'add_pipe_support', args: { line: support.line, type: support.type, at: support.at } });
   }
   calls.push({ tool: 'check_clashes', args: {} });
   return calls;

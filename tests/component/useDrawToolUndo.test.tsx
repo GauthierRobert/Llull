@@ -1,6 +1,3 @@
-/**
- * Ctrl+Z during a draw operation removes the last collected point and does not reach global undo.
- */
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act, fireEvent } from '@testing-library/react';
 import { useStore, useToolStore } from '@ui/store';
@@ -20,11 +17,9 @@ describe('draw tool undo', () => {
     act(() => result.current.handleClick([0, 0]));
     act(() => result.current.handleClick([1, 0]));
     expect(result.current.collectedPoints).toHaveLength(2);
-
     fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
     expect(result.current.collectedPoints).toEqual([[0, 0]]);
     expect(undo).not.toHaveBeenCalled();
-
     fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
     fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
     expect(result.current.collectedPoints).toHaveLength(0);
@@ -44,7 +39,6 @@ describe('draw tool move', () => {
     expect(dispatch.mock.calls).toEqual([['move_entities', { ids: ['a', 'b'], delta: [3, -2, 0] }]]);
     expect(result.current.collectedPoints).toHaveLength(0);
   });
-
   it('ignores clicks while nothing is selected', () => {
     const dispatch = vi.fn();
     useStore.setState({ dispatch, document: createEmptyDocument() });
@@ -54,7 +48,6 @@ describe('draw tool move', () => {
     expect(result.current.collectedPoints).toHaveLength(0);
     expect(dispatch).not.toHaveBeenCalled();
   });
-
   it('Esc drops the base point first, then returns to Select', () => {
     useStore.setState({ document: { ...createEmptyDocument(), selection: ['a'] } });
     const { result } = renderHook(() => useDrawTool());
@@ -70,7 +63,6 @@ describe('draw tool move', () => {
     });
     expect(result.current.activeTool).toBe('none');
   });
-
   it('switching tools drops points in progress', () => {
     const { result } = renderHook(() => useDrawTool());
     act(() => result.current.setActiveTool('polyline'));
@@ -78,7 +70,6 @@ describe('draw tool move', () => {
     act(() => useToolStore.getState().setDrawTool('line'));
     expect(result.current.collectedPoints).toHaveLength(0);
   });
-
   it('Enter and Esc typed into a text field are left to the field', () => {
     const dispatch = vi.fn();
     useStore.setState({ dispatch });

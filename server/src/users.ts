@@ -126,11 +126,13 @@ export function requireRole(required: Role, allowQuery: boolean): RequestHandler
     if (user === null) return void res.status(401).json(UNAUTHORIZED_BODY);
     const license = getLicense();
     if (!licensedUserIds(loadUsers(), license.seats).has(user.id)) {
-      return void res.status(402).json({
-        error:
-          `License seat limit reached: ${license.seats} named user(s) allowed (${license.label}). ` +
-          `User "${user.id}" has no seat — remove an unused user or install a larger license.`,
-      });
+      return void res
+        .status(402)
+        .json({
+          error:
+            `License seat limit reached: ${license.seats} named user(s) allowed (${license.label}). ` +
+            `User "${user.id}" has no seat — remove an unused user or install a larger license.`,
+        });
     }
     if (ROLE_RANK[user.role] < ROLE_RANK[required]) {
       return void res

@@ -17,7 +17,6 @@ export async function extractionBuildingFlow(session: UiSession): Promise<UiRun>
   await session.start();
   const driver = new UiDriver(session);
   for (const call of extractionBuilding.script) await driver.perform(call);
-
   const levelIds = extractionIntent.levels.map((_, index) => levelId(index));
   const { provided, fileNames } = await exportPackage(session, levelIds);
   const saved = await saveProject(session);

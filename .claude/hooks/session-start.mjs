@@ -33,9 +33,5 @@ if (!existsSync('node_modules')) lines.push('- node_modules missing: run `npm in
 const now = boardNow();
 if (now) lines.push(`- board NOW: ${now.slice(2)}`);
 
-process.stdout.write(
-  JSON.stringify({
-    hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: lines.join('\n') },
-  }),
-);
+process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: lines.join('\n') } }));
 process.exit(0);

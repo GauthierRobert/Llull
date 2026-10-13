@@ -7,13 +7,7 @@ export function docWith(...shapes: Array<Record<string, unknown>>): CadDocument 
   const entities = Object.fromEntries(
     shapes.map((shape) => [
       shape['id'] as string,
-      {
-        position: [0, 0, 0],
-        rotation: [0, 0, 0],
-        layerId: DEFAULT_LAYER_ID,
-        color: '#ffffff',
-        ...shape,
-      } as unknown as Entity,
+      { position: [0, 0, 0], rotation: [0, 0, 0], layerId: DEFAULT_LAYER_ID, color: '#ffffff', ...shape } as unknown as Entity,
     ]),
   );
   return { ...createEmptyDocument(), entities, order: Object.keys(entities) };
@@ -38,11 +32,7 @@ export function volumeOf(docOrEntity: CadDocument | Entity, entityId?: string): 
   const doc =
     'entities' in docOrEntity
       ? docOrEntity
-      : {
-          ...createEmptyDocument(),
-          entities: { [docOrEntity.id]: docOrEntity },
-          order: [docOrEntity.id],
-        };
+      : { ...createEmptyDocument(), entities: { [docOrEntity.id]: docOrEntity }, order: [docOrEntity.id] };
   const id = entityId ?? ('entities' in docOrEntity ? '' : docOrEntity.id);
   return (execute(doc, 'mass_properties', { entityId: id }).data as { volume: number }).volume;
 }

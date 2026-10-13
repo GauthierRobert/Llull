@@ -5,9 +5,7 @@ import { execute } from '@core/commands/registry';
 import { buildingErrors } from '@aec/building/validate';
 import { serializeDocument } from '@core/commands/persistence/serialization';
 
-const house = execute(createEmptyDocument(), 'add_building_template', {
-  template: 'house',
-}).document;
+const house = execute(createEmptyDocument(), 'add_building_template', { template: 'house' }).document;
 const valid = JSON.parse(JSON.stringify(house.building)) as Record<string, unknown>;
 
 function mutate(edit: (building: Record<string, any>) => void): unknown {
@@ -19,12 +17,9 @@ function mutate(edit: (building: Record<string, any>) => void): unknown {
 describe('buildingErrors', () => {
   it('accepts every generated building (incl. slab openings)', () => {
     expect(buildingErrors(valid)).toEqual([]);
-    const office = execute(createEmptyDocument(), 'add_building_template', {
-      template: 'office',
-    }).document;
+    const office = execute(createEmptyDocument(), 'add_building_template', { template: 'office' }).document;
     expect(buildingErrors(JSON.parse(JSON.stringify(office.building)))).toEqual([]);
   });
-
   it.each([
     ['not an object', () => 3, /must be an object/],
     ['missing levels', () => mutate((b) => delete b.levels), /levels must be an object/],
@@ -46,7 +41,6 @@ describe('buildingErrors', () => {
   ])('rejects %s', (_label, build, message) => {
     expect(buildingErrors(build()).join('\n')).toMatch(message);
   });
-
   it('load_document refuses a malformed building and keeps the current document', () => {
     const json = serializeDocument(house).replace('"thickness":300', '"thickness":"thick"');
     const before = createEmptyDocument();
@@ -67,16 +61,11 @@ describe('stricter building validation', () => {
   ])('rejects %s', (_label, build, message) => {
     expect(buildingErrors(build()).join('\n')).toMatch(message);
   });
-
   it('load_document regenerates building geometry from the model', () => {
-    const tampered = JSON.parse(serializeDocument(house)) as {
-      document: { entities: Record<string, unknown>; order: string[] };
-    };
+    const tampered = JSON.parse(serializeDocument(house)) as { document: { entities: Record<string, unknown>; order: string[] } };
     delete tampered.document.entities['wall-1:body-0'];
     tampered.document.order = tampered.document.order.filter((id) => id !== 'wall-1:body-0');
-    const loaded = execute(createEmptyDocument(), 'load_document', {
-      json: JSON.stringify(tampered),
-    });
+    const loaded = execute(createEmptyDocument(), 'load_document', { json: JSON.stringify(tampered) });
     expect(loaded.document.entities['wall-1:body-0']).toBeDefined();
   });
 });
@@ -88,7 +77,6 @@ describe('footing reinforcement validation', () => {
     footing['reinforcement'] = reinforcement;
     return building;
   };
-
   it('accepts valid bars and rejects malformed ones', () => {
     expect(buildingErrors(footingWith({ barDiameter: 12, spacing: 150, cover: 50 }))).toEqual([]);
     expect(buildingErrors(footingWith({ barDiameter: 0, spacing: 150, cover: 50 })).join()).toMatch(/reinforcement must have/);

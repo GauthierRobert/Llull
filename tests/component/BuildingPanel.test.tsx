@@ -1,14 +1,10 @@
-/**
- * Component tests for <BuildingPanel /> — param-gathering → dispatch (react R11).
- * Geometry/quantity math is unit-tested in tests/unit/building.
- */
-
 import { resetStore } from '../helpers/componentEntities';
 import { describe, it, expect, beforeEach, vi, type MockInstance } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useStore, useViewportStore } from '@ui/store';
 import { BuildingPanel } from '@ui/panels/building/BuildingPanel';
 import { localDispatch, spyDispatch } from '../helpers/storeTestHelpers';
+import { xy, xyz } from '../helpers/xy';
 
 beforeEach(() => {
   resetStore();
@@ -35,7 +31,6 @@ describe('BuildingPanel', () => {
       ['add_building_template', { template: 'office' }],
     ]);
   });
-
   it('swaps the templates for view actions once the building has elements', () => {
     localDispatch('add_portal_frame_building', {});
     const dispatch = spyDispatch();
@@ -44,7 +39,6 @@ describe('BuildingPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Zoom to building' }));
     expect(dispatch).toHaveBeenCalledWith('fit_view', { direction: 'iso' });
   });
-
   it('hides and shows the cladding layer in the viewport without touching the document', () => {
     localDispatch('add_portal_frame_building', {});
     const before = useStore.getState().document;
@@ -57,7 +51,6 @@ describe('BuildingPanel', () => {
     expect(useViewportStore.getState().hiddenLayerIds.has(claddingLayer.id)).toBe(false);
     expect(useStore.getState().document).toBe(before);
   });
-
   it('adds a level with name and height', () => {
     const dispatch = spyDispatch();
     render(<BuildingPanel />);
@@ -66,23 +59,15 @@ describe('BuildingPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add level' }));
     expect(dispatch).toHaveBeenCalledWith('add_level', { name: 'Basement', height: 2600 });
   });
-
   it('lists levels and elements of the active level, with activate / select / delete', () => {
     localDispatch('add_level', { name: 'Ground' });
     localDispatch('add_level', { name: 'Upper', makeActive: false });
-    localDispatch('draw_walls', {
-      points: [
-        [0, 0],
-        [4000, 0],
-      ],
-    });
+    localDispatch('draw_walls', { points: xy(0, 0, 4000, 0) });
     const dispatch = spyDispatch();
     render(<BuildingPanel />);
     expect(screen.getByTestId('level-row-level-1')).toHaveAttribute('aria-current', 'true');
     const upper = useStore.getState().document.building!.levels['level-2']!;
-    const activateUpper = screen.getByRole('button', {
-      name: `Activate level Upper +${upper.elevation} mm · h ${upper.height}`,
-    });
+    const activateUpper = screen.getByRole('button', { name: `Activate level Upper +${upper.elevation} mm · h ${upper.height}` });
     expect(activateUpper).toHaveTextContent(`+${upper.elevation} mm · h ${upper.height}`);
     fireEvent.click(activateUpper);
     expect(dispatch).toHaveBeenCalledWith('set_active_level', { levelId: 'level-2' });
@@ -91,42 +76,22 @@ describe('BuildingPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete Wall W1' }));
     expect(dispatch).toHaveBeenCalledWith('delete_building_element', { elementIds: ['wall-1'] });
     fireEvent.click(screen.getByRole('button', { name: 'Delete level Upper' }));
-    expect(dispatch).toHaveBeenCalledWith('delete_level', {
-      levelId: 'level-2',
-      deleteElements: true,
-    });
+    expect(dispatch).toHaveBeenCalledWith('delete_level', { levelId: 'level-2', deleteElements: true });
   });
-
   it('element tools gather params and dispatch one command; invalid input shows an error', () => {
     localDispatch('add_level', {});
-    localDispatch('draw_walls', {
-      points: [
-        [0, 0],
-        [4000, 0],
-      ],
-    });
+    localDispatch('draw_walls', { points: xy(0, 0, 4000, 0) });
     const dispatch = spyDispatch();
     render(<BuildingPanel />);
     fireEvent.click(screen.getByTestId('tool-submit'));
-    expect(dispatch).toHaveBeenLastCalledWith('add_grid_system', {
-      xSpacings: [6000, 6000],
-      ySpacings: [5000],
-    });
-
+    expect(dispatch).toHaveBeenLastCalledWith('add_grid_system', { xSpacings: [6000, 6000], ySpacings: [5000] });
     fireEvent.change(screen.getByTestId('building-tool-select'), { target: { value: 'door' } });
     fireEvent.click(screen.getByTestId('tool-submit'));
     expect(screen.getByRole('alert')).toHaveTextContent('Pick a host wall first.');
     fireEvent.change(screen.getByTestId('tool-field-wallId'), { target: { value: 'wall-1' } });
     fireEvent.change(screen.getByTestId('tool-field-offset'), { target: { value: '1200' } });
     fireEvent.click(screen.getByTestId('tool-submit'));
-    expect(dispatch).toHaveBeenLastCalledWith('add_door', {
-      wallId: 'wall-1',
-      offset: 1200,
-      width: 900,
-      height: 2100,
-      swing: 'left',
-    });
-
+    expect(dispatch).toHaveBeenLastCalledWith('add_door', { wallId: 'wall-1', offset: 1200, width: 900, height: 2100, swing: 'left' });
     fireEvent.change(screen.getByTestId('building-tool-select'), { target: { value: 'column' } });
     fireEvent.click(screen.getByTestId('tool-field-atGrid'));
     fireEvent.click(screen.getByTestId('tool-submit'));
@@ -136,13 +101,11 @@ describe('BuildingPanel', () => {
       width: 300,
       levelId: 'level-1',
     });
-
     fireEvent.change(screen.getByTestId('building-tool-select'), { target: { value: 'wall' } });
     fireEvent.change(screen.getByTestId('tool-field-x1'), { target: { value: 'abc' } });
     fireEvent.click(screen.getByTestId('tool-submit'));
     expect(screen.getByRole('alert')).toHaveTextContent('Check: x1');
   });
-
   it('saves project info changes only', () => {
     localDispatch('add_level', {});
     const dispatch = spyDispatch();
@@ -153,14 +116,8 @@ describe('BuildingPanel', () => {
     fireEvent.click(save);
     expect(dispatch).toHaveBeenCalledWith('set_project_info', { client: 'ACME' });
   });
-
   it('shows the live takeoff and sets a unit rate', () => {
-    localDispatch('draw_walls', {
-      points: [
-        [0, 0],
-        [5000, 0],
-      ],
-    });
+    localDispatch('draw_walls', { points: xy(0, 0, 5000, 0) });
     const dispatch = spyDispatch();
     render(<BuildingPanel />);
     expect(screen.getByTestId('takeoff-wall.concrete.m3')).toHaveTextContent('3 m³');
@@ -170,14 +127,8 @@ describe('BuildingPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Set rate' }));
     expect(dispatch).toHaveBeenCalledWith('set_cost_rates', { rates: { 'wall.concrete.m3': 180 } });
   });
-
   it('export buttons report the exporter summary', () => {
-    localDispatch('draw_walls', {
-      points: [
-        [0, 0],
-        [5000, 0],
-      ],
-    });
+    localDispatch('draw_walls', { points: xy(0, 0, 5000, 0) });
     const { createObjectURL, click } = stubDownloads();
     render(<BuildingPanel />);
     fireEvent.click(screen.getByRole('button', { name: 'DXF (AutoCAD)' }));
@@ -190,7 +141,6 @@ describe('BuildingPanel', () => {
     expect(click).toHaveBeenCalledTimes(3);
     click.mockRestore();
   });
-
   it('generates a steel hall and picks industrial tools from their group', () => {
     const dispatch = spyDispatch();
     render(<BuildingPanel />);
@@ -201,22 +151,13 @@ describe('BuildingPanel', () => {
     fireEvent.change(screen.getByTestId('tool-field-service'), { target: { value: 'steam' } });
     fireEvent.click(screen.getByTestId('tool-submit'));
     expect(dispatch).toHaveBeenLastCalledWith('add_pipe_run', {
-      points: [
-        [2000, 3000, 4000],
-        [20000, 3000, 4000],
-      ],
+      points: xyz(2000, 3000, 4000, 20000, 3000, 4000),
       dn: 100,
       service: 'steam',
     });
   });
-
   it('runs the clash check and selects a clashing pair', () => {
-    localDispatch('add_steel_member', {
-      profile: 'HEA300',
-      role: 'column',
-      start: [0, 0, 0],
-      end: [0, 0, 6000],
-    });
+    localDispatch('add_steel_member', { profile: 'HEA300', role: 'column', start: [0, 0, 0], end: [0, 0, 6000] });
     localDispatch('add_equipment', { name: 'Press', location: [0, 0], size: [2000, 2000, 2000] });
     render(<BuildingPanel />);
     fireEvent.click(screen.getByTestId('clash-check'));
@@ -225,7 +166,6 @@ describe('BuildingPanel', () => {
     fireEvent.click(screen.getByTestId('clash-row'));
     expect(useStore.getState().document.selection).toEqual(['equipment-1:body', 'member-1:body']);
   });
-
   it('reports a clean model and exports an elevation and a section', () => {
     localDispatch('add_box', { position: [0, 0, 500], size: [2000, 1000, 1000] });
     const { click } = stubDownloads();
@@ -242,15 +182,12 @@ describe('BuildingPanel', () => {
     expect(click).toHaveBeenCalledTimes(2);
     click.mockRestore();
   });
-
   it('checks the portal frames and dispatches their design', () => {
     localDispatch('add_portal_frame_building', { span: 18000, length: 12000, cladding: false });
     const dispatch = spyDispatch();
     render(<BuildingPanel />);
     fireEvent.change(screen.getByLabelText('Snow load (kN/m²)'), { target: { value: '1.0' } });
-    fireEvent.change(screen.getByLabelText('Wind pressure qp (kN/m²)'), {
-      target: { value: '0.6' },
-    });
+    fireEvent.change(screen.getByLabelText('Wind pressure qp (kN/m²)'), { target: { value: '0.6' } });
     fireEvent.click(screen.getByTestId('frame-check'));
     expect(screen.getByTestId('frame-check-summary')).toHaveTextContent(
       /Checked 3 frame\(s\).*10 ULS combination\(s\).*S = 1 kN\/m², qp = 0\.6 kN\/m²/,
@@ -262,23 +199,10 @@ describe('BuildingPanel', () => {
     fireEvent.click(screen.getByTestId('frame-design'));
     fireEvent.click(screen.getByTestId('footing-design'));
     fireEvent.click(screen.getByTestId('purlin-design'));
-    expect(dispatch).toHaveBeenCalledWith('design_purlins', {
-      roofDeadLoad: 0.5,
-      snowLoad: 1,
-      windPressure: 0.6,
-    });
-    expect(dispatch).toHaveBeenCalledWith('design_footings', {
-      deadLoad: 0.5,
-      snowLoad: 1,
-      windPressure: 0.6,
-    });
-    expect(dispatch).toHaveBeenCalledWith('design_portal_frames', {
-      deadLoad: 0.5,
-      snowLoad: 1,
-      windPressure: 0.6,
-    });
+    expect(dispatch).toHaveBeenCalledWith('design_purlins', { roofDeadLoad: 0.5, snowLoad: 1, windPressure: 0.6 });
+    expect(dispatch).toHaveBeenCalledWith('design_footings', { deadLoad: 0.5, snowLoad: 1, windPressure: 0.6 });
+    expect(dispatch).toHaveBeenCalledWith('design_portal_frames', { deadLoad: 0.5, snowLoad: 1, windPressure: 0.6 });
   });
-
   it('points to auto-size when a check fails, and drops the hint once the design passes', () => {
     localDispatch('add_portal_frame_building', {});
     const { unmount } = render(<BuildingPanel />);
@@ -286,21 +210,14 @@ describe('BuildingPanel', () => {
     expect(screen.getAllByText('FAIL').length).toBeGreaterThan(0);
     expect(screen.getByTestId('frame-check-next-step')).toHaveTextContent(/Auto-size/);
     unmount();
-
     localDispatch('design_portal_frames', { deadLoad: 0.5, snowLoad: 0.8, windPressure: 0 });
     render(<BuildingPanel />);
     fireEvent.click(screen.getByTestId('frame-check'));
     expect(screen.queryByText('FAIL')).toBeNull();
     expect(screen.queryByTestId('frame-check-next-step')).toBeNull();
   });
-
   it('runs the bracing, foundation and crane runway checks', () => {
-    localDispatch('add_portal_frame_building', {
-      span: 18000,
-      length: 12000,
-      cladding: false,
-      crane: { capacity: 5, railHeight: 5000 },
-    });
+    localDispatch('add_portal_frame_building', { span: 18000, length: 12000, cladding: false, crane: { capacity: 5, railHeight: 5000 } });
     render(<BuildingPanel />);
     const summary = (): HTMLElement => screen.getByTestId('frame-check-summary');
     fireEvent.click(screen.getByTestId('bracing-check'));
@@ -314,7 +231,6 @@ describe('BuildingPanel', () => {
     fireEvent.click(rows[0]!);
     expect(useStore.getState().document.selection.length).toBeGreaterThan(0);
   });
-
   it('exports the anchor bolt plan and the DSTV NC files of a hall', () => {
     localDispatch('add_portal_frame_building', { span: 12000, length: 12000, cladding: false });
     const { click } = stubDownloads();

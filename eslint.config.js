@@ -12,11 +12,7 @@ export default tseslint.config(
   js.configs.recommended,
   tseslint.configs.recommended,
   {
-    languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-      globals: { ...globals.browser, ...globals.node },
-    },
+    languageOptions: { ecmaVersion: 'latest', sourceType: 'module', globals: { ...globals.browser, ...globals.node } },
     plugins: { 'react-hooks': reactHooks },
     rules: {
       'react-hooks/rules-of-hooks': 'error',
@@ -24,12 +20,7 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/explicit-function-return-type': ['warn', { allowExpressions: true }],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [{ group: ['@core/lib/*'], message: 'Import core helpers via @lib/* instead.' }],
-        },
-      ],
+      'no-restricted-imports': ['error', { patterns: [{ group: ['@core/lib/*'], message: 'Import core helpers via @lib/* instead.' }] }],
       '@typescript-eslint/consistent-type-imports': ['error', { fixStyle: 'separate-type-imports', disallowTypeAnnotations: false }],
     },
   },
@@ -44,10 +35,7 @@ export default tseslint.config(
     rules: {
       'no-restricted-syntax': [
         'error',
-        {
-          selector: "MetaProperty[meta.name='import']",
-          message: 'import.meta does not exist in the CommonJS server/desktop bundles.',
-        },
+        { selector: "MetaProperty[meta.name='import']", message: 'import.meta does not exist in the CommonJS server/desktop bundles.' },
       ],
     },
   },

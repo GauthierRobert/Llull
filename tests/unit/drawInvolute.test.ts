@@ -2,263 +2,64 @@ import { describe, it, expect } from 'vitest';
 import { type PolylineEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { sampleInvolute } from '@lib/gearOutline';
-import { expectSingleEntity } from '../helpers/expectNoOp';
+import { expectSingleEntity, expectNoOp, expectPure } from '../helpers/expectNoOp';
+
+const doc = createEmptyDocument();
+const involute = (p: object): { r: ReturnType<typeof execute>; poly: PolylineEntity } => {
+  const r = execute(doc, 'draw_involute', p);
+  return { r, poly: r.document.entities[r.affected[0]!] as PolylineEntity };
+};
 
 describe('draw_involute', () => {
-  // Happy path — basic shape
-
-  it('creates exactly one open polyline entity', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_involute', { baseRadius: 4, endAngle: Math.PI });
-    expectSingleEntity(result, 'polyline');
-    const entity = result.document.entities[result.affected[0]!]!;
-    expect((entity as PolylineEntity).closed).toBe(false);
-  });
-
-  it('defaults samples=24 — polyline has 24 points', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_involute', { baseRadius: 4, endAngle: Math.PI });
-    const id = result.affected[0]!;
-    const poly = result.document.entities[id] as PolylineEntity;
+  it('creates one open polyline of 24 default samples from (baseRadius, 0) to radius baseR·√(1+t²), purely', () => {
+    const { r, poly } = involute({ baseRadius: 4, endAngle: Math.PI });
+    expectSingleEntity(r, 'polyline');
+    expect(poly.closed).toBe(false);
     expect(poly.points).toHaveLength(24);
+    expect(poly.points[0]![0]).toBeCloseTo(4, 9);
+    expect(poly.points[0]![1]).toBeCloseTo(0, 9);
+    const last = poly.points.at(-1)!;
+    expect(Math.abs(Math.hypot(last[0], last[1]) - 4 * Math.sqrt(1 + Math.PI ** 2))).toBeLessThan(1e-9);
+    expectPure(doc, () => [
+      execute(doc, 'draw_involute', { baseRadius: 4, endAngle: Math.PI }),
+      execute(doc, 'draw_involute', { baseRadius: -1, endAngle: 1 }),
+    ]);
   });
 
-  it('first point is approximately (baseRadius, 0) when startAngle=0', () => {
-    const baseRadius = 4;
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_involute', { baseRadius, endAngle: Math.PI });
-    const id = result.affected[0]!;
-    const poly = result.document.entities[id] as PolylineEntity;
-    const [x0, y0] = poly.points[0]!;
-    expect(x0).toBeCloseTo(baseRadius, 9);
-    expect(y0).toBeCloseTo(0, 9);
+  it('shares sampleInvolute with add_spur_gear: the flank reaches the gear outer radius', () => {
+    const [pitch, base] = [42, 42 * Math.cos(Math.PI / 9)];
+    const last = sampleInvolute(base, 0, Math.sqrt(((pitch + 2) / base) ** 2 - 1), 14).at(-1)!;
+    expect(Math.abs(Math.hypot(last[0], last[1]) - (pitch + 2))).toBeLessThan(1e-9);
   });
 
-  it('last point radius from origin equals baseR * sqrt(1 + tEnd²) within 1e-9', () => {
-    const baseRadius = 4;
-    const endAngle = Math.PI;
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_involute', { baseRadius, endAngle });
-    const id = result.affected[0]!;
-    const poly = result.document.entities[id] as PolylineEntity;
-    const last = poly.points[poly.points.length - 1]!;
-    const actualR = Math.sqrt(last[0] ** 2 + last[1] ** 2);
-    const expectedR = baseRadius * Math.sqrt(1 + endAngle ** 2);
-    expect(Math.abs(actualR - expectedR)).toBeLessThan(1e-9);
-  });
-
-  // Math cross-check with add_spur_gear (shared helper proves one source of truth)
-
-  it('endpoint radius matches gear outerRadius — proves shared sampleInvolute helper', () => {
-    // Derive the gear parameters used in addSpurGear tests:
-    //   module=2, teeth=42, pressureAngle=Math.PI/9
-    const mod = 2;
-    const teeth = 42;
-    const pressureAngle = Math.PI / 9;
-    const pitchRadius = (mod * teeth) / 2; // 42
-    const baseR = pitchRadius * Math.cos(pressureAngle);
-    const outerRadius = pitchRadius + mod; // 44
-
-    // The involute's tMax parameter where it reaches outerRadius:
-    //   baseR * sqrt(1 + tMax²) = outerRadius  →  tMax = sqrt((outerRadius/baseR)² − 1)
-    const tMax = Math.sqrt((outerRadius / baseR) ** 2 - 1);
-
-    // Sample the same curve add_spur_gear uses internally.
-    const pts = sampleInvolute(baseR, 0, tMax, 14);
-    const last = pts[pts.length - 1]!;
-    const actualR = Math.sqrt(last[0] ** 2 + last[1] ** 2);
-
-    expect(Math.abs(actualR - outerRadius)).toBeLessThan(1e-9);
-  });
-
-  // samples param
-
-  it('explicit samples=10 produces 10 points', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_involute', {
-      baseRadius: 3,
-      endAngle: 2,
-      samples: 10,
-    });
-    const id = result.affected[0]!;
-    const poly = result.document.entities[id] as PolylineEntity;
-    expect(poly.points).toHaveLength(10);
-  });
-
-  it('samples=2 produces exactly 2 points (minimum)', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_involute', {
-      baseRadius: 5,
-      endAngle: 1,
-      samples: 2,
-    });
-    const id = result.affected[0]!;
-    const poly = result.document.entities[id] as PolylineEntity;
-    expect(poly.points).toHaveLength(2);
-  });
-
-  // startAngle default
-
-  it('omitting startAngle defaults to 0 — same as explicit startAngle=0', () => {
-    const doc = createEmptyDocument();
-    const r1 = execute(doc, 'draw_involute', { baseRadius: 4, endAngle: 2 });
-    const r2 = execute(doc, 'draw_involute', { baseRadius: 4, startAngle: 0, endAngle: 2 });
-    const p1 = (r1.document.entities[r1.affected[0]!] as PolylineEntity).points;
-    const p2 = (r2.document.entities[r2.affected[0]!] as PolylineEntity).points;
+  it('honours samples, startAngle default, placement and reports the sweep', () => {
+    expect(involute({ baseRadius: 3, endAngle: 2, samples: 10 }).poly.points).toHaveLength(10);
+    expect(involute({ baseRadius: 5, endAngle: 1, samples: 2 }).poly.points).toHaveLength(2);
+    const p1 = involute({ baseRadius: 4, endAngle: 2 }).poly.points;
+    const p2 = involute({ baseRadius: 4, startAngle: 0, endAngle: 2 }).poly.points;
     expect(p1.length).toBe(p2.length);
-    for (let i = 0; i < p1.length; i++) {
-      expect(p1[i]![0]).toBeCloseTo(p2[i]![0], 12);
-      expect(p1[i]![1]).toBeCloseTo(p2[i]![1], 12);
-    }
+    p1.forEach((p, i) => p.forEach((v, k) => expect(v).toBeCloseTo(p2[i]![k]!, 12)));
+    const placed = involute({ baseRadius: 3, endAngle: 1, position: [5, -2, 7], rotation: [0, 0, Math.PI] }).poly;
+    expect(placed.position).toEqual([5, -2, 7]);
+    expect(placed.rotation[2]).toBeCloseTo(Math.PI, 9);
+    expect(involute({ baseRadius: 3, endAngle: 1, position: [10, 0, 0] }).poly.position[0]).toBe(10);
+    const { r } = involute({ baseRadius: 4, startAngle: 0.5, endAngle: 2.5, samples: 12 });
+    for (const s of [r.affected[0]!, '4', '0.5', '2.5', '12']) expect(r.summary).toContain(s);
   });
 
-  // position / rotation placement
-
-  it('position is stored on the entity', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_involute', {
-      baseRadius: 3,
-      endAngle: 1,
-      position: [5, -2, 7],
-    });
-    const entity = result.document.entities[result.affected[0]!]!;
-    expect(entity.position).toEqual([5, -2, 7]);
-  });
-
-  it('rotation is stored on the entity', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_involute', {
-      baseRadius: 3,
-      endAngle: 1,
-      rotation: [0, 0, Math.PI],
-    });
-    const entity = result.document.entities[result.affected[0]!]!;
-    expect(entity.rotation[2]).toBeCloseTo(Math.PI, 9);
-  });
-
-  it('different positions produce distinct entity placements', () => {
-    const doc = createEmptyDocument();
-    const r1 = execute(doc, 'draw_involute', { baseRadius: 3, endAngle: 1, position: [0, 0, 0] });
-    const r2 = execute(doc, 'draw_involute', { baseRadius: 3, endAngle: 1, position: [10, 0, 0] });
-    expect(r2.document.entities[r2.affected[0]!]!.position[0]).toBe(10);
-    expect(r1.document.entities[r1.affected[0]!]!.position[0]).toBe(0);
-  });
-
-  // Summary
-
-  it('summary contains entity id, baseRadius, sweep range, and sample count', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_involute', {
-      baseRadius: 4,
-      startAngle: 0.5,
-      endAngle: 2.5,
-      samples: 12,
-    });
-    const id = result.affected[0]!;
-    expect(result.summary).toContain(id);
-    expect(result.summary).toContain('4'); // baseRadius
-    expect(result.summary).toContain('0.5'); // startAngle
-    expect(result.summary).toContain('2.5'); // endAngle
-    expect(result.summary).toContain('12'); // samples
-  });
-
-  // Failure paths
-
-  it('baseRadius=0 -> no-op, affected:[], summary mentions baseRadius', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_involute', { baseRadius: 0, endAngle: 1 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toMatch(/baseRadius/i);
-  });
-
-  it('baseRadius<0 -> no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_involute', { baseRadius: -3, endAngle: 1 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('samples=1 -> no-op, affected:[], summary mentions samples', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_involute', { baseRadius: 4, endAngle: 1, samples: 1 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toMatch(/samples/i);
-  });
-
-  it('endAngle <= startAngle -> no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_involute', {
-      baseRadius: 4,
-      startAngle: 2,
-      endAngle: 1,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toMatch(/endAngle/i);
-  });
-
-  it('endAngle === startAngle -> no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_involute', {
-      baseRadius: 4,
-      startAngle: 1,
-      endAngle: 1,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('NaN baseRadius -> no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_involute', { baseRadius: NaN, endAngle: 1 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('Infinity endAngle -> no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_involute', { baseRadius: 4, endAngle: Infinity });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('NaN startAngle -> no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_involute', {
-      baseRadius: 4,
-      startAngle: NaN,
-      endAngle: 1,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('NaN samples -> no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_involute', {
-      baseRadius: 4,
-      endAngle: 1,
-      samples: NaN,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  // Purity
-
-  it('is pure — happy path does not mutate input doc', () => {
-    const doc = createEmptyDocument();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'draw_involute', { baseRadius: 4, endAngle: Math.PI });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('is pure — failure path does not mutate input doc', () => {
-    const doc = createEmptyDocument();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'draw_involute', { baseRadius: -1, endAngle: 1 });
-    expect(JSON.stringify(doc)).toBe(snapshot);
+  it.each<[object, RegExp?]>([
+    [{ baseRadius: 0, endAngle: 1 }, /baseRadius/i],
+    [{ baseRadius: -3, endAngle: 1 }],
+    [{ baseRadius: 4, endAngle: 1, samples: 1 }, /samples/i],
+    [{ baseRadius: 4, startAngle: 2, endAngle: 1 }, /endAngle/i],
+    [{ baseRadius: 4, startAngle: 1, endAngle: 1 }],
+    [{ baseRadius: NaN, endAngle: 1 }],
+    [{ baseRadius: 4, endAngle: Infinity }],
+    [{ baseRadius: 4, startAngle: NaN, endAngle: 1 }],
+    [{ baseRadius: 4, endAngle: 1, samples: NaN }],
+  ])('%j is a no-op', (p, summary) => {
+    const r = execute(doc, 'draw_involute', p);
+    expectNoOp(r, doc);
+    if (summary) expect(r.summary).toMatch(summary);
   });
 });

@@ -91,10 +91,7 @@ export function serviceWorkerPlugin(root: string): Plugin {
         if (output === undefined) return '';
         return output.type === 'chunk' ? output.code : output.source;
       };
-      const files = Object.keys(bundle).map((fileName) => ({
-        fileName,
-        bytes: Buffer.byteLength(sourceOf(fileName)),
-      }));
+      const files = Object.keys(bundle).map((fileName) => ({ fileName, bytes: Buffer.byteLength(sourceOf(fileName)) }));
       const workerSource = readFileSync(resolve(root, 'serviceWorker/sw.js'), 'utf8');
       const manifest = buildServiceWorkerManifest(
         files,
@@ -102,11 +99,7 @@ export function serviceWorkerPlugin(root: string): Plugin {
         (fileName) => createHash('sha256').update(sourceOf(fileName)).digest('hex'),
         workerSource,
       );
-      this.emitFile({
-        type: 'asset',
-        fileName: 'sw.js',
-        source: serviceWorkerScript(manifest, workerSource),
-      });
+      this.emitFile({ type: 'asset', fileName: 'sw.js', source: serviceWorkerScript(manifest, workerSource) });
     },
   };
 }

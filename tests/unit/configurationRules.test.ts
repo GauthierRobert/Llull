@@ -3,10 +3,7 @@ import type { Configuration, Parameter } from '@core/model/types';
 import { configurationDraftOf, isConfigurationActive } from '@ui/panels/configurationRules';
 
 const param = (expression: string): Parameter => ({ name: 'w', expression, value: 1 });
-const config = (parameterValues: Record<string, string>): Configuration => ({
-  name: 'c',
-  parameterValues,
-});
+const config = (parameterValues: Record<string, string>): Configuration => ({ name: 'c', parameterValues });
 
 describe('configurationRules', () => {
   it('is active only when every parameter holds the expression', () => {
@@ -15,18 +12,13 @@ describe('configurationRules', () => {
     expect(isConfigurationActive(config({ w: '2' }), {})).toBe(false);
     expect(isConfigurationActive(config({}), { w: param('2') })).toBe(false);
   });
-
   it('builds a trimmed draft and ignores blank rows', () => {
     const rows = [
       { paramName: ' w ', expression: ' 2 ' },
       { paramName: '', expression: '' },
     ];
-    expect(configurationDraftOf(' small ', rows)).toEqual({
-      name: 'small',
-      parameterValues: { w: '2' },
-    });
+    expect(configurationDraftOf(' small ', rows)).toEqual({ name: 'small', parameterValues: { w: '2' } });
   });
-
   it('rejects blank name, no rows and half-filled rows', () => {
     const ok = [{ paramName: 'w', expression: '2' }];
     expect(configurationDraftOf(' ', ok)).toBeNull();

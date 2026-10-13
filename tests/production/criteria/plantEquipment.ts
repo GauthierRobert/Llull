@@ -62,10 +62,7 @@ function openingsCheck({ document }: GradeContext): CheckOutcome {
       if (!cut) problems.push(`${equipment.mark} passes through ${slab.mark} (top ${top}) with no opening`);
     }
   }
-  return {
-    pass: problems.length === 0,
-    detail: problems.length === 0 ? `${crossings} floor crossing(s), all cut` : problems.join('; '),
-  };
+  return { pass: problems.length === 0, detail: problems.length === 0 ? `${crossings} floor crossing(s), all cut` : problems.join('; ') };
 }
 
 function supportedCheck({ document }: GradeContext): CheckOutcome {

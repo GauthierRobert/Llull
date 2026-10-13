@@ -129,10 +129,7 @@ export const addHelixSpring = defineCommand({
       { path, section: { shape: 'circle', radius: r } },
       add3(position, applyMat3(matrix, startLocal)),
       color,
-      {
-        rotation: eulerFromMat(matrix),
-        name,
-      },
+      { rotation: eulerFromMat(matrix), name },
     );
     const freeLength = resolved.rise + 2 * r;
     const data = { freeLength, turns: resolved.turns, pitch: middlePitch, wireDiameter: 2 * r, outerDiameter: 2 * (coilRadius + r) };

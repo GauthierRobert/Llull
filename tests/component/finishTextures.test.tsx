@@ -1,9 +1,3 @@
-/**
- * Viewport finish textures: the hook builds three.js DataTextures from the core procedural maps
- * (repeat-wrapped, sRGB albedo) and disposes them when the finish changes; applyBoxUvs writes a
- * box-projected uv attribute. WebGL does not run in jsdom, so we check the three.js objects.
- */
-
 import { describe, it, expect } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import * as THREE from 'three';
@@ -36,7 +30,6 @@ describe('useFinishTextures', () => {
     expect(result.current).toBeNull();
     expect(disposed).toBe(1);
   });
-
   it('applyBoxUvs projects each vertex on its dominant normal plane', () => {
     const geometry = new THREE.BoxGeometry(40, 20, 10);
     applyBoxUvs(geometry, 20);

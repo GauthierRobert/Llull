@@ -14,6 +14,8 @@ interface ScheduleTable {
 }
 import type { PlanSheet } from '@aec/building/drawings/sheet';
 import { rawBuilding } from './elementEdits';
+import { expectNoOp } from '../../helpers/expectNoOp';
+import { xy, xyz } from '../../helpers/xy';
 
 function element(doc: CadDocument, id: string): BuildingElement {
   const found = doc.building?.elements[id];
@@ -21,10 +23,7 @@ function element(doc: CadDocument, id: string): BuildingElement {
   return found;
 }
 
-const ROUTE = [
-  [0, 0, 3000],
-  [6000, 0, 3000],
-];
+const ROUTE = xyz(0, 0, 3000, 6000, 0, 3000);
 
 describe('add_pipe_run line-list data', () => {
   it('stores line, DN, from and to and takes the OD from the DN table', () => {
@@ -38,59 +37,28 @@ describe('add_pipe_run line-list data', () => {
     });
     expect(result.summary).toMatch(/pipe PL1 \(pipe-1\) line L-101 DN100 Ø114\.3, 6\.00 m/);
     expect(result.summary).toMatch(/EQ1 → BL-1/);
-    expect(element(result.document, 'pipe-1')).toMatchObject({
-      line: 'L-101',
-      dn: 100,
-      from: 'EQ1',
-      to: 'BL-1',
-      diameter: 114.3,
-    });
+    expect(element(result.document, 'pipe-1')).toMatchObject({ line: 'L-101', dn: 100, from: 'EQ1', to: 'BL-1', diameter: 114.3 });
   });
-
-  it.each([
-    [15, 21.3],
-    [25, 33.7],
-    [50, 60.3],
-    [150, 168.3],
-    [400, 406.4],
-  ])('DN%i has outside diameter %f mm', (dn, od) => {
+  it.each(xy(15, 21.3, 25, 33.7, 50, 60.3, 150, 168.3, 400, 406.4))('DN%i has outside diameter %f mm', (dn, od) => {
     expect(outsideDiameterMm(dn)).toBe(od);
     const doc = run(createEmptyDocument(), 'add_pipe_run', { points: ROUTE, dn });
     expect((element(doc, 'pipe-1') as PipeElement).diameter).toBe(od);
   });
-
   it('converts the table OD to the document units and lets diameter override it', () => {
     const metric = { ...createEmptyDocument(), units: 'cm' as const };
-    const converted = run(metric, 'add_pipe_run', {
-      points: [
-        [0, 0, 0],
-        [100, 0, 0],
-      ],
-      dn: 100,
-    });
+    const converted = run(metric, 'add_pipe_run', { points: xyz(0, 0, 0, 100, 0, 0), dn: 100 });
     expect((element(converted, 'pipe-1') as PipeElement).diameter).toBeCloseTo(11.43, 5);
-    const explicit = run(createEmptyDocument(), 'add_pipe_run', {
-      points: ROUTE,
-      dn: 100,
-      diameter: 120,
-    });
+    const explicit = run(createEmptyDocument(), 'add_pipe_run', { points: ROUTE, dn: 100, diameter: 120 });
     expect(element(explicit, 'pipe-1')).toMatchObject({ diameter: 120, dn: 100 });
   });
-
   it('keeps an untabulated DN when an explicit diameter is given', () => {
-    const doc = run(createEmptyDocument(), 'add_pipe_run', {
-      points: ROUTE,
-      dn: 90,
-      diameter: 101.6,
-    });
+    const doc = run(createEmptyDocument(), 'add_pipe_run', { points: ROUTE, dn: 90, diameter: 101.6 });
     expect(element(doc, 'pipe-1')).toMatchObject({ dn: 90, diameter: 101.6 });
   });
-
   it('is a graceful no-op for an unknown DN without diameter or an invalid DN', () => {
     const doc = createEmptyDocument();
     const unknown = execute(doc, 'add_pipe_run', { points: ROUTE, dn: 90 });
-    expect(unknown.affected).toEqual([]);
-    expect(unknown.document).toBe(doc);
+    expectNoOp(unknown, doc);
     expect(unknown.summary).toMatch(/DN90 is not in the pipe size table.*explicit diameter/);
     for (const dn of [0, -50, 100.5]) {
       const result = execute(doc, 'add_pipe_run', { points: ROUTE, dn, diameter: 100 });
@@ -98,15 +66,8 @@ describe('add_pipe_run line-list data', () => {
       expect(result.summary).toMatch(/dn must be a positive integer/);
     }
   });
-
   it('prints a line list in the pipe schedule with Mark first', () => {
-    let doc = run(createEmptyDocument(), 'add_pipe_run', {
-      points: ROUTE,
-      line: 'L-101',
-      dn: 100,
-      from: 'EQ1',
-      to: 'EQ2',
-    });
+    let doc = run(createEmptyDocument(), 'add_pipe_run', { points: ROUTE, line: 'L-101', dn: 100, from: 'EQ1', to: 'EQ2' });
     doc = run(doc, 'add_pipe_run', { points: ROUTE, from: 'EQ3', diameter: 50 });
     const table = execute(doc, 'building_schedule', { kind: 'pipe' }).data as ScheduleTable;
     const header = table.columns;
@@ -122,27 +83,15 @@ describe('add_pipe_run line-list data', () => {
     expect(cell(1, 'From')).toBe('EQ3');
     expect(cell(1, 'To')).toBe('');
   });
-
   it('exports the line number in the IFC description and keeps the mark as name', () => {
-    const doc = run(createEmptyDocument(), 'add_pipe_run', {
-      points: ROUTE,
-      service: 'steam',
-      line: 'L-101',
-    });
+    const doc = run(createEmptyDocument(), 'add_pipe_run', { points: ROUTE, service: 'steam', line: 'L-101' });
     const ifc = (execute(doc, 'export_ifc', {}).data as IfcExport).ifc;
     expect(ifc).toMatch(/IFCPIPESEGMENT\('[^']{22}',\$,'PL1','L-101 steam'/);
     const plain = run(createEmptyDocument(), 'add_pipe_run', { points: ROUTE, service: 'steam' });
     expect((execute(plain, 'export_ifc', {}).data as IfcExport).ifc).toMatch(/IFCPIPESEGMENT\('[^']{22}',\$,'PL1','steam'/);
   });
-
   it('validates the optional fields of a loaded document', () => {
-    const doc = run(createEmptyDocument(), 'add_pipe_run', {
-      points: ROUTE,
-      line: 'L-1',
-      dn: 50,
-      from: 'A',
-      to: 'B',
-    });
+    const doc = run(createEmptyDocument(), 'add_pipe_run', { points: ROUTE, line: 'L-1', dn: 50, from: 'A', to: 'B' });
     const copy = rawBuilding(doc);
     expect(buildingErrors(copy)).toEqual([]);
     const pipe = copy.elements['pipe-1'] as Record<string, unknown>;
@@ -162,13 +111,7 @@ function plant(): CadDocument {
     clearance: 900,
     mark: 'R-101',
   });
-  doc = run(doc, 'add_equipment', {
-    name: 'Pump',
-    location: [8000, 3000],
-    size: [1000, 800, 900],
-    weight: 450,
-    mark: 'P-101',
-  });
+  doc = run(doc, 'add_equipment', { name: 'Pump', location: [8000, 3000], size: [1000, 800, 900], weight: 450, mark: 'P-101' });
   return doc;
 }
 
@@ -182,12 +125,14 @@ describe('IFC equipment property set', () => {
     const proxyRef = /^(#\d+)=/.exec(proxy ?? '')?.[1];
     expect(proxyRef).toBeDefined();
     expect(record('IFCRELDEFINESBYPROPERTIES').some((line) => line.includes(`(${proxyRef})`))).toBe(true);
-    expect(ifc).toContain("'Pset_llullEquipment'");
-    expect(ifc).toContain("IFCPROPERTYSINGLEVALUE('OperatingWeight','Operating weight in kg',IFCMASSMEASURE(55000.),$)");
-    expect(ifc).toContain("IFCPROPERTYSINGLEVALUE('OperatingWeight','Operating weight in kg',IFCMASSMEASURE(450.),$)");
-    expect(ifc).toContain("IFCPROPERTYSINGLEVALUE('MaintenanceClearance','Free space around the footprint, mm',IFCLENGTHMEASURE(900.),$)");
+    for (const s of [
+      "'Pset_llullEquipment'",
+      "IFCPROPERTYSINGLEVALUE('OperatingWeight','Operating weight in kg',IFCMASSMEASURE(55000.),$)",
+      "IFCPROPERTYSINGLEVALUE('OperatingWeight','Operating weight in kg',IFCMASSMEASURE(450.),$)",
+      "IFCPROPERTYSINGLEVALUE('MaintenanceClearance','Free space around the footprint, mm',IFCLENGTHMEASURE(900.),$)",
+    ])
+      expect(ifc).toContain(s);
   });
-
   it('derives GlobalIds from the element id (+ suffix), stable across revisions', () => {
     const guids = (doc: CadDocument): string[] =>
       (execute(doc, 'export_ifc', {}).data as IfcExport).ifc
@@ -200,11 +145,7 @@ describe('IFC equipment property set', () => {
     expect(new Set(before).size).toBe(6);
     const revised = run(base, 'update_equipment', { currentMark: 'R-101', weight: 61000 });
     expect(guids(revised)).toEqual(before);
-    const added = run(revised, 'add_equipment', {
-      name: 'Extra',
-      location: [0, 0],
-      size: [1, 1, 1],
-    });
+    const added = run(revised, 'add_equipment', { name: 'Extra', location: [0, 0], size: [1, 1, 1] });
     expect(guids(added).slice(0, 6)).toEqual(before);
   });
 });
@@ -236,21 +177,15 @@ describe('update_equipment', () => {
       weight: 61000,
     });
     expect(result.document.building?.elementOrder).toEqual(doc.building?.elementOrder);
-    expect(result.document.entities['equipment-1:body']).toMatchObject({
-      position: [4500, 3000, 2750],
-    });
+    expect(result.document.entities['equipment-1:body']).toMatchObject({ position: [4500, 3000, 2750] });
   });
-
   it('edits by current tag, renames the tag and moves level', () => {
     let doc = run(plant(), 'add_level', { name: 'Mezzanine' });
     const level = doc.building?.levelOrder[1] as string;
     doc = run(doc, 'update_equipment', { currentMark: 'P-101', mark: 'P-201', levelId: level });
     expect(element(doc, 'equipment-2')).toMatchObject({ mark: 'P-201', levelId: level });
-    const noChange = execute(doc, 'update_equipment', { elementId: 'equipment-2', mark: 'P-201' });
-    expect(noChange.document).toBe(doc);
-    expect(noChange.affected).toEqual([]);
+    expectNoOp(execute(doc, 'update_equipment', { elementId: 'equipment-2', mark: 'P-201' }), doc);
   });
-
   it('is a graceful no-op for bad targets and values', () => {
     const doc = run(run(plant(), 'add_pipe_run', { points: ROUTE }), 'add_equipment', {
       name: 'Twin',
@@ -258,28 +193,15 @@ describe('update_equipment', () => {
       size: [1, 1, 1],
       mark: 'DUP',
     });
-    const refused = execute(doc, 'add_equipment', {
-      name: 'Twin2',
-      location: [0, 5],
-      size: [1, 1, 1],
-      mark: 'DUP',
-    });
+    const refused = execute(doc, 'add_equipment', { name: 'Twin2', location: [0, 5], size: [1, 1, 1], mark: 'DUP' });
     expect(refused.document).toBe(doc);
     expect(refused.summary).toMatch(/tag 'DUP' is already used by equipment-3/);
     // Duplicate tags can still arrive from a loaded file: forge one to cover the ambiguity branch.
-    const withSecond = run(doc, 'add_equipment', {
-      name: 'Twin2',
-      location: [0, 5],
-      size: [1, 1, 1],
-      mark: 'DUP2',
-    });
+    const withSecond = run(doc, 'add_equipment', { name: 'Twin2', location: [0, 5], size: [1, 1, 1], mark: 'DUP2' });
     const forged = withSecond.building!.elements['equipment-4'] as EquipmentElement;
     const twin: CadDocument = {
       ...withSecond,
-      building: {
-        ...withSecond.building!,
-        elements: { ...withSecond.building!.elements, 'equipment-4': { ...forged, mark: 'DUP' } },
-      },
+      building: { ...withSecond.building!, elements: { ...withSecond.building!.elements, 'equipment-4': { ...forged, mark: 'DUP' } } },
     };
     const cases: Array<[Record<string, unknown>, RegExp]> = [
       [{}, /give elementId or currentMark/],
@@ -309,34 +231,20 @@ describe('update_equipment', () => {
 
 describe('equipment location accepts [x, y, z]', () => {
   it('add_equipment and update_equipment truncate a 3-component location to [x, y]', () => {
-    const added = execute(createEmptyDocument(), 'add_equipment', {
-      name: 'Tank',
-      location: [1, 2, 0],
-      size: [1000, 1000, 2000],
-    });
+    const added = execute(createEmptyDocument(), 'add_equipment', { name: 'Tank', location: [1, 2, 0], size: [1000, 1000, 2000] });
     expect(added.affected.length, added.summary).toBeGreaterThan(0);
     expect(element(added.document, 'equipment-1')).toMatchObject({ location: [1, 2] });
-    const moved = run(added.document, 'update_equipment', {
-      elementId: 'equipment-1',
-      location: [5, 6, 7],
-    });
+    const moved = run(added.document, 'update_equipment', { elementId: 'equipment-1', location: [5, 6, 7] });
     expect(element(moved, 'equipment-1')).toMatchObject({ location: [5, 6] });
   });
-
   it('refuses a location with fewer than 2 finite numbers', () => {
     const base = createEmptyDocument();
-    const added = execute(base, 'add_equipment', {
-      name: 'Tank',
-      location: [1],
-      size: [1000, 1000, 2000],
-    });
-    expect(added.affected).toEqual([]);
-    expect(added.document).toBe(base);
+    const added = execute(base, 'add_equipment', { name: 'Tank', location: [1], size: [1000, 1000, 2000] });
+    expectNoOp(added, base);
     expect(added.summary).toMatch(/location must be \[x, y\]/);
     const doc = plant();
     const updated = execute(doc, 'update_equipment', { elementId: 'equipment-1', location: [1] });
-    expect(updated.affected).toEqual([]);
-    expect(updated.document).toBe(doc);
+    expectNoOp(updated, doc);
     expect(updated.summary).toMatch(/location must be \[x, y\]/);
   });
 });
@@ -365,12 +273,7 @@ function tower(): CadDocument {
     end: [6000, 0, 0],
     levelId: doc.building?.levelOrder[0],
   });
-  doc = run(doc, 'add_column', {
-    location: [8000, 2000],
-    width: 400,
-    height: 14000,
-    levelId: doc.building?.levelOrder[0],
-  });
+  doc = run(doc, 'add_column', { location: [8000, 2000], width: 400, height: 14000, levelId: doc.building?.levelOrder[0] });
   return doc;
 }
 
@@ -384,20 +287,17 @@ describe('columns on upper-floor plans', () => {
       .primitives.filter((p) => p.layer === 'S-COLS' && p.type === 'polygon' && p.style === 'cut')
       .map((p) => (p.type === 'polygon' ? (p.points[0]?.[0] as number) : 0))
       .sort((a, b) => a - b);
-
   it('draws a continuous steel column on every level plan its extent crosses', () => {
     const [x0, x1, x2] = [first, second, ground].map(columnsAt);
     expect(x2?.some((x) => near([x], 1000))).toBe(true);
     expect(x0?.some((x) => near([x], 1000))).toBe(true);
     expect(x1?.some((x) => near([x], 1000))).toBe(true);
   });
-
   it('omits columns that end below the cut and beams of other levels', () => {
     expect(columnsAt(ground).filter((x) => near([x], 5000))).toHaveLength(1);
     expect(columnsAt(first).filter((x) => near([x], 5000))).toHaveLength(0);
     expect(buildPlanDrawing(doc, second)!.primitives.some((p) => p.type === 'line')).toBe(false);
   });
-
   it('draws a tall concrete column on upper levels only while it crosses the cut', () => {
     const concrete = (levelId: string): boolean =>
       buildPlanDrawing(doc, levelId)!.primitives.some((p) => p.layer === 'S-COLS' && p.type === 'polygon' && p.fill === 'hatch');
@@ -409,7 +309,6 @@ describe('columns on upper-floor plans', () => {
     const upper = twoLevel.building?.levelOrder[1] as string;
     expect(buildPlanDrawing(twoLevel, upper)!.primitives.some((p) => p.layer === 'S-COLS')).toBe(false);
   });
-
   it('shows them in export_dxf and export_plan_sheet of the upper level', () => {
     const dxf = (execute(doc, 'export_dxf', { levelId: second }).data as DxfExport).dxf;
     expect(dxf).toContain('S-COLS');
@@ -418,7 +317,6 @@ describe('columns on upper-floor plans', () => {
     const base = (execute(doc, 'export_dxf', { levelId: ground }).data as DxfExport).dxf;
     expect(base.length).toBeGreaterThan(dxf.length);
   });
-
   it('ignores a column whose home level is unknown', () => {
     const broken = structuredClone(doc);
     const member = Object.values(broken.building!.elements).find((e) => e.category === 'member' && e.role === 'column')!;

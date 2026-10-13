@@ -26,14 +26,8 @@ export interface GizmoTransform {
 }
 
 export type GizmoCommit =
-  | {
-      readonly name: 'move_entities';
-      readonly params: { ids: string[]; delta: [number, number, number] };
-    }
-  | {
-      readonly name: 'rotate_entity';
-      readonly params: { id: string; delta: [number, number, number] };
-    }
+  | { readonly name: 'move_entities'; readonly params: { ids: string[]; delta: [number, number, number] } }
+  | { readonly name: 'rotate_entity'; readonly params: { id: string; delta: [number, number, number] } }
   | { readonly name: 'scale_entity'; readonly params: { id: string; factor: number } };
 
 /** Hint for a translate drag that grid snap returned to its start (`rawEnd` moved, nothing committed); else null. */

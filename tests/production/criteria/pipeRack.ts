@@ -167,10 +167,7 @@ function roadClearanceCheck(rules: RackRules, ctx: GradeContext): CheckOutcome {
     if (!reaches) continue;
     if (element.role === 'column') obstructions.push(`${element.mark} (${element.profile}) stands in the road`);
     const facts = section(element.profile);
-    candidates.push({
-      label: `${element.mark} ${element.profile}`,
-      bottom: Math.min(start[2], end[2]) - (facts?.h ?? 0) / 2,
-    });
+    candidates.push({ label: `${element.mark} ${element.profile}`, bottom: Math.min(start[2], end[2]) - (facts?.h ?? 0) / 2 });
   }
   for (const run of runsOf(ctx)) {
     // Corridor edges plus every route vertex inside the corridor (a line may dip between them).
@@ -179,10 +176,7 @@ function roadClearanceCheck(rules: RackRules, ctx: GradeContext): CheckOutcome {
       ...run.route.filter((point) => point[0] > xMin && point[0] < xMax),
     ].filter((point): point is Vec3 => point !== null);
     if (inside.length === 0) continue;
-    candidates.push({
-      label: run.label,
-      bottom: Math.min(...inside.map((point) => underside(run, point))),
-    });
+    candidates.push({ label: run.label, bottom: Math.min(...inside.map((point) => underside(run, point))) });
   }
   const lowest = candidates.sort((a, b) => a.bottom - b.bottom)[0];
   if (!lowest) return { pass: false, detail: 'nothing crosses the road corridor: no rack over the road' };
@@ -297,9 +291,7 @@ function lineMetresCheck(intent: PlantIntent, ctx: GradeContext): CheckOutcome {
     const od = PIPE_OD[line.dn] ?? 0;
     designed.set(od, (designed.get(od) ?? 0) + polylineLength(line.route) / 1000);
   }
-  const takeoff = ctx.run('quantity_takeoff').data as {
-    lines?: { key: string; unit: string; quantity: number }[];
-  };
+  const takeoff = ctx.run('quantity_takeoff').data as { lines?: { key: string; unit: string; quantity: number }[] };
   const takeoffByOd = new Map<number, number>();
   for (const line of takeoff.lines ?? []) {
     if (!line.key.startsWith('pipe.') || line.unit !== 'm') continue;
@@ -348,9 +340,7 @@ function trayCheck(intent: PlantIntent, rules: RackRules, ctx: GradeContext): Ch
   if (Math.abs(modelledMetres - designedMetres) > 0.005 * designedMetres + 0.05) {
     problems.push(`${round(modelledMetres, 2)} m of tray, design ${round(designedMetres, 2)} m`);
   }
-  const takeoff = ctx.run('quantity_takeoff').data as {
-    lines?: { key: string; unit: string; quantity: number }[];
-  };
+  const takeoff = ctx.run('quantity_takeoff').data as { lines?: { key: string; unit: string; quantity: number }[] };
   const takeoffMetres = (takeoff.lines ?? [])
     .filter((line) => line.key.startsWith('tray.') && line.unit === 'm')
     .reduce((sum, line) => sum + line.quantity, 0);
