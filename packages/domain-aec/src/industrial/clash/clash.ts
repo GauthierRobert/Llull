@@ -3,15 +3,18 @@
  * @layer domain-aec
  */
 
+import { clamp01 } from '@lib/clamp';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import type { BimCategory, BuildingElement, BuildingModel } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
+import { unknownLevelFailure } from '../../building/levelLookup';
 import { defineCommand, z } from '@core/commands/schema';
 import { fromMm, toMm } from '@core/model/units';
 import { getBuilding } from '../../building/model';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { dot3, scale3, sub3 } from '@lib/vec3';
 import { atLevel } from '../evaluate';
+import { briefList } from '../../shared/briefList';
 import { type OrientedBox, boxOverlap, elementBoxes } from './clashBoxes';
 import { slabPenetrations } from './clashSlabs';
 
@@ -75,7 +78,7 @@ function distanceToPolyline(point: Vec3, polyline: ReadonlyArray<Vec3>): number 
     const [a, b] = [polyline[index] as Vec3, polyline[index + 1] as Vec3];
     const ab = sub3(b, a);
     const ap = sub3(point, a);
-    const t = Math.max(0, Math.min(1, dot3(ap, ab) / (dot3(ab, ab) || 1)));
+    const t = clamp01(dot3(ap, ab) / (dot3(ab, ab) || 1));
     best = Math.min(best, Math.hypot(...sub3(ap, scale3(ab, t))));
   }
   return best;
@@ -213,8 +216,8 @@ export const checkClashes = defineCommand({
   }),
   run: (doc, { levelId, tolerance }): CommandResult => {
     const building = getBuilding(doc);
-    if (levelId !== undefined && !building.levels[levelId])
-      return noop(doc, `check_clashes failed: no level '${levelId}'.`);
+    const unknownLevel = unknownLevelFailure(doc, 'check_clashes', levelId);
+    if (unknownLevel) return unknownLevel;
     const resolvedTolerance = tolerance ?? fromMm(doc, 5);
     if (!(resolvedTolerance >= 0))
       return noop(doc, 'check_clashes failed: tolerance must be >= 0.');
@@ -228,14 +231,12 @@ export const checkClashes = defineCommand({
       return `${clash.kind} ${a?.mark ?? clash.a} × ${b?.mark ?? clash.b} (${formatDepthMm(toMm(doc, clash.depth))} mm)`;
     };
     const hard = clashes.filter((clash) => clash.kind === 'hard').length;
-    return {
-      document: doc,
-      summary:
-        clashes.length === 0
-          ? 'No clashes found.'
-          : `${hard} hard clash(es), ${clashes.length - hard} clearance violation(s): ${clashes.slice(0, 10).map(describe).join('; ')}${clashes.length > 10 ? '; …' : ''}.`,
-      affected: [],
-      data: { clashes },
-    };
+    return report(
+      doc,
+      clashes.length === 0
+        ? 'No clashes found.'
+        : `${hard} hard clash(es), ${clashes.length - hard} clearance violation(s): ${briefList(clashes, describe, 10, '; ')}.`,
+      { clashes },
+    );
   },
 });

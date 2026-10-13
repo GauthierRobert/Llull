@@ -6,14 +6,14 @@
 
 import { Router, type Response } from 'express';
 import { exportStepFile } from '@mcp/index';
-import type { ExportStlData } from '@core/commands/exchange/exportStl';
-import type { ExportStepExactData } from '@core/commands/brep/topology';
+import { isRecord } from '@lib/isRecord';
 import { errorMessage } from '@lib/errorMessage';
 import { applyCommand } from './commandBus';
 import { getLiveDoc } from './liveDocument';
 import type { ExchangeOptions } from './pythonExchange';
 import { safeFileName } from '@lib/safeFileName';
 import { guardRead } from './security';
+import { fileOfRecord } from './cli/saveFiles';
 
 /** Attachment headers + a text (send) or binary (end) body. */
 function sendDownload(
@@ -32,16 +32,6 @@ function sendDownload(
   res.status(200).end(body);
 }
 
-type CodeLanguage = 'cadquery' | 'build123d' | 'openscad' | 'freecad';
-
-/** Absent -> cadquery; unknown value -> null (caller answers 400). */
-function exportLanguage(raw: unknown): CodeLanguage | null {
-  if (raw === undefined) return 'cadquery';
-  return raw === 'cadquery' || raw === 'build123d' || raw === 'openscad' || raw === 'freecad'
-    ? raw
-    : null;
-}
-
 /** @param exchange Python bridge shared with the MCP exchange tools (STEP needs it). */
 export function buildExportRouter(exchange: ExchangeOptions): Router {
   const router = Router();
@@ -51,40 +41,29 @@ export function buildExportRouter(exchange: ExchangeOptions): Router {
   router.get('/stl', (req, res) => {
     const format = req.query['format'] === 'binary' ? 'binary' : 'ascii';
     const name = safeFileName(req.query['name']);
-    const data = applyCommand('export_stl', { format, name }).data as ExportStlData | undefined;
-    if (!data) {
-      res.status(500).json({ error: 'export_stl returned no data.' });
+    const result = applyCommand('export_stl', { format, name });
+    const file = isRecord(result.data) ? fileOfRecord(result.data) : null;
+    if (file === null) {
+      res.status(500).json({ error: `export_stl returned no ${format} data.` });
       return;
     }
-    if (data.format === 'binary' && !data.stlBase64) {
-      res.status(500).json({ error: 'export_stl binary result missing stlBase64.' });
-      return;
-    }
-    sendDownload(
-      res,
-      `${name}.stl`,
-      'model/stl',
-      data.format === 'binary' ? Buffer.from(data.stlBase64 ?? '', 'base64') : (data.stl ?? ''),
-    );
+    sendDownload(res, `${name}.stl`, 'model/stl', file.bytes);
   });
 
-  /** Query: language = cadquery (default) | build123d | openscad | freecad; name = file base name. */
+  /**
+   * Query: language = cadquery (default) | build123d | openscad | freecad; name = file base name.
+   * The language is validated by the `export_code` schema: an invalid value is a 400.
+   */
   router.get('/code', (req, res) => {
     const name = safeFileName(req.query['name'], 'model');
-    const language = exportLanguage(req.query['language']);
-    if (language === null) {
-      res.status(400).json({
-        error: 'Unknown language; use cadquery, build123d, openscad or freecad.',
-      });
-      return;
-    }
     const result = applyCommand('export_code', {
-      language,
       name,
+      language: req.query['language'] ?? 'cadquery',
     });
     const data = result.data as { text?: string; fileName?: string } | undefined;
     if (data?.text === undefined || data.fileName === undefined) {
-      res.status(500).json({ error: result.summary });
+      const invalid = result.summary.includes('invalid params');
+      res.status(invalid ? 400 : 500).json({ error: result.summary });
       return;
     }
     sendDownload(res, data.fileName, 'text/plain; charset=utf-8', data.text);
@@ -92,27 +71,18 @@ export function buildExportRouter(exchange: ExchangeOptions): Router {
 
   /**
    * Query: name; language = cadquery (default) | build123d. Without the Python bridge, the exact
-   * B-rep kernel writes the STEP itself (export_step_exact); 503 when neither is available.
+   * B-rep kernel writes the STEP itself (`exportStepFile`); 503 when neither is available.
    */
   router.get('/step', (req, res) => {
     const port = exchange.port;
-    const name = safeFileName(req.query['name'], 'model');
-    if (port === null) {
-      const exact = applyCommand('export_step_exact', {});
-      const data = exact.data as ExportStepExactData | undefined;
-      if (data === undefined) {
-        res.status(503).json({
-          error: `STEP export needs the Python bridge (LLULL_PYTHON is off) or the exact OCC kernel (LLULL_KERNEL=occt). Kernel export: ${exact.summary}`,
-        });
-        return;
-      }
-      sendDownload(res, `${name}.step`, 'model/step', data.step);
-      return;
-    }
-    exportStepFile(getLiveDoc, port, { name, language: req.query['language'], save: false })
+    exportStepFile(getLiveDoc, port, {
+      name: safeFileName(req.query['name'], 'model'),
+      language: req.query['language'],
+      save: false,
+    })
       .then((file) => {
         if ('error' in file) {
-          res.status(500).json({ error: file.error });
+          res.status(port === null ? 503 : 500).json({ error: file.error });
           return;
         }
         sendDownload(res, file.fileName, 'model/step', Buffer.from(file.stepBase64, 'base64'));

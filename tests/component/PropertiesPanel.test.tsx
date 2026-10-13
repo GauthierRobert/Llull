@@ -10,6 +10,7 @@
  * (workflow W3, react R11 — behavior only, no internals or geometry math)
  */
 
+import { resetStore } from '../helpers/componentEntities';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, within, fireEvent } from '@testing-library/react';
 import { useStore } from '@ui/store';
@@ -18,10 +19,6 @@ import { PropertiesPanel } from '@ui/panels/PropertiesPanel';
 import { localDispatch } from '../helpers/storeTestHelpers';
 
 // Helpers
-
-function resetStore(): void {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
-}
 
 function createBox(size: [number, number, number] = [2, 2, 2]): string {
   const result = localDispatch('add_box', { size });

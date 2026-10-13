@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { portalHall } from '../../helpers/portalHall';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { exportNcFiles, type NcExport } from '@aec/industrial/fabrication/ncExport';
@@ -9,7 +10,7 @@ import { findProfile } from '@aec/steel/profiles';
 const HALL = { span: 24000, length: 30000 };
 
 function hall(): CadDocument {
-  return execute(createEmptyDocument(), 'add_portal_frame_building', HALL).document;
+  return portalHall(HALL);
 }
 
 function run(
@@ -182,10 +183,7 @@ describe('export_nc_files', () => {
   it('gives identical millimetre values for a document in metres', () => {
     const base = createEmptyDocument();
     const metres = hall();
-    const asMetres = execute({ ...base, units: 'm' }, 'add_portal_frame_building', {
-      span: 24,
-      length: 30,
-    }).document;
+    const asMetres = portalHall({ span: 24, length: 30 }, { ...base, units: 'm' });
     expect(asMetres.units).toBe('m');
     const [a, b] = [files(metres), files(asMetres)];
     expect(b.map((file) => file.content)).toEqual(a.map((file) => file.content));

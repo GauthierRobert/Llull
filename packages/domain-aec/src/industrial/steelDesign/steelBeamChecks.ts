@@ -13,8 +13,11 @@ import { shearReducedMoment } from './steelFrameSection';
 import type { SteelBar } from './steelMemberBars';
 import {
   analysedRow,
-  beamSection,
+  withBeamSection,
+  metres,
   ULS_COMBINATION,
+  deflectionCheckLine,
+  shearCheckLine,
   type CheckLine,
   type MemberRow,
 } from './steelMemberRows';
@@ -36,68 +39,70 @@ export function checkBeam(
   deflectionRatio: number,
   strut: StrutForce | undefined,
 ): MemberRow {
-  const gate = beamSection(bar);
-  if ('skipped' in gate) return gate.skipped;
-  const { profile, resistance } = gate;
-  const lengthMm = bar.length;
-  const lengthText = `L ${(lengthMm / 1000).toFixed(2)} m`;
-  const loads = result.loads;
-  const restrained = loads.floorSupport || loads.lineSupport;
-  const restraint = loads.floorSupport
-    ? 'LTB restrained by the floor'
-    : loads.lineSupport
-      ? 'LTB restrained by the pipes / trays on the top flange'
-      : 'unrestrained over its span';
-  const elastic = resistance.sectionClass === 3 ? ', elastic Wel' : '';
-  const momentEd = result.uls.maxMoment;
-  const shearEd = result.uls.maxShear;
-  const shearResistance = resistance.shear / 1000;
-  const shearCase = shearReducedMoment(profile, bar.fy, result.uls.shearAtMoment);
-  const momentResistance = shearCase.moment / 1e6;
-  const reduction = shearCase.reduced
-    ? `, reduced for V ${result.uls.shearAtMoment.toFixed(0)} kN (§6.2.8)`
-    : '';
-  const chiLateral = restrained ? 1 : lateralTorsionalReduction(profile, bar.fy, lengthMm, 1);
-  const lines: CheckLine[] = [
-    {
-      name: `bending (class ${resistance.sectionClass}, ${restrained ? 'LTB restrained' : 'LTB checked'})`,
-      utilisation: momentEd / (chiLateral * momentResistance),
-      combination: ULS_COMBINATION,
-      detail: `${profile.name} ${lengthText}, ${restraint}${elastic}: M ${momentEd.toFixed(1)} kNm ≤ ${restrained ? 'Mc,Rd' : `Mb,Rd (χLT ${chiLateral.toFixed(2)})`} ${(chiLateral * momentResistance).toFixed(1)} kNm${reduction}`,
-    },
-    {
-      name: 'shear (§6.2.6)',
-      utilisation: shearEd / shearResistance,
-      combination: ULS_COMBINATION,
-      detail: `${profile.name}: V ${shearEd.toFixed(1)} kN ≤ Vpl,Rd ${shearResistance.toFixed(0)} kN`,
-    },
-  ];
-  const limit = lengthMm / deflectionRatio;
-  lines.push({
-    name: `deflection (L/${deflectionRatio})`,
-    utilisation: result.sls.deflection / limit,
-    combination: 'SLS G + Q',
-    detail: `${profile.name} ${lengthText}: δ ${result.sls.deflection.toFixed(1)} mm ≤ L/${deflectionRatio} = ${limit.toFixed(1)} mm`,
-  });
-  if (strut && strut.force > 0) {
-    const buckling = memberBuckling(profile, bar.fy, strut.force * 1000, momentEd * 1e6, {
-      major: lengthMm,
-      minor: lengthMm,
-      lateralTorsional: restrained ? 1 : lengthMm,
+  return withBeamSection(bar, ({ profile, resistance }) => {
+    const lengthMm = bar.length;
+    const lengthText = `L ${metres(lengthMm)} m`;
+    const loads = result.loads;
+    const restrained = loads.floorSupport || loads.lineSupport;
+    const restraint = loads.floorSupport
+      ? 'LTB restrained by the floor'
+      : loads.lineSupport
+        ? 'LTB restrained by the pipes / trays on the top flange'
+        : 'unrestrained over its span';
+    const elastic = resistance.sectionClass === 3 ? ', elastic Wel' : '';
+    const momentEd = result.uls.maxMoment;
+    const shearEd = result.uls.maxShear;
+    const shearResistance = resistance.shear / 1000;
+    const shearCase = shearReducedMoment(profile, bar.fy, result.uls.shearAtMoment);
+    const momentResistance = shearCase.moment / 1e6;
+    const reduction = shearCase.reduced
+      ? `, reduced for V ${result.uls.shearAtMoment.toFixed(0)} kN (§6.2.8)`
+      : '';
+    const chiLateral = restrained ? 1 : lateralTorsionalReduction(profile, bar.fy, lengthMm, 1);
+    const lines: CheckLine[] = [
+      {
+        name: `bending (class ${resistance.sectionClass}, ${restrained ? 'LTB restrained' : 'LTB checked'})`,
+        utilisation: momentEd / (chiLateral * momentResistance),
+        combination: ULS_COMBINATION,
+        detail: `${profile.name} ${lengthText}, ${restraint}${elastic}: M ${momentEd.toFixed(1)} kNm ≤ ${restrained ? 'Mc,Rd' : `Mb,Rd (χLT ${chiLateral.toFixed(2)})`} ${(chiLateral * momentResistance).toFixed(1)} kNm${reduction}`,
+      },
+      shearCheckLine(
+        profile.name,
+        ULS_COMBINATION,
+        shearEd / shearResistance,
+        shearEd,
+        shearResistance,
+      ),
+    ];
+    const limit = lengthMm / deflectionRatio;
+    lines.push(
+      deflectionCheckLine(
+        `${profile.name} ${lengthText}`,
+        `L/${deflectionRatio}`,
+        result.sls.deflection,
+        limit,
+      ),
+    );
+    if (strut && strut.force > 0) {
+      const buckling = memberBuckling(profile, bar.fy, strut.force * 1000, momentEd * 1e6, {
+        major: lengthMm,
+        minor: lengthMm,
+        lateralTorsional: restrained ? 1 : lengthMm,
+      });
+      lines.push({
+        name: 'strut compression + bending (§6.3.3)',
+        utilisation: buckling.utilisation,
+        combination: `${ULS_COMBINATION} + notional horizontal force`,
+        detail: `${profile.name} ${lengthText}, ${strut.note}: N ${strut.force.toFixed(1)} kN with M ${momentEd.toFixed(1)} kNm, χ ${Math.min(buckling.chiMajor, buckling.chiMinor).toFixed(2)}, χLT ${buckling.chiLateralTorsional.toFixed(2)}`,
+      });
+    }
+    return analysedRow(bar, lines, {
+      MEd: momentEd,
+      VEd: shearEd,
+      deflection: result.sls.deflection,
+      reactionStart: result.uls.reactionStart,
+      reactionEnd: result.uls.reactionEnd,
+      ...(strut ? { NEd: strut.force } : {}),
     });
-    lines.push({
-      name: 'strut compression + bending (§6.3.3)',
-      utilisation: buckling.utilisation,
-      combination: `${ULS_COMBINATION} + notional horizontal force`,
-      detail: `${profile.name} ${lengthText}, ${strut.note}: N ${strut.force.toFixed(1)} kN with M ${momentEd.toFixed(1)} kNm, χ ${Math.min(buckling.chiMajor, buckling.chiMinor).toFixed(2)}, χLT ${buckling.chiLateralTorsional.toFixed(2)}`,
-    });
-  }
-  return analysedRow(bar, lines, {
-    MEd: momentEd,
-    VEd: shearEd,
-    deflection: result.sls.deflection,
-    reactionStart: result.uls.reactionStart,
-    reactionEnd: result.uls.reactionEnd,
-    ...(strut ? { NEd: strut.force } : {}),
   });
 }

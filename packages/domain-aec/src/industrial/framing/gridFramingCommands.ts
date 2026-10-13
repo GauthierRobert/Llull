@@ -8,8 +8,8 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
 import { fromMm, toMetres } from '@core/model/units';
-import { elementAffected, elementsOf, getBuilding, resolveLevel } from '../../building/model';
-import { regenerateBuilding } from '../../building/evaluate/evaluateElements';
+import { elementsOf, getBuilding, resolveLevel } from '../../building/model';
+import { commitBuilding } from '../../building/evaluate/evaluateElements';
 import { findProfile } from '../../steel/profiles';
 import {
   appendMembers,
@@ -27,6 +27,8 @@ import {
   unknownLabels,
 } from './gridFraming';
 import { levelIdParam } from '../../building/levelParams';
+
+const materialField = z.string().optional().describe('Steel grade. Default S355.');
 
 /** Length text with a precision suited to the unit: whole mm, otherwise up to 3 decimals. */
 const lengthText = (doc: Pick<CadDocument, 'units'>, value: number): string =>
@@ -99,13 +101,13 @@ function placed(
 ): CommandResult {
   const added = appendMembers(prepared.building, prepared.levelId, specs);
   if ('reason' in added) return noop(doc, `${tool} failed: ${added.reason}.`);
-  const document = regenerateBuilding(doc, added.building);
-  return {
-    document,
-    summary: summarize(document, added.ids),
-    affected: elementAffected(document, added.ids),
-    data: { elementIds: added.ids, skipped },
-  };
+  return commitBuilding(
+    doc,
+    added.building,
+    added.ids,
+    (document) => summarize(document, added.ids),
+    { elementIds: added.ids, skipped },
+  );
 }
 
 const selected = (
@@ -161,7 +163,7 @@ export const addGridColumns = defineCommand({
       .describe(
         '"pinned" (default) or "fixed": the column foot restrains rotation in check_steel_members.',
       ),
-    material: z.string().optional().describe('Steel grade. Default S355.'),
+    material: materialField,
   }),
   run: (doc, params): CommandResult =>
     withSetup(doc, 'add_grid_columns', params, (prepared, tool) => {
@@ -300,7 +302,7 @@ export const addGridBeams = defineCommand({
     endJoint: jointFixitySchema
       .optional()
       .describe('Joint at each beam end: "pinned" (default) or "rigid".'),
-    material: z.string().optional().describe('Steel grade. Default S355.'),
+    material: materialField,
   }),
   run: (doc, params): CommandResult =>
     withSetup(doc, 'add_grid_beams', params, (prepared, tool) => {
@@ -417,7 +419,7 @@ export const addGridBracing = defineCommand({
       .describe(
         'Top node height relative to the NEXT storey FFL (base elevation + level height), in DOCUMENT UNITS (not necessarily mm). Default 0 (at the next FFL); negative puts the node under the floor beams.',
       ),
-    material: z.string().optional().describe('Steel grade. Default S355.'),
+    material: materialField,
   }),
   run: (doc, params): CommandResult =>
     withSetup(doc, 'add_grid_bracing', params, (prepared, tool) => {

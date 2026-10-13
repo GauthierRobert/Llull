@@ -2,16 +2,18 @@
  * @layer domain-aec
  */
 
+import { unitsToMm } from '../../shared/numeric';
 import type { Vec2 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { toMetres } from '@core/model/units';
 import { elementsOf, existingLevelId, fileSlug, getBuilding } from '../../building/model';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { distance } from '@lib/polygon';
 import {
   MARGIN,
   PAPER_MM,
+  PAPER_FIELD,
+  sheetFitWarning,
   composeSheetSvg,
   TITLE_HEIGHT,
   fitScale,
@@ -90,10 +92,7 @@ export const exportAnchorPlan = defineCommand({
       .describe(
         'Scale denominator N for 1:N (e.g. 100). Default: the smallest standard scale that fits the paper (1-2-5 steps beyond 1:2000).',
       ),
-    paper: z
-      .enum(Object.keys(PAPER_MM) as [PaperSize, ...PaperSize[]])
-      .optional()
-      .describe('Paper size (landscape). Default A3.'),
+    paper: PAPER_FIELD,
     embedment: z
       .number()
       .optional()
@@ -115,7 +114,7 @@ export const exportAnchorPlan = defineCommand({
         `export_anchor_plan failed: no such level${levelId !== undefined ? ` '${levelId}'` : ''} (add_level / add_portal_frame_building first).`,
       );
     }
-    const mm = (value: number): number => toMetres(doc, value) * 1000;
+    const mm = unitsToMm(doc);
     const plates = placePlates(doc, level, mm);
     if (plates.length === 0) {
       return noop(
@@ -326,15 +325,11 @@ export const exportAnchorPlan = defineCommand({
     const filename = `${fileSlug(building.project.name, 'project')}_${fileSlug(level.name, 'level')}_anchor-plan_${sheetPaper}_1-${sheetScale}.svg`;
     const fits =
       (maxX - minX) / sheetScale <= viewport.width && (maxY - minY) / sheetScale <= viewport.height;
-    return {
-      document: doc,
-      summary:
-        `Anchor plan ${filename}: ${plates.length} base plate(s), ${boltCount} anchor bolt(s), ${vertical.length + horizontal.length} grid line(s) at 1:${sheetScale} on ${sheetPaper}, embedment ${mmText(embedmentMm)} mm.` +
-        (fits
-          ? ''
-          : ' WARNING: the plan is larger than the paper at this scale; omit scale to auto-fit or choose a larger paper.'),
-      affected: [],
-      data: {
+    return report(
+      doc,
+      `Anchor plan ${filename}: ${plates.length} base plate(s), ${boltCount} anchor bolt(s), ${vertical.length + horizontal.length} grid line(s) at 1:${sheetScale} on ${sheetPaper}, embedment ${mmText(embedmentMm)} mm.` +
+        sheetFitWarning(fits, 'plan'),
+      {
         svg: `${svg}\n`,
         filename,
         boltCount,
@@ -344,6 +339,6 @@ export const exportAnchorPlan = defineCommand({
         levelId: level.id,
         fits,
       },
-    };
+    );
   },
 });

@@ -9,20 +9,22 @@
 import React, { useState } from 'react';
 import type { PlatformObject } from '@core/model/civil';
 import { useStore } from '@ui/store';
-import { PanelSection, FormError } from '@ui/panels/PanelParts';
+import { PanelSection, FormError, StatusLine } from '@ui/panels/PanelParts';
 import {
   CivilObjectSelect,
-  CivilStatus,
   useCivilObjects,
-  NumberField,
+  NumberTextField,
   PointsFromSelectionRow,
   TextField,
   useChosenId,
 } from './CivilParts';
 import { optionalNumber, parseNumber, optionalText } from '@ui/numberText';
 import { parsePoints } from './civilInput';
+import { useFormValues } from '@ui/panels/useFormValues';
 import { runQuery } from '@ui/services/localQuery';
 import { CivilReportRow } from './CivilReportRow';
+
+const PLATFORM_FORM = { outline: '', elevation: '', cutSlope: '', fillSlope: '', name: '' };
 
 function PlatformRow({ platform }: { platform: PlatformObject }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
@@ -80,7 +82,7 @@ function CompareSurfaces(): React.ReactElement {
       >
         Compare volumes
       </button>
-      <CivilStatus text={status} testId="civil-compare-status" />
+      <StatusLine text={status} testId="civil-compare-status" />
     </div>
   );
 }
@@ -90,17 +92,12 @@ export function EarthworksSection(): React.ReactElement {
   const surfaces = useCivilObjects('surface');
   const platforms = useCivilObjects('platform');
   const [surfaceId, setSurface] = useChosenId(surfaces);
-  const [outline, setOutline] = useState('');
-  const [elevation, setElevation] = useState('');
-  const [cutSlope, setCutSlope] = useState('');
-  const [fillSlope, setFillSlope] = useState('');
-  const [name, setName] = useState('');
-  const [error, setError] = useState('');
+  const { values, error, setError, field } = useFormValues(() => PLATFORM_FORM);
 
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
-    const boundary = parsePoints(outline);
-    const level = parseNumber(elevation);
+    const boundary = parsePoints(values.outline);
+    const level = parseNumber(values.elevation);
     if (boundary === null || boundary.length < 3) {
       setError('Outline: at least 3 points "x,y; x,y; x,y".');
       return;
@@ -113,9 +110,9 @@ export function EarthworksSection(): React.ReactElement {
       surfaceId,
       boundary,
       elevation: level,
-      ...optionalNumber('cutSlope', cutSlope),
-      ...optionalNumber('fillSlope', fillSlope),
-      ...optionalText('name', name),
+      ...optionalNumber('cutSlope', values.cutSlope),
+      ...optionalNumber('fillSlope', values.fillSlope),
+      ...optionalText('name', values.name),
     });
     setError('');
   };
@@ -132,8 +129,7 @@ export function EarthworksSection(): React.ReactElement {
     >
       <form className="civil-form" onSubmit={handleSubmit} aria-label="Add platform">
         <PointsFromSelectionRow
-          value={outline}
-          set={setOutline}
+          {...field('outline')}
           label="Platform outline"
           noSelectionError="Select one closed polyline first."
           setError={setError}
@@ -146,20 +142,14 @@ export function EarthworksSection(): React.ReactElement {
           />
         </PointsFromSelectionRow>
         <div className="building-inline-form">
-          <NumberField
-            value={elevation}
-            set={setElevation}
+          <NumberTextField
+            {...field('elevation')}
             hint="Pad elevation"
             label="Platform elevation"
           />
-          <NumberField value={cutSlope} set={setCutSlope} hint="Cut H:1V (1.5)" label="Cut slope" />
-          <NumberField
-            value={fillSlope}
-            set={setFillSlope}
-            hint="Fill H:1V (2)"
-            label="Fill slope"
-          />
-          <TextField value={name} set={setName} hint="Name" label="Platform name" />
+          <NumberTextField {...field('cutSlope')} hint="Cut H:1V (1.5)" label="Cut slope" />
+          <NumberTextField {...field('fillSlope')} hint="Fill H:1V (2)" label="Fill slope" />
+          <TextField {...field('name')} hint="Name" label="Platform name" />
           <button type="submit" className="btn btn--primary btn--sm" disabled={surfaceId === ''}>
             Add platform
           </button>

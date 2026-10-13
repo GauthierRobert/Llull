@@ -5,6 +5,8 @@
  */
 
 import type { CadDocument, DocumentUnit } from '@core/model/types';
+import type { CommandResult } from '@core/commands/types';
+import { noop } from '@core/commands/noop';
 import {
   type CivilCategory,
   type CivilModel,
@@ -63,14 +65,16 @@ export function civilObject<C extends CivilCategory>(
     : undefined;
 }
 
-/** The object `id` of `category`, or the failure summary `<tool> failed: no <category> <id>.` */
-export function civilObjectOrFailure<C extends CivilCategory>(
-  doc: Pick<CadDocument, 'civil'>,
+/** The object `id` of `category`, or the no-op result `<tool> failed: no <category> <id>.` */
+export function civilObjectOrNoop<C extends CivilCategory>(
+  doc: CadDocument,
   id: string,
   category: C,
   tool: string,
-): Extract<CivilObject, { category: C }> | string {
-  return civilObject(getCivil(doc), id, category) ?? `${tool} failed: no ${category} ${id}.`;
+): Extract<CivilObject, { category: C }> | CommandResult {
+  return (
+    civilObject(getCivil(doc), id, category) ?? noop(doc, `${tool} failed: no ${category} ${id}.`)
+  );
 }
 
 /** Objects of one category in creation order. */
@@ -110,6 +114,11 @@ export function formatStation(metres: number): string {
   const kilometres = Math.floor(value / 1000 + 1e-9);
   const rest = value - kilometres * 1000;
   return `${sign}${kilometres}+${rest.toFixed(2).padStart(6, '0')}`;
+}
+
+/** Station label of a document-unit station: `formatStation(toMetres(doc, station))`. */
+export function stationText(doc: Pick<CadDocument, 'units'>, station: number): string {
+  return formatStation(toMetres(doc, station));
 }
 
 /** Converts a length given in `unit` into the document's units. */

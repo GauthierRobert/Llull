@@ -9,6 +9,8 @@ import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { boundsCenter, entityBoundsInDoc } from '../../geometry/bounds';
 import { len3 } from '../../lib/vec3';
+import { isPositiveNumber } from '../../lib/isFiniteNumber';
+import { POSITIVE_FIELDS } from '../../model/positiveFields';
 
 /** Severity of a model issue. */
 type IssueSeverity = 'error' | 'warning' | 'info';
@@ -38,97 +40,31 @@ const issue = (
   entityId?: string,
 ): Issue => ({ severity, code, message, ...(entityId !== undefined ? { entityId } : {}) });
 
-/** Degenerate geometry: sizes, radii, and depths that are ≤ 0. */
+/** Degenerate geometry: sizes, radii, and depths that are not finite and > 0 (`POSITIVE_FIELDS`). */
 function checkDegenerateGeometry(e: Entity): Issue[] {
   const label = e.kind.charAt(0).toUpperCase() + e.kind.slice(1);
-  const nonPositive = (field: string, value: number, rule: string): Issue[] =>
-    value <= 0
-      ? [
-          issue(
-            'error',
-            'degenerate_size',
-            `${label} entity '${e.id}' has ${field} ${value} ≤ 0. ${rule}`,
-            e.id,
-          ),
-        ]
-      : [];
-  switch (e.kind) {
-    case 'box':
-    case 'wedge':
-      return e.size.some((c) => c <= 0)
-        ? [
-            issue(
-              'error',
-              'degenerate_size',
-              `${label} entity '${e.id}' has a zero or negative size component [${e.size.join(', ')}]. All dimensions must be > 0.`,
-              e.id,
-            ),
-          ]
-        : [];
-    case 'cylinder':
-    case 'cone':
-      return [
-        ...nonPositive('radius', e.radius, 'Radius must be > 0.'),
-        ...nonPositive('height', e.height, 'Height must be > 0.'),
-      ];
-    case 'sphere':
-    case 'circle':
-    case 'arc':
-      return nonPositive('radius', e.radius, 'Radius must be > 0.');
-    case 'extrusion':
-      return nonPositive('depth', e.depth, 'Depth must be > 0.');
-    case 'ellipse':
-      return [
-        ...nonPositive('radiusX', e.radiusX, 'Both radii must be > 0.'),
-        ...nonPositive('radiusY', e.radiusY, 'Both radii must be > 0.'),
-      ];
-    case 'torus':
-      return [
-        ...nonPositive('ringRadius', e.ringRadius, 'ringRadius must be > 0.'),
-        ...nonPositive('tubeRadius', e.tubeRadius, 'tubeRadius must be > 0.'),
-      ];
-    case 'pyramid':
-      return [
-        ...nonPositive('baseWidth', e.baseWidth, 'baseWidth must be > 0.'),
-        ...nonPositive('baseDepth', e.baseDepth, 'baseDepth must be > 0.'),
-        ...nonPositive('height', e.height, 'Height must be > 0.'),
-      ];
-    case 'sweep':
-      return e.section.shape === 'circle'
-        ? nonPositive('section radius', e.section.radius, 'Radius must be > 0.')
-        : [];
-    case 'image':
-      return [
-        ...nonPositive('width', e.width, 'Underlay width must be > 0.'),
-        ...nonPositive('height', e.height, 'Underlay height must be > 0.'),
-      ];
-    case 'text':
-      return [
-        ...nonPositive('height', e.height, 'Height must be > 0.'),
-        ...(e.content.trim().length === 0
-          ? [
-              issue(
-                'error',
-                'degenerate_size',
-                `Text entity '${e.id}' has empty content. Content must be a non-empty string.`,
-                e.id,
-              ),
-            ]
-          : []),
-      ];
-    case 'point':
-    case 'line':
-    case 'polyline':
-    case 'rectangle':
-    case 'spline':
-    case 'dimension':
-    case 'mesh':
-    case 'revolution':
-    case 'loft':
-    case 'subdivision':
-    case 'instance':
-      return [];
+  const degenerate = (detail: string): Issue =>
+    issue('error', 'degenerate_size', `${label} entity '${e.id}' ${detail}.`, e.id);
+  const fields: Record<string, unknown> = { ...e };
+  const issues = (POSITIVE_FIELDS[e.kind] ?? [])
+    .filter((field) => !isPositiveNumber(fields[field]))
+    .map((field) =>
+      degenerate(`has ${field} ${String(fields[field])}; ${field} must be finite and > 0`),
+    );
+  if (e.kind === 'box' || e.kind === 'wedge') {
+    if (!e.size.every((c) => isPositiveNumber(c)))
+      issues.push(
+        degenerate(
+          `has a non-positive size component [${e.size.join(', ')}]; all dimensions must be finite and > 0`,
+        ),
+      );
+  } else if (e.kind === 'sweep') {
+    if (e.section.shape === 'circle' && !isPositiveNumber(e.section.radius))
+      issues.push(degenerate(`has section radius ${e.section.radius}; it must be finite and > 0`));
+  } else if (e.kind === 'text' && e.content.trim().length === 0) {
+    issues.push(degenerate('has empty content; content must be a non-empty string'));
   }
+  return issues;
 }
 
 /** A polyline intended as an extrusion profile must be closed. */

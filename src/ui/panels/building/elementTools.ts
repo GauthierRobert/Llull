@@ -5,6 +5,7 @@
  * command + params (param-gathering only — the command does all document work, react R1).
  */
 
+import { toRadians } from '@lib/angle';
 import {
   FieldReader,
   checkbox,
@@ -12,8 +13,8 @@ import {
   num,
   onLevel,
   placement,
-  radians,
   result,
+  buildWith,
   select,
   txt,
   type ElementTool,
@@ -54,16 +55,13 @@ function wallTool(
     id,
     label,
     fields: [...geometryFields, ...wallSectionFields(thickness, material)],
-    build: (values, context) => {
-      const reader = new FieldReader(values);
-      return result(reader, command, {
-        ...geometry(reader),
-        thickness: reader.number('thickness'),
-        height: reader.optionalNumber('height'),
-        material: reader.text('material'),
-        ...onLevel(context),
-      });
-    },
+    build: buildWith(command, (reader, context) => ({
+      ...geometry(reader),
+      thickness: reader.number('thickness'),
+      height: reader.optionalNumber('height'),
+      material: reader.text('material'),
+      ...onLevel(context),
+    })),
   };
 }
 
@@ -152,13 +150,10 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
       txt('xSpacings', 'X bay spans ({unit}, comma-separated)', '6000, 6000'),
       txt('ySpacings', 'Y bay spans ({unit}, comma-separated)', '5000'),
     ],
-    build: (values) => {
-      const reader = new FieldReader(values);
-      return result(reader, 'add_grid_system', {
-        xSpacings: reader.numberList('xSpacings'),
-        ySpacings: reader.numberList('ySpacings'),
-      });
-    },
+    build: buildWith('add_grid_system', (reader) => ({
+      xSpacings: reader.numberList('xSpacings'),
+      ySpacings: reader.numberList('ySpacings'),
+    })),
   },
   ...GRID_FRAMING_TOOLS,
   wallTool(
@@ -363,16 +358,13 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
       num('depth', 'Depth', '500'),
       levelField(),
     ],
-    build: (values, context) => {
-      const reader = new FieldReader(values);
-      return result(reader, 'add_beam', {
-        start: reader.point('x1', 'y1'),
-        end: reader.point('x2', 'y2'),
-        width: reader.number('width'),
-        depth: reader.number('depth'),
-        ...placement(reader, context),
-      });
-    },
+    build: buildWith('add_beam', (reader, context) => ({
+      start: reader.point('x1', 'y1'),
+      end: reader.point('x2', 'y2'),
+      width: reader.number('width'),
+      depth: reader.number('depth'),
+      ...placement(reader, context),
+    })),
   },
   {
     id: 'stair',
@@ -385,16 +377,13 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
       num('treadDepth', 'Tread', '280'),
       levelField(),
     ],
-    build: (values, context) => {
-      const reader = new FieldReader(values);
-      return result(reader, 'add_stair', {
-        start: reader.point('x', 'y'),
-        angle: radians(reader.number('direction')),
-        width: reader.number('width'),
-        treadDepth: reader.number('treadDepth'),
-        ...placement(reader, context),
-      });
-    },
+    build: buildWith('add_stair', (reader, context) => ({
+      start: reader.point('x', 'y'),
+      angle: toRadians(reader.number('direction')),
+      width: reader.number('width'),
+      treadDepth: reader.number('treadDepth'),
+      ...placement(reader, context),
+    })),
   },
   {
     id: 'room',

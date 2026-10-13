@@ -3,9 +3,14 @@
  */
 
 import type { Vec2 } from '@core/model/types';
-import { escapeXml } from '@lib/escapeXml';
 import { distance } from '@lib/polygon';
-import { n, type Viewport } from '../../shared/sheetFrame';
+import {
+  n,
+  readableDimensionLabel,
+  svgPoints,
+  svgText,
+  type Viewport,
+} from '../../shared/sheetFrame';
 import { ROW_HEIGHT } from './anchorPlanLayout';
 
 export class PlanCanvas {
@@ -34,12 +39,14 @@ export class PlanCanvas {
     );
   }
 
-  text(at: Vec2, size: number, content: string, anchor = 'middle', rotation = 0): void {
-    const transform =
-      rotation !== 0 ? ` transform="rotate(${n(rotation)} ${n(at[0])} ${n(at[1])})"` : '';
-    this.parts.push(
-      `<text x="${n(at[0])}" y="${n(at[1])}" font-size="${n(size)}" text-anchor="${anchor}"${transform}>${escapeXml(content)}</text>`,
-    );
+  text(
+    at: Vec2,
+    size: number,
+    content: string,
+    anchor: 'start' | 'middle' | 'end' = 'middle',
+    rotation = 0,
+  ): void {
+    this.parts.push(svgText(at[0], at[1], size, anchor, content, rotation));
   }
 
   /** Aligned dimension between two model points, drawn `side` paper-mm off the measured line. */
@@ -56,24 +63,13 @@ export class PlanCanvas {
     this.line(da, db, 'dim');
     for (const end of [da, db])
       this.line([end[0] - 1, end[1] + 1], [end[0] + 1, end[1] - 1], 'dim');
-    let angle = (Math.atan2(pb[1] - pa[1], pb[0] - pa[0]) * 180) / Math.PI;
-    if (angle > 90 || angle <= -90) angle += 180;
-    const radians = (angle * Math.PI) / 180;
-    this.text(
-      [
-        (da[0] + db[0]) / 2 + Math.sin(radians) * 1.2,
-        (da[1] + db[1]) / 2 - Math.cos(radians) * 1.2,
-      ],
-      2.2,
-      label,
-      'middle',
-      angle,
-    );
+    const { angle, middle } = readableDimensionLabel(da, db, pb[0] - pa[0], pb[1] - pa[1]);
+    this.text(middle, 2.2, label, 'middle', angle);
   }
 
   polygon(points: ReadonlyArray<Vec2>, cssClass: string): void {
     this.parts.push(
-      `<polygon points="${points.map((point) => this.map(point).map(n).join(',')).join(' ')}" class="${cssClass}"/>`,
+      `<polygon points="${svgPoints(points.map((point) => this.map(point)))}" class="${cssClass}"/>`,
     );
   }
 }
@@ -88,9 +84,7 @@ export function scheduleTable(
   const widths = [14, 14, 20, 14, 14, 26, 18];
   const headers = ['Plate', 'Grid', 'Bolts', 'Embed.', 'Proj.', 'Plate mm', 'TOC / grout'];
   const parts = [`<g id="bolt-schedule">`];
-  parts.push(
-    `<text x="${n(x)}" y="${n(y)}" font-size="3" text-anchor="start">Anchor bolt schedule (mm)</text>`,
-  );
+  parts.push(svgText(x, y, 3, 'start', 'Anchor bolt schedule (mm)'));
   const all = [headers, ...rows];
   all.forEach((row, rowIndex) => {
     const top = y + 2 + rowIndex * ROW_HEIGHT;
@@ -100,7 +94,7 @@ export function scheduleTable(
       const cssClass = rowIndex === 0 ? 'frame' : 'frame-thin';
       parts.push(
         `<rect x="${n(left)}" y="${n(top)}" width="${cellWidth}" height="${ROW_HEIGHT}" class="${cssClass}"/>`,
-        `<text x="${n(left + 1)}" y="${n(top + 2.8)}" font-size="2" text-anchor="start">${escapeXml(cell)}</text>`,
+        svgText(left + 1, top + 2.8, 2, 'start', cell),
       );
       left += cellWidth;
     });

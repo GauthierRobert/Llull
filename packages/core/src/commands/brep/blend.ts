@@ -10,7 +10,7 @@ import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { currentContext } from '../context';
 import { kernelUnavailable } from '../kernelRefusal';
-import { noop } from '../noop';
+import { noop, failer } from '../noop';
 import { commitKernelResult, evaluateRecipe, operandRecipe } from './kernelShape';
 import { OCC_KERNEL_HINT } from './modify3d';
 
@@ -45,7 +45,7 @@ export const blendUnion = defineCommand({
     radius: z.number().describe('Joint fillet radius in document units (> 0).'),
   }),
   run: (doc, { ids, radius }, ctx): CommandResult => {
-    const fail = (why: string): CommandResult => noop(doc, `blend_union: ${why}; no-op.`);
+    const fail = failer(doc, 'blend_union');
     if (ids.length < 2 || ids.length > MAX_BLEND_OPERANDS)
       return fail(`needs 2..${MAX_BLEND_OPERANDS} solids (got ${ids.length})`);
     if (new Set(ids).size !== ids.length) return fail('ids must be distinct');

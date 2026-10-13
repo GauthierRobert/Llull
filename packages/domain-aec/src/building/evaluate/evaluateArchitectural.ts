@@ -30,8 +30,9 @@ import type {
   StairElement,
   WallElement,
 } from '@core/model/building';
-import { polygonArea, polygonCentroid, toCounterClockwise } from '@lib/polygon';
-import { fromMm, toMetres } from '@core/model/units';
+import { polygonCentroid, toCounterClockwise } from '@lib/polygon';
+import { fromMm } from '@core/model/units';
+import { planAreaM2 } from '../../shared/planArea';
 import { prismMesh } from '../../shared/mesh';
 import { base, CATEGORY_LAYER, colorForMaterial, meshEntity, orientedBox } from './entities';
 import { curvedBandBetween } from '../geometry/curvedWallGeometry';
@@ -52,20 +53,23 @@ export interface EvaluationContext {
   readonly building: BuildingModel;
 }
 
-/** Plan frame of `wall` and the elevation of its base on `level`. */
-function wallPlacement(
-  wall: WallElement,
-  level: BuildingLevel,
-): { frame: ReturnType<typeof wallFrame>; baseZ: number } {
+/** A wall and the level it stands on. */
+export interface WallHost {
+  readonly wall: WallElement;
+  readonly level: BuildingLevel;
+}
+
+/** Plan frame of the wall and the elevation of its base. */
+function wallPlacement({ wall, level }: WallHost): {
+  frame: ReturnType<typeof wallFrame>;
+  baseZ: number;
+} {
   return { frame: wallFrame(wall), baseZ: level.elevation + wall.baseOffset };
 }
 
-export function evaluateWall(
-  context: EvaluationContext,
-  wall: WallElement,
-  level: BuildingLevel,
-): Entity[] {
-  const { frame, baseZ } = wallPlacement(wall, level);
+export function evaluateWall(context: EvaluationContext, host: WallHost): Entity[] {
+  const { wall } = host;
+  const { frame, baseZ } = wallPlacement(host);
   const color = colorForMaterial(wall.material, '#c9c4b8');
   const pieces = wallPieces(
     wall,
@@ -88,10 +92,10 @@ export function evaluateWall(
 export function evaluateOpening(
   context: EvaluationContext,
   opening: OpeningElement,
-  wall: WallElement,
-  level: BuildingLevel,
+  host: WallHost,
 ): Entity[] {
-  const { frame, baseZ } = wallPlacement(wall, level);
+  const { wall, level } = host;
+  const { frame, baseZ } = wallPlacement(host);
   const [cx, cy] = pointAlong(wall, frame, opening.offset);
   const centerZ = baseZ + opening.sillHeight + opening.height / 2;
   if (opening.category === 'window') {
@@ -234,7 +238,7 @@ export function evaluateRoom(
   const color = CATEGORY_LAYER.room.color;
   const [cx, cy] = polygonCentroid(room.boundary);
   const textHeight = fromMm(context.doc, 250);
-  const areaSquareMetres = polygonArea(room.boundary) * toMetres(context.doc, 1) ** 2;
+  const areaSquareMetres = planAreaM2(context.doc, room.boundary);
   const outline: PolylineEntity = {
     ...base(
       room,

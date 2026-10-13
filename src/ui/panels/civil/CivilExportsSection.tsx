@@ -7,10 +7,10 @@
 
 import React, { useState } from 'react';
 import { PAPER_SIZES, type PaperSize } from '@aec/shared/sheetFrame';
-import { PanelSection } from '@ui/panels/PanelParts';
+import { PanelSection, StatusLine } from '@ui/panels/PanelParts';
+import { QueryDownloadButton } from '@ui/panels/QueryDownloadButton';
 import { OptionSelect } from '@ui/panels/OptionSelect';
-import { CivilStatus, NumberField } from './CivilParts';
-import { downloadQuery } from '@ui/services/localQuery';
+import { NumberTextField } from './CivilParts';
 import { optionalNumber } from '@ui/numberText';
 
 export function CivilExportsSection(): React.ReactElement {
@@ -26,49 +26,38 @@ export function CivilExportsSection(): React.ReactElement {
       testId="civil-exports"
     >
       <div className="building-actions">
-        <button
-          type="button"
-          className="btn btn--primary btn--sm"
-          onClick={() =>
-            setStatus(downloadQuery('export_landxml', {}, 'text', 'site.xml', 'application/xml'))
-          }
-        >
-          LandXML
-        </button>
-        <button
-          type="button"
-          className="btn btn--ghost btn--sm"
-          onClick={() =>
-            setStatus(
-              downloadQuery('export_civil_dxf', {}, 'text', 'site_civil.dxf', 'application/dxf'),
-            )
-          }
-        >
-          DXF (civil)
-        </button>
+        <QueryDownloadButton
+          primary
+          label="LandXML"
+          command="export_landxml"
+          field="text"
+          fallbackName="site.xml"
+          mimeType="application/xml"
+          onStatus={setStatus}
+        />
+        <QueryDownloadButton
+          label="DXF (civil)"
+          command="export_civil_dxf"
+          field="text"
+          fallbackName="site_civil.dxf"
+          mimeType="application/dxf"
+          onStatus={setStatus}
+        />
       </div>
       <div className="building-inline-form">
         <OptionSelect value={paper} options={PAPER_SIZES} label="Sheet paper" onChange={setPaper} />
-        <NumberField value={scale} set={setScale} hint="Scale 1:N (auto)" label="Sheet scale" />
-        <button
-          type="button"
-          className="btn btn--ghost btn--sm"
-          onClick={() =>
-            setStatus(
-              downloadQuery(
-                'export_civil_plan_sheet',
-                { paper, ...optionalNumber('scale', scale) },
-                'text',
-                'civil_plan.svg',
-                'image/svg+xml',
-              ),
-            )
-          }
-        >
-          Plan sheet
-        </button>
+        <NumberTextField value={scale} set={setScale} hint="Scale 1:N (auto)" label="Sheet scale" />
+        <QueryDownloadButton
+          label="Plan sheet"
+          command="export_civil_plan_sheet"
+          params={{ paper, ...optionalNumber('scale', scale) }}
+          field="text"
+          fallbackName="civil_plan.svg"
+          mimeType="image/svg+xml"
+          onStatus={setStatus}
+        />
       </div>
-      <CivilStatus text={status} testId="civil-export-status" />
+      <StatusLine text={status} testId="civil-export-status" />
     </PanelSection>
   );
 }

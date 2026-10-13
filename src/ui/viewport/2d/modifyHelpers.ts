@@ -9,7 +9,8 @@
  * @pure
  */
 
-import { distance, pointInPolygon, polygonArea, projectOntoSegment } from '@lib/polygon';
+import { ellipsePoint } from '@lib/arc';
+import { distance, pointInPolygon, projectOntoSegment } from '@lib/polygon';
 import type * as THREE from 'three';
 import type {
   CadDocument,
@@ -22,6 +23,7 @@ import type {
 } from '@core/model/types';
 import { is3D } from '@core/model/types';
 import { GLYPH_WIDTH_RATIO, textLocalBounds } from '@core/geometry/bounds';
+import { closedShapeArea } from '@core/geometry/shapeArea';
 import { underlayCorners } from '@core/geometry/imageUnderlay';
 import { DEFAULT_OFFSET, dimensionDrawing } from './entities/dimensionGeometry';
 import { nearestOnArc } from './snapping/geometry';
@@ -167,7 +169,7 @@ export function entityDistSq(entity: Entity, worldPick: Vec2): number {
       const { center, radiusX, radiusY } = entity;
       const samples = Array.from({ length: ELLIPSE_PICK_SAMPLES + 1 }, (_, i): Vec2 => {
         const t = (i / ELLIPSE_PICK_SAMPLES) * 2 * Math.PI;
-        return [center[0] + radiusX * Math.cos(t), center[1] + radiusY * Math.sin(t)];
+        return ellipsePoint(center, radiusX, radiusY, t);
       });
       return chainDistSq(pick, samples, false);
     }
@@ -341,30 +343,31 @@ export function nearestEntityId(
 export function enclosingArea(entity: Entity, worldPick: Vec2): number | null {
   const pick: Vec2 = [worldPick[0] - entity.position[0], worldPick[1] - entity.position[1]];
   switch (entity.kind) {
-    case 'rectangle': {
-      const { width, height } = entity;
-      const inside = pick[0] >= 0 && pick[0] <= width && pick[1] >= 0 && pick[1] <= height;
-      return inside ? width * height : null;
-    }
-    case 'circle': {
-      const inside = distance(pick, entity.center) <= entity.radius;
-      return inside ? Math.PI * entity.radius * entity.radius : null;
-    }
+    case 'rectangle':
+      if (pick[0] < 0 || pick[0] > entity.width || pick[1] < 0 || pick[1] > entity.height) {
+        return null;
+      }
+      break;
+    case 'circle':
+      if (distance(pick, entity.center) > entity.radius) return null;
+      break;
     case 'ellipse': {
       const { center, radiusX, radiusY } = entity;
       if (radiusX <= 0 || radiusY <= 0) return null;
       const u = (pick[0] - center[0]) / radiusX;
       const v = (pick[1] - center[1]) / radiusY;
-      return u * u + v * v <= 1 ? Math.PI * radiusX * radiusY : null;
+      if (u * u + v * v > 1) return null;
+      break;
     }
-    case 'polyline': {
-      const { closed, points } = entity;
-      if (!closed || points.length < 3 || !pointInPolygon(pick, points)) return null;
-      return polygonArea(points);
-    }
+    case 'polyline':
+      if (!entity.closed || entity.points.length < 3 || !pointInPolygon(pick, entity.points)) {
+        return null;
+      }
+      break;
     default:
       return null;
   }
+  return closedShapeArea(entity);
 }
 
 /**

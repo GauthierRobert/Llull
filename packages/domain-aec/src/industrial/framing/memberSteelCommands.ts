@@ -10,7 +10,7 @@ import { fromMm, toMetres } from '@core/model/units';
 import { elementAffected, getBuilding, resolveLevel, withElement } from '../../building/model';
 import { noop } from '@core/commands/noop';
 import { duplicateSummary, findTwin, sameSegment } from '../../shared/duplicates';
-import { regenerateBuilding } from '../../building/evaluate/evaluateElements';
+import { commitBuilding, regenerateBuilding } from '../../building/evaluate/evaluateElements';
 import { distance3 } from '@lib/vec3';
 import { findProfile, type SteelProfile } from '../../steel/profiles';
 import { refitPlates } from '../connections/plateSupport';
@@ -143,17 +143,17 @@ export const addSteelMember = defineCommand({
       },
     ]);
     if ('reason' in added) return noop(doc, `add_steel_member failed: ${added.reason}.`);
-    const document = regenerateBuilding(doc, added.building);
-    const member = document.building?.elements[added.ids[0] as string];
     const section = findProfile(profile) as SteelProfile;
     const length = distance3(to, from);
     const metres = toMetres(doc, length);
-    return {
-      document,
-      summary: `Added ${role} ${member?.mark ?? ''} (${added.ids[0] ?? ''}) ${profileSummary(section)}, length ${length.toFixed(1)} ${doc.units}, ${(metres * section.massPerMetre).toFixed(1)} kg${fixityText(startJoint, endJoint, baseFixity)}.`,
-      affected: elementAffected(document, added.ids),
-      data: { elementId: added.ids[0] },
-    };
+    return commitBuilding(
+      doc,
+      added.building,
+      added.ids,
+      (document) =>
+        `Added ${role} ${document.building?.elements[added.ids[0] as string]?.mark ?? ''} (${added.ids[0] ?? ''}) ${profileSummary(section)}, length ${length.toFixed(1)} ${doc.units}, ${(metres * section.massPerMetre).toFixed(1)} kg${fixityText(startJoint, endJoint, baseFixity)}.`,
+      { elementId: added.ids[0] },
+    );
   },
 });
 

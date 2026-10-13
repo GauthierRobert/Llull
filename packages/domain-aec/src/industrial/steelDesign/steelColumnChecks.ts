@@ -6,6 +6,7 @@
  * @pure
  */
 
+import { clamp } from '@lib/clamp';
 import { memberBuckling } from './steelDesign';
 import { GAMMA_G, GAMMA_Q } from '../../shared/loadFactors';
 import { type ColumnNode } from './steelFraming';
@@ -54,7 +55,7 @@ export function columnSegments(
     z: group.reduce((sum, node) => sum + node.zAxis, 0) / group.length,
     load: group.reduce((sum, node) => sum + GAMMA_G * node.permanent + GAMMA_Q * node.imposed, 0),
   }));
-  const inside = levels.map((level) => ({ ...level, z: Math.min(high, Math.max(low, level.z)) }));
+  const inside = levels.map((level) => ({ ...level, z: clamp(level.z, low, high) }));
   const boundaries = [low, ...inside.map((level) => level.z), high].filter(
     (z, index, all) => index === 0 || z - (all[index - 1] as number) >= 1,
   );

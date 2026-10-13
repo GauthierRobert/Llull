@@ -4,7 +4,9 @@ import { defineCommand, vec3, z } from '../schema';
 import { formatLength } from '../document/units';
 import { boundsCenter, entityBoundsInDoc } from '../../geometry/bounds';
 import { dot3, sub3, len3, distance3 } from '../../lib/vec3';
+import { entityOfKind } from '../entity/entityOfKind';
 import { noop, report } from '../noop';
+import { angleFromCosine, toDegrees } from '../../lib/angle';
 
 /**
  * @command measure_distance
@@ -71,7 +73,7 @@ export const measureDistance = defineCommand({
   },
 });
 
-const POINT_3D = z.tuple([z.number(), z.number(), z.number()]);
+export const POINT_3D = z.tuple([z.number(), z.number(), z.number()]);
 
 /**
  * @command measure_angle
@@ -113,22 +115,10 @@ export const measureAngle = defineCommand({
       vA = sub3(arm1, vertex);
       vB = sub3(arm2, vertex);
     } else if (lineId1 && lineId2) {
-      const e1 = doc.entities[lineId1];
-      const e2 = doc.entities[lineId2];
-      if (!e1) return noop(doc, `measure_angle: entity '${lineId1}' not found.`);
-      if (!e2) return noop(doc, `measure_angle: entity '${lineId2}' not found.`);
-      if (e1.kind !== 'line') {
-        return noop(
-          doc,
-          `measure_angle: entity '${lineId1}' is kind '${e1.kind}', expected 'line'.`,
-        );
-      }
-      if (e2.kind !== 'line') {
-        return noop(
-          doc,
-          `measure_angle: entity '${lineId2}' is kind '${e2.kind}', expected 'line'.`,
-        );
-      }
+      const e1 = entityOfKind(doc, lineId1, ['line']);
+      if (typeof e1 === 'string') return noop(doc, `measure_angle: ${e1}.`);
+      const e2 = entityOfKind(doc, lineId2, ['line']);
+      if (typeof e2 === 'string') return noop(doc, `measure_angle: ${e2}.`);
       vA = [e1.end[0] - e1.start[0], e1.end[1] - e1.start[1], 0];
       vB = [e2.end[0] - e2.start[0], e2.end[1] - e2.start[1], 0];
     } else {
@@ -143,8 +133,8 @@ export const measureAngle = defineCommand({
     if (lenA < 1e-12 || lenB < 1e-12)
       return noop(doc, 'measure_angle: degenerate vector (zero length) — cannot compute angle.');
 
-    const radians = Math.acos(Math.max(-1, Math.min(1, dot3(vA, vB) / (lenA * lenB))));
-    const degrees = (radians * 180) / Math.PI;
+    const radians = angleFromCosine(dot3(vA, vB) / (lenA * lenB));
+    const degrees = toDegrees(radians);
     return report(
       doc,
       `Angle = ${degrees.toFixed(doc.displayPrecision)}° (${radians.toFixed(doc.displayPrecision)} rad).`,

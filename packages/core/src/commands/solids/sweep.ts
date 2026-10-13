@@ -1,9 +1,8 @@
 import type { CurveSegment } from '../../model/curve';
-import type { SweepSection, SweepStation, Vec2, Vec3 } from '../../model/types';
+import type { CadDocument, SweepSection, SweepStation, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
-import { colorField, defineCommand, untypedArray, z, layerIdField } from '../schema';
-import { noop } from '../noop';
-import { isVec2 } from '../../lib/vec2';
+import { defineCommand, untypedArray, z } from '../schema';
+import { failer } from '../noop';
 import { isVec3, sub3 } from '../../lib/vec3';
 import { polygonArea } from '../../lib/polygon';
 import { newEntity } from '../entity/newEntity';
@@ -11,13 +10,13 @@ import {
   DEFAULT_SOLID_COLOR,
   commitSolid,
   existingLayerOrDefault,
-  explicitIdField,
+  solidStyleFields,
   explicitIdOrNext,
   explicitIdTaken,
 } from './shared';
 import { MAX_PROFILE_POINTS } from '../limits';
-import { sketchLoop, sketchPath } from './sketchCurves';
-import { type SectionSpec, sectionSpecFields, specRing } from './sectionSpecs';
+import { sketchPath } from './sketchCurves';
+import { type SectionSpec, sectionLoop, sectionSpecFields, specRing } from './sectionSpecs';
 import { alignRing } from '../../geometry/sectionRing';
 import {
   catmullRomBeziers,
@@ -37,7 +36,7 @@ const DEFAULT_BEND_FACTOR = 3;
 
 /** Section and its half-size (largest distance from the path), or an error message. */
 function resolveSection(
-  doc: Parameters<typeof sketchLoop>[0],
+  doc: CadDocument,
   radius: number | undefined,
   innerRadius: number | undefined,
   section: ReadonlyArray<unknown> | undefined,
@@ -55,19 +54,9 @@ function resolveSection(
     };
   }
   if (innerRadius !== undefined) return 'innerRadius only applies to a circular section (radius)';
-  let profile: Vec2[];
-  let curves: CurveSegment<Vec2>[] = [];
-  if (section !== undefined) {
-    const bad = section.findIndex((point) => !isVec2(point));
-    if (bad >= 0) return `section point ${bad} must be a finite [x, y] pair`;
-    profile = section as Vec2[];
-    if (profile.length < 3 || profile.length > MAX_PROFILE_POINTS)
-      return `section needs 3..${MAX_PROFILE_POINTS} points (got ${profile.length})`;
-  } else {
-    const loop = sketchLoop(doc, [sectionId as string]);
-    if (typeof loop === 'string') return `section ${loop}`;
-    ({ profile, curves } = loop);
-  }
+  const loop = sectionLoop(doc, section, sectionId);
+  if (typeof loop === 'string') return loop;
+  const { profile, curves } = loop;
   if (polygonArea(profile) <= 1e-12) return 'section encloses no area';
   const exact = curves.some((segment) => segment.type !== 'line');
   return {
@@ -78,7 +67,7 @@ function resolveSection(
 
 /** Station rings (aligned to their predecessor) and the largest half-size, or an error message. */
 function resolveStations(
-  doc: Parameters<typeof sketchLoop>[0],
+  doc: CadDocument,
   raw: ReadonlyArray<SectionSpec & { at: number }>,
 ): { section: SweepSection; halfSize: number; stations: SweepStation[] } | string {
   if (raw.length < 2) return `stations needs >= 2 entries (got ${raw.length})`;
@@ -237,9 +226,7 @@ export const sweepProfile = defineCommand({
           'Replaces radius / innerRadius / section / sectionId.',
       )
       .optional(),
-    layerId: layerIdField(),
-    color: colorField(DEFAULT_SOLID_COLOR),
-    id: explicitIdField(),
+    ...solidStyleFields(),
   }),
   run: (
     doc,
@@ -259,7 +246,7 @@ export const sweepProfile = defineCommand({
       id: explicitId,
     },
   ): CommandResult => {
-    const fail = (why: string): CommandResult => noop(doc, `sweep_profile: ${why}; no-op.`);
+    const fail = failer(doc, 'sweep_profile');
     if (explicitIdTaken(doc, explicitId)) return fail(`entity id "${explicitId}" already exists`);
     const resolved =
       rawStations === undefined

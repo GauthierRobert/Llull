@@ -19,6 +19,7 @@ import {
   subdivisionTriangles,
 } from '@core/geometry/subdivision';
 import { expectNoOp } from '../helpers/expectNoOp';
+import { isWatertight, createdIn, volumeOf } from '../helpers/fixtureDocument';
 
 const empty = createEmptyDocument();
 
@@ -27,27 +28,7 @@ function run(doc: CadDocument, name: string, params: object): ReturnType<typeof 
 }
 
 function created(doc: CadDocument, params: object): { doc: CadDocument; e: SubdivisionEntity } {
-  const result = run(doc, 'add_subdivision_solid', params);
-  expect(result.affected, result.summary).toHaveLength(1);
-  const id = result.affected[0] as string;
-  return { doc: result.document, e: result.document.entities[id] as SubdivisionEntity };
-}
-
-function volumeOf(doc: CadDocument, id: string): number {
-  return (run(doc, 'mass_properties', { entityId: id }).data as { volume: number }).volume;
-}
-
-function isWatertight(triangles: ReadonlyArray<ReadonlyArray<readonly number[]>>): boolean {
-  const key = (p: readonly number[]): string => p.map((v) => v.toFixed(7)).join(',');
-  const edges = new Map<string, number>();
-  for (const triangle of triangles) {
-    for (let k = 0; k < 3; k++) {
-      const [a, b] = [key(triangle[k] as number[]), key(triangle[(k + 1) % 3] as number[])];
-      const edge = a < b ? `${a}|${b}` : `${b}|${a}`;
-      edges.set(edge, (edges.get(edge) ?? 0) + 1);
-    }
-  }
-  return [...edges.values()].every((count) => count === 2);
+  return createdIn<SubdivisionEntity>(doc, 'add_subdivision_solid', params);
 }
 
 const cubeEdges = (cage: ReturnType<typeof boxCage>): Array<[number, number]> => {
@@ -414,8 +395,8 @@ describe('edit_subdivision_cage', () => {
   });
 
   it.each([
-    [{ id: 'nope', levels: 1 }, "no entity 'nope'"],
-    [{ levels: 1 }, 'not a subdivision solid'],
+    [{ id: 'nope', levels: 1 }, "entity 'nope' not found"],
+    [{ levels: 1 }, "expected 'subdivision'"],
     [{}, 'give at least one of'],
     [{ vertexIndices: [0], region: { min: [0, 0, 0], max: [1, 1, 1] }, levels: 1 }, 'not both'],
     [{ vertexIndices: [99], translate: [0, 0, 1] }, 'outside 0..'],
@@ -429,7 +410,7 @@ describe('edit_subdivision_cage', () => {
   ])('rejects bad edits (%#)', (params, text) => {
     const withBox = run(base.doc, 'add_box', { size: [1, 1, 1] });
     const boxId = withBox.affected[0] as string;
-    const id = text === 'not a subdivision solid' ? boxId : base.e.id;
+    const id = text === "expected 'subdivision'" ? boxId : base.e.id;
     expectNoOp(
       run(withBox.document, 'edit_subdivision_cage', { id, ...params }),
       withBox.document,

@@ -16,7 +16,7 @@ import {
   pointAtStation,
 } from './alignmentGeometry';
 import { evaluateCorridor } from '../road/corridorMesh';
-import { formatStation } from '../model';
+import { stationText } from '../model';
 import { labelHeight, type CivilContext } from '../context';
 import { toMetres } from '@core/model/units';
 
@@ -34,7 +34,7 @@ function stationTicks(context: CivilContext, alignment: AlignmentObject): Entity
     const station = start + k * alignment.stationInterval;
     const placed = pointAtStation(alignment, station);
     if (!placed) continue;
-    const label = formatStation(toMetres(context.doc, station));
+    const label = stationText(context.doc, station);
     const nx = -Math.sin(placed.direction);
     const ny = Math.cos(placed.direction);
     const [x, y] = placed.point;
@@ -74,7 +74,7 @@ function spiralAnnotations(
   elements: ReturnType<typeof horizontalElements>,
 ): Entity[] {
   const height = labelHeight(context.doc);
-  const station = (s: number): string => formatStation(toMetres(context.doc, s));
+  const station = (s: number): string => stationText(context.doc, s);
   const entities: Entity[] = [];
   let index = 0;
   for (const element of elements) {
@@ -122,7 +122,7 @@ function curveAnnotations(context: CivilContext, alignment: AlignmentObject): En
         p[1] + ((p[1] - element.center[1]) / length) * height * 2,
       ];
     };
-    const station = (s: number): string => formatStation(toMetres(context.doc, s));
+    const station = (s: number): string => stationText(context.doc, s);
     const place = (p: Vec2): [number, number, number] => [...outward(p), 0];
     entities.push(
       civilPoint(alignment, `pi${i}`, `${alignment.name} PI`, 'centreline', [

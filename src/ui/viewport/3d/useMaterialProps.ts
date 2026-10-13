@@ -18,6 +18,13 @@ import { useMemo } from 'react';
 import * as THREE from 'three';
 import type { Material } from '@core/model/types';
 import { type DisplayMode, useViewportStore } from '@ui/store';
+import {
+  SELECTION_EMISSIVE,
+  SELECTION_EMISSIVE_INTENSITY,
+  XRAY_EMISSIVE,
+  XRAY_EMISSIVE_INTENSITY,
+  XRAY_OPACITY,
+} from '../viewportPalette';
 
 /** Document-material fields that drive a mesh's PBR surface. */
 export type PbrMaterial = Pick<Material, 'color' | 'metalness' | 'roughness' | 'finish'>;
@@ -72,8 +79,8 @@ export function useMaterialProps({
   const displayMode: DisplayMode = useViewportStore((s) => s.displayMode);
 
   return useMemo((): MaterialProps => {
-    const emissive = selected ? '#3a7bd5' : '#000000';
-    const emissiveIntensity = selected ? 0.35 : 0;
+    const emissive = selected ? SELECTION_EMISSIVE : '#000000';
+    const emissiveIntensity = selected ? SELECTION_EMISSIVE_INTENSITY : 0;
 
     switch (displayMode) {
       case 'wireframe':
@@ -96,14 +103,14 @@ export function useMaterialProps({
         // X-ray ignores PBR material override — keep transparent appearance.
         return {
           color,
-          emissive: '#4a9eff',
-          emissiveIntensity: selected ? 0.6 : 0.2,
+          emissive: XRAY_EMISSIVE,
+          emissiveIntensity: XRAY_EMISSIVE_INTENSITY[selected ? 'selected' : 'idle'],
           roughness,
           metalness,
           envMapIntensity: 0,
           wireframe: false,
           transparent: true,
-          opacity: selected ? 0.35 : 0.18,
+          opacity: XRAY_OPACITY[selected ? 'selected' : 'idle'],
           depthWrite: false,
           side: THREE.DoubleSide,
         };

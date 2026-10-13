@@ -7,13 +7,21 @@
  * can draw a cue in the 3D viewport.
  */
 
+import { toDegrees, toRadians } from '@lib/angle';
 import React from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore, useViewportStore } from '@ui/store';
 import type { Constraint, Joint, DriveRelation } from '@core/model/types';
-import { PanelEmpty, PanelHeader, PanelSection, IconButton } from '@ui/panels/PanelParts';
+import {
+  PanelEmpty,
+  PanelHeader,
+  PanelSection,
+  IconButton,
+  DeleteButton,
+} from '@ui/panels/PanelParts';
 import { CommitInput } from '@ui/panels/propertyFields';
 import { orderedValues } from '@ui/panels/orderedValues';
+import { parseNumber } from '@ui/numberText';
 
 type ChipTone = 'accent' | 'success' | 'warning' | 'danger' | 'agent';
 
@@ -45,12 +53,14 @@ function fmtEntityRef(ref: Constraint['a'] | Constraint['b']): string {
 }
 
 interface MechanismRowProps {
-  noun: 'constraint' | 'joint';
+  noun: 'constraint' | 'joint' | 'drive';
   id: string;
-  kind: string;
-  tone: ChipTone;
-  highlighted: boolean;
-  onHighlight: (id: string) => void;
+  /** Chip text and tone; omitted = no chip. */
+  kind?: string;
+  tone?: ChipTone;
+  highlighted?: boolean;
+  /** Omitted = the row cannot be highlighted in the viewport (no eye button). */
+  onHighlight?: (id: string) => void;
   info: React.ReactNode;
   /** Controls between the info text and the action buttons. */
   inline?: React.ReactNode;
@@ -62,8 +72,8 @@ function MechanismRow({
   noun,
   id,
   kind,
-  tone,
-  highlighted,
+  tone = 'accent',
+  highlighted = false,
   onHighlight,
   info,
   inline,
@@ -71,18 +81,20 @@ function MechanismRow({
 }: MechanismRowProps): React.ReactElement {
   return (
     <li className={mechanismRowClass(highlighted)} data-testid={`${noun}-row-${id}`}>
-      <span className={`chip chip--${tone}`}>{kind}</span>
+      {kind !== undefined && <span className={`chip chip--${tone}`}>{kind}</span>}
       <span className="panel__row-main mechanisms-row-info">{info}</span>
       {inline}
       <div className="panel__row-actions">
-        <IconButton
-          icon="eye"
-          testId={`${noun}-highlight-${id}`}
-          pressed={highlighted}
-          onClick={() => onHighlight(id)}
-          title="Highlight in the viewport"
-          label={`Highlight ${noun} ${id}`}
-        />
+        {onHighlight !== undefined && (
+          <IconButton
+            icon="eye"
+            testId={`${noun}-highlight-${id}`}
+            pressed={highlighted}
+            onClick={() => onHighlight(id)}
+            title="Highlight in the viewport"
+            label={`Highlight ${noun} ${id}`}
+          />
+        )}
         {actions}
       </div>
     </li>
@@ -137,14 +149,9 @@ function ConstraintRow({
             title="Solve all constraints"
             label="Solve constraints"
           />
-          <IconButton
-            icon="trash"
-            danger
+          <DeleteButton
             testId={`constraint-delete-${constraint.id}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              dispatch('delete_constraint', { id: constraint.id });
-            }}
+            onDelete={() => dispatch('delete_constraint', { id: constraint.id })}
             title="Delete this constraint"
             label={`Delete constraint ${constraint.id}`}
           />
@@ -160,10 +167,6 @@ interface JointRowProps {
   onHighlight: (id: string) => void;
 }
 
-const radiansToDegrees = (radians: number): number =>
-  Math.round(((radians * 180) / Math.PI) * 1e6) / 1e6;
-const degreesToRadians = (degrees: number): number => (degrees * Math.PI) / 180;
-
 function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
 
@@ -171,14 +174,14 @@ function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.Rea
   const revolute = joint.kind === 'revolute';
   // Presentation only: revolute angles are shown in degrees (like Properties); the command
   // keeps radians.
-  const currentValue = revolute ? radiansToDegrees(joint.angle) : joint.displacement;
+  const currentValue = revolute ? toDegrees(joint.angle, 6) : joint.displacement;
 
   const commitInput = (text: string): void => {
-    const parsed = parseFloat(text);
-    if (!isNaN(parsed) && parsed !== currentValue) {
+    const parsed = parseNumber(text);
+    if (parsed !== undefined && parsed !== currentValue) {
       dispatch('set_joint_value', {
         id: joint.id,
-        value: revolute ? degreesToRadians(parsed) : parsed,
+        value: revolute ? toRadians(parsed) : parsed,
       });
     }
   };
@@ -213,14 +216,9 @@ function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.Rea
         </>
       }
       actions={
-        <IconButton
-          icon="trash"
-          danger
+        <DeleteButton
           testId={`joint-delete-${joint.id}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            dispatch('delete_joint', { id: joint.id });
-          }}
+          onDelete={() => dispatch('delete_joint', { id: joint.id })}
           title="Delete this joint"
           label={`Delete joint ${joint.id}`}
         />
@@ -242,32 +240,28 @@ function DriveRelationRow({ relation }: DriveRelationRowProps): React.ReactEleme
       : '';
 
   return (
-    <li
-      className="panel__row panel__row--overlay-actions mechanisms-row"
-      data-testid={`drive-row-${relation.id}`}
-    >
-      <span className="panel__row-main mechanisms-row-info">
-        <strong>{relation.driver.slice(-6)}</strong>
-        {' → '}
-        <strong>{relation.driven.slice(-6)}</strong>
-        {' · ratio '}
-        <span className="mechanisms-ratio">{relation.ratio.toFixed(4)}</span>
-        {offsetLabel}
-      </span>
-      <div className="panel__row-actions">
-        <IconButton
-          icon="trash"
-          danger
+    <MechanismRow
+      noun="drive"
+      id={relation.id}
+      info={
+        <>
+          <strong>{relation.driver.slice(-6)}</strong>
+          {' → '}
+          <strong>{relation.driven.slice(-6)}</strong>
+          {' · ratio '}
+          <span className="mechanisms-ratio">{relation.ratio.toFixed(4)}</span>
+          {offsetLabel}
+        </>
+      }
+      actions={
+        <DeleteButton
           testId={`drive-delete-${relation.id}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            dispatch('delete_drive_relation', { id: relation.id });
-          }}
+          onDelete={() => dispatch('delete_drive_relation', { id: relation.id })}
           title="Delete this drive relation"
           label={`Delete drive relation ${relation.id}`}
         />
-      </div>
-    </li>
+      }
+    />
   );
 }
 

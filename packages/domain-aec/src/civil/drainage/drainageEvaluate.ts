@@ -4,7 +4,7 @@
  * @pure
  */
 
-import type { Entity, MeshData, Vec2, Vec3 } from '@core/model/types';
+import type { Entity, MeshData, Vec3 } from '@core/model/types';
 import type { ManholeObject, PipeObject } from '@core/model/civil';
 import { circlePolygon } from '@lib/arc';
 import { cross3 } from '@lib/vec3';
@@ -49,10 +49,6 @@ function axisPrismMesh(bottom: Vec3, top: Vec3, radius: number, sides: number): 
   return { positions, indices };
 }
 
-function circlePoints(centre: Vec2, radius: number, sides: number): Vec2[] {
-  return circlePolygon(centre, radius, sides);
-}
-
 export function evaluateManhole(context: CivilContext, manhole: ManholeObject): Entity[] {
   const [x, y] = manhole.position;
   const radius = manhole.diameter / 2;
@@ -71,7 +67,7 @@ export function evaluateManhole(context: CivilContext, manhole: ManholeObject): 
       'plan',
       `${manhole.name} plan`,
       'structures',
-      circlePoints(manhole.position, radius, MANHOLE_SIDES),
+      circlePolygon(manhole.position, radius, MANHOLE_SIDES),
       true,
       manhole.rimElevation,
     ),

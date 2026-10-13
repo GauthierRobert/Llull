@@ -9,6 +9,7 @@ import { DEFAULT_BACKGROUND, buildSvg } from './svg';
 import { MAX_POLYGONS, applyBudget, type EntityPolygons } from './budget';
 import { cutEntityPolygons, unitPlanes } from './clip';
 import { expandInstance } from '../../geometry/instanceExpansion';
+import { orderedEntities } from '../entity/entityOps';
 
 /** Component instances nested deeper than this are not drawn (guards against reference cycles). */
 const MAX_INSTANCE_DEPTH = 4;
@@ -46,9 +47,8 @@ export function renderDocument(
   const cutEntityIds: string[] = [];
 
   const items: EntityPolygons[] = [];
-  for (const id of doc.order) {
-    const e = doc.entities[id];
-    if (!e) continue;
+  for (const e of orderedEntities(doc)) {
+    const id = e.id;
     let polygons: PreDepthPolygon[] = drawableEntities(doc, e).flatMap(tessellateEntity);
     if (cut && (cutIds === null || cutIds.has(id))) {
       const result = cutEntityPolygons(polygons, cut, planes, tolerance);
@@ -68,10 +68,9 @@ export function renderDocument(
   });
   const background = options.background === undefined ? DEFAULT_BACKGROUND : options.background;
   // Underlays are never capped by MAX_POLYGONS: they are one <image> each, painted first.
-  const underlays = doc.order.flatMap((id) => {
-    const e = doc.entities[id];
-    return e ? drawableEntities(doc, e).filter((d): d is ImageEntity => d.kind === 'image') : [];
-  });
+  const underlays = orderedEntities(doc).flatMap((e) =>
+    drawableEntities(doc, e).filter((d): d is ImageEntity => d.kind === 'image'),
+  );
 
   return {
     view,

@@ -14,10 +14,10 @@ import type { DrawToolKind } from '@ui/store';
 import { chainSegments, loopSegments } from '../lineGeometry';
 import { useAnchoredGeometry } from '../useDisposable';
 import { useOverlayMaterial } from '../useOverlayMaterial';
+import { OVERLAY_ACCENT } from '../viewportPalette';
 import { pixelsToWorld } from './gridHelpers';
 import { drawToolDescriptor } from './drawToolTable';
 
-const PREVIEW_COLOR = '#60a5fa'; // blue-400
 const PREVIEW_HINT_COLOR = '#94a3b8'; // slate-400
 const MARKER_COLOR = '#f59e0b';
 /** On-screen half-sizes (px): converted to world units with the camera zoom so they never scale with it. */
@@ -97,7 +97,7 @@ export function DrawPreview({
   cursor,
   zoom,
 }: DrawPreviewProps): React.ReactElement | null {
-  const solidMaterial = useOverlayMaterial(PREVIEW_COLOR, 0.85);
+  const solidMaterial = useOverlayMaterial(OVERLAY_ACCENT, 0.85);
   const hintMaterial = useOverlayMaterial(PREVIEW_HINT_COLOR, 0.5);
   const crosshairRadius = pixelsToWorld(CROSSHAIR_RADIUS_PX, zoom);
   const preview = useMemo(

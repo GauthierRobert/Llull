@@ -13,9 +13,9 @@ import { useStore, useViewportStore } from '@ui/store';
 import { type Layer, DEFAULT_LAYER_ID } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
 import { ConfirmDialog } from '@ui/components/ConfirmDialog';
-import { IconButton, PanelHeader } from '@ui/panels/PanelParts';
+import { DeleteButton, IconButton, PanelHeader } from '@ui/panels/PanelParts';
 import { CommitInput } from '@ui/panels/propertyFields';
-import { useIsMounted } from '@ui/hooks/useIsMounted';
+import { useDispatchThen } from '@ui/hooks/useDispatchThen';
 import { orderedValues } from '@ui/panels/orderedValues';
 
 function useLayerEntityCounts(): Record<string, number> {
@@ -54,12 +54,15 @@ const LayerRow = memo(function LayerRow({ layer, entityCount }: LayerRowProps): 
       data-testid={`layer-row-${layer.id}`}
       aria-label={`Layer: ${layer.name}`}
     >
-      <button
-        type="button"
-        className={`icon-btn layer-visibility-btn${effectivelyVisible ? '' : ' layer-visibility-btn--hidden'}`}
-        onClick={() => toggleLayerVisibility(layer.id)}
-        aria-pressed={effectivelyVisible}
-        aria-label={
+      <IconButton
+        icon={effectivelyVisible ? 'eye' : 'eyeOff'}
+        size={14}
+        className={classNames(
+          'layer-visibility-btn',
+          !effectivelyVisible && 'layer-visibility-btn--hidden',
+        )}
+        pressed={effectivelyVisible}
+        label={
           effectivelyVisible
             ? `Hide layer ${layer.name} in viewport`
             : `Show layer ${layer.name} in viewport`
@@ -67,20 +70,18 @@ const LayerRow = memo(function LayerRow({ layer, entityCount }: LayerRowProps): 
         title={
           effectivelyVisible ? 'Hide layer in viewport (local)' : 'Show layer in viewport (local)'
         }
-      >
-        <Icon name={effectivelyVisible ? 'eye' : 'eyeOff'} size={14} />
-      </button>
+        onClick={() => toggleLayerVisibility(layer.id)}
+      />
 
-      <button
-        type="button"
-        className={`icon-btn layer-lock${layer.locked ? ' layer-lock--locked' : ''}`}
-        onClick={() => dispatch('update_layer', { id: layer.id, locked: !layer.locked })}
-        aria-pressed={layer.locked}
-        aria-label={layer.locked ? `Unlock layer ${layer.name}` : `Lock layer ${layer.name}`}
+      <IconButton
+        icon={layer.locked ? 'lock' : 'unlock'}
+        size={12}
+        className={classNames('layer-lock', layer.locked && 'layer-lock--locked')}
+        pressed={layer.locked}
+        label={layer.locked ? `Unlock layer ${layer.name}` : `Lock layer ${layer.name}`}
         title={layer.locked ? 'Locked — click to unlock' : 'Unlocked — click to lock'}
-      >
-        <Icon name={layer.locked ? 'lock' : 'unlock'} size={12} />
-      </button>
+        onClick={() => dispatch('update_layer', { id: layer.id, locked: !layer.locked })}
+      />
 
       {layer.color != null ? (
         <span
@@ -125,14 +126,12 @@ const LayerRow = memo(function LayerRow({ layer, entityCount }: LayerRowProps): 
           title="Rename layer"
           onClick={() => setRenaming(true)}
         />
-        <IconButton
-          icon="trash"
+        <DeleteButton
           size={12}
-          danger
           disabled={isDefaultLayer}
           label={`Delete layer ${layer.name}`}
           title={isDefaultLayer ? 'The default layer cannot be deleted' : 'Delete layer'}
-          onClick={() => setConfirmingDelete(true)}
+          onDelete={() => setConfirmingDelete(true)}
         />
       </span>
 
@@ -157,9 +156,8 @@ const LayerRow = memo(function LayerRow({ layer, entityCount }: LayerRowProps): 
 });
 
 function AddLayerForm(): React.ReactElement {
-  const dispatch = useStore((s) => s.dispatch);
   const [name, setName] = useState('');
-  const isMounted = useIsMounted();
+  const dispatchThen = useDispatchThen();
   const trimmed = name.trim();
 
   return (
@@ -169,15 +167,7 @@ function AddLayerForm(): React.ReactElement {
       onSubmit={(e) => {
         e.preventDefault();
         if (trimmed === '') return;
-        dispatch(
-          'add_layer',
-          { name: trimmed },
-          {
-            onResult: ({ changed }) => {
-              if (changed && isMounted()) setName('');
-            },
-          },
-        );
+        dispatchThen('add_layer', { name: trimmed }, () => setName(''));
       }}
     >
       <div className="param-add-fields">

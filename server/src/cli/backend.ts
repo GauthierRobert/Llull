@@ -7,28 +7,27 @@
 
 import fs from 'fs';
 import path from 'path';
-import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
-import { serializeDocument, deserializeDocument } from '@core/commands/persistence/serialization';
-import { type CadDocument, createEmptyDocument } from '@core/model/types';
+import type { CadDocument } from '@core/model/types';
+import { failedOutcome, runCommandOutcome } from '@mcp/commandOutcome';
+import { parseCommandResponse, type CommandOutcome } from '@mcp/restProtocol';
 import { errorMessage } from '@lib/errorMessage';
-import { isRecord } from '@lib/isRecord';
 import type { StepObserver } from './progress';
 import type { ExchangeOptions } from '../pythonExchange';
 import { runLocalExchange } from './exchange';
-import { writeFileAtomic } from '../writeFileAtomic';
-import type { CliRunResult } from './result';
+import { requestJson, type FetchLike } from '../restClient';
+import { readDocumentFile, writeDocumentFile } from '../documentFile';
 
 export interface CliBackend {
   /** Human label: the document path or the server URL. */
   readonly target: string;
-  run(name: string, params: unknown): Promise<CliRunResult>;
+  run(name: string, params: unknown): Promise<CommandOutcome>;
   /** An exchange tool (export_step, import_step, import_dwg, import_code). */
-  exchange(name: string, params: unknown): Promise<CliRunResult>;
+  exchange(name: string, params: unknown): Promise<CommandOutcome>;
   /** Step back one change (local: swap with the `.bak` copy; server: `POST /undo`). */
-  undo(): Promise<CliRunResult>;
+  undo(): Promise<CommandOutcome>;
   /** Re-apply the undone change (local: the same swap; server: `POST /redo`). */
-  redo(): Promise<CliRunResult>;
+  redo(): Promise<CommandOutcome>;
 }
 
 /** The backup kept next to a local document before each save: one level of undo. */
@@ -36,17 +35,10 @@ function backupPathOf(docPath: string): string {
   return `${docPath}.bak`;
 }
 
-/** The document stored at `docPath`; an empty document when the file does not exist yet. */
-function readDocumentFile(docPath: string): CadDocument {
-  if (!fs.existsSync(docPath)) return createEmptyDocument();
-  return deserializeDocument(fs.readFileSync(docPath, 'utf8'));
-}
-
 /** Save `doc` to `docPath`, keeping the previous file as `<docPath>.bak`. */
-export function writeDocumentFile(docPath: string, doc: CadDocument): void {
-  fs.mkdirSync(path.dirname(path.resolve(docPath)), { recursive: true });
+export function saveDocumentWithBackup(docPath: string, doc: CadDocument): void {
   if (fs.existsSync(docPath)) fs.copyFileSync(docPath, backupPathOf(docPath));
-  writeFileAtomic(docPath, serializeDocument(doc));
+  writeDocumentFile(docPath, doc);
 }
 
 interface LocalOptions {
@@ -65,10 +57,10 @@ export function createLocalBackend(docPath: string, options: LocalOptions): CliB
     doc ??= readDocumentFile(docPath);
     return doc;
   };
-  const runCommand = (name: string, params: unknown): CliRunResult => {
+  const runCommand = (name: string, params: unknown): CommandOutcome => {
     try {
       const prior = currentDoc();
-      const result = execute(
+      const { document, outcome } = runCommandOutcome(
         prior,
         name,
         params,
@@ -76,28 +68,16 @@ export function createLocalBackend(docPath: string, options: LocalOptions): CliB
           ? { ...defaultContext(), onStep: options.observer.onStep }
           : undefined,
       );
-      const changed = result.document !== prior;
-      doc = result.document;
-      if (changed && !options.dryRun) writeDocumentFile(docPath, result.document);
-      return {
-        summary: result.summary,
-        affected: result.affected,
-        isError: result.rejected === true,
-        changed,
-        ...(result.data !== undefined
-          ? { data: options.observer?.withDurations(result.data) ?? result.data }
-          : {}),
-      };
+      doc = document;
+      if (outcome.changed && !options.dryRun) saveDocumentWithBackup(docPath, document);
+      return outcome.data !== undefined
+        ? { ...outcome, data: options.observer?.withDurations(outcome.data) ?? outcome.data }
+        : outcome;
     } catch (error) {
-      return {
-        summary: `Command ${name} failed: ${errorMessage(error)}`,
-        affected: [],
-        isError: true,
-        changed: false,
-      };
+      return failedOutcome(name, error);
     }
   };
-  const swapWithBackup = (label: string): Promise<CliRunResult> => {
+  const swapWithBackup = (label: string): Promise<CommandOutcome> => {
     const backup = backupPathOf(docPath);
     if (!fs.existsSync(backup)) {
       return Promise.resolve({
@@ -136,31 +116,6 @@ export function createLocalBackend(docPath: string, options: LocalOptions): CliB
   };
 }
 
-/** A `CliRunResult` out of a server JSON body (the command bus result shape). */
-function resultOfBody(body: unknown, status: number): CliRunResult {
-  if (!isRecord(body) || typeof body['summary'] !== 'string') {
-    const message = isRecord(body) && typeof body['error'] === 'string' ? body['error'] : '';
-    return {
-      summary: `Server answered HTTP ${status}${message !== '' ? `: ${message}` : ''}.`,
-      affected: [],
-      isError: true,
-      changed: false,
-    };
-  }
-  const affected = Array.isArray(body['affected'])
-    ? body['affected'].filter((id): id is string => typeof id === 'string')
-    : [];
-  return {
-    summary: body['summary'],
-    affected,
-    isError: body['isError'] === true || status >= 400,
-    changed: body['changed'] === true,
-    ...(body['data'] !== undefined ? { data: body['data'] } : {}),
-  };
-}
-
-type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
-
 /** A server that accepts the connection but never answers must not hang the CLI. */
 const REMOTE_TIMEOUT_MS = 120_000;
 
@@ -177,26 +132,15 @@ export function createRemoteBackend(serverUrl: string, options: RemoteOptions): 
   const base = serverUrl.replace(/\/+$/, '');
   const timeoutMs =
     options.timeoutSeconds !== undefined ? options.timeoutSeconds * 1000 : REMOTE_TIMEOUT_MS;
-  const fetchImpl: FetchLike = options.fetchImpl ?? ((url, init) => fetch(url, init));
-  const post = async (route: string, body: unknown): Promise<CliRunResult> => {
+  const post = async (route: string, body: unknown): Promise<CommandOutcome> => {
     try {
-      const response = await fetchImpl(`${base}${route}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(options.token !== undefined ? { Authorization: `Bearer ${options.token}` } : {}),
-        },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(timeoutMs),
+      const reply = await requestJson(`${base}${route}`, {
+        body,
+        token: options.token,
+        timeoutMs,
+        fetchImpl: options.fetchImpl,
       });
-      const text = await response.text();
-      let parsed: unknown = null;
-      try {
-        parsed = JSON.parse(text) as unknown;
-      } catch {
-        parsed = { error: text.slice(0, 200) };
-      }
-      return resultOfBody(parsed, response.status);
+      return parseCommandResponse(reply.body, reply.status);
     } catch (error) {
       if (error instanceof Error && error.name === 'TimeoutError') {
         return {

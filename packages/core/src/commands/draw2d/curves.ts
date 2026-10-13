@@ -2,16 +2,16 @@ import type { Vec2 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { newEntity } from '../entity/newEntity';
 import { compactNumber } from '../../lib/compactNumber';
-import { defineCommand, z, colorField, nameField, looseVec2 as vec2 } from '../schema';
+import { defineCommand, z, looseVec2 as vec2 } from '../schema';
 import { nextId } from '../../lib/id';
 import { ORIGIN, finiteVec3OrZero } from '../../lib/vec3';
 import { MAX_CURVE_SAMPLES, MAX_SPLINE_CONTROL_POINTS } from '../limits';
-import { sampleInvolute } from '../solids/gears';
+import { sampleInvolute } from '../../lib/gearOutline';
 import {
   DEFAULT_DRAW_COLOR,
   drawPointSeries,
-  workPlanePositionField,
-  workPlaneRotationField,
+  workPlaneNamedFields,
+  workPlaneStyleFields,
 } from './shared';
 import { commitEntity } from '../entity/commitEntity';
 import { pointsExtent } from '../../geometry/bounds';
@@ -39,8 +39,7 @@ export const drawEllipse = defineCommand({
     radiusY: z
       .number()
       .describe('Semi-axis length along the local Y axis (half-height). Must be greater than 0.'),
-    position: workPlanePositionField(),
-    color: colorField(DEFAULT_DRAW_COLOR),
+    ...workPlaneStyleFields(),
   }),
   run: (
     doc,
@@ -97,8 +96,7 @@ export const drawSpline = defineCommand({
         'When true, the spline loops back from the last point to the first, forming a closed curve. Defaults to false.',
       )
       .optional(),
-    position: workPlanePositionField(),
-    color: colorField(DEFAULT_DRAW_COLOR),
+    ...workPlaneStyleFields(),
   }),
   run: (
     doc,
@@ -161,10 +159,7 @@ export const drawInvolute = defineCommand({
           'Minimum 2. Default 24. Higher values give a smoother polyline.',
       )
       .optional(),
-    position: workPlanePositionField(),
-    rotation: workPlaneRotationField(),
-    color: colorField(DEFAULT_DRAW_COLOR),
-    name: nameField(),
+    ...workPlaneNamedFields(),
   }),
   run: (
     doc,

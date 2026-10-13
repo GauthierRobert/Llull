@@ -9,6 +9,7 @@
  *
  * @pure
  */
+import { clamp } from '@lib/clamp';
 
 /**
  * Radial segment count for a bounding-box diagonal `diag` (world units; clamped to ≥ 1e-6).
@@ -17,7 +18,7 @@
 export function radialSegmentsForDiag(diag: number): number {
   const safeDiag = Math.max(diag, 1e-6);
   const raw = 8 + Math.floor(Math.log2(safeDiag) * 4);
-  return Math.max(8, Math.min(64, raw));
+  return clamp(raw, 8, 64);
 }
 
 /**

@@ -162,7 +162,7 @@ export function Viewport2D(): React.ReactElement {
     activeTool: activeModifyTool,
     phase: modifyPhase,
     pendingValue,
-    setActiveTool: setModifyTool,
+    toggleTool: toggleModifyTool,
     handleEntityPick,
     setPendingValue,
     commitValue,
@@ -203,7 +203,7 @@ export function Viewport2D(): React.ReactElement {
           activeTool={activeModifyTool}
           phase={modifyPhase}
           pendingValue={pendingValue}
-          onSelectTool={setModifyTool}
+          onToggleTool={toggleModifyTool}
           onSetValue={setPendingValue}
           onCommitValue={commitValue}
         />

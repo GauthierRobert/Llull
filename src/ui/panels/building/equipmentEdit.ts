@@ -7,7 +7,8 @@
  */
 
 import type { EquipmentElement } from '@core/model/building';
-import { FieldReader, radians, result } from './elementToolForm';
+import { toDegrees, toRadians } from '@lib/angle';
+import { FieldReader, result } from './elementToolForm';
 
 type EquipmentEditKey =
   | 'mark'
@@ -44,8 +45,6 @@ export const EQUIPMENT_EDIT_FIELDS: ReadonlyArray<EquipmentEditField> = [
   { key: 'weight', label: 'Weight (kg)', kind: 'number' },
 ];
 
-const toDegrees = (radians: number): number => Math.round(((radians * 180) / Math.PI) * 1e6) / 1e6;
-
 export function equipmentValues(element: EquipmentElement): EquipmentEditValues {
   return {
     mark: element.mark,
@@ -55,7 +54,7 @@ export function equipmentValues(element: EquipmentElement): EquipmentEditValues 
     length: String(element.size[0]),
     width: String(element.size[1]),
     height: String(element.size[2]),
-    angle: String(toDegrees(element.angle)),
+    angle: String(toDegrees(element.angle, 6)),
     clearance: String(element.clearance),
     weight: String(element.weight),
     levelId: element.levelId,
@@ -83,7 +82,7 @@ export function buildEquipmentUpdate(
   if (changed('length', 'width', 'height')) {
     changes['size'] = [reader.number('length'), reader.number('width'), reader.number('height')];
   }
-  if (changed('angle')) changes['angle'] = radians(reader.number('angle'));
+  if (changed('angle')) changes['angle'] = toRadians(reader.number('angle'));
   if (changed('clearance')) changes['clearance'] = reader.number('clearance');
   if (changed('weight')) changes['weight'] = reader.number('weight');
   if (changed('levelId')) changes['levelId'] = reader.text('levelId');

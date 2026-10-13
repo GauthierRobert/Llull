@@ -4,9 +4,9 @@
  * @pure
  */
 
+import { unitsToMm } from '../../shared/numeric';
 import type { BasePlateElement, BuildingModel } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
-import { toMetres } from '@core/model/units';
 import { findProfile } from '../../steel/profiles';
 import type { BaseReaction } from '../frames/frameModelSolve';
 import { anchorBoltResistance, yieldStrength } from '../steelDesign/steelDesign';
@@ -32,7 +32,7 @@ export function plateRows(
   wind: boolean,
 ): FoundationRow[] {
   const crane = hasCase(reaction, 'CL') || hasCase(reaction, 'CR');
-  const toMm = (value: number): number => toMetres(doc, value) * 1000;
+  const toMm = unitsToMm(doc);
   const areaMm2 = toMm(plate.length) * toMm(plate.width);
   const bolts = Math.max(1, plate.boltCount);
   const resistance = anchorBoltResistance(toMm(plate.boltDiameter));

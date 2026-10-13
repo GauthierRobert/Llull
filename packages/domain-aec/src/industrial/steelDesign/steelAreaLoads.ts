@@ -7,6 +7,8 @@
  * @pure
  */
 
+import { clamp } from '@lib/clamp';
+import { planPoint } from '@lib/vec2';
 import { pointInPolygon, polygonArea, projectOntoSegment, type Point2 } from '@lib/polygon';
 import { elementsOf } from '../../building/model';
 import { GRAVITY, round } from '../../shared/numeric';
@@ -120,7 +122,7 @@ function rasterCells(surface: Surface): { centres: Point2[]; area: number } {
   const ys = surface.polygon.map((point) => point[1]);
   const [minX, maxX] = [Math.min(...xs), Math.max(...xs)];
   const [minY, maxY] = [Math.min(...ys), Math.max(...ys)];
-  const cell = Math.min(200, Math.max(25, Math.sqrt(((maxX - minX) * (maxY - minY)) / 40000)));
+  const cell = clamp(Math.sqrt(((maxX - minX) * (maxY - minY)) / 40000), 25, 200);
   const centres: Point2[] = [];
   for (let x = minX + cell / 2; x < maxX; x += cell) {
     for (let y = minY + cell / 2; y < maxY; y += cell) {
@@ -219,23 +221,18 @@ function applyEquipment(
     if (equipment?.category !== 'equipment') continue;
     const weightKn = (Math.max(0, equipment.weight) * GRAVITY) / 1000;
     const [length, width] = footprint.size;
-    const cell = Math.max(5, Math.min(100, length / 4, width / 4));
-    const nu = Math.min(300, Math.max(1, Math.ceil(length / cell)));
-    const nv = Math.min(300, Math.max(1, Math.ceil(width / cell)));
+    const cell = clamp(Math.min(length / 4, width / 4), 5, 100);
+    const nu = clamp(Math.ceil(length / cell), 1, 300);
+    const nv = clamp(Math.ceil(width / cell), 1, 300);
     const onBeams = beamsUnder(beams, footprint.base - 1, footprint.base);
     const share = weightKn / (nu * nv);
-    const cos = Math.cos(footprint.angle);
-    const sin = Math.sin(footprint.angle);
     let carried = 0;
     let viaFloor = 0;
     for (let i = 0; i < nu; i++) {
       for (let j = 0; j < nv; j++) {
         const u = -length / 2 + ((i + 0.5) * length) / nu;
         const v = -width / 2 + ((j + 0.5) * width) / nv;
-        const point: Point2 = [
-          footprint.center[0] + u * cos - v * sin,
-          footprint.center[1] + u * sin + v * cos,
-        ];
+        const point: Point2 = planPoint(footprint.center, footprint.angle, [u, v]);
         const surface = surfaces.find(
           (candidate) =>
             Math.abs(candidate.top - footprint.base) <= STAND_ON_TOLERANCE &&

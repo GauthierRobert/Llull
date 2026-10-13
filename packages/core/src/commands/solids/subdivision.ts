@@ -6,17 +6,17 @@
 
 import type { SubdivisionEntity, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
-import { colorField, defineCommand, vec3, z, layerIdField, nameField } from '../schema';
-import { noop } from '../noop';
-import { add3, finiteVec3OrZero, map3 } from '../../lib/vec3';
-import { applyEulerXYZ } from '../../lib/eulerRotation';
+import { defineCommand, vec3, z } from '../schema';
+import { failer } from '../noop';
+import { finiteVec3OrZero, map3 } from '../../lib/vec3';
+import { entityLocalToWorld } from '../../geometry/entityFrame';
 import { newEntity } from '../entity/newEntity';
 import {
   DEFAULT_SOLID_COLOR,
   commitSolid,
   rotationField,
   existingLayerOrDefault,
-  explicitIdField,
+  namedSolidStyleFields,
   explicitIdOrNext,
   explicitIdTaken,
 } from './shared';
@@ -28,6 +28,7 @@ import {
   cageProblem,
   cylinderCage,
 } from '../../geometry/subdivision';
+import { roundTo } from '../../lib/compactNumber';
 
 /** Largest cage accepted (vertices); the surface grows ×4 per level. */
 const MAX_CAGE_VERTICES = 2000;
@@ -178,13 +179,10 @@ export const addSubdivisionSolid = defineCommand({
     levels: levelsField.optional(),
     position: vec3('World position of the cage origin. Defaults to [0, 0, 0].').optional(),
     rotation: rotationField(),
-    layerId: layerIdField(),
-    color: colorField(DEFAULT_SOLID_COLOR),
-    name: nameField(),
-    id: explicitIdField(),
+    ...namedSolidStyleFields(),
   }),
   run: (doc, params): CommandResult => {
-    const fail = (why: string): CommandResult => noop(doc, `add_subdivision_solid: ${why}; no-op.`);
+    const fail = failer(doc, 'add_subdivision_solid');
     const { levels = 3, creases = [], position = [0, 0, 0], rotation, layerId, name } = params;
     const explicitId = params.id;
     if (explicitIdTaken(doc, explicitId)) return fail(`entity id "${explicitId}" already exists`);
@@ -229,9 +227,7 @@ export function cageData(entity: {
   };
 }
 
-const round = (value: number): number => Math.round(value * 1e6) / 1e6;
-
 /** World coordinates of a cage point. */
 export function worldOf(p: Vec3, entity: { position: Vec3; rotation: Vec3 }): Vec3 {
-  return map3(add3(applyEulerXYZ(p, [0, 0, 0], entity.rotation), entity.position), round);
+  return map3(entityLocalToWorld(entity, p), (value) => roundTo(value, 6));
 }

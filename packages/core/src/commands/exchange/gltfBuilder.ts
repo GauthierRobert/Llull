@@ -8,15 +8,11 @@
  * @pure
  */
 
+import { tupleExtent } from '../../lib/extent';
+
 /** Component-wise min/max of a flat array of `components`-tuples (all-zero when empty). */
 function bounds(data: Float32Array, components: number): { min: number[]; max: number[] } {
-  const min = Array.from({ length: components }, () => Infinity);
-  const max = Array.from({ length: components }, () => -Infinity);
-  data.forEach((value, i) => {
-    const axis = i % components;
-    if (value < (min[axis] as number)) min[axis] = value;
-    if (value > (max[axis] as number)) max[axis] = value;
-  });
+  const { min, max } = tupleExtent(data, components);
   return Number.isFinite(min[0]) ? { min, max } : { min: min.map(() => 0), max: max.map(() => 0) };
 }
 

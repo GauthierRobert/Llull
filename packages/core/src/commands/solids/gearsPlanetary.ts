@@ -8,22 +8,22 @@ import type { CadDocument, Entity, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { nextId } from '../../lib/id';
-import { compactNumber as fmt } from '../../lib/compactNumber';
+import { compactNumber as fmt, vecText } from '../../lib/compactNumber';
 import { applyEulerXYZ } from '../../lib/eulerRotation';
 import { finiteVec3OrZero } from '../../lib/vec3';
-import { DEFAULT_FLANK_SAMPLES, externalGearPattern, toothOutline } from '../../lib/gearOutline';
+import {
+  DEFAULT_FLANK_SAMPLES,
+  externalGearPattern,
+  pitchRadiusOf,
+  toothOutline,
+} from '../../lib/gearOutline';
 import { MAX_GEAR_TEETH } from '../limits';
 import { withEntity } from '../entity/entityOps';
 import { newEntity } from '../entity/newEntity';
 import { positionField } from './shared';
-import {
-  AXIS_ROTATION,
-  faceWidthProblem,
-  placedMeshEntity,
-  pressureAngleProblem,
-} from './gearSolid';
+import { AXIS_ROTATION, placedMeshEntity, moduleProblem, toothShapeProblem } from './gearSolid';
 import { internalGearMesh, minRingOuterRadius } from './gearsInternal';
-import { noop } from '../noop';
+import { failedWith } from '../noop';
 
 const MAX_PLANETS = 12;
 
@@ -116,9 +116,9 @@ export const addPlanetaryGearset = defineCommand({
       namePrefix = 'planetary',
     },
   ): CommandResult => {
-    const fail = (why: string): CommandResult => noop(doc, `add_planetary_gearset failed: ${why}`);
-    if (!(mod > 0 && Number.isFinite(mod)))
-      return fail(`module must be finite and > 0, got ${String(mod)}.`);
+    const fail = failedWith(doc, 'add_planetary_gearset');
+    const moduleIssue = moduleProblem(mod);
+    if (moduleIssue !== null) return fail(moduleIssue);
     const [sun, planet, count] = [sunTeeth, planetTeeth, planetCount].map(Math.round) as [
       number,
       number,
@@ -135,7 +135,7 @@ export const addPlanetaryGearset = defineCommand({
         `planetCount must be an integer in [1, ${MAX_PLANETS}], got ${String(planetCount)}.`,
       );
     }
-    const shapeProblem = pressureAngleProblem(pressureAngle) ?? faceWidthProblem(faceWidth);
+    const shapeProblem = toothShapeProblem(pressureAngle, faceWidth);
     if (shapeProblem !== null) return fail(shapeProblem);
     if ((sun + ring) % count !== 0) {
       const valid = Array.from({ length: MAX_PLANETS }, (_, i) => i + 1).filter(
@@ -152,7 +152,7 @@ export const addPlanetaryGearset = defineCommand({
         `ringOuterRadius must be >= ${fmt(minRim)} (ring pitch radius + 2.25*module), got ${String(ringOuterRadius)}.`,
       );
     }
-    const centerDistance = (mod * (sun + planet)) / 2;
+    const centerDistance = pitchRadiusOf(mod, sun + planet);
     if (count > 1 && 2 * centerDistance * Math.sin(Math.PI / count) <= mod * (planet + 2.2)) {
       return fail(
         `neighbouring planets would collide: ${count} planets of ${planet} teeth do not fit on centre distance ${fmt(centerDistance)}. Use fewer planets or fewer planet teeth.`,
@@ -212,13 +212,13 @@ export const addPlanetaryGearset = defineCommand({
       summary:
         `Created planetary gearset: sun ${sunId} (${sun}T), ${count} planets [${planetIds.join(', ')}] (${planet}T), ` +
         `ring ${ringId} (${ring}T). module=${fmt(mod)} centerDistance=${fmt(centerDistance)} ` +
-        `ratio=${fmt(ratio)}:1 (sun in, ring fixed, carrier out) axis=${axis} at [${centre.map(fmt).join(', ')}].`,
+        `ratio=${fmt(ratio)}:1 (sun in, ring fixed, carrier out) axis=${axis} at ${vecText(centre)}.`,
       affected: [sunId, ...planetIds, ringId],
       data: {
         ringTeeth: ring,
         ratio,
         centerDistance,
-        ringPitchRadius: (mod * ring) / 2,
+        ringPitchRadius: pitchRadiusOf(mod, ring),
         ids: { sun: sunId, planets: planetIds, ring: ringId },
       },
     };

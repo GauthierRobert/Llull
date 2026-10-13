@@ -17,14 +17,15 @@ import {
   matFromAxis,
   unitAxisOrNull,
 } from '../../lib/axisRotation';
-import { compactNumber as fmt } from '../../lib/compactNumber';
+import { compactNumber as fmt, vecText } from '../../lib/compactNumber';
 import { withEntity } from '../entity/entityOps';
 import { positionField } from './shared';
 import { newEntity } from '../entity/newEntity';
-import { noop } from '../noop';
+import { failer } from '../noop';
 import { BEARING_TABLE, BEARING_TYPES, lookupBearing, type BearingType } from './bearingTable';
+import { toRadians } from '../../lib/angle';
 
-const TAPER_ANGLE = (12 * Math.PI) / 180;
+const TAPER_ANGLE = toRadians(12);
 const MAX_ROLLING_ELEMENTS = 40;
 const ROLLING_COLOR = '#8c93a0';
 
@@ -241,8 +242,7 @@ export const addBearing = defineCommand({
       name,
     },
   ): CommandResult => {
-    const fail = (reason: string): CommandResult =>
-      noop(doc, `add_bearing failed: ${reason}; no-op.`);
+    const fail = failer(doc, 'add_bearing');
     const resolved = resolveSection(doc, { type, designation, bore, outerDiameter, width });
     if ('error' in resolved) return fail(resolved.error);
     const unitAxis = axis === undefined ? ([0, 0, 1] as Vec3) : unitAxisOrNull(axis);
@@ -337,7 +337,7 @@ export const addBearing = defineCommand({
       summary:
         `Added ${section.type} bearing ${label} as group ${groupId} ("${group.name}"): bore ${fmt(section.bore)}, ` +
         `outer diameter ${fmt(section.outerDiameter)}, width ${fmt(section.width)}, ${layout.count} rolling elements; ` +
-        `centered at [${position.map(fmt).join(', ')}], axis [${unitAxis.map(fmt).join(', ')}]. ` +
+        `centered at ${vecText(position)}, axis ${vecText(unitAxis)}. ` +
         `Ids: ${memberIds.join(', ')}.`,
       affected: [...memberIds, groupId],
       data,

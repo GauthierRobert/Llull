@@ -13,15 +13,12 @@
  * @layer tests/component
  */
 
+import { resetStore } from '../helpers/componentEntities';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '@ui/store';
-import { type CameraState, createEmptyDocument } from '@core/model/types';
+import { type CameraState } from '@core/model/types';
 import { localDispatch } from '../helpers/storeTestHelpers';
 import { sphericalToCartesian } from '@ui/viewport/3d/CameraRig';
-
-function resetStore(): void {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
-}
 
 // Store-level tests — set_camera updates document.camera
 

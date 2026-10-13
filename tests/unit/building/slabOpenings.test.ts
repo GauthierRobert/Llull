@@ -6,7 +6,7 @@ import { buildPlanDrawing } from '@aec/building/drawings/planDrawing';
 import type { TakeoffLine } from '@aec/building/quantities/takeoffBasics';
 import type { IfcExport } from '@aec/building/exchange/ifcBuild';
 import { segmentsIntersect, pointInPolygon } from '@lib/polygon';
-import { run } from './runFixtures';
+import { run } from '../../helpers/runFixtures';
 
 const rect = (x0: number, y0: number, x1: number, y1: number): number[][] => [
   [x0, y0],

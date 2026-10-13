@@ -11,7 +11,7 @@
  * @pure
  */
 
-import { round } from '../../shared/numeric';
+import { round, roundedMetres } from '../../shared/numeric';
 import { metres as shown } from '../steelDesign/steelMemberRows';
 import { pipeWeightPerMetre } from './pipeWeight';
 import { riserRuns } from './routeSupport';
@@ -47,7 +47,6 @@ export function riserRows(
   allowedMm: number,
   overhangRatio: number,
 ): RiserRow[] {
-  const metres = (millimetres: number): number => round(millimetres / 1000, 2);
   return riserRuns(run.points).map((riser): RiserRow => {
     const onRun = (station: SupportStation): boolean =>
       station.onRiser &&
@@ -125,14 +124,14 @@ export function riserRows(
       );
     }
     return {
-      fromZM: metres(riser.from[2]),
-      toZM: metres(riser.to[2]),
-      lengthM: metres(length),
+      fromZM: roundedMetres(riser.from[2]),
+      toZM: roundedMetres(riser.to[2]),
+      lengthM: roundedMetres(length),
       guides: lateral.length,
-      maxGuideSpacingM: metres(
+      maxGuideSpacingM: roundedMetres(
         Math.max(largest, ...free.map((value) => (value === null ? 0 : value))),
       ),
-      allowedSpacingM: metres(allowedMm),
+      allowedSpacingM: roundedMetres(allowedMm),
       weightKn: round(weightKn, 2),
       weightBy,
       ok: issues.length === 0,

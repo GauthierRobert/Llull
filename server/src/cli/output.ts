@@ -7,7 +7,7 @@
 
 import { shapeToolCallContent } from '@mcp/index';
 import { isRecord } from '@lib/isRecord';
-import type { CliRunResult } from './result';
+import type { CommandOutcome } from '@mcp/restProtocol';
 import { formatDuration } from './progress';
 import type { SavedFile } from './saveFiles';
 import { aliasLine, type PlanAliases } from './aliases';
@@ -18,7 +18,7 @@ const STEP_IDS_SHOWN = 4;
 /** Plan steps at least this slow show their duration in text mode (all do in `--json`). */
 const STEP_DURATION_SHOWN_MS = 1000;
 
-export interface PrintableResult extends CliRunResult {
+export interface PrintableResult extends CommandOutcome {
   readonly saved?: readonly SavedFile[];
   /** `run` only: the plan's `as` aliases that survive in the final document. */
   readonly planAliases?: PlanAliases;

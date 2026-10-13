@@ -6,9 +6,10 @@
 
 import type { CurveSegment } from '../../model/curve';
 import type { CadDocument, Entity, Vec2, Vec3 } from '../../model/types';
-import { applyEulerXYZ, inverseEulerXYZ } from '../../lib/eulerRotation';
-import { add3, distance3, sub3 } from '../../lib/vec3';
+import { inverseEulerXYZ } from '../../lib/eulerRotation';
+import { distance3, sub3 } from '../../lib/vec3';
 import { positiveSweep } from '../../lib/angle';
+import { polar } from '../../lib/arc';
 import {
   JOINT_TOLERANCE,
   catmullRomBeziers,
@@ -18,6 +19,7 @@ import {
   sampleProfile,
 } from '../../geometry/curveSegments';
 import { MAX_PROFILE_POINTS } from '../limits';
+import { planeToWorld } from '../../geometry/workPlane';
 
 /** Cubic Bézier handle length of a quarter ellipse (max radial error ≈ 0.03 %). */
 const QUARTER_KAPPA = 0.5522847498;
@@ -34,10 +36,6 @@ export interface SketchLoop {
 }
 
 const line = (a: Vec2, b: Vec2): CurveSegment<Vec2> => ({ type: 'line', points: [a, b] });
-
-function polar(center: Vec2, radius: number, angle: number): Vec2 {
-  return [center[0] + radius * Math.cos(angle), center[1] + radius * Math.sin(angle)];
-}
 
 function ellipseCurves(center: Vec2, rx: number, ry: number): CurveSegment<Vec2>[] {
   const at = (x: number, y: number): Vec2 => [center[0] + x, center[1] + y];
@@ -222,7 +220,6 @@ export function sketchPath(doc: CadDocument, id: string): CurveSegment<Vec3>[] |
   if (entity === undefined) return `no entity "${id}"`;
   const own = entityCurves(entity);
   if (own === null) return `entity "${id}" (kind="${entity.kind}") is not a 2D curve`;
-  const toWorld = ([x, y]: Vec2): Vec3 =>
-    add3(applyEulerXYZ([x, y, 0], [0, 0, 0], entity.rotation), entity.position);
+  const toWorld = (local: Vec2): Vec3 => planeToWorld(entity.position, entity.rotation, local);
   return own.curves.map((segment) => mapSegment(segment, toWorld));
 }

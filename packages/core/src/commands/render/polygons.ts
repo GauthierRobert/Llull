@@ -52,6 +52,8 @@ import {
 import type { PreDepthPolygon } from './types';
 import { positiveSweep } from '../../lib/angle';
 import { arcPolyline } from '../../lib/arc';
+import { catmullRomBeziers, segmentPoint } from '../../geometry/curveSegments';
+import { planeToWorld } from '../../geometry/workPlane';
 
 // 3D solids
 
@@ -142,8 +144,8 @@ function applyRotation(
 
 // 2D shapes: one stroked path each, lifted from the local plane to world space
 
-function place2D(localPt: Vec2, position: Vec3): Vec3 {
-  return [position[0] + localPt[0], position[1] + localPt[1], position[2]];
+function place2D(localPt: Vec2, entity: { position: Vec3; rotation: Vec3 }): Vec3 {
+  return planeToWorld(entity.position, entity.rotation, localPt);
 }
 
 const stroke = (verts: Vec3[], color: string): PreDepthPolygon => ({
@@ -155,25 +157,25 @@ const stroke = (verts: Vec3[], color: string): PreDepthPolygon => ({
 
 /** SEG_CIRCLE+1 samples of an ellipse arc from `startAngle` sweeping `span` radians. */
 function strokeEllipseArc(
-  e: { position: Vec3; center: Vec2; color: string },
+  e: { position: Vec3; rotation: Vec3; center: Vec2; color: string },
   radiusX: number,
   radiusY: number,
   startAngle: number,
   span: number,
 ): PreDepthPolygon[] {
   const verts = arcPolyline(e.center, radiusX, startAngle, span, SEG_CIRCLE, radiusY).map((point) =>
-    place2D(point, e.position),
+    place2D(point, e),
   );
   return [stroke(verts, e.color)];
 }
 
 function tessellate2DLine(e: LineEntity): PreDepthPolygon[] {
-  return [stroke([place2D(e.start, e.position), place2D(e.end, e.position)], e.color)];
+  return [stroke([place2D(e.start, e), place2D(e.end, e)], e.color)];
 }
 
 function tessellate2DPolyline(e: PolylineEntity): PreDepthPolygon[] {
   if (e.points.length < 2) return [];
-  const verts = e.points.map((pt) => place2D(pt, e.position));
+  const verts = e.points.map((pt) => place2D(pt, e));
   if (e.closed) verts.push(verts[0] as Vec3);
   return [stroke(verts, e.color)];
 }
@@ -188,50 +190,35 @@ function tessellate2DCircle(e: CircleEntity): PreDepthPolygon[] {
 }
 
 function tessellate2DRectangle(e: RectangleEntity): PreDepthPolygon[] {
-  const [px, py, pz] = e.position;
-  const verts: Vec3[] = [
-    [px, py, pz],
-    [px + e.width, py, pz],
-    [px + e.width, py + e.height, pz],
-    [px, py + e.height, pz],
-    [px, py, pz],
+  const corners: Vec2[] = [
+    [0, 0],
+    [e.width, 0],
+    [e.width, e.height],
+    [0, e.height],
+    [0, 0],
   ];
-  return [stroke(verts, e.color)];
+  return [
+    stroke(
+      corners.map((corner) => place2D(corner, e)),
+      e.color,
+    ),
+  ];
 }
 
 function tessellate2DEllipse(e: EllipseEntity): PreDepthPolygon[] {
   return strokeEllipseArc(e, e.radiusX, e.radiusY, 0, 2 * Math.PI);
 }
 
-/** Uniform Catmull-Rom interpolation of one coordinate between `p1` and `p2` at `t` in [0, 1]. */
-function catmullRom(p0: number, p1: number, p2: number, p3: number, t: number): number {
-  const t2 = t * t;
-  const t3 = t2 * t;
-  return (
-    0.5 *
-    (2 * p1 +
-      (-p0 + p2) * t +
-      (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
-      (-p0 + 3 * p1 - 3 * p2 + p3) * t3)
-  );
-}
-
-/** Uniform Catmull-Rom spline through the points (they ARE the control points), 8 samples per segment. */
+/** The spline's centripetal Catmull-Rom curve (the same one the viewport and bounds use), 8 samples per segment. */
 function tessellate2DSpline(e: SplineEntity): PreDepthPolygon[] {
   if (e.points.length < 2) return [];
   const STEPS = 8;
-  const pts = e.closed ? [...e.points, e.points[0] as Vec2] : [...e.points];
-  // Duplicated end points act as the missing neighbours of the first and last segments.
-  const extended = [pts[0] as Vec2, ...pts, pts[pts.length - 1] as Vec2];
   const verts: Vec3[] = [];
-  for (let i = 1; i < extended.length - 2; i++) {
-    const [p0, p1, p2, p3] = extended.slice(i - 1, i + 3) as [Vec2, Vec2, Vec2, Vec2];
+  for (const segment of catmullRomBeziers(e.points, e.closed)) {
     // Each segment starts where the previous one ended: skip the duplicate first sample.
     for (let s = verts.length > 0 ? 1 : 0; s <= STEPS; s++) {
-      const t = s / STEPS;
-      const x = catmullRom(p0[0], p1[0], p2[0], p3[0], t);
-      const y = catmullRom(p0[1], p1[1], p2[1], p3[1], t);
-      verts.push(place2D([x, y], e.position));
+      const [x, y] = segmentPoint(segment, s / STEPS);
+      verts.push(place2D([x, y], e));
     }
   }
   return [stroke(verts, e.color)];
@@ -239,24 +226,10 @@ function tessellate2DSpline(e: SplineEntity): PreDepthPolygon[] {
 
 /** A tiny cross: two short segments. */
 function tessellate2DPoint(e: PointEntity): PreDepthPolygon[] {
-  const [px, py, pz] = e.position;
   const s = 0.1;
-  return [
-    stroke(
-      [
-        [px - s, py, pz],
-        [px + s, py, pz],
-      ],
-      e.color,
-    ),
-    stroke(
-      [
-        [px, py - s, pz],
-        [px, py + s, pz],
-      ],
-      e.color,
-    ),
-  ];
+  const arm = (from: Vec2, to: Vec2): PreDepthPolygon =>
+    stroke([place2D(from, e), place2D(to, e)], e.color);
+  return [arm([-s, 0], [s, 0]), arm([0, -s], [0, s])];
 }
 
 /** Polygons of one entity; 3D solids carry their rotation, 2D shapes ignore it (plane orientation is out of scope). */

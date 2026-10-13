@@ -4,6 +4,7 @@
  * content — and never changes the document.
  */
 
+import { resetStore } from '../helpers/componentEntities';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useStore } from '@ui/store';
@@ -21,7 +22,7 @@ function decodedBody(href: string): string {
 }
 
 beforeEach(() => {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
+  resetStore();
 });
 
 describe('CivilFeedback', () => {

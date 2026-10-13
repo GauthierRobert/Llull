@@ -20,7 +20,8 @@ vi.mock('@react-three/fiber', () => ({
   useThree: () => fake,
 }));
 
-import { ViewPresetsInner, ViewPresetsOverlay } from '@ui/viewport/3d/ViewPresets';
+import { CameraBridge } from '@ui/viewport/3d/cameraBridge';
+import { ViewPresetsOverlay } from '@ui/viewport/3d/ViewPresets';
 
 describe('view presets', () => {
   const camera = new THREE.PerspectiveCamera();
@@ -37,7 +38,7 @@ describe('view presets', () => {
   function mount(): void {
     render(
       <>
-        <ViewPresetsInner />
+        <CameraBridge />
         <ViewPresetsOverlay />
       </>,
     );

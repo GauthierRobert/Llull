@@ -56,10 +56,7 @@ export function DecalOverlay({ entity }: { entity: Entity }): React.ReactElement
   if (items.length === 0) return null;
   const { position, rotation } = entity;
   return (
-    <group
-      position={[position[0], position[1], position[2]]}
-      rotation={[rotation[0], rotation[1], rotation[2]]}
-    >
+    <group position={position} rotation={rotation}>
       {items.map((item) => (
         <mesh key={item.id} name={item.id} geometry={item.geometry} renderOrder={1}>
           <meshStandardMaterial

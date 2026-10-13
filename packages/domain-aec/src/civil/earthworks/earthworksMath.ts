@@ -8,6 +8,7 @@
 import type { Vec2 } from '@core/model/types';
 import { pointInPolygon, polygonArea, projectOntoSegment } from '@lib/polygon';
 import { elevationAt, tinBounds, type Tin } from '../surface/tin';
+import { batterLevel } from './batter';
 
 /** Default grid: the pad gets about this many cells. */
 export const TARGET_PAD_CELLS = 2500;
@@ -168,9 +169,33 @@ function depthAt(
   fillSlope: number,
 ): number {
   if (distance === 0) return ground - elevation;
-  if (ground > elevation) return Math.max(0, ground - (elevation + distance / cutSlope));
-  if (ground < elevation) return Math.min(0, ground - (elevation - distance / fillSlope));
+  if (ground > elevation)
+    return Math.max(0, ground - batterLevel(elevation, distance, 'cut', cutSlope, fillSlope));
+  if (ground < elevation)
+    return Math.min(0, ground - batterLevel(elevation, distance, 'fill', cutSlope, fillSlope));
   return 0;
+}
+
+/** Running cut / fill totals of signed depths (cut positive, fill negative). */
+class CutFillTally {
+  cut = 0;
+  fill = 0;
+  cutCells = 0;
+  fillCells = 0;
+  maxCut = 0;
+  maxFill = 0;
+
+  add(depth: number): void {
+    if (depth > 0) {
+      this.cut += depth;
+      this.cutCells += 1;
+      this.maxCut = Math.max(this.maxCut, depth);
+    } else if (depth < 0) {
+      this.fill -= depth;
+      this.fillCells += 1;
+      this.maxFill = Math.max(this.maxFill, -depth);
+    }
+  }
 }
 
 /** Cut / fill of a pad at `elevation` over pre-sampled ground. */
@@ -181,34 +206,20 @@ export function volumesFromSamples(
   cutSlope: number,
   fillSlope: number,
 ): Earthworks {
-  let cut = 0;
-  let fill = 0;
-  let cutCells = 0;
-  let fillCells = 0;
-  let maxCut = 0;
-  let maxFill = 0;
+  const tally = new CutFillTally();
   for (let i = 0; i < samples.ground.length; i++) {
     const ground = samples.ground[i] as number;
     if (Number.isNaN(ground)) continue;
-    const depth = depthAt(ground, samples.distance[i] as number, elevation, cutSlope, fillSlope);
-    if (depth > 0) {
-      cut += depth;
-      cutCells += 1;
-      maxCut = Math.max(maxCut, depth);
-    } else if (depth < 0) {
-      fill -= depth;
-      fillCells += 1;
-      maxFill = Math.max(maxFill, -depth);
-    }
+    tally.add(depthAt(ground, samples.distance[i] as number, elevation, cutSlope, fillSlope));
   }
   return {
-    cutVolume: cut * samples.cellArea,
-    fillVolume: fill * samples.cellArea,
-    cutArea: cutCells * samples.cellArea,
-    fillArea: fillCells * samples.cellArea,
+    cutVolume: tally.cut * samples.cellArea,
+    fillVolume: tally.fill * samples.cellArea,
+    cutArea: tally.cutCells * samples.cellArea,
+    fillArea: tally.fillCells * samples.cellArea,
     padArea: polygonArea(boundary),
-    maxCutDepth: maxCut,
-    maxFillDepth: maxFill,
+    maxCutDepth: tally.maxCut,
+    maxFillDepth: tally.maxFill,
     spacing: samples.spacing,
     samples: samples.ground.length,
     outsideTin: samples.outsideTin,
@@ -268,29 +279,22 @@ export function compareSurfaceVolumes(
   if (!(width > 0) || !(height > 0)) return none;
   const step = spacing ?? Math.sqrt((width * height) / COMPARE_TARGET_CELLS);
   const { centres, cellArea } = cellCentres(minX, minY, width, height, step);
-  let cut = 0;
-  let fill = 0;
-  let cutCells = 0;
-  let fillCells = 0;
+  const tally = new CutFillTally();
   let outsideTin = 0;
   for (const at of centres) {
     const z0 = elevationAt(base, at);
     const z1 = elevationAt(comparison, at);
     if (z0 === null || z1 === null) {
       outsideTin += 1;
-    } else if (z1 < z0) {
-      cut += z0 - z1;
-      cutCells += 1;
-    } else if (z1 > z0) {
-      fill += z1 - z0;
-      fillCells += 1;
+    } else {
+      tally.add(z0 - z1);
     }
   }
   return {
-    cutVolume: cut * cellArea,
-    fillVolume: fill * cellArea,
-    cutArea: cutCells * cellArea,
-    fillArea: fillCells * cellArea,
+    cutVolume: tally.cut * cellArea,
+    fillVolume: tally.fill * cellArea,
+    cutArea: tally.cutCells * cellArea,
+    fillArea: tally.fillCells * cellArea,
     area: (centres.length - outsideTin) * cellArea,
     spacing: Math.sqrt(cellArea),
     samples: centres.length,

@@ -7,8 +7,8 @@
 
 import type { CurveSegment } from '../model/curve';
 import type { Vec2, Vec3 } from '../model/types';
-import { add3, cross3, distance3, dot3, len3, normalize3, scale3, sub3 } from '../lib/vec3';
-import { positiveSweep } from '../lib/angle';
+import { add3, cross3, distance3, dot3, len3, lerp3, normalize3, scale3, sub3 } from '../lib/vec3';
+import { angleFromCosine, positiveSweep } from '../lib/angle';
 
 type Point = Vec2 | Vec3;
 
@@ -80,7 +80,7 @@ export function segmentPoint(segment: CurveSegment<Point>, t: number): Vec3 {
     if (g !== null) return arcPoint(g, t);
   }
   const [a, b] = [pts[0] as Vec3, pts[pts.length - 1] as Vec3];
-  return add3(a, scale3(sub3(b, a), t));
+  return lerp3(a, b, t);
 }
 
 /** Unit tangent at parameter t in [0, 1]; [0,0,0] when degenerate. */
@@ -204,7 +204,7 @@ export function firstCorner(segments: ReadonlyArray<CurveSegment<Point>>): numbe
   for (let i = 1; i < segments.length; i++) {
     const a = segmentTangent(segments[i - 1] as CurveSegment<Point>, 1);
     const b = segmentTangent(segments[i] as CurveSegment<Point>, 0);
-    if (Math.acos(Math.min(1, Math.max(-1, dot3(a, b)))) > G1_TOLERANCE) return i;
+    if (angleFromCosine(dot3(a, b)) > G1_TOLERANCE) return i;
   }
   return -1;
 }
@@ -281,7 +281,7 @@ export function filletPolyline(
     const [prev, corner, next] = [points[i - 1], points[i], points[i + 1]] as [Vec3, Vec3, Vec3];
     const dIn = normalize3(sub3(corner, prev));
     const dOut = normalize3(sub3(next, corner));
-    const turn = Math.acos(Math.min(1, Math.max(-1, dot3(dIn, dOut))));
+    const turn = angleFromCosine(dot3(dIn, dOut));
     if (turn < G1_TOLERANCE) {
       bends.push(null);
       continue;
@@ -354,7 +354,7 @@ export function closesSmoothly(segments: ReadonlyArray<CurveSegment<Point>>): bo
   if (first === undefined || last === undefined) return false;
   const a = segmentTangent(last, 1);
   const b = segmentTangent(first, 0);
-  return Math.acos(Math.min(1, Math.max(-1, dot3(a, b)))) <= G1_TOLERANCE;
+  return angleFromCosine(dot3(a, b)) <= G1_TOLERANCE;
 }
 
 /** Arc length of a chain: exact for lines and arcs, 64-chord estimate for Béziers. */

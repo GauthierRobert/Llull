@@ -8,6 +8,8 @@
  * @pure only the provided args determine the output.
  */
 
+import { clamp } from '@lib/clamp';
+
 interface McpPromptMessage {
   role: 'user' | 'assistant';
   content: { type: 'text'; text: string };
@@ -79,7 +81,7 @@ const modelBracket: PromptTemplate = {
     const w = Number(width);
     const h = Number(height);
     const t = Number(thickness);
-    const n = Math.min(Math.max(Math.round(Number(hole_count)), 1), 4);
+    const n = clamp(Math.round(Number(hole_count)), 1, 4);
     const holeRadius = Math.max(t * 0.4, 2);
     const holeDepth = t + 2; // punch fully through
 

@@ -2,10 +2,11 @@
  * writeBatchInstances: after instances move, the InstancedMesh bounds must follow them, otherwise
  * three keeps the stale first-write sphere and frustum-culls / fails to raycast moved instances.
  */
+import { resetStore } from '../helpers/componentEntities';
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { useStore } from '@ui/store';
-import { createEmptyDocument, type Entity } from '@core/model/types';
+import { type Entity } from '@core/model/types';
 import { localDispatch } from '../helpers/storeTestHelpers';
 import { groupEntitiesForInstancing, type InstanceBatch } from '@ui/viewport/3d/grouping';
 import { writeBatchInstances } from '@ui/viewport/3d/instanceWriter';
@@ -24,7 +25,7 @@ function newMesh(): THREE.InstancedMesh {
 
 describe('writeBatchInstances', () => {
   beforeEach(() => {
-    useStore.setState({ document: createEmptyDocument(), lastSummary: null });
+    resetStore();
   });
 
   it('refreshes the bounding sphere when an instance moves', () => {

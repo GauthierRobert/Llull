@@ -27,9 +27,8 @@ import {
   SERVER_INSTRUCTIONS,
   applyDiscoveryToolCall,
   isPromptEnabled,
-  closestToolNames,
+  suggestToolNames,
   isToolEnabled,
-  searchTools,
   toolsetOf,
 } from '@mcp/index';
 import { getCommand } from '@core/commands/registry';
@@ -52,11 +51,7 @@ function unknownToolResult(
   name: string,
   enabledToolsets: ReadonlySet<ToolsetName>,
 ): CallToolResult {
-  const typoMatches = closestToolNames(name, 5);
-  const suggestions =
-    typoMatches.length > 0
-      ? typoMatches
-      : searchTools(name.replace(/_/g, ' '), 5, enabledToolsets).map((r) => r.name);
+  const suggestions = suggestToolNames(name, 5, enabledToolsets);
   const hint = suggestions.length > 0 ? ` Closest tools: ${suggestions.join(', ')}.` : '';
   return makeErrorResult(
     `Unknown command: ${name}.${hint} Use search_tools to find tools by keyword.`,

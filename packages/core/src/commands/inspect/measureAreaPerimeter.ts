@@ -1,3 +1,4 @@
+import { closedShapeArea } from '../../geometry/shapeArea';
 import { distance, polygonArea, polygonPerimeter } from '../../lib/polygon';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
@@ -19,7 +20,7 @@ export const measureArea = defineCommand({
   annotations: { readOnly: true },
   description:
     'Compute the area of a closed 2D shape. Provide either: (a) an entityId for a closed ' +
-    'polyline, rectangle, or circle entity; or (b) an explicit polygon as points ([[x,y],...], >= 3 points). ' +
+    'polyline, rectangle, circle, or ellipse entity; or (b) an explicit polygon as points ([[x,y],...], >= 3 points). ' +
     'Returns data: { area, unit } where unit is the squared document unit (e.g. "mm²"). ' +
     'Open polylines are rejected with an explanatory message. Does not modify the document.',
   params: z.object({
@@ -27,7 +28,7 @@ export const measureArea = defineCommand({
       .string()
       .optional()
       .describe(
-        "Id of a closed 2D shape entity: 'polyline' (must have closed:true), 'rectangle', or 'circle'.",
+        "Id of a closed 2D shape entity: 'polyline' (must have closed:true), 'rectangle', 'circle', or 'ellipse'.",
       ),
     points: z
       .array(z.tuple([z.number(), z.number()]))
@@ -56,27 +57,23 @@ export const measureArea = defineCommand({
     const e = doc.entities[entityId];
     if (!e) return noop(doc, `measure_area: entity '${entityId}' not found.`);
 
-    switch (e.kind) {
-      case 'circle':
-        return measured(Math.PI * e.radius * e.radius, ` of ${entityId}`);
-      case 'rectangle':
-        return measured(e.width * e.height, ` of ${entityId}`);
-      case 'polyline':
-        if (!e.closed) {
-          return noop(
-            doc,
-            `measure_area: polyline '${entityId}' is not closed — cannot compute area.`,
-          );
-        }
-        if (e.points.length < 3)
-          return noop(doc, `measure_area: polyline '${entityId}' has fewer than 3 points.`);
-        return measured(polygonArea(e.points), ` of ${entityId}`);
-      default:
+    if (e.kind === 'polyline') {
+      if (!e.closed) {
         return noop(
           doc,
-          `measure_area: entity '${entityId}' is kind '${e.kind}'; supported kinds are 'circle', 'rectangle', 'polyline'.`,
+          `measure_area: polyline '${entityId}' is not closed — cannot compute area.`,
         );
+      }
+      if (e.points.length < 3)
+        return noop(doc, `measure_area: polyline '${entityId}' has fewer than 3 points.`);
     }
+    const area = closedShapeArea(e);
+    if (area === null)
+      return noop(
+        doc,
+        `measure_area: entity '${entityId}' is kind '${e.kind}'; supported kinds are 'circle', 'rectangle', 'ellipse', 'polyline'.`,
+      );
+    return measured(area, ` of ${entityId}`);
   },
 });
 

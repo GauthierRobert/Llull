@@ -9,6 +9,7 @@ import {
   extrusion,
   ifcString,
   placement,
+  placementAt,
   circleProfile,
   scaledPolygonProfile,
   rectangleProfile,
@@ -55,13 +56,7 @@ export function exportOther(
       return { ref, material: element.material };
     }
     case 'column': {
-      const local = placement(
-        context,
-        storeyPlacement,
-        mm(element.location[0]),
-        mm(element.location[1]),
-        0,
-      );
+      const local = placementAt(context, storeyPlacement, element.location, 0);
       const profile =
         element.shape === 'circular'
           ? circleProfile(context, mm(element.width) / 2)

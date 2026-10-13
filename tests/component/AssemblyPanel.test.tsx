@@ -12,18 +12,14 @@
  * No geometry math or internals are asserted — behavioral testing only.
  */
 
+import { resetStore } from '../helpers/componentEntities';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
 import { AssemblyPanel } from '@ui/panels/AssemblyPanel';
 import { localDispatch } from '../helpers/storeTestHelpers';
 
 // Helpers
-
-function resetStore(): void {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
-}
 
 // Tests
 

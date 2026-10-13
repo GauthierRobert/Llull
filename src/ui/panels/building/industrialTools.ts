@@ -5,6 +5,7 @@
  * ONE command + params (param-gathering only, react R1).
  */
 
+import { toRadians } from '@lib/angle';
 import { PIPE_OUTSIDE_DIAMETER_MM } from '@aec/industrial/piping/pipeSizes';
 import { PIPE_SUPPORT_TOOL } from './pipeSupportTool';
 import {
@@ -23,8 +24,8 @@ import {
   num,
   onLevel,
   placement,
-  radians,
   result,
+  buildWith,
   select,
   txt,
   type ElementTool,
@@ -149,7 +150,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
         profile: reader.text('profile'),
         start: [reader.number('x1'), reader.number('y1'), reader.number('z1')],
         end: [reader.number('x2'), reader.number('y2'), reader.number('z2')],
-        roll: radians(reader.number('roll')),
+        roll: toRadians(reader.number('roll')),
         startJoint: joint('startJoint'),
         endJoint: joint('endJoint'),
         baseFixity: role === 'column' ? reader.text('baseFixity') || undefined : undefined,
@@ -193,15 +194,12 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
       ]),
       num('thickness', 'Thickness', '80'),
     ],
-    build: (values, context) => {
-      const reader = new FieldReader(values);
-      return result(reader, 'add_panel', {
-        corners: reader.pointList('corners', 3),
-        role: reader.text('role'),
-        thickness: reader.number('thickness'),
-        ...onLevel(context),
-      });
-    },
+    build: buildWith('add_panel', (reader, context) => ({
+      corners: reader.pointList('corners', 3),
+      role: reader.text('role'),
+      thickness: reader.number('thickness'),
+      ...onLevel(context),
+    })),
   },
   {
     id: 'craneRunway',
@@ -216,17 +214,14 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
       num('capacity', 'Capacity (t)', '10'),
       profileField('profile', 'Runway beam', 'HEB300', true),
     ],
-    build: (values, context) => {
-      const reader = new FieldReader(values);
-      return result(reader, 'add_crane_runway', {
-        start: reader.point('x1', 'y1'),
-        end: reader.point('x2', 'y2'),
-        railHeight: reader.number('railHeight'),
-        capacity: reader.number('capacity'),
-        profile: reader.text('profile'),
-        ...onLevel(context),
-      });
-    },
+    build: buildWith('add_crane_runway', (reader, context) => ({
+      start: reader.point('x1', 'y1'),
+      end: reader.point('x2', 'y2'),
+      railHeight: reader.number('railHeight'),
+      capacity: reader.number('capacity'),
+      profile: reader.text('profile'),
+      ...onLevel(context),
+    })),
   },
   {
     id: 'equipment',
@@ -255,7 +250,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
         location: reader.point('x', 'y'),
         size: [reader.number('length'), reader.number('width'), reader.number('height')],
         shape: reader.text('shape') === 'box' ? undefined : reader.text('shape'),
-        angle: radians(reader.number('angle')),
+        angle: toRadians(reader.number('angle')),
         clearance: reader.number('clearance'),
         weight: reader.optionalNumber('weight'),
         ...placement(reader, context),
@@ -306,16 +301,13 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
       txt('system', 'System', 'power'),
       levelField(),
     ],
-    build: (values, context) => {
-      const reader = new FieldReader(values);
-      return result(reader, 'add_cable_tray', {
-        points: reader.pointList('points', 2),
-        width: reader.number('width'),
-        height: reader.number('height'),
-        system: reader.text('system') || undefined,
-        ...placement(reader, context),
-      });
-    },
+    build: buildWith('add_cable_tray', (reader, context) => ({
+      points: reader.pointList('points', 2),
+      width: reader.number('width'),
+      height: reader.number('height'),
+      system: reader.text('system') || undefined,
+      ...placement(reader, context),
+    })),
   },
   {
     id: 'basePlates',
@@ -327,16 +319,13 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
       num('boltCount', 'Anchor bolts', '4'),
       num('boltDiameter', 'Bolt Ø', '24'),
     ],
-    build: (values, context) => {
-      const reader = new FieldReader(values);
-      return result(reader, 'add_base_plates', {
-        thickness: reader.optionalNumber('thickness'),
-        margin: reader.number('margin'),
-        boltCount: reader.number('boltCount'),
-        boltDiameter: reader.number('boltDiameter'),
-        ...onLevel(context),
-      });
-    },
+    build: buildWith('add_base_plates', (reader, context) => ({
+      thickness: reader.optionalNumber('thickness'),
+      margin: reader.number('margin'),
+      boltCount: reader.number('boltCount'),
+      boltDiameter: reader.number('boltDiameter'),
+      ...onLevel(context),
+    })),
   },
   {
     id: 'connections',
@@ -347,14 +336,11 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
       num('boltDiameter', 'Bolt Ø', '20'),
       num('haunchLength', 'Haunch length', '', true),
     ],
-    build: (values, context) => {
-      const reader = new FieldReader(values);
-      return result(reader, 'add_moment_connections', {
-        plateThickness: reader.optionalNumber('plateThickness'),
-        boltDiameter: reader.number('boltDiameter'),
-        haunchLength: reader.optionalNumber('haunchLength'),
-        ...onLevel(context),
-      });
-    },
+    build: buildWith('add_moment_connections', (reader, context) => ({
+      plateThickness: reader.optionalNumber('plateThickness'),
+      boltDiameter: reader.number('boltDiameter'),
+      haunchLength: reader.optionalNumber('haunchLength'),
+      ...onLevel(context),
+    })),
   },
 ];

@@ -6,12 +6,13 @@ import {
   type Vec3,
 } from '../../model/types';
 import type { CommandResult } from '../types';
-import { z, colorField, looseVec3, tolerant } from '../schema';
+import { z, colorField, layerIdField, looseVec3, nameField, tolerant } from '../schema';
 import { rotatedEntityBounds } from '../../geometry/rotatedBounds';
 import { add3, finiteVec3OrZero } from '../../lib/vec3';
 import { nextId } from '../../lib/id';
 import { commitEntity } from '../entity/commitEntity';
 import { newEntity } from '../entity/newEntity';
+import { idOrNext, idTaken } from '../entity/explicitId';
 import { noop } from '../noop';
 import { compactNumber } from '../../lib/compactNumber';
 import { isVec2 } from '../../lib/vec2';
@@ -165,6 +166,30 @@ export function placedSolidFields(
   return { position: positionField(), anchor, rotation, color: colorField(DEFAULT_SOLID_COLOR) };
 }
 
+/** Fields every created solid ends with: layerId, color, id (spread into `z.object`; order is schema order). */
+export function solidStyleFields(): {
+  layerId: ReturnType<typeof layerIdField>;
+  color: ReturnType<typeof colorField>;
+  id: ReturnType<typeof explicitIdField>;
+} {
+  return { layerId: layerIdField(), color: colorField(DEFAULT_SOLID_COLOR), id: explicitIdField() };
+}
+
+/** `solidStyleFields` with `name` between color and id. */
+export function namedSolidStyleFields(): {
+  layerId: ReturnType<typeof layerIdField>;
+  color: ReturnType<typeof colorField>;
+  name: ReturnType<typeof nameField>;
+  id: ReturnType<typeof explicitIdField>;
+} {
+  return {
+    layerId: layerIdField(),
+    color: colorField(DEFAULT_SOLID_COLOR),
+    name: nameField(),
+    id: explicitIdField(),
+  };
+}
+
 /** Optional explicit `id` param of a created solid. */
 export function explicitIdField(): z.ZodOptional<z.ZodString> {
   return z
@@ -175,17 +200,17 @@ export function explicitIdField(): z.ZodOptional<z.ZodString> {
 
 /** `true` when the explicit `id` is non-empty and already names an entity. */
 export function explicitIdTaken(doc: CadDocument, id: string | undefined): id is string {
-  return id !== undefined && id.length > 0 && Object.hasOwn(doc.entities, id);
+  return id !== undefined && id.length > 0 && idTaken(doc.entities, id);
 }
 
 /** The explicit `id` when non-empty, else a fresh `prefix` id. */
 export function explicitIdOrNext(id: string | undefined, prefix: string): string {
-  return id !== undefined && id.length > 0 ? id : nextId(prefix);
+  return idOrNext(id, prefix);
 }
 
 /** `layerId` when it names an existing layer, else the default layer. */
 export function existingLayerOrDefault(doc: CadDocument, layerId: string | undefined): string {
-  return layerId !== undefined && Object.hasOwn(doc.layers, layerId) ? layerId : DEFAULT_LAYER_ID;
+  return layerId !== undefined && idTaken(doc.layers, layerId) ? layerId : DEFAULT_LAYER_ID;
 }
 
 /** `axis` param of a placed primitive: direction of the primitive's local +Z (its symmetry axis). */
@@ -234,7 +259,7 @@ export function rejectNonPositive(
 }
 
 /** Same as `rejectNonPositive` for a `[w, h, d]` size vector (one combined summary). */
-export function rejectBadSize(doc: CadDocument, command: string, size: Vec3): CommandResult | null {
+function rejectBadSize(doc: CadDocument, command: string, size: Vec3): CommandResult | null {
   if (
     Array.isArray(size) &&
     size.length === 3 &&
@@ -283,7 +308,9 @@ export function rejectZeroAreaProfile(
   );
 }
 
-/** Append `entity` and report it: `<description>; world AABB ...` with `affected: [entity.id]`. */
+/**
+ * Append `entity` and report it: `<description>; world AABB ...` with `affected: [entity.id]`.
+ */
 export function commitSolid(doc: CadDocument, entity: Entity, description: string): CommandResult {
   return commitEntity(doc, entity, `${description}; ${boundsText(rotatedEntityBounds(entity))}.`);
 }
@@ -322,4 +349,62 @@ export function placeSolid<K extends Entity['kind']>(
     rotation: resolved.rotation,
   });
   return commitSolid(doc, entity, spec.describe(id));
+}
+
+interface SolidPlacement {
+  readonly position: Vec3;
+  readonly rotation: unknown;
+  readonly axis?: unknown;
+  readonly color: string;
+  readonly anchor: unknown;
+}
+
+/** Validate a `[w, h, d]` size and place a `box` / `wedge` ("Added <kind> <id> of size w×h×d"). */
+export function placeSizedSolid(
+  doc: CadDocument,
+  kind: 'box' | 'wedge',
+  idPrefix: string,
+  defaultAnchor: PlacementAnchor,
+  size: Vec3,
+  placement: SolidPlacement,
+): CommandResult {
+  const rejected = rejectBadSize(doc, `add_${kind}`, size);
+  if (rejected) return rejected;
+  const [w, h, d] = size;
+  return placeSolid(doc, {
+    kind,
+    idPrefix,
+    geometry: { size },
+    halfExtents: [w / 2, h / 2, d / 2],
+    defaultAnchor,
+    ...placement,
+    describe: (id) => `Added ${kind} ${id} of size ${size.join('×')}`,
+  });
+}
+
+/** Validate radius/height and place a `cylinder` / `cone` ("... with <radiusLabel> r and height h"). */
+export function placeRoundSolid(
+  doc: CadDocument,
+  kind: 'cylinder' | 'cone',
+  idPrefix: string,
+  defaultAnchor: PlacementAnchor,
+  radiusLabel: string,
+  dims: { readonly radius: number; readonly height: number },
+  placement: SolidPlacement,
+): CommandResult {
+  const { radius, height } = dims;
+  const rejected = rejectNonPositive(doc, `add_${kind}`, [
+    ['radius', radius],
+    ['height', height],
+  ]);
+  if (rejected) return rejected;
+  return placeSolid(doc, {
+    kind,
+    idPrefix,
+    geometry: { radius, height },
+    halfExtents: [radius, radius, height / 2],
+    defaultAnchor,
+    ...placement,
+    describe: (id) => `Added ${kind} ${id} with ${radiusLabel} ${radius} and height ${height}`,
+  });
 }

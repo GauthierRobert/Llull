@@ -14,23 +14,15 @@
  * No geometry math or internals — behavioral testing only.
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-import { answerDispatch, liveSnapshot } from '../helpers/storeTestHelpers';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { resetStore } from '../helpers/componentEntities';
+import { answerDispatch, liveSnapshot, spyDispatch } from '../helpers/storeTestHelpers';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { useStore } from '@ui/store';
-import { type Material, createEmptyDocument } from '@core/model/types';
+import { type Material } from '@core/model/types';
 import { MaterialsPanel } from '@ui/panels/MaterialsPanel';
 
 // Helpers
-
-function resetStore(): void {
-  useStore.setState({
-    document: createEmptyDocument(),
-    lastSummary: null,
-  });
-}
 
 const STEEL_AND_PLA: Record<string, Material> = {
   steel: { name: 'steel', density: 0.00785, color: '#b0b0b0', metalness: 0.9, roughness: 0.2 },
@@ -47,11 +39,6 @@ function setMaterials(mats: Record<string, Material>): void {
 function setSelection(ids: string[]): void {
   const doc = useStore.getState().document;
   useStore.setState({ document: { ...doc, selection: ids } });
-}
-
-/** Patch the dispatch action on the store for spy purposes. */
-function patchDispatch(spy: ReturnType<typeof vi.fn>): void {
-  useStore.setState({ dispatch: spy } as any);
 }
 
 // Rendering tests
@@ -182,8 +169,7 @@ describe('MaterialsPanel — assign', () => {
       steel: { name: 'steel', density: 0.00785, color: '#b0b0b0', metalness: 0.9, roughness: 0.2 },
     });
     setSelection(['e-abc', 'e-def']);
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
+    const dispatchSpy = spyDispatch();
 
     render(<MaterialsPanel />);
 
@@ -199,8 +185,7 @@ describe('MaterialsPanel — assign', () => {
   it('dispatches with the correct materialName when multiple materials exist', () => {
     setMaterials(STEEL_AND_PLA);
     setSelection(['e-001']);
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
+    const dispatchSpy = spyDispatch();
 
     render(<MaterialsPanel />);
 
@@ -257,8 +242,7 @@ describe('MaterialsPanel — create form', () => {
   });
 
   it('dispatches create_material with correct params on submit', () => {
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
+    const dispatchSpy = spyDispatch();
 
     const { form, nameInput, densityInput } = renderCreateForm();
 

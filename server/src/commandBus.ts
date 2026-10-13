@@ -15,14 +15,13 @@
 
 import type { CadDocument } from '@core/model/types';
 import { withMonotonicStepCounter } from '@core/model/stepCounter';
-import { execute, getCommand } from '@core/commands/registry';
-import { errorMessage } from '@lib/errorMessage';
-import { hashText } from '@lib/hash';
+import { getCommand } from '@core/commands/registry';
 import { getLiveDoc, getLiveLogPosition, setLiveDoc } from './liveDocument';
-import { ANONYMOUS_ACTOR, appendAudit, hashParams, type Actor } from './audit';
+import { ANONYMOUS_ACTOR, appendAudit, hashJson, type Actor } from './audit';
+import { runCommandOutcome } from '@mcp/commandOutcome';
 import type { CommandResponseBody } from '@mcp/restProtocol';
 
-/** Maximum undo/redo depth — mirrors MAX_UNDO_DEPTH in the UI store. */
+/** Maximum undo/redo depth (the same cap as the UI store's local history). */
 const MAX_UNDO_DEPTH = 100;
 
 /** Idempotency cache size: commandId -> result, least recently used evicted first. */
@@ -32,14 +31,6 @@ interface CachedResult {
   readonly result: CommandResponseBody;
 }
 const _resultsByCommandId = new Map<string, CachedResult>();
-
-function requestHashOf(name: string, params: unknown): string {
-  try {
-    return hashText(JSON.stringify([name, params ?? null]));
-  } catch {
-    return '';
-  }
-}
 
 type HistoryDirection = 'undo' | 'redo';
 const history: Record<HistoryDirection, CadDocument[]> = { undo: [], redo: [] };
@@ -75,7 +66,7 @@ export function applyCommand(
   actor?: Actor,
 ): CommandResponseBody {
   if (commandId === undefined) return runCommand(name, params, actor);
-  const requestHash = requestHashOf(name, params);
+  const requestHash = hashJson([name, params]);
   const cached = _resultsByCommandId.get(commandId);
   if (cached !== undefined) {
     if (cached.requestHash !== requestHash) {
@@ -122,38 +113,18 @@ function boundedForReplay(result: CommandResponseBody): CommandResponseBody {
 /** `changed` = the live document was replaced by this call. */
 function runCommand(name: string, params: unknown, actor?: Actor): CommandResponseBody {
   const prior = getLiveDoc();
-  let result: ReturnType<typeof execute>;
-  try {
-    result = execute(prior, name, params);
-  } catch (err) {
-    // A throwing command must surface as an error result, never a transport failure.
-    return withHistoryFlags({
-      summary: `Command ${name} failed: ${errorMessage(err)}`,
-      affected: [],
-      isError: true,
-      changed: false,
-    });
-  }
-
-  const changed = result.document !== prior;
-  if (changed) {
+  const { document, outcome } = runCommandOutcome(prior, name, params);
+  if (outcome.changed) {
     history.undo = pushCapped(history.undo, prior);
     history.redo = [];
-    setLiveDoc(result.document, {
+    setLiveDoc(document, {
       name,
       params,
       ...(actor?.named === true ? { user: { id: actor.userId, name: actor.userName } } : {}),
     });
-    recordAudit(actor, name, params, result.summary, result.affected.length);
+    recordAudit(actor, name, params, outcome.summary, outcome.affected.length);
   }
-
-  return withHistoryFlags({
-    summary: result.summary,
-    affected: result.affected,
-    isError: result.rejected === true,
-    changed,
-    ...(result.data !== undefined ? { data: result.data } : {}),
-  });
+  return withHistoryFlags(outcome);
 }
 
 function recordAudit(
@@ -170,7 +141,7 @@ function recordAudit(
     userName: who.userName,
     source: who.source,
     command,
-    paramsSha256: hashParams(params),
+    paramsSha256: hashJson(params),
     summary,
     affectedCount,
     ...getLiveLogPosition(),

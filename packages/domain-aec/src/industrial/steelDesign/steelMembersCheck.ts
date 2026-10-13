@@ -4,13 +4,14 @@
 
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
+import { unknownLevelFailure } from '../../building/levelLookup';
 import { defineCommand, z } from '@core/commands/schema';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { isFiniteNumber, isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
-import { getBuilding } from '../../building/model';
 import { round } from '../../shared/numeric';
 import { toCsv } from '../../shared/csv';
-import { briefList, highestUtilisation } from '../common/utilisation';
+import { briefList } from '../../shared/briefList';
+import { highestUtilisation } from '../common/utilisation';
 import { analyseSteelStructure } from './steelStructureAnalysis';
 
 const ASSUMPTIONS: ReadonlyArray<string> = [
@@ -131,9 +132,8 @@ export const checkSteelMembers = defineCommand({
       return noop(doc, 'check_steel_members failed: notionalFactor must be a number in [0, 0.1].');
     if (!isPositiveNumber(deflectionRatio))
       return noop(doc, 'check_steel_members failed: deflectionRatio must be a number > 0.');
-    const building = getBuilding(doc);
-    if (params.levelId !== undefined && !building.levels[params.levelId])
-      return noop(doc, `check_steel_members failed: no level '${params.levelId}'.`);
+    const unknownLevel = unknownLevelFailure(doc, 'check_steel_members', params.levelId);
+    if (unknownLevel) return unknownLevel;
     if (!isPositiveNumber(swayRatio))
       return noop(doc, 'check_steel_members failed: swayRatio must be a number > 0.');
     const analysis = analyseSteelStructure(doc, {
@@ -197,42 +197,37 @@ export const checkSteelMembers = defineCommand({
       (analysis.warnings.length === 0
         ? '.'
         : `; ${analysis.warnings.length} warning(s) in data.warnings.`);
-    return {
-      document: doc,
-      summary,
-      affected: [],
-      data: {
-        ok: failing.length === 0 && notAnalysed.length === 0,
-        members,
-        csv,
-        totals: {
-          members: members.length,
-          analysed: analysed.length,
-          notAnalysed: notAnalysed.length,
-          failing: failing.length,
-          maxUtilisation: worst?.utilisation ?? 0,
-          maxUtilisationMark: worst?.mark ?? null,
-          steelMassKg: round(steelMassKg, 1),
-        },
-        failures: failing.map((row) => row.id),
-        notAnalysed: notAnalysed.map((row) => row.id),
-        loads: {
-          floorDeadLoad,
-          imposedLoad,
-          pipeContentDensity,
-          cableTrayWeight,
-          notionalFactor,
-          deflectionRatio,
-          swayRatio,
-          floors: analysis.floors,
-          equipment: analysis.equipment,
-          lines: analysis.lines,
-          assumptions: ASSUMPTIONS,
-        },
-        storeys: analysis.storeys,
-        frames: analysis.frames,
-        warnings: analysis.warnings,
+    return report(doc, summary, {
+      ok: failing.length === 0 && notAnalysed.length === 0,
+      members,
+      csv,
+      totals: {
+        members: members.length,
+        analysed: analysed.length,
+        notAnalysed: notAnalysed.length,
+        failing: failing.length,
+        maxUtilisation: worst?.utilisation ?? 0,
+        maxUtilisationMark: worst?.mark ?? null,
+        steelMassKg: round(steelMassKg, 1),
       },
-    };
+      failures: failing.map((row) => row.id),
+      notAnalysed: notAnalysed.map((row) => row.id),
+      loads: {
+        floorDeadLoad,
+        imposedLoad,
+        pipeContentDensity,
+        cableTrayWeight,
+        notionalFactor,
+        deflectionRatio,
+        swayRatio,
+        floors: analysis.floors,
+        equipment: analysis.equipment,
+        lines: analysis.lines,
+        assumptions: ASSUMPTIONS,
+      },
+      storeys: analysis.storeys,
+      frames: analysis.frames,
+      warnings: analysis.warnings,
+    });
   },
 });

@@ -5,14 +5,14 @@
 
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
+import { unknownLevelFailure } from '../../building/levelLookup';
 import { defineCommand, z } from '@core/commands/schema';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
-import { getBuilding } from '../../building/model';
-import { round } from '../../shared/numeric';
+import { round, roundedMetres } from '../../shared/numeric';
 import { metres as shown } from '../steelDesign/steelMemberRows';
 import { toCsv } from '../../shared/csv';
-import { briefList } from '../common/utilisation';
+import { briefList } from '../../shared/briefList';
 import { collectSteelBars, modelUnits, type ModelUnits } from '../steelDesign/steelMemberBars';
 import { spanCoordinate } from './routeSupport';
 import { createBeamLoads, type BeamLoads } from '../steelDesign/steelBeamLoads';
@@ -91,7 +91,6 @@ function rowOf(
         : 'none';
   const limit = pipeSpanLimit(element.dn, run.diameterMm);
   const allowed = limit.spanM * spanFactor;
-  const metres = (millimetres: number): number => round(millimetres / 1000, 2);
   const length = spanCoordinate(run.points, run.lengthMm);
   const spans = arcs.map((arc) => spanCoordinate(run.points, arc));
   const stretch = [...(carriers[0] ? [0] : []), ...spans, ...(carriers[1] ? [length] : [])];
@@ -144,13 +143,13 @@ function rowOf(
     mark: element.mark,
     line: element.line ?? '',
     dn: limit.dn,
-    lengthM: metres(run.lengthMm),
+    lengthM: roundedMetres(run.lengthMm),
     maxSpanM: limit.spanM,
     allowedSpanM: round(allowed, 2),
-    largestSpanM: metres(largest),
+    largestSpanM: roundedMetres(largest),
     overhangM: {
-      start: overhang.start === null ? null : metres(overhang.start),
-      end: overhang.end === null ? null : metres(overhang.end),
+      start: overhang.start === null ? null : roundedMetres(overhang.start),
+      end: overhang.end === null ? null : roundedMetres(overhang.end),
     },
     supports: arcs.length,
     unattached: unattached.length,
@@ -212,9 +211,8 @@ export const checkPipeSupports = defineCommand({
       return noop(doc, 'check_pipe_supports failed: spanFactor must be a number > 0.');
     if (!isNonNegativeNumber(overhangRatio))
       return noop(doc, 'check_pipe_supports failed: overhangRatio must be a number >= 0.');
-    const building = getBuilding(doc);
-    if (params.levelId !== undefined && !building.levels[params.levelId])
-      return noop(doc, `check_pipe_supports failed: no level '${params.levelId}'.`);
+    const unknownLevel = unknownLevelFailure(doc, 'check_pipe_supports', params.levelId);
+    if (unknownLevel) return unknownLevel;
     const units = modelUnits(doc);
     const runs = pipeRunsOf(units);
     const selected = runs.filter(
@@ -264,15 +262,13 @@ export const checkPipeSupports = defineCommand({
       failing,
       (row) => `${row.mark}${row.line === '' ? '' : ` ${row.line}`} (${row.issues[0] ?? ''})`,
     );
-    return {
-      document: doc,
-      summary:
-        `Pipe support check (span table × ${spanFactor}): ${pipes.length} pipe(s), ${pipes.length - failing.length} ok` +
+    return report(
+      doc,
+      `Pipe support check (span table × ${spanFactor}): ${pipes.length} pipe(s), ${pipes.length - failing.length} ok` +
         (failing.length === 0 ? '' : `, ${failing.length} failing: ${list}`) +
         (unattached > 0 ? `; ${unattached} unattached support(s)` : '') +
         '.',
-      affected: [],
-      data: {
+      {
         ok: failing.length === 0,
         pipes,
         failures: failing.map((row) => row.id),
@@ -288,6 +284,6 @@ export const checkPipeSupports = defineCommand({
         csv,
         assumptions: ASSUMPTIONS,
       },
-    };
+    );
   },
 });

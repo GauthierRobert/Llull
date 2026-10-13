@@ -4,7 +4,7 @@
 
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from '../frames/frameLoadParams';
 import { DEFAULT_TIE_CAPACITY } from './foundationModel';
 import { SOIL_SHAPE, soilInputs } from './soilParams';
@@ -98,10 +98,9 @@ export const foundationCheck = defineCommand({
       );
     }
     const failureIds = [...new Set(failures.map((row) => row.elementId))];
-    return {
-      document: doc,
-      summary:
-        `Checked ${footings} footing(s) and ${plates} base plate(s) on level '${levelId}' ` +
+    return report(
+      doc,
+      `Checked ${footings} footing(s) and ${plates} base plate(s) on level '${levelId}' ` +
         `(${describeLoads(loads)}, soil ${soilBearing} kPa, Es ${soilModulus} MPa, ${thrustTie ? `thrust taken by a tie / slab (capacity ${tieCapacity} kN)` : 'thrust resisted by pad friction'}): ${rows.length} check(s), ` +
         (unchecked > 0
           ? `${unchecked} footing(s) not checked (no analysed frame column, e.g. gable posts); `
@@ -112,13 +111,12 @@ export const foundationCheck = defineCommand({
           (row) => `${row.column} ${row.check}`,
           'all OK (no reinforcement check).',
         ),
-      affected: [],
-      data: {
+      {
         rows,
         csv,
         maxUtilisation: worstRow.utilisation,
         failures: failureIds,
       },
-    };
+    );
   },
 });

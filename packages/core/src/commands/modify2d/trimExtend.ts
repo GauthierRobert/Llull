@@ -1,8 +1,9 @@
 import type { CadDocument, LineEntity, Vec2 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
-import { len2, sub2 } from '../../lib/vec2';
-import { segIntersect, evalLine } from './geometry';
+import { lerp2, len2, sub2 } from '../../lib/vec2';
+import { lineIntersectionParams } from '../../lib/polygon';
+import { entityOfKind } from '../entity/entityOfKind';
 import { changed, noop } from '../noop';
 import { replaceEntity } from '../entity/entityOps';
 
@@ -22,18 +23,10 @@ function resolveLinePair(
 ): { line: LineEntity; boundary: LineEntity } | CommandResult {
   if (id === boundaryId)
     return noop(doc, `${command}: id and boundaryId must be different entities.`);
-  const line = doc.entities[id];
-  const boundary = doc.entities[boundaryId];
-  if (!line) return noop(doc, `${command}: entity ${id} not found.`);
-  if (!boundary) return noop(doc, `${command}: boundary entity ${boundaryId} not found.`);
-  if (line.kind !== 'line')
-    return noop(doc, `${command}: entity ${id} is kind '${line.kind}', expected 'line'.`);
-  if (boundary.kind !== 'line') {
-    return noop(
-      doc,
-      `${command}: boundary ${boundaryId} is kind '${boundary.kind}', expected 'line'.`,
-    );
-  }
+  const line = entityOfKind(doc, id, ['line']);
+  if (typeof line === 'string') return noop(doc, `${command}: ${line}.`);
+  const boundary = entityOfKind(doc, boundaryId, ['line']);
+  if (typeof boundary === 'string') return noop(doc, `${command}: boundary ${boundary}.`);
   return { line, boundary };
 }
 
@@ -50,7 +43,7 @@ function moveEndpointToBoundary(
   const pair = resolveLinePair(doc, command, id, boundaryId);
   if ('summary' in pair) return pair;
   const { line, boundary } = pair;
-  const hit = segIntersect(line.start, line.end, boundary.start, boundary.end);
+  const hit = lineIntersectionParams(line.start, line.end, boundary.start, boundary.end);
   if (hit === null)
     return noop(doc, `${command}: lines ${id} and ${boundaryId} are parallel — no intersection.`);
   if (
@@ -62,7 +55,7 @@ function moveEndpointToBoundary(
       `${command}: intersection of ${id} and ${boundaryId} is outside segment bounds.`,
     );
   }
-  const point = evalLine(line.start, line.end, hit.t);
+  const point = lerp2(line.start, line.end, hit.t);
   const done =
     command === 'trim'
       ? `Trimmed line ${id} to intersection with ${boundaryId}`

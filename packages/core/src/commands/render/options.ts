@@ -8,6 +8,7 @@ import type { CadDocument, Vec3 } from '../../model/types';
 import { isValidCut } from './clip';
 import { MAX_POLYGONS } from './budget';
 import type { CutSpec, RenderOptions, RenderViewData } from './types';
+import { clamp } from '../../lib/clamp';
 
 const COLOR_PATTERN = /^(#[0-9a-fA-F]{3,8}|[a-zA-Z]{3,20}|(rgb|hsl)a?\([0-9.,%\s/-]+\))$/;
 const MAX_CUT_PLANES = 6;
@@ -53,7 +54,7 @@ export function resolveRenderOptions(
   const options: RenderOptions = {};
   if (params.zoom !== undefined) {
     if (!Number.isFinite(params.zoom) || params.zoom <= 0) return { error: 'zoom must be > 0' };
-    options.zoom = Math.max(0.1, Math.min(50, params.zoom));
+    options.zoom = clamp(params.zoom, 0.1, 50);
   }
   if (params.direction !== undefined) {
     const [x, y, z] = params.direction;
@@ -73,7 +74,7 @@ export function resolveRenderOptions(
     options.background = params.background.trim();
   }
   if (params.maxPolygons !== undefined && Number.isFinite(params.maxPolygons)) {
-    options.maxPolygons = Math.max(500, Math.min(100000, Math.round(params.maxPolygons)));
+    options.maxPolygons = clamp(Math.round(params.maxPolygons), 500, 100000);
   }
   if (params.cut !== undefined) {
     const problem = validateCut(doc, params.cut);

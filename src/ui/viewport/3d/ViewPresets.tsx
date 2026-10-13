@@ -12,16 +12,16 @@
  * Purely presentational: reads the store and never mutates the document (PRIME DIRECTIVE).
  */
 
-import React, { useEffect } from 'react';
-import { useThree } from '@react-three/fiber';
+import React from 'react';
 import * as THREE from 'three';
-import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useStore } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
 import { NamedViewsOverlay } from './NamedViews';
 import { computeFitFraming } from './fitBounds';
-import { toRenderPosition } from './floatingOrigin';
+import { getAspect, placeCamera } from './cameraBridge';
 import { PRESET_DIRECTIONS, type PresetDirection, type PresetName } from './viewPresetDirections';
+
+const ORIGIN: readonly [number, number, number] = [0, 0, 0];
 
 const PRESETS: ReadonlyArray<{ name: PresetName; label: string }> = [
   { name: 'front', label: 'Front' },
@@ -30,54 +30,6 @@ const PRESETS: ReadonlyArray<{ name: PresetName; label: string }> = [
   { name: 'iso', label: 'Iso' },
 ];
 
-type ApplyPreset = (direction: PresetDirection, target: THREE.Vector3, distance: number) => void;
-
-// Module-level bridge between the inner (Canvas) and outer (DOM) layers: r3f has no portals or
-// context across the Canvas boundary. Holds ONLY the camera driver registered by
-// ViewPresetsInner; it never touches the document.
-const bridge: { applyPreset: ApplyPreset | null; getAspect: (() => number) | null } = {
-  applyPreset: null,
-  getAspect: null,
-};
-
-/** Mounted INSIDE the r3f Canvas (useThree); registers the camera driver for the overlay. */
-export function ViewPresetsInner(): null {
-  const { camera, controls, invalidate, get } = useThree();
-
-  useEffect(() => {
-    bridge.applyPreset = (direction, target, distance) => {
-      const orbit = controls as OrbitControlsImpl | null;
-      if (!orbit) return;
-
-      const dir = new THREE.Vector3(direction[0], direction[1], direction[2]).normalize();
-      // `target` is world space; the camera lives in render space (world − renderOrigin).
-      const renderTarget = new THREE.Vector3(
-        ...toRenderPosition([target.x, target.y, target.z], useStore.getState().renderOrigin),
-      );
-
-      camera.up.set(0, 0, 1);
-      camera.position.copy(renderTarget.clone().addScaledVector(dir, distance));
-      camera.lookAt(renderTarget);
-      orbit.target.copy(renderTarget);
-
-      // Must call both update() and invalidate() under frameloop="demand".
-      orbit.update();
-      invalidate();
-    };
-    bridge.getAspect = () => {
-      const { width, height } = get().size;
-      return height > 0 ? width / height : 1;
-    };
-    // Unregister on unmount so a stale closure over a disposed camera cannot fire after teardown.
-    return () => {
-      bridge.applyPreset = null;
-      bridge.getAspect = null;
-    };
-  }, [camera, controls, invalidate, get]);
-
-  return null;
-}
-
 /** Rendered OUTSIDE the Canvas as a DOM overlay. */
 export function ViewPresetsOverlay(): React.ReactElement {
   const selection = useStore((s) => s.document.selection);
@@ -85,13 +37,14 @@ export function ViewPresetsOverlay(): React.ReactElement {
 
   /** View `ids` from `direction`, framed to fit; nothing to frame -> origin from distance 10. */
   const frame = (direction: PresetDirection, ids: string[]): void => {
-    const framing = computeFitFraming(useStore.getState().document, ids, bridge.getAspect?.() ?? 1);
-    if (!framing) {
-      bridge.applyPreset?.(direction, new THREE.Vector3(), 10);
-      return;
-    }
-    const [x, y, z] = framing.center;
-    bridge.applyPreset?.(direction, new THREE.Vector3(x, y, z), framing.distance);
+    const framing = computeFitFraming(useStore.getState().document, ids, getAspect());
+    const center = framing?.center ?? ORIGIN;
+    const distance = framing?.distance ?? 10;
+    const eye = new THREE.Vector3(...direction)
+      .normalize()
+      .multiplyScalar(distance)
+      .add(new THREE.Vector3(...center));
+    placeCamera([eye.x, eye.y, eye.z], center);
   };
   const fit = (ids: string[]): void => {
     if (ids.length > 0) frame(PRESET_DIRECTIONS.iso, ids);

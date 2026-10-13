@@ -6,13 +6,14 @@ import type { CadDocument } from '@core/model/types';
 import { PURLIN_LOAD_SHAPE } from './purlinLoadParams';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { existingLevelId, getBuilding } from '../../building/model';
-import { noop } from '@core/commands/noop';
+import { levelOrFailure } from '../../building/levelLookup';
+import { noop, report } from '@core/commands/noop';
 import { isNonNegativeNumber } from '@lib/isFiniteNumber';
 import type { PurlinRow } from './purlinModel';
 import { analysePurlins, locatePurlinMembers } from './purlinAnalysis';
 import { round } from '../../shared/numeric';
 import { LIMIT_COLUMNS, checkTable, failureSummary, limitCells } from '../reports/checkReport';
+import { maxUtilisation } from '../common/utilisation';
 
 /**
  * @command check_purlins
@@ -66,9 +67,8 @@ export const checkPurlins = defineCommand({
         'check_purlins failed: windPressure, snowLoad and roofDeadLoad must be >= 0.',
       );
     }
-    const levelId = existingLevelId(getBuilding(doc), params.levelId);
-    if (levelId === undefined)
-      return noop(doc, `check_purlins failed: no level '${params.levelId ?? ''}'.`);
+    const levelId = levelOrFailure(doc, 'check_purlins', params.levelId);
+    if (typeof levelId !== 'string') return levelId;
     const { members, skipped } = locatePurlinMembers(doc, levelId);
     const analysis = analysePurlins(members, levelId, { windPressure, snowLoad, roofDeadLoad });
     if ('reason' in analysis) return noop(doc, analysis.reason);
@@ -79,20 +79,17 @@ export const checkPurlins = defineCommand({
       (row, status) => [row.mark, row.kind, row.zone, round(row.span), ...limitCells(row, status)],
     );
     const purlinRows = rows.filter((row) => row.kind === 'purlin');
-    const maxOf = (list: readonly PurlinRow[]): number =>
-      round(Math.max(0, ...list.map((row) => row.utilisation)));
-    return {
-      document: doc,
-      summary:
-        `Purlin check (qp ${windPressure} kN/m², S ${snowLoad}, roof G ${roofDeadLoad}): ` +
+    const maxOf = (list: readonly PurlinRow[]): number => round(maxUtilisation(list));
+    return report(
+      doc,
+      `Purlin check (qp ${windPressure} kN/m², S ${snowLoad}, roof G ${roofDeadLoad}): ` +
         `${purlinRows.length} purlin(s), ${rows.length - purlinRows.length} rail(s), simply supported per bay; ` +
         `max utilisation purlins ${maxOf(purlinRows)}, rails ${maxOf(rows.filter((row) => row.kind === 'rail'))} ` +
         `(governing ${worst?.mark ?? '—'} ${worst?.kind ?? ''} zone ${worst?.zone ?? '—'}: ${worst?.check ?? '—'}); ` +
         `e = ${round(eAcross / 1000, 1)} m across / ${round(eAlong / 1000, 1)} m along the ridge; ` +
         failureSummary(failures, (row) => `${row.mark} ${row.kind}`, 'all OK (preliminary).') +
         (skipped.length > 0 ? ` Not checked: ${skipped.join(', ')}.` : ''),
-      affected: [],
-      data: {
+      {
         rows,
         csv,
         maxUtilisation: worst?.utilisation ?? 0,
@@ -102,6 +99,6 @@ export const checkPurlins = defineCommand({
         edgeDistanceAcrossRidge: eAcross,
         edgeDistanceAlongRidge: eAlong,
       },
-    };
+    );
   },
 });

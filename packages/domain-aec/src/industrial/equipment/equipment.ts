@@ -8,7 +8,6 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, looseVec2, vec3, z } from '@core/commands/schema';
 import { fromMm, toMetres } from '@core/model/units';
 import {
-  elementAffected,
   getBuilding,
   isVec2,
   nextElementId,
@@ -19,7 +18,7 @@ import {
 } from '../../building/model';
 import { noop } from '@core/commands/noop';
 import { duplicateSummary, findTwin, samePath } from '../../shared/duplicates';
-import { regenerateBuilding } from '../../building/evaluate/evaluateElements';
+import { commitBuilding } from '../../building/evaluate/evaluateElements';
 import {
   SHAPE_PARAM_TEXT,
   describeEquipmentShape,
@@ -108,15 +107,14 @@ export const addEquipment = defineCommand({
       clearance: resolvedClearance,
       weight,
     };
-    const document = regenerateBuilding(doc, withElement(resolution.building, equipment));
-    return {
-      document,
-      summary:
-        `Added equipment ${equipment.mark} "${equipment.name}" (${equipment.id}) ${describeEquipmentShape(shape, dimensions, doc.units)}, ` +
+    return commitBuilding(
+      doc,
+      withElement(resolution.building, equipment),
+      [equipment.id],
+      `Added equipment ${equipment.mark} "${equipment.name}" (${equipment.id}) ${describeEquipmentShape(shape, dimensions, doc.units)}, ` +
         `clearance ${resolvedClearance}${weight > 0 ? `, ${weight} kg` : ''}.`,
-      affected: elementAffected(document, [equipment.id]),
-      data: { elementId: equipment.id },
-    };
+      { elementId: equipment.id },
+    );
   },
 });
 
@@ -216,18 +214,17 @@ export const addPipeRun = defineCommand({
       ...(origin !== undefined ? { from: origin } : {}),
       ...(destination !== undefined ? { to: destination } : {}),
     };
-    const document = regenerateBuilding(doc, withElement(resolution.building, pipe));
     const length = routeLength(path);
     const label = `${lineNumber !== undefined ? ` line ${lineNumber}` : ''}${dn !== undefined ? ` DN${dn}` : ''}`;
     const ends = origin !== undefined || destination !== undefined;
-    return {
-      document,
-      summary:
-        `Added ${pipe.service} pipe ${pipe.mark} (${pipe.id})${label} Ø${resolvedDiameter}, ` +
+    return commitBuilding(
+      doc,
+      withElement(resolution.building, pipe),
+      [pipe.id],
+      `Added ${pipe.service} pipe ${pipe.mark} (${pipe.id})${label} Ø${resolvedDiameter}, ` +
         `${toMetres(doc, length).toFixed(2)} m, ${path.length - 2} bend(s)` +
         `${ends ? `, ${origin ?? '?'} → ${destination ?? '?'}` : ''}.`,
-      affected: elementAffected(document, [pipe.id]),
-      data: { elementId: pipe.id },
-    };
+      { elementId: pipe.id },
+    );
   },
 });

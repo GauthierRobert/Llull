@@ -5,11 +5,15 @@
  */
 
 import { escapeXml } from '@lib/escapeXml';
-import { round } from '../../shared/numeric';
+import { n, svgPoints } from '../../shared/sheetFrame';
 
 type Point = readonly [number, number];
 
-export const num = (value: number): string => String(round(value));
+/** Long-section plot frame shared by road and drainage profiles (SVG user units). */
+export const PLOT_LEFT = 90;
+export const PLOT_TOP = 60;
+export const PLOT_ROW_HEIGHT = 16;
+export const PLOT_MAX_WIDTH = 1000;
 
 export interface TextStyle {
   readonly size?: number;
@@ -20,11 +24,9 @@ export interface TextStyle {
 }
 
 export function svgText(x: number, y: number, content: string, style: TextStyle = {}): string {
-  const rotate = style.rotate
-    ? ` transform="rotate(${num(style.rotate)} ${num(x)} ${num(y)})"`
-    : '';
+  const rotate = style.rotate ? ` transform="rotate(${n(style.rotate)} ${n(x)} ${n(y)})"` : '';
   return (
-    `<text x="${num(x)}" y="${num(y)}" font-family="monospace" font-size="${style.size ?? 10}" ` +
+    `<text x="${n(x)}" y="${n(y)}" font-family="monospace" font-size="${style.size ?? 10}" ` +
     `text-anchor="${style.anchor ?? 'start'}" fill="${style.fill ?? '#222'}"` +
     `${style.weight === 'bold' ? ' font-weight="bold"' : ''}${rotate}>${escapeXml(content)}</text>`
   );
@@ -32,13 +34,13 @@ export function svgText(x: number, y: number, content: string, style: TextStyle 
 
 export function svgLine(a: Point, b: Point, stroke = '#999', width = 1, dash?: string): string {
   return (
-    `<line x1="${num(a[0])}" y1="${num(a[1])}" x2="${num(b[0])}" y2="${num(b[1])}" ` +
+    `<line x1="${n(a[0])}" y1="${n(a[1])}" x2="${n(b[0])}" y2="${n(b[1])}" ` +
     `stroke="${stroke}" stroke-width="${width}"${dash ? ` stroke-dasharray="${dash}"` : ''}/>`
   );
 }
 
 export function svgPolyline(points: ReadonlyArray<Point>, stroke: string, width = 1.5): string {
-  const list = points.map((p) => `${num(p[0])},${num(p[1])}`).join(' ');
+  const list = svgPoints(points);
   return `<polyline points="${list}" fill="none" stroke="${stroke}" stroke-width="${width}"/>`;
 }
 
@@ -50,18 +52,18 @@ export function svgRect(
   stroke = '#444',
   fill = 'none',
 ): string {
-  return `<rect x="${num(x)}" y="${num(y)}" width="${num(w)}" height="${num(h)}" stroke="${stroke}" fill="${fill}"/>`;
+  return `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" stroke="${stroke}" fill="${fill}"/>`;
 }
 
 export function svgPolygon(points: ReadonlyArray<Point>, fill: string): string {
-  const list = points.map((p) => `${num(p[0])},${num(p[1])}`).join(' ');
+  const list = svgPoints(points);
   return `<polygon points="${list}" fill="${fill}" fill-opacity="0.35" stroke="none"/>`;
 }
 
 export function svgDocument(width: number, height: number, body: ReadonlyArray<string>): string {
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${num(width)}" height="${num(height)}" ` +
-    `viewBox="0 0 ${num(width)} ${num(height)}"><rect width="100%" height="100%" fill="#fff"/>` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${n(width)}" height="${n(height)}" ` +
+    `viewBox="0 0 ${n(width)} ${n(height)}"><rect width="100%" height="100%" fill="#fff"/>` +
     `${body.join('')}</svg>`
   );
 }

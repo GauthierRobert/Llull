@@ -12,34 +12,23 @@
 
 import type { Vec3 } from '../../model/types';
 import type { ShapeEdge, ShapeTopology } from '../../geometry/kernel';
+import { clamp01 } from '../../lib/clamp';
+import { distanceSq3, dot3, lerp3, sub3 } from '../../lib/vec3';
 
 const roundable = (edge: ShapeEdge): boolean => !edge.seam && !edge.degenerate;
 
-const distanceSquared = (a: Vec3, b: Vec3): number =>
-  (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
-
 /** Squared distance from `point` to the segment a-b. */
 function segmentDistanceSquared(point: Vec3, a: Vec3, b: Vec3): number {
-  const ab: Vec3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
-  const lengthSquared = ab[0] ** 2 + ab[1] ** 2 + ab[2] ** 2;
-  const t =
-    lengthSquared === 0
-      ? 0
-      : Math.min(
-          1,
-          Math.max(
-            0,
-            ((point[0] - a[0]) * ab[0] + (point[1] - a[1]) * ab[1] + (point[2] - a[2]) * ab[2]) /
-              lengthSquared,
-          ),
-        );
-  return distanceSquared(point, [a[0] + ab[0] * t, a[1] + ab[1] * t, a[2] + ab[2] * t]);
+  const ab = sub3(b, a);
+  const lengthSquared = dot3(ab, ab);
+  const t = lengthSquared === 0 ? 0 : clamp01(dot3(sub3(point, a), ab) / lengthSquared);
+  return distanceSq3(point, lerp3(a, b, t));
 }
 
 /** Squared distance from `point` to the edge (its sample polyline; start-mid-end when unsampled). */
 function edgeDistanceSquared(edge: ShapeEdge, point: Vec3): number {
   const path = edge.samples ?? [edge.start, edge.mid, edge.end];
-  let best = distanceSquared(path[0] ?? edge.mid, point);
+  let best = distanceSq3(path[0] ?? edge.mid, point);
   for (let k = 1; k < path.length; k++) {
     const [a, b] = [path[k - 1], path[k]];
     if (a !== undefined && b !== undefined)
@@ -61,7 +50,7 @@ function nearestEdge(topology: ShapeTopology, point: Vec3): number | undefined {
     const candidate = {
       edge,
       distance: edgeDistanceSquared(edge, point),
-      mid: distanceSquared(edge.mid, point),
+      mid: distanceSq3(edge.mid, point),
     };
     if (
       best === undefined ||

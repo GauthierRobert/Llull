@@ -11,7 +11,7 @@ import type { CadDocument, Component, InstanceEntity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { rotatedEntityBounds } from '@core/geometry/rotatedBounds';
 import { expandInstance } from '@core/geometry/instanceExpansion';
-import { expectNoOp } from '../helpers/expectNoOp';
+import { expectNoOp, expectPure } from '../helpers/expectNoOp';
 
 interface Comp {
   doc: CadDocument;
@@ -45,12 +45,6 @@ function withSecondInstance(
 ): Comp & { inst2Id: string } {
   const inst2 = execute(c.doc, 'insert_instance', { componentId: c.componentId, position });
   return { ...c, doc: inst2.document, inst2Id: inst2.affected[0]! };
-}
-
-function expectPure(doc: CadDocument, run: () => unknown): void {
-  const snapshot = JSON.stringify(doc);
-  run();
-  expect(JSON.stringify(doc)).toBe(snapshot);
 }
 
 describe('assemblies', () => {
@@ -285,7 +279,7 @@ describe('assemblies', () => {
 
   it('explode_instance on a non-instance entity is a graceful no-op', () => {
     const doc = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
-    expectNoOp(execute(doc, 'explode_instance', { id: doc.order[0]! }), doc, 'not an instance');
+    expectNoOp(execute(doc, 'explode_instance', { id: doc.order[0]! }), doc, "expected 'instance'");
   });
 
   it('explode_instance on a missing id is a graceful no-op', () => {

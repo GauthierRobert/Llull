@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { segmentIntersection, type Segment } from '../../src/ui/viewport/2d/snapping/geometry';
+import { segmentIntersection } from '@lib/polygon';
+import type { Segment } from '../../src/ui/viewport/2d/snapping/geometry';
 import { allSegmentIntersections } from '../../src/ui/viewport/2d/snapping/segmentSweep';
 
 const key = (p: [number, number]): string => `${p[0].toFixed(6)},${p[1].toFixed(6)}`;
@@ -8,8 +9,10 @@ function bruteForce(segments: ReadonlyArray<Segment>): Array<[number, number]> {
   const found: Array<[number, number]> = [];
   for (let i = 0; i < segments.length; i++) {
     for (let j = i + 1; j < segments.length; j++) {
-      const point = segmentIntersection(...(segments[i] as Segment), ...(segments[j] as Segment));
-      if (point) found.push(point);
+      const [ax, ay, bx, by] = segments[i] as Segment;
+      const [cx, cy, dx, dy] = segments[j] as Segment;
+      const point = segmentIntersection([ax, ay], [bx, by], [cx, cy], [dx, dy]);
+      if (point) found.push([point[0], point[1]]);
     }
   }
   return found;

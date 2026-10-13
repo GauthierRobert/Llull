@@ -1,15 +1,29 @@
 /** Pure planar polygon / segment helpers. @layer lib */
 
-export type Point2 = readonly [number, number];
+import { clamp01 } from './clamp';
+import type { Vec2 } from '../model/vectors';
+import { centroid2, lerp2, orient2 } from './vec2';
+
+export type Point2 = Vec2;
+
+/** Calls `visit(x1, y1, x2, y2, cross)` for each closed-polygon edge; cross = x1*y2 - x2*y1. */
+function forEachEdge(
+  points: ReadonlyArray<Point2>,
+  visit: (x1: number, y1: number, x2: number, y2: number, cross: number) => void,
+): void {
+  for (let i = 0; i < points.length; i++) {
+    const [x1, y1] = points[i] as Point2;
+    const [x2, y2] = points[(i + 1) % points.length] as Point2;
+    visit(x1, y1, x2, y2, x1 * y2 - x2 * y1);
+  }
+}
 
 /** Signed shoelace area; > 0 when counter-clockwise. */
 export function signedArea(points: ReadonlyArray<Point2>): number {
   let twiceArea = 0;
-  for (let i = 0; i < points.length; i++) {
-    const [x1, y1] = points[i] as Point2;
-    const [x2, y2] = points[(i + 1) % points.length] as Point2;
-    twiceArea += x1 * y2 - x2 * y1;
-  }
+  forEachEdge(points, (_x1, _y1, _x2, _y2, cross) => {
+    twiceArea += cross;
+  });
   return twiceArea / 2;
 }
 
@@ -30,18 +44,14 @@ export function polygonPerimeter(points: ReadonlyArray<Point2>): number {
 export function polygonCentroid(points: ReadonlyArray<Point2>): Point2 {
   const area = signedArea(points);
   if (Math.abs(area) < 1e-12) {
-    const sum = points.reduce<[number, number]>((acc, [x, y]) => [acc[0] + x, acc[1] + y], [0, 0]);
-    return [sum[0] / Math.max(points.length, 1), sum[1] / Math.max(points.length, 1)];
+    return centroid2(points);
   }
   let cx = 0;
   let cy = 0;
-  for (let i = 0; i < points.length; i++) {
-    const [x1, y1] = points[i] as Point2;
-    const [x2, y2] = points[(i + 1) % points.length] as Point2;
-    const cross = x1 * y2 - x2 * y1;
+  forEachEdge(points, (x1, y1, x2, y2, cross) => {
     cx += (x1 + x2) * cross;
     cy += (y1 + y2) * cross;
-  }
+  });
   return [cx / (6 * area), cy / (6 * area)];
 }
 
@@ -71,7 +81,7 @@ export function projectOntoSegment(
   const dy = b[1] - a[1];
   const lengthSquared = dx * dx + dy * dy;
   const rawT = lengthSquared === 0 ? 0 : ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / lengthSquared;
-  const t = Math.min(1, Math.max(0, rawT));
+  const t = clamp01(rawT);
   return { distance: distance(p, [a[0] + t * dx, a[1] + t * dy]), t };
 }
 
@@ -107,16 +117,44 @@ export function offsetPolygon(points: ReadonlyArray<Point2>, delta: number): Poi
   });
 }
 
+/**
+ * Parameters `{ t, u }` of the crossing of the infinite lines P(t) = p + t(q − p) and
+ * Q(u) = r + u(s − r), or null when parallel/collinear. t and u are not clamped to [0, 1].
+ */
+export function lineIntersectionParams(
+  p: Point2,
+  q: Point2,
+  r: Point2,
+  s: Point2,
+): { t: number; u: number } | null {
+  const dx1 = q[0] - p[0];
+  const dy1 = q[1] - p[1];
+  const dx2 = s[0] - r[0];
+  const dy2 = s[1] - r[1];
+  const denom = dx1 * dy2 - dy1 * dx2;
+  if (Math.abs(denom) < 1e-12) return null;
+  const dx3 = r[0] - p[0];
+  const dy3 = r[1] - p[1];
+  return { t: (dx3 * dy2 - dy3 * dx2) / denom, u: (dx3 * dy1 - dy3 * dx1) / denom };
+}
+
 /** Intersection of the infinite lines a1→a2 and b1→b2, or null when parallel. */
-function lineIntersection(a1: Point2, a2: Point2, b1: Point2, b2: Point2): Point2 | null {
-  const d1x = a2[0] - a1[0];
-  const d1y = a2[1] - a1[1];
-  const d2x = b2[0] - b1[0];
-  const d2y = b2[1] - b1[1];
-  const denominator = d1x * d2y - d1y * d2x;
-  if (Math.abs(denominator) < 1e-12) return null;
-  const t = ((b1[0] - a1[0]) * d2y - (b1[1] - a1[1]) * d2x) / denominator;
-  return [a1[0] + t * d1x, a1[1] + t * d1y];
+export function lineIntersection(a1: Point2, a2: Point2, b1: Point2, b2: Point2): Point2 | null {
+  const hit = lineIntersectionParams(a1, a2, b1, b2);
+  return hit === null ? null : lerp2(a1, a2, hit.t);
+}
+
+/** Crossing point of segments a1–a2 and b1–b2 (ends included), or null when parallel or apart. */
+export function segmentIntersection(a1: Point2, a2: Point2, b1: Point2, b2: Point2): Point2 | null {
+  const rx = a2[0] - a1[0];
+  const ry = a2[1] - a1[1];
+  const sx = b2[0] - b1[0];
+  const sy = b2[1] - b1[1];
+  const denominator = rx * sy - ry * sx;
+  if (Math.abs(denominator) < 1e-10) return null;
+  const t = ((b1[0] - a1[0]) * sy - (b1[1] - a1[1]) * sx) / denominator;
+  const u = ((b1[0] - a1[0]) * ry - (b1[1] - a1[1]) * rx) / denominator;
+  return t >= 0 && t <= 1 && u >= 0 && u <= 1 ? [a1[0] + t * rx, a1[1] + t * ry] : null;
 }
 
 /** Even-odd point-in-polygon test (points on the boundary may go either way). */
@@ -137,11 +175,9 @@ export function pointInPolygon(point: Point2, polygon: ReadonlyArray<Point2>): b
 
 /** True when segments a1–a2 and b1–b2 cross at a single interior point (touching ends excluded). */
 export function segmentsIntersect(a1: Point2, a2: Point2, b1: Point2, b2: Point2): boolean {
-  const orient = (p: Point2, q: Point2, r: Point2): number =>
-    (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
-  const d1 = orient(b1, b2, a1);
-  const d2 = orient(b1, b2, a2);
-  const d3 = orient(a1, a2, b1);
-  const d4 = orient(a1, a2, b2);
+  const d1 = orient2(b1, b2, a1);
+  const d2 = orient2(b1, b2, a2);
+  const d3 = orient2(a1, a2, b1);
+  const d4 = orient2(a1, a2, b2);
   return d1 * d2 < 0 && d3 * d4 < 0;
 }

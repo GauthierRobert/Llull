@@ -2,13 +2,13 @@
  * Pre-engineered steel hall generator (portal frames) and crane runways.
  * @layer domain-aec
  */
+import { toRadians } from '@lib/angle';
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { BuildingModel, SlabElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, vec2, z } from '@core/commands/schema';
 import { fromMm, toMetres } from '@core/model/units';
 import {
-  elementAffected,
   getBuilding,
   nextElementId,
   nextMark,
@@ -16,7 +16,7 @@ import {
   withElement,
 } from '../../building/model';
 import { noop } from '@core/commands/noop';
-import { regenerateBuilding } from '../../building/evaluate/evaluateElements';
+import { commitBuilding } from '../../building/evaluate/evaluateElements';
 import { findProfile, type SteelProfile } from '../../steel/profiles';
 import { appendMembers, type MemberSpec } from '../common/memberSupport';
 import {
@@ -112,13 +112,13 @@ export const addCraneRunway = defineCommand({
     });
     const added = appendMembers(resolution.building, resolution.level.id, specs);
     if ('reason' in added) return noop(doc, `add_crane_runway failed: ${added.reason}.`);
-    const document = regenerateBuilding(doc, added.building);
-    return {
-      document,
-      summary: `Added crane runway (${capacity} t): ${specs.filter((spec) => spec.role === 'crane').length} beam segment(s) ${profile.name}, ${specs.filter((spec) => spec.role !== 'crane').length} bracket(s).`,
-      affected: elementAffected(document, added.ids),
-      data: { elementIds: added.ids },
-    };
+    return commitBuilding(
+      doc,
+      added.building,
+      added.ids,
+      `Added crane runway (${capacity} t): ${specs.filter((spec) => spec.role === 'crane').length} beam segment(s) ${profile.name}, ${specs.filter((spec) => spec.role !== 'crane').length} bracket(s).`,
+      { elementIds: added.ids },
+    );
   },
 });
 
@@ -140,28 +140,16 @@ export const addPortalFrameBuilding = defineCommand({
   run: (doc, params): CommandResult => {
     const inputs = portalInputs(doc, params);
     if ('reason' in inputs) return noop(doc, inputs.reason);
-    const {
-      mm,
-      origin,
-      span,
-      spanCount,
-      hallLength,
-      targetBay,
-      eave,
-      pitchDegrees,
-      purlinSpacing,
-      railSpacing,
-      roofType,
-      columnBase,
-      profiles: p,
-    } = inputs;
+    const { mm, origin, profiles: p, columnBase } = inputs;
+    const { span, spanCount, hallLength, targetBay, eave } = inputs;
+    const { pitchDegrees, purlinSpacing, railSpacing, roofType } = inputs;
     const resolution = resolveLevel(doc, getBuilding(doc), params.levelId);
     if (!resolution.ok) return noop(doc, `add_portal_frame_building failed: ${resolution.reason}.`);
     const levelId = resolution.level.id;
 
     const bays = Math.max(1, Math.round(hallLength / targetBay));
     const bay = hallLength / bays;
-    const pitch = (pitchDegrees * Math.PI) / 180;
+    const pitch = toRadians(pitchDegrees);
     const estimatedMembers =
       bays *
       (6 * spanCount +
@@ -324,28 +312,27 @@ export const addPortalFrameBuilding = defineCommand({
         }
       }
     }
-    const document = regenerateBuilding(doc, building);
     const tonnes = steelMass(doc, building, ids) / 1000;
     const memberCount = ids.filter((id) => id.startsWith('member-')).length;
     const gridCount = ids.filter((id) => id.startsWith('grid-')).length;
-    return {
-      document,
-      summary:
-        `Added portal-frame hall ${toMetres(doc, totalWidth).toFixed(1)} × ${toMetres(doc, hallLength).toFixed(1)} m` +
+    return commitBuilding(
+      doc,
+      building,
+      ids,
+      `Added portal-frame hall ${toMetres(doc, totalWidth).toFixed(1)} × ${toMetres(doc, hallLength).toFixed(1)} m` +
         `${spanWidths.length > 1 ? ` (${spanWidths.length} spans)` : ''}, ` +
         `${bays + 1} frames at ${toMetres(doc, bay).toFixed(2)} m, eaves ${toMetres(doc, eave).toFixed(2)} m, ${monopitch ? 'high eaves' : 'ridge'} ${toMetres(doc, ridge).toFixed(2)} m: ` +
         `${memberCount} steel members (${tonnes.toFixed(1)} t)` +
         `${monopitch ? ', monopitch roof' : ''}${columnBase === 'fixed' ? ', fixed column bases' : ''}` +
         `${params.crane ? `, crane runway ${params.crane.capacity ?? 10} t` : ''}, ${gridCount} grid lines, ${ids.length - memberCount - gridCount} other element(s).`,
-      affected: elementAffected(document, ids),
-      data: {
+      {
         elementIds: ids,
         steelTonnes: tonnes,
         frames: bays + 1,
         baySpacing: bay,
         spans: spanWidths.length,
       },
-    };
+    );
   },
 });
 

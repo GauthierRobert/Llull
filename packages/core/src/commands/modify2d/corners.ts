@@ -8,6 +8,7 @@ import { replaceEntity, withEntity } from '../entity/entityOps';
 import { newEntity } from '../entity/newEntity';
 import { changed, noop, report } from '../noop';
 import { elementAt } from '../../lib/elementAt';
+import { angleFromCosine } from '../../lib/angle';
 
 interface Corner {
   poly: PolylineEntity;
@@ -128,8 +129,7 @@ export const fillet2D = defineCommand({
     const dirPrev = normalize2(toPrev);
     const dirNext = normalize2(toNext);
 
-    const cosA = Math.max(-1, Math.min(1, dot2(dirPrev, dirNext)));
-    const halfAngle = Math.acos(cosA) / 2;
+    const halfAngle = angleFromCosine(dot2(dirPrev, dirNext)) / 2;
 
     if (halfAngle < 1e-9 || Math.abs(halfAngle - Math.PI / 2) < 1e-9) {
       return noop(

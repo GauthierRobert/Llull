@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { createdIn, volumeOf } from '../helpers/fixtureDocument';
 import {
   type CadDocument,
   type SubdivisionEntity,
@@ -17,16 +18,8 @@ const run = (doc: CadDocument, params: object): ReturnType<typeof execute> =>
   execute(doc, 'surface_from_curves', params as Record<string, unknown>);
 
 function created(doc: CadDocument, params: object): { doc: CadDocument; e: SubdivisionEntity } {
-  const result = run(doc, params);
-  expect(result.affected, result.summary).toHaveLength(1);
-  return {
-    doc: result.document,
-    e: result.document.entities[result.affected[0] as string] as SubdivisionEntity,
-  };
+  return createdIn<SubdivisionEntity>(doc, 'surface_from_curves', params);
 }
-
-const volumeOf = (doc: CadDocument, id: string): number =>
-  (execute(doc, 'mass_properties', { entityId: id }).data as { volume: number }).volume;
 
 /** A 10 × 10 square loop, given out of order and partly reversed. */
 const square: Vec3[][] = [

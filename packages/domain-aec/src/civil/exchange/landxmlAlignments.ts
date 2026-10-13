@@ -5,6 +5,8 @@
  * @pure
  */
 
+import { toDegrees } from '@lib/angle';
+import { fixedNumber } from '@lib/compactNumber';
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { AlignmentObject } from '@core/model/civil';
 import { escapeXml } from '@lib/escapeXml';
@@ -21,8 +23,7 @@ type Doc = Pick<CadDocument, 'civil' | 'units'>;
 
 /** Metres with at most 4 decimals (0.1 mm), no trailing zeros, never "-0". */
 export function metres(doc: Doc, value: number): string {
-  const rounded = Number(toMetres(doc, value).toFixed(4));
-  return Object.is(rounded, -0) ? '0' : String(rounded);
+  return fixedNumber(toMetres(doc, value), 4);
 }
 
 /** LandXML points are "northing easting". */
@@ -38,7 +39,7 @@ function spiralXml(doc: Doc, element: SpiralElement): string {
   const radius = Number.isFinite(element.radiusEnd) ? element.radiusEnd : element.radiusStart;
   const theta = element.length / (2 * radius);
   const [totalX, totalY] = clothoidLocal(element.length, radius, element.length);
-  const degrees = Number(((theta * 180) / Math.PI).toFixed(6));
+  const degrees = Number(toDegrees(theta).toFixed(6));
   return (
     `        <Spiral length="${metres(doc, element.length)}" radiusStart="${radiusText(doc, element.radiusStart)}" ` +
     `radiusEnd="${radiusText(doc, element.radiusEnd)}" rot="${element.rotation}" spiType="clothoid" ` +
@@ -59,7 +60,7 @@ function alignmentXml(doc: Doc, alignment: AlignmentObject): string[] {
       );
     }
     if (element.kind === 'spiral') return spiralXml(doc, element);
-    const delta = Number(((element.deflection * 180) / Math.PI).toFixed(6));
+    const delta = Number(toDegrees(element.deflection).toFixed(6));
     return (
       `        <Curve rot="${element.rotation}" crvType="arc" radius="${metres(doc, element.radius)}" ` +
       `delta="${delta}" ${common}><Start>${northEast(doc, element.start)}</Start>` +

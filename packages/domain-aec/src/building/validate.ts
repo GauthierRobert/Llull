@@ -4,7 +4,9 @@
  * @pure
  */
 
+import { isStringArray } from '@lib/isStringArray';
 import { isFiniteNumber, isPositiveNumber } from '@lib/isFiniteNumber';
+import { isVec3 } from '@lib/vec3';
 import { isRecord } from '@lib/isRecord';
 import { MEMBER_LAYER } from './evaluate/entities';
 import { arcThrough } from './geometry/curvedWallGeometry';
@@ -37,23 +39,25 @@ const NUMBERS: Readonly<Record<string, ReadonlyArray<string>>> = {
 
 const CATEGORIES: ReadonlySet<string> = new Set(Object.keys(NUMBERS));
 
-/** Fields that must be strictly positive. */
-const POSITIVE: Readonly<Record<string, ReadonlyArray<string>>> = {
-  wall: ['thickness', 'height'],
-  door: ['width', 'height'],
-  window: ['width', 'height'],
-  slab: ['thickness'],
-  column: ['width', 'depth', 'height'],
-  beam: ['width', 'depth'],
-  stair: ['width', 'riserHeight', 'treadDepth'],
-  footing: ['width', 'length', 'thickness'],
-  panel: ['thickness'],
-  pipe: ['diameter'],
-  tray: ['width', 'height'],
-  plate: ['length', 'width', 'thickness', 'boltCount', 'boltDiameter'],
-  curvedWall: ['thickness', 'height'],
-  connection: ['plateThickness', 'boltRows', 'boltDiameter'],
+/** Numeric fields that may be zero or negative (every other numeric field must be > 0). */
+const SIGNED: Readonly<Record<string, ReadonlyArray<string>>> = {
+  wall: ['baseOffset'],
+  door: ['offset', 'sillHeight'],
+  window: ['offset', 'sillHeight'],
+  slab: ['offset'],
+  beam: ['topOffset'],
+  stair: ['angle', 'riserCount'],
+  member: ['roll'],
+  footing: ['topOffset'],
+  equipment: ['angle', 'clearance', 'weight'],
+  curvedWall: ['baseOffset'],
+  connection: ['haunchLength'],
+  pipeSupport: ['rodLength', 'pedestalHeight'],
 };
+
+/** Fields that must be strictly positive. */
+const positiveFields = (category: string): string[] =>
+  (NUMBERS[category] ?? []).filter((field) => !SIGNED[category]?.includes(field));
 
 /** Plan-point fields each category must carry (categories not listed carry none). */
 const POINTS: Readonly<Record<string, ReadonlyArray<string>>> = {
@@ -70,14 +74,8 @@ const POINTS: Readonly<Record<string, ReadonlyArray<string>>> = {
 const isPoint = (value: unknown): boolean =>
   Array.isArray(value) && value.length >= 2 && value.every(isFiniteNumber);
 
-const isPoint3 = (value: unknown): boolean =>
-  Array.isArray(value) && value.length === 3 && value.every(isFiniteNumber);
-
 const isPolygon = (value: unknown): boolean =>
   Array.isArray(value) && value.length >= 3 && value.every(isPoint);
-
-const isStringArray = (value: unknown): boolean =>
-  Array.isArray(value) && value.every((item) => typeof item === 'string');
 
 type Elements = Record<string, unknown>;
 
@@ -145,7 +143,7 @@ function pipeSupportErrors(key: string, element: Elements, elements: Elements): 
   if (!['shoe', 'hanger', 'guide', 'anchor'].includes(String(element['type']))) {
     errors.push(`building element ${key}: type must be shoe, hanger, guide or anchor`);
   }
-  if (!isPoint3(element['position'])) {
+  if (!isVec3(element['position'])) {
     errors.push(`building element ${key}: position must be [x, y, z]`);
   }
   const memberId = element['memberId'];
@@ -196,7 +194,7 @@ function elementErrors(
       errors.push(`building element ${key}: ${field} must be a finite number`);
     }
   }
-  for (const field of POSITIVE[category] ?? []) {
+  for (const field of positiveFields(category)) {
     const value = element[field];
     if (typeof value === 'number' && !(value > 0))
       errors.push(`building element ${key}: ${field} must be > 0`);
@@ -238,7 +236,7 @@ function elementErrors(
       errors.push(`building element ${key}: openings must be polygons`);
     }
   }
-  if (category === 'member' && (!isPoint3(element['start']) || !isPoint3(element['end']))) {
+  if (category === 'member' && (!isVec3(element['start']) || !isVec3(element['end']))) {
     errors.push(`building element ${key}: start and end must be [x, y, z]`);
   }
   if (category === 'member' && typeof element['profile'] !== 'string') {
@@ -259,7 +257,7 @@ function elementErrors(
   }
   if (
     category === 'equipment' &&
-    !(isPoint3(element['size']) && (element['size'] as number[]).every((n) => n > 0))
+    !(isVec3(element['size']) && element['size'].every((n) => n > 0))
   ) {
     errors.push(`building element ${key}: size must be [length, width, height], all > 0`);
   }
@@ -325,7 +323,7 @@ function elementErrors(
       (category === 'panel' && field === 'corners') ||
       ((category === 'pipe' || category === 'tray') && field === 'points');
     const value = element[field];
-    if (expected && !(Array.isArray(value) && value.length >= minimum && value.every(isPoint3))) {
+    if (expected && !(Array.isArray(value) && value.length >= minimum && value.every(isVec3))) {
       errors.push(`building element ${key}: ${field} must be ≥ ${minimum} [x, y, z] points`);
     }
   }

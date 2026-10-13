@@ -6,6 +6,7 @@ import { offsetSegment, miterJoin, resolvePolyline } from './geometry';
 import { commitEntity } from '../entity/commitEntity';
 import { referenceSuffix, withEntities, withoutEntities } from '../entity/entityOps';
 import { newEntity } from '../entity/newEntity';
+import { entityOfKind } from '../entity/entityOfKind';
 import { changed, noop } from '../noop';
 import { elementAt } from '../../lib/elementAt';
 
@@ -97,8 +98,8 @@ export const offset2D = defineCommand({
       ),
   }),
   run: (doc, { id, distance }): CommandResult => {
-    const entity = doc.entities[id];
-    if (!entity) return noop(doc, `offset_2d: entity ${id} not found.`);
+    const entity = entityOfKind(doc, id);
+    if (typeof entity === 'string') return noop(doc, `offset_2d: ${entity}.`);
     if (distance === 0) return noop(doc, `offset_2d: distance is 0 — no-op.`);
 
     const newId = nextId('offset');
@@ -122,11 +123,10 @@ export const offset2D = defineCommand({
         const pts = entity.points;
         if (pts.length < 2)
           return noop(doc, `offset_2d: polyline ${id} has fewer than 2 points — no-op.`);
-        const segs = pts
-          .slice(0, -1)
-          .map((p, i) => offsetSegment(p, elementAt(pts, i + 1), distance));
-        if (entity.closed)
-          segs.push(offsetSegment(elementAt(pts, pts.length - 1), elementAt(pts, 0), distance));
+        const edgeCount = entity.closed ? pts.length : pts.length - 1;
+        const segs = Array.from({ length: edgeCount }, (_, i) =>
+          offsetSegment(elementAt(pts, i), elementAt(pts, (i + 1) % pts.length), distance),
+        );
         const joins = (entity.closed ? segs : segs.slice(1)).map((seg, i) => {
           const prev = elementAt(segs, entity.closed ? (i - 1 + segs.length) % segs.length : i);
           return miterJoin(prev[0], prev[1], seg[0], seg[1]);

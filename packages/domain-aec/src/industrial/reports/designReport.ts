@@ -6,6 +6,9 @@
 
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
+import { report } from '@core/commands/noop';
+import { elementAffected } from '../../building/model';
+import { failingRows, maxUtilisation } from '../common/utilisation';
 
 const LIMITED_NOTE = 'largest available size reached for some elements';
 
@@ -17,8 +20,8 @@ interface UtilisationStats {
 /** Maximum utilisation and number of rows above 1. */
 export function utilisationStats(rows: ReadonlyArray<{ utilisation: number }>): UtilisationStats {
   return {
-    maxUtilisation: Math.max(0, ...rows.map((row) => row.utilisation)),
-    failures: rows.filter((row) => row.utilisation > 1).length,
+    maxUtilisation: maxUtilisation(rows),
+    failures: failingRows(rows).length,
   };
 }
 
@@ -33,11 +36,26 @@ export function noChangeResult(
   limited: boolean,
 ): CommandResult {
   const stats = utilisationStats(rows);
+  return report(
+    doc,
+    `Designed ${subject}: no change needed (max utilisation ${stats.maxUtilisation.toFixed(2)}${limited ? `; ${LIMITED_NOTE}` : ''}).`,
+    { changes: [], ...stats },
+  );
+}
+
+/** The result of a design that resized elements: `changed` ids are affected, `changes` and `stats` are the data. */
+export function designResult(
+  document: CadDocument,
+  summary: string,
+  changed: ReadonlySet<string>,
+  changes: ReadonlyArray<string>,
+  stats: UtilisationStats,
+): CommandResult {
   return {
-    document: doc,
-    summary: `Designed ${subject}: no change needed (max utilisation ${stats.maxUtilisation.toFixed(2)}${limited ? `; ${LIMITED_NOTE}` : ''}).`,
-    affected: [],
-    data: { changes: [], ...stats },
+    document,
+    summary,
+    affected: elementAffected(document, [...changed]),
+    data: { changes, ...stats },
   };
 }
 

@@ -6,10 +6,10 @@ import type { SteelMemberElement } from '@core/model/building';
 import { sectionProperties, type SteelProfile } from '../../steel/profiles';
 import { bucklingReduction, eulerForce } from '../steelDesign/steelDesign';
 import { CRANE_FACTORS, craneActions } from '../frames/frameModelTypes';
+import { GAMMA_CRANE } from '../../shared/loadFactors';
 import { bufferForce, GAMMA_BUFFER } from '../runway/runwayCheckModel';
 
 /** ULS factor on the crane drive force HL (permanent-type variable crane action, groups 1 and 5). */
-const GAMMA_CRANE = 1.35;
 
 /** Crane longitudinal design force (kN) acting at rail level on the wall that carries one runway. */
 interface CraneWallForce {

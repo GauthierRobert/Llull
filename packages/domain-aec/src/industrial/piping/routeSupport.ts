@@ -4,6 +4,7 @@
  * @pure
  */
 
+import { clamp01 } from '@lib/clamp';
 import type { Vec3 } from '@core/model/types';
 import { add3, distance3, dot3, scale3, sub3 } from '@lib/vec3';
 import { toVec3 } from '../common/memberSupport';
@@ -88,7 +89,7 @@ export function nearestOnRoute(route: ReadonlyArray<Vec3>, point: Vec3): RouteSn
   let travelled = 0;
   for (const [index, { a, delta, length, direction }] of segmentsOf(route).entries()) {
     if (length > 0) {
-      const t = Math.max(0, Math.min(1, dot3(sub3(point, a), delta) / (length * length)));
+      const t = clamp01(dot3(sub3(point, a), delta) / (length * length));
       const snapped = add3(a, scale3(delta, t));
       const distance = distance3(point, snapped);
       if (best === null || distance < best.distance - 1e-9) {
@@ -109,7 +110,7 @@ export function pointAtArc(
   let last: { point: Vec3; direction: Vec3; segment: number } | null = null;
   for (const [index, { a, delta, length, direction }] of segmentsOf(route).entries()) {
     if (length === 0) continue;
-    const t = Math.max(0, Math.min(1, (arc - travelled) / length));
+    const t = clamp01((arc - travelled) / length);
     last = { point: add3(a, scale3(delta, t)), direction, segment: index };
     if (arc <= travelled + length) return last;
     travelled += length;

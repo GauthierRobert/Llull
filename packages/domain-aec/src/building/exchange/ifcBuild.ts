@@ -8,7 +8,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { toMm } from '@core/model/units';
 import { fileSlug, getBuilding, orderedElements } from '../model';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { type Context, StepWriter, ifcGuid, ifcReal, ifcString, placement } from './ifcStep';
 import { type Exported, exportCurvedWallElement, exportWallElement } from './ifcElementExport';
 import { exportConnection, exportIndustrial, exportPlate } from './ifcIndustrialExport';
@@ -238,11 +238,10 @@ export const exportIfc = defineCommand({
       timestamp === undefined && building.project.date !== '' && !isoDate
         ? ` Project date "${building.project.date}" is not YYYY-MM-DD, so the header uses ${stamp}.`
         : '';
-    return {
-      document: doc,
-      summary: `IFC4 ${result.filename}: ${result.elementCount} building element(s) as ${result.productCount} IFC product(s) on ${building.levelOrder.length} storey(s), ${result.entityCount} STEP entities.${dateNote}`,
-      affected: [],
-      data: result,
-    };
+    return report(
+      doc,
+      `IFC4 ${result.filename}: ${result.elementCount} building element(s) as ${result.productCount} IFC product(s) on ${building.levelOrder.length} storey(s), ${result.entityCount} STEP entities.${dateNote}`,
+      result,
+    );
   },
 });

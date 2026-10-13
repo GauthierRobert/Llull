@@ -1,5 +1,6 @@
 /** @layer ui/viewport — vertex-data builders shared by the 2D and 3D line overlays. */
 
+import { ellipsePoint } from '@lib/arc';
 import * as THREE from 'three';
 import type { Vec2 } from '@core/model/types';
 
@@ -49,6 +50,11 @@ export function rectangleCorners(width: number, height: number): Vec2[] {
   ];
 }
 
+/** Flat xyz outline (closed loop) of a `width` x `height` rectangle at the origin. */
+export function rectangleOutline(width: number, height: number): number[] {
+  return flattenPoints(closeLoop(rectangleCorners(width, height)));
+}
+
 /** Segment vertex pairs approximating an axis-aligned ellipse outline. */
 export function ellipseOutline(
   cx: number,
@@ -59,7 +65,7 @@ export function ellipseOutline(
 ): Vec2[] {
   const vertex = (index: number): Vec2 => {
     const angle = (index / segments) * Math.PI * 2;
-    return [cx + radiusX * Math.cos(angle), cy + radiusY * Math.sin(angle)];
+    return ellipsePoint([cx, cy], radiusX, radiusY, angle);
   };
   return Array.from({ length: segments }, (_, index) => [vertex(index), vertex(index + 1)]).flat();
 }

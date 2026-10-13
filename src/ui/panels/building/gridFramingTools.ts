@@ -5,12 +5,12 @@
  * grid): each maps form values to ONE command (param-gathering only, react R1).
  */
 
+import { toRadians } from '@lib/angle';
 import {
   FieldReader,
   defaultedSelect,
   levelField,
   num,
-  radians,
   result,
   select,
   textList,
@@ -59,7 +59,7 @@ export const GRID_FRAMING_TOOLS: ReadonlyArray<ElementTool> = [
         ...levelParam(reader, 'topLevelId'),
         axes: textList(reader, 'axes'),
         exclude: textList(reader, 'exclude'),
-        roll: roll === 0 ? undefined : radians(roll),
+        roll: roll === 0 ? undefined : toRadians(roll),
         baseFixity: reader.text('baseFixity'),
         material: reader.text('material') || undefined,
       });

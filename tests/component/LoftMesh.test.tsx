@@ -10,7 +10,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '@ui/store';
 import type { LoftEntity } from '@core/model/types';
 import { loftTriangles } from '@core/geometry/loft';
-import { buildMeshSolidGeometry } from '@ui/viewport/3d/entities/meshSolidGeometry';
+import { buildTriangleSoupGeometry } from '@ui/viewport/3d/entities/meshSolidGeometry';
 import { dispatchEntity, resetStore } from '../helpers/componentEntities';
 
 describe('LoftMesh — loft_sections command → kind "loft"', () => {
@@ -25,12 +25,10 @@ describe('LoftMesh — loft_sections command → kind "loft"', () => {
     });
     expect(entity.kind).toBe('loft');
     expect(useStore.getState().document.order).toContain(id);
-    const positions = loftTriangles(entity as LoftEntity).flat(2);
-    const geometry = buildMeshSolidGeometry({
-      positions,
-      indices: Array.from({ length: positions.length / 3 }, (_, corner) => corner),
-    });
-    expect(geometry.getAttribute('position').count).toBe(positions.length / 3);
+    const triangles = loftTriangles(entity as LoftEntity);
+    const geometry = buildTriangleSoupGeometry(triangles);
+    if (geometry === null) throw new Error('empty geometry');
+    expect(geometry.getAttribute('position').count).toBe(triangles.length * 3);
     expect(geometry.getAttribute('normal')).toBeDefined();
     geometry.dispose();
   });

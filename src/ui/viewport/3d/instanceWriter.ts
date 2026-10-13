@@ -8,11 +8,11 @@
 
 import * as THREE from 'three';
 import type { EntityId } from '@core/model/types';
+import { SELECTION_EMISSIVE, SELECTION_EMISSIVE_INTENSITY } from '../viewportPalette';
 import type { InstanceBatch } from './grouping';
 
-/** Selected-highlight tint color (hex). Matches useMaterialProps.ts emissive. */
-const SELECTED_EMISSIVE = new THREE.Color('#3a7bd5');
-const SELECTED_EMISSIVE_INTENSITY = 0.35;
+/** Selected-highlight tint color. Matches useMaterialProps.ts emissive. */
+const SELECTED_EMISSIVE = new THREE.Color(SELECTION_EMISSIVE);
 
 /** White — used to force allocation of the instance color buffer. */
 const WHITE = new THREE.Color(1, 1, 1);
@@ -37,7 +37,7 @@ export function writeBatchInstances(
     // Shaded mode with an assigned material uses its diffuse color; selection tints on top.
     SCRATCH_COLOR.set(batch.pbrMaterial ? batch.pbrMaterial.color : entity.color);
     if (selectionSet.has(entity.id)) {
-      SCRATCH_COLOR.lerp(SELECTED_EMISSIVE, SELECTED_EMISSIVE_INTENSITY);
+      SCRATCH_COLOR.lerp(SELECTED_EMISSIVE, SELECTION_EMISSIVE_INTENSITY);
     }
     mesh.setColorAt(i, SCRATCH_COLOR);
   });

@@ -14,6 +14,18 @@ export const rejection = (doc: CadDocument, summary: string): CommandResult => (
   rejected: true,
 });
 
+/** Reporter for a command's rejections: `fail(why)` -> no-op "<command>: <why>; no-op.". */
+export const failer =
+  (doc: CadDocument, command: string) =>
+  (why: string): CommandResult =>
+    noop(doc, `${command}: ${why}; no-op.`);
+
+/** Like `failer`, worded "<command> failed: <why>" (used by the machine-element commands). */
+export const failedWith =
+  (doc: CadDocument, command: string) =>
+  (why: string): CommandResult =>
+    noop(doc, `${command} failed: ${why}`);
+
 /** Result with no affected ids; `data` (when given) carries a query's structured answer. */
 export const report = (document: CadDocument, summary: string, data?: unknown): CommandResult => ({
   ...noop(document, summary),

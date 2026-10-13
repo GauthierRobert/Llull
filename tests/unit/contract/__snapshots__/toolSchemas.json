@@ -3618,7 +3618,7 @@
     "input_schema": {
       "properties": {
         "bufferStiffness": {
-          "description": "Buffer spring constant SB in kN/m (> 0). Default 1000.",
+          "description": "Buffer spring constant SB in kN/m (> 0) for HB,1 = φ7 v1 √(mc SB). Default 1000 kN/m.",
           "type": "number"
         },
         "craneCapacity": {
@@ -3626,7 +3626,7 @@
           "type": "number"
         },
         "craneSelfWeight": {
-          "description": "Crane self-weight Gc in kN (> 0). Default 0.5 Q + 20 kN.",
+          "description": "Crane self-weight Gc in kN (> 0, bridge + trolley; trolley = 0.2 Gc). Default 0.5 Q + 20 kN.",
           "type": "number"
         },
         "deadLoad": {
@@ -3642,7 +3642,7 @@
           "type": "number"
         },
         "travelSpeed": {
-          "description": "Crane long travel speed in m/s (> 0) for the buffer force (v1 = 0.7 × travelSpeed). Default 0.63 (about 38 m/min).",
+          "description": "Crane long travel speed in m/s (> 0) for the buffer force HB,1 (v1 = 0.7 × travelSpeed). Default 0.63 (about 38 m/min).",
           "type": "number"
         },
         "windPressure": {
@@ -3703,7 +3703,7 @@
           "type": "string"
         },
         "craneSelfWeight": {
-          "description": "Crane self-weight Gc in kN (> 0, bridge + trolley, trolley = 0.2 Gc). Default 0.5 Q + 20 kN.",
+          "description": "Crane self-weight Gc in kN (> 0, bridge + trolley; trolley = 0.2 Gc). Default 0.5 Q + 20 kN.",
           "type": "number"
         },
         "craneSpan": {
@@ -3720,7 +3720,7 @@
           "type": "string"
         },
         "hoistingClass": {
-          "description": "EN 1991-3 hoisting class: φ2 = φ2,min + β2 vh (HC1 1.05 + 0.17 vh, HC2 1.10 + 0.34 vh, HC3 1.15 + 0.51 vh, HC4 1.20 + 0.68 vh). Default HC2.",
+          "description": "EN 1991-3 hoisting class for the dynamic factor φ2 = φ2,min + β2 vh (HC1 1.05 + 0.17 vh, HC2 1.10 + 0.34 vh, HC3 1.15 + 0.51 vh, HC4 1.20 + 0.68 vh). Default HC2.",
           "enum": [
             "HC1",
             "HC2",
@@ -3730,7 +3730,7 @@
           "type": "string"
         },
         "hoistingSpeed": {
-          "description": "Hoisting speed vh in m/s (>= 0). Default 0.1.",
+          "description": "Hoisting speed vh in m/s (>= 0) for φ2. Default 0.1.",
           "type": "number"
         },
         "levelId": {
@@ -3738,7 +3738,7 @@
           "type": "string"
         },
         "minHookApproach": {
-          "description": "Minimum hook approach to the rail in m (>= 0); positions the trolley for the maximum wheel load. Default 1.0.",
+          "description": "Minimum approach of the hook to a rail in m (>= 0): the trolley position that maximises the wheel load. Default 1.0.",
           "type": "number"
         },
         "railSize": {
@@ -3758,7 +3758,7 @@
           "type": "number"
         },
         "wheelBase": {
-          "description": "Distance between the two wheels of a rail wheel group, mm (> 0). Default 3000.",
+          "description": "Wheel base a of a crane rail wheel group (distance between its two wheels) in mm (> 0), used for the transverse drive force HT = φ5 ξ M / a. Default 3000.",
           "type": "number"
         }
       },
@@ -3939,7 +3939,7 @@
           "type": "number"
         },
         "wheelBase": {
-          "description": "Wheel base a of a crane rail wheel group in mm (> 0), used for the transverse drive force HT = φ5 ξ M / a. Default 3000.",
+          "description": "Wheel base a of a crane rail wheel group (distance between its two wheels) in mm (> 0), used for the transverse drive force HT = φ5 ξ M / a. Default 3000.",
           "type": "number"
         },
         "windPressure": {
@@ -4046,7 +4046,7 @@
           "type": "number"
         },
         "wheelBase": {
-          "description": "Wheel base a of a crane rail wheel group in mm (> 0), used for the transverse drive force HT = φ5 ξ M / a. Default 3000.",
+          "description": "Wheel base a of a crane rail wheel group (distance between its two wheels) in mm (> 0), used for the transverse drive force HT = φ5 ξ M / a. Default 3000.",
           "type": "number"
         },
         "windPressure": {
@@ -4783,7 +4783,7 @@
           "type": "boolean"
         },
         "wheelBase": {
-          "description": "Wheel base a of a crane rail wheel group in mm (> 0), used for the transverse drive force HT = φ5 ξ M / a. Default 3000.",
+          "description": "Wheel base a of a crane rail wheel group (distance between its two wheels) in mm (> 0), used for the transverse drive force HT = φ5 ξ M / a. Default 3000.",
           "type": "number"
         },
         "windPressure": {
@@ -4843,7 +4843,7 @@
           "type": "number"
         },
         "wheelBase": {
-          "description": "Wheel base a of a crane rail wheel group in mm (> 0), used for the transverse drive force HT = φ5 ξ M / a. Default 3000.",
+          "description": "Wheel base a of a crane rail wheel group (distance between its two wheels) in mm (> 0), used for the transverse drive force HT = φ5 ξ M / a. Default 3000.",
           "type": "number"
         },
         "windPressure": {
@@ -5648,7 +5648,7 @@
     "input_schema": {
       "properties": {
         "freeboardM": {
-          "description": "Flooding freeboard below rim in metres. Default 0.3.",
+          "description": "Required freeboard below the rim in metres (>= 0) before flooding is flagged. Default 0.3.",
           "type": "number"
         },
         "fromManholeId": {
@@ -5679,11 +5679,11 @@
           "type": "object"
         },
         "manholeLossK": {
-          "description": "Manhole loss coefficient K (>= 0). Default 0.5.",
+          "description": "Manhole head-loss coefficient K in K v^2/2g (>= 0). Default 0.5.",
           "type": "number"
         },
         "outfallLevel": {
-          "description": "Tailwater elevation at the outfall(s), document units. Default: outlet normal depth.",
+          "description": "Tailwater elevation at the outfall(s) in document units, same datum as invert levels. Default: normal-depth water level of the outlet pipe.",
           "type": "number"
         },
         "rainfallIntensityMmH": {
@@ -5765,7 +5765,7 @@
           "type": "string"
         },
         "scale": {
-          "description": "Scale denominator N for 1:N. Default: the smallest standard scale that fits (1-2-5 steps beyond 1:2000).",
+          "description": "Scale denominator N for 1:N (e.g. 100). Default: the smallest standard scale that fits (1-2-5 steps beyond 1:2000).",
           "type": "number"
         },
         "title": {
@@ -6895,11 +6895,11 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Compute the area of a closed 2D shape. Provide either: (a) an entityId for a closed polyline, rectangle, or circle entity; or (b) an explicit polygon as points ([[x,y],...], >= 3 points). Returns data: { area, unit } where unit is the squared document unit (e.g. \"mm²\"). Open polylines are rejected with an explanatory message. Does not modify the document.",
+    "description": "Compute the area of a closed 2D shape. Provide either: (a) an entityId for a closed polyline, rectangle, circle, or ellipse entity; or (b) an explicit polygon as points ([[x,y],...], >= 3 points). Returns data: { area, unit } where unit is the squared document unit (e.g. \"mm²\"). Open polylines are rejected with an explanatory message. Does not modify the document.",
     "input_schema": {
       "properties": {
         "entityId": {
-          "description": "Id of a closed 2D shape entity: 'polyline' (must have closed:true), 'rectangle', or 'circle'.",
+          "description": "Id of a closed 2D shape entity: 'polyline' (must have closed:true), 'rectangle', 'circle', or 'ellipse'.",
           "type": "string"
         },
         "points": {

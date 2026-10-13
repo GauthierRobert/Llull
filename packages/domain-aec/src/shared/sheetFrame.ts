@@ -5,13 +5,35 @@
  * @pure
  */
 
-import type { CadDocument } from '@core/model/types';
+import type { CadDocument, Vec2 } from '@core/model/types';
+import { z } from '@core/commands/schema';
+import { toDegrees, toRadians } from '@lib/angle';
 import { escapeXml } from '@lib/escapeXml';
 import { getBuilding } from '../building/model';
 import { round } from './numeric';
 
 export const PAPER_SIZES = ['A4', 'A3', 'A2', 'A1', 'A0'] as const;
 export type PaperSize = (typeof PAPER_SIZES)[number];
+
+/** `paper` parameter shared by the drawing-sheet commands. */
+export const PAPER_FIELD = z
+  .enum(PAPER_SIZES)
+  .optional()
+  .describe('Paper size (landscape). Default A3.');
+
+/** `scale` parameter of the building drawing sheets (plan, elevation). */
+export const SCALE_FIELD = z
+  .number()
+  .optional()
+  .describe(
+    'Scale denominator N for 1:N (e.g. 100). Default: the smallest standard scale that fits (1-2-5 steps beyond 1:2000).',
+  );
+
+/** Warning appended to a sheet summary when `what` is larger than the paper at the chosen scale. */
+export const sheetFitWarning = (fits: boolean, what: string): string =>
+  fits
+    ? ''
+    : ` WARNING: the ${what} is larger than the paper at this scale; omit scale to auto-fit or choose a larger paper.`;
 
 /** Landscape ISO 216 sizes, millimetres. */
 export const PAPER_MM: Readonly<Record<PaperSize, readonly [number, number]>> = {
@@ -42,6 +64,54 @@ export function sheetDrawingArea(width: number, height: number): Viewport {
 
 /** SVG number text: two decimals, no trailing zeros. */
 export const n = (value: number): string => String(round(value));
+
+/** SVG points attribute text: `x,y` pairs joined by spaces. */
+export const svgPoints = (points: ReadonlyArray<readonly [number, number]>): string =>
+  points.map((point) => point.map(n).join(',')).join(' ');
+
+/** Model point to paper mm: `center` lands at the viewport middle, +Y flipped, `perUnit` paper mm per model unit. */
+export const paperMap =
+  (viewport: Viewport, center: Vec2, perUnit: number) =>
+  ([x, y]: Vec2): Vec2 => [
+    viewport.x + viewport.width / 2 + (x - center[0]) * perUnit,
+    viewport.y + viewport.height / 2 - (y - center[1]) * perUnit,
+  ];
+
+/**
+ * Dimension label placement: text angle (degrees, flipped to read left-to-right / bottom-up) for a
+ * baseline direction (`dx`, `dy`), and the label anchor 1.2 mm off the midpoint of the dimension line `da`-`db`.
+ */
+export function readableDimensionLabel(
+  da: Vec2,
+  db: Vec2,
+  dx: number,
+  dy: number,
+): { readonly angle: number; readonly middle: Vec2 } {
+  let angle = toDegrees(Math.atan2(dy, dx));
+  if (angle > 90 || angle <= -90) angle += 180;
+  const radians = toRadians(angle);
+  return {
+    angle,
+    middle: [
+      (da[0] + db[0]) / 2 + Math.sin(radians) * 1.2,
+      (da[1] + db[1]) / 2 - Math.cos(radians) * 1.2,
+    ],
+  };
+}
+
+/** SVG `<text>` at paper point (`x`, `y`), content XML-escaped; optional rotation about the anchor point. */
+export const svgText = (
+  x: number,
+  y: number,
+  size: number,
+  anchor: 'start' | 'middle' | 'end',
+  content: string,
+  rotationDeg = 0,
+): string => {
+  const transform =
+    rotationDeg !== 0 ? ` transform="rotate(${n(rotationDeg)} ${n(x)} ${n(y)})"` : '';
+  return `<text x="${n(x)}" y="${n(y)}" font-size="${n(size)}" text-anchor="${anchor}"${transform}>${escapeXml(content)}</text>`;
+};
 
 export interface Viewport {
   readonly x: number;

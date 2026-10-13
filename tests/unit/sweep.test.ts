@@ -13,6 +13,7 @@ import { solidTriangles } from '@core/geometry/solidTriangles';
 import { tessellateEntity } from '@core/commands/render/polygons';
 import { sweepFrames, sweepSegmentRings, sweepTriangles } from '@core/geometry/sweep';
 import { expectNoOp } from '../helpers/expectNoOp';
+import { docWith, volumeOf, isWatertight } from '../helpers/fixtureDocument';
 
 const empty = createEmptyDocument();
 
@@ -22,49 +23,10 @@ const L_PATH = [
   [10, 10, 0],
 ];
 
-/** Doc holding 2D fixture entities (test setup only). */
-function docWith(...shapes: Array<Record<string, unknown>>): CadDocument {
-  const entities = Object.fromEntries(
-    shapes.map((shape) => [
-      shape['id'] as string,
-      {
-        position: [0, 0, 0],
-        rotation: [0, 0, 0],
-        layerId: DEFAULT_LAYER_ID,
-        color: '#ffffff',
-        ...shape,
-      } as unknown as Entity,
-    ]),
-  );
-  return { ...empty, entities, order: Object.keys(entities) };
-}
-
 function sweepOf(doc: CadDocument, params: Record<string, unknown>): SweepEntity {
   const result = execute(doc, 'sweep_profile', params);
   expect(result.affected, result.summary).toHaveLength(1);
   return result.document.entities[result.affected[0] as string] as SweepEntity;
-}
-
-function volumeOf(entity: Entity): number {
-  const doc = { ...empty, entities: { [entity.id]: entity }, order: [entity.id] };
-  return (execute(doc, 'mass_properties', { entityId: entity.id }).data as { volume: number })
-    .volume;
-}
-
-/** Every undirected edge of a closed triangle soup is shared by exactly two triangles. */
-function isWatertight(
-  triangles: ReadonlyArray<readonly [readonly number[], ...unknown[]]>,
-): boolean {
-  const key = (p: readonly number[]): string => p.map((v) => v.toFixed(9)).join(',');
-  const edges = new Map<string, number>();
-  for (const triangle of triangles as ReadonlyArray<ReadonlyArray<readonly number[]>>) {
-    for (let k = 0; k < 3; k++) {
-      const [a, b] = [key(triangle[k] as number[]), key(triangle[(k + 1) % 3] as number[])];
-      const edge = a < b ? `${a}|${b}` : `${b}|${a}`;
-      edges.set(edge, (edges.get(edge) ?? 0) + 1);
-    }
-  }
-  return [...edges.values()].every((count) => count === 2);
 }
 
 describe('sweep_profile — happy paths', () => {
@@ -406,7 +368,7 @@ describe('sweep entity across the kind dispatch', () => {
     for (const solid of [pipe, bar]) {
       const triangles = solidTriangles(solid);
       expect(triangles.length).toBeGreaterThan(0);
-      expect(isWatertight(triangles)).toBe(true);
+      expect(isWatertight(triangles, 9)).toBe(true);
     }
     expect(tessellateEntity(pipe).length).toBe(solidTriangles(pipe).length);
   });
@@ -564,7 +526,7 @@ describe('closed-path sweeps', () => {
     const doc = docWith({ id: 'ring', kind: 'circle', center: [0, 0], radius: 10 });
     const ring = sweepOf(doc, { pathId: 'ring', radius: 2 });
     const triangles = solidTriangles(ring);
-    expect(isWatertight(triangles)).toBe(true);
+    expect(isWatertight(triangles, 9)).toBe(true);
     expect(volumeOf(ring)).toBeCloseTo(2 * Math.PI * Math.PI * 10 * 4, 6);
   });
 
@@ -577,7 +539,7 @@ describe('closed-path sweeps', () => {
     ];
     const frame = sweepOf(empty, { path: square, closed: true, radius: 1, bendRadius: 4 });
     expect(frame.path.filter((s) => s.type === 'arc')).toHaveLength(4);
-    expect(isWatertight(solidTriangles(frame))).toBe(true);
+    expect(isWatertight(solidTriangles(frame), 9)).toBe(true);
     const hose = sweepOf(empty, {
       path: square,
       closed: true,
@@ -586,7 +548,7 @@ describe('closed-path sweeps', () => {
       innerRadius: 0.3,
     });
     expect(hose.path.every((s) => s.type === 'bezier')).toBe(true);
-    expect(isWatertight(solidTriangles(hose))).toBe(true);
+    expect(isWatertight(solidTriangles(hose), 9)).toBe(true);
   });
 
   it('a rectangular profile section closes without a twist seam on a 3D loop', () => {
@@ -606,7 +568,7 @@ describe('closed-path sweeps', () => {
         [-1, 0.3],
       ],
     });
-    expect(isWatertight(solidTriangles(loop))).toBe(true);
+    expect(isWatertight(solidTriangles(loop), 9)).toBe(true);
   });
 
   it('closed rectangle and polyline sketches get bends at every corner', () => {

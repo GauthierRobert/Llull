@@ -10,6 +10,7 @@
  * @pure the only mutation is the injected per-session `enabledToolsets` set, by `enable_toolset`.
  */
 
+import { clamp } from '@lib/clamp';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { isRecord } from '@lib/isRecord';
 import { buildMcpTools, type McpToolDefinition } from './tools';
@@ -265,6 +266,21 @@ export function closestToolNames(name: string, limit: number): string[] {
     .map(({ name: toolName }) => toolName);
 }
 
+/**
+ * "Did you mean" names for an unknown tool: typo matches first, else keyword search of the name
+ * (`foo_bar` -> "foo bar") within the enabled toolsets.
+ */
+export function suggestToolNames(
+  name: string,
+  limit: number,
+  enabledToolsets: ReadonlySet<ToolsetName>,
+): string[] {
+  const typoMatches = closestToolNames(name, limit);
+  return typoMatches.length > 0
+    ? typoMatches
+    : searchTools(name.replace(/_/g, ' '), limit, enabledToolsets).map((r) => r.name);
+}
+
 function outcome(
   summary: string,
   isError: boolean,
@@ -284,7 +300,7 @@ function runSearchTools(
   const query = typeof args.query === 'string' ? args.query.trim() : '';
   if (query === '') return outcome('search_tools: query must be a non-empty string.', true);
   const requestedLimit = isFiniteNumber(args.limit) ? args.limit : SEARCH_TOOLS_DEFAULT_LIMIT;
-  const limit = Math.min(SEARCH_TOOLS_MAX_LIMIT, Math.max(1, Math.floor(requestedLimit)));
+  const limit = clamp(Math.floor(requestedLimit), 1, SEARCH_TOOLS_MAX_LIMIT);
   const results = searchTools(query, limit, enabledToolsets);
   if (results.length === 0)
     return outcome(`search_tools: no tools match "${query}".`, false, { results });

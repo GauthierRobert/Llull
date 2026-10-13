@@ -9,6 +9,7 @@
 import type { Vec2 } from '@core/model/types';
 import { circlePolygon } from '@lib/arc';
 import { round } from '../shared/numeric';
+import { bisect } from '@lib/bisect';
 
 type ProfileShape = 'I' | 'U' | 'C' | 'SHS' | 'RHS' | 'CHS' | 'L';
 
@@ -454,12 +455,11 @@ export function sectionProperties(profile: SteelProfile): SectionProperties {
       const part = clipAt(loop, level, 1);
       return part.length < 3 ? sum : sum + signed(part, index === 0 ? 1 : -1).area;
     }, 0);
-  let [low, high] = [Math.min(...ys), Math.max(...ys)];
-  for (let step = 0; step < 60; step++) {
-    const middle = (low + high) / 2;
-    if (areaAbove(middle) > total.area / 2) low = middle;
-    else high = middle;
-  }
+  const { low, high } = bisect(
+    (level) => areaAbove(level) > total.area / 2,
+    Math.min(...ys),
+    Math.max(...ys),
+  );
   const axis = (low + high) / 2;
   const plasticModulus = loops.reduce((sum, loop, index) => {
     const sign = index === 0 ? 1 : -1;

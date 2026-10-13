@@ -11,6 +11,7 @@ import { createIsolatedKernel, defaultWorkerEntry } from './isolatedKernel';
 import { parseKernelChoice, type KernelChoice } from '@core/geometry/kernelChoice';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { errorMessage } from '@lib/errorMessage';
+import { positiveInteger } from './env';
 
 let activeKernel: KernelChoice | null = null;
 
@@ -28,8 +29,7 @@ const DEFAULT_OCC_CALL_TIMEOUT_MS = 30_000;
 
 /** `LLULL_OCC_TIMEOUT_MS`: positive milliseconds a single OCC call may run before its worker is killed. */
 export function occtCallTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
-  const requested = Number(env['LLULL_OCC_TIMEOUT_MS']);
-  return Number.isFinite(requested) && requested > 0 ? requested : DEFAULT_OCC_CALL_TIMEOUT_MS;
+  return positiveInteger(env['LLULL_OCC_TIMEOUT_MS'], DEFAULT_OCC_CALL_TIMEOUT_MS);
 }
 
 /**

@@ -10,11 +10,16 @@ import { PURLIN_LOAD_SHAPE } from './purlinLoadParams';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { fromMm } from '@core/model/units';
-import { elementAffected, elementsOf, getBuilding, withElement } from '../../building/model';
+import { elementsOf, getBuilding, withElement } from '../../building/model';
 import { noop } from '@core/commands/noop';
 import { add3, scale3 } from '@lib/vec3';
 import { regenerateBuilding } from '../../building/evaluate/evaluateElements';
-import { finalUtilisationText, noChangeResult, utilisationStats } from '../reports/designReport';
+import {
+  designResult,
+  finalUtilisationText,
+  noChangeResult,
+  utilisationStats,
+} from '../reports/designReport';
 import { sweepFrame } from '../../shared/mesh';
 import { findProfile, lightestProfile, sectionProperties } from '../../steel/profiles';
 
@@ -116,15 +121,15 @@ export const designPurlins = defineCommand({
     const document = regenerateBuilding(doc, getBuilding(current));
     const final = analyse(document).rows;
     const stats = utilisationStats(final);
-    return {
+    return designResult(
       document,
-      summary:
-        `Designed ${final.length} purlin / rail row(s): ${changes.join('; ')}. ` +
+      `Designed ${final.length} purlin / rail row(s): ${changes.join('; ')}. ` +
         `${finalUtilisationText(stats, 'row(s)', limited)} ` +
         `Re-seated on rafters / columns; verify bracing eaves struts with check_bracing.`,
-      affected: elementAffected(document, [...changed]),
-      data: { changes, ...stats },
-    };
+      changed,
+      changes,
+      stats,
+    );
   },
 });
 

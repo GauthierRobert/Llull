@@ -28,6 +28,7 @@ import {
   exchangeOptionsFromEnv,
   type ExchangeOptions,
 } from './pythonExchange';
+import { exchangeDirOf, positiveInteger } from './env';
 
 const DEFAULT_MAX_BYTES = 50 * 1024 * 1024;
 const MAX_DXF_BYTES = 512 * 1024 * 1024;
@@ -60,21 +61,15 @@ export interface DwgConvertConfig {
   readonly exchangeDir: string | null;
 }
 
-function positive(raw: string | undefined, fallback: number): number {
-  const value = Number(raw);
-  return Number.isFinite(value) && value > 0 ? value : fallback;
-}
-
 export function dwgConfigFromEnv(env: NodeJS.ProcessEnv = process.env): DwgConvertConfig {
   const dwg2dxf = env['LLULL_DWG2DXF'] ?? 'dwg2dxf';
   const oda = env['LLULL_ODA_CONVERTER'];
-  const exchangeDir = env['LLULL_EXCHANGE_DIR'];
   return {
     dwg2dxf: dwg2dxf === 'off' || dwg2dxf === '' ? null : dwg2dxf,
     odaConverter: oda !== undefined && oda !== '' && oda !== 'off' ? oda : null,
-    timeoutMs: positive(env['LLULL_DWG_TIMEOUT_MS'], 60_000),
-    maxBytes: positive(env['LLULL_DWG_MAX_BYTES'], DEFAULT_MAX_BYTES),
-    exchangeDir: exchangeDir !== undefined && exchangeDir !== '' ? path.resolve(exchangeDir) : null,
+    timeoutMs: positiveInteger(env['LLULL_DWG_TIMEOUT_MS'], 60_000),
+    maxBytes: positiveInteger(env['LLULL_DWG_MAX_BYTES'], DEFAULT_MAX_BYTES),
+    exchangeDir: exchangeDirOf(env),
   };
 }
 

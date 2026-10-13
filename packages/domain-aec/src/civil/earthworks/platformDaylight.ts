@@ -9,6 +9,8 @@ import { polygonPerimeter } from '@lib/polygon';
 import { normalize2 } from '@lib/vec2';
 import { daylightReach } from './earthworksMath';
 import { elevationAt, type Tin } from '../surface/tin';
+import { bisect } from '@lib/bisect';
+import { batterLevel } from './batter';
 
 /** Pad-edge points generated around the outline (vertices included). */
 const RING_POINTS = 160;
@@ -75,7 +77,7 @@ function march(
   if (ground === elevation) return { ...base, clipped: false };
   const mode: BatterMode = ground > elevation ? 'cut' : 'fill';
   const designAt = (t: number): number =>
-    mode === 'cut' ? elevation + t / cutSlope : elevation - t / fillSlope;
+    batterLevel(elevation, t, mode === 'cut' ? 'cut' : 'fill', cutSlope, fillSlope);
   const pointAt = (t: number): Vec2 => [at[0] + normal[0] * t, at[1] + normal[1] * t];
   const gapAt = (t: number): number | null => {
     const z = elevationAt(tin, pointAt(t));
@@ -97,12 +99,7 @@ function march(
     const gap = gapAt(t);
     if (gap === null) return result(previous, true);
     if (gap <= 0) {
-      let [low, high] = [previous, t];
-      for (let i = 0; i < BISECTIONS; i++) {
-        const mid = (low + high) / 2;
-        if ((gapAt(mid) ?? -1) > 0) low = mid;
-        else high = mid;
-      }
+      const { low, high } = bisect((mid) => (gapAt(mid) ?? -1) > 0, previous, t, BISECTIONS);
       return result((low + high) / 2, false);
     }
     previous = t;

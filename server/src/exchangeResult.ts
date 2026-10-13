@@ -8,18 +8,16 @@
  */
 
 import type { McpShapedResult } from '@mcp/dispatch';
+import { applyExchangeToolCall, type ExchangeDeps } from '@mcp/exchangeTools';
+import type { CadDocument } from '@core/model/types';
+import type { CommandOutcome } from '@mcp/restProtocol';
+import type { ExchangeCommandResult } from '@mcp/exchangeTools';
+import type { ExchangeOptions } from './pythonExchange';
 import { isRecord } from '@lib/isRecord';
-
-export interface UnshapedResult {
-  readonly summary: string;
-  readonly affected: string[];
-  readonly isError: boolean;
-  readonly data?: unknown;
-}
 
 const AFFECTED_LINE = /^Affected entity ids: (.+)$/;
 
-export function unshapeExchangeResult(shaped: McpShapedResult): UnshapedResult {
+export function unshapeExchangeResult(shaped: McpShapedResult): ExchangeCommandResult {
   const summary = shaped.content[0]?.text ?? '';
   const structured = shaped.structuredContent;
   const fromStructure =
@@ -44,4 +42,37 @@ export function unshapeExchangeResult(shaped: McpShapedResult): UnshapedResult {
     isError: shaped.isError,
     ...(data !== undefined && !(isRecord(data) && Object.keys(data).length === 0) ? { data } : {}),
   };
+}
+
+/** The MCP-layer dependencies of the exchange tools: the configured ports + the host document. */
+export function exchangeDepsOf(exchange: ExchangeOptions, host: ExchangeHost): ExchangeDeps {
+  return {
+    port: exchange.port,
+    dwg: exchange.dwg ?? null,
+    getDoc: host.getDoc,
+    applyCommand: host.applyCommand,
+    allowCodeExecution: exchange.allowCodeExecution,
+  };
+}
+
+export interface ExchangeHost {
+  readonly getDoc: () => CadDocument;
+  /** Runs a registry command on the host's document (command bus, or a local tracked document). */
+  readonly applyCommand: (name: string, params: unknown) => ExchangeCommandResult;
+}
+
+/**
+ * Run an exchange tool and answer the command-bus shape plus `changed` (the host document was
+ * replaced). null = `name` is not an exchange tool. The one wiring of ports + host for REST and CLI.
+ */
+export async function runExchangeTool(
+  name: string,
+  params: unknown,
+  exchange: ExchangeOptions,
+  host: ExchangeHost,
+): Promise<CommandOutcome | null> {
+  const before = host.getDoc();
+  const shaped = await applyExchangeToolCall(name, params, exchangeDepsOf(exchange, host));
+  if (shaped === null) return null;
+  return { ...unshapeExchangeResult(shaped), changed: host.getDoc() !== before };
 }

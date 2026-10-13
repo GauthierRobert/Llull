@@ -6,18 +6,21 @@
  * `add_pipe` (upstream / downstream manholes, diameter, material, Manning n).
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useStore } from '@ui/store';
 import {
   CivilObjectSelect,
   useCivilObjects,
-  NumberField,
+  NumberTextField,
   TextField,
   useChosenId,
 } from './CivilParts';
 import { optionalNumber, optionalText } from '@ui/numberText';
 import { manholeParamsOf } from './civilRules';
 import { FormError } from '@ui/panels/PanelParts';
+import { useFormValues } from '@ui/panels/useFormValues';
+
+const PIPE_FORM = { diameter: '', material: '', manningN: '' };
 
 const MANHOLE_FIELDS = [
   ['rimElevation', 'Rim elevation'],
@@ -28,9 +31,10 @@ const MANHOLE_FIELDS = [
   ['entryTimeMin', 'Entry time min'],
 ] as const;
 
-type ManholeKey = (typeof MANHOLE_FIELDS)[number][0];
-
-const EMPTY_MANHOLE: Record<ManholeKey, string> = {
+const MANHOLE_FORM = {
+  position: '',
+  invert: '',
+  name: '',
   rimElevation: '',
   diameter: '',
   catchmentAreaHa: '',
@@ -42,36 +46,32 @@ const EMPTY_MANHOLE: Record<ManholeKey, string> = {
 export function ManholeForm(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const surfaces = useCivilObjects('surface');
-  const [position, setPosition] = useState('');
-  const [invert, setInvert] = useState('');
   const [surfaceId, setSurface] = useChosenId(surfaces, true);
-  const [fields, setFields] = useState(EMPTY_MANHOLE);
-  const [name, setName] = useState('');
-  const [error, setError] = useState('');
+  const { values, error, setError, change, field } = useFormValues(() => MANHOLE_FORM);
 
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
-    const gathered = manholeParamsOf({ position, invert, surfaceId, numbers: fields, name });
+    const gathered = manholeParamsOf({
+      position: values.position,
+      invert: values.invert,
+      surfaceId,
+      numbers: Object.fromEntries(MANHOLE_FIELDS.map(([key]) => [key, values[key]])),
+      name: values.name,
+    });
     if (!gathered.ok) {
       setError(gathered.error);
       return;
     }
     dispatch('add_manhole', gathered.params);
-    setError('');
-    setPosition('');
-    setName('');
+    change('position', '');
+    change('name', '');
   };
 
   return (
     <form className="civil-form" onSubmit={handleSubmit} aria-label="Add manhole">
       <div className="building-inline-form">
-        <TextField value={position} set={setPosition} hint="x,y" label="Manhole position" />
-        <NumberField
-          value={invert}
-          set={setInvert}
-          hint="Invert elevation"
-          label="Manhole invert"
-        />
+        <TextField {...field('position')} hint="x,y" label="Manhole position" />
+        <NumberTextField {...field('invert')} hint="Invert elevation" label="Manhole invert" />
         <CivilObjectSelect
           objects={surfaces}
           value={surfaceId}
@@ -82,16 +82,14 @@ export function ManholeForm(): React.ReactElement {
       </div>
       <div className="building-inline-form">
         {MANHOLE_FIELDS.map(([key, placeholder]) => (
-          <input
+          <NumberTextField
             key={key}
-            type="number"
-            value={fields[key]}
-            placeholder={placeholder}
-            aria-label={`Manhole ${placeholder.toLowerCase()}`}
-            onChange={(event) => setFields((prev) => ({ ...prev, [key]: event.target.value }))}
+            {...field(key)}
+            hint={placeholder}
+            label={`Manhole ${placeholder.toLowerCase()}`}
           />
         ))}
-        <TextField value={name} set={setName} hint="Name" label="Manhole name" />
+        <TextField {...field('name')} hint="Name" label="Manhole name" />
         <button type="submit" className="btn btn--primary btn--sm">
           Add manhole
         </button>
@@ -106,9 +104,7 @@ export function PipeForm(): React.ReactElement {
   const manholes = useCivilObjects('manhole');
   const [fromId, setFrom] = useChosenId(manholes);
   const [toId, setTo] = useChosenId(manholes, false, 1);
-  const [diameter, setDiameter] = useState('');
-  const [material, setMaterial] = useState('');
-  const [manningN, setManningN] = useState('');
+  const { values, field } = useFormValues(() => PIPE_FORM);
 
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
@@ -116,9 +112,9 @@ export function PipeForm(): React.ReactElement {
     dispatch('add_pipe', {
       fromId,
       toId,
-      ...optionalNumber('diameter', diameter),
-      ...optionalText('material', material),
-      ...optionalNumber('manningN', manningN),
+      ...optionalNumber('diameter', values.diameter),
+      ...optionalText('material', values.material),
+      ...optionalNumber('manningN', values.manningN),
     });
   };
 
@@ -126,9 +122,9 @@ export function PipeForm(): React.ReactElement {
     <form className="building-inline-form" onSubmit={handleSubmit} aria-label="Add pipe">
       <CivilObjectSelect objects={manholes} value={fromId} label="Pipe from" onChange={setFrom} />
       <CivilObjectSelect objects={manholes} value={toId} label="Pipe to" onChange={setTo} />
-      <NumberField value={diameter} set={setDiameter} hint="Diameter" label="Pipe diameter" />
-      <TextField value={material} set={setMaterial} hint="Material" label="Pipe material" />
-      <NumberField value={manningN} set={setManningN} hint="Manning n" label="Pipe Manning n" />
+      <NumberTextField {...field('diameter')} hint="Diameter" label="Pipe diameter" />
+      <TextField {...field('material')} hint="Material" label="Pipe material" />
+      <NumberTextField {...field('manningN')} hint="Manning n" label="Pipe Manning n" />
       <button
         type="submit"
         className="btn btn--primary btn--sm"

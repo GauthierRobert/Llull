@@ -9,6 +9,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { isRecord } from '@lib/isRecord';
+import { readJsonFile } from '../readJsonFile';
 import { writeFileAtomic } from '../writeFileAtomic';
 
 export interface DesktopDiscovery {
@@ -56,12 +57,7 @@ function isProcessAlive(pid: number): boolean {
 }
 
 function readDesktopDiscoveryFile(home: string): DesktopDiscovery | null {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(fs.readFileSync(desktopDiscoveryPath(home), 'utf8')) as unknown;
-  } catch {
-    return null;
-  }
+  const parsed = readJsonFile(desktopDiscoveryPath(home));
   if (!isRecord(parsed)) return null;
   const { url, token, pid, documentPath, version } = parsed;
   if (typeof url !== 'string' || typeof token !== 'string' || typeof pid !== 'number') return null;

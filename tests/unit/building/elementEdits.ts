@@ -1,4 +1,4 @@
-import type { BuildingElement } from '@core/model/building';
+import type { BuildingElement, SteelMemberElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 
 function buildingOf(doc: CadDocument): NonNullable<CadDocument['building']> {
@@ -42,3 +42,13 @@ export const rawBuilding = (
   doc: CadDocument,
 ): { elements: Record<string, Record<string, unknown>> } =>
   JSON.parse(JSON.stringify(doc.building));
+
+/** The steel members of `doc` with the given role. */
+export const membersOf = (
+  doc: CadDocument,
+  role: SteelMemberElement['role'],
+): SteelMemberElement[] =>
+  Object.values(doc.building?.elements ?? {}).filter(
+    (element): element is SteelMemberElement =>
+      element.category === 'member' && element.role === role,
+  );

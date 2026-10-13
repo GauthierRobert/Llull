@@ -13,9 +13,10 @@ import type {
   SlabElement,
   WallElement,
 } from '@core/model/building';
-import { polygonArea, polygonCentroid } from '@lib/polygon';
+import { polygonCentroid } from '@lib/polygon';
 import { curvedBandBetween, curvedWallExtent, tangentWall } from '../geometry/curvedWallGeometry';
 import { fromMm, toMetres } from '@core/model/units';
+import { planAreaM2 } from '../../shared/planArea';
 import { gridBubbleCenters } from '../geometry/gridGeometry';
 import {
   doorSwing,
@@ -333,7 +334,7 @@ export function columnPrimitive(column: ColumnElement): PlanPrimitive {
 export function roomPrimitives(doc: PlanSource, room: RoomElement): PlanPrimitive[] {
   const [cx, cy] = polygonCentroid(room.boundary);
   const textHeight = fromMm(doc, 250);
-  const area = polygonArea(room.boundary) * toMetres(doc, 1) ** 2;
+  const area = planAreaM2(doc, room.boundary);
   const layer = layerName('room');
   return [
     annotationText(layer, [cx, cy + textHeight * 0.7], textHeight, room.name),

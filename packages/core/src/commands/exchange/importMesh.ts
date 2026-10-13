@@ -12,6 +12,7 @@ import { MAX_IMPORT_BODIES, MAX_IMPORT_TRIANGLES } from '../limits';
 import { isHexColor } from '../../lib/isHexColor';
 import { changed, noop } from '../noop';
 import { newEntity } from '../entity/newEntity';
+import { soupIndices } from '../../geometry/meshVolume';
 
 interface MeshBodyParams {
   positions: number[];
@@ -98,7 +99,7 @@ export const importMesh = defineCommand({
         'mesh',
         id,
         {
-          mesh: { positions: soup, indices: Array.from({ length: soup.length / 3 }, (_, n) => n) },
+          mesh: { positions: soup, indices: soupIndices(soup) },
         },
         [0, 0, 0],
         isHexColor(body.color) ? body.color : DEFAULT_MESH_COLOR,

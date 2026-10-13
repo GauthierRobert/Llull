@@ -5,7 +5,7 @@
 
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { CIVIL_CATEGORIES } from '@core/model/civil';
 import { getCivil, withoutObjects } from './model';
 import { dependentsOf, referencesOf } from './integrity';
@@ -44,16 +44,14 @@ export const describeCivil = defineCommand({
       name,
       objects.filter((object) => object.category === name).length,
     ]).filter(([, count]) => (count as number) > 0);
-    return {
-      document: doc,
-      summary:
-        objects.length === 0
-          ? 'The civil model is empty.'
-          : `Civil model: ${counts.map(([name, count]) => `${count} ${name}`).join(', ')}. ` +
+    return report(
+      doc,
+      objects.length === 0
+        ? 'The civil model is empty.'
+        : `Civil model: ${counts.map(([name, count]) => `${count} ${name}`).join(', ')}. ` +
             objects.map((object) => `${object.id} "${object.name}"`).join('; '),
-      affected: [],
-      data: { objects },
-    };
+      { objects },
+    );
   },
 });
 

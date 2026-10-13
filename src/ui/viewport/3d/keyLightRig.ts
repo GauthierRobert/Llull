@@ -7,8 +7,9 @@
  * (world - renderOrigin), the space the light lives in.
  */
 
-import type { Bounds } from '@core/geometry/bounds';
+import { type Bounds, boundsCenter, boundsDiagonalRadius } from '@core/geometry/bounds';
 import type { Vec3 } from '@core/model/types';
+import { toRenderPosition } from './floatingOrigin';
 
 /** Half-size of the shadow frustum used for scenes smaller than this (the original fixed rig). */
 export const MIN_SHADOW_HALF_EXTENT = 30;
@@ -33,20 +34,8 @@ export interface KeyLightRig {
  * @invariant bounds null (empty scene) -> the original fixed rig at the origin
  */
 export function computeKeyLightRig(bounds: Bounds | null, renderOrigin: Vec3): KeyLightRig {
-  const centre: Vec3 = bounds
-    ? [
-        (bounds.min[0] + bounds.max[0]) / 2 - renderOrigin[0],
-        (bounds.min[1] + bounds.max[1]) / 2 - renderOrigin[1],
-        (bounds.min[2] + bounds.max[2]) / 2 - renderOrigin[2],
-      ]
-    : [0, 0, 0];
-  const radius = bounds
-    ? Math.hypot(
-        bounds.max[0] - bounds.min[0],
-        bounds.max[1] - bounds.min[1],
-        bounds.max[2] - bounds.min[2],
-      ) / 2
-    : 0;
+  const centre: Vec3 = bounds ? toRenderPosition(boundsCenter(bounds), renderOrigin) : [0, 0, 0];
+  const radius = bounds ? boundsDiagonalRadius(bounds) : 0;
   const halfExtent = Math.max(MIN_SHADOW_HALF_EXTENT, radius * PADDING);
   const scale = halfExtent / MIN_SHADOW_HALF_EXTENT;
   return {

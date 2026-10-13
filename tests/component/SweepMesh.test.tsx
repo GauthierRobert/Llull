@@ -10,7 +10,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '@ui/store';
 import type { SweepEntity } from '@core/model/types';
 import { sweepTriangles } from '@core/geometry/sweep';
-import { buildMeshSolidGeometry } from '@ui/viewport/3d/entities/meshSolidGeometry';
+import { buildTriangleSoupGeometry } from '@ui/viewport/3d/entities/meshSolidGeometry';
 import { dispatchEntity, resetStore } from '../helpers/componentEntities';
 
 describe('SweepMesh — sweep_profile command → kind "sweep"', () => {
@@ -38,12 +38,10 @@ describe('SweepMesh — sweep_profile command → kind "sweep"', () => {
       ],
       radius: 1,
     }).entity as SweepEntity;
-    const positions = sweepTriangles(pipe).flat(2);
-    const geometry = buildMeshSolidGeometry({
-      positions,
-      indices: Array.from({ length: positions.length / 3 }, (_, corner) => corner),
-    });
-    expect(geometry.getAttribute('position').count).toBe(positions.length / 3);
+    const triangles = sweepTriangles(pipe);
+    const geometry = buildTriangleSoupGeometry(triangles);
+    if (geometry === null) throw new Error('empty geometry');
+    expect(geometry.getAttribute('position').count).toBe(triangles.length * 3);
     expect(geometry.getAttribute('normal')).toBeDefined();
     geometry.dispose();
   });

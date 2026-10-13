@@ -7,13 +7,7 @@
 import type { BasePlateElement, BuildingModel, SteelMemberElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import { fromMm } from '@core/model/units';
-import {
-  elementsOf,
-  nextElementId,
-  nextMark,
-  withElement,
-  withoutElements,
-} from '../../building/model';
+import { elementsOf, appendElements, withElement, withoutElements } from '../../building/model';
 import { findProfile } from '../../steel/profiles';
 
 interface PlateSize {
@@ -32,31 +26,31 @@ export function appendBasePlates(
   columns: ReadonlyArray<SteelMemberElement>,
   size: PlateSize,
 ): { building: BuildingModel; ids: string[] } {
-  let next = building;
-  const ids: string[] = [];
   const margin = size.margin ?? fromMm(doc, 100);
-  for (const column of columns) {
-    const profile = findProfile(column.profile);
-    if (!profile) continue;
-    const plate: BasePlateElement = {
-      id: nextElementId(next, 'plate'),
-      category: 'plate',
-      mark: nextMark(next, 'plate'),
-      entityIds: [],
-      levelId: column.levelId,
-      memberId: column.id,
-      length: fromMm(doc, profile.h) + 2 * margin,
-      width: fromMm(doc, profile.b) + 2 * margin,
-      thickness: size.thickness ?? fromMm(doc, profile.h >= 300 ? 25 : 20),
-      boltCount: size.boltCount ?? 4,
-      boltDiameter: size.boltDiameter ?? fromMm(doc, 24),
-      material: 'S355',
-      ...(size.fixity === 'fixed' ? { fixity: 'fixed' as const } : {}),
-    };
-    next = withElement(next, plate);
-    ids.push(plate.id);
-  }
-  return { building: next, ids };
+  return appendElements(
+    building,
+    columns,
+    'plate',
+    (column, id, mark): BasePlateElement | undefined => {
+      const profile = findProfile(column.profile);
+      if (!profile) return undefined;
+      return {
+        id,
+        category: 'plate',
+        mark,
+        entityIds: [],
+        levelId: column.levelId,
+        memberId: column.id,
+        length: fromMm(doc, profile.h) + 2 * margin,
+        width: fromMm(doc, profile.b) + 2 * margin,
+        thickness: size.thickness ?? fromMm(doc, profile.h >= 300 ? 25 : 20),
+        boltCount: size.boltCount ?? 4,
+        boltDiameter: size.boltDiameter ?? fromMm(doc, 24),
+        material: 'S355',
+        ...(size.fixity === 'fixed' ? { fixity: 'fixed' as const } : {}),
+      };
+    },
+  );
 }
 
 /**
@@ -94,11 +88,7 @@ export function columnsWithoutPlates(
   levelId: string | null,
   memberIds: ReadonlySet<string> | null,
 ): SteelMemberElement[] {
-  const plated = new Set(
-    Object.values(building.elements).flatMap((element) =>
-      element.category === 'plate' ? [element.memberId] : [],
-    ),
-  );
+  const plated = new Set(elementsOf(building, 'plate').map((plate) => plate.memberId));
   return elementsOf(building, 'member').filter(
     (element) =>
       element.role === 'column' &&

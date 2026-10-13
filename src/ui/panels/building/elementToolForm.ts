@@ -93,10 +93,6 @@ export function defaultedSelect(
 /** Picker group of the steel hall / plant tools. */
 export const INDUSTRIAL_TOOL_GROUP = 'Industrial / steel';
 
-export function radians(degrees: number): number {
-  return (degrees * Math.PI) / 180;
-}
-
 export function isFieldShown(field: ToolField, values: Readonly<Record<string, string>>): boolean {
   return (
     field.showWhen === undefined || field.showWhen.values.includes(values[field.showWhen.key] ?? '')
@@ -167,6 +163,17 @@ export function result(
     Object.entries(params).filter(([, value]) => value !== undefined),
   );
   return { ok: true, command, params: cleaned };
+}
+
+/** `ElementTool.build` for a tool that always yields `command` with params read from the fields. */
+export function buildWith(
+  command: string,
+  params: (reader: FieldReader, context: ToolContext) => Record<string, unknown>,
+): ElementTool['build'] {
+  return (values, context) => {
+    const reader = new FieldReader(values);
+    return result(reader, command, params(reader, context));
+  };
 }
 
 /** Comma / semicolon separated text → trimmed non-empty items; blank → undefined. */

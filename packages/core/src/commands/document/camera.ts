@@ -7,16 +7,12 @@
  */
 
 import type { CameraState } from '../../model/types';
-import { VIEWPORT_FOV_DEGREES } from '../../model/viewport';
-import { scale3, sub3, len3 } from '../../lib/vec3';
-import { boundsCenter } from '../../geometry/bounds';
+import { fitFraming } from '../../geometry/viewFraming';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
 import { computeSceneSnapshot } from '../inspect/scene';
 import { noop, report } from '../noop';
-
-/** Half of the 3D viewport PerspectiveCamera's vertical field of view. */
-const HALF_FOV_RAD = (VIEWPORT_FOV_DEGREES / 2) * (Math.PI / 180);
+import { clamp } from '../../lib/clamp';
 
 /** Direction presets (eye position → view); top/bottom stop short of the poles to avoid gimbal lock. */
 const DIRECTION_PRESETS: Record<string, { azimuth: number; polar: number }> = {
@@ -33,7 +29,7 @@ const MIN_POLAR = 0.01;
 const MAX_POLAR = Math.PI - 0.01;
 
 /** `polar` limited to [0.01, π−0.01] so the eye never reaches a pole. */
-const clampPolar = (polar: number): number => Math.min(MAX_POLAR, Math.max(MIN_POLAR, polar));
+const clampPolar = (polar: number): number => clamp(polar, MIN_POLAR, MAX_POLAR);
 
 /**
  * @command set_camera
@@ -164,13 +160,7 @@ export const fitView = defineCommand({
       );
     }
 
-    const target = boundsCenter(bounds);
-    const half = scale3(sub3(bounds.max, bounds.min), 0.5);
-    const boundsRadius = len3(half);
-    // A lone point has no extent: avoid a degenerate distance.
-    const safeRadius = boundsRadius < 0.001 ? 1 : boundsRadius;
-    const distance = (safeRadius / Math.sin(HALF_FOV_RAD)) * padding;
-
+    const { center: target, distance } = fitFraming(bounds, 1, padding);
     const next: CameraState = { target, azimuth, polar, distance };
     return report(
       { ...doc, camera: next },

@@ -13,8 +13,8 @@
 import type { CadDocument, Entity, MaterialFinish, Vec3 } from '../../model/types';
 import { decalPatch } from '../../geometry/decal';
 import { rasterizeText } from '../../lib/blockFont';
-import { applyEulerXYZ } from '../../lib/eulerRotation';
-import { add3 } from '../../lib/vec3';
+import { entityLocalToWorld } from '../../geometry/entityFrame';
+import { dot3 } from '../../lib/vec3';
 import { parseHexRgb } from '../../lib/isHexColor';
 import { boxUv, finishMaps } from '../../geometry/finishMaps';
 import { encodePng } from '../../lib/png';
@@ -23,13 +23,14 @@ import type { Triangle } from '../../geometry/triangles';
 import { facetNormal } from '../../geometry/tessellation';
 import { expandInstance } from '../../geometry/instanceExpansion';
 import { localTriangles, solidTriangles } from '../../geometry/solidTriangles';
+import { toRadians } from '../../lib/angle';
 
 /** Metalness / roughness of a solid without an assigned material (matches the viewport). */
 export const DEFAULT_METALNESS = 0.08;
 export const DEFAULT_ROUGHNESS = 0.45;
 
 /** Faces meeting at less than this angle share a smoothed vertex normal. */
-const CREASE_ANGLE = (30 * Math.PI) / 180;
+const CREASE_ANGLE = toRadians(30);
 
 /** PBR appearance of one exported part. */
 export interface PartAppearance {
@@ -132,7 +133,7 @@ export function collectDecalParts(doc: CadDocument, ids: readonly string[]): Dec
           patch.positions[i + 1] ?? 0,
           patch.positions[i + 2] ?? 0,
         ];
-        positions.push(...add3(applyEulerXYZ(p, [0, 0, 0], entity.rotation), entity.position));
+        positions.push(...entityLocalToWorld(entity, p));
       }
       parts.push({
         name: `${entity.name ?? entity.id}/decal "${decal.text}"`,
@@ -182,12 +183,12 @@ export function creasedNormals(tris: readonly Triangle[]): Float32Array {
   const cosLimit = Math.cos(CREASE_ANGLE);
   const out = new Float32Array(tris.length * 9);
   tris.forEach((tri, face) => {
-    const own = faceNormals[face] as readonly [number, number, number];
+    const own = faceNormals[face] as Vec3;
     tri.forEach((v, corner) => {
       let [x, y, z] = [0, 0, 0];
       for (const other of facesAt.get(key(v)) ?? []) {
-        const n = faceNormals[other] as readonly [number, number, number];
-        if (n[0] * own[0] + n[1] * own[1] + n[2] * own[2] < cosLimit) continue;
+        const n = faceNormals[other] as Vec3;
+        if (dot3(n, own) < cosLimit) continue;
         x += n[0];
         y += n[1];
         z += n[2];

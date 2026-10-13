@@ -14,6 +14,7 @@
  * fetch is mocked via vi.stubGlobal — no real network calls are made.
  */
 
+import { httpFail } from '../helpers/integrationFetch';
 import { execute } from '@core/commands/registry';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -522,10 +523,6 @@ describe('CadStore — offline fallback', () => {
 });
 
 // Sync races (select during push, failed push retry, patches, SSE-open network errors)
-
-function httpFail(status: number): { ok: false; status: number; json: () => Promise<object> } {
-  return { ok: false, status, json: () => Promise.resolve({}) };
-}
 
 function okResponse(affected?: string[]): {
   ok: true;

@@ -60,6 +60,23 @@ function steps(
         width: mm(width),
         ...(height === undefined ? {} : { height: mm(height) }),
       });
+  const gridStep =
+    (xSpacings: number[], ySpacings: number[]): Step =>
+    (d) =>
+      addGridSystem.run(d, {
+        xSpacings: xSpacings.map(mm),
+        ySpacings: ySpacings.map(mm),
+        origin: at(0, 0),
+      });
+  const perimeterWallsStep =
+    (width: number, depth: number, thickness: number, material: string): Step =>
+    (d) =>
+      drawWalls.run(d, {
+        points: rectangle(0, 0, width, depth),
+        closed: true,
+        thickness: mm(thickness),
+        material,
+      });
   const naming: Step[] =
     building.project.name === 'Untitled project'
       ? [
@@ -75,19 +92,8 @@ function steps(
       levelStep('Ground floor', 0, 2900, true),
       levelStep('First floor', 2900, 2900),
       levelStep('Roof', 5800, 1000),
-      (d) =>
-        addGridSystem.run(d, {
-          xSpacings: [mm(5000), mm(5000)],
-          ySpacings: [mm(8000)],
-          origin: at(0, 0),
-        }),
-      (d) =>
-        drawWalls.run(d, {
-          points: rectangle(0, 0, 10000, 8000),
-          closed: true,
-          thickness: mm(300),
-          material: 'masonry',
-        }),
+      gridStep([5000, 5000], [8000]),
+      perimeterWallsStep(10000, 8000, 300, 'masonry'),
       (d) =>
         drawWalls.run(d, {
           points: [at(5000, 0), at(5000, 8000)],
@@ -143,19 +149,8 @@ function steps(
     levelStep('Level 1', 3600, 3600),
     levelStep('Level 2', 7200, 3600),
     levelStep('Roof', 10800, 1000),
-    (d) =>
-      addGridSystem.run(d, {
-        xSpacings: [mm(7500), mm(7500), mm(7500)],
-        ySpacings: [mm(7500), mm(5000)],
-        origin: at(0, 0),
-      }),
-    (d) =>
-      drawWalls.run(d, {
-        points: rectangle(0, 0, 22500, 12500),
-        closed: true,
-        thickness: mm(250),
-        material: 'concrete',
-      }),
+    gridStep([7500, 7500, 7500], [7500, 5000]),
+    perimeterWallsStep(22500, 12500, 250, 'concrete'),
     (d) => addColumn.run(d, { atGridIntersections: true, width: mm(400) }),
     (d) =>
       addBeam.run(d, { start: at(0, 7500), end: at(22500, 7500), width: mm(300), depth: mm(600) }),

@@ -7,7 +7,7 @@
  */
 
 import type { Vec3 } from '../model/types';
-import { add3, dot3, scale3, sub3 } from '../lib/vec3';
+import { dot3, lerp3 } from '../lib/vec3';
 
 /** Unit-normal plane; `signedDistance(plane, p) > 0` is its positive side. */
 export interface UnitPlane {
@@ -32,4 +32,4 @@ export function forEachEdge(
 
 /** Where edge `a→b` (signed distances `sa`, `sb` of opposite sides) meets the plane. */
 export const edgeCrossing = (a: Vec3, b: Vec3, sa: number, sb: number): Vec3 =>
-  add3(a, scale3(sub3(b, a), sa / (sa - sb)));
+  lerp3(a, b, sa / (sa - sb));

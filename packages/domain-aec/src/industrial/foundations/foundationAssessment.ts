@@ -5,7 +5,7 @@
  */
 
 import type { CadDocument } from '@core/model/types';
-import { getBuilding } from '../../building/model';
+import { getBuilding, levelElementsOf } from '../../building/model';
 import type { FrameLoads } from '../frames/frameModelTypes';
 import { baseReactions } from '../frames/frameModelSolve';
 import {
@@ -16,7 +16,7 @@ import {
 } from './foundationModel';
 import { differentialRows, footingRows } from './foundationRows';
 import { plateRows } from './foundationPlateRows';
-import { groundSlabWeight, slidingHorizontalOf } from './foundationThrust';
+import { reactionColumn, slabSharePerColumn, slidingHorizontalOf } from './foundationThrust';
 import {
   combine,
   findFooting,
@@ -49,12 +49,11 @@ export function checkFoundations(
   const reactions = baseReactions(doc, building, levelId, loads);
   const checkedFootings = new Set<string>();
   const tieDone = new Set<string>();
-  const slabWeight = thrustTie ? groundSlabWeight(doc, building, levelId) : 0;
   const settlements: PadSettlement[] = [];
-  const slabShare = reactions.length > 0 ? slabWeight / reactions.length : 0;
+  const slabShare = slabSharePerColumn(doc, building, levelId, thrustTie, reactions.length);
   for (const reaction of reactions) {
-    const column = building.elements[reaction.columnId];
-    if (column?.category !== 'member') continue;
+    const column = reactionColumn(building, reaction);
+    if (!column) continue;
     const siblings = reactions.filter((other) => other.frame === reaction.frame);
     const slidingHorizontal = slidingHorizontalOf(reactions, reaction, thrustTie);
     const footing = findFooting(doc, building, levelId, column);
@@ -122,11 +121,8 @@ export function checkFoundations(
     }
   }
   rows.push(...differentialRows(doc, settlements));
-  const unchecked = Object.values(building.elements).filter(
-    (element) =>
-      element.category === 'footing' &&
-      element.levelId === levelId &&
-      !checkedFootings.has(element.id),
+  const unchecked = levelElementsOf(building, 'footing', levelId).filter(
+    (element) => !checkedFootings.has(element.id),
   ).length;
   return { rows, footings, plates, unchecked };
 }

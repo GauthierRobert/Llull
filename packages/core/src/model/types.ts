@@ -396,7 +396,7 @@ export type Entity =
 
 const SHAPE2D_KIND_SET: ReadonlySet<string> = new Set(SHAPE2D_KINDS);
 
-export function is2D(e: Entity): boolean {
+export function is2D(e: Entity): e is Extract<Entity, { kind: Shape2DKind }> {
   return SHAPE2D_KIND_SET.has(e.kind);
 }
 

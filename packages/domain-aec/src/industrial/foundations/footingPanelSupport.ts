@@ -8,7 +8,7 @@ import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
 import type { BuildingModel, FootingElement, PanelElement } from '@core/model/building';
 import { distance } from '@lib/polygon';
 import { fromMm } from '@core/model/units';
-import { nextElementId, nextMark, toVec2, withElement } from '../../building/model';
+import { appendElements, nextElementId, nextMark, toVec2, withElement } from '../../building/model';
 import { panelFrame } from '../evaluate';
 
 /** Upper bound on members one generator call may create (keeps agents from hanging the host). */
@@ -70,14 +70,15 @@ export function appendFootings(
     material?: string | undefined;
   },
 ): { building: BuildingModel; ids: string[] } {
-  let next = building;
-  const ids: string[] = [];
   const width = size.width ?? fromMm(doc, 1500);
-  for (const location of locations) {
-    const footing: FootingElement = {
-      id: nextElementId(next, 'footing'),
+  return appendElements(
+    building,
+    locations,
+    'footing',
+    (location, id, mark): FootingElement => ({
+      id,
       category: 'footing',
-      mark: nextMark(next, 'footing'),
+      mark,
       entityIds: [],
       levelId,
       location: toVec2(location),
@@ -86,11 +87,8 @@ export function appendFootings(
       thickness: size.thickness ?? fromMm(doc, 600),
       topOffset: size.topOffset ?? -fromMm(doc, 300),
       material: size.material?.trim() || 'concrete',
-    };
-    next = withElement(next, footing);
-    ids.push(footing.id);
-  }
-  return { building: next, ids };
+    }),
+  );
 }
 
 /** Adds one cladding panel (no regeneration); null when the corners are not a usable plane. */

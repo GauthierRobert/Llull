@@ -7,42 +7,35 @@
  */
 
 import React, { useState } from 'react';
-import { useStore } from '@ui/store';
+import { PAPER_SIZES } from '@aec/shared/sheetFrame';
 import { isNcFilesData } from '@ui/resultData';
-import { downloadQuery, runQuery } from '@ui/services/localQuery';
-import { PanelSection } from '@ui/panels/PanelParts';
+import { runQuery } from '@ui/services/localQuery';
+import { PanelSection, StatusLine } from '@ui/panels/PanelParts';
+import { QueryDownloadButton } from '@ui/panels/QueryDownloadButton';
 import { OptionSelect } from '@ui/panels/OptionSelect';
 import { capitalize } from '@ui/panels/capitalize';
-import { orderedValues } from '@ui/panels/orderedValues';
 import { downloadText } from '@ui/download';
 import { optionalNumber } from '@ui/numberText';
+import { LevelSelect } from './LevelSelect';
+import { useBuildingLevels } from './useBuildingLevels';
 
-const PAPERS = ['A4', 'A3', 'A2', 'A1', 'A0'] as const;
 const SCALES = ['auto', '20', '50', '100', '200', '500'] as const;
 const DIRECTIONS = ['south', 'north', 'east', 'west'] as const;
 
 export function BuildingExportsSection(): React.ReactElement {
-  const building = useStore((s) => s.document.building);
-  const [paper, setPaper] = useState<(typeof PAPERS)[number]>('A3');
+  const levels = useBuildingLevels();
+  const [paper, setPaper] = useState<(typeof PAPER_SIZES)[number]>('A3');
   const [scale, setScale] = useState<(typeof SCALES)[number]>('auto');
   const [status, setStatus] = useState('');
   const [direction, setDirection] = useState<(typeof DIRECTIONS)[number]>('south');
   const [cutAt, setCutAt] = useState('');
   const [hideCladding, setHideCladding] = useState(false);
   const [levelChoice, setLevelChoice] = useState('');
-  const levels = building ? orderedValues(building.levelOrder, building.levels) : [];
   const levelParams =
     levelChoice !== '' && levels.some((level) => level.id === levelChoice)
       ? { levelId: levelChoice }
       : {};
   const scaleParams = scale === 'auto' ? {} : { scale: Number(scale) };
-
-  const run = (
-    command: string,
-    params: Record<string, unknown>,
-    field: string,
-    mimeType: string,
-  ): void => setStatus(downloadQuery(command, params, field, null, mimeType));
 
   const exportNcFiles = (): void => {
     const result = runQuery('export_nc_files');
@@ -60,7 +53,7 @@ export function BuildingExportsSection(): React.ReactElement {
       testId="building-exports"
     >
       <div className="building-inline-form">
-        <OptionSelect value={paper} options={PAPERS} label="Paper size" onChange={setPaper} />
+        <OptionSelect value={paper} options={PAPER_SIZES} label="Paper size" onChange={setPaper} />
         <OptionSelect
           value={scale}
           options={SCALES}
@@ -68,47 +61,33 @@ export function BuildingExportsSection(): React.ReactElement {
           optionLabel={(value) => (value === 'auto' ? 'Fit scale' : `1:${value}`)}
           onChange={setScale}
         />
-        <select
+        <LevelSelect
+          levels={levels}
           value={levelParams.levelId ?? ''}
-          onChange={(event) => setLevelChoice(event.target.value)}
-          aria-label="Export level"
+          label="Export level"
           title="Level printed by the plan sheet, anchor plan and DXF"
-        >
-          <option value="">Active level</option>
-          {levels.map((level) => (
-            <option key={level.id} value={level.id}>
-              {level.name}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          className="btn btn--primary btn--sm"
-          onClick={() =>
-            run(
-              'export_plan_sheet',
-              { paper, ...scaleParams, ...levelParams },
-              'svg',
-              'image/svg+xml',
-            )
-          }
-        >
-          Plan sheet
-        </button>
-        <button
-          type="button"
-          className="btn btn--ghost btn--sm"
-          onClick={() =>
-            run(
-              'export_anchor_plan',
-              { paper, ...scaleParams, ...levelParams },
-              'svg',
-              'image/svg+xml',
-            )
-          }
-        >
-          Anchor plan
-        </button>
+          blankLabel="Active level"
+          onChange={setLevelChoice}
+        />
+        <QueryDownloadButton
+          primary
+          label="Plan sheet"
+          command="export_plan_sheet"
+          params={{ paper, ...scaleParams, ...levelParams }}
+          field="svg"
+          fallbackName={null}
+          mimeType="image/svg+xml"
+          onStatus={setStatus}
+        />
+        <QueryDownloadButton
+          label="Anchor plan"
+          command="export_anchor_plan"
+          params={{ paper, ...scaleParams, ...levelParams }}
+          field="svg"
+          fallbackName={null}
+          mimeType="image/svg+xml"
+          onStatus={setStatus}
+        />
       </div>
       <div className="building-inline-form">
         <OptionSelect
@@ -133,51 +112,46 @@ export function BuildingExportsSection(): React.ReactElement {
           />
           <span>Hide cladding</span>
         </label>
-        <button
-          type="button"
-          className="btn btn--primary btn--sm"
-          onClick={() =>
-            run(
-              'export_elevation_sheet',
-              {
-                direction,
-                paper,
-                ...scaleParams,
-                ...optionalNumber('cutAt', cutAt),
-                ...(hideCladding ? { exclude: ['panel'] } : {}),
-              },
-              'svg',
-              'image/svg+xml',
-            )
-          }
-        >
-          {cutAt.trim() === '' ? 'Elevation sheet' : 'Section sheet'}
-        </button>
+        <QueryDownloadButton
+          primary
+          label={cutAt.trim() === '' ? 'Elevation sheet' : 'Section sheet'}
+          command="export_elevation_sheet"
+          params={{
+            direction,
+            paper,
+            ...scaleParams,
+            ...optionalNumber('cutAt', cutAt),
+            ...(hideCladding ? { exclude: ['panel'] } : {}),
+          }}
+          field="svg"
+          fallbackName={null}
+          mimeType="image/svg+xml"
+          onStatus={setStatus}
+        />
       </div>
       <div className="building-actions">
-        <button
-          type="button"
-          className="btn btn--ghost btn--sm"
-          onClick={() => run('export_dxf', { ...levelParams }, 'dxf', 'application/dxf')}
-        >
-          DXF (AutoCAD)
-        </button>
-        <button
-          type="button"
-          className="btn btn--ghost btn--sm"
-          onClick={() => run('export_ifc', {}, 'ifc', 'application/x-step')}
-        >
-          IFC (BIM)
-        </button>
+        <QueryDownloadButton
+          label="DXF (AutoCAD)"
+          command="export_dxf"
+          params={{ ...levelParams }}
+          field="dxf"
+          fallbackName={null}
+          mimeType="application/dxf"
+          onStatus={setStatus}
+        />
+        <QueryDownloadButton
+          label="IFC (BIM)"
+          command="export_ifc"
+          field="ifc"
+          fallbackName={null}
+          mimeType="application/x-step"
+          onStatus={setStatus}
+        />
         <button type="button" className="btn btn--ghost btn--sm" onClick={exportNcFiles}>
           NC files (DSTV)
         </button>
       </div>
-      {status !== '' && (
-        <p className="building-summary" role="status" data-testid="building-export-status">
-          {status}
-        </p>
-      )}
+      <StatusLine text={status} testId="building-export-status" />
     </PanelSection>
   );
 }

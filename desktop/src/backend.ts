@@ -11,6 +11,9 @@ import net from 'net';
 import path from 'path';
 import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
+import { isHealthy } from '@server/restClient';
+import { readJsonFile } from '@server/readJsonFile';
+import { writeFileAtomic } from '@server/writeFileAtomic';
 
 /** Default local port; any free port replaces it when taken (then remembered). */
 export const DEFAULT_DESKTOP_PORT = 47827;
@@ -44,15 +47,11 @@ function settingsPath(userDataDir: string): string {
 }
 
 function rememberedPort(userDataDir: string): number | null {
-  try {
-    const parsed = JSON.parse(fs.readFileSync(settingsPath(userDataDir), 'utf8')) as unknown;
-    const port = isRecord(parsed) ? parsed['port'] : undefined;
-    return typeof port === 'number' && Number.isInteger(port) && port > 0 && port < 65536
-      ? port
-      : null;
-  } catch {
-    return null;
-  }
+  const parsed = readJsonFile(settingsPath(userDataDir));
+  const port = isRecord(parsed) ? parsed['port'] : undefined;
+  return typeof port === 'number' && Number.isInteger(port) && port > 0 && port < 65536
+    ? port
+    : null;
 }
 
 /** The remembered port when free, else the default when free, else any free port (remembered). */
@@ -61,7 +60,7 @@ export async function chooseBackendPort(userDataDir: string): Promise<number> {
   const port = (await canListen(preferred)) ? preferred : await anyFreePort();
   if (port !== rememberedPort(userDataDir)) {
     fs.mkdirSync(userDataDir, { recursive: true });
-    fs.writeFileSync(settingsPath(userDataDir), JSON.stringify({ port }, null, 2));
+    writeFileAtomic(settingsPath(userDataDir), JSON.stringify({ port }, null, 2));
   }
   return port;
 }
@@ -85,12 +84,7 @@ async function waitForHealth(url: string, exited: () => string | null): Promise<
   for (;;) {
     const exitReason = exited();
     if (exitReason !== null) throw new Error(exitReason);
-    try {
-      const response = await fetch(`${url}/health`);
-      if (response.ok) return;
-    } catch {
-      // not listening yet
-    }
+    if (await isHealthy(url)) return;
     if (Date.now() > deadline)
       throw new Error(
         `the local backend did not answer ${url}/health within ${HEALTH_TIMEOUT_MS} ms`,

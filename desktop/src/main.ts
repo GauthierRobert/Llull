@@ -18,12 +18,13 @@ import { chooseBackendPort, startBackend, type RunningBackend } from './backend'
 import { backendEnv, backendOrigin } from './backendEnv';
 import { cliShimFor, installCliShim } from './cliShim';
 import { createDocumentSession, type DocumentSession } from './documents';
+import { DEFAULT_SAVE_NAME, DOCUMENT_EXTENSIONS, DOCUMENT_FILE_PATTERN } from '@mcp/documentFiles';
 import { desktopLayout } from './layout';
 import { agentHelpText, menuTemplate } from './menu';
 import { navigationDecision } from './navigation';
 
 const FILE_FILTERS = [
-  { name: 'llull document', extensions: ['llull', 'json'] },
+  { name: 'llull document', extensions: [...DOCUMENT_EXTENSIONS] },
   { name: 'All files', extensions: ['*'] },
 ];
 
@@ -47,7 +48,7 @@ let pendingOpen: string | null = documentArgument(process.argv);
 
 function documentArgument(argv: readonly string[]): string | null {
   const candidate = argv.slice(app.isPackaged ? 1 : 2).find((arg) => !arg.startsWith('-'));
-  return candidate !== undefined && /\.(llull|json)$/i.test(candidate) ? candidate : null;
+  return candidate !== undefined && DOCUMENT_FILE_PATTERN.test(candidate) ? candidate : null;
 }
 
 function refreshTitleAndDiscovery(): void {
@@ -128,7 +129,7 @@ async function saveDocument(forceDialog: boolean): Promise<boolean> {
   let target = forceDialog ? null : session.currentPath();
   if (target === null) {
     const result = await dialog.showSaveDialog({
-      defaultPath: 'model.llull',
+      defaultPath: DEFAULT_SAVE_NAME,
       filters: FILE_FILTERS,
     });
     if (result.canceled || result.filePath === undefined) return false;

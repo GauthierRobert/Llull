@@ -9,7 +9,9 @@ import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import { createEmptyBuilding, type ProjectInfo } from '@core/model/building';
 import { PanelSection } from '@ui/panels/PanelParts';
-import { LabeledInput } from './LabeledInput';
+import { CommandForm } from '@ui/panels/CommandForm';
+import { LabeledInput } from '@ui/panels/LabeledInput';
+import { changedFields } from '@ui/panels/changedParams';
 import { contentKey } from '@ui/contentKey';
 
 const FIELDS: ReadonlyArray<readonly [keyof ProjectInfo, string]> = [
@@ -32,21 +34,20 @@ interface ProjectFormProps {
 function ProjectForm({ project }: ProjectFormProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const [values, setValues] = useState<ProjectInfo>(project);
-  const changed = FIELDS.some(([key]) => values[key] !== project[key]);
-
-  const handleSubmit = (event: React.FormEvent): void => {
-    event.preventDefault();
-    const changes = Object.fromEntries(
-      FIELDS.filter(([key]) => values[key] !== project[key]).map(([key]) => [key, values[key]]),
-    );
-    dispatch('set_project_info', changes);
-  };
+  const changes = changedFields(
+    project,
+    values,
+    FIELDS.map(([key]) => key),
+  );
+  const changed = Object.keys(changes).length > 0;
 
   return (
-    <form
-      className="panel__form building-form"
-      onSubmit={handleSubmit}
-      aria-label="Project information"
+    <CommandForm
+      ariaLabel="Project information"
+      submitLabel="Save project info"
+      ghostSubmit
+      submitDisabled={!changed}
+      onSubmit={() => dispatch('set_project_info', changes)}
     >
       {FIELDS.map(([key, label]) => (
         <LabeledInput
@@ -58,10 +59,7 @@ function ProjectForm({ project }: ProjectFormProps): React.ReactElement {
           testId={`project-${key}`}
         />
       ))}
-      <button type="submit" className="btn btn--ghost btn--sm" disabled={!changed}>
-        Save project info
-      </button>
-    </form>
+    </CommandForm>
   );
 }
 

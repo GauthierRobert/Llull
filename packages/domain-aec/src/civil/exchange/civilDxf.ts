@@ -6,11 +6,13 @@
  * @pure
  */
 
+import { toRadians } from '@lib/angle';
 import type { CadDocument, Entity, Vec2, Vec3 } from '@core/model/types';
 import { DxfWriter } from '../../building/exchange/dxfWriter';
 import type { SiteCalibration } from '@core/model/civil';
 import { assembleDxf } from '../../building/exchange/dxfExport';
 import { localToGrid, resolveFrame, type CoordinateFrame } from '../crs/crs';
+import { entityPlanPoint } from '@core/geometry/entityFrame';
 
 export interface CivilDxf {
   readonly text: string;
@@ -20,10 +22,8 @@ export interface CivilDxf {
 
 type Frame = (point: Vec2) => Vec2;
 
-function planWorld(entity: Entity, [x, y]: Vec2, frame: Frame): Vec2 {
-  const cos = Math.cos(entity.rotation[2]);
-  const sin = Math.sin(entity.rotation[2]);
-  return frame([entity.position[0] + x * cos - y * sin, entity.position[1] + x * sin + y * cos]);
+function planWorld(entity: Entity, point: Vec2, frame: Frame): Vec2 {
+  return frame(entityPlanPoint(entity, point));
 }
 
 function writeMesh(
@@ -85,7 +85,7 @@ function writeEntity(
         entity.height,
         entity.content,
         entity.anchor ?? 'left',
-        entity.rotation[2] + (rotationDeg * Math.PI) / 180,
+        entity.rotation[2] + toRadians(rotationDeg),
         z,
       );
       return;

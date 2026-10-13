@@ -5,6 +5,8 @@
  * @pure
  */
 
+import { clamp } from '@lib/clamp';
+import { toDegrees } from '@lib/angle';
 import type { Vec2 } from '@core/model/types';
 import type { AlignmentObject } from '@core/model/civil';
 import { normalize2, sub2 } from '@lib/vec2';
@@ -168,8 +170,8 @@ function spiralProblem(
     if (!spiralCurve(radius, length, deflection)) {
       const spiralAngle = length / (2 * radius);
       return (
-        `PI ${i}: deflection ${((deflection * 180) / Math.PI).toFixed(3)} deg is smaller than twice ` +
-        `the spiral angle (2 x ${((spiralAngle * 180) / Math.PI).toFixed(3)} deg for Ls ${length} ` +
+        `PI ${i}: deflection ${toDegrees(deflection).toFixed(3)} deg is smaller than twice ` +
+        `the spiral angle (2 x ${toDegrees(spiralAngle).toFixed(3)} deg for Ls ${length} ` +
         `and R ${radius}); shorten the spirals or reduce the radius.`
       );
     }
@@ -333,7 +335,7 @@ export function elementPointAt(
   element: HorizontalElement,
   station: number,
 ): { point: Vec2; direction: number } {
-  const along = Math.min(Math.max(station - element.startStation, 0), element.length);
+  const along = clamp(station - element.startStation, 0, element.length);
   if (element.kind === 'line') {
     return {
       point: [
@@ -379,7 +381,7 @@ function nearestStationOnElement(element: HorizontalElement, xy: Vec2): number {
     const dx = xy[0] - element.start[0];
     const dy = xy[1] - element.start[1];
     const along = dx * Math.cos(element.direction) + dy * Math.sin(element.direction);
-    return element.startStation + Math.min(Math.max(along, 0), element.length);
+    return element.startStation + clamp(along, 0, element.length);
   }
   if (element.kind === 'spiral') return nearestAlongSpiral(element, xy);
   const sign = arcSign(element);

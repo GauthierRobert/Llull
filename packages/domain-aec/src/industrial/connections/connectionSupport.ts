@@ -11,13 +11,7 @@ import type {
 } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import { fromMm } from '@core/model/units';
-import {
-  elementsOf,
-  nextElementId,
-  nextMark,
-  withElement,
-  withoutElements,
-} from '../../building/model';
+import { elementsOf, appendElements, withoutElements, levelElementsOf } from '../../building/model';
 import { distance3 } from '@lib/vec3';
 import { findProfile } from '../../steel/profiles';
 
@@ -30,7 +24,7 @@ export function findMomentJoints(
   rafterIds: ReadonlySet<string> | null,
   tolerance: number,
 ): MomentJoint[] {
-  const members = elementsOf(building, 'member').filter((member) => member.levelId === levelId);
+  const members = levelElementsOf(building, 'member', levelId);
   const existing = elementsOf(building, 'connection');
   const connected = new Set(existing.map((element) => `${element.rafterId}:${element.end}`));
   const pairKey = (a: string, b: string): string => (a < b ? `${a}|${b}` : `${b}|${a}`);
@@ -85,30 +79,33 @@ export function appendConnections(
   joints: ReadonlyArray<MomentJoint>,
   size: ConnectionSize,
 ): { building: BuildingModel; ids: string[] } {
-  let next = building;
-  const ids: string[] = [];
-  for (const joint of joints) {
-    const rafter = building.elements[joint.rafterId];
-    const profile = rafter?.category === 'member' ? findProfile(rafter.profile) : undefined;
-    if (!rafter || rafter.category !== 'member' || !profile) continue;
-    const horizontal = Math.hypot(rafter.end[0] - rafter.start[0], rafter.end[1] - rafter.start[1]);
-    const connection: MomentConnectionElement = {
-      id: nextElementId(next, 'connection'),
-      category: 'connection',
-      mark: nextMark(next, 'connection'),
-      entityIds: [],
-      levelId,
-      ...joint,
-      plateThickness: size.plateThickness ?? fromMm(doc, profile.h >= 400 ? 25 : 20),
-      boltRows: joint.kind === 'eaves' ? 4 : 3,
-      boltDiameter: size.boltDiameter ?? fromMm(doc, 20),
-      haunchLength: joint.kind === 'eaves' ? (size.haunchLength ?? horizontal / 5) : 0,
-      material: 'S355',
-    };
-    next = withElement(next, connection);
-    ids.push(connection.id);
-  }
-  return { building: next, ids };
+  return appendElements(
+    building,
+    joints,
+    'connection',
+    (joint, id, mark): MomentConnectionElement | undefined => {
+      const rafter = building.elements[joint.rafterId];
+      const profile = rafter?.category === 'member' ? findProfile(rafter.profile) : undefined;
+      if (!rafter || rafter.category !== 'member' || !profile) return undefined;
+      const horizontal = Math.hypot(
+        rafter.end[0] - rafter.start[0],
+        rafter.end[1] - rafter.start[1],
+      );
+      return {
+        id,
+        category: 'connection',
+        mark,
+        entityIds: [],
+        levelId,
+        ...joint,
+        plateThickness: size.plateThickness ?? fromMm(doc, profile.h >= 400 ? 25 : 20),
+        boltRows: joint.kind === 'eaves' ? 4 : 3,
+        boltDiameter: size.boltDiameter ?? fromMm(doc, 20),
+        haunchLength: joint.kind === 'eaves' ? (size.haunchLength ?? horizontal / 5) : 0,
+        material: 'S355',
+      };
+    },
+  );
 }
 
 /**

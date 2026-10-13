@@ -6,8 +6,9 @@
  * the scene footprint and keeps it on the ground (z = 0, or lower when the scene dips below it).
  */
 
-import type { Bounds } from '@core/geometry/bounds';
+import { type Bounds, boundsCenter } from '@core/geometry/bounds';
 import type { Vec3 } from '@core/model/types';
+import { toRenderPosition } from './floatingOrigin';
 
 /** The original fixed patch, kept for an empty scene. */
 const DEFAULT_SCALE = 40;
@@ -37,12 +38,9 @@ export function computeContactShadowPlane(
   const scale = Math.max(Math.max(extentX, extentY) * FOOTPRINT_MARGIN, MIN_SCALE);
   const height = bounds.max[2] - Math.min(bounds.min[2], 0);
   const ground = Math.min(bounds.min[2], 0) - scale * 1e-3;
+  const [centreX, centreY] = boundsCenter(bounds);
   return {
-    position: [
-      (bounds.min[0] + bounds.max[0]) / 2 - renderOrigin[0],
-      (bounds.min[1] + bounds.max[1]) / 2 - renderOrigin[1],
-      ground - renderOrigin[2],
-    ],
+    position: toRenderPosition([centreX, centreY, ground], renderOrigin),
     scale,
     far: Math.max(height * 1.5, scale * 0.25),
   };

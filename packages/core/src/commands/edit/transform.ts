@@ -23,6 +23,7 @@ import {
 } from '../../lib/axisRotation';
 import { replaceEntity } from '../entity/entityOps';
 import { rotateEulerAboutWorldZ } from '../../lib/eulerRotation';
+import { toDegrees } from '../../lib/angle';
 
 const arrayCountField = z
   .number()
@@ -290,7 +291,7 @@ export const arrayPolar = defineCommand({
         };
       }),
     );
-    const angleDeg = ((angle * 180) / Math.PI).toFixed(1);
+    const angleDeg = toDegrees(angle).toFixed(1);
     return changed(
       document,
       `Polar array of ${target.kind} ${id}: created ${newIds.length} copies ` +

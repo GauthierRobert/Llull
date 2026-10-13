@@ -6,8 +6,9 @@ import type {
   TextEntity,
   Vec3,
 } from '../model/types';
-import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
-import { ORIGIN, add3, sub3 } from '../lib/vec3';
+import { instanceToWorld } from './instanceTransform';
+import { tupleExtent } from '../lib/extent';
+import { ORIGIN, add3, sub3, vec3At } from '../lib/vec3';
 import { sweepTriangles } from './sweep';
 import { loftTriangles } from './loft';
 import { subdivisionTriangles } from './subdivision';
@@ -27,24 +28,8 @@ export interface Bounds {
 
 /** Min/max of a flat xyz position array (`[x0, y0, z0, x1, ...]`); needs at least one full triple. */
 function positionsExtent(positions: readonly number[]): { min: Vec3; max: Vec3 } {
-  let minX = Infinity,
-    minY = Infinity,
-    minZ = Infinity;
-  let maxX = -Infinity,
-    maxY = -Infinity,
-    maxZ = -Infinity;
-  for (let i = 0; i + 2 < positions.length; i += 3) {
-    const x = positions[i] as number,
-      y = positions[i + 1] as number,
-      z = positions[i + 2] as number;
-    if (x < minX) minX = x;
-    if (y < minY) minY = y;
-    if (z < minZ) minZ = z;
-    if (x > maxX) maxX = x;
-    if (y > maxY) maxY = y;
-    if (z > maxZ) maxZ = z;
-  }
-  return { min: [minX, minY, minZ], max: [maxX, maxY, maxZ] };
+  const { min, max } = tupleExtent(positions, 3);
+  return { min: vec3At(min, 0), max: vec3At(max, 0) };
 }
 
 /** 2D extents of `points`; all zeros for an empty list. */
@@ -55,17 +40,13 @@ export function pointsExtent(points: ReadonlyArray<readonly [number, number]>): 
   maxY: number;
 } {
   if (points.length === 0) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
-  let minX = Infinity,
-    minY = Infinity,
-    maxX = -Infinity,
-    maxY = -Infinity;
-  for (const [x, y] of points) {
-    if (x < minX) minX = x;
-    if (y < minY) minY = y;
-    if (x > maxX) maxX = x;
-    if (y > maxY) maxY = y;
-  }
-  return { minX, minY, maxX, maxY };
+  const { min, max } = tupleExtent(points.flat(), 2);
+  return {
+    minX: min[0] as number,
+    minY: min[1] as number,
+    maxX: max[0] as number,
+    maxY: max[1] as number,
+  };
 }
 
 const bounds = (min: Vec3, max: Vec3): Bounds => ({ min, max });
@@ -255,17 +236,14 @@ export function instanceBoundsFromDoc(
     return { min: instance.position, max: instance.position };
 
   const { scale = [1, 1, 1], rotation, position } = instance;
-  const hasRotation = !isZeroRotation(rotation);
+  const toWorld = instanceToWorld(scale, rotation, position);
 
   const worldPoints: Vec3[] = [];
   for (const cid of component.order) {
     const child = component.entities[cid];
     if (!child) continue;
     for (const c of boundsCorners(entityBoundsInDoc(doc, child, depth + 1))) {
-      const scaled: Vec3 = [c[0] * scale[0], c[1] * scale[1], c[2] * scale[2]];
-      // Rotate around the component origin, then translate.
-      const rotated = hasRotation ? applyEulerXYZ(scaled, ORIGIN, rotation) : scaled;
-      worldPoints.push(add3(rotated, position));
+      worldPoints.push(toWorld(c));
     }
   }
   return worldPoints.length > 0 ? boundsOfPoints(worldPoints) : bounds(position, position);
@@ -318,6 +296,11 @@ export function boundsOverlap(a: Bounds, b: Bounds): boolean {
 /** Centre of an AABB. */
 export function boundsCenter({ min, max }: Bounds): Vec3 {
   return [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2];
+}
+
+/** Radius of the sphere around the centre of an AABB that passes through its corners. */
+export function boundsDiagonalRadius({ min, max }: Bounds): number {
+  return Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) / 2;
 }
 
 /** Largest side of an AABB. */

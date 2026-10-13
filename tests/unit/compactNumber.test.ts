@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compactNumber, significantNumber } from '@lib/compactNumber';
+import { compactNumber, significantNumber, vecText } from '@lib/compactNumber';
 
 describe('compactNumber', () => {
   it('rounds to 4 decimals without trailing zeros', () => {
@@ -13,5 +13,12 @@ describe('significantNumber', () => {
     expect(significantNumber(7850.123, 3)).toBe('7850');
     expect(significantNumber(0.1 + 0.2, 6)).toBe('0.3');
     expect(significantNumber(1.5e21, 3)).toBe('1.5e+21');
+  });
+});
+
+describe('vecText', () => {
+  it('formats components compactly', () => {
+    expect(vecText([1, 2.50001, 0])).toBe('[1, 2.5, 0]');
+    expect(vecText([])).toBe('[]');
   });
 });

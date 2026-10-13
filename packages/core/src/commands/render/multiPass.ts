@@ -12,7 +12,7 @@ import type { CutSpec, RenderOptions, RenderViewData } from './types';
 import { DEFAULT_BACKGROUND, extractSvgInner, r2, svgDocument } from './svg';
 import { computeSceneSnapshot } from '../inspect/scene';
 import { boundsCenter, boundsExtent } from '../../geometry/bounds';
-import { ORIGIN } from '../../lib/vec3';
+import { ORIGIN, dot3 } from '../../lib/vec3';
 import { rotateEulerAboutWorldZ } from '../../lib/eulerRotation';
 
 /** Render only the entities of `doc` whose id satisfies `keep` (document order preserved). */
@@ -64,13 +64,13 @@ function rotateCut(cut: CutSpec, cx: number, cy: number, angleRad: number): CutS
       const [nx, ny, nz] = normal;
       const turned: Vec3 = [cos * nx - sin * ny, sin * nx + cos * ny, nz];
       // Keep the plane through the same (turned) point: n'·(c + R(p − c)) with p = n·offset/|n|².
-      const lengthSq = nx * nx + ny * ny + nz * nz;
+      const lengthSq = dot3(normal, normal);
       const pointOffset = offset / (lengthSq || 1);
       const p: Vec3 = [nx * pointOffset - cx, ny * pointOffset - cy, nz * pointOffset];
       const moved: Vec3 = [cx + cos * p[0] - sin * p[1], cy + sin * p[0] + cos * p[1], p[2]];
       return {
         normal: turned,
-        offset: turned[0] * moved[0] + turned[1] * moved[1] + turned[2] * moved[2],
+        offset: dot3(turned, moved),
       };
     }),
   };

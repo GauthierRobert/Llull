@@ -20,7 +20,7 @@ import {
 } from '../../shared/sheetFrame';
 import { toMetres, toMm } from '@core/model/units';
 import { endStation, horizontalElements } from '../alignment/alignmentGeometry';
-import { formatStation, getCivil } from '../model';
+import { stationText, getCivil } from '../model';
 import { analyseStations, reportRows, reportStations } from '../road/roadReport';
 import { LONG_SECTION_LEFT, longSectionSvg } from './longSectionSvg';
 import { validateProfile } from '../alignment/profileGeometry';
@@ -112,7 +112,7 @@ export function buildPlanProfileSheet(
     const x = stationX(toMetres(doc, station));
     strip.push(
       `<line class="station-tick" x1="${n(x)}" y1="${n(axisY - halfWidth - 2)}" x2="${n(x)}" y2="${n(axisY + halfWidth + 2)}" stroke="#5a5a5a" stroke-width="0.18"/>`,
-      `<text class="station-label" x="${n(x)}" y="${n(axisY + halfWidth + 6)}" font-size="2" text-anchor="middle">${escapeXml(formatStation(toMetres(doc, station)))}</text>`,
+      `<text class="station-label" x="${n(x)}" y="${n(axisY + halfWidth + 6)}" font-size="2" text-anchor="middle">${escapeXml(stationText(doc, station))}</text>`,
     );
   });
   for (const element of horizontalElements(alignment)) {

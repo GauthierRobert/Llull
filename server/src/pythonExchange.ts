@@ -19,6 +19,7 @@ import path from 'node:path';
 import type { Readable } from 'node:stream';
 import type { PythonBackend } from '@core/codegen/pythonRuntime';
 import type { CadExchangePort, DwgConverterPort, ProgramRun } from '@mcp/index';
+import { exchangeDirOf, positiveInteger } from './env';
 
 /** Response size cap (it is JSON.parse'd in memory). ~96 MB of STEP once base64-encoded. */
 const MAX_OUTPUT_BYTES = 128 * 1024 * 1024;
@@ -65,14 +66,12 @@ export function pythonExchangeConfigFromEnv(
 ): PythonExchangeConfig | null {
   const python = env['LLULL_PYTHON'] ?? 'python3';
   if (python === 'off') return null;
-  const timeout = Number(env['LLULL_PYTHON_TIMEOUT_MS']);
-  const exchangeDir = env['LLULL_EXCHANGE_DIR'];
   return {
     python,
     build123dPython: env['LLULL_PYTHON_BUILD123D'] ?? python,
-    timeoutMs: Number.isFinite(timeout) && timeout > 0 ? timeout : 120_000,
+    timeoutMs: positiveInteger(env['LLULL_PYTHON_TIMEOUT_MS'], 120_000),
     bridgeScript: path.resolve(__dirname, '../python/llull_bridge.py'),
-    exchangeDir: exchangeDir !== undefined && exchangeDir !== '' ? path.resolve(exchangeDir) : null,
+    exchangeDir: exchangeDirOf(env),
   };
 }
 

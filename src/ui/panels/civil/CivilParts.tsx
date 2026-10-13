@@ -8,6 +8,7 @@
 import React, { useMemo, useState } from 'react';
 import type { CivilCategory, CivilObject } from '@core/model/civil';
 import { useStore } from '@ui/store';
+import { PairSelect } from '@ui/panels/OptionSelect';
 import { formatPoints, selectedPolylinePoints } from './civilInput';
 
 /** Civil objects of `category` in creation order (re-derived when the civil model changes). */
@@ -82,14 +83,13 @@ export function CivilObjectSelect({
   emptyLabel,
 }: CivilObjectSelectProps): React.ReactElement {
   return (
-    <select value={value} aria-label={label} onChange={(event) => onChange(event.target.value)}>
-      {emptyLabel !== undefined && <option value="">{emptyLabel}</option>}
-      {objects.map((object) => (
-        <option key={object.id} value={object.id}>
-          {object.name}
-        </option>
-      ))}
-    </select>
+    <PairSelect
+      value={value}
+      options={objects.map((object) => [object.id, object.name] as const)}
+      label={label}
+      {...(emptyLabel !== undefined ? { blankLabel: emptyLabel } : {})}
+      onChange={onChange}
+    />
   );
 }
 
@@ -113,21 +113,6 @@ export function useChosenId(
   const value =
     picked === '' && preferredIndex !== undefined ? (objects[preferredIndex]?.id ?? '') : picked;
   return [chosenId(objects, value, allowEmpty), setPicked];
-}
-
-export function CivilStatus({
-  text,
-  testId,
-}: {
-  text: string;
-  testId: string;
-}): React.ReactElement | null {
-  if (text === '') return null;
-  return (
-    <p className="building-summary" role="status" data-testid={testId}>
-      {text}
-    </p>
-  );
 }
 
 interface CivilFieldProps {
@@ -159,7 +144,7 @@ export function TextField(props: CivilFieldProps): React.ReactElement {
   return <CivilInput {...props} />;
 }
 
-export function NumberField(props: CivilFieldProps): React.ReactElement {
+export function NumberTextField(props: CivilFieldProps): React.ReactElement {
   return <CivilInput {...props} type="number" />;
 }
 

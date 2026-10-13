@@ -6,7 +6,8 @@
  * @pure
  */
 
-type Vec3 = readonly [number, number, number];
+import type { Vec3 } from '../model/vectors';
+import { clamp } from './clamp';
 export type Mat3 = readonly [
   number,
   number,
@@ -94,7 +95,7 @@ export function matFromEulerXYZ(euler: Vec3): Mat3 {
 
 /** Euler XYZ angles of a rotation matrix (inverse of `matFromEulerXYZ`; gimbal lock sets rz = 0). */
 export function eulerFromMat(m: Mat3): [number, number, number] {
-  const ry = Math.asin(Math.max(-1, Math.min(1, m[2])));
+  const ry = Math.asin(clamp(m[2], -1, 1));
   if (Math.abs(m[2]) < 0.9999999) return [Math.atan2(-m[5], m[8]), ry, Math.atan2(-m[1], m[0])];
   return [Math.atan2(m[7], m[4]), ry, 0];
 }

@@ -1,15 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { portalHall } from '../../helpers/portalHall';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { buildElevationDrawing, chainLoops } from '@aec/building/drawings/elevationProjection';
 import type { ElevationSheet } from '@aec/building/drawings/elevation';
 
 function hall(): CadDocument {
-  return execute(createEmptyDocument(), 'add_portal_frame_building', {
-    span: 12000,
-    length: 18000,
-    eaveHeight: 5000,
-  }).document;
+  return portalHall({ span: 12000, length: 18000, eaveHeight: 5000 });
 }
 
 function box(): CadDocument {

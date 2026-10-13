@@ -5,16 +5,15 @@
  * @pure
  */
 
+import { toRadians } from '@lib/angle';
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { CivilModel, CivilObject, SiteCalibration } from '@core/model/civil';
 
 export type CoordinateFrame = 'local' | 'grid';
 
-const radians = (degrees: number): number => (degrees * Math.PI) / 180;
-
 /** grid = gridOrigin + k * R(theta) * (local - localOrigin). */
 export function localToGrid(calibration: SiteCalibration, point: Vec2): Vec2 {
-  const theta = radians(calibration.rotationDeg);
+  const theta = toRadians(calibration.rotationDeg);
   const cos = Math.cos(theta) * calibration.scaleFactor;
   const sin = Math.sin(theta) * calibration.scaleFactor;
   const dx = point[0] - calibration.localOrigin[0];
@@ -27,7 +26,7 @@ export function localToGrid(calibration: SiteCalibration, point: Vec2): Vec2 {
 
 /** Inverse of `localToGrid`. */
 export function gridToLocal(calibration: SiteCalibration, point: Vec2): Vec2 {
-  const theta = radians(calibration.rotationDeg);
+  const theta = toRadians(calibration.rotationDeg);
   const cos = Math.cos(theta) / calibration.scaleFactor;
   const sin = Math.sin(theta) / calibration.scaleFactor;
   const dx = point[0] - calibration.gridOrigin[0];

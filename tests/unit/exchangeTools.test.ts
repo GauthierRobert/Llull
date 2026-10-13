@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { textOf } from '../helpers/applyToolCall';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import {
@@ -95,10 +96,6 @@ function docWithBox(): CadDocument {
 }
 
 const STEP_RUN: ProgramRun = { trace: {}, traced: true, stepBase64: 'U1RFUFNURVA=', log: '' };
-
-function textOf(result: { content: Array<{ text: string }> } | null): string {
-  return result === null ? '' : result.content.map((c) => c.text).join('\n');
-}
 
 describe('buildExchangeToolDefinitions', () => {
   it('defines export_step, import_step, import_dwg and import_code with annotations', () => {

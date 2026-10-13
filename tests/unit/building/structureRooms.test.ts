@@ -3,7 +3,7 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { wallLoop, gridIntersections } from '@aec/building/elements/structure';
 import type { WallElement } from '@core/model/building';
-import { run } from './runFixtures';
+import { run } from '../../helpers/runFixtures';
 
 const SQUARE = [
   [0, 0],

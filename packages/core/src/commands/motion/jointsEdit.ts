@@ -1,7 +1,7 @@
 import type { Joint, JointMateRef } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
-import { nextId } from '../../lib/id';
+import { idOrNext, idTaken } from '../entity/explicitId';
 import { resolveNumeric } from '../parametric/expression';
 import { instanceFrameRef, instanceRefsProblem } from '../assembly/instanceFrameRef';
 import { isValidAxis } from '../../lib/axis';
@@ -69,8 +69,8 @@ export const addJoint = defineCommand({
     const refProblem = instanceRefsProblem(doc, 'add_joint', { a, b });
     if (refProblem !== null) return noop(doc, refProblem);
 
-    const jointId = id !== undefined && id.length > 0 ? id : nextId('joint');
-    if (jointId in doc.joints)
+    const jointId = idOrNext(id, 'joint');
+    if (idTaken(doc.joints, jointId))
       return noop(doc, `add_joint: joint id '${jointId}' already exists — no change made.`);
 
     const mateRef = ({ instanceId, frame }: typeof a): JointMateRef =>

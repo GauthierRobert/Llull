@@ -5,10 +5,10 @@
 
 import type { MeshData } from '../model/types';
 import type { Point2 } from '../lib/polygon';
-import { applyEulerXYZ } from '../lib/eulerRotation';
+import { entityLocalToWorld } from './entityFrame';
+import { vec3At } from '../lib/vec3';
 import { triangulatePolygon } from '../lib/triangulate';
-
-type Vec3 = readonly [number, number, number];
+import type { Vec3 } from '../model/vectors';
 
 export interface MeshBuilder {
   /** Index of the vertex at (x, y, z); identical coordinates share one vertex. */
@@ -187,15 +187,9 @@ export function prismMesh(
 
 /** World-space copy of a local mesh: rotated (extrinsic XYZ) about the origin, then moved to `position`. */
 export function placeMesh(mesh: MeshData, position: Vec3, rotation: Vec3): MeshData {
-  const origin: Vec3 = [0, 0, 0];
   const positions: number[] = [];
   for (let i = 0; i + 2 < mesh.positions.length; i += 3) {
-    const rotated = applyEulerXYZ(
-      [mesh.positions[i]!, mesh.positions[i + 1]!, mesh.positions[i + 2]!],
-      origin,
-      rotation,
-    );
-    positions.push(rotated[0] + position[0], rotated[1] + position[1], rotated[2] + position[2]);
+    positions.push(...entityLocalToWorld({ position, rotation }, vec3At(mesh.positions, i)));
   }
   return { positions, indices: [...mesh.indices] };
 }

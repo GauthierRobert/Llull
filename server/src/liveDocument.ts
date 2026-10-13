@@ -15,6 +15,7 @@ import { serializeDocument, deserializeDocument } from '@core/commands/persisten
 import { errorMessage } from '@lib/errorMessage';
 import { type LiveCommandEvent, type LiveSnapshotEvent, documentHash } from '@mcp/liveSync';
 import { setAuditDefaultDirectory } from './audit';
+import { isTestRun, positiveInteger } from './env';
 
 /**
  * Autosave path (override via `LLULL_AUTOSAVE_PATH`; default next to the server bundle). Disabled
@@ -25,10 +26,7 @@ const AUTOSAVE_PATH =
 
 setAuditDefaultDirectory(path.dirname(AUTOSAVE_PATH));
 
-const AUTOSAVE_ENABLED =
-  !process.env['VITEST'] &&
-  process.env['TEST'] !== 'true' &&
-  process.env['LLULL_AUTOSAVE_DISABLED'] !== 'true';
+const AUTOSAVE_ENABLED = !isTestRun() && process.env['LLULL_AUTOSAVE_DISABLED'] !== 'true';
 
 function loadAutosave(): CadDocument {
   if (!AUTOSAVE_ENABLED) return createEmptyDocument();
@@ -59,7 +57,7 @@ function quarantineAutosave(): string | null {
 
 const autosaver = createAutosaver({
   filePath: AUTOSAVE_PATH,
-  debounceMs: Number.parseInt(process.env['LLULL_AUTOSAVE_DEBOUNCE_MS'] ?? '', 10) || 300,
+  debounceMs: positiveInteger(process.env['LLULL_AUTOSAVE_DEBOUNCE_MS'], 300),
   serialize: serializeDocument,
 });
 

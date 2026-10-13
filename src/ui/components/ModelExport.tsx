@@ -8,7 +8,7 @@
 
 import React, { useState } from 'react';
 import { runQuery } from '@ui/services/localQuery';
-import { downloadBlob as download } from '@ui/download';
+import { downloadBlob as download, downloadText } from '@ui/download';
 import { isCodeExportData } from '@ui/resultData';
 import { fetchStepExport } from '@ui/services/serverFiles';
 
@@ -33,7 +33,7 @@ export function ModelExport(): React.ReactElement {
       return;
     }
     const { text, fileName } = result.data;
-    download(new Blob([text], { type: 'text/plain;charset=utf-8' }), fileName);
+    downloadText(text, fileName, 'text/plain');
     setStatus(result.summary);
   };
 

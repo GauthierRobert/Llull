@@ -18,8 +18,12 @@ import {
 import { surfaceTinById } from '../surface/surfaceTin';
 import { elevationAt } from '../surface/tin';
 import type { ReportRow } from '../road/roadReport';
-import { formatStation } from '../model';
+import { stationText } from '../model';
 import {
+  PLOT_LEFT,
+  PLOT_MAX_WIDTH,
+  PLOT_ROW_HEIGHT,
+  PLOT_TOP,
   levelFrame,
   niceStep,
   pushLevelGrid,
@@ -32,11 +36,11 @@ import {
 } from '../road/roadSvg';
 import { toMetres } from '@core/model/units';
 
-export const LONG_SECTION_LEFT = 90;
-const LEFT = LONG_SECTION_LEFT;
-const TOP = 60;
-const ROW_HEIGHT = 16;
-const MAX_PLOT_WIDTH = 1000;
+export const LONG_SECTION_LEFT = PLOT_LEFT;
+const LEFT = PLOT_LEFT;
+const TOP = PLOT_TOP;
+const ROW_HEIGHT = PLOT_ROW_HEIGHT;
+const MAX_PLOT_WIDTH = PLOT_MAX_WIDTH;
 const MAX_PLOT_HEIGHT = 480;
 
 type Pair = readonly [number, number];
@@ -134,7 +138,7 @@ export function longSectionSvg(
       svgText(
         px,
         TOP + 10 + (index % 2) * 10,
-        `PVI ${formatStation(toMetres(doc, pvi.station))} / ${toMetres(doc, pvi.elevation).toFixed(2)}`,
+        `PVI ${stationText(doc, pvi.station)} / ${toMetres(doc, pvi.elevation).toFixed(2)}`,
         { anchor: 'middle', size: 8, fill: '#a01818' },
       ),
     );
@@ -156,7 +160,7 @@ export function longSectionSvg(
     const px = x(toMetres(doc, curve.pviStation));
     const lengthText = toMetres(doc, curve.length).toFixed(1);
     const turning = curve.turning
-      ? ` ${curve.kind === 'crest' ? 'high' : 'low'} ${toMetres(doc, curve.turning.elevation).toFixed(2)}@${formatStation(toMetres(doc, curve.turning.station))}`
+      ? ` ${curve.kind === 'crest' ? 'high' : 'low'} ${toMetres(doc, curve.turning.elevation).toFixed(2)}@${stationText(doc, curve.turning.station)}`
       : '';
     body.push(
       svgText(

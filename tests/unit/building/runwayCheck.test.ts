@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { portalHall } from '../../helpers/portalHall';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { GRAVITY } from '@aec/shared/numeric';
@@ -12,11 +13,7 @@ import {
 import { craneActions } from '@aec/industrial/frames/frameModelTypes';
 
 function hall(capacity = 10): CadDocument {
-  return execute(createEmptyDocument(), 'add_portal_frame_building', {
-    span: 24000,
-    length: 30000,
-    crane: { capacity, railHeight: 6000 },
-  }).document;
+  return portalHall({ span: 24000, length: 30000, crane: { capacity, railHeight: 6000 } });
 }
 
 function rowsOf(doc: CadDocument, params = {}): RunwayCheckRow[] {
@@ -181,10 +178,7 @@ describe('check_crane_runways', () => {
   });
 
   it('is a graceful no-op without cranes', () => {
-    const plain = execute(createEmptyDocument(), 'add_portal_frame_building', {
-      span: 24000,
-      length: 30000,
-    }).document;
+    const plain = portalHall({ span: 24000, length: 30000 });
     const result = runwayCheck.run(plain, {});
     expect(result.data).toBeUndefined();
     expect(result.summary).toMatch(/no crane runway beam/);

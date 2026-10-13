@@ -4,12 +4,14 @@
  * @layer core/commands
  */
 
-import type { Entity, Vec3 } from '../../model/types';
+import { type Entity, type Vec3, is2D } from '../../model/types';
 import type { RenderViewData } from './types';
 import { boundsCorners, entityBounds } from '../../geometry/bounds';
 import { escapeXml } from '../../lib/escapeXml';
 import { type Projector, makeProjector } from './camera';
 import { appendBeforeClose, r2, svgDot } from './svg';
+import { planeToWorld } from '../../geometry/workPlane';
+import { clamp } from '../../lib/clamp';
 
 /** Colour-coding group of an entity in the label overlay. */
 type EntityCategory = 'point' | 'curve2d' | 'solid3d' | 'annotation';
@@ -23,6 +25,7 @@ const CATEGORY_STYLE: Record<EntityCategory, { color: string; caption: string }>
 };
 
 function entityCategory(e: Entity): EntityCategory {
+  if (!is2D(e)) return 'solid3d';
   switch (e.kind) {
     case 'point':
       return 'point';
@@ -38,21 +41,6 @@ function entityCategory(e: Entity): EntityCategory {
     case 'dimension':
     case 'image':
       return 'annotation';
-    case 'box':
-    case 'cylinder':
-    case 'sphere':
-    case 'extrusion':
-    case 'mesh':
-    case 'cone':
-    case 'torus':
-    case 'wedge':
-    case 'pyramid':
-    case 'revolution':
-    case 'sweep':
-    case 'loft':
-    case 'subdivision':
-    case 'instance':
-      return 'solid3d';
   }
 }
 
@@ -72,7 +60,7 @@ function evenlySampled<T>(points: T[]): T[] {
  */
 function entityKeyPoints(e: Entity): Vec3[] {
   const pos = e.position;
-  const lift = (x: number, y: number): Vec3 => [pos[0] + x, pos[1] + y, pos[2]];
+  const lift = (x: number, y: number): Vec3 => planeToWorld(pos, e.rotation, [x, y]);
 
   switch (e.kind) {
     case 'point':
@@ -105,19 +93,7 @@ function entityKeyPoints(e: Entity): Vec3[] {
       return [lift(0, 0), lift(e.width, 0), lift(e.width, e.height), lift(0, e.height)];
     case 'instance':
       return [pos]; // its component's extent needs the document; anchor the label at its origin
-    case 'box':
-    case 'cylinder':
-    case 'sphere':
-    case 'extrusion':
-    case 'mesh':
-    case 'cone':
-    case 'torus':
-    case 'wedge':
-    case 'pyramid':
-    case 'revolution':
-    case 'sweep':
-    case 'loft':
-    case 'subdivision':
+    default:
       return boundsCorners(entityBounds(e));
   }
 }
@@ -165,8 +141,8 @@ export function appendEntityLabels(
 
     // The label is always drawn (clamped inside the viewport), even if its markers clip.
     const [lx, ly] = labelAnchor(keyPoints, project);
-    const clampedLx = Math.max(4, Math.min(width - 4, lx));
-    const clampedLy = Math.max(12, Math.min(height - 4, ly));
+    const clampedLx = clamp(lx, 4, width - 4);
+    const clampedLy = clamp(ly, 12, height - 4);
     lines.push(
       `    <text x="${r2(clampedLx)}" y="${r2(clampedLy)}" ${labelStyle} fill="${color}" text-anchor="middle">${escapeXml(e.name ?? e.id)}</text>`,
     );

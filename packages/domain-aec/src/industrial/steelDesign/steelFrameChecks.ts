@@ -7,6 +7,7 @@
  * @pure
  */
 
+import { toDegrees } from '@lib/angle';
 import type { FrameResult } from '@lib/frame2d';
 import { memberBuckling } from './steelDesign';
 import type { MomentFrame } from './steelFrameDetect';
@@ -22,9 +23,11 @@ import type { BeamResult } from './steelFraming';
 import type { SteelBar } from './steelMemberBars';
 import {
   analysedRow,
-  beamSection,
+  withBeamSection,
   columnSection,
+  deflectionCheckLine,
   metres,
+  shearCheckLine,
   skippedRow,
   ULS_COMBINATION,
   type CheckLine,
@@ -116,82 +119,85 @@ function beamRow(
   layout: BarLayout,
   input: FrameCheckInput,
 ): MemberRow {
-  const gate = beamSection(bar);
-  if ('skipped' in gate) return gate.skipped;
-  const { profile, resistance } = gate;
-  const { solutions } = input;
-  const length = bar.length;
-  const restrained = result.loads.floorSupport || result.loads.lineSupport;
-  const combination = combinationOf(input);
-  let interaction: CheckLine | undefined;
-  let section: CheckLine | undefined;
-  let shearLine: CheckLine | undefined;
-  let maxMoment = 0;
-  let maxShear = 0;
-  let maxCompression = 0;
-  const joints: [number, number] = [0, 0];
-  for (const ulsResult of solutions.uls) {
-    const diagram = beamDiagram(ulsResult, layout, solutions.amplification);
-    const hogLength = hoggingLength(diagram, layout, length);
-    const compression = diagram.compression;
-    const sagging = memberBuckling(profile, bar.fy, compression, diagram.sagging, {
-      major: length,
-      minor: length,
-      lateralTorsional: restrained ? 1 : length,
+  return withBeamSection(bar, ({ profile, resistance }) => {
+    const { solutions } = input;
+    const length = bar.length;
+    const restrained = result.loads.floorSupport || result.loads.lineSupport;
+    const combination = combinationOf(input);
+    let interaction: CheckLine | undefined;
+    let section: CheckLine | undefined;
+    let shearLine: CheckLine | undefined;
+    let maxMoment = 0;
+    let maxShear = 0;
+    let maxCompression = 0;
+    const joints: [number, number] = [0, 0];
+    for (const ulsResult of solutions.uls) {
+      const diagram = beamDiagram(ulsResult, layout, solutions.amplification);
+      const hogLength = hoggingLength(diagram, layout, length);
+      const compression = diagram.compression;
+      const sagging = memberBuckling(profile, bar.fy, compression, diagram.sagging, {
+        major: length,
+        minor: length,
+        lateralTorsional: restrained ? 1 : length,
+      });
+      const hogging = memberBuckling(profile, bar.fy, compression, diagram.hogging, {
+        major: length,
+        minor: length,
+        lateralTorsional: Math.max(hogLength, 1),
+      });
+      const worstBuckling = sagging.utilisation >= hogging.utilisation ? sagging : hogging;
+      const governingMoment =
+        sagging.utilisation >= hogging.utilisation ? diagram.sagging : diagram.hogging;
+      interaction = worstOf(interaction, {
+        name: 'frame N+M (§6.3.3)',
+        utilisation: worstBuckling.utilisation,
+        combination,
+        detail: `${profile.name} L ${metres(length)} m${solutions.amplification > 1 ? `, sway ×${solutions.amplification.toFixed(2)}` : ''}: M ${mega(governingMoment).toFixed(1)} kNm (${sagging.utilisation >= hogging.utilisation ? 'sagging' : `hogging, LTB over ${metres(hogLength)} m`}) with N ${kilo(compression).toFixed(1)} kN compression, χ ${Math.min(worstBuckling.chiMajor, worstBuckling.chiMinor).toFixed(2)}, χLT ${worstBuckling.chiLateralTorsional.toFixed(2)}`,
+      });
+      const hogResistance = shearReducedMoment(profile, bar.fy, kilo(diagram.shear));
+      const sectionUtilisation = Math.max(
+        compression / resistance.axial + diagram.hogging / hogResistance.moment,
+        compression / resistance.axial + diagram.sagging / resistance.moment,
+      );
+      section = worstOf(section, {
+        name: 'cross-section N+M (§6.2.9)',
+        utilisation: sectionUtilisation,
+        combination,
+        detail: `${profile.name} class ${resistance.sectionClass}: M ${mega(Math.max(diagram.hogging, diagram.sagging)).toFixed(1)} kNm ≤ Mc,Rd ${mega(hogResistance.moment).toFixed(1)} kNm${hogResistance.reduced ? ' (reduced for shear, §6.2.8)' : ''} with N ${kilo(compression).toFixed(1)} kN`,
+      });
+      shearLine = worstOf(
+        shearLine,
+        shearCheckLine(
+          profile.name,
+          combination,
+          diagram.shear / resistance.shear,
+          kilo(diagram.shear),
+          kilo(resistance.shear),
+        ),
+      );
+      maxMoment = Math.max(maxMoment, diagram.sagging, diagram.hogging);
+      maxShear = Math.max(maxShear, diagram.shear);
+      maxCompression = Math.max(maxCompression, compression);
+      const ends: [number, number] = [
+        diagram.stations[0] ?? 0,
+        diagram.stations[diagram.stations.length - 1] ?? 0,
+      ];
+      ends.forEach((moment, index) => {
+        if (Math.abs(moment) > Math.abs(joints[index] ?? 0)) joints[index] = moment;
+      });
+    }
+    const deflection = deflectionLine(bar, layout, solutions.slsGravity, input.deflectionRatio);
+    const jointForces: Record<string, number> = {};
+    if (bar.startJoint === 'rigid') jointForces['jointMomentStart'] = mega(joints[0]);
+    if (bar.endJoint === 'rigid') jointForces['jointMomentEnd'] = mega(joints[1]);
+    return analysedRow(bar, [interaction, section, shearLine, deflection.line], {
+      MEd: mega(maxMoment),
+      VEd: kilo(maxShear),
+      NEd: kilo(maxCompression),
+      deflection: deflection.value,
+      ...jointForces,
+      amplification: solutions.amplification,
     });
-    const hogging = memberBuckling(profile, bar.fy, compression, diagram.hogging, {
-      major: length,
-      minor: length,
-      lateralTorsional: Math.max(hogLength, 1),
-    });
-    const worstBuckling = sagging.utilisation >= hogging.utilisation ? sagging : hogging;
-    const governingMoment =
-      sagging.utilisation >= hogging.utilisation ? diagram.sagging : diagram.hogging;
-    interaction = worstOf(interaction, {
-      name: 'frame N+M (§6.3.3)',
-      utilisation: worstBuckling.utilisation,
-      combination,
-      detail: `${profile.name} L ${metres(length)} m${solutions.amplification > 1 ? `, sway ×${solutions.amplification.toFixed(2)}` : ''}: M ${mega(governingMoment).toFixed(1)} kNm (${sagging.utilisation >= hogging.utilisation ? 'sagging' : `hogging, LTB over ${metres(hogLength)} m`}) with N ${kilo(compression).toFixed(1)} kN compression, χ ${Math.min(worstBuckling.chiMajor, worstBuckling.chiMinor).toFixed(2)}, χLT ${worstBuckling.chiLateralTorsional.toFixed(2)}`,
-    });
-    const hogResistance = shearReducedMoment(profile, bar.fy, kilo(diagram.shear));
-    const sectionUtilisation = Math.max(
-      compression / resistance.axial + diagram.hogging / hogResistance.moment,
-      compression / resistance.axial + diagram.sagging / resistance.moment,
-    );
-    section = worstOf(section, {
-      name: 'cross-section N+M (§6.2.9)',
-      utilisation: sectionUtilisation,
-      combination,
-      detail: `${profile.name} class ${resistance.sectionClass}: M ${mega(Math.max(diagram.hogging, diagram.sagging)).toFixed(1)} kNm ≤ Mc,Rd ${mega(hogResistance.moment).toFixed(1)} kNm${hogResistance.reduced ? ' (reduced for shear, §6.2.8)' : ''} with N ${kilo(compression).toFixed(1)} kN`,
-    });
-    shearLine = worstOf(shearLine, {
-      name: 'shear (§6.2.6)',
-      utilisation: diagram.shear / resistance.shear,
-      combination,
-      detail: `${profile.name}: V ${kilo(diagram.shear).toFixed(1)} kN ≤ Vpl,Rd ${kilo(resistance.shear).toFixed(0)} kN`,
-    });
-    maxMoment = Math.max(maxMoment, diagram.sagging, diagram.hogging);
-    maxShear = Math.max(maxShear, diagram.shear);
-    maxCompression = Math.max(maxCompression, compression);
-    const ends: [number, number] = [
-      diagram.stations[0] ?? 0,
-      diagram.stations[diagram.stations.length - 1] ?? 0,
-    ];
-    ends.forEach((moment, index) => {
-      if (Math.abs(moment) > Math.abs(joints[index] ?? 0)) joints[index] = moment;
-    });
-  }
-  const deflection = deflectionLine(bar, layout, solutions.slsGravity, input.deflectionRatio);
-  const jointForces: Record<string, number> = {};
-  if (bar.startJoint === 'rigid') jointForces['jointMomentStart'] = mega(joints[0]);
-  if (bar.endJoint === 'rigid') jointForces['jointMomentEnd'] = mega(joints[1]);
-  return analysedRow(bar, [interaction, section, shearLine, deflection.line], {
-    MEd: mega(maxMoment),
-    VEd: kilo(maxShear),
-    NEd: kilo(maxCompression),
-    deflection: deflection.value,
-    ...jointForces,
-    amplification: solutions.amplification,
   });
 }
 
@@ -216,12 +222,7 @@ function deflectionLine(
   const label = cantilever ? `cantilever 2L/${ratio}` : `L/${ratio}`;
   return {
     value,
-    line: {
-      name: `deflection (${label})`,
-      utilisation: value / limit,
-      combination: 'SLS G + Q',
-      detail: `${bar.profileName} L ${metres(bar.length)} m: δ ${value.toFixed(1)} mm ≤ ${label} = ${limit.toFixed(1)} mm`,
-    },
+    line: deflectionCheckLine(`${bar.profileName} L ${metres(bar.length)} m`, label, value, limit),
   };
 }
 
@@ -233,7 +234,7 @@ function columnRow(bar: SteelBar, layout: BarLayout, input: FrameCheckInput): Me
   if (axis === null) {
     return skippedRow(
       bar,
-      `${profile.name}: roll ${((bar.roll * 180) / Math.PI).toFixed(0)}° lies between the principal axes — set roll 0 or π/2 so the frame plane bends one principal axis`,
+      `${profile.name}: roll ${toDegrees(bar.roll).toFixed(0)}° lies between the principal axes — set roll 0 or π/2 so the frame plane bends one principal axis`,
     );
   }
   const { solutions, system } = input;
@@ -286,12 +287,16 @@ function columnRow(bar: SteelBar, layout: BarLayout, input: FrameCheckInput): Me
         combination,
         detail: `${profile.name} class ${sectionClass} (${axisText}), ${zText}: N ${kilo(maxAxial).toFixed(0)} kN ≤ Npl,Rd ${kilo(resistance.axial).toFixed(0)} kN with M ${mega(moment).toFixed(1)} kNm ≤ M${axis === 'strong' ? '' : 'z'},Rd ${mega(bending.moment).toFixed(1)} kNm`,
       });
-      shearLine = worstOf(shearLine, {
-        name: 'shear (§6.2.6)',
-        utilisation: shear / bending.shear,
-        combination,
-        detail: `${profile.name} (${axisText}) ${zText}: V ${kilo(shear).toFixed(1)} kN ≤ Vpl,Rd ${kilo(bending.shear).toFixed(0)} kN`,
-      });
+      shearLine = worstOf(
+        shearLine,
+        shearCheckLine(
+          `${profile.name} (${axisText}) ${zText}`,
+          combination,
+          shear / bending.shear,
+          kilo(shear),
+          kilo(bending.shear),
+        ),
+      );
       maxMoment = Math.max(maxMoment, moment);
       maxCompression = Math.max(maxCompression, compression);
       maxShear = Math.max(maxShear, shear);

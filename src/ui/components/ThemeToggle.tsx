@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { useThemeStore } from '@ui/store';
-import { Icon } from '@ui/components/Icon';
+import { IconButton } from '@ui/panels/PanelParts';
 
 export function ThemeToggle(): React.ReactElement {
   const theme = useThemeStore((s) => s.theme);
@@ -15,14 +15,11 @@ export function ThemeToggle(): React.ReactElement {
   const label = `Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`;
 
   return (
-    <button
-      type="button"
-      className="icon-btn"
+    <IconButton
+      icon={theme === 'dark' ? 'sun' : 'moon'}
+      size={16}
+      label={label}
       onClick={toggleTheme}
-      aria-label={label}
-      title={label}
-    >
-      <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={16} />
-    </button>
+    />
   );
 }

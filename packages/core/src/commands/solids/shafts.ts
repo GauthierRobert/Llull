@@ -10,18 +10,22 @@ import type { CommandResult } from '../types';
 import type { Point2 } from '../../lib/polygon';
 import { defineCommand, z, nameField } from '../schema';
 import { nextId } from '../../lib/id';
-import { compactNumber as fmt } from '../../lib/compactNumber';
+import { compactNumber as fmt, vecText } from '../../lib/compactNumber';
 import { finiteVec3OrZero } from '../../lib/vec3';
-import { DEFAULT_FLANK_SAMPLES, toothOutline } from '../../lib/gearOutline';
+import { arcPolyline } from '../../lib/arc';
+import { DEFAULT_FLANK_SAMPLES, pitchRadiusOf, toothOutline } from '../../lib/gearOutline';
 import { addCap, addWalls, createMeshBuilder, prismMesh } from '../../geometry/prismMesh';
-import { MAX_GEAR_TEETH } from '../limits';
 import { rotatedEntityBounds } from '../../geometry/rotatedBounds';
 import { withEntity } from '../entity/entityOps';
-import { commitEntity } from '../entity/commitEntity';
 import { newEntity } from '../entity/newEntity';
-import { boundsText, positionField, rotationField } from './shared';
-import { placedMeshEntity, pressureAngleProblem } from './gearSolid';
-import { noop } from '../noop';
+import { boundsText, commitSolid, positionField, rotationField } from './shared';
+import {
+  moduleProblem,
+  placedMeshEntity,
+  pressureAngleProblem,
+  teethCountProblem,
+} from './gearSolid';
+import { failedWith } from '../noop';
 
 const SHAFT_SEGMENTS = 64;
 
@@ -76,18 +80,15 @@ export const addSplineShaft = defineCommand({
       name,
     },
   ): CommandResult => {
-    const fail = (why: string): CommandResult => noop(doc, `add_spline_shaft failed: ${why}`);
+    const fail = failedWith(doc, 'add_spline_shaft');
     if (!(referenceDiameter > 0 && Number.isFinite(referenceDiameter))) {
       return fail(`referenceDiameter must be finite and > 0, got ${String(referenceDiameter)}.`);
     }
-    if (!(mod > 0 && Number.isFinite(mod)))
-      return fail(`module must be finite and > 0, got ${String(mod)}.`);
+    const moduleIssue = moduleProblem(mod);
+    if (moduleIssue !== null) return fail(moduleIssue);
     const count = Math.round(teeth ?? referenceDiameter / mod - 2);
-    if (!(count >= 6 && count <= MAX_GEAR_TEETH)) {
-      return fail(
-        `teeth must be an integer in [6, ${MAX_GEAR_TEETH}], got ${String(teeth ?? count)}.`,
-      );
-    }
+    const teethIssue = teethCountProblem('teeth', count, 6, teeth ?? count);
+    if (teethIssue !== null) return fail(teethIssue);
     if (!(length > 0 && Number.isFinite(length)))
       return fail(`length must be finite and > 0, got ${String(length)}.`);
     const angleProblem = pressureAngleProblem(pressureAngle);
@@ -99,7 +100,7 @@ export const addSplineShaft = defineCommand({
       return fail('module is too large for this referenceDiameter (root radius <= 0).');
     const profile = toothOutline({
       teeth: count,
-      baseRadius: ((mod * count) / 2) * Math.cos(pressureAngle),
+      baseRadius: pitchRadiusOf(mod, count) * Math.cos(pressureAngle),
       tipRadius,
       rootRadius,
       refRadius: referenceRadius,
@@ -113,12 +114,11 @@ export const addSplineShaft = defineCommand({
       rotation: finiteVec3OrZero(rotation),
       name,
     });
-    return commitEntity(
+    return commitSolid(
       doc,
       entity,
       `Created spline_shaft ${id}: W${fmt(referenceDiameter)}x${fmt(mod)}x${count} tipD=${fmt(2 * tipRadius)} ` +
-        `rootD=${fmt(2 * rootRadius)} length=${fmt(length)} (${profile.length} profile points) at [${at.map(fmt).join(', ')}]. ` +
-        `${boundsText(rotatedEntityBounds(entity))}.`,
+        `rootD=${fmt(2 * rootRadius)} length=${fmt(length)} (${profile.length} profile points) at ${vecText(at)}`,
     );
   },
 });
@@ -171,18 +171,13 @@ interface KeywayGeometry {
 /** Shaft section outlines for a groove of `width` and `depth` on the +X side. */
 function keywayGeometry(radius: number, width: number, depth: number): KeywayGeometry {
   const half = Math.asin(width / (2 * radius));
-  const polar = (a: number): Point2 => [radius * Math.cos(a), radius * Math.sin(a)];
   const outsideSteps = Math.max(
     8,
     Math.ceil(((2 * Math.PI - 2 * half) * SHAFT_SEGMENTS) / (2 * Math.PI)),
   );
-  const outside = Array.from({ length: outsideSteps + 1 }, (_, i) =>
-    polar(half + ((2 * Math.PI - 2 * half) * i) / outsideSteps),
-  );
+  const outside = arcPolyline([0, 0], radius, half, 2 * Math.PI - 2 * half, outsideSteps);
   const slotSteps = Math.max(2, Math.ceil((2 * half * SHAFT_SEGMENTS) / (2 * Math.PI)));
-  const slotInside = Array.from({ length: slotSteps - 1 }, (_, j) =>
-    polar(-half + (2 * half * (j + 1)) / slotSteps),
-  );
+  const slotInside = arcPolyline([0, 0], radius, -half, 2 * half, slotSteps).slice(1, -1);
   const upperEdge = outside[0]!;
   const lowerEdge = outside[outside.length - 1]!;
   const floorX = radius - depth;
@@ -292,7 +287,7 @@ export const addKeyedShaft = defineCommand({
       name,
     },
   ): CommandResult => {
-    const fail = (why: string): CommandResult => noop(doc, `add_keyed_shaft failed: ${why}`);
+    const fail = failedWith(doc, 'add_keyed_shaft');
     if (!(diameter > 0 && Number.isFinite(diameter)))
       return fail(`diameter must be finite and > 0, got ${String(diameter)}.`);
     if (!(length > 0 && Number.isFinite(length)))
@@ -365,7 +360,7 @@ export const addKeyedShaft = defineCommand({
       summary:
         `Created keyed_shaft ${shaftId}: d=${fmt(diameter)} length=${fmt(length)} keyway b=${fmt(width)} t1=${fmt(depth)} ` +
         `length=${fmt(span)} from z=${fmt(start)}${includeKey ? ` plus key ${entities[1]!.id} (h=${fmt(height)})` : ''} ` +
-        `at [${at.map(fmt).join(', ')}]. ${boundsText(rotatedEntityBounds(shaft))}.`,
+        `at ${vecText(at)}. ${boundsText(rotatedEntityBounds(shaft))}.`,
       affected: entities.map((e) => e.id),
     };
   },

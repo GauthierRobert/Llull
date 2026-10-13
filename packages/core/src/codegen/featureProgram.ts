@@ -6,7 +6,14 @@
  * @pure
  */
 
-import { type CadDocument, type Entity, type FeatureStep, type Vec3, is3D } from '../model/types';
+import {
+  type CadDocument,
+  type Entity,
+  type FeatureStep,
+  type Vec3,
+  is2D,
+  is3D,
+} from '../model/types';
 import type { CommandDefinition } from '../commands/types';
 import { replayHistory, type ReplayStepEvent } from '../commands/history/replay';
 import { buildParamEnv } from '../commands/history/regenerate';
@@ -86,6 +93,7 @@ function dominantAxis(axis: Vec3): Axis {
 /** Lower one evaluated entity to a shape; `raw` are the params of the step that produced it. */
 function lowerShape(entity: Entity, doc: CadDocument, raw: unknown, ctx: LowerContext): ShapeSpec {
   const field = (key: string): unknown => child(raw, key);
+  if (is2D(entity)) return { kind: 'mesh', positions: entityTrianglePositions(entity, doc) };
   switch (entity.kind) {
     case 'box':
     case 'wedge':
@@ -138,17 +146,6 @@ function lowerShape(entity: Entity, doc: CadDocument, raw: unknown, ctx: LowerCo
     case 'mesh':
     case 'sweep':
     case 'loft':
-    case 'line':
-    case 'polyline':
-    case 'arc':
-    case 'circle':
-    case 'rectangle':
-    case 'point':
-    case 'ellipse':
-    case 'spline':
-    case 'text':
-    case 'dimension':
-    case 'image':
     case 'instance':
       return { kind: 'mesh', positions: entityTrianglePositions(entity, doc) };
   }

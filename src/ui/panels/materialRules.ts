@@ -1,6 +1,7 @@
 /** @layer ui/panels Pure validation/parsing of the "new material" form (no document access). */
 
 import { isHexColor } from '@lib/isHexColor';
+import { parseNumber } from '@ui/numberText';
 
 export interface MaterialForm {
   readonly name: string;
@@ -24,9 +25,9 @@ const isUnitInterval = (value: number): boolean => value >= 0 && value <= 1;
 /** The `create_material` params, or null while the form is incomplete / out of range. */
 export function materialDraftOf(form: MaterialForm): MaterialDraft | null {
   const name = form.name.trim();
-  const density = parseFloat(form.density);
-  const metalness = parseFloat(form.metalness);
-  const roughness = parseFloat(form.roughness);
+  const density = parseNumber(form.density) ?? NaN;
+  const metalness = parseNumber(form.metalness) ?? NaN;
+  const roughness = parseNumber(form.roughness) ?? NaN;
   const valid =
     name !== '' &&
     density > 0 &&

@@ -7,6 +7,7 @@
  * @pure
  */
 
+import { clamp } from '@lib/clamp';
 import { projectOntoSegment } from '@lib/polygon';
 import type { ModelUnits, SteelBar } from './steelMemberBars';
 import type { ColumnNode } from './steelFraming';
@@ -126,7 +127,7 @@ export function applySupportedPipe(
         bar.id,
         {
           beamId: station.id,
-          zAxis: Math.min(bar.end[2], Math.max(bar.start[2], station.point[2])),
+          zAxis: clamp(station.point[2], bar.start[2], bar.end[2]),
           permanent: weight,
           imposed: 0,
         },

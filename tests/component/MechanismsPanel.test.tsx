@@ -16,25 +16,15 @@
  * @layer tests/component
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { resetStore } from '../helpers/componentEntities';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { act, render, screen, fireEvent } from '@testing-library/react';
 import { useStore } from '@ui/store';
 import { useViewportStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
 import { MechanismsPanel } from '@ui/panels/MechanismsPanel';
-import { localDispatch } from '../helpers/storeTestHelpers';
+import { localDispatch, spyDispatch } from '../helpers/storeTestHelpers';
 
 // Helpers
-
-function resetStore(): void {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
-}
-
-function patchDispatch(spy: ReturnType<typeof vi.fn>): void {
-  useStore.setState({ dispatch: spy } as any);
-}
 
 // Shared setup helpers
 
@@ -168,8 +158,7 @@ describe('MechanismsPanel — constraints section', () => {
 
   it('"Solve" button dispatches solve_constraints', () => {
     const { constraintId } = buildFullDoc();
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
+    const dispatchSpy = spyDispatch();
     render(<MechanismsPanel />);
     const solveBtn = screen.getByTestId(`constraint-solve-${constraintId}`);
     fireEvent.click(solveBtn);
@@ -178,8 +167,7 @@ describe('MechanismsPanel — constraints section', () => {
 
   it('"Delete" button dispatches delete_constraint with the correct id', () => {
     const { constraintId } = buildFullDoc();
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
+    const dispatchSpy = spyDispatch();
     render(<MechanismsPanel />);
     const deleteBtn = screen.getByTestId(`constraint-delete-${constraintId}`);
     fireEvent.click(deleteBtn);
@@ -220,8 +208,7 @@ describe('MechanismsPanel — joints section', () => {
 
   it('editing joint value and blurring dispatches set_joint_value', () => {
     const { jointId } = buildFullDoc();
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
+    const dispatchSpy = spyDispatch();
     render(<MechanismsPanel />);
     const input = screen.getByTestId(`joint-value-${jointId}`);
     // The field is in degrees; the command receives radians.
@@ -235,8 +222,7 @@ describe('MechanismsPanel — joints section', () => {
 
   it('does not re-dispatch an unchanged value on blur', () => {
     const { jointId } = buildFullDoc();
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
+    const dispatchSpy = spyDispatch();
     render(<MechanismsPanel />);
     fireEvent.blur(screen.getByTestId(`joint-value-${jointId}`));
     expect(dispatchSpy).not.toHaveBeenCalled();
@@ -267,8 +253,7 @@ describe('MechanismsPanel — joints section', () => {
 
   it('"Delete" button dispatches delete_joint with the correct id', () => {
     const { jointId } = buildFullDoc();
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
+    const dispatchSpy = spyDispatch();
     render(<MechanismsPanel />);
     const deleteBtn = screen.getByTestId(`joint-delete-${jointId}`);
     fireEvent.click(deleteBtn);
@@ -295,8 +280,7 @@ describe('MechanismsPanel — drive relations section', () => {
 
   it('"Delete" button dispatches delete_drive_relation with the correct id', () => {
     const { driveId } = buildFullDoc();
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
+    const dispatchSpy = spyDispatch();
     render(<MechanismsPanel />);
     const deleteBtn = screen.getByTestId(`drive-delete-${driveId}`);
     fireEvent.click(deleteBtn);

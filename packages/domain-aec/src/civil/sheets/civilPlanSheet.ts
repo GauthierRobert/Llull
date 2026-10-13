@@ -6,6 +6,8 @@
  * @pure
  */
 
+import { clamp } from '@lib/clamp';
+import { toDegrees } from '@lib/angle';
 import type { CadDocument, Entity, Vec2 } from '@core/model/types';
 import { escapeXml } from '@lib/escapeXml';
 import {
@@ -13,6 +15,8 @@ import {
   fitScale,
   MARGIN,
   n,
+  paperMap,
+  svgPoints,
   northArrow,
   PAPER_MM,
   sheetDrawingArea,
@@ -23,6 +27,7 @@ import { toMetres, toMm } from '@core/model/units';
 import { niceStep } from '../road/roadSvg';
 import { clipPolyline, insideRect } from './planClip';
 import { gridToLocal, localToGrid } from '../crs/crs';
+import { entityPlanPoint } from '@core/geometry/entityFrame';
 
 export interface CivilSheetOptions {
   readonly paper: PaperSize;
@@ -53,12 +58,7 @@ const isDrawable = (entity: Entity): entity is Drawable =>
   entity.kind === 'text';
 
 function worldPoints(entity: Drawable): Vec2[] {
-  const cos = Math.cos(entity.rotation[2]);
-  const sin = Math.sin(entity.rotation[2]);
-  const place = ([x, y]: Vec2): Vec2 => [
-    entity.position[0] + x * cos - y * sin,
-    entity.position[1] + x * sin + y * cos,
-  ];
+  const place = (point: Vec2): Vec2 => entityPlanPoint(entity, point);
   if (entity.kind === 'line') return [place(entity.start), place(entity.end)];
   if (entity.kind === 'polyline') return entity.points.map(place);
   return [[entity.position[0], entity.position[1]]];
@@ -170,10 +170,7 @@ export function buildCivilPlanSheet(
     options.scale ??
     fitScale((bounds[2] - bounds[0]) * mmPerUnit, (bounds[3] - bounds[1]) * mmPerUnit, viewport);
   const perUnit = mmPerUnit / scale;
-  const toPaper = ([x, y]: Vec2): Vec2 => [
-    viewport.x + viewport.width / 2 + (x - center[0]) * perUnit,
-    viewport.y + viewport.height / 2 - (y - center[1]) * perUnit,
-  ];
+  const toPaper = paperMap(viewport, center, perUnit);
   const counts = { lines: 0, polylines: 0, points: 0, texts: 0 };
   const perLayer = new Map<string, { name: string; color: string; count: number }>();
   const body: string[] = [];
@@ -185,10 +182,7 @@ export function buildCivilPlanSheet(
     if (entity.kind === 'line' || entity.kind === 'polyline') {
       const runs = clipPolyline(paper, entity.kind === 'polyline' && entity.closed, viewport);
       markup = runs
-        .map(
-          (run) =>
-            `<polyline class="civil-line" points="${run.map((p) => p.map(n).join(',')).join(' ')}" ${stroke}/>`,
-        )
+        .map((run) => `<polyline class="civil-line" points="${svgPoints(run)}" ${stroke}/>`)
         .join('');
       if (runs.length > 0) counts[entity.kind === 'line' ? 'lines' : 'polylines']++;
     } else if (paper[0] && insideRect(paper[0], viewport)) {
@@ -197,8 +191,8 @@ export function buildCivilPlanSheet(
         markup = `<path class="civil-point" d="M${n(x - 0.8)} ${n(y)}H${n(x + 0.8)}M${n(x)} ${n(y - 0.8)}V${n(y + 0.8)}" ${stroke}/>`;
         counts.points++;
       } else if (entity.kind === 'text') {
-        const size = Math.min(Math.max(entity.height * perUnit, 1.8), 5);
-        const turn = (-entity.rotation[2] * 180) / Math.PI;
+        const size = clamp(entity.height * perUnit, 1.8, 5);
+        const turn = toDegrees(-entity.rotation[2]);
         const anchor =
           entity.anchor === 'left' ? 'start' : entity.anchor === 'right' ? 'end' : 'middle';
         markup =

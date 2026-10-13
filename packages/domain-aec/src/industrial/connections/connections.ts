@@ -6,11 +6,12 @@
 import type { BuildingModel, MomentConnectionElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
+import { unknownLevelFailure } from '../../building/levelLookup';
 import { defineCommand, z } from '@core/commands/schema';
 import { fromMm, toMm } from '@core/model/units';
-import { elementAffected, existingLevelId, getBuilding } from '../../building/model';
+import { existingLevelId, getBuilding } from '../../building/model';
 import { noop } from '@core/commands/noop';
-import { regenerateBuilding } from '../../building/evaluate/evaluateElements';
+import { commitBuilding } from '../../building/evaluate/evaluateElements';
 import { findProfile, STEEL_DENSITY_KG_PER_M3 } from '../../steel/profiles';
 import { boltSize } from '../evaluate';
 import { buildingConnectionSolids } from './evaluateConnections';
@@ -79,8 +80,8 @@ export const addMomentConnections = defineCommand({
       );
     }
     const building = getBuilding(doc);
-    if (params.levelId !== undefined && !building.levels[params.levelId])
-      return noop(doc, `add_moment_connections failed: no level '${params.levelId}'.`);
+    const unknownLevel = unknownLevelFailure(doc, 'add_moment_connections', params.levelId);
+    if (unknownLevel) return unknownLevel;
     const levelId = existingLevelId(building, params.levelId) ?? '';
     const joints = findMomentJoints(
       building,
@@ -99,7 +100,6 @@ export const addMomentConnections = defineCommand({
       boltDiameter,
       haunchLength,
     });
-    const document = regenerateBuilding(doc, added.building);
     const connections = added.ids.map(
       (id) => added.building.elements[id] as MomentConnectionElement,
     );
@@ -109,15 +109,15 @@ export const addMomentConnections = defineCommand({
       (sum, connection) => sum + connectionMass(doc, added.building, connection),
       0,
     );
-    return {
-      document,
-      summary:
-        `Added ${connections.length} moment connection(s): ${eaves} eaves (haunched), ` +
+    return commitBuilding(
+      doc,
+      added.building,
+      added.ids,
+      `Added ${connections.length} moment connection(s): ${eaves} eaves (haunched), ` +
         `${connections.length - eaves} apex; ${bolts} bolt(s) ${boltSize(doc, connections[0]?.boltDiameter ?? 0)}, ` +
         `${kilograms.toFixed(1)} kg of plates and haunches.`,
-      affected: elementAffected(document, added.ids),
-      data: { elementIds: added.ids },
-    };
+      { elementIds: added.ids },
+    );
   },
 });
 

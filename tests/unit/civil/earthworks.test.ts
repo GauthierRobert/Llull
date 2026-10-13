@@ -1,14 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { applied as step } from '../../helpers/runFixtures';
 import { createEmptyDocument, type CadDocument, type Vec2, type Vec3 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { civilObject, getCivil } from '@aec/civil/model';
-
-function step(doc: CadDocument, name: string, params: Record<string, unknown>): CadDocument {
-  const result = execute(doc, name, params);
-  expect(result.affected.length, result.summary).toBeGreaterThan(0);
-  return result.document;
-}
 
 /** Gridded survey points over [0,100]² with elevation z(x, y). */
 function ground(z: (x: number, y: number) => number): CadDocument {

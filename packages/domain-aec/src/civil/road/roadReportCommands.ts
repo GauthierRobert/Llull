@@ -8,10 +8,10 @@ import type { CadDocument } from '@core/model/types';
 import type { AlignmentObject } from '@core/model/civil';
 import type { CommandResult } from '@core/commands/types';
 import { commandCatalog, defineCommand, z } from '@core/commands/schema';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { safeFileName } from '@lib/safeFileName';
 import { alignmentLength } from '../alignment/alignmentGeometry';
-import { civilObjectOrFailure, getCivil } from '../model';
+import { civilObjectOrNoop, getCivil } from '../model';
 import { alignmentIdParam } from './roadParams';
 import { designChecks } from './roadChecks';
 import { analyseStations, reportCsv, reportRows, reportStations } from './roadReport';
@@ -20,23 +20,21 @@ import { crossSectionSvg, MAX_CROSS_SECTIONS } from './crossSectionSvg';
 import { validateProfile } from '../alignment/profileGeometry';
 import { toMetres } from '@core/model/units';
 
+const intervalField = (spacing: string, fallback: string): z.ZodOptional<z.ZodNumber> =>
+  z.number().optional().describe(`${spacing} spacing, document units. Default: ${fallback}.`);
+
 function checkedAlignment(
   doc: CadDocument,
-  alignmentId: string,
-  interval: number | undefined,
+  params: { alignmentId: string; interval?: number | undefined },
   command: string,
-): { alignment: AlignmentObject; interval: number } | string {
-  const alignment = civilObjectOrFailure(doc, alignmentId, 'alignment', command);
-  if (typeof alignment === 'string') return alignment;
-  const step = interval ?? alignment.stationInterval;
-  if (!(step > 0)) return `${command} failed: interval must be > 0.`;
+): { alignment: AlignmentObject; interval: number } | CommandResult {
+  const alignment = civilObjectOrNoop(doc, params.alignmentId, 'alignment', command);
+  if ('summary' in alignment) return alignment;
+  const interval = params.interval ?? alignment.stationInterval;
+  if (!(interval > 0)) return noop(doc, `${command} failed: interval must be > 0.`);
   if (alignmentLength(alignment) <= 0)
-    return `${command} failed: ${alignment.name} has no valid geometry.`;
-  return { alignment, interval: step };
-}
-
-function readOnly(doc: CadDocument, summary: string, data: unknown): CommandResult {
-  return { document: doc, summary, affected: [], data };
+    return noop(doc, `${command} failed: ${alignment.name} has no valid geometry.`);
+  return { alignment, interval };
 }
 
 /**
@@ -58,18 +56,15 @@ export const alignmentReport = defineCommand({
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
     alignmentId: alignmentIdParam,
-    interval: z
-      .number()
-      .optional()
-      .describe('Row spacing, document units. Default: the alignment station interval.'),
+    interval: intervalField('Row', 'the alignment station interval'),
     designSpeedKmh: z
       .number()
       .optional()
       .describe('Design speed (km/h, > 0) to enable the geometric checks.'),
   }),
   run: (doc, params): CommandResult => {
-    const checked = checkedAlignment(doc, params.alignmentId, params.interval, 'alignment_report');
-    if (typeof checked === 'string') return noop(doc, checked);
+    const checked = checkedAlignment(doc, params, 'alignment_report');
+    if ('summary' in checked) return checked;
     const { alignment, interval } = checked;
     if (params.designSpeedKmh !== undefined && !(params.designSpeedKmh > 0))
       return noop(doc, 'alignment_report failed: designSpeedKmh must be > 0.');
@@ -98,7 +93,7 @@ export const alignmentReport = defineCommand({
         ? ` Design speed ${checks.designSpeedKmh} km/h: all checks pass.`
         : ` Design speed ${checks.designSpeedKmh} km/h: ${checks.failures.length} failure(s): ${checks.failures.join(' ')}`
       : '';
-    return readOnly(
+    return report(
       doc,
       `${alignment.name} (${alignment.id}): ${rows.length} stations over ${totals.lengthM} m; ${earthworks}.${checkText}`,
       { rows, totals, csv: reportCsv(rows), ...(checks ? { checks } : {}) },
@@ -126,19 +121,11 @@ export const exportLongSection = defineCommand({
       .number()
       .optional()
       .describe('Vertical / horizontal scale ratio (> 0). Default 10.'),
-    interval: z
-      .number()
-      .optional()
-      .describe('Table column spacing, document units. Default: the station interval.'),
+    interval: intervalField('Table column', 'the station interval'),
   }),
   run: (doc, params): CommandResult => {
-    const checked = checkedAlignment(
-      doc,
-      params.alignmentId,
-      params.interval,
-      'export_long_section',
-    );
-    if (typeof checked === 'string') return noop(doc, checked);
+    const checked = checkedAlignment(doc, params, 'export_long_section');
+    if ('summary' in checked) return checked;
     const { alignment, interval } = checked;
     const exaggeration = params.verticalExaggeration ?? 10;
     if (!(exaggeration > 0))
@@ -156,7 +143,7 @@ export const exportLongSection = defineCommand({
     if (text === null)
       return noop(doc, 'export_long_section failed: the profile has no stations on the alignment.');
     const fileName = `${safeFileName(alignment.name, alignment.id)}_long_section.svg`;
-    return readOnly(
+    return report(
       doc,
       `Long section of ${alignment.name}: ${fileName} (${text.length} bytes, VE x${exaggeration}).`,
       {
@@ -183,19 +170,11 @@ export const exportCrossSections = defineCommand({
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
     alignmentId: alignmentIdParam,
-    interval: z
-      .number()
-      .optional()
-      .describe('Section spacing, document units. Default: the station interval.'),
+    interval: intervalField('Section', 'the station interval'),
   }),
   run: (doc, params): CommandResult => {
-    const checked = checkedAlignment(
-      doc,
-      params.alignmentId,
-      params.interval,
-      'export_cross_sections',
-    );
-    if (typeof checked === 'string') return noop(doc, checked);
+    const checked = checkedAlignment(doc, params, 'export_cross_sections');
+    if ('summary' in checked) return checked;
     const { alignment } = checked;
     if (!alignment.section || validateProfile(alignment.profile) !== null) {
       return noop(
@@ -216,7 +195,7 @@ export const exportCrossSections = defineCommand({
       return noop(doc, 'export_cross_sections failed: no station lies on the design profile.');
     const fileName = `${safeFileName(alignment.name, alignment.id)}_cross_sections.svg`;
     const drawn = analysis.filter((entry) => entry.cross !== null).length;
-    return readOnly(doc, `Cross sections of ${alignment.name}: ${drawn} stations, ${fileName}.`, {
+    return report(doc, `Cross sections of ${alignment.name}: ${drawn} stations, ${fileName}.`, {
       text,
       fileName,
       stations: drawn,

@@ -5,7 +5,8 @@
  * extents overlap reach the exact test, so scenes with thousands of segments stay near-linear.
  */
 
-import { segmentIntersection, type Segment } from './geometry';
+import { segmentIntersection } from '@lib/polygon';
+import type { Segment } from './geometry';
 
 const EPSILON = 1e-9;
 
@@ -24,14 +25,15 @@ export function allSegmentIntersections(segments: ReadonlyArray<Segment>): Array
   const points: Array<[number, number]> = [];
   for (let order = 0; order < byMinX.length; order++) {
     const i = byMinX[order] as number;
-    const first = segments[i] as Segment;
+    const [ax, ay, bx, by] = segments[i] as Segment;
     for (let next = order + 1; next < byMinX.length; next++) {
       const j = byMinX[next] as number;
       if ((minX[j] as number) > (maxX[i] as number)) break;
       if ((minY[j] as number) > (maxY[i] as number) || (maxY[j] as number) < (minY[i] as number))
         continue;
-      const point = segmentIntersection(...first, ...(segments[j] as Segment));
-      if (point) points.push(point);
+      const [cx, cy, dx, dy] = segments[j] as Segment;
+      const point = segmentIntersection([ax, ay], [bx, by], [cx, cy], [dx, dy]);
+      if (point) points.push([point[0], point[1]]);
     }
   }
   return points;

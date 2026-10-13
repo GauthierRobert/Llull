@@ -5,6 +5,7 @@
  * @pure
  */
 
+import { clamp } from '@lib/clamp';
 import { sectionProperties, type SteelProfile } from '../../steel/profiles';
 
 export const E_STEEL = 210000; // N/mm²
@@ -103,6 +104,35 @@ export function sectionResistance(
 /** Euler buckling force π² E I / L² (N) of second moment of area `inertia` (mm⁴) over `length` (mm). */
 export const eulerForce = (inertia: number, length: number): number =>
   (Math.PI ** 2 * E_STEEL * inertia) / length ** 2;
+
+/** One storey of a sway frame for the Horne αcr estimate. */
+export interface StoreyDrift {
+  readonly id: string;
+  /** Storey height, mm. */
+  readonly height: number;
+  /** Relative horizontal drift under HORNE_FACTOR-scaled loads (H/200), mm. */
+  readonly drift: number;
+  /** Largest column compression in the storey, N or kN (only its sign is used). */
+  readonly compression: number;
+}
+
+/** Horne αcr = min over compressed storeys of h / (200 δ); Infinity (id null) when none sways. */
+export function horneAlphaCritical(storeys: ReadonlyArray<StoreyDrift>): {
+  alpha: number;
+  id: string | null;
+} {
+  let alpha = Infinity;
+  let id: string | null = null;
+  for (const storey of storeys) {
+    if (!(storey.compression > 0 && storey.drift > 0)) continue;
+    const candidate = storey.height / (200 * storey.drift);
+    if (candidate < alpha) {
+      alpha = candidate;
+      id = storey.id;
+    }
+  }
+  return { alpha, id };
+}
 
 /** Flexural buckling reduction χ (EN 1993-1-1 §6.3.1.2) for a non-dimensional slenderness. */
 export function bucklingReduction(slenderness: number, imperfection: number): number {
@@ -213,7 +243,7 @@ export function memberBuckling(
   // Annex B Tab. B.1 — class 1–2: Cm (1 + (λ̄ − 0.2) n) ≤ Cm (1 + 0.8 n);
   // class 3: Cm (1 + 0.6 λ̄ n) ≤ Cm (1 + 0.6 n).
   const kyy = plastic
-    ? 0.9 * (1 + Math.min(Math.max(lambdaMajor - 0.2, 0), 0.8) * n)
+    ? 0.9 * (1 + clamp(lambdaMajor - 0.2, 0, 0.8) * n)
     : 0.9 * (1 + 0.6 * Math.min(lambdaMajor, 1) * n);
   // Tab. B.2 (CmLT = 0.9): kzy = 1 − c λ̄z nz / (CmLT − 0.25), λ̄z clamped to 1; c = 0.1 / 0.05.
   const factor = plastic ? 0.1 : 0.05;

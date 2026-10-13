@@ -15,6 +15,7 @@
 import { memo, useCallback, useMemo } from 'react';
 import type { CadDocument, Entity, EntityId, InstanceEntity, SolidKind } from '@core/model/types';
 import { useStore, useViewportStore } from '@ui/store';
+import { useSelectionSet } from '@ui/store/selectionHooks';
 import { animatedEntityIds, findClickAnimationsForEntity } from './animationClickHelpers';
 import { isEntityVisible } from '../entityVisibility';
 import { BoxMesh } from './entities/BoxMesh';
@@ -176,8 +177,8 @@ const EntityRenderer = memo(function EntityRenderer({
 
 export function Entities(): React.ReactElement {
   const document = useStore((s) => s.document);
-  const { order, entities, layers, selection, materials, animations, groups } = document;
-  const selectionSet = useMemo(() => new Set<EntityId>(selection), [selection]);
+  const { order, entities, layers, materials, animations, groups } = document;
+  const selectionSet = useSelectionSet();
 
   const select = useStore((s) => s.select);
   const toggleSelection = useStore((s) => s.toggleSelection);

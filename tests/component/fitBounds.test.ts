@@ -1,13 +1,13 @@
+import { resetStore } from '../helpers/componentEntities';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
 import { VIEWPORT_FOV_DEGREES } from '@core/model/viewport';
 import { computeFitFraming } from '@ui/viewport/3d/fitBounds';
 import { localDispatch } from '../helpers/storeTestHelpers';
 
 describe('computeFitFraming', () => {
   beforeEach(() => {
-    useStore.setState({ document: createEmptyDocument(), lastSummary: null });
+    resetStore();
   });
 
   it('returns null when no id exists', () => {

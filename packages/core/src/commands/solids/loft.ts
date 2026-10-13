@@ -1,15 +1,14 @@
 import type { CadDocument, Vec2, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
-import { colorField, defineCommand, vec3, z, layerIdField } from '../schema';
-import { noop } from '../noop';
-import { add3, centroid3, distance3, dot3, sub3 } from '../../lib/vec3';
-import { applyEulerXYZ } from '../../lib/eulerRotation';
+import { defineCommand, vec3, z } from '../schema';
+import { failer } from '../noop';
+import { centroid3, distance3, dot3, sub3 } from '../../lib/vec3';
 import { newEntity } from '../entity/newEntity';
 import {
   DEFAULT_SOLID_COLOR,
   commitSolid,
   existingLayerOrDefault,
-  explicitIdField,
+  solidStyleFields,
   explicitIdOrNext,
   explicitIdTaken,
 } from './shared';
@@ -17,6 +16,7 @@ import { sketchLoop } from './sketchCurves';
 import { type SectionSpec, sectionSpecFields, specPolygon } from './sectionSpecs';
 import { alignRing, resampleRing } from '../../geometry/sectionRing';
 import { ringNormal } from '../../geometry/skin';
+import { planeToWorld } from '../../geometry/workPlane';
 
 const MAX_LOFT_SECTIONS = 200;
 
@@ -61,9 +61,7 @@ function placedSections(
  */
 function loftRingsOf(placed: readonly PlacedSection[]): Vec3[][] | string {
   const raw = placed.map(({ polygon, origin, rotation }) =>
-    resampleRing(polygon).map(([x, y]) =>
-      add3(applyEulerXYZ([x, y, 0], [0, 0, 0], rotation), origin),
-    ),
+    resampleRing(polygon).map((local) => planeToWorld(origin, rotation, local)),
   );
   const centres = raw.map((ring) => centroid3(ring));
   for (let i = 1; i < centres.length; i++) {
@@ -128,15 +126,13 @@ export const loftSections = defineCommand({
         'true: straight lines between neighbouring sections; false (default): smooth blend.',
       )
       .optional(),
-    layerId: layerIdField(),
-    color: colorField(DEFAULT_SOLID_COLOR),
-    id: explicitIdField(),
+    ...solidStyleFields(),
   }),
   run: (
     doc,
     { sectionIds, sections, ruled = false, layerId, color = DEFAULT_SOLID_COLOR, id: explicitId },
   ): CommandResult => {
-    const fail = (why: string): CommandResult => noop(doc, `loft_sections: ${why}; no-op.`);
+    const fail = failer(doc, 'loft_sections');
     if (explicitIdTaken(doc, explicitId)) return fail(`entity id "${explicitId}" already exists`);
     const placed = placedSections(doc, sectionIds, sections);
     if (typeof placed === 'string') return fail(placed);

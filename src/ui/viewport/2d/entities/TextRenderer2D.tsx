@@ -30,11 +30,7 @@ export function TextRenderer2D({
   const groupRef = useRef<THREE.Group>(null);
   useMinScreenSize(groupRef, height);
   return (
-    <group
-      ref={groupRef}
-      position={[position[0], position[1], position[2]]}
-      rotation={[0, 0, rotation[2] ?? 0]}
-    >
+    <group ref={groupRef} position={position} rotation={[0, 0, rotation[2] ?? 0]}>
       <Text
         font={TEXT_FONT_URL}
         fontSize={height}

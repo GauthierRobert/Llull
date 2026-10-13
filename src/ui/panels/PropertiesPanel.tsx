@@ -5,9 +5,11 @@
  * the stored value.
  */
 
+import { toDegrees, toRadians } from '@lib/angle';
 import React from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore, useViewportStore } from '@ui/store';
+import { useSoleSelectedEntity } from '@ui/store/selectionHooks';
 import { deleteSelection, duplicateSelection } from '@ui/actions/selectionActions';
 import { type Entity, is2D } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
@@ -16,8 +18,6 @@ import { AxisFields, CommitInput, PropRow } from './propertyFields';
 import { dimensionRows } from './entityDimensions';
 import { ElementInspector } from './building/ElementInspector';
 import { buildingElementOf } from '@aec/index';
-
-const DEGREES_PER_RADIAN = 180 / Math.PI;
 
 /** Delta vector that changes component `axisIndex` of `current` to `target`. */
 function axisDelta(current: readonly number[], axisIndex: number, target: number): number[] {
@@ -105,12 +105,12 @@ function EntityDetail({ entity }: { entity: Entity }): React.ReactElement {
         {!is2D(entity) && (
           <PropRow label="Rotation°">
             <AxisFields
-              values={entity.rotation.map((r) => r * DEGREES_PER_RADIAN)}
+              values={entity.rotation.map((r) => toDegrees(r))}
               label="Rotation"
               onAxisCommit={(axisIndex, degrees) =>
                 dispatch('rotate_entity', {
                   id: entity.id,
-                  delta: axisDelta(entity.rotation, axisIndex, degrees / DEGREES_PER_RADIAN),
+                  delta: axisDelta(entity.rotation, axisIndex, toRadians(degrees)),
                 })
               }
             />
@@ -145,9 +145,7 @@ function PropertiesBody(): React.ReactElement {
   const entities = useStore((s) => s.document.entities);
   const building = useStore((s) => s.document.building);
   const document = building === undefined ? { entities } : { entities, building };
-  const [selectedId] = selection;
-  const entity =
-    selection.length === 1 && selectedId !== undefined ? entities[selectedId] : undefined;
+  const entity = useSoleSelectedEntity();
   const elementIds = new Set<string>();
   for (const id of selection) {
     const elementId = buildingElementOf(document, id);

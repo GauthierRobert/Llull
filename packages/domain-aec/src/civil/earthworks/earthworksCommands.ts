@@ -8,10 +8,11 @@ import type { CadDocument, Vec2 } from '@core/model/types';
 import type { PlatformObject } from '@core/model/civil';
 import type { CommandResult } from '@core/commands/types';
 import { commandCatalog, defineCommand, z, vec2 } from '@core/commands/schema';
-import { noop } from '@core/commands/noop';
-import { isValidPolygon, segmentsIntersect, signedArea } from '@lib/polygon';
+import { newNameParam } from '../commonParams';
+import { noop, report } from '@core/commands/noop';
+import { isValidPolygon, segmentsIntersect, toCounterClockwise } from '@lib/polygon';
 import {
-  civilObjectOrFailure,
+  civilObjectOrNoop,
   civilObject,
   civilObjectsOf,
   getCivil,
@@ -32,14 +33,12 @@ import {
 } from './earthworksMath';
 import { daylightPoints } from './platformDaylight';
 import { toMetres } from '@core/model/units';
-import { round as roundDigits } from '../../shared/numeric';
+import { round } from '../../shared/numeric';
 
 const DEFAULT_CUT_SLOPE = 1.5;
 const DEFAULT_FILL_SLOPE = 2;
 const MAX_BOUNDARY_VERTICES = 2000;
 const BALANCE_ITERATIONS = 60;
-
-const round = (value: number, digits = 3): number => roundDigits(value, digits);
 
 const slopeOf = (name: string, value: number): string | null =>
   value > 0 && Number.isFinite(value) ? null : `${name} must be > 0 (horizontal per 1 vertical).`;
@@ -78,24 +77,19 @@ function platformProblem(platform: PlatformObject, tin: Tin): string | null {
   return null;
 }
 
-const counterClockwise = (points: ReadonlyArray<Vec2>): Vec2[] => {
-  const copy = points.map((point): Vec2 => [point[0], point[1]]);
-  return signedArea(copy) < 0 ? copy.reverse() : copy;
-};
-
 /** Volumes in m³ / areas in m² / depths in m. Net = cut - fill (positive = surplus to export). */
-function report(doc: CadDocument, works: Earthworks): Record<string, number> {
+function worksData(doc: CadDocument, works: Earthworks): Record<string, number> {
   const k = toMetres(doc, 1);
   return {
-    cutM3: round(works.cutVolume * k ** 3),
-    fillM3: round(works.fillVolume * k ** 3),
-    netM3: round((works.cutVolume - works.fillVolume) * k ** 3),
-    cutAreaM2: round(works.cutArea * k ** 2),
-    fillAreaM2: round(works.fillArea * k ** 2),
-    padAreaM2: round(works.padArea * k ** 2),
-    maxCutDepthM: round(works.maxCutDepth * k),
-    maxFillDepthM: round(works.maxFillDepth * k),
-    gridSpacingM: round(works.spacing * k),
+    cutM3: round(works.cutVolume * k ** 3, 3),
+    fillM3: round(works.fillVolume * k ** 3, 3),
+    netM3: round((works.cutVolume - works.fillVolume) * k ** 3, 3),
+    cutAreaM2: round(works.cutArea * k ** 2, 3),
+    fillAreaM2: round(works.fillArea * k ** 2, 3),
+    padAreaM2: round(works.padArea * k ** 2, 3),
+    maxCutDepthM: round(works.maxCutDepth * k, 3),
+    maxFillDepthM: round(works.maxFillDepth * k, 3),
+    gridSpacingM: round(works.spacing * k, 3),
     samples: works.samples,
     samplesOutsideTin: works.outsideTin,
   };
@@ -147,8 +141,8 @@ export const addPlatform = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const civil = getCivil(doc);
-    const surface = civilObjectOrFailure(doc, params.surfaceId, 'surface', 'add_platform');
-    if (typeof surface === 'string') return noop(doc, surface);
+    const surface = civilObjectOrNoop(doc, params.surfaceId, 'surface', 'add_platform');
+    if ('summary' in surface) return surface;
     const tin = surfaceTin(civil, surface);
     const id = nextCivilId(civil, 'platform');
     const platform: PlatformObject = {
@@ -157,14 +151,14 @@ export const addPlatform = defineCommand({
       name: params.name?.trim() || `Platform ${civilObjectsOf(civil, 'platform').length + 1}`,
       entityIds: [],
       surfaceId: surface.id,
-      boundary: counterClockwise(params.boundary),
+      boundary: toCounterClockwise(params.boundary),
       elevation: params.elevation,
       cutSlope: params.cutSlope ?? DEFAULT_CUT_SLOPE,
       fillSlope: params.fillSlope ?? DEFAULT_FILL_SLOPE,
     };
     const problem = platformProblem(platform, tin);
     if (problem) return noop(doc, `add_platform failed: ${problem}`);
-    const data = report(doc, worksOf(platform, tin));
+    const data = worksData(doc, worksOf(platform, tin));
     return commitCivil(
       doc,
       withObject(civil, platform),
@@ -198,7 +192,7 @@ export const updatePlatform = defineCommand({
       .describe('New pad outline (>= 3 vertices, simple polygon, inside the surface).'),
     cutSlope: z.number().optional().describe('Cut batter, horizontal per 1 vertical (> 0).'),
     fillSlope: z.number().optional().describe('Fill batter, horizontal per 1 vertical (> 0).'),
-    name: z.string().optional().describe('New name.'),
+    name: newNameParam,
   }),
   run: (doc, params): CommandResult => {
     const civil = getCivil(doc);
@@ -210,7 +204,7 @@ export const updatePlatform = defineCommand({
     const updated: PlatformObject = {
       ...platform,
       name: params.name?.trim() || platform.name,
-      boundary: params.boundary ? counterClockwise(params.boundary) : platform.boundary,
+      boundary: params.boundary ? toCounterClockwise(params.boundary) : platform.boundary,
       elevation: params.elevation ?? platform.elevation,
       cutSlope: params.cutSlope ?? platform.cutSlope,
       fillSlope: params.fillSlope ?? platform.fillSlope,
@@ -219,7 +213,7 @@ export const updatePlatform = defineCommand({
       return noop(doc, `update_platform: nothing to change on ${platform.id}.`);
     const problem = platformProblem(updated, tin);
     if (problem) return noop(doc, `update_platform failed: ${problem}`);
-    const data = report(doc, worksOf(updated, tin));
+    const data = worksData(doc, worksOf(updated, tin));
     return commitCivil(
       doc,
       withObject(civil, updated),
@@ -265,7 +259,7 @@ export const platformEarthworks = defineCommand({
     }
     if (gridSpacing !== undefined && !(gridSpacing > 0))
       return noop(doc, 'platform_earthworks failed: gridSpacing must be > 0.');
-    const data = report(doc, worksOf(platform, tin, gridSpacing));
+    const data = worksData(doc, worksOf(platform, tin, gridSpacing));
     const daylight = daylightPoints(
       tin,
       platform.boundary,
@@ -273,21 +267,19 @@ export const platformEarthworks = defineCommand({
       platform.cutSlope,
       platform.fillSlope,
     );
-    return {
-      document: doc,
-      summary:
-        `${platform.name} (${platform.id}) at ${toMetresText(doc, platform.elevation)} m: ` +
+    return report(
+      doc,
+      `${platform.name} (${platform.id}) at ${toMetresText(doc, platform.elevation)} m: ` +
         `${volumeText(data)}; cut area ${data['cutAreaM2']} m², fill area ${data['fillAreaM2']} m², ` +
         `max cut ${data['maxCutDepthM']} m, max fill ${data['maxFillDepthM']} m; ` +
         `grid ${data['gridSpacingM']} m.`,
-      affected: [],
-      data: {
+      {
         platformId,
         ...data,
         daylight: daylight.map((point) => point.daylight),
         daylightClipped: daylight.filter((point) => point.clipped).length,
       },
-    };
+    );
   },
 });
 
@@ -388,7 +380,7 @@ export const balancePlatform = defineCommand({
       platform.cutSlope,
       platform.fillSlope,
     );
-    const data = report(doc, works);
+    const data = worksData(doc, works);
     const residual = round(
       (works.cutVolume * swellFactor - works.fillVolume) * toMetres(doc, 1) ** 3,
     );
@@ -448,27 +440,25 @@ export const compareSurfaces = defineCommand({
     const data = {
       baseSurfaceId,
       comparisonSurfaceId,
-      cutM3: round(result.cutVolume * k ** 3),
-      fillM3: round(result.fillVolume * k ** 3),
-      netM3: round((result.cutVolume - result.fillVolume) * k ** 3),
-      cutAreaM2: round(result.cutArea * k ** 2),
-      fillAreaM2: round(result.fillArea * k ** 2),
-      areaM2: round(result.area * k ** 2),
-      gridSpacingM: round(result.spacing * k),
+      cutM3: round(result.cutVolume * k ** 3, 3),
+      fillM3: round(result.fillVolume * k ** 3, 3),
+      netM3: round((result.cutVolume - result.fillVolume) * k ** 3, 3),
+      cutAreaM2: round(result.cutArea * k ** 2, 3),
+      fillAreaM2: round(result.fillArea * k ** 2, 3),
+      areaM2: round(result.area * k ** 2, 3),
+      gridSpacingM: round(result.spacing * k, 3),
       samples: result.samples,
       samplesOutsideTin: result.outsideTin,
     };
-    return {
-      document: doc,
-      summary:
-        `${comparisonSurfaceId} vs ${baseSurfaceId}: cut ${data.cutM3} m³, fill ${data.fillM3} m³, ` +
+    return report(
+      doc,
+      `${comparisonSurfaceId} vs ${baseSurfaceId}: cut ${data.cutM3} m³, fill ${data.fillM3} m³, ` +
         `net ${data.netM3} m³ (cut - fill) over ${data.areaM2} m²; grid ${data.gridSpacingM} m` +
         (data.samplesOutsideTin > 0
           ? `; ${data.samplesOutsideTin} sample(s) outside a TIN skipped.`
           : '.'),
-      affected: [],
       data,
-    };
+    );
   },
 });
 

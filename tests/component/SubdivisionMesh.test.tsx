@@ -11,7 +11,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '@ui/store';
 import type { SubdivisionEntity } from '@core/model/types';
 import { subdivisionTriangles } from '@core/geometry/subdivision';
-import { buildMeshSolidGeometry } from '@ui/viewport/3d/entities/meshSolidGeometry';
+import { buildTriangleSoupGeometry } from '@ui/viewport/3d/entities/meshSolidGeometry';
 import { dispatchEntity, resetStore } from '../helpers/componentEntities';
 
 describe('SubdivisionMesh — add_subdivision_solid command → kind "subdivision"', () => {
@@ -24,13 +24,11 @@ describe('SubdivisionMesh — add_subdivision_solid command → kind "subdivisio
     });
     expect(entity.kind).toBe('subdivision');
     expect(useStore.getState().document.order).toContain(id);
-    const positions = subdivisionTriangles(entity as SubdivisionEntity).flat(2);
-    expect(positions.length).toBe(14 * 16 * 2 * 9);
-    const geometry = buildMeshSolidGeometry({
-      positions,
-      indices: Array.from({ length: positions.length / 3 }, (_, corner) => corner),
-    });
-    expect(geometry.getAttribute('position').count).toBe(positions.length / 3);
+    const triangles = subdivisionTriangles(entity as SubdivisionEntity);
+    expect(triangles.length * 9).toBe(14 * 16 * 2 * 9);
+    const geometry = buildTriangleSoupGeometry(triangles);
+    if (geometry === null) throw new Error('empty geometry');
+    expect(geometry.getAttribute('position').count).toBe(triangles.length * 3);
     expect(geometry.getAttribute('normal')).toBeDefined();
     geometry.dispose();
   });

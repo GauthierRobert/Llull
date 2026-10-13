@@ -11,10 +11,10 @@ import {
   isValidPolygon,
   pointInPolygon,
   projectOntoSegment,
-  polygonArea,
   segmentsIntersect,
 } from '@lib/polygon';
-import { fromMm, toMetres } from '@core/model/units';
+import { fromMm } from '@core/model/units';
+import { planAreaM2 } from '../../shared/planArea';
 import { getBuilding, isVec2List, toVec2, withElement } from '../model';
 import { noop } from '@core/commands/noop';
 import { commitBuilding } from '../evaluate/evaluateElements';
@@ -164,7 +164,7 @@ export const addSlabOpening = defineCommand({
     const error = slabOpeningError(slab, outline);
     if (error) return noop(doc, `add_slab_opening refused: ${error}.`);
     const updated: SlabElement = { ...slab, openings: [...(slab.openings ?? []), outline] };
-    const area = polygonArea(outline) * toMetres(doc, 1) ** 2;
+    const area = planAreaM2(doc, outline);
     const openingIndex = (updated.openings?.length ?? 1) - 1;
     return commitBuilding(
       doc,

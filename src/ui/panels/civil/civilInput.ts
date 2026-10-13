@@ -4,6 +4,7 @@
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
+import { fixedNumber } from '@lib/compactNumber';
 import { parseNumberRow } from '@ui/numberText';
 import { localToWorld2D } from '@ui/viewport/2d/snapping/geometry';
 
@@ -55,5 +56,5 @@ export function selectedPolylinePoints(doc: CadDocument): Vec2[] | null {
 
 /** Plan points as the "x,y; x,y" text the point fields accept. */
 export function formatPoints(points: ReadonlyArray<Vec2>): string {
-  return points.map(([x, y]) => `${Number(x.toFixed(3))},${Number(y.toFixed(3))}`).join('; ');
+  return points.map(([x, y]) => `${fixedNumber(x, 3)},${fixedNumber(y, 3)}`).join('; ');
 }

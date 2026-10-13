@@ -11,10 +11,11 @@ import type { AlignmentObject } from '@core/model/civil';
 import { PAPER_SIZES, type PaperSize } from '@aec/shared/sheetFrame';
 import { useStore } from '@ui/store';
 import { OptionSelect } from '@ui/panels/OptionSelect';
-import { CivilObjectRow, CivilStatus, NumberField } from './CivilParts';
+import { CivilObjectRow, NumberTextField } from './CivilParts';
+import { StatusLine } from '@ui/panels/PanelParts';
+import { QueryDownloadButton } from '@ui/panels/QueryDownloadButton';
 import { optionalNumber, parseNumber } from '@ui/numberText';
 import { parsePvis } from './civilInput';
-import { downloadQuery } from '@ui/services/localQuery';
 
 const SECTION_FIELDS = [
   ['laneWidth', 'Lane width'],
@@ -116,7 +117,7 @@ export function AlignmentEditor({ alignment }: { alignment: AlignmentObject }): 
             </button>
           </div>
           <div className="building-inline-form">
-            <NumberField
+            <NumberTextField
               value={superelevation}
               set={setSuperelevation}
               hint="Superelevation (0.06)"
@@ -127,80 +128,48 @@ export function AlignmentEditor({ alignment }: { alignment: AlignmentObject }): 
             </button>
           </div>
           <div className="building-actions">
-            <NumberField
+            <NumberTextField
               value={designSpeed}
               set={setDesignSpeed}
               hint="Design speed km/h"
               label={`Design speed of ${label}`}
             />
-            <button
-              type="button"
-              className="btn btn--ghost btn--sm"
-              onClick={() =>
-                setStatus(
-                  downloadQuery(
-                    'alignment_report',
-                    { ...params, ...optionalNumber('designSpeedKmh', designSpeed) },
-                    'csv',
-                    `${alignment.id}-report.csv`,
-                    'text/csv',
-                  ),
-                )
-              }
-            >
-              Report CSV
-            </button>
-            <button
-              type="button"
-              className="btn btn--ghost btn--sm"
-              onClick={() =>
-                setStatus(
-                  downloadQuery(
-                    'export_long_section',
-                    params,
-                    'text',
-                    `${alignment.id}-long-section.svg`,
-                    'image/svg+xml',
-                  ),
-                )
-              }
-            >
-              Long section SVG
-            </button>
-            <button
-              type="button"
-              className="btn btn--ghost btn--sm"
-              onClick={() =>
-                setStatus(
-                  downloadQuery(
-                    'export_cross_sections',
-                    params,
-                    'text',
-                    `${alignment.id}-cross-sections.svg`,
-                    'image/svg+xml',
-                  ),
-                )
-              }
-            >
-              Cross sections SVG
-            </button>
-            <button
-              type="button"
-              className="btn btn--ghost btn--sm"
-              onClick={() =>
-                setStatus(
-                  downloadQuery(
-                    'export_plan_profile_sheet',
-                    { ...params, paper },
-                    'text',
-                    `${alignment.id}-plan-profile.svg`,
-                    'image/svg+xml',
-                  ),
-                )
-              }
-            >
-              Plan-profile sheet
-            </button>
+            <QueryDownloadButton
+              label="Report CSV"
+              command="alignment_report"
+              params={{ ...params, ...optionalNumber('designSpeedKmh', designSpeed) }}
+              field="csv"
+              fallbackName={`${alignment.id}-report.csv`}
+              mimeType="text/csv"
+              onStatus={setStatus}
+            />
+            <QueryDownloadButton
+              label="Long section SVG"
+              command="export_long_section"
+              params={params}
+              field="text"
+              fallbackName={`${alignment.id}-long-section.svg`}
+              mimeType="image/svg+xml"
+              onStatus={setStatus}
+            />
+            <QueryDownloadButton
+              label="Cross sections SVG"
+              command="export_cross_sections"
+              params={params}
+              field="text"
+              fallbackName={`${alignment.id}-cross-sections.svg`}
+              mimeType="image/svg+xml"
+              onStatus={setStatus}
+            />
+            <QueryDownloadButton
+              label="Plan-profile sheet"
+              command="export_plan_profile_sheet"
+              params={{ ...params, paper }}
+              field="text"
+              fallbackName={`${alignment.id}-plan-profile.svg`}
+              mimeType="image/svg+xml"
+              onStatus={setStatus}
+            />
             <OptionSelect
               value={paper}
               options={PAPER_SIZES}
@@ -208,7 +177,7 @@ export function AlignmentEditor({ alignment }: { alignment: AlignmentObject }): 
               onChange={setPaper}
             />
           </div>
-          <CivilStatus text={status} testId={`civil-alignment-status-${alignment.id}`} />
+          <StatusLine text={status} testId={`civil-alignment-status-${alignment.id}`} />
         </div>
       }
     />

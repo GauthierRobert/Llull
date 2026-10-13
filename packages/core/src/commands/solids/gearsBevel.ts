@@ -13,9 +13,14 @@ import type { CommandResult } from '../types';
 import type { Point2 } from '../../lib/polygon';
 import { defineCommand, z, nameField } from '../schema';
 import { nextId } from '../../lib/id';
-import { compactNumber as fmt } from '../../lib/compactNumber';
+import { compactNumber as fmt, vecText } from '../../lib/compactNumber';
 import { finiteVec3OrZero } from '../../lib/vec3';
-import { DEFAULT_FLANK_SAMPLES, externalGearPattern, toothOutline } from '../../lib/gearOutline';
+import {
+  DEFAULT_FLANK_SAMPLES,
+  externalGearPattern,
+  pitchRadiusOf,
+  toothOutline,
+} from '../../lib/gearOutline';
 import {
   addCap,
   addLoftWalls,
@@ -24,13 +29,17 @@ import {
   createMeshBuilder,
   placeMesh,
 } from '../../geometry/prismMesh';
-import { MAX_GEAR_TEETH } from '../limits';
-import { rotatedEntityBounds } from '../../geometry/rotatedBounds';
-import { commitEntity } from '../entity/commitEntity';
 import { withEntity } from '../entity/entityOps';
-import { boundsText, positionField, rotationField } from './shared';
-import { AXIS_ROTATION, meshGearEntity, pressureAngleProblem } from './gearSolid';
+import { commitSolid, positionField, rotationField } from './shared';
+import {
+  AXIS_ROTATION,
+  meshGearEntity,
+  moduleProblem,
+  pressureAngleProblem,
+  teethCountProblem,
+} from './gearSolid';
 import { noop } from '../noop';
+import { toDegrees } from '../../lib/angle';
 
 const ORIGIN: Vec3 = [0, 0, 0];
 const MAX_FACE_FRACTION = 0.7;
@@ -69,7 +78,7 @@ export function bevelGearMesh(
   bore: number,
   phase: number,
 ): MeshData {
-  const pitchRadius = (mod * teeth) / 2;
+  const pitchRadius = pitchRadiusOf(mod, teeth);
   // Tooth heights are measured normal to the pitch cone; in the heel plane (perpendicular to the axis)
   // that stretches the radial offsets from the pitch circle by 1 / cos(pitchAngle).
   const stretch = 1 / Math.cos(geometry.pitchAngle);
@@ -111,14 +120,11 @@ interface BevelInputs {
 /** Rejection reason for bevel parameters, or the pitch cone when valid. */
 function checkBevel(input: BevelInputs): string | BevelGeometry {
   const { mod, teeth, matingTeeth, shaftAngle, pitchAngle, faceWidth, pressureAngle, bore } = input;
-  if (!(mod > 0 && Number.isFinite(mod)))
-    return `module must be finite and > 0, got ${String(mod)}.`;
-  if (!(Number.isInteger(teeth) && teeth >= 6 && teeth <= MAX_GEAR_TEETH)) {
-    return `teeth must be an integer in [6, ${MAX_GEAR_TEETH}], got ${String(teeth)}.`;
-  }
-  if (!(Number.isInteger(matingTeeth) && matingTeeth >= 6 && matingTeeth <= MAX_GEAR_TEETH)) {
-    return `matingTeeth must be an integer in [6, ${MAX_GEAR_TEETH}], got ${String(matingTeeth)}.`;
-  }
+  const countProblem =
+    moduleProblem(mod) ??
+    teethCountProblem('teeth', teeth, 6) ??
+    teethCountProblem('matingTeeth', matingTeeth, 6);
+  if (countProblem !== null) return countProblem;
   if (!(shaftAngle > 0 && shaftAngle < Math.PI)) {
     return `shaftAngle must be in (0, π) radians, got ${String(shaftAngle)}.`;
   }
@@ -135,8 +141,8 @@ function checkBevel(input: BevelInputs): string | BevelGeometry {
     );
   }
   const shrink = 1 - faceWidth / geometry.coneDistance;
-  const rootRadius = (mod * teeth) / 2 - (1.25 * mod) / Math.cos(geometry.pitchAngle);
-  if (!(rootRadius > 0.3 * ((mod * teeth) / 2))) {
+  const rootRadius = pitchRadiusOf(mod, teeth) - (1.25 * mod) / Math.cos(geometry.pitchAngle);
+  if (!(rootRadius > 0.3 * pitchRadiusOf(mod, teeth))) {
     return `pitch angle too steep for ${teeth} teeth (root radius ${fmt(rootRadius)} <= 30% of the pitch radius); use more teeth or a smaller tooth ratio.`;
   }
   const toeRoot = shrink * rootRadius;
@@ -251,13 +257,12 @@ export const addBevelGear = defineCommand({
     const oriented = placeMesh(local, ORIGIN, AXIS_ROTATION[axis]);
     const id = nextId('bevel');
     const pivoted = meshGearEntity(id, placeMesh(oriented, at, turn), color, name);
-    return commitEntity(
+    return commitSolid(
       doc,
       pivoted,
       `Created bevel_gear ${id}: module=${fmt(mod)} teeth=${teeth} matingTeeth=${matingTeeth} ` +
-        `pitchAngle=${fmt((checked.pitchAngle * 180) / Math.PI)}deg coneDistance=${fmt(checked.coneDistance)} ` +
-        `face=${fmt(faceWidth)} apexHeight=${fmt(checked.apexHeight)} bore=${fmt(bore)} at [${at.map(fmt).join(', ')}]. ` +
-        `${boundsText(rotatedEntityBounds(pivoted))}.`,
+        `pitchAngle=${fmt(toDegrees(checked.pitchAngle))}deg coneDistance=${fmt(checked.coneDistance)} ` +
+        `face=${fmt(faceWidth)} apexHeight=${fmt(checked.apexHeight)} bore=${fmt(bore)} at ${vecText(at)}`,
     );
   },
 });
@@ -356,7 +361,7 @@ export const addBevelGearPair = defineCommand({
       summary:
         `Created bevel gear pair: pinion ${pinionId} (${pinionTeeth}T, axis Z) and wheel ${wheelId} (${wheelTeeth}T, axis X), ` +
         `module=${fmt(mod)} ratio=${fmt(wheelTeeth / pinionTeeth)}:1 coneDistance=${fmt(pinion.coneDistance)} ` +
-        `apex at [${apex.map(fmt).join(', ')}].`,
+        `apex at ${vecText(apex)}.`,
       affected: [pinionId, wheelId],
       data: {
         ratio: wheelTeeth / pinionTeeth,

@@ -5,6 +5,7 @@
  * @pure
  */
 
+import { toDegrees } from '../lib/angle';
 import type { Feature, FeatureProgram, Term } from './program';
 import { significantNumber } from '../lib/compactNumber';
 
@@ -22,7 +23,7 @@ export function formatTerm(term: Term): string {
 /** Radians → degrees, keeping a parameter expression symbolic via `piName` (e.g. `math.pi`). */
 export function formatDegrees(term: Term, piName: string): string {
   if (term.expression !== undefined) return `(${term.expression}) * 180 / ${piName}`;
-  const degrees = (term.value * 180) / Math.PI;
+  const degrees = toDegrees(term.value);
   return Math.abs(degrees) < 1e-12 ? '0' : significantNumber(degrees, 15);
 }
 

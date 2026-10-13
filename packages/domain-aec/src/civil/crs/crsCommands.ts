@@ -8,7 +8,7 @@ import type { CadDocument } from '@core/model/types';
 import type { CivilCrs } from '@core/model/civil';
 import type { CommandResult } from '@core/commands/types';
 import { commandCatalog, defineCommand, z, vec2 } from '@core/commands/schema';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { getCivil } from '../model';
 import { gridToLocal, localToGrid } from './crs';
 
@@ -131,12 +131,10 @@ export const transformCoordinates = defineCommand({
       return noop(doc, 'transform_coordinates failed: no site calibration (set_site_calibration).');
     if (points.length === 0) return noop(doc, 'transform_coordinates failed: no points.');
     const convert = direction === 'localToGrid' ? localToGrid : gridToLocal;
-    return {
-      document: doc,
-      summary: `Transformed ${points.length} point(s) ${direction}.`,
-      affected: [],
-      data: { points: points.map((point) => convert(calibration, point)), direction },
-    };
+    return report(doc, `Transformed ${points.length} point(s) ${direction}.`, {
+      points: points.map((point) => convert(calibration, point)),
+      direction,
+    });
   },
 });
 

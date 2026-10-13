@@ -27,6 +27,33 @@ export interface CheckLine {
   readonly detail: string;
 }
 
+/** Plastic shear check line (§6.2.6); `subject` prefixes the detail, forces in kN. */
+export const shearCheckLine = (
+  subject: string,
+  combination: string,
+  utilisation: number,
+  shearEdKn: number,
+  shearRdKn: number,
+): CheckLine => ({
+  name: 'shear (§6.2.6)',
+  utilisation,
+  combination,
+  detail: `${subject}: V ${shearEdKn.toFixed(1)} kN ≤ Vpl,Rd ${shearRdKn.toFixed(0)} kN`,
+});
+
+/** SLS deflection check line against `limit` (mm); `label` names the limit, e.g. "L/250". */
+export const deflectionCheckLine = (
+  subject: string,
+  label: string,
+  deflection: number,
+  limit: number,
+): CheckLine => ({
+  name: `deflection (${label})`,
+  utilisation: deflection / limit,
+  combination: 'SLS G + Q',
+  detail: `${subject}: δ ${deflection.toFixed(1)} mm ≤ ${label} = ${limit.toFixed(1)} mm`,
+});
+
 export interface MemberRow {
   readonly id: string;
   readonly mark: string;
@@ -109,7 +136,7 @@ interface Skipped {
 const skip = (bar: SteelBar, reason: string): Skipped => ({ skipped: skippedRow(bar, reason) });
 
 /** Profile and resistance of a bar bent about its depth axis, or the row of a bar not covered (shape, class 4). */
-export function beamSection(
+function beamSection(
   bar: SteelBar,
 ): { profile: SteelProfile; resistance: ReturnType<typeof sectionResistance> } | Skipped {
   const { profile } = bar;
@@ -128,6 +155,18 @@ export function beamSection(
     );
   }
   return { profile, resistance };
+}
+
+/** Row built by `build` from the section of a beam bar, or the skipped row when it is not covered. */
+export function withBeamSection(
+  bar: SteelBar,
+  build: (section: {
+    profile: SteelProfile;
+    resistance: ReturnType<typeof sectionResistance>;
+  }) => MemberRow,
+): MemberRow {
+  const gate = beamSection(bar);
+  return 'skipped' in gate ? gate.skipped : build(gate);
 }
 
 /** Profile, compression class and resistance of a column, or the row of a bar not covered (shape, class 4). */

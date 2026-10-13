@@ -5,7 +5,7 @@
  * parameters, dispatch the single command it maps to (see elementTools.ts).
  */
 
-import React, { useId, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useStore } from '@ui/store';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { ELEMENT_TOOLS } from './elementTools';
@@ -16,8 +16,11 @@ import {
   type ElementTool,
   type ToolField,
 } from './elementToolForm';
-import { BuildingForm } from './BuildingForm';
-import { useFormValues } from './useFormValues';
+import { CommandForm } from '@ui/panels/CommandForm';
+import { LabeledInput } from '@ui/panels/LabeledInput';
+import { LabeledSelect } from '@ui/panels/LabeledSelect';
+import { StatusLine } from '@ui/panels/PanelParts';
+import { useFormValues } from '@ui/panels/useFormValues';
 import { INDUSTRIAL_TOOLS } from './industrialTools';
 import { gridExtent } from './gridExtent';
 import { elementOptions, type ElementOptions } from './elementOptions';
@@ -44,7 +47,6 @@ interface FieldInputProps {
 function FieldInput({ field, value, lists, units, onChange }: FieldInputProps): React.ReactElement {
   const fieldLabel = field.label.replace('{unit}', units);
   const testId = `tool-field-${field.key}`;
-  const inputId = useId();
   if (field.kind === 'checkbox') {
     return (
       <label className="field">
@@ -65,44 +67,27 @@ function FieldInput({ field, value, lists, units, onChange }: FieldInputProps): 
         ? lists[field.options].map((option): readonly [string, string] => [option.id, option.label])
         : (field.options ?? []);
     return (
-      <div className="field">
-        <label className="field__label" htmlFor={inputId}>
-          {fieldLabel}
-        </label>
-        <select
-          id={inputId}
-          value={value}
-          onChange={(event) => onChange(field.key, event.target.value)}
-          data-testid={testId}
-        >
-          {listKind !== null && (
-            <option value="">
-              {field.blankLabel ?? blankOptionLabel(listKind, lists[listKind].length)}
-            </option>
-          )}
-          {options.map(([optionValue, label]) => (
-            <option key={optionValue} value={optionValue}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <LabeledSelect
+        label={fieldLabel}
+        value={value}
+        options={options}
+        {...(listKind !== null
+          ? { blankLabel: field.blankLabel ?? blankOptionLabel(listKind, lists[listKind].length) }
+          : {})}
+        testId={testId}
+        onChange={(chosen) => onChange(field.key, chosen)}
+      />
     );
   }
   return (
-    <div className="field">
-      <label className="field__label" htmlFor={inputId}>
-        {fieldLabel}
-      </label>
-      <input
-        id={inputId}
-        type={field.kind === 'number' ? 'number' : 'text'}
-        value={value}
-        placeholder={field.optional === true ? 'auto' : undefined}
-        onChange={(event) => onChange(field.key, event.target.value)}
-        data-testid={testId}
-      />
-    </div>
+    <LabeledInput
+      label={fieldLabel}
+      type={field.kind === 'number' ? 'number' : 'text'}
+      value={value}
+      placeholder={field.optional === true ? 'auto' : undefined}
+      testId={testId}
+      onChange={(text) => onChange(field.key, text)}
+    />
   );
 }
 
@@ -131,7 +116,7 @@ function ToolForm({ tool }: ToolFormProps): React.ReactElement {
   };
 
   return (
-    <BuildingForm
+    <CommandForm
       ariaLabel={`Add ${tool.label}`}
       error={error}
       submitLabel={`Add ${tool.label.toLowerCase()}`}
@@ -150,7 +135,7 @@ function ToolForm({ tool }: ToolFormProps): React.ReactElement {
             onChange={change}
           />
         ))}
-    </BuildingForm>
+    </CommandForm>
   );
 }
 
@@ -187,11 +172,7 @@ export function ElementToolsSection(): React.ReactElement {
         </select>
       </label>
       {tool && <ToolForm key={tool.id} tool={tool} />}
-      {lastSummary !== null && lastSummary !== '' && (
-        <p className="building-summary" role="status" data-testid="building-last-summary">
-          {lastSummary}
-        </p>
-      )}
+      <StatusLine text={lastSummary ?? ''} testId="building-last-summary" />
     </PanelSection>
   );
 }

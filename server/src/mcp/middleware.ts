@@ -5,8 +5,8 @@
  */
 
 import type { Request, RequestHandler, Response } from 'express';
-import { UNAUTHORIZED_BODY, buildRateLimiter, hasValidBearer } from '../security';
-import { isUserMode, requireRole } from '../users';
+import { buildRateLimiter, hasValidBearer } from '../security';
+import { UNAUTHORIZED_BODY, isUserMode, requireRole } from '../users';
 
 /**
  * Bearer-token auth guard.

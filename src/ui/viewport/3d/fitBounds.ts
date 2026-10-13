@@ -6,8 +6,8 @@
  */
 
 import type { CadDocument, Vec3 } from '@core/model/types';
-import { type Bounds, boundsCenter, entityBoundsInDoc, mergeBounds } from '@core/geometry/bounds';
-import { VIEWPORT_FOV_DEGREES } from '@core/model/viewport';
+import { type Bounds, entityBoundsInDoc, mergeBounds } from '@core/geometry/bounds';
+import { fitFraming } from '@core/geometry/viewFraming';
 
 /** Margin applied on top of the exact fit distance. */
 const FIT_MARGIN = 1.15;
@@ -51,20 +51,9 @@ export function computeFitFraming(
   const merged = mergedEntityBounds(document, ids);
   if (!merged) return null;
 
-  const extentRadius =
-    Math.hypot(
-      merged.max[0] - merged.min[0],
-      merged.max[1] - merged.min[1],
-      merged.max[2] - merged.min[2],
-    ) / 2;
   // Real size wins, however small (a 0.02 mm part must fill the view); only a point gets a default.
-  const sphereRadius = extentRadius > 0 ? extentRadius : DEGENERATE_SPHERE_RADIUS;
-  // The bounding sphere must fit the narrower of the vertical / horizontal half-angles.
-  const halfVertical = (VIEWPORT_FOV_DEGREES / 2) * (Math.PI / 180);
-  const halfHorizontal = Math.atan(Math.tan(halfVertical) * Math.max(aspect, 1e-3));
-  const halfAngle = Math.min(halfVertical, halfHorizontal);
-  return {
-    center: boundsCenter(merged),
-    distance: (sphereRadius / Math.sin(halfAngle)) * FIT_MARGIN,
-  };
+  return fitFraming(merged, aspect, FIT_MARGIN, {
+    degenerateBelow: 0,
+    degenerateRadius: DEGENERATE_SPHERE_RADIUS,
+  });
 }

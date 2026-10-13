@@ -4,6 +4,7 @@
  * @pure
  */
 
+import { toDegrees } from '@lib/angle';
 import type { CadDocument } from '@core/model/types';
 import { levelMembersInMm } from '../common/memberSupport';
 import { GAMMA_G, GAMMA_Q } from '../../shared/loadFactors';
@@ -25,8 +26,9 @@ import {
   type ZoneSummary,
 } from './purlinModel';
 import { beamVerdicts, freeFlangeReduction, governing } from './purlinSection';
-import { GRAVITY, round } from '../../shared/numeric';
+import { round, weightKnPerMetre } from '../../shared/numeric';
 import { distance3 } from '@lib/vec3';
+import { boundsOfPoints } from '@core/geometry/bounds';
 
 interface PurlinLoads {
   readonly windPressure: number;
@@ -81,15 +83,10 @@ export function analysePurlins(
 
   // Hall envelope: plan extents of every member, ridge height, eaves level.
   const everyPoint = members.flatMap(({ start, end }) => [start, end]);
-  const [x0, x1] = [
-    Math.min(...everyPoint.map((point) => point[0])),
-    Math.max(...everyPoint.map((point) => point[0])),
-  ];
-  const [y0, yEnd] = [
-    Math.min(...everyPoint.map((point) => point[1])),
-    Math.max(...everyPoint.map((point) => point[1])),
-  ];
-  const height = Math.max(...everyPoint.map((point) => point[2]));
+  const { min: envelopeMin, max: envelopeMax } = boundsOfPoints(everyPoint);
+  const [x0, x1] = [envelopeMin[0], envelopeMax[0]];
+  const [y0, yEnd] = [envelopeMin[1], envelopeMax[1]];
+  const height = envelopeMax[2];
   const rafterZs = members
     .filter(({ member }) => member.role === 'rafter')
     .flatMap(({ start, end }) => [start[2], end[2]]);
@@ -178,12 +175,12 @@ export function analysePurlins(
         const cosine = Math.cos(pitch);
         const fy = yieldStrength(purlin.member.material);
         const trib = tributary / 1000;
-        const selfWeight = (purlin.profile.massPerMetre * GRAVITY) / 1000;
+        const selfWeight = weightKnPerMetre(purlin.profile.massPerMetre);
         // Vertical dead per metre of purlin, snow on plan (× cos pitch); normal comp. × cos pitch.
         const dead = (roofDeadLoad * trib + selfWeight) * cosine;
         const snow = snowLoad * trib * cosine * cosine;
 
-        const pitchDegrees = (pitch * 180) / Math.PI;
+        const pitchDegrees = toDegrees(pitch);
         const { zone, direction, cpe, pressureOption } = purlinWind({
           purlin,
           eavesEnd,
@@ -246,7 +243,7 @@ export function analysePurlins(
           zone,
           span: purlin.length / 1000,
           ...worst,
-          check: `${worst.check} ${purlin.member.profile}, tributary ${tributary.toFixed(0)} mm, pitch ${((pitch * 180) / Math.PI).toFixed(1)}°`,
+          check: `${worst.check} ${purlin.member.profile}, tributary ${tributary.toFixed(0)} mm, pitch ${toDegrees(pitch).toFixed(1)}°`,
           upliftUtilisation: (uplift[0] as Verdict).utilisation,
         });
         record('roof', zone, cpe, worst.utilisation);

@@ -1,7 +1,7 @@
 import type { CadDocument, DriveRelation } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
-import { nextId } from '../../lib/id';
+import { idOrNext, idTaken } from '../entity/explicitId';
 import { detectCycleOnAdd, evaluateMotionInternal } from './jointsKinematics';
 import { changed, noop, report } from '../noop';
 /**
@@ -79,8 +79,8 @@ export const addDriveRelation = defineCommand({
       );
     }
 
-    const drId = typeof id === 'string' && id.length > 0 ? id : nextId('dr');
-    if (drId in doc.driveRelations) {
+    const drId = idOrNext(id, 'dr');
+    if (idTaken(doc.driveRelations, drId)) {
       return noop(
         doc,
         `add_drive_relation: drive relation id '${drId}' already exists — no change made.`,

@@ -5,7 +5,7 @@ import {
   DEFAULT_SOLID_COLOR,
   placeSolid,
   placedSolidFields,
-  rejectBadSize,
+  placeSizedSolid,
   rejectNonPositive,
 } from './shared';
 
@@ -49,21 +49,7 @@ export const addWedge = defineCommand({
     doc,
     { size, position = ORIGIN, rotation, color = DEFAULT_SOLID_COLOR, anchor },
   ): CommandResult => {
-    const rejected = rejectBadSize(doc, 'add_wedge', size);
-    if (rejected) return rejected;
-    const [w, h, d] = size;
-    return placeSolid(doc, {
-      kind: 'wedge',
-      idPrefix: 'wdg',
-      geometry: { size },
-      halfExtents: [w / 2, h / 2, d / 2],
-      defaultAnchor: 'min',
-      anchor,
-      position,
-      rotation,
-      color,
-      describe: (id) => `Added wedge ${id} of size ${size.join('×')}`,
-    });
+    return placeSizedSolid(doc, 'wedge', 'wdg', 'min', size, { position, rotation, color, anchor });
   },
 });
 

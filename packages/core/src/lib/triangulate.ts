@@ -3,20 +3,18 @@
  * (O(n²)); used to mesh slabs with openings. @layer lib
  */
 
+import { orient2 } from './vec2';
 import { pointInPolygon, polygonArea, segmentsIntersect, signedArea, type Point2 } from './polygon';
 
-function cross(o: Point2, a: Point2, b: Point2): number {
-  return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
-}
-
 function pointInTriangle(p: Point2, a: Point2, b: Point2, c: Point2): boolean {
-  return cross(a, b, p) >= 0 && cross(b, c, p) >= 0 && cross(c, a, p) >= 0;
+  return orient2(a, b, p) >= 0 && orient2(b, c, p) >= 0 && orient2(c, a, p) >= 0;
 }
 
 /** True when `p` lies on segment a–b strictly between its ends. */
 function onSegment(p: Point2, a: Point2, b: Point2): boolean {
   const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
-  if (length === 0 || Math.abs(cross(a, b, p)) > length * 1e-9 * Math.max(1, length)) return false;
+  if (length === 0 || Math.abs(orient2(a, b, p)) > length * 1e-9 * Math.max(1, length))
+    return false;
   const t = ((p[0] - a[0]) * (b[0] - a[0]) + (p[1] - a[1]) * (b[1] - a[1])) / (length * length);
   return t > 1e-9 && t < 1 - 1e-9;
 }
@@ -156,13 +154,13 @@ function triangulateWith(
     let clipped = false;
     for (let i = 0; i < remaining.length && !clipped; i++) {
       const [previous, current, next] = neighbours(i);
-      if (cross(previous.point, current.point, next.point) <= 1e-12) continue;
+      if (orient2(previous.point, current.point, next.point) <= 1e-12) continue;
       // Only reflex (or flat) vertices can invalidate an ear (earcut rule).
       const blocked = remaining.some((other, j) => {
         if ([previous, current, next].some((corner) => same(corner.point, other.point)))
           return false;
         const [before, , after] = neighbours(j);
-        if (cross(before.point, other.point, after.point) > 1e-12) return false;
+        if (orient2(before.point, other.point, after.point) > 1e-12) return false;
         return pointInTriangle(other.point, previous.point, current.point, next.point);
       });
       if (blocked) continue;
@@ -174,19 +172,19 @@ function triangulateWith(
     // Stalled: drop one flat or repeated vertex (area-neutral) and retry.
     const flat = remaining.findIndex((_, i) => {
       const [previous, current, next] = neighbours(i);
-      return Math.abs(cross(previous.point, current.point, next.point)) <= 1e-12;
+      return Math.abs(orient2(previous.point, current.point, next.point)) <= 1e-12;
     });
     if (flat < 0) break;
     remaining.splice(flat, 1);
   }
   if (remaining.length === 3) {
     const [a, b, c] = remaining as [Vertex, Vertex, Vertex];
-    if (cross(a.point, b.point, c.point) > 1e-12) triangles.push([a.index, b.index, c.index]);
+    if (orient2(a.point, b.point, c.point) > 1e-12) triangles.push([a.index, b.index, c.index]);
   }
   const target = polygonArea(outer) - holes.reduce((sum, hole) => sum + polygonArea(hole), 0);
   const covered = triangles.reduce((sum, [a, b, c]) => {
     const [pa, pb, pc] = [vertices[a], vertices[b], vertices[c]] as [Point2, Point2, Point2];
-    return sum + Math.abs(cross(pa, pb, pc)) / 2;
+    return sum + Math.abs(orient2(pa, pb, pc)) / 2;
   }, 0);
   const complete = target > 0 && Math.abs(covered - target) <= target * 1e-6;
   return { vertices, triangles, complete };

@@ -19,3 +19,10 @@ export function expectSingleEntity(result: ReturnType<typeof execute>, kind: str
   expect(result.document.order).toHaveLength(1);
   expect(result.document.entities[result.affected[0]!]!.kind).toBe(kind);
 }
+
+/** Purity: `run` (which executes against `doc`) must leave `doc` deep-equal to its snapshot. */
+export function expectPure(doc: CadDocument, run: () => unknown): void {
+  const snapshot = JSON.stringify(doc);
+  run();
+  expect(JSON.stringify(doc)).toBe(snapshot);
+}

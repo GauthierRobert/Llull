@@ -9,6 +9,7 @@
 import type { FinishPattern, Material } from '../model/types';
 import { parseHexRgb } from '../lib/isHexColor';
 import { map3 } from '../lib/vec3';
+import { clamp } from '../lib/clamp';
 
 /** Texture tile edge in pixels. */
 const FINISH_TEXTURE_SIZE = 256;
@@ -94,7 +95,7 @@ function sampleAt(pattern: FinishPattern, u: number, v: number, size: number): S
   }
 }
 
-const clampByte = (value: number): number => Math.max(0, Math.min(255, Math.round(value)));
+const clampByte = (value: number): number => clamp(Math.round(value), 0, 255);
 
 /**
  * Tileable maps of `material.finish` (null without a finish). `color2` defaults to the base

@@ -7,8 +7,9 @@ import type { SlabElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
-import { polygonArea, rotatePoint2 } from '@lib/polygon';
-import { fromMm, toMetres } from '@core/model/units';
+import { rotatePoint2 } from '@lib/polygon';
+import { fromMm } from '@core/model/units';
+import { planAreaM2 } from '../../shared/planArea';
 import { elementAffected, getBuilding, withElement } from '../../building/model';
 import { regenerateBuilding } from '../../building/evaluate/evaluateElements';
 import { slabOpeningError } from '../../building/elements/slabOpenings';
@@ -78,7 +79,7 @@ export const addEquipmentOpenings = defineCommand({
     if (cut.length === 0)
       return noop(doc, `add_equipment_openings refused: ${refused.join('; ')}.`);
     const document = regenerateBuilding(doc, next);
-    const area = polygonArea(outline) * toMetres(doc, 1) ** 2;
+    const area = planAreaM2(doc, outline);
     return {
       document,
       summary:

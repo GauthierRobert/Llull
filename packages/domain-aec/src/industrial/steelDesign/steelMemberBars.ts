@@ -9,7 +9,7 @@ import type { CadDocument, Vec3 } from '@core/model/types';
 import type { BaseFixity, BuildingModel, JointFixity, MemberRole } from '@core/model/building';
 import { fromMm } from '@core/model/units';
 import { elementsOf, getBuilding } from '../../building/model';
-import { GRAVITY } from '../../shared/numeric';
+import { weightKnPerMetre } from '../../shared/numeric';
 import { findProfile, sectionProperties, type SteelProfile } from '../../steel/profiles';
 import { yieldStrength } from './steelDesign';
 import { distance3 } from '@lib/vec3';
@@ -157,7 +157,7 @@ export function collectSteelBars(doc: CadDocument): SteelBar[] {
 
 /** Self weight of a profile, kN/m. */
 export const selfWeightPerMetre = (profile: SteelProfile): number =>
-  (profile.massPerMetre * GRAVITY) / 1000;
+  weightKnPerMetre(profile.massPerMetre);
 
 /** Top of steel of a horizontal beam (axis mid-height + half the section depth), mm. */
 export const topOfSteel = (bar: SteelBar): number =>

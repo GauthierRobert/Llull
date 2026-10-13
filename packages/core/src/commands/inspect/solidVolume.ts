@@ -1,5 +1,5 @@
-import type { CadDocument, Entity, Vec3 } from '../../model/types';
-import { cross3, dot3 } from '../../lib/vec3';
+import { type CadDocument, type Entity, is2D } from '../../model/types';
+import { signedMeshVolume } from '../../geometry/meshVolume';
 import type { ExecutionContext } from '../types';
 import { entityBounds } from '../../geometry/bounds';
 import { expandInstance } from '../../geometry/instanceExpansion';
@@ -47,25 +47,7 @@ function sweepVolume(e: Extract<Entity, { kind: 'sweep' }>): number {
 
 /** Volume of a closed, outward-wound triangle soup. */
 function closedMeshVolume(positions: number[]): number {
-  const indices = Array.from({ length: positions.length / 3 }, (_, corner) => corner);
-  return Math.abs(meshVolume(positions, indices));
-}
-
-/** Signed-tetrahedra volume of a closed, consistently wound indexed mesh (Σ A·(B×C) / 6). */
-function meshVolume(positions: ReadonlyArray<number>, indices: ReadonlyArray<number>): number {
-  const vertex = (i: number): Vec3 => [
-    positions[i * 3] as number,
-    positions[i * 3 + 1] as number,
-    positions[i * 3 + 2] as number,
-  ];
-  let sum = 0;
-  for (let t = 0; t + 2 < indices.length; t += 3) {
-    sum += dot3(
-      vertex(indices[t] as number),
-      cross3(vertex(indices[t + 1] as number), vertex(indices[t + 2] as number)),
-    );
-  }
-  return Math.abs(sum / 6);
+  return Math.abs(signedMeshVolume(positions, []));
 }
 
 /**
@@ -78,6 +60,13 @@ export function solidVolume(
   e: Entity,
   ctx: ExecutionContext | undefined,
 ): SolidVolume {
+  if (is2D(e)) {
+    return {
+      error:
+        `entity '${e.id}' is kind '${e.kind}'; ` +
+        "supported kinds are 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', 'subdivision', 'instance'.",
+    };
+  }
   switch (e.kind) {
     case 'box':
       return { volume: e.size[0] * e.size[1] * e.size[2] };
@@ -90,7 +79,7 @@ export function solidVolume(
     case 'mesh': {
       const exact = exactVolume(e, ctx);
       return exact === null
-        ? { volume: meshVolume(e.mesh.positions, e.mesh.indices), method: 'mesh' }
+        ? { volume: Math.abs(signedMeshVolume(e.mesh.positions, e.mesh.indices)), method: 'mesh' }
         : { volume: exact, method: 'exact' };
     }
     case 'cone':
@@ -135,22 +124,6 @@ export function solidVolume(
       return { volume: closedMeshVolume(loftTriangles(e).flat(2)) };
     case 'subdivision':
       return { volume: closedMeshVolume(subdivisionTriangles(e).flat(2)) };
-    case 'line':
-    case 'polyline':
-    case 'arc':
-    case 'circle':
-    case 'rectangle':
-    case 'point':
-    case 'ellipse':
-    case 'spline':
-    case 'text':
-    case 'dimension':
-    case 'image':
-      return {
-        error:
-          `entity '${e.id}' is kind '${e.kind}'; ` +
-          "supported kinds are 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', 'subdivision', 'instance'.",
-      };
   }
 }
 

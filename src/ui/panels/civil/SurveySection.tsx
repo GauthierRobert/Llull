@@ -13,7 +13,8 @@ import { PanelSection } from '@ui/panels/PanelParts';
 import { OptionSelect } from '@ui/panels/OptionSelect';
 import { CivilObjectRow, useCivilObjects, TextField } from './CivilParts';
 import { DxfImports } from './DxfImports';
-import { fileStem, readChosenFile } from '@ui/chosenFile';
+import { fileStem } from '@ui/chosenFile';
+import { FileField } from '@ui/panels/FileField';
 import { optionalText } from '@ui/numberText';
 
 const FORMATS = ['PENZD', 'PNEZD', 'PENZ', 'PNEZ', 'ENZ', 'NEZ'] as const;
@@ -36,11 +37,10 @@ export function SurveySection(): React.ReactElement {
   const [format, setFormat] = useState<(typeof FORMATS)[number]>('PENZD');
   const [unit, setUnit] = useState<DocumentUnit>('m');
 
-  const loadFile = (event: React.ChangeEvent<HTMLInputElement>): void =>
-    readChosenFile(event, (content, fileName) => {
-      setText(content);
-      setName((previous) => (previous.trim() === '' ? fileStem(fileName) : previous));
-    });
+  const loadFile = (content: string, fileName: string): void => {
+    setText(content);
+    setName((previous) => (previous.trim() === '' ? fileStem(fileName) : previous));
+  };
 
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
@@ -80,7 +80,7 @@ export function SurveySection(): React.ReactElement {
         </div>
       )}
       <form className="civil-form" onSubmit={handleSubmit} aria-label="Import survey points">
-        <input type="file" accept=".csv,.txt,.xyz" aria-label="Survey file" onChange={loadFile} />
+        <FileField accept=".csv,.txt,.xyz" ariaLabel="Survey file" onText={loadFile} />
         <textarea
           value={text}
           rows={3}

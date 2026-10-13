@@ -4,7 +4,7 @@
  * @pure
  */
 
-import type { BuildingModel } from '@core/model/building';
+import type { BuildingModel, SteelMemberElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import { toMetres } from '@core/model/units';
 import { getBuilding } from '../../building/model';
@@ -34,6 +34,26 @@ export function groundSlabWeight(
         : sum,
     0,
   );
+}
+
+/** Ground-slab weight (kN) carried by each of `columnCount` columns; 0 without thrust tie. */
+export function slabSharePerColumn(
+  doc: CadDocument,
+  building: BuildingModel,
+  levelId: string,
+  thrustTie: boolean,
+  columnCount: number,
+): number {
+  return thrustTie && columnCount > 0 ? groundSlabWeight(doc, building, levelId) / columnCount : 0;
+}
+
+/** The steel column a base reaction belongs to; undefined when it is not a member. */
+export function reactionColumn(
+  building: BuildingModel,
+  reaction: BaseReaction,
+): SteelMemberElement | undefined {
+  const column = building.elements[reaction.columnId];
+  return column?.category === 'member' ? column : undefined;
 }
 
 /** Horizontal force (kN) resisted by one pad: shared across the frame columns when `thrustTie`. */

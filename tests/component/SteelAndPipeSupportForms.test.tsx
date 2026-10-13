@@ -3,10 +3,10 @@
  * the pipe-support check (param-gathering → dispatch; the command math is unit-tested elsewhere).
  */
 
+import { resetStore } from '../helpers/componentEntities';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
 import { BuildingPanel } from '@ui/panels/building/BuildingPanel';
 import { localDispatch, spyDispatch } from '../helpers/storeTestHelpers';
 import { shoeDoc } from '../unit/building/pipeSupportFixtures';
@@ -18,7 +18,7 @@ const supportCount = (): number =>
   ).length;
 
 beforeEach(() => {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
+  resetStore();
 });
 
 describe('steel member form: roll, joints, base fixity', () => {

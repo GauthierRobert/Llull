@@ -5,6 +5,7 @@
  * @pure
  */
 
+import { clamp } from '@lib/clamp';
 import { RISER_SLOPE, arcLengths, pointAtArc } from './routeSupport';
 import { SAME_SUPPORT_DISTANCE, type EndCarrier, type PipeRun } from './pipeSupportLayout';
 
@@ -33,7 +34,7 @@ export function autoSupportArcs(
   const offset = Math.min(MAX_CORNER_OFFSET, spacing / 4);
   const chosen: number[] = [...existing];
   const add = (arc: number): void => {
-    const clamped = Math.min(length, Math.max(0, arc));
+    const clamped = clamp(arc, 0, length);
     if (
       isPlaceable(run, clamped) &&
       chosen.every((other) => Math.abs(other - clamped) >= SAME_SUPPORT_DISTANCE)

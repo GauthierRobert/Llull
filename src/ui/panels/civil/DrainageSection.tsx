@@ -9,14 +9,13 @@
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
-import { downloadText } from '@ui/download';
-import { isCsvData } from '@ui/resultData';
-import { PanelSection } from '@ui/panels/PanelParts';
-import { CivilObjectRow, CivilStatus, useCivilObjects, NumberField } from './CivilParts';
+import { PanelSection, StatusLine } from '@ui/panels/PanelParts';
+import { QueryDownloadButton } from '@ui/panels/QueryDownloadButton';
+import { CivilObjectRow, useCivilObjects, NumberTextField } from './CivilParts';
 import { ManholeForm, PipeForm } from './DrainageForms';
 import { optionalNumber } from '@ui/numberText';
 import { IDF_FIELDS, failuresOf, stormParams } from './civilRules';
-import { downloadQuery, runQuery } from '@ui/services/localQuery';
+import { downloadCsvQuery, runQuery } from '@ui/services/localQuery';
 
 function NetworkChecks(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
@@ -35,15 +34,15 @@ function NetworkChecks(): React.ReactElement {
   };
 
   const checkCsv = (): void => {
-    const result = runQuery('check_drainage_network', checkParams);
-    if (isCsvData(result.data)) downloadText(result.data.csv, 'drainage-check.csv', 'text/csv');
-    setStatus(result.summary);
+    setStatus(
+      downloadCsvQuery('check_drainage_network', checkParams, 'drainage-check.csv').summary,
+    );
   };
 
   return (
     <>
       <div className="building-actions">
-        <NumberField
+        <NumberTextField
           value={rainfall}
           set={setRainfall}
           hint="Rainfall mm/h (50)"
@@ -82,19 +81,16 @@ function NetworkChecks(): React.ReactElement {
         >
           Size pipes
         </button>
-        <button
-          type="button"
-          className="btn btn--ghost btn--sm"
-          onClick={() =>
-            setStatus(
-              downloadQuery('drainage_schedule', {}, 'csv', 'drainage-schedule.csv', 'text/csv'),
-            )
-          }
-        >
-          Schedule CSV
-        </button>
+        <QueryDownloadButton
+          label="Schedule CSV"
+          command="drainage_schedule"
+          field="csv"
+          fallbackName="drainage-schedule.csv"
+          mimeType="text/csv"
+          onStatus={setStatus}
+        />
       </div>
-      <CivilStatus text={status} testId="civil-drainage-status" />
+      <StatusLine text={status} testId="civil-drainage-status" />
       {failures.length > 0 && (
         <ul className="civil-failures" aria-label="Drainage failures">
           {failures.map((failure, index) => (

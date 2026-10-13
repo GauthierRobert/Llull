@@ -84,8 +84,8 @@ export function SolidMeshShell({
     <mesh
       name={entity.id}
       geometry={geometry}
-      position={[position[0], position[1], position[2]]}
-      rotation={[rotation[0], rotation[1], rotation[2]]}
+      position={position}
+      rotation={rotation}
       onClick={selectOnClick(entity.id, onSelect)}
       castShadow
       receiveShadow

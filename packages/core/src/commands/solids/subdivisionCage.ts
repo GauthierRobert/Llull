@@ -1,7 +1,8 @@
 import type { CadDocument, SubdivisionEntity, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
-import { changed, noop } from '../noop';
+import { entityOfKind } from '../entity/entityOfKind';
+import { changed, failer } from '../noop';
 import { add3, distance3, map3, scale3, sub3 } from '../../lib/vec3';
 import { inverseEulerXYZ } from '../../lib/eulerRotation';
 import { replaceEntity } from '../entity/entityOps';
@@ -81,11 +82,7 @@ function reported(
 }
 
 function subdivisionTarget(doc: CadDocument, id: string): SubdivisionEntity | string {
-  const entity = doc.entities[id];
-  if (entity === undefined) return `no entity '${id}'`;
-  if (entity.kind !== 'subdivision')
-    return `'${id}' is a ${entity.kind}, not a subdivision solid (add_subdivision_solid)`;
-  return entity;
+  return entityOfKind(doc, id, ['subdivision']);
 }
 
 /**
@@ -138,7 +135,7 @@ export const editSubdivisionCage = defineCommand({
     levels: levelsField.optional(),
   }),
   run: (doc, params): CommandResult => {
-    const fail = (why: string): CommandResult => noop(doc, `edit_subdivision_cage: ${why}; no-op.`);
+    const fail = failer(doc, 'edit_subdivision_cage');
     const entity = subdivisionTarget(doc, params.id);
     if (typeof entity === 'string') return fail(entity);
     const { vertexIndices, region, falloff = 0, translate, scale, pivot, crease } = params;

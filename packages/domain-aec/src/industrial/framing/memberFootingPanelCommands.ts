@@ -6,9 +6,9 @@ import type { Vec3 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, vec2, z } from '@core/commands/schema';
 import { fromMm } from '@core/model/units';
-import { elementAffected, getBuilding, resolveLevel } from '../../building/model';
+import { getBuilding, resolveLevel } from '../../building/model';
 import { noop } from '@core/commands/noop';
-import { regenerateBuilding } from '../../building/evaluate/evaluateElements';
+import { commitBuilding } from '../../building/evaluate/evaluateElements';
 import {
   appendFootings,
   appendPanel,
@@ -85,13 +85,13 @@ export const addFooting = defineCommand({
       topOffset,
       material,
     });
-    const document = regenerateBuilding(doc, added.building);
-    return {
-      document,
-      summary: `Added ${added.ids.length} pad footing(s) ${added.ids.join(', ')}.`,
-      affected: elementAffected(document, added.ids),
-      data: { elementIds: added.ids },
-    };
+    return commitBuilding(
+      doc,
+      added.building,
+      added.ids,
+      `Added ${added.ids.length} pad footing(s) ${added.ids.join(', ')}.`,
+      { elementIds: added.ids },
+    );
   },
 });
 
@@ -137,12 +137,13 @@ export const addPanel = defineCommand({
       material,
     });
     if (!added) return noop(doc, 'add_panel failed: the corners do not span a plane.');
-    const document = regenerateBuilding(doc, added.building);
-    return {
-      document,
-      summary: `Added ${role} panel ${document.building?.elements[added.id]?.mark ?? ''} (${added.id}).`,
-      affected: elementAffected(document, [added.id]),
-      data: { elementId: added.id },
-    };
+    return commitBuilding(
+      doc,
+      added.building,
+      [added.id],
+      (document) =>
+        `Added ${role} panel ${document.building?.elements[added.id]?.mark ?? ''} (${added.id}).`,
+      { elementId: added.id },
+    );
   },
 });

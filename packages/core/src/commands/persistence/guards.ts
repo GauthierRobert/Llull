@@ -17,25 +17,7 @@ import { MAX_SUBDIVISION_LEVELS, type Cage, cageProblem } from '../../geometry/s
 import type { CurveSegment } from '../../model/curve';
 import { isVec2 } from '../../lib/vec2';
 import { MAX_IMAGE_DATA_URL_LENGTH } from '../limits';
-
-export function isStringArray(v: unknown): v is string[] {
-  return Array.isArray(v) && v.every((x) => typeof x === 'string');
-}
-
-/** Fields that must be finite and > 0, per entity kind. */
-const POSITIVE_FIELDS: Readonly<Record<string, readonly string[]>> = {
-  cylinder: ['radius', 'height'],
-  cone: ['radius', 'height'],
-  sphere: ['radius'],
-  torus: ['ringRadius', 'tubeRadius'],
-  pyramid: ['baseWidth', 'baseDepth', 'height'],
-  arc: ['radius'],
-  circle: ['radius'],
-  rectangle: ['width', 'height'],
-  ellipse: ['radiusX', 'radiusY'],
-  text: ['height'],
-  image: ['width', 'height', 'pixelWidth', 'pixelHeight'],
-};
+import { POSITIVE_FIELDS } from '../../model/positiveFields';
 
 /** First problem of a saved image underlay's raster fields, or null (the payload is not decoded). */
 function imageProblem(v: Record<string, unknown>): string | null {

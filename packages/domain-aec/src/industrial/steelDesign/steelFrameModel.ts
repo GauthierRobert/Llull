@@ -6,6 +6,7 @@
  * @pure
  */
 
+import { clamp } from '@lib/clamp';
 import type { FrameMember, FrameNode } from '@lib/frame2d';
 import { loadTotals } from './steelBeamAnalysis';
 import { E_STEEL } from './steelDesign';
@@ -267,12 +268,12 @@ export function buildFrameSystem(
       invalid.set(bar.id, 'the beam has no length between the columns it joins');
       return;
     }
-    const count = Math.min(MAX_STATIONS, Math.max(MIN_STATIONS, Math.ceil(lengthM / 0.5)));
+    const count = clamp(Math.ceil(lengthM / 0.5), MIN_STATIONS, MAX_STATIONS);
     const stations = [
       0,
       lengthM,
       ...Array.from({ length: count - 1 }, (_, i) => ((i + 1) * lengthM) / count),
-      ...points.map((point) => Math.min(lengthM, Math.max(0, point.at))),
+      ...points.map((point) => clamp(point.at, 0, lengthM)),
     ]
       .sort((a, b) => a - b)
       .filter((s, index, all) => index === 0 || s - (all[index - 1] as number) > STATION_MERGE);
@@ -317,7 +318,7 @@ export function buildFrameSystem(
       });
     }
     for (const point of points) {
-      const station = nearestIndex(stations, Math.min(lengthM, Math.max(0, point.at)));
+      const station = nearestIndex(stations, clamp(point.at, 0, lengthM));
       nodeLoads.push({
         node: indices[station] as number,
         permanent: point.permanent * 1000,

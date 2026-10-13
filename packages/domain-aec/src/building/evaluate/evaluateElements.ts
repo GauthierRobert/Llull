@@ -29,7 +29,7 @@ import { evaluatePipeSupport } from '../../industrial/piping/evaluateSupports';
 import { reconcilePipeSupports } from '../../industrial/piping/pipeSupportAttach';
 import { BUILDING_LAYER_COLOR } from './entities';
 import { regenerateOwned } from '../../shared/derived';
-import { elementAffected } from '../model';
+import { elementAffected, orderedElements } from '../model';
 import { openingsOf } from '../geometry/wallGeometry';
 import {
   type EvaluationContext,
@@ -52,14 +52,14 @@ function evaluateElement(context: EvaluationContext, element: BuildingElement): 
     if (!host || (host.category !== 'wall' && host.category !== 'curvedWall')) return [];
     const level = building.levels[host.levelId];
     const wall = host.category === 'wall' ? host : tangentWall(host, element.offset);
-    return level ? evaluateOpening(context, element, wall, level) : [];
+    return level ? evaluateOpening(context, element, { wall, level }) : [];
   }
   const leveled = element as Exclude<BuildingElement, GridElement | OpeningElement>;
   const level = building.levels[leveled.levelId];
   if (!level) return [];
   switch (leveled.category) {
     case 'wall':
-      return evaluateWall(context, leveled, level);
+      return evaluateWall(context, { wall: leveled, level });
     case 'slab':
       return evaluateSlab(leveled, level);
     case 'column':
@@ -128,7 +128,7 @@ export function regenerateBuilding(doc: CadDocument, edited: BuildingModel): Cad
   const { parts, owners } = regenerateOwned(
     doc,
     Object.values(doc.building?.elements ?? {}),
-    building.elementOrder.flatMap((id) => building.elements[id] ?? []),
+    orderedElements(building),
     (element) => evaluateElement(context, element),
     BUILDING_LAYER_COLOR,
   );
@@ -140,12 +140,13 @@ export function commitBuilding(
   doc: CadDocument,
   model: BuildingModel,
   elementIds: ReadonlyArray<string>,
-  summary: string,
+  summary: string | ((document: CadDocument) => string),
   data?: Record<string, unknown>,
 ): CommandResult {
   const document = regenerateBuilding(doc, model);
+  const text = typeof summary === 'function' ? summary(document) : summary;
   const affected = elementAffected(document, elementIds);
   return data === undefined
-    ? { document, summary, affected }
-    : { document, summary, affected, data };
+    ? { document, summary: text, affected }
+    : { document, summary: text, affected, data };
 }

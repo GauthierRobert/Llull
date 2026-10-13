@@ -1,10 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
-  type CadDocument,
   type Entity,
   type ExtrusionEntity,
   type RevolutionEntity,
-  DEFAULT_LAYER_ID,
   createEmptyDocument,
 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
@@ -12,25 +10,9 @@ import { serializeDocument } from '@core/commands/persistence/serialization';
 import { entityCurves } from '@core/commands/solids/sketchCurves';
 import { segmentPoint } from '@core/geometry/curveSegments';
 import { expectNoOp } from '../helpers/expectNoOp';
+import { docWith, createdEntity as created } from '../helpers/fixtureDocument';
 
 const empty = createEmptyDocument();
-
-/** Doc holding 2D fixture entities (test setup only). */
-function docWith(...shapes: Array<Record<string, unknown>>): CadDocument {
-  const entities = Object.fromEntries(
-    shapes.map((shape) => [
-      shape['id'] as string,
-      {
-        position: [0, 0, 0],
-        rotation: [0, 0, 0],
-        layerId: DEFAULT_LAYER_ID,
-        color: '#ffffff',
-        ...shape,
-      } as unknown as Entity,
-    ]),
-  );
-  return { ...empty, entities, order: Object.keys(entities) };
-}
 
 /** Half bell-nozzle contour: a spline wall closed by straight lines to/along the axis. */
 const NOZZLE = docWith(
@@ -59,12 +41,6 @@ const NOZZLE = docWith(
   },
   { id: 'base', kind: 'line', start: [2.5, 0], end: [3, 0] },
 );
-
-function created<T extends Entity>(doc: CadDocument, name: string, params: object): T {
-  const result = execute(doc, name, params as Record<string, unknown>);
-  expect(result.affected, result.summary).toHaveLength(1);
-  return result.document.entities[result.affected[0] as string] as T;
-}
 
 describe('revolve_profile with profileIds', () => {
   it('revolves a closed spline + line loop and keeps its exact curves', () => {

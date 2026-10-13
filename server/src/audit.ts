@@ -13,6 +13,7 @@ import path from 'path';
 import { errorMessage } from '@lib/errorMessage';
 import type { Response } from 'express';
 import { requestUser, sha256Hex } from './users';
+import { isTestRun, positiveInteger } from './env';
 
 export type AuditSource = 'rest' | 'mcp';
 
@@ -53,16 +54,11 @@ export function actorOf(res: Response, source: AuditSource): Actor {
     : { userId: user.id, userName: user.name, source, named: true };
 }
 
-function posInt(value: string | undefined, fallback: number): number {
-  const n = Number.parseInt(value ?? '', 10);
-  return Number.isFinite(n) && n > 0 ? n : fallback;
-}
-
 /** Resolved audit file, or null when auditing is off (tests without LLULL_AUDIT_FILE). */
 function auditFilePath(defaultDirectory: string): string | null {
   const configured = process.env['LLULL_AUDIT_FILE']?.trim();
   if (configured !== undefined && configured !== '') return configured;
-  if (process.env['VITEST'] !== undefined || process.env['TEST'] === 'true') return null;
+  if (isTestRun()) return null;
   return path.join(defaultDirectory, 'audit.jsonl');
 }
 
@@ -73,9 +69,10 @@ export function setAuditDefaultDirectory(directory: string): void {
   defaultDirectory = directory;
 }
 
-export function hashParams(params: unknown): string {
+/** SHA-256 of the JSON form of `value`; '' when it is not serializable (cycle, BigInt). */
+export function hashJson(value: unknown): string {
   try {
-    return sha256Hex(JSON.stringify(params ?? null));
+    return sha256Hex(JSON.stringify(value ?? null));
   } catch {
     return '';
   }
@@ -101,9 +98,9 @@ export function appendAudit(entry: AuditEntry): void {
     if (
       size > 0 &&
       size + Buffer.byteLength(line) >
-        posInt(process.env['LLULL_AUDIT_MAX_BYTES'], 10 * 1024 * 1024)
+        positiveInteger(process.env['LLULL_AUDIT_MAX_BYTES'], 10 * 1024 * 1024)
     ) {
-      rotate(file, posInt(process.env['LLULL_AUDIT_KEEP'], 5));
+      rotate(file, positiveInteger(process.env['LLULL_AUDIT_KEEP'], 5));
     }
     fs.appendFileSync(file, line, { encoding: 'utf8', mode: 0o600 });
   } catch (err) {
@@ -123,7 +120,7 @@ export function readAudit(query: AuditQuery): AuditEntry[] {
   if (file === null) return [];
   const sinceMs = query.since === undefined ? -Infinity : Date.parse(query.since);
   const matches: AuditEntry[] = [];
-  const keep = posInt(process.env['LLULL_AUDIT_KEEP'], 5);
+  const keep = positiveInteger(process.env['LLULL_AUDIT_KEEP'], 5);
   const files = [file, ...Array.from({ length: keep }, (_, i) => `${file}.${i + 1}`)].reverse();
   for (const candidate of files) {
     let text: string;

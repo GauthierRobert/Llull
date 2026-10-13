@@ -15,33 +15,20 @@
  * No geometry math or internals — behavioral testing only.
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-import { answerDispatch, liveSnapshot } from '../helpers/storeTestHelpers';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { resetStore } from '../helpers/componentEntities';
+import { answerDispatch, liveSnapshot, spyDispatch } from '../helpers/storeTestHelpers';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { useStore } from '@ui/store';
-import { type Configuration, createEmptyDocument } from '@core/model/types';
+import { type Configuration } from '@core/model/types';
 import { ConfigurationsPanel } from '@ui/panels/ConfigurationsPanel';
 
 // Helpers
-
-function resetStore(): void {
-  useStore.setState({
-    document: createEmptyDocument(),
-    lastSummary: null,
-  });
-}
 
 /** Inject configurations directly into the store document for fixture setup. */
 function setConfigurations(configs: Record<string, Configuration>): void {
   const doc = useStore.getState().document;
   useStore.getState().hydrateLiveDocument(liveSnapshot({ ...doc, configurations: configs }));
-}
-
-/** Patch the dispatch action on the store for spy purposes. Tests-only. */
-function patchDispatch(spy: ReturnType<typeof vi.fn>): void {
-  useStore.setState({ dispatch: spy } as any);
 }
 
 function textbox(root: HTMLElement, name: RegExp): HTMLInputElement {
@@ -137,8 +124,7 @@ describe('ConfigurationsPanel — activate', () => {
     setConfigurations({
       small: { name: 'small', parameterValues: { w: '10' } },
     });
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
+    const dispatchSpy = spyDispatch();
 
     render(<ConfigurationsPanel />);
 
@@ -153,8 +139,7 @@ describe('ConfigurationsPanel — activate', () => {
       alpha: { name: 'alpha', parameterValues: { x: '1' } },
       beta: { name: 'beta', parameterValues: { x: '2' } },
     });
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
+    const dispatchSpy = spyDispatch();
 
     render(<ConfigurationsPanel />);
 
@@ -211,8 +196,7 @@ describe('ConfigurationsPanel — create form', () => {
   });
 
   it('dispatches create_configuration with name and parameterValues on submit', () => {
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
+    const dispatchSpy = spyDispatch();
 
     render(<ConfigurationsPanel />);
 
@@ -229,8 +213,7 @@ describe('ConfigurationsPanel — create form', () => {
   });
 
   it('dispatches create_configuration with multiple parameter rows', () => {
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
+    const dispatchSpy = spyDispatch();
 
     render(<ConfigurationsPanel />);
 

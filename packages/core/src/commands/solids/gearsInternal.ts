@@ -8,23 +8,26 @@ import type { MeshData } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z, nameField } from '../schema';
 import { nextId } from '../../lib/id';
-import { compactNumber as fmt } from '../../lib/compactNumber';
+import { compactNumber as fmt, vecText } from '../../lib/compactNumber';
 import { finiteVec3OrZero } from '../../lib/vec3';
-import { DEFAULT_FLANK_SAMPLES, internalCavityPattern, toothOutline } from '../../lib/gearOutline';
+import {
+  DEFAULT_FLANK_SAMPLES,
+  internalCavityPattern,
+  pitchRadiusOf,
+  toothOutline,
+} from '../../lib/gearOutline';
 import { circleThrough, ringMesh } from '../../geometry/prismMesh';
 import { MAX_GEAR_TEETH } from '../limits';
-import { rotatedEntityBounds } from '../../geometry/rotatedBounds';
-import { commitEntity } from '../entity/commitEntity';
-import { boundsText, positionField, rotationField } from './shared';
-import { faceWidthProblem, placedMeshEntity, pressureAngleProblem } from './gearSolid';
-import { noop } from '../noop';
+import { commitSolid, positionField, rotationField } from './shared';
+import { moduleProblem, placedMeshEntity, teethCountProblem, toothShapeProblem } from './gearSolid';
+import { failedWith } from '../noop';
 
 /** Minimum radial wall (in modules) between the tooth-space roots and the rim. */
 const MIN_RIM_WALL_MODULES = 1;
 
 /** Rim radius below which an internal gear has no material left behind its tooth spaces. */
 export function minRingOuterRadius(mod: number, teeth: number): number {
-  return (mod * teeth) / 2 + (1.25 + MIN_RIM_WALL_MODULES) * mod;
+  return pitchRadiusOf(mod, teeth) + (1.25 + MIN_RIM_WALL_MODULES) * mod;
 }
 
 /** Local-frame ring mesh (axis +Z, z in [0, faceWidth]); `phase` rotates the tooth-space pattern. */
@@ -99,13 +102,12 @@ export const addInternalGear = defineCommand({
       name,
     },
   ): CommandResult => {
-    const fail = (why: string): CommandResult => noop(doc, `add_internal_gear failed: ${why}`);
-    if (!(mod > 0)) return fail(`module must be finite and > 0, got ${String(mod)}.`);
+    const fail = failedWith(doc, 'add_internal_gear');
     const teethInt = Math.round(teeth);
-    if (!(teethInt >= 12 && teethInt <= MAX_GEAR_TEETH)) {
-      return fail(`teeth must be an integer in [12, ${MAX_GEAR_TEETH}], got ${String(teeth)}.`);
-    }
-    const shapeProblem = pressureAngleProblem(pressureAngle) ?? faceWidthProblem(faceWidth);
+    const shapeProblem =
+      moduleProblem(mod) ??
+      teethCountProblem('teeth', teethInt, 12, teeth) ??
+      toothShapeProblem(pressureAngle, faceWidth);
     if (shapeProblem !== null) return fail(shapeProblem);
     const minRim = minRingOuterRadius(mod, teethInt);
     if (!(outerRadius >= minRim && Number.isFinite(outerRadius))) {
@@ -124,14 +126,13 @@ export const addInternalGear = defineCommand({
       color,
       name,
     );
-    const pitchRadius = (mod * teethInt) / 2;
-    return commitEntity(
+    const pitchRadius = pitchRadiusOf(mod, teethInt);
+    return commitSolid(
       doc,
       entity,
       `Created internal_gear ${id}: module=${fmt(mod)} teeth=${teethInt} pitchD=${fmt(2 * pitchRadius)} ` +
         `tipD=${fmt(2 * (pitchRadius - mod))} rootD=${fmt(2 * (pitchRadius + 1.25 * mod))} ` +
-        `outerR=${fmt(outerRadius)} face=${fmt(faceWidth)} at [${at.map(fmt).join(', ')}]. ` +
-        `${boundsText(rotatedEntityBounds(entity))}.`,
+        `outerR=${fmt(outerRadius)} face=${fmt(faceWidth)} at ${vecText(at)}`,
     );
   },
 });

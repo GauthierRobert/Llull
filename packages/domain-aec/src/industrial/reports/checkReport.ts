@@ -1,6 +1,7 @@
 import { round } from '../../shared/numeric';
 import { toCsv } from '../../shared/csv';
-import { briefList, highestUtilisation } from '../common/utilisation';
+import { briefList } from '../../shared/briefList';
+import { failingRows, highestUtilisation } from '../common/utilisation';
 
 /** Summary tail of an engineering check: `allOkText`, or up to 8 failing rows (utilisation > 1). */
 export const failureSummary = <Row extends { utilisation: number }>(
@@ -22,7 +23,7 @@ export const checkTable = <Row extends { utilisation: number }>(
     header,
     rows.map((row) => cells(row, row.utilisation > 1 ? 'FAIL' : 'OK')),
   ),
-  failures: rows.filter((row) => row.utilisation > 1),
+  failures: failingRows(rows),
   worst: highestUtilisation(rows),
 });
 

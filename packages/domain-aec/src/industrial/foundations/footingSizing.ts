@@ -2,6 +2,7 @@
  * @layer domain-aec
  */
 
+import { unitsToMm } from '../../shared/numeric';
 import type { FootingElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import { fromMm, toMetres } from '@core/model/units';
@@ -21,13 +22,14 @@ import {
   THICKNESS_STEP_MM,
 } from './footingModel';
 import { designMat } from './footingMat';
+import { maxUtilisation } from '../common/utilisation';
 
 export function geometryOf(
   doc: CadDocument,
   footing: FootingElement,
   face: { x: number; y: number },
 ): Geometry {
-  const toMm = (value: number): number => toMetres(doc, value) * 1000;
+  const toMm = unitsToMm(doc);
   return {
     widthMm: toMm(footing.width),
     lengthMm: toMm(footing.length),
@@ -84,7 +86,7 @@ export function evaluatePad(
     thickness: fromMm(doc, thicknessMm),
   };
   const rows = footingRows(context, trial, '');
-  const soilUtilisation = Math.max(0, ...rows.map((row) => row.utilisation));
+  const soilUtilisation = maxUtilisation(rows);
   if (soilUtilisation > 1) return { soilUtilisation, mat: null, passes: false };
   const geometry = geometryOf(doc, trial, context.face);
   const net = netLoads(

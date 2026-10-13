@@ -14,31 +14,16 @@
  * No geometry math or internals — behavioral testing only.
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { resetStore } from '../helpers/componentEntities';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { act, render, screen, fireEvent, within } from '@testing-library/react';
-import { useStore } from '@ui/store';
-import { createEmptyDocument } from '@core/model/types';
 import { ParametersPanel } from '@ui/panels/ParametersPanel';
-import { answerDispatch, localDispatch } from '../helpers/storeTestHelpers';
+import { answerDispatch, localDispatch, spyDispatch } from '../helpers/storeTestHelpers';
 
 // Helpers
 
-function resetStore(): void {
-  useStore.setState({
-    document: createEmptyDocument(),
-    lastSummary: null,
-  });
-}
-
 function addParam(name: string, expression: string): void {
   localDispatch('set_parameter', { name, expression });
-}
-
-/** Patch the dispatch action on the store for spy purposes. Tests-only. */
-function patchDispatch(spy: ReturnType<typeof vi.fn>): void {
-  useStore.setState({ dispatch: spy } as any);
 }
 
 // Rendering tests
@@ -119,8 +104,7 @@ describe('ParametersPanel — editing expression', () => {
 
   it('dispatches set_parameter when Enter is pressed with a new expression', () => {
     addParam('base', '5');
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
+    const dispatchSpy = spyDispatch();
 
     render(<ParametersPanel />);
 
@@ -135,8 +119,7 @@ describe('ParametersPanel — editing expression', () => {
 
   it('does NOT dispatch when Escape is pressed', () => {
     addParam('x', '1');
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
+    const dispatchSpy = spyDispatch();
 
     render(<ParametersPanel />);
 
@@ -151,8 +134,7 @@ describe('ParametersPanel — editing expression', () => {
 
   it('dispatches set_parameter on blur when expression changed', () => {
     addParam('val', '3');
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
+    const dispatchSpy = spyDispatch();
 
     render(<ParametersPanel />);
 
@@ -166,8 +148,7 @@ describe('ParametersPanel — editing expression', () => {
 
   it('does NOT dispatch on blur when expression unchanged', () => {
     addParam('unchanged', '42');
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
+    const dispatchSpy = spyDispatch();
 
     render(<ParametersPanel />);
 
@@ -188,8 +169,7 @@ describe('ParametersPanel — delete parameter', () => {
 
   it('dispatches delete_parameter when the delete button is clicked', () => {
     addParam('toDelete', '7');
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
+    const dispatchSpy = spyDispatch();
 
     render(<ParametersPanel />);
 
@@ -219,8 +199,7 @@ describe('ParametersPanel — add parameter form', () => {
   });
 
   it('dispatches set_parameter when the add form is submitted', () => {
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
+    const dispatchSpy = spyDispatch();
 
     render(<ParametersPanel />);
 

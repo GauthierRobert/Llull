@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { portalHall } from '../../helpers/portalHall';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { ultimateCombinations } from '@aec/industrial/foundations/foundationCombinations';
@@ -13,10 +14,10 @@ const HALL = { span: 24000, length: 30000 };
 
 function hall(params: Record<string, unknown> = {}, units?: 'm'): CadDocument {
   const base = createEmptyDocument();
-  return execute(units ? { ...base, units } : base, 'add_portal_frame_building', {
-    ...(units ? { span: 24, length: 30 } : HALL),
-    ...params,
-  }).document;
+  return portalHall(
+    { ...(units ? { span: 24, length: 30 } : HALL), ...params },
+    units ? { ...base, units } : base,
+  );
 }
 
 function rowsOf(doc: CadDocument, params: Record<string, unknown> = {}): FoundationRow[] {
@@ -208,10 +209,7 @@ describe('foundation check review fixes', () => {
 
 describe('slab friction with a thrust tie', () => {
   it('lets the ground slab resist the net wind shear of tied frames', () => {
-    const doc = execute(createEmptyDocument(), 'add_portal_frame_building', {
-      span: 24000,
-      length: 30000,
-    }).document;
+    const doc = portalHall({ span: 24000, length: 30000 });
     const tied = execute(doc, 'check_foundations', { windPressure: 0.7 });
     const untied = execute(doc, 'check_foundations', { windPressure: 0.7, thrustTie: false });
     const max = (result: ReturnType<typeof execute>): number =>

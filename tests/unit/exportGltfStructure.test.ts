@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { parsedGltf } from '../helpers/gltfExport';
+import { run } from '../helpers/runFixtures';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 
@@ -21,10 +23,6 @@ interface GltfData {
   base64?: string;
 }
 
-function run(doc: CadDocument, name: string, params: Record<string, unknown>): CadDocument {
-  return execute(doc, name, params).document;
-}
-
 /** A red box named "Frame", a blue box named "Plate", and an unnamed red sphere. */
 function coloredDoc(): CadDocument {
   let doc = createEmptyDocument();
@@ -38,7 +36,7 @@ function coloredDoc(): CadDocument {
 }
 
 const gltfOf = (doc: CadDocument, params: Record<string, unknown> = {}): GltfJson =>
-  JSON.parse((execute(doc, 'export_gltf', params).data as GltfData).text as string) as GltfJson;
+  parsedGltf<GltfJson>(doc, params);
 
 describe('export_gltf per-entity structure', () => {
   it('writes one named node and mesh per entity with a material per distinct color', () => {

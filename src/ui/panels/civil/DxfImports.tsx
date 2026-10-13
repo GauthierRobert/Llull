@@ -9,7 +9,9 @@ import React, { useState } from 'react';
 import type { DocumentUnit } from '@core/model/types';
 import type { DwgImportTarget } from '@mcp/restProtocol';
 import { useStore } from '@ui/store';
-import { fileStem, readChosenFile, takeChosenFile } from '@ui/chosenFile';
+import { fileStem } from '@ui/chosenFile';
+import { FileField } from '@ui/panels/FileField';
+import { StatusLine } from '@ui/panels/PanelParts';
 import { useIsMounted } from '@ui/hooks/useIsMounted';
 import { uploadDwg } from '@ui/services/serverFiles';
 
@@ -17,9 +19,7 @@ export function DxfImports({ unit }: { unit: DocumentUnit }): React.ReactElement
   const dispatch = useStore((s) => s.dispatch);
   const [dwgStatus, setDwgStatus] = useState('');
   const isMounted = useIsMounted();
-  const importDwg = (event: React.ChangeEvent<HTMLInputElement>, target: DwgImportTarget): void => {
-    const file = takeChosenFile(event);
-    if (!file) return;
+  const importDwg = (file: File, target: DwgImportTarget): void => {
     setDwgStatus(`Converting ${file.name}…`);
     void uploadDwg(file, target, unit).then((status) => {
       if (isMounted()) setDwgStatus(status);
@@ -27,53 +27,33 @@ export function DxfImports({ unit }: { unit: DocumentUnit }): React.ReactElement
   };
   return (
     <div className="building-inline-form" aria-label="DXF import">
-      <label className="field">
-        <span>Import survey DXF</span>
-        <input
-          type="file"
-          accept=".dxf"
-          aria-label="Survey DXF file"
-          onChange={(event) =>
-            readChosenFile(event, (text, fileName) =>
-              dispatch('import_survey_dxf', { text, name: fileStem(fileName), sourceUnit: unit }),
-            )
-          }
-        />
-      </label>
-      <label className="field">
-        <span>Import DXF drawing</span>
-        <input
-          type="file"
-          accept=".dxf"
-          aria-label="Drawing DXF file"
-          onChange={(event) =>
-            readChosenFile(event, (text) => dispatch('import_dxf', { text, sourceUnit: unit }))
-          }
-        />
-      </label>
-      <label className="field">
-        <span>Import DWG drawing (via server)</span>
-        <input
-          type="file"
-          accept=".dwg"
-          aria-label="Drawing DWG file"
-          onChange={(event) => importDwg(event, 'drawing')}
-        />
-      </label>
-      <label className="field">
-        <span>Import survey DWG (via server)</span>
-        <input
-          type="file"
-          accept=".dwg"
-          aria-label="Survey DWG file"
-          onChange={(event) => importDwg(event, 'survey')}
-        />
-      </label>
-      {dwgStatus !== '' && (
-        <p className="hint" role="status">
-          {dwgStatus}
-        </p>
-      )}
+      <FileField
+        label="Import survey DXF"
+        accept=".dxf"
+        ariaLabel="Survey DXF file"
+        onText={(text, fileName) =>
+          dispatch('import_survey_dxf', { text, name: fileStem(fileName), sourceUnit: unit })
+        }
+      />
+      <FileField
+        label="Import DXF drawing"
+        accept=".dxf"
+        ariaLabel="Drawing DXF file"
+        onText={(text) => dispatch('import_dxf', { text, sourceUnit: unit })}
+      />
+      <FileField
+        label="Import DWG drawing (via server)"
+        accept=".dwg"
+        ariaLabel="Drawing DWG file"
+        onFile={(file) => importDwg(file, 'drawing')}
+      />
+      <FileField
+        label="Import survey DWG (via server)"
+        accept=".dwg"
+        ariaLabel="Survey DWG file"
+        onFile={(file) => importDwg(file, 'survey')}
+      />
+      <StatusLine text={dwgStatus} />
     </div>
   );
 }

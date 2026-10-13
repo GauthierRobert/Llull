@@ -5,7 +5,7 @@
  * @layer core/commands
  */
 
-import type { Entity, Vec3 } from '../model/types';
+import { type Entity, type Vec3, is2D } from '../model/types';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { revolutionTriangles } from './revolution';
 import { sweepTriangles } from './sweep';
@@ -84,6 +84,7 @@ function applyRotationToTriangles(tris: Triangle[], position: Vec3, rotation: Ve
 
 /** Triangles of a non-instance entity before its own `rotation` is applied (world position baked in). */
 function unrotatedTriangles(e: Entity): Triangle[] {
+  if (is2D(e)) return [];
   switch (e.kind) {
     case 'box':
       return triangulateBox(e);
@@ -111,19 +112,8 @@ function unrotatedTriangles(e: Entity): Triangle[] {
       return loftTriangles(e, e.position);
     case 'subdivision':
       return subdivisionTriangles(e, e.position);
-    case 'line':
-    case 'polyline':
-    case 'arc':
-    case 'circle':
-    case 'rectangle':
-    case 'point':
-    case 'ellipse':
-    case 'spline':
-    case 'text':
-    case 'dimension':
-    case 'image':
     case 'instance':
-      return []; // 2D shapes and instances
+      return [];
   }
 }
 

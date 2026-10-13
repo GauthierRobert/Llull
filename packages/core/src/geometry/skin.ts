@@ -7,7 +7,7 @@
  */
 
 import type { Vec2, Vec3 } from '../model/types';
-import { add3, centroid3, cross3, normalize3, scale3, sub3 } from '../lib/vec3';
+import { add3, centroid3, cross3, dot3, normalize3, scale3, sub3 } from '../lib/vec3';
 import { triangulatePolygon } from '../lib/triangulate';
 import type { Triangle } from './triangles';
 
@@ -42,14 +42,12 @@ function cap(ring: ReadonlyArray<Vec3>, outward: Vec3): Triangle[] {
   const n = normalize3(ringNormal(ring));
   const u = normalize3(Math.abs(n[0]) < 0.9 ? cross3(n, [1, 0, 0]) : cross3(n, [0, 1, 0]));
   const v = cross3(n, u);
-  const flat = ring.map(
-    (p): Vec2 => [p[0] * u[0] + p[1] * u[1] + p[2] * u[2], p[0] * v[0] + p[1] * v[1] + p[2] * v[2]],
-  );
-  const facesOut = n[0] * outward[0] + n[1] * outward[1] + n[2] * outward[2] > 0;
+  const flat = ring.map((p): Vec2 => [dot3(p, u), dot3(p, v)]);
+  const facesOut = dot3(n, outward) > 0;
   return triangulatePolygon(flat).triangles.map(([a, b, c]): Triangle => {
     const [pa, pb, pc] = [ring[a], ring[b], ring[c]] as [Vec3, Vec3, Vec3];
     const ccwInPlane = cross3(sub3(pb, pa), sub3(pc, pa));
-    const alongN = ccwInPlane[0] * n[0] + ccwInPlane[1] * n[1] + ccwInPlane[2] * n[2] > 0;
+    const alongN = dot3(ccwInPlane, n) > 0;
     return alongN === facesOut ? [pa, pb, pc] : [pa, pc, pb];
   });
 }

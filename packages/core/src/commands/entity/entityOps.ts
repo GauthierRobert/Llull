@@ -1,6 +1,17 @@
 import type { CadDocument, Entity, EntityGroup } from '../../model/types';
 
 /**
+ * Entities in drawing order (`doc.order`), skipping ids with no stored entity.
+ * @pure
+ */
+export function orderedEntities(doc: CadDocument): Entity[] {
+  return doc.order.flatMap((id) => {
+    const e = doc.entities[id];
+    return e ? [e] : [];
+  });
+}
+
+/**
  * `doc` with `entity` stored and appended to `order`.
  * @pure
  */

@@ -13,9 +13,9 @@ import { CommandParamForm } from '@ui/components/commandPalette/CommandParamForm
 import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
 import type { FeatureStep } from '@core/model/types';
-import { useIsMounted } from '@ui/hooks/useIsMounted';
+import { useDispatchThen } from '@ui/hooks/useDispatchThen';
 import { Icon } from '@ui/components/Icon';
-import { PanelEmpty, PanelHeader, IconButton } from '@ui/panels/PanelParts';
+import { PanelEmpty, PanelHeader, IconButton, DeleteButton } from '@ui/panels/PanelParts';
 
 interface FeatureStepRowProps {
   step: FeatureStep;
@@ -31,7 +31,7 @@ const FeatureStepRow = memo(function FeatureStepRow({
   const dispatch = useStore((s) => s.dispatch);
   const [editing, setEditing] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
-  const isMounted = useIsMounted();
+  const dispatchThen = useDispatchThen();
   const command = getCommand(step.name);
 
   const isSuppressed = step.suppressed === true;
@@ -39,16 +39,11 @@ const FeatureStepRow = memo(function FeatureStepRow({
 
   const submitEdit = (params: Record<string, unknown>): void => {
     setRefusal(null);
-    dispatch(
+    dispatchThen(
       'edit_step_params',
       { stepId: step.id, params },
-      {
-        onResult: ({ summary, changed }) => {
-          if (!isMounted()) return;
-          if (changed) setEditing(false);
-          else setRefusal(summary);
-        },
-      },
+      () => setEditing(false),
+      setRefusal,
     );
   };
 
@@ -100,10 +95,8 @@ const FeatureStepRow = memo(function FeatureStepRow({
             label={`Move step ${displayLabel} down`}
             title="Move down"
           />
-          <IconButton
-            icon="trash"
-            danger
-            onClick={() => dispatch('delete_step', { stepId: step.id })}
+          <DeleteButton
+            onDelete={() => dispatch('delete_step', { stepId: step.id })}
             label={`Delete step ${displayLabel}`}
             title="Delete step"
           />

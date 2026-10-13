@@ -8,8 +8,10 @@
 
 import type { CurveSegment } from '../model/curve';
 import type { Vec2, Vec3 } from '../model/types';
-import { signedArea } from '../lib/polygon';
+import { toCounterClockwise } from '../lib/polygon';
 import { catmullRomBeziers, segmentPoint } from './curveSegments';
+import { segmentLengths } from '../lib/polyline';
+import { centroid2 } from '../lib/vec2';
 
 /** Points per section ring. */
 export const SECTION_RING_POINTS = 24;
@@ -20,9 +22,8 @@ export const SECTION_RING_POINTS = 24;
  * @invariant polygon has >= 3 points and non-zero area
  */
 export function resampleRing(polygon: ReadonlyArray<Vec2>, count = SECTION_RING_POINTS): Vec2[] {
-  const ccw = signedArea(polygon) < 0 ? [...polygon].reverse() : [...polygon];
-  const cx = ccw.reduce((sum, p) => sum + p[0], 0) / ccw.length;
-  const cy = ccw.reduce((sum, p) => sum + p[1], 0) / ccw.length;
+  const ccw = toCounterClockwise(polygon);
+  const [cx, cy] = centroid2(ccw);
   let startEdge = 0;
   let startT = 0;
   let bestX = -Infinity;
@@ -46,9 +47,7 @@ export function resampleRing(polygon: ReadonlyArray<Vec2>, count = SECTION_RING_
   const loop: Vec2[] = [start];
   for (let k = 1; k <= ccw.length; k++) loop.push(ccw[(startEdge + k) % ccw.length] as Vec2);
   loop.push(start);
-  const lengths = loop
-    .slice(1)
-    .map((p, i) => Math.hypot(p[0] - (loop[i] as Vec2)[0], p[1] - (loop[i] as Vec2)[1]));
+  const lengths = segmentLengths(loop);
   const total = lengths.reduce((sum, length) => sum + length, 0);
   const ring: Vec2[] = [];
   let edge = 0;

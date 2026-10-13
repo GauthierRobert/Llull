@@ -5,14 +5,12 @@
 
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
-import { noop } from '@core/commands/noop';
-import { civilObjectOrFailure, getCivil } from '../model';
+import { report } from '@core/commands/noop';
+import { civilObjectOrNoop, getCivil } from '../model';
 import { surfaceTin } from './surfaceTin';
 import { corners, elevationAt, slopeAt, tinBounds, tinPlanArea, triangleCount } from './tin';
 import { toMetres } from '@core/model/units';
-import { round as roundDigits } from '../../shared/numeric';
-
-const round = (value: number, digits = 3): number => roundDigits(value, digits);
+import { round } from '../../shared/numeric';
 
 /**
  * @command surface_elevation
@@ -32,15 +30,15 @@ export const surfaceElevation = defineCommand({
   }),
   run: (doc, { surfaceId, points }): CommandResult => {
     const civil = getCivil(doc);
-    const surface = civilObjectOrFailure(doc, surfaceId, 'surface', 'surface_elevation');
-    if (typeof surface === 'string') return noop(doc, surface);
+    const surface = civilObjectOrNoop(doc, surfaceId, 'surface', 'surface_elevation');
+    if ('summary' in surface) return surface;
     const tin = surfaceTin(civil, surface);
     const samples = points.map((at) => {
       const elevation = elevationAt(tin, at);
       const slope = slopeAt(tin, at);
       return {
         at,
-        elevation: elevation === null ? null : round(elevation),
+        elevation: elevation === null ? null : round(elevation, 3),
         slopePercent: slope === null ? null : round(slope * 100, 2),
       };
     });
@@ -53,12 +51,11 @@ export const surfaceElevation = defineCommand({
           : `${toMetres(doc, sample.elevation).toFixed(3)} m (${sample.slopePercent} %)`,
       )
       .join('; ');
-    return {
-      document: doc,
-      summary: `${surface.name}: ${listed}${samples.length > 5 ? '; …' : ''}${outside > 0 ? ` (${outside} outside the surface)` : ''}.`,
-      affected: [],
-      data: { surfaceId, points: samples },
-    };
+    return report(
+      doc,
+      `${surface.name}: ${listed}${samples.length > 5 ? '; …' : ''}${outside > 0 ? ` (${outside} outside the surface)` : ''}.`,
+      { surfaceId, points: samples },
+    );
   },
 });
 
@@ -77,8 +74,8 @@ export const surfaceReport = defineCommand({
   params: z.object({ surfaceId: z.string().describe('Surface id, e.g. "surface-1".') }),
   run: (doc, { surfaceId }): CommandResult => {
     const civil = getCivil(doc);
-    const surface = civilObjectOrFailure(doc, surfaceId, 'surface', 'surface_report');
-    if (typeof surface === 'string') return noop(doc, surface);
+    const surface = civilObjectOrNoop(doc, surfaceId, 'surface', 'surface_report');
+    if ('summary' in surface) return surface;
     const tin = surfaceTin(civil, surface);
     const bounds = tinBounds(tin);
     const metres = (value: number): number => toMetres(doc, value);
@@ -107,19 +104,17 @@ export const surfaceReport = defineCommand({
       points: tin.points.length,
       triangles: triangleCount(tin),
       planAreaM2: round(area, 2),
-      minElevationM: bounds ? round(metres(bounds.min[2])) : null,
-      maxElevationM: bounds ? round(metres(bounds.max[2])) : null,
-      meanElevationM: areaSum > 0 ? round(metres(weighted / areaSum)) : null,
+      minElevationM: bounds ? round(metres(bounds.min[2]), 3) : null,
+      maxElevationM: bounds ? round(metres(bounds.max[2]), 3) : null,
+      meanElevationM: areaSum > 0 ? round(metres(weighted / areaSum), 3) : null,
       meanSlopePercent: areaSum > 0 ? round((slopeSum / areaSum) * 100, 2) : null,
     };
-    return {
-      document: doc,
-      summary:
-        `${surface.name}: ${data.points} points, ${data.triangles} triangles, ${data.planAreaM2} m²; ` +
+    return report(
+      doc,
+      `${surface.name}: ${data.points} points, ${data.triangles} triangles, ${data.planAreaM2} m²; ` +
         `elevation ${data.minElevationM}–${data.maxElevationM} m (mean ${data.meanElevationM} m); ` +
         `mean slope ${data.meanSlopePercent} %.`,
-      affected: [],
       data,
-    };
+    );
   },
 });

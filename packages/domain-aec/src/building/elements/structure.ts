@@ -3,7 +3,7 @@
  * @layer domain-aec
  */
 
-import type { Vec2 } from '@core/model/types';
+import type { CadDocument, Vec2 } from '@core/model/types';
 import type {
   BeamElement,
   BuildingModel,
@@ -14,8 +14,9 @@ import type {
 } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
-import { distance, isValidPolygon, offsetPolygon, polygonArea } from '@lib/polygon';
-import { fromMm, toMetres, toMm } from '@core/model/units';
+import { distance, isValidPolygon, offsetPolygon } from '@lib/polygon';
+import { fromMm, toMm } from '@core/model/units';
+import { planAreaM2 } from '../../shared/planArea';
 import {
   getBuilding,
   isVec2List,
@@ -24,6 +25,7 @@ import {
   resolveLevel,
   toVec2,
   withElement,
+  levelElementsOf,
 } from '../model';
 import { noop } from '@core/commands/noop';
 import {
@@ -86,7 +88,7 @@ export function wallLoop(walls: ReadonlyArray<WallElement>): Vec2[] | null {
  * Plan outline of a room / slab from an explicit boundary or a closed wall loop.
  * @failure walls on different levels -> `failure`; invalid input -> outline null
  */
-export function resolveOutline(
+function resolveOutline(
   building: BuildingModel,
   source: { boundary: unknown; wallIds: string[] | undefined },
   wallShift: (halfThickness: number) => number,
@@ -117,6 +119,31 @@ export function resolveOutline(
   const shift = wallShift(Math.max(...walls.map((wall) => wall.thickness)) / 2);
   const outline = loop ? (shift === 0 ? loop : offsetPolygon(loop, shift)) : null;
   return { outline, wallLevelId: walls[0]?.levelId };
+}
+
+/** The valid plan outline of a room / slab (and the level of its walls), or the no-op result naming `tool`. */
+export function outlineOrNoop(
+  doc: CadDocument,
+  building: BuildingModel,
+  source: { boundary: unknown; wallIds: string[] | undefined },
+  wallShift: (halfThickness: number) => number,
+  tool: string,
+  dropRepeatedPoints = false,
+): { outline: Vec2[]; wallLevelId: string | undefined } | CommandResult {
+  const { outline, wallLevelId, failure } = resolveOutline(
+    building,
+    source,
+    wallShift,
+    dropRepeatedPoints,
+  );
+  if (failure) return noop(doc, `${tool} failed: ${failure}.`);
+  if (!outline || !isValidPolygon(outline)) {
+    return noop(
+      doc,
+      `${tool} failed: give a boundary of ≥ 3 non-collinear [x, y] points, or wallIds forming a closed loop.`,
+    );
+  }
+  return { outline, wallLevelId };
 }
 
 /**
@@ -177,19 +204,16 @@ export const addSlab = defineCommand({
     },
   ): CommandResult => {
     const building = getBuilding(doc);
-    const { outline, wallLevelId, failure } = resolveOutline(
+    const resolved = outlineOrNoop(
+      doc,
       building,
       { boundary, wallIds },
       (half) => (wallFace === 'outer' ? half : wallFace === 'inner' ? -half : 0),
+      'add_slab',
       true,
     );
-    if (failure) return noop(doc, `add_slab failed: ${failure}.`);
-    if (!outline || !isValidPolygon(outline)) {
-      return noop(
-        doc,
-        'add_slab failed: give a boundary polygon of ≥ 3 non-collinear [x, y] points, or wallIds forming a closed loop.',
-      );
-    }
+    if ('summary' in resolved) return resolved;
+    const { outline, wallLevelId } = resolved;
     const resolvedThickness = thickness ?? fromMm(doc, 200);
     if (resolvedThickness <= 0) return noop(doc, 'add_slab failed: thickness must be > 0.');
     const resolution = resolveLevel(doc, building, levelId ?? wallLevelId);
@@ -219,7 +243,7 @@ export const addSlab = defineCommand({
       doc,
       withElement(resolution.building, slab),
       [slab.id],
-      `Added ${slab.role} slab ${slab.mark} (${slab.id}) on ${resolution.level.name}: area ${(polygonArea(outline) * toMetres(doc, 1) ** 2).toFixed(2)} m², thickness ${resolvedThickness} ${doc.units}.`,
+      `Added ${slab.role} slab ${slab.mark} (${slab.id}) on ${resolution.level.name}: area ${planAreaM2(doc, outline).toFixed(2)} m², thickness ${resolvedThickness} ${doc.units}.`,
       { elementId: slab.id },
     );
   },
@@ -310,10 +334,7 @@ export const addColumn = defineCommand({
     if (!resolution.ok) return noop(doc, `add_column failed: ${resolution.reason}.`);
     let next = resolution.building;
     const ids: string[] = [];
-    const existing = Object.values(next.elements).filter(
-      (element): element is ColumnElement =>
-        element.category === 'column' && element.levelId === resolution.level.id,
-    );
+    const existing = levelElementsOf(next, 'column', resolution.level.id);
     const occupied = (location: Vec2): ColumnElement | undefined =>
       existing.find(
         (column) => column.location[0] === location[0] && column.location[1] === location[1],

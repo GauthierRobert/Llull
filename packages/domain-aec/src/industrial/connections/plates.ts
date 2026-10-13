@@ -6,11 +6,12 @@
 import type { BasePlateElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
+import { unknownLevelFailure } from '../../building/levelLookup';
 import { defineCommand, z } from '@core/commands/schema';
 import { fromMm } from '@core/model/units';
-import { elementAffected, existingLevelId, getBuilding } from '../../building/model';
+import { existingLevelId, getBuilding } from '../../building/model';
 import { noop } from '@core/commands/noop';
-import { regenerateBuilding } from '../../building/evaluate/evaluateElements';
+import { commitBuilding } from '../../building/evaluate/evaluateElements';
 import { STEEL_DENSITY_KG_PER_M3 } from '../../steel/profiles';
 import { boltSize } from '../evaluate';
 import { appendBasePlates, columnsWithoutPlates } from './plateSupport';
@@ -74,8 +75,8 @@ export const addBasePlates = defineCommand({
     }
     const building = getBuilding(doc);
     const levelId = existingLevelId(building, params.levelId) ?? null;
-    if (params.levelId !== undefined && !building.levels[params.levelId])
-      return noop(doc, `add_base_plates failed: no level '${params.levelId}'.`);
+    const unknownLevel = unknownLevelFailure(doc, 'add_base_plates', params.levelId);
+    if (unknownLevel) return unknownLevel;
     const columns = columnsWithoutPlates(
       building,
       levelId,
@@ -89,14 +90,14 @@ export const addBasePlates = defineCommand({
       boltCount,
       boltDiameter,
     });
-    const document = regenerateBuilding(doc, added.building);
     const plates = added.ids.map((id) => added.building.elements[id] as BasePlateElement);
     const kilograms = plates.reduce((sum, plate) => sum + plateMass(doc, plate), 0);
-    return {
-      document,
-      summary: `Added ${plates.length} base plate(s) with ${plates.length * boltCount} anchor bolt(s) ${boltSize(doc, plates[0]?.boltDiameter ?? 0)}: ${kilograms.toFixed(1)} kg of plate.`,
-      affected: elementAffected(document, added.ids),
-      data: { elementIds: added.ids },
-    };
+    return commitBuilding(
+      doc,
+      added.building,
+      added.ids,
+      `Added ${plates.length} base plate(s) with ${plates.length * boltCount} anchor bolt(s) ${boltSize(doc, plates[0]?.boltDiameter ?? 0)}: ${kilograms.toFixed(1)} kg of plate.`,
+      { elementIds: added.ids },
+    );
   },
 });

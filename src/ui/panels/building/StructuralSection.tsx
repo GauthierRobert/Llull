@@ -10,9 +10,9 @@ import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import { runQuery } from '@ui/services/localQuery';
 import type { BuildingModel } from '@core/model/building';
-import { PanelSection } from '@ui/panels/PanelParts';
+import { ListRow, PanelSection, StatusLine } from '@ui/panels/PanelParts';
 import { isFailing, toWarnings, worstRows, type ReportRow } from './structuralReport';
-import { LabeledInput } from './LabeledInput';
+import { LabeledInput } from '@ui/panels/LabeledInput';
 
 interface Report {
   readonly summary: string;
@@ -144,9 +144,7 @@ export function StructuralSection(): React.ReactElement {
       </div>
       {report !== null && (
         <>
-          <p className="building-summary" role="status" data-testid="frame-check-summary">
-            {report.summary}
-          </p>
+          <StatusLine text={report.summary} testId="frame-check-summary" />
           {report.rows.some(isFailing) && (
             <p className="building-subhead" role="note" data-testid="frame-check-next-step">
               Some members fail: use Auto-size above to up-size them, then verify again.
@@ -154,24 +152,21 @@ export function StructuralSection(): React.ReactElement {
           )}
           <ul className="panel__list" aria-label="Utilisations">
             {report.rows.map((row) => (
-              <li key={row.key} className="panel__row">
-                <button
-                  type="button"
-                  className="building-row-btn"
-                  onClick={() => select(building?.elements[row.elementId]?.entityIds ?? [])}
-                  data-testid="frame-check-row"
-                >
-                  {isFailing(row) ? (
-                    <span className="chip chip--danger">FAIL</span>
-                  ) : (
-                    <span className="chip chip--success">OK</span>
-                  )}
-                  <span className="panel__row-main">{row.label}</span>
-                  <span className="panel__row-meta">
-                    {row.detail !== '' ? row.detail : row.utilisation.toFixed(2)}
-                  </span>
-                </button>
-              </li>
+              <ListRow
+                key={row.key}
+                buttonTestId="frame-check-row"
+                onSelect={() => select(building?.elements[row.elementId]?.entityIds ?? [])}
+              >
+                {isFailing(row) ? (
+                  <span className="chip chip--danger">FAIL</span>
+                ) : (
+                  <span className="chip chip--success">OK</span>
+                )}
+                <span className="panel__row-main">{row.label}</span>
+                <span className="panel__row-meta">
+                  {row.detail !== '' ? row.detail : row.utilisation.toFixed(2)}
+                </span>
+              </ListRow>
             ))}
           </ul>
           {report.warnings.length > 0 && (

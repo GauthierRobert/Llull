@@ -9,7 +9,7 @@
 
 import type { Vec3 } from '../model/types';
 import { cross3, normalize3, sub3 } from '../lib/vec3';
-import { signedArea } from '../lib/polygon';
+import { signedArea, toCounterClockwise } from '../lib/polygon';
 import { triangulatePolygon } from '../lib/triangulate';
 import { circlePolygon } from '../lib/arc';
 
@@ -263,7 +263,7 @@ export function extrusionRings(e: {
   depth: number;
 }): { bottom: Vec3[]; top: Vec3[] } {
   const [px, py, pz] = e.position;
-  const profile = signedArea(e.profile) < 0 ? [...e.profile].reverse() : e.profile;
+  const profile = toCounterClockwise(e.profile);
   return {
     bottom: profile.map(([x, y]): Vec3 => [px + x, py + y, pz]),
     top: profile.map(([x, y]): Vec3 => [px + x, py + y, pz + e.depth]),

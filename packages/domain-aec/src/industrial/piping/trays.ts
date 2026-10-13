@@ -8,7 +8,6 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { fromMm, toMetres } from '@core/model/units';
 import {
-  elementAffected,
   getBuilding,
   nextElementId,
   nextMark,
@@ -17,7 +16,7 @@ import {
 } from '../../building/model';
 import { noop } from '@core/commands/noop';
 import { duplicateSummary, findTwin, samePath } from '../../shared/duplicates';
-import { regenerateBuilding } from '../../building/evaluate/evaluateElements';
+import { commitBuilding } from '../../building/evaluate/evaluateElements';
 import { hasRepeatedPoint, routeLength, routeOrFailure } from './routeSupport';
 import { levelIdParam } from '../../building/levelParams';
 
@@ -80,12 +79,12 @@ export const addCableTray = defineCommand({
       height: resolvedHeight,
       system: system?.trim() || 'power',
     };
-    const document = regenerateBuilding(doc, withElement(resolution.building, tray));
-    return {
-      document,
-      summary: `Added ${tray.system} cable tray ${tray.mark} (${tray.id}) ${resolvedWidth}×${resolvedHeight}, ${toMetres(doc, trayLength(tray)).toFixed(2)} m.`,
-      affected: elementAffected(document, [tray.id]),
-      data: { elementId: tray.id },
-    };
+    return commitBuilding(
+      doc,
+      withElement(resolution.building, tray),
+      [tray.id],
+      `Added ${tray.system} cable tray ${tray.mark} (${tray.id}) ${resolvedWidth}×${resolvedHeight}, ${toMetres(doc, trayLength(tray)).toFixed(2)} m.`,
+      { elementId: tray.id },
+    );
   },
 });

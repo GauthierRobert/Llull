@@ -18,7 +18,7 @@ import {
 import { surfaceTinById } from '../surface/surfaceTin';
 import { elevationAt } from '../surface/tin';
 import { crossSlopesAt, hasSuperelevation, superelevationRate } from '../alignment/superelevation';
-import { formatStation, fromMetres } from '../model';
+import { stationText, fromMetres } from '../model';
 import { toMetres } from '@core/model/units';
 import { round } from '../../shared/numeric';
 
@@ -109,7 +109,7 @@ export function reportRows(
     const groundM = entry.groundZ === null ? null : toMetres(doc, entry.groundZ);
     return {
       station: round(toMetres(doc, entry.station), 3),
-      stationText: formatStation(toMetres(doc, entry.station)),
+      stationText: stationText(doc, entry.station),
       x: round(toMetres(doc, placed?.point[0] ?? 0), 3),
       y: round(toMetres(doc, placed?.point[1] ?? 0), 3),
       groundM: groundM === null ? null : round(groundM, 3),

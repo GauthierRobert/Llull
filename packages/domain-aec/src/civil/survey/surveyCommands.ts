@@ -7,10 +7,12 @@ import { type Vec2, type Vec3, DOCUMENT_UNITS } from '@core/model/types';
 import type { SurfaceObject, SurveyPoint } from '@core/model/civil';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2, vec3 } from '@core/commands/schema';
+import { briefList } from '../../shared/briefList';
+import { newNameParam } from '../commonParams';
 import { noop } from '@core/commands/noop';
 import { isValidPolygon } from '@lib/polygon';
 import {
-  civilObjectOrFailure,
+  civilObjectOrNoop,
   civilAffected,
   civilObject,
   civilObjectsOf,
@@ -113,7 +115,7 @@ export const importSurveyPoints = defineCommand({
         doc,
         `import_survey_points failed: no valid point found (format ${format}` +
           (parsed.rejectedLines.length > 0
-            ? `; unreadable lines ${parsed.rejectedLines.slice(0, 10).join(', ')})`
+            ? `; unreadable lines ${briefList(parsed.rejectedLines, String, 10)})`
             : ')'),
       );
     }
@@ -126,7 +128,7 @@ export const importSurveyPoints = defineCommand({
     const { civil, id, group } = newPointGroup(doc, name, 'Survey', surveyPoints);
     const skipped =
       parsed.rejectedLines.length > 0
-        ? ` Skipped ${parsed.rejectedLines.length} unreadable line(s): ${parsed.rejectedLines.slice(0, 10).join(', ')}.`
+        ? ` Skipped ${parsed.rejectedLines.length} unreadable line(s): ${briefList(parsed.rejectedLines, String, 10)}.`
         : '';
     const drawn =
       surveyPoints.length > MAX_DRAWN_POINTS
@@ -249,7 +251,7 @@ export const updateSurface = defineCommand({
     'length, or add more [x, y, z] points. Platforms and alignments on it update automatically.',
   params: z.object({
     surfaceId: z.string().describe('Surface id, e.g. "surface-1".'),
-    name: z.string().optional().describe('New name.'),
+    name: newNameParam,
     contourInterval: z.number().optional().describe('Minor contour interval (> 0).'),
     majorEvery: z.number().int().optional().describe('Every n-th contour is major (0 = none).'),
     boundary: z
@@ -261,8 +263,8 @@ export const updateSurface = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const civil = getCivil(doc);
-    const surface = civilObjectOrFailure(doc, params.surfaceId, 'surface', 'update_surface');
-    if (typeof surface === 'string') return noop(doc, surface);
+    const surface = civilObjectOrNoop(doc, params.surfaceId, 'surface', 'update_surface');
+    if ('summary' in surface) return surface;
     const boundary = params.boundary?.length === 0 ? undefined : params.boundary;
     const maxEdgeLength = params.maxEdgeLength === 0 ? undefined : params.maxEdgeLength;
     const checked = checkSurfaceOptions({ ...params, boundary, maxEdgeLength });

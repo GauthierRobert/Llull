@@ -32,6 +32,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { TransformControls as TransformControlsImpl } from 'three-stdlib';
 import { type GizmoMode, useStore, useViewportStore } from '@ui/store';
+import { useSoleSelectedEntity } from '@ui/store/selectionHooks';
 import { toRenderPosition } from './floatingOrigin';
 import { type Snap3DType, type SnapPoint3D, collectSnapCandidates3D, snap3d } from './snap3d';
 import { SnapIndicator3D } from './SnapIndicator3D';
@@ -70,12 +71,8 @@ export function TransformGizmo({
   onDraggingChanged,
 }: TransformGizmoProps): React.ReactElement | null {
   // Narrow selectors (R3). Single-entity selection only; gizmo hidden for 0 or multi-select (v1).
-  const selectedId = useStore((s) =>
-    s.document.selection.length === 1 ? s.document.selection[0] : undefined,
-  );
-  const entity = useStore((s) =>
-    selectedId === undefined ? undefined : s.document.entities[selectedId],
-  );
+  const entity = useSoleSelectedEntity();
+  const selectedId = entity?.id;
   const dispatch = useStore((s) => s.dispatch);
   const renderOrigin = useStore((s) => s.renderOrigin);
   const snap3dEnabled = useViewportStore((s) => s.snap3dEnabled);
@@ -235,18 +232,14 @@ export function TransformGizmo({
   }, [handleDraggingChanged]);
 
   // Generated building geometry is edited through its element (Building panel), not the gizmo.
-  if (!entity || !selectedId || entity.tags?.includes('bim') === true) return null;
+  if (!entity || entity.tags?.includes('bim') === true) return null;
 
   const [x, y, z] = toRenderPosition(entity.position, renderOrigin);
 
   return (
     <>
       {/* Sibling pattern: a real scene-graph <group> is the controls' target (see header). */}
-      <group
-        ref={targetRef}
-        position={[x, y, z]}
-        rotation={[entity.rotation[0], entity.rotation[1], entity.rotation[2]]}
-      />
+      <group ref={targetRef} position={[x, y, z]} rotation={entity.rotation} />
       <TransformControls
         ref={controlsRef}
         object={targetRef as unknown as MutableRefObject<THREE.Object3D>}

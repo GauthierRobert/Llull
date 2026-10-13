@@ -165,3 +165,113 @@ export function FormError({ text }: { text: string }): React.ReactElement | null
     </p>
   );
 }
+
+/** Polite status line (a command summary or a validation message); nothing while `text` is empty. */
+export function StatusLine({
+  text,
+  testId,
+}: {
+  text: string;
+  testId?: string;
+}): React.ReactElement | null {
+  if (text === '') return null;
+  return (
+    <p className="building-summary" role="status" data-testid={testId}>
+      {text}
+    </p>
+  );
+}
+
+interface ListRowProps {
+  /** Highlighted row (`panel__row--selected`). */
+  selected?: boolean;
+  /** Marks the row as the current item of its list (`aria-current`). */
+  current?: boolean;
+  testId?: string;
+  /** Click on the row's main button. */
+  onSelect: () => void;
+  /** Accessible name of the main button; omitted = its visible text. */
+  label?: string;
+  /** `aria-pressed` of the main button (toggle rows). */
+  pressed?: boolean;
+  buttonTestId?: string;
+  /** Row buttons (edit, delete…), shown after the main button. */
+  actions?: React.ReactNode;
+  /** Content of the main button: chip, `panel__row-main`, `panel__row-meta`. */
+  children: React.ReactNode;
+}
+
+/** One selectable list row: a full-width button plus optional trailing action buttons. */
+export function ListRow({
+  selected = false,
+  current,
+  testId,
+  onSelect,
+  label,
+  pressed,
+  buttonTestId,
+  actions,
+  children,
+}: ListRowProps): React.ReactElement {
+  return (
+    <li
+      className={classNames('panel__row', selected && 'panel__row--selected')}
+      data-testid={testId}
+      aria-current={current === true ? 'true' : undefined}
+    >
+      <button
+        type="button"
+        className="building-row-btn"
+        aria-label={label}
+        aria-pressed={pressed}
+        data-testid={buttonTestId}
+        onClick={onSelect}
+      >
+        {children}
+      </button>
+      {actions !== undefined && <span className="panel__row-actions">{actions}</span>}
+    </li>
+  );
+}
+
+interface DeleteButtonProps {
+  /** Accessible name, e.g. `Delete layer Walls`; also the tooltip unless `title` is given. */
+  label: string;
+  title?: string;
+  /** Icon: `trash` (default) or `close`. */
+  icon?: 'trash' | 'close';
+  size?: number;
+  className?: string;
+  testId?: string;
+  disabled?: boolean;
+  onDelete: () => void;
+}
+
+/** Danger icon button of a row; the click never reaches the row behind it. */
+export function DeleteButton({
+  label,
+  title,
+  icon = 'trash',
+  size,
+  className,
+  testId,
+  disabled,
+  onDelete,
+}: DeleteButtonProps): React.ReactElement {
+  return (
+    <IconButton
+      icon={icon}
+      danger
+      label={label}
+      title={title ?? label}
+      {...(size !== undefined ? { size } : {})}
+      {...(className !== undefined ? { className } : {})}
+      {...(testId !== undefined ? { testId } : {})}
+      {...(disabled !== undefined ? { disabled } : {})}
+      onClick={(event) => {
+        event.stopPropagation();
+        onDelete();
+      }}
+    />
+  );
+}

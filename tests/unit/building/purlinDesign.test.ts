@@ -1,23 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import { portalHall } from '../../helpers/portalHall';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { SteelMemberElement } from '@core/model/building';
 import { execute } from '@core/commands/registry';
 import { findProfile } from '@aec/steel/profiles';
 import { nextSecondaryProfile } from '@aec/industrial/purlins/purlinDesign';
 import type { PurlinRow } from '@aec/industrial/purlins/purlinModel';
+import { membersOf } from './elementEdits';
 
 const hall = (params: Record<string, unknown> = {}): CadDocument =>
-  execute(createEmptyDocument(), 'add_portal_frame_building', {
-    span: 24000,
-    length: 30000,
-    ...params,
-  }).document;
-
-const membersOf = (doc: CadDocument, role: SteelMemberElement['role']): SteelMemberElement[] =>
-  Object.values(doc.building?.elements ?? {}).filter(
-    (element): element is SteelMemberElement =>
-      element.category === 'member' && element.role === role,
-  );
+  portalHall({ span: 24000, length: 30000, ...params });
 
 const rowsOf = (doc: CadDocument, params: Record<string, unknown> = {}): PurlinRow[] =>
   (execute(doc, 'check_purlins', params).data as { rows: PurlinRow[] }).rows;

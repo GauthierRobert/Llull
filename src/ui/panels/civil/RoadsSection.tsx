@@ -5,35 +5,33 @@
  * clothoid spiral lengths, ground surface) and one AlignmentEditor per alignment.
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useStore } from '@ui/store';
 import { PanelSection, FormError } from '@ui/panels/PanelParts';
 import {
   CivilObjectSelect,
   useCivilObjects,
-  NumberField,
+  NumberTextField,
   PointsFromSelectionRow,
   TextField,
   useChosenId,
 } from './CivilParts';
 import { alignmentParamsOf } from './civilRules';
 import { AlignmentEditor } from './AlignmentEditor';
+import { useFormValues } from '@ui/panels/useFormValues';
+
+const ALIGNMENT_FORM = { points: '', radii: '', spirals: '', interval: '', name: '' };
 
 export function RoadsSection(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const surfaces = useCivilObjects('surface');
   const alignments = useCivilObjects('alignment');
-  const [points, setPoints] = useState('');
-  const [radii, setRadii] = useState('');
-  const [spirals, setSpirals] = useState('');
   const [surfaceId, setSurface] = useChosenId(surfaces, true);
-  const [interval, setIntervalText] = useState('');
-  const [name, setName] = useState('');
-  const [error, setError] = useState('');
+  const { values, error, setError, field } = useFormValues(() => ALIGNMENT_FORM);
 
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
-    const gathered = alignmentParamsOf({ points, radii, spirals, surfaceId, interval, name });
+    const gathered = alignmentParamsOf({ ...values, surfaceId });
     if (!gathered.ok) {
       setError(gathered.error);
       return;
@@ -54,22 +52,15 @@ export function RoadsSection(): React.ReactElement {
     >
       <form className="civil-form" onSubmit={handleSubmit} aria-label="Add alignment">
         <PointsFromSelectionRow
-          value={points}
-          set={setPoints}
+          {...field('points')}
           label="Alignment points"
           noSelectionError="Select one polyline first."
           setError={setError}
         />
         <div className="building-inline-form">
+          <TextField {...field('radii')} hint="Radii per interior PI" label="Curve radii" />
           <TextField
-            value={radii}
-            set={setRadii}
-            hint="Radii per interior PI"
-            label="Curve radii"
-          />
-          <TextField
-            value={spirals}
-            set={setSpirals}
+            {...field('spirals')}
             hint="Spiral lengths (clothoid)"
             label="Spiral lengths"
           />
@@ -80,13 +71,12 @@ export function RoadsSection(): React.ReactElement {
             emptyLabel="No ground surface"
             onChange={setSurface}
           />
-          <NumberField
-            value={interval}
-            set={setIntervalText}
+          <NumberTextField
+            {...field('interval')}
             hint="Station interval"
             label="Station interval"
           />
-          <TextField value={name} set={setName} hint="Name" label="Alignment name" />
+          <TextField {...field('name')} hint="Name" label="Alignment name" />
           <button type="submit" className="btn btn--primary btn--sm">
             Add alignment
           </button>

@@ -11,7 +11,7 @@ import { defineCommand, z, looseVec3 as vec3, colorField } from '../schema';
 import { nextId } from '../../lib/id';
 import { ORIGIN } from '../../lib/vec3';
 import { applyMat3, eulerFromMat, matFromAxis, unitAxisOrNull } from '../../lib/axisRotation';
-import { compactNumber as fmt } from '../../lib/compactNumber';
+import { compactNumber as fmt, vecText } from '../../lib/compactNumber';
 import { commitSolid, positionField } from './shared';
 import { newEntity } from '../entity/newEntity';
 import { noop } from '../noop';
@@ -218,7 +218,7 @@ export const addHelixSpring = defineCommand({
         doc,
         entity,
         `Added helix spring ${id}: ${fmt(resolved.turns)} turns, pitch ${fmt(middlePitch)}, wire Ø${fmt(2 * r)}, ` +
-          `mean coil radius ${fmt(coilRadius)}, free length ${fmt(freeLength)} along [${unitAxis.map(fmt).join(', ')}]`,
+          `mean coil radius ${fmt(coilRadius)}, free length ${fmt(freeLength)} along ${vecText(unitAxis)}`,
       ),
       data,
     };

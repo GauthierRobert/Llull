@@ -4,25 +4,31 @@
  * @layer domain-aec
  */
 
+import { clamp } from '@lib/clamp';
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { toMm } from '@core/model/units';
 import { fileSlug, getBuilding } from '../model';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
 import { type PlanDrawing, type PlanPrimitive } from './planModel';
 import { buildPlanDrawing } from './planDrawing';
-import { escapeXml } from '@lib/escapeXml';
 import { wrapAngle } from '@lib/angle';
 import {
   composeSheetSvg,
   fitScale,
   MARGIN,
   n,
+  paperMap,
+  readableDimensionLabel,
+  svgPoints,
   northArrow,
   PAPER_MM,
-  PAPER_SIZES,
+  PAPER_FIELD,
+  SCALE_FIELD,
+  sheetFitWarning,
   sheetDrawingArea,
+  svgText,
   type PaperSize,
   type Viewport,
 } from '../../shared/sheetFrame';
@@ -38,16 +44,15 @@ class SheetPainter {
 
   map([x, y]: Vec2): Vec2 {
     const [minX, minY, maxX, maxY] = this.drawing.bounds;
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
-    return [
-      this.viewport.x + this.viewport.width / 2 + (x - cx) * this.paperPerUnit,
-      this.viewport.y + this.viewport.height / 2 - (y - cy) * this.paperPerUnit,
-    ];
+    return paperMap(
+      this.viewport,
+      [(minX + maxX) / 2, (minY + maxY) / 2],
+      this.paperPerUnit,
+    )([x, y]);
   }
 
   private points(points: ReadonlyArray<Vec2>): string {
-    return points.map((point) => this.map(point).map(n).join(',')).join(' ');
+    return svgPoints(points.map((point) => this.map(point)));
   }
 
   private styleOf(style: PlanPrimitive['style'], filled: boolean): string {
@@ -63,12 +68,7 @@ class SheetPainter {
   }
 
   text(at: Vec2, sizeMm: number, content: string, rotationDeg = 0): void {
-    const [x, y] = at;
-    const transform =
-      rotationDeg !== 0 ? ` transform="rotate(${n(rotationDeg)} ${n(x)} ${n(y)})"` : '';
-    this.parts.push(
-      `<text x="${n(x)}" y="${n(y)}" font-size="${n(sizeMm)}" text-anchor="middle"${transform}>${escapeXml(content)}</text>`,
-    );
+    this.parts.push(svgText(at[0], at[1], sizeMm, 'middle', content, rotationDeg));
   }
 
   paint(primitive: PlanPrimitive): void {
@@ -143,7 +143,7 @@ class SheetPainter {
     if (length === 0) return;
     // Model "right of a→b" becomes "left of a→b" once Y is flipped on paper.
     const normal: Vec2 = [dy / length, -dx / length];
-    const gap = Math.min(Math.max(primitive.offset * this.paperPerUnit, 6), 14);
+    const gap = clamp(primitive.offset * this.paperPerUnit, 6, 14);
     const along = (point: Vec2, distance: number): Vec2 => [
       point[0] - normal[0] * distance,
       point[1] - normal[1] * distance,
@@ -159,13 +159,7 @@ class SheetPainter {
     );
     for (const end of [da, db])
       this.parts.push(line([end[0] - 1, end[1] + 1], [end[0] + 1, end[1] - 1]));
-    let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
-    if (angle > 90 || angle <= -90) angle += 180;
-    const radians = (angle * Math.PI) / 180;
-    const middle: Vec2 = [
-      (da[0] + db[0]) / 2 + Math.sin(radians) * 1.2,
-      (da[1] + db[1]) / 2 - Math.cos(radians) * 1.2,
-    ];
+    const { angle, middle } = readableDimensionLabel(da, db, dx, dy);
     this.text(middle, 2.5, primitive.label, angle);
   }
 }
@@ -243,13 +237,8 @@ export const exportPlanSheet = defineCommand({
     'filled from set_project_info. data.svg holds the file text.',
   params: z.object({
     levelId: z.string().optional().describe('Level to draw. Default: active level.'),
-    paper: z.enum(PAPER_SIZES).optional().describe('Paper size (landscape). Default A3.'),
-    scale: z
-      .number()
-      .optional()
-      .describe(
-        'Scale denominator N for 1:N (e.g. 100). Default: the smallest standard scale that fits (1-2-5 steps beyond 1:2000).',
-      ),
+    paper: PAPER_FIELD,
+    scale: SCALE_FIELD,
     title: z.string().optional().describe('Drawing title. Default "<level> — Floor plan".'),
   }),
   run: (doc, { levelId, paper = 'A3', scale, title }): CommandResult => {
@@ -260,11 +249,10 @@ export const exportPlanSheet = defineCommand({
         'export_plan_sheet failed: no such level (add_level / draw_walls first) or invalid scale (must be > 0).',
       );
     }
-    return {
-      document: doc,
-      summary: `Plan sheet ${sheet.filename}: level ${sheet.levelId} at 1:${sheet.scale} on ${sheet.paper}.${sheet.fits ? '' : ' WARNING: the drawing is larger than the paper at this scale; omit scale to auto-fit or choose a larger paper.'}`,
-      affected: [],
-      data: sheet,
-    };
+    return report(
+      doc,
+      `Plan sheet ${sheet.filename}: level ${sheet.levelId} at 1:${sheet.scale} on ${sheet.paper}.${sheetFitWarning(sheet.fits, 'drawing')}`,
+      sheet,
+    );
   },
 });

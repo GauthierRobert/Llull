@@ -5,6 +5,7 @@
  * the whole outbox and the local document.
  */
 
+import { httpFail } from '../helpers/integrationFetch';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { Mock } from 'vitest';
 import { execute } from '@core/commands/registry';
@@ -18,12 +19,6 @@ interface FakeResponse {
   status: number;
   json: () => Promise<unknown>;
 }
-
-const httpFail = (status: number): FakeResponse => ({
-  ok: false,
-  status,
-  json: () => Promise.resolve({}),
-});
 
 /**
  * Simulated server. `refuse(name)` returns an HTTP status to answer instead of applying the

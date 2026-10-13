@@ -10,6 +10,7 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { listCommands } from '@core/commands/registry';
 import { SERVER_BASE } from '@ui/serverConfig';
 import { Icon } from '@ui/components/Icon';
+import { IconButton } from '@ui/panels/PanelParts';
 import { ModalDialog } from './ModalDialog';
 
 const SERVER_INSTALL_CMD = 'npm --prefix server install && npm --prefix server run dev';
@@ -173,15 +174,14 @@ export function McpConnect({ onClose }: McpConnectProps): React.ReactElement {
           </h2>
           <p className="mcp-connect__subtitle">Let Claude or any MCP client drive this canvas.</p>
         </div>
-        <button
-          type="button"
-          className="icon-btn mcp-connect__close"
-          onClick={onClose}
-          aria-label="Close dialog"
+        <IconButton
+          icon="close"
+          size={14}
+          className="mcp-connect__close"
+          label="Close dialog"
           title="Close"
-        >
-          <Icon name="close" size={14} />
-        </button>
+          onClick={onClose}
+        />
       </div>
 
       <div className="mcp-connect__body">
