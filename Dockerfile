@@ -18,23 +18,19 @@ RUN npm --prefix server prune --omit=dev
 
 # ---- DWG converter -------------------------------------------------------------------------
 # LibreDWG's dwg2dxf gives DWG import. Debian stable does not package it (and Debian lists CVEs
-# up to 0.13.4), so a pinned release is built from the GNU tarball, verified against its GNU
-# signature (gnu-keyring.gpg). WITH_DWG=0 skips it; LIBREDWG_SHA256 additionally pins the bytes.
+# up to 0.13.4), so a pinned release is built from source. The tarball must match
+# LIBREDWG_SHA256 (verified against the maintainer's signature, key 38A4167B0DB69E49C5F7216CB8C28866AB27A7A2);
+# LIBREDWG_URL may point at a mirror, the checksum keeps it honest. WITH_DWG=0 skips the stage.
 FROM debian:bookworm-slim@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587 AS dwg
 ARG WITH_DWG=1
 ARG LIBREDWG_VERSION=0.14
-ARG LIBREDWG_SHA256=
+ARG LIBREDWG_SHA256=62ebb73b984f865960f20ed26619ea5f8789d5e3fd088fa40a2598384da81275
+ARG LIBREDWG_URL=https://ftp.gnu.org/gnu/libredwg/libredwg-${LIBREDWG_VERSION}.tar.xz
 RUN mkdir -p /out/bin /out/lib && if [ "$WITH_DWG" = "1" ]; then \
       apt-get update \
-      && apt-get install -y --no-install-recommends build-essential ca-certificates curl xz-utils gpgv \
-      && curl -fsSL -o /tmp/libredwg.tar.xz \
-         "https://ftp.gnu.org/gnu/libredwg/libredwg-${LIBREDWG_VERSION}.tar.xz" \
-      && curl -fsSL -o /tmp/libredwg.tar.xz.sig \
-         "https://ftp.gnu.org/gnu/libredwg/libredwg-${LIBREDWG_VERSION}.tar.xz.sig" \
-      && curl -fsSL -o /tmp/gnu-keyring.gpg "https://ftp.gnu.org/gnu/gnu-keyring.gpg" \
-      && gpgv --keyring /tmp/gnu-keyring.gpg /tmp/libredwg.tar.xz.sig /tmp/libredwg.tar.xz \
-      && if [ -n "$LIBREDWG_SHA256" ]; then \
-           echo "$LIBREDWG_SHA256  /tmp/libredwg.tar.xz" | sha256sum -c -; fi \
+      && apt-get install -y --no-install-recommends build-essential ca-certificates curl xz-utils \
+      && curl -fsSL -o /tmp/libredwg.tar.xz "$LIBREDWG_URL" \
+      && echo "$LIBREDWG_SHA256  /tmp/libredwg.tar.xz" | sha256sum -c - \
       && mkdir /tmp/src && tar -xJf /tmp/libredwg.tar.xz -C /tmp/src --strip-components=1 \
       && cd /tmp/src && ./configure --prefix=/usr/local --disable-bindings --disable-static \
       && make -j"$(nproc)" && make install \

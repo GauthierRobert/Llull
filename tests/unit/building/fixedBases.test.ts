@@ -137,6 +137,7 @@ describe('fixed column bases in the frame analysis', () => {
     expect(left.cases.WL!.moment).toBeGreaterThan(0);
     expect(left.cases.WL!.horizontal + right.cases.WL!.horizontal).toBeLessThan(0);
   });
+  // Two full portal-frame designs: ~10 s plain, ~28 s under coverage instrumentation.
   it('designs a lighter crane hall with fixed bases than with pinned bases', () => {
     const design = (columnBase: 'pinned' | 'fixed'): ReturnType<typeof sections> => {
       const result = execute(hall({ ...CRANE_HALL, columnBase }), 'design_portal_frames', { windPressure: 0.7 });
@@ -148,7 +149,7 @@ describe('fixed column bases in the frame analysis', () => {
     expect(fixed.tonnes).toBeLessThan(pinned.tonnes);
     expect(`${fixed.column}/${fixed.rafter}`).toBe('HEA400/IPE450');
     expect(`${pinned.column}/${pinned.rafter}`).not.toBe(`${fixed.column}/${fixed.rafter}`);
-  });
+  }, 120_000);
 });
 
 describe('footing eccentricity and overturning with a base moment', () => {

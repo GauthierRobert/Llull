@@ -106,8 +106,9 @@ Set `LLULL_PUBLIC_URL=https://cad.example.com` and `LLULL_ALLOWED_HOSTS=cad.exam
 
 The image builds LibreDWG's `dwg2dxf` from a pinned GNU release (`LIBREDWG_VERSION`, default
 0.14 — Debian stable does not package LibreDWG, and Debian's tracker lists CVEs up to 0.13.4).
-The download is verified against its GNU signature (`gnu-keyring.gpg`); pin the exact bytes too with the published checksum:
-`docker build --build-arg LIBREDWG_SHA256=<sha256 from ftp.gnu.org/gnu/libredwg> …`. Build without
+The tarball must match the pinned `LIBREDWG_SHA256` (checked against the maintainer's signature
+when pinned); when bumping `LIBREDWG_VERSION`, verify the new `.sig` and pin its checksum. Fetch
+from a mirror with `--build-arg LIBREDWG_URL=<url>` — the checksum still applies. Build without
 DWG support with `--build-arg WITH_DWG=0`. Check with `docker compose exec llull dwg2dxf --version`.
 Alternatives: mount the ODA File Converter and set `LLULL_ODA_CONVERTER=<executable>`, or set
 `LLULL_DWG2DXF=off`. Without a converter `POST /import/dwg` answers 503; DXF import is unaffected.
