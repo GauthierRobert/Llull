@@ -37,7 +37,7 @@
     "@anthropic-ai/sdk": "^0.131.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.6.5",
     "@types/supertest": "^7.2.0",
     "esbuild": "^0.28.2",
     "supertest": "^7.2.2",
