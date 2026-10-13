@@ -1,11 +1,12 @@
-// In-Canvas camera sync: document.camera → live camera/controls, plus adaptive near/far.
+// In-Canvas camera sync: document.camera → live camera/controls, plus adaptive near/far and damping settle.
 
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import type * as THREE from 'three';
+import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useStore } from '@ui/store';
 import { driveCamera } from './cameraBridge';
+import { shouldSettleCoast } from './orbitSettle';
 
 /** Spherical → eye, +Z up: polar 0 = above the target, π/2 = in its XY plane; azimuth from +Y toward +X. */
 export function sphericalToCartesian(
@@ -55,6 +56,28 @@ export function AdaptiveClipping(): null {
     perspective.near = Math.max(distance / 2000, 1e-3);
     perspective.far = Math.max(distance * 2000, 1e3);
     perspective.updateProjectionMatrix();
+  });
+  return null;
+}
+
+/** Ends the OrbitControls damping coast once it is sub-pixel, so the demand frameloop goes idle at any zoom (W5G). */
+export function OrbitSettle(): null {
+  const lastPosition = useRef(new THREE.Vector3());
+  const lastTarget = useRef(new THREE.Vector3());
+  useFrame(({ camera, controls, size }) => {
+    const orbit = controls as OrbitControlsImpl | null;
+    if (!orbit?.enableDamping || !(camera instanceof THREE.PerspectiveCamera)) return;
+    const step = lastPosition.current.distanceTo(camera.position) + lastTarget.current.distanceTo(orbit.target);
+    lastPosition.current.copy(camera.position);
+    lastTarget.current.copy(orbit.target);
+    if (!shouldSettleCoast(step, camera.position.distanceTo(orbit.target), camera.fov, size.height)) return;
+    // An undamped update() zeroes the pending rotate/pan deltas; restoring the pose drops that sub-pixel remainder.
+    orbit.enableDamping = false;
+    orbit.update();
+    camera.position.copy(lastPosition.current);
+    orbit.target.copy(lastTarget.current);
+    orbit.update();
+    orbit.enableDamping = true;
   });
   return null;
 }

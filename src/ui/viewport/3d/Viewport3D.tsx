@@ -19,7 +19,7 @@ import { ClippingPlane } from './ClippingPlane';
 import { ViewportControls } from './ViewportControls';
 import { AnimationPlayer } from './AnimationPlayer';
 import { useRenderQuality } from './useRenderQuality';
-import { AdaptiveClipping, CameraReactor, sphericalToCartesian } from './CameraRig';
+import { AdaptiveClipping, CameraReactor, OrbitSettle, sphericalToCartesian } from './CameraRig';
 import { GROUND_PLANE_ROTATION, SceneLighting } from './SceneLighting';
 import { MechanismOverlay } from './MechanismOverlay';
 import { useViewportPalette } from '@ui/viewport/viewportPalette';
@@ -79,6 +79,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
 
       <RenderOriginSyncer />
       <AdaptiveClipping />
+      <OrbitSettle />
 
       <CameraBridge />
 
