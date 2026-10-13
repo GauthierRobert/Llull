@@ -181,4 +181,22 @@ describe('per-client live stream cap', () => {
       server.close();
     }
   });
+
+  it('does not cap proxied streams while trust proxy is unset (all users share the proxy IP)', async () => {
+    process.env['LLULL_LIVE_MAX_PER_CLIENT'] = '1';
+    const server = app.listen(0);
+    const { port } = server.address() as { port: number };
+    const controller = new AbortController();
+    const proxied = { 'X-Forwarded-For': '203.0.113.7' };
+    try {
+      const first = await fetch(`http://127.0.0.1:${port}/live`, { headers: proxied, signal: controller.signal });
+      const second = await fetch(`http://127.0.0.1:${port}/live`, { headers: proxied, signal: controller.signal });
+      expect([first.status, second.status]).toEqual([200, 200]);
+    } finally {
+      delete process.env['LLULL_LIVE_MAX_PER_CLIENT'];
+      controller.abort();
+      server.closeAllConnections();
+      server.close();
+    }
+  });
 });

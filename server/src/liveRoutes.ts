@@ -7,7 +7,7 @@
  *   POST /undo, /redo    "Nothing to undo/redo." is a normal result, not an error
  */
 
-import { Router, type RequestHandler } from 'express';
+import { Router, type Request, type RequestHandler } from 'express';
 import { isRecord } from '@lib/isRecord';
 import { applyCommand, undo, redo } from './commandBus';
 import { subscribeLive, getLiveSnapshot, liveSubscriberCount, MAX_LIVE_SUBSCRIBERS, liveMaxPerClient } from './liveDocument';
@@ -15,6 +15,16 @@ import { guardMutation, guardRead } from './security';
 import { actorOf } from './audit';
 
 const KEEPALIVE_MS = 25_000;
+
+/**
+ * Per-client key for the /live stream cap, or null when the client cannot be told apart: behind a proxy
+ * with `trust proxy` unset every user shares the proxy's address, so only the global cap applies.
+ */
+function liveClientKey(req: Request): string | null {
+  const proxied = req.headers['x-forwarded-for'] !== undefined || req.headers['forwarded'] !== undefined;
+  if (proxied && !req.app.get('trust proxy')) return null;
+  return req.ip ?? req.socket.remoteAddress ?? 'unknown';
+}
 
 export function buildLiveRouter(restLimiter: RequestHandler): Router {
   const router = Router();
@@ -24,10 +34,10 @@ export function buildLiveRouter(restLimiter: RequestHandler): Router {
 
   router.get('/live', restLimiter, readGuard, (req, res) => {
     if (liveSubscriberCount() >= MAX_LIVE_SUBSCRIBERS) return void res.status(503).json({ error: 'Too many live subscribers.' });
-    const client = req.ip ?? req.socket.remoteAddress ?? 'unknown';
-    const open = streamsPerClient.get(client) ?? 0;
+    const client = liveClientKey(req);
+    const open = client === null ? 0 : (streamsPerClient.get(client) ?? 0);
     if (open >= liveMaxPerClient()) return void res.status(429).json({ error: 'Too many live streams from this client.' });
-    streamsPerClient.set(client, open + 1);
+    if (client !== null) streamsPerClient.set(client, open + 1);
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -35,9 +45,11 @@ export function buildLiveRouter(restLimiter: RequestHandler): Router {
     const unsubscribe = subscribeLive(res);
     const keepaliveTimer = setInterval(() => res.write(':keepalive\n\n'), KEEPALIVE_MS);
     req.on('close', () => {
-      const remaining = (streamsPerClient.get(client) ?? 1) - 1;
-      if (remaining > 0) streamsPerClient.set(client, remaining);
-      else streamsPerClient.delete(client);
+      if (client !== null) {
+        const remaining = (streamsPerClient.get(client) ?? 1) - 1;
+        if (remaining > 0) streamsPerClient.set(client, remaining);
+        else streamsPerClient.delete(client);
+      }
       clearInterval(keepaliveTimer);
       unsubscribe();
       res.end();

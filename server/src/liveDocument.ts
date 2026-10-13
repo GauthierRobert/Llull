@@ -90,7 +90,7 @@ export function getLiveSnapshot(): LiveSnapshotEvent {
 const _subscribers = new Set<Response>();
 export const MAX_LIVE_SUBSCRIBERS = 64; // further `GET /live` get 503
 /** `LLULL_LIVE_MAX_PER_CLIENT` (default 4): concurrent `GET /live` per client IP; more get 429. */
-export const liveMaxPerClient = (): number => positiveInteger(process.env['LLULL_LIVE_MAX_PER_CLIENT'], 4);
+export const liveMaxPerClient = (): number => positiveInteger(process.env['LLULL_LIVE_MAX_PER_CLIENT'], 8);
 /** A subscriber whose unsent buffer exceeds this is dropped (it resyncs via `/live/snapshot`). */
 const MAX_SSE_BACKLOG_BYTES = 8 * 1024 * 1024;
 

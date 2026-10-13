@@ -25,7 +25,7 @@ function maxSessions(): number {
 
 /**
  * Make room for one more session by closing the oldest-idle ones while at/over the cap. With a known `userId`
- * that user's own sessions go first (so one caller cannot push out others); otherwise global LRU.
+ * that user's own sessions go first (a user at the cap recycles their own); a caller with none evicts by global LRU.
  */
 export function evictForCapacity(userId?: string): void {
   const limit = maxSessions();
