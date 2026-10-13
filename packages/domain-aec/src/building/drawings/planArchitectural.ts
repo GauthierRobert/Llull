@@ -30,7 +30,6 @@ import { stairPoint } from '../geometry/stairGeometry';
 import { layerBoundaries } from '../elements/wallLayers';
 import {
   DIMENSION_LAYER,
-  type PlanPrimitive,
   type PlanSource,
   annotationText,
   band,
@@ -38,12 +37,13 @@ import {
   layerName,
   thinLine,
 } from './planModel';
+import type { DrawingPrimitive } from '@core/model/drawing';
 
 /** Plan symbol of a door (leaf + swing) or window (three lines) in a straight wall frame. */
 function openingSymbol(
   wall: Pick<WallElement, 'start' | 'end' | 'thickness'>,
   opening: OpeningElement,
-): PlanPrimitive[] {
+): DrawingPrimitive[] {
   const layer = layerName(opening.category);
   if (opening.category === 'window') {
     const frame = wallFrame(wall);
@@ -77,11 +77,11 @@ export function wallPrimitives(
   building: BuildingModel,
   wall: WallElement,
   cutHeight: number,
-): PlanPrimitive[] {
+): DrawingPrimitive[] {
   const frame = wallFrame(wall);
   const half = wall.thickness / 2;
   const layer = layerName('wall');
-  const primitives: PlanPrimitive[] = [];
+  const primitives: DrawingPrimitive[] = [];
   const openings = openingsOf(building, wall.id);
   const extent = wallExtent(building, wall);
   const addCut = (from: number, to: number): void => {
@@ -130,51 +130,12 @@ export function wallPrimitives(
   return primitives;
 }
 
-export function boundsOf(
-  primitives: ReadonlyArray<PlanPrimitive>,
-): [number, number, number, number] {
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  const include = (point: Vec2, pad = 0): void => {
-    minX = Math.min(minX, point[0] - pad);
-    minY = Math.min(minY, point[1] - pad);
-    maxX = Math.max(maxX, point[0] + pad);
-    maxY = Math.max(maxY, point[1] + pad);
-  };
-  for (const primitive of primitives) {
-    switch (primitive.type) {
-      case 'polygon':
-      case 'polyline':
-        primitive.points.forEach((point) => include(point));
-        break;
-      case 'line':
-        include(primitive.a);
-        include(primitive.b);
-        break;
-      case 'arc':
-      case 'circle':
-        include(primitive.center, primitive.radius);
-        break;
-      case 'text':
-        include(primitive.at, primitive.height);
-        break;
-      case 'dimension':
-        include(primitive.a, primitive.offset * 1.5);
-        include(primitive.b, primitive.offset * 1.5);
-        break;
-    }
-  }
-  return Number.isFinite(minX) ? [minX, minY, maxX, maxY] : [0, 0, 0, 0];
-}
-
 /** Dimension text in millimetres (construction convention). */
 export function dimensionLabel(doc: PlanSource, value: number): string {
   return String(Math.round(toMetres(doc, value) * 1000));
 }
 
-function dimension(a: Vec2, b: Vec2, offset: number, label: string): PlanPrimitive {
+function dimension(a: Vec2, b: Vec2, offset: number, label: string): DrawingPrimitive {
   return { type: 'dimension', layer: DIMENSION_LAYER, style: 'annotation', a, b, offset, label };
 }
 
@@ -183,8 +144,8 @@ export function dimensionPrimitives(
   doc: PlanSource,
   building: BuildingModel,
   walls: ReadonlyArray<WallElement>,
-): PlanPrimitive[] {
-  const primitives: PlanPrimitive[] = [];
+): DrawingPrimitive[] {
+  const primitives: DrawingPrimitive[] = [];
   const gap = fromMm(doc, 1200);
   if (walls.length > 0) {
     const half = Math.max(...walls.map((wall) => wall.thickness)) / 2;
@@ -236,12 +197,12 @@ export function dimensionPrimitives(
 export function stairPrimitives(
   doc: PlanSource,
   stair: Extract<BuildingModel['elements'][string], { category: 'stair' }>,
-): PlanPrimitive[] {
+): DrawingPrimitive[] {
   const half = stair.width / 2;
   const at = (along: number, across: number): Vec2 => stairPoint(stair, along, across);
   const run = stair.riserCount * stair.treadDepth;
   const layer = layerName('stair');
-  const primitives: PlanPrimitive[] = [
+  const primitives: DrawingPrimitive[] = [
     {
       type: 'polygon',
       layer,
@@ -270,7 +231,7 @@ export function curvedWallPrimitives(
   building: BuildingModel,
   wall: CurvedWallElement,
   cutHeight: number,
-): PlanPrimitive[] {
+): DrawingPrimitive[] {
   const extent = curvedWallExtent(building, wall);
   const outline = curvedBandBetween(wall, extent.start, extent.end);
   if (!outline) return [];
@@ -279,7 +240,7 @@ export function curvedWallPrimitives(
   if (!(localCut >= 0 && localCut < wall.height))
     return [{ type: 'polygon', layer, style: 'hidden', points: outline }];
   const openings = openingsOf(building, wall.id);
-  const primitives: PlanPrimitive[] = [];
+  const primitives: DrawingPrimitive[] = [];
   for (const piece of wallPieces(wall, openings, extent)) {
     if (!(piece.z0 <= localCut && localCut < piece.z1)) continue;
     const points = curvedBandBetween(wall, piece.s0, piece.s1);
@@ -292,9 +253,9 @@ export function curvedWallPrimitives(
 }
 
 /** Slab outline plus each opening outline with its diagonal break line. */
-export function slabPrimitives(slab: SlabElement): PlanPrimitive[] {
+export function slabPrimitives(slab: SlabElement): DrawingPrimitive[] {
   const layer = layerName('slab');
-  const primitives: PlanPrimitive[] = [
+  const primitives: DrawingPrimitive[] = [
     { type: 'polygon', layer, style: 'thin', points: slab.boundary },
   ];
   for (const opening of slab.openings ?? []) {
@@ -308,13 +269,14 @@ export function slabPrimitives(slab: SlabElement): PlanPrimitive[] {
   return primitives;
 }
 
-export function columnPrimitive(column: ColumnElement): PlanPrimitive {
+export function columnPrimitive(column: ColumnElement): DrawingPrimitive {
   const layer = layerName('column');
   if (column.shape === 'circular') {
     return {
       type: 'circle',
       layer,
       style: 'cut',
+      fill: 'hatch',
       center: column.location,
       radius: column.width / 2,
     };
@@ -331,7 +293,7 @@ export function columnPrimitive(column: ColumnElement): PlanPrimitive {
 }
 
 /** Room name and "mark · area" tags at the outline centroid. */
-export function roomPrimitives(doc: PlanSource, room: RoomElement): PlanPrimitive[] {
+export function roomPrimitives(doc: PlanSource, room: RoomElement): DrawingPrimitive[] {
   const [cx, cy] = polygonCentroid(room.boundary);
   const textHeight = fromMm(doc, 250);
   const area = planAreaM2(doc, room.boundary);
@@ -348,10 +310,13 @@ export function roomPrimitives(doc: PlanSource, room: RoomElement): PlanPrimitiv
 }
 
 /** Axis line with a labelled bubble at each end. */
-export function gridPrimitives(doc: PlanSource, grid: GridElement): PlanPrimitive[] {
+export function gridPrimitives(doc: PlanSource, grid: GridElement): DrawingPrimitive[] {
   const bubbleRadius = fromMm(doc, 400);
   const layer = layerName('grid');
-  const primitives: PlanPrimitive[] = [thinLine(layer, grid.start, grid.end)];
+  // Grid lines are chain lines (ISO 128 type 04), like every axis.
+  const primitives: DrawingPrimitive[] = [
+    { type: 'line', layer, style: 'center', a: grid.start, b: grid.end },
+  ];
   for (const center of gridBubbleCenters(grid, bubbleRadius)) {
     primitives.push(
       { type: 'circle', layer, style: 'thin', center, radius: bubbleRadius },

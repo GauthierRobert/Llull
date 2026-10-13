@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { boundsOf, dimensionLabel } from '@aec/building/drawings/planArchitectural';
+import { dimensionLabel } from '@aec/building/drawings/planArchitectural';
+import { drawingBounds } from '@core/model/drawing';
 import { buildPlanDrawing } from '@aec/building/drawings/planDrawing';
 import { type DxfExport } from '@aec/building/exchange/dxfExport';
 import { DxfWriter, dxfLayerName, dxfText } from '@aec/building/exchange/dxfWriter';
@@ -80,6 +81,14 @@ describe('plan drawing', () => {
     expect(dims).toEqual(['10300', '8300', '5000', '5000', '8000']);
   });
 
+  it('draws grid lines as chain (centre) lines', () => {
+    const grids = buildPlanDrawing(house(), undefined)!.primitives.filter(
+      (p) => p.layer === 'S-GRID' && p.type === 'line',
+    );
+    expect(grids.length).toBeGreaterThan(0);
+    expect(grids.every((p) => p.style === 'center')).toBe(true);
+  });
+
   it('returns null for an unknown level and can skip dimensions', () => {
     const doc = house();
     expect(buildPlanDrawing(doc, 'level-9')).toBeNull();
@@ -89,7 +98,7 @@ describe('plan drawing', () => {
   });
 
   it('helpers', () => {
-    expect(boundsOf([])).toEqual([0, 0, 0, 0]);
+    expect(drawingBounds([])).toEqual([0, 0, 0, 0]);
     let metres = run(createEmptyDocument(), 'set_units', { units: 'm' });
     expect(dimensionLabel(metres, 2.45)).toBe('2450');
     metres = run(metres, 'draw_walls', {
@@ -152,10 +161,24 @@ describe('export_dxf', () => {
     expect(data.dxf).toContain('\nPOINT\n');
     expect(data.dxf).toContain('Note \\U+00B2');
     expect(data.dxf).toMatch(/\nLAYER\n2\nS-BEAM\n70\n0\n62\n4\n6\nDASHED/);
+    expect(data.dxf).toMatch(/\nLAYER\n2\nS-GRID\n70\n0\n62\n1\n6\nCENTER/);
     // DXF is a strict alternation of group codes and values.
     const lines = data.dxf.trimEnd().split('\n');
     expect(lines.length % 2).toBe(0);
     for (let index = 0; index < lines.length; index += 2) expect(lines[index]).toMatch(/^\d+$/);
+  });
+
+  it('exports 3D solids as their technical top view (visible, hidden dashed, centre chain)', () => {
+    let doc = run(createEmptyDocument(), 'add_box', { size: [10, 10, 1], position: [0, 0, 5] });
+    doc = run(doc, 'add_cylinder', { radius: 2, height: 2, position: [0, 0, 0] });
+    const data = execute(doc, 'export_dxf', {}).data as DxfExport;
+    expect(data.layers).toEqual(
+      expect.arrayContaining(['OBJ-VISIBLE', 'OBJ-HIDDEN', 'OBJ-CENTER']),
+    );
+    expect(data.dxf).toMatch(/\nLAYER\n2\nOBJ-HIDDEN\n70\n0\n62\n8\n6\nDASHED/);
+    expect(data.dxf).toMatch(/\nLAYER\n2\nOBJ-CENTER\n70\n0\n62\n1\n6\nCENTER/);
+    expect(data.dxf).toContain('\nLTYPE\n2\nCENTER\n');
+    expect(execute(doc, 'export_dxf', { includeDrafting: false }).summary).toMatch(/nothing/);
   });
 
   it('exports drafting-only documents and fails cleanly', () => {
@@ -189,7 +212,9 @@ describe('export_plan_sheet', () => {
     expect(sheet.svg).toContain('id="title-block"');
     expect(sheet.svg).toContain('Maison Dupont');
     expect(sheet.svg).toContain('1:100 @ A3');
-    expect(sheet.svg).toContain('class="cut"');
+    // Concrete cuts (walls, square and round columns) are hatched.
+    expect(sheet.svg).toContain('class="cut-hatch"');
+    expect(sheet.svg).toMatch(/<circle [^>]*class="cut-hatch"/);
     expect(sheet.svg).toContain('class="hidden"');
     expect(sheet.svg).toMatch(/<path d="M [\d.]+ [\d.]+ A /);
     expect(sheet.svg).toContain('id="north-arrow"');

@@ -18,3 +18,12 @@ export function useStableByKey<T>(value: T, key: string): T {
 export function pointsKey(points: ReadonlyArray<ReadonlyArray<number>>): string {
   return points.map((point) => point.join(',')).join(';');
 }
+
+/** Returns the previous list while its items are the same objects in the same order. */
+export function useStableList<T>(items: ReadonlyArray<T>): ReadonlyArray<T> {
+  const stable = useRef(items);
+  const previous = stable.current;
+  const same = previous.length === items.length && previous.every((item, i) => item === items[i]);
+  if (!same) stable.current = items;
+  return stable.current;
+}

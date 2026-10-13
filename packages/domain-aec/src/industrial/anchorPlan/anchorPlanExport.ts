@@ -155,12 +155,7 @@ export const exportAnchorPlan = defineCommand({
       [horizontal, false],
     ] as const) {
       for (const axis of axes) {
-        canvas.line(
-          canvas.map(axis.from),
-          canvas.map(axis.to),
-          'thin',
-          ' stroke-dasharray="6 1 1 1"',
-        );
+        canvas.line(canvas.map(axis.from), canvas.map(axis.to), 'center');
         const [bx, by] = canvas.map(axis.from);
         const centre: Vec2 = isVertical ? [bx, by + BUBBLE_RADIUS] : [bx - BUBBLE_RADIUS, by];
         canvas.parts.push(

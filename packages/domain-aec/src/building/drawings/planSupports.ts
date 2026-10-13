@@ -10,13 +10,8 @@ import { planPoint } from '@lib/vec2';
 import type { Vec2 } from '@core/model/types';
 import type { BuildingModel, PipeSupportElement } from '@core/model/building';
 import { fromMm } from '@core/model/units';
-import {
-  type PlanPrimitive,
-  type PlanSource,
-  annotationText,
-  layerName,
-  thinLine,
-} from './planModel';
+import { type PlanSource, annotationText, layerName, thinLine } from './planModel';
+import type { DrawingPrimitive } from '@core/model/drawing';
 import { pipeAngle } from '../../industrial/piping/supportParts';
 
 /** Side of a support symbol, mm (diameter for the hanger circle). */
@@ -27,16 +22,16 @@ export function supportPrimitives(
   doc: PlanSource,
   building: BuildingModel,
   support: PipeSupportElement,
-): PlanPrimitive[] {
+): DrawingPrimitive[] {
   const pipe = building.elements[support.pipeId];
   const angle = pipe?.category === 'pipe' ? pipeAngle(pipe, support.position) : 0;
   const half = fromMm(doc, SYMBOL_SIZE) / 2;
   const centre: Vec2 = [support.position[0], support.position[1]];
   const at = (along: number, across: number): Vec2 => planPoint(centre, angle, [along, across]);
   const layer = layerName('pipeSupport');
-  const line = (a: Vec2, b: Vec2): PlanPrimitive => thinLine(layer, a, b);
+  const line = (a: Vec2, b: Vec2): DrawingPrimitive => thinLine(layer, a, b);
   const square: Vec2[] = [at(-half, -half), at(half, -half), at(half, half), at(-half, half)];
-  const symbol = ((): PlanPrimitive[] => {
+  const symbol = ((): DrawingPrimitive[] => {
     switch (support.type) {
       case 'shoe':
         return [{ type: 'polygon', layer, style: 'cut', points: square, fill: 'solid' }];

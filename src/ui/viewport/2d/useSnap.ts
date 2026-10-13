@@ -12,6 +12,7 @@ import { useStore, useViewportStore } from '@ui/store';
 import { isEntityVisible } from '../entityVisibility';
 import { snap, applyOrthoPolar } from './snapping/resolveSnap';
 import { collectSnapCandidates } from './snapping/candidates';
+import { useSectionCutDepth } from './sectionCut';
 import { adaptiveGridStep, pixelsToWorld } from './gridHelpers';
 import type { SnapResult, SnapPoint, CollectOpts, OrthoPolarOpts } from './snapping/types';
 
@@ -48,6 +49,7 @@ function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult | null
   const entities = useStore((s) => s.document.entities);
   const order = useStore((s) => s.document.order);
   const components = useStore((s) => s.document.components);
+  const cutDepth = useSectionCutDepth();
   const layers = useStore((s) => s.document.layers);
   const hiddenLayerIds = useViewportStore((s) => s.hiddenLayerIds);
   const hiddenEntityIds = useViewportStore((s) => s.hiddenEntityIds);
@@ -80,11 +82,11 @@ function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult | null
     () =>
       collectSnapCandidates(
         { entities, order, components },
-        { ...collectOpts, extensions: false, nearest: false, isVisible },
+        { ...collectOpts, extensions: false, nearest: false, isVisible, cutDepth },
         drawOrigin ?? null,
         null,
       ),
-    [entities, order, components, collectOpts, drawOrigin, isVisible],
+    [entities, order, components, collectOpts, drawOrigin, isVisible, cutDepth],
   );
 
   // Cursor-DEPENDENT candidates: extension + nearest only. These do follow the
@@ -95,7 +97,7 @@ function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult | null
   const cursorCandidates = useMemo((): readonly SnapPoint[] => {
     if ((!wantExtensions && !wantNearest) || adjustedCursor === null) return NO_CANDIDATES;
     return collectSnapCandidates(
-      { entities, order },
+      { entities, order, components },
       {
         endpoints: false,
         midpoints: false,
@@ -110,7 +112,7 @@ function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult | null
       null,
       adjustedCursor,
     );
-  }, [entities, order, wantExtensions, wantNearest, adjustedCursor, isVisible]);
+  }, [entities, order, components, wantExtensions, wantNearest, adjustedCursor, isVisible]);
 
   if (adjustedCursor === null) return null;
 

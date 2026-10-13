@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import type { PlanPrimitive } from '@aec/index';
+import type { DrawingPrimitive } from '@core/model/drawing';
 import { planAnchor } from '../../src/ui/viewport/2d/planAnchor';
 
 const base = { layer: 'A-WALL', style: 'cut' } as const;
 
 describe('planAnchor', () => {
   it('is the first point of the first primitive that has one', () => {
-    const primitives: PlanPrimitive[] = [
+    const primitives: DrawingPrimitive[] = [
       { ...base, type: 'polygon', points: [] },
       {
         ...base,

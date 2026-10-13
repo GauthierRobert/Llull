@@ -5,13 +5,13 @@
  */
 
 import type { Vec2 } from '@core/model/types';
-import type { PlanPrimitive } from '@aec/index';
+import type { DrawingPrimitive } from '@core/model/drawing';
 
 /**
  * First XY point found in `primitives`, or [0, 0] when there is none.
  * @pure
  */
-export function planAnchor(primitives: ReadonlyArray<PlanPrimitive>): Vec2 {
+export function planAnchor(primitives: ReadonlyArray<DrawingPrimitive>): Vec2 {
   for (const primitive of primitives) {
     switch (primitive.type) {
       case 'polygon':

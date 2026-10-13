@@ -12,6 +12,7 @@ import { cross3, dot3, sub3 } from '@lib/vec3';
 import { orientOutward } from '@core/geometry/meshVolume';
 import { isValidPolygon, toCounterClockwise } from '@lib/polygon';
 import { release } from '@core/geometry/nativeObject';
+import { revolutionAxisIndex } from '@core/geometry/revolution';
 import {
   explorer,
   type OccApi,
@@ -251,12 +252,7 @@ function wedgeSolid(api: OccApi, entity: Entity): OccShape | null {
 function revolvedProfile(api: OccApi, entity: Entity): OccShape | null {
   if (entity.kind !== 'revolution' || !isValidPolygon(entity.profile)) return null;
   if (!(entity.angle > 0) || !(entity.segments >= 3)) return null;
-  const [absX, absY, absZ] = [
-    Math.abs(entity.axis[0]),
-    Math.abs(entity.axis[1]),
-    Math.abs(entity.axis[2]),
-  ];
-  const frame = absZ >= absX && absZ >= absY ? 'Z' : absY >= absX ? 'Y' : 'X';
+  const frame = (['X', 'Y', 'Z'] as const)[revolutionAxisIndex(entity.axis)];
   // The profile's winding must agree with the sweep direction or the solid comes out inside-out.
   const ordered =
     frame === 'Y'

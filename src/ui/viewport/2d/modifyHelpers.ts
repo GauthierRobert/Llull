@@ -27,7 +27,9 @@ import { closedShapeArea } from '@core/geometry/shapeArea';
 import { underlayCorners } from '@core/geometry/imageUnderlay';
 import { DEFAULT_OFFSET, dimensionDrawing } from './entities/dimensionGeometry';
 import { nearestOnArc } from './snapping/geometry';
-import { ringsDistSq, solidOutline } from './solidOutline';
+import { currentSectionCutDepth } from './sectionCut';
+import { solidSegments } from './solidDrawing';
+import { segmentsDistSq } from './solidDrawingEdges';
 import { rectangleCorners } from '../lineGeometry';
 
 /** Pick radius in screen pixels (selection and modify-tool picks). */
@@ -277,14 +279,9 @@ export function dimensionLabelDistSq(
   return dx * dx + dy * dy;
 }
 
-/**
- * Squared distance to a 3D solid's top-view footprint outline; derived building geometry
- * (`bim` tag, drawn per level elsewhere) is not pickable here.
- */
-function solidOutlineDistSq(document: CadDocument, solid: Entity, worldPick: Vec2): number {
-  if (solid.tags?.includes('bim') === true) return Infinity;
-  const rings = solidOutline(document, solid);
-  return rings === null ? Infinity : ringsDistSq(rings, worldPick);
+/** Squared distance to the nearest edge of a 3D solid's drawn top view. */
+function solidEdgeDistSq(document: CadDocument, solid: Entity, worldPick: Vec2): number {
+  return segmentsDistSq(solidSegments(document, solid, currentSectionCutDepth()), worldPick);
 }
 
 /**
@@ -329,7 +326,7 @@ export function nearestEntityId(
       entity.kind === 'dimension'
         ? dimensionLabelDistSq(document, entity, worldPick)
         : is3D(entity)
-          ? solidOutlineDistSq(document, entity, worldPick)
+          ? solidEdgeDistSq(document, entity, worldPick)
           : entityDistSq(entity, worldPick),
     tolerance * tolerance,
   );

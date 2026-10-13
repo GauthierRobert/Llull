@@ -7,7 +7,7 @@ import type { Triangle } from './triangles';
  * World-space triangles of one entity; instances are expanded through their component (`doc`).
  * 2D shapes return [].
  */
-export function entityToTriangles(e: Entity, doc: CadDocument): Triangle[] {
+export function entityToTriangles(e: Entity, doc: Pick<CadDocument, 'components'>): Triangle[] {
   if (e.kind === 'instance') {
     const component = doc.components[e.componentId];
     if (!component) return [];

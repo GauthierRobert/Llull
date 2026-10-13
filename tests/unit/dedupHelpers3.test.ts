@@ -68,7 +68,8 @@ describe('sheet frame helpers', () => {
     expect(up.angle).toBe(0);
     expect(up.middle[0]).toBeCloseTo(5, 12);
     expect(up.middle[1]).toBeCloseTo(-1.2, 12);
-    expect(readableDimensionLabel([0, 0], [10, 0], -1, 0).angle).toBe(360);
+    // A leftward baseline reads left-to-right: the same direction as 0° (formerly reported as 360°).
+    expect(readableDimensionLabel([0, 0], [10, 0], -1, 0).angle).toBe(0);
     expect(readableDimensionLabel([0, 0], [0, 10], 0, -1).angle).toBe(90);
   });
 });

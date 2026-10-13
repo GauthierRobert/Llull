@@ -50,6 +50,8 @@ export interface CollectOpts {
   extensions?: boolean;
   /** Entities rejected here contribute no snap geometry (hidden layers / entities). Default: all. */
   isVisible?: (entity: Entity) => boolean;
+  /** Plan-section depth of the drawn 3D solids (see sectionCut); undefined = uncut view. */
+  cutDepth?: number | undefined;
   /** Include nearest snaps (closest point on any entity geometry). Default false. */
   nearest?: boolean;
 }

@@ -6,9 +6,11 @@
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
+import { LINE_PATTERNS, dashArray } from '@core/model/drawing';
 import { z } from '@core/commands/schema';
-import { toDegrees, toRadians } from '@lib/angle';
+import { readableAngle, toDegrees } from '@lib/angle';
 import { escapeXml } from '@lib/escapeXml';
+import { niceStep } from '@lib/niceStep';
 import { getBuilding } from '../building/model';
 import { round } from './numeric';
 
@@ -87,11 +89,9 @@ export function readableDimensionLabel(
   dx: number,
   dy: number,
 ): { readonly angle: number; readonly middle: Vec2 } {
-  let angle = toDegrees(Math.atan2(dy, dx));
-  if (angle > 90 || angle <= -90) angle += 180;
-  const radians = toRadians(angle);
+  const radians = readableAngle(Math.atan2(dy, dx));
   return {
-    angle,
+    angle: toDegrees(radians),
     middle: [
       (da[0] + db[0]) / 2 + Math.sin(radians) * 1.2,
       (da[1] + db[1]) / 2 - Math.cos(radians) * 1.2,
@@ -130,15 +130,14 @@ export function fitScale(widthMm: number, heightMm: number, viewport: Viewport):
   const largest = STANDARD_SCALES[STANDARD_SCALES.length - 1] as number;
   const needed = Math.max(widthMm / (viewport.width * 0.92), heightMm / (viewport.height * 0.92));
   if (!(needed > largest) || !Number.isFinite(needed)) return largest;
-  const decade = 10 ** Math.floor(Math.log10(needed));
-  return ([1, 2, 5, 10] as const).map((step) => step * decade).find((c) => c >= needed) as number;
+  return niceStep(needed);
 }
 
 /** Shared drawing-sheet stylesheet (line weights in paper millimetres). */
 const SHEET_STYLE = [
   `<style>`,
   `.cut{fill:#4a4a4a;stroke:#000;stroke-width:0.35}.cut-line{fill:none;stroke:#000;stroke-width:0.35}`,
-  `.thin{fill:none;stroke:#000;stroke-width:0.18}.hidden{fill:none;stroke:#000;stroke-width:0.18;stroke-dasharray:1.5 1}`,
+  `.thin{fill:none;stroke:#000;stroke-width:0.18}.hidden{fill:none;stroke:#000;stroke-width:0.18;stroke-dasharray:${dashArray(LINE_PATTERNS.hidden, 0.75)}}.center{fill:none;stroke:#000;stroke-width:0.18;stroke-dasharray:${dashArray(LINE_PATTERNS.center, 1)}}`,
   `.dim{stroke:#000;stroke-width:0.13}.frame{fill:none;stroke:#000;stroke-width:0.5}.frame-thin{fill:none;stroke:#000;stroke-width:0.25}`,
   `.solid{fill:#000;stroke:#000;stroke-width:0.25}.label{fill:#555}text{fill:#000}`,
   `.cut-hatch{fill:url(#hatch-concrete);stroke:#000;stroke-width:0.35}`,
@@ -194,9 +193,16 @@ export function northArrow(x: number, y: number): string {
   );
 }
 
+/** A length in metres as scale-bar text: millimetres below 1 m ("5 mm", "250 mm"), metres above. */
+function lengthLabel(metres: number): string {
+  return metres < 1
+    ? `${Number((metres * 1000).toPrecision(6))} mm`
+    : `${Number(metres.toPrecision(6))} m`;
+}
+
 function scaleBar(x: number, y: number, scale: number): string {
-  const stepsMetres = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100];
-  const step = stepsMetres.find((metres) => (metres * 1000) / scale >= 8) ?? 100;
+  // A 1-2-5 step of at least 8 paper mm: millimetres for machine parts, up to kilometres for sites.
+  const step = niceStep((8 * scale) / 1000);
   const stepMm = (step * 1000) / scale;
   const parts = [`<g id="scale-bar">`];
   for (let index = 0; index < 5; index++) {
@@ -206,7 +212,7 @@ function scaleBar(x: number, y: number, scale: number): string {
   }
   parts.push(
     `<text x="${n(x)}" y="${n(y + 5.5)}" font-size="2.4" text-anchor="middle">0</text>`,
-    `<text x="${n(x + 5 * stepMm)}" y="${n(y + 5.5)}" font-size="2.4" text-anchor="middle">${n(5 * step)} m</text>`,
+    `<text x="${n(x + 5 * stepMm)}" y="${n(y + 5.5)}" font-size="2.4" text-anchor="middle">${lengthLabel(5 * step)}</text>`,
     `</g>`,
   );
   return parts.join('');

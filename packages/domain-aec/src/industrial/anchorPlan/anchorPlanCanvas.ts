@@ -3,14 +3,8 @@
  */
 
 import type { Vec2 } from '@core/model/types';
-import { distance } from '@lib/polygon';
-import {
-  n,
-  readableDimensionLabel,
-  svgPoints,
-  svgText,
-  type Viewport,
-} from '../../shared/sheetFrame';
+import { n, svgPoints, svgText, type Viewport } from '../../shared/sheetFrame';
+import { paperDimension, svgLine } from '../../shared/drawingSvg';
 import { ROW_HEIGHT } from './anchorPlanLayout';
 
 export class PlanCanvas {
@@ -33,10 +27,8 @@ export class PlanCanvas {
     return millimetres / this.scale;
   }
 
-  line(a: Vec2, b: Vec2, cssClass: string, extra = ''): void {
-    this.parts.push(
-      `<line x1="${n(a[0])}" y1="${n(a[1])}" x2="${n(b[0])}" y2="${n(b[1])}" class="${cssClass}"${extra}/>`,
-    );
+  line(a: Vec2, b: Vec2, cssClass: string): void {
+    this.parts.push(svgLine(a, b, cssClass));
   }
 
   text(
@@ -51,20 +43,7 @@ export class PlanCanvas {
 
   /** Aligned dimension between two model points, drawn `side` paper-mm off the measured line. */
   dimension(a: Vec2, b: Vec2, side: number, label: string): void {
-    const [pa, pb] = [this.map(a), this.map(b)];
-    const length = distance(pa, pb);
-    if (length === 0) return;
-    const normal: Vec2 = [(pb[1] - pa[1]) / length, -(pb[0] - pa[0]) / length];
-    const shift = (p: Vec2, d: number): Vec2 => [p[0] + normal[0] * d, p[1] + normal[1] * d];
-    const [da, db] = [shift(pa, side), shift(pb, side)];
-    const sign = Math.sign(side);
-    this.line(shift(pa, sign * 1), shift(pa, side + sign * 1.5), 'dim');
-    this.line(shift(pb, sign * 1), shift(pb, side + sign * 1.5), 'dim');
-    this.line(da, db, 'dim');
-    for (const end of [da, db])
-      this.line([end[0] - 1, end[1] + 1], [end[0] + 1, end[1] - 1], 'dim');
-    const { angle, middle } = readableDimensionLabel(da, db, pb[0] - pa[0], pb[1] - pa[1]);
-    this.text(middle, 2.2, label, 'middle', angle);
+    this.parts.push(...paperDimension(this.map(a), this.map(b), side, label, 2.2));
   }
 
   polygon(points: ReadonlyArray<Vec2>, cssClass: string): void {

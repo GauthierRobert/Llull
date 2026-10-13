@@ -1153,7 +1153,8 @@ describe('phase 2 review regressions', () => {
     const doc = plated();
     const drawing = execute(doc, 'export_elevation_sheet', { direction: 'south', cutAt: 0 })
       .data as { svg: string };
-    expect(drawing.svg).toContain('class="poche-steel"');
+    // Steel cut faces are filled solid (class "cut"), not hatched.
+    expect(drawing.svg).toContain('class="cut"');
     const broken = rawBuilding(doc);
     broken.elements['member-1']!['role'] = 'beam';
     expect(buildingErrors(broken)).toEqual([expect.stringMatching(/is not a steel column/)]);

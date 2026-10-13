@@ -5707,11 +5707,11 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "Export a DXF (AutoCAD R12 ASCII, opens in AutoCAD, BricsCAD, DraftSight, LibreCAD, Revit…) of a level floor plan: wall poché cut at 1.2 m, door swings, windows, columns, beams (dashed), stairs, room tags, grid bubbles and overall / grid dimensions on AIA layers (A-WALL, A-DOOR, A-GLAZ, S-GRID…), plus the document’s own 2D drafting. data.dxf holds the file text.",
+    "description": "Export a DXF (AutoCAD R12 ASCII, opens in AutoCAD, BricsCAD, DraftSight, LibreCAD, Revit…) of a level floor plan: wall poché cut at 1.2 m, door swings, windows, columns, beams (dashed), stairs, room tags, grid bubbles and overall / grid dimensions on AIA layers (A-WALL, A-DOOR, A-GLAZ, S-GRID…), plus the document’s own 2D drafting and its 3D solids as a technical top view (visible edges on OBJ-VISIBLE, hidden edges dashed on OBJ-HIDDEN, centre lines on OBJ-CENTER). data.dxf holds the file text.",
     "input_schema": {
       "properties": {
         "includeDrafting": {
-          "description": "Also export non-building 2D entities (lines, polylines, circles, text…). Default true.",
+          "description": "Also export non-building 2D entities (lines, polylines, circles, text…) and the top view of non-building 3D solids. Default true.",
           "type": "boolean"
         },
         "levelId": {
@@ -5729,7 +5729,7 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "Produce a printable elevation or section drawing (SVG in real millimetres, print to PDF at 100%) projected from the 3D model with hidden lines removed: north / south / east / west elevation (+Y is north), or a section when cutAt is given (the model nearer to the viewer than the cut plane is removed and cut outlines are drawn heavy). Shows level datums, grid bubbles, scale bar and the title block. Use exclude: [\"panel\"] to show the steel frame behind the cladding. data.svg holds the file text.",
+    "description": "Produce a printable elevation or section drawing (SVG in real millimetres, print to PDF at 100%) drawn as an ISO 128 line drawing from the 3D model with hidden lines removed (visible edges heavy, centre lines chain-dotted): north / south / east / west elevation (+Y is north), or a section when cutAt is given (the model nearer to the viewer than the cut plane is removed; cut faces outlined heavy, hatched at 45°, steel filled solid). Shows level datums, grid bubbles, scale bar and the title block. Use exclude: [\"panel\"] to show the steel frame behind the cladding. data.svg holds the file text.",
     "input_schema": {
       "properties": {
         "cutAt": {

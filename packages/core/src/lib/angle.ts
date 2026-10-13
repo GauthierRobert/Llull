@@ -44,3 +44,14 @@ export function toDegrees(radians: number, decimals?: number): number {
 export function angleFromCosine(cosine: number): number {
   return Math.acos(Math.min(1, Math.max(-1, cosine)));
 }
+
+/**
+ * A text direction that reads left-to-right / bottom-up: `angle` (radians) turned by π into
+ * (−π/2, π/2] when it points backwards. Dimension values, contour and alignment labels.
+ */
+export function readableAngle(angle: number): number {
+  const wrapped = wrapSignedAngle(angle);
+  if (wrapped > Math.PI / 2 + 1e-9) return wrapped - Math.PI;
+  if (wrapped <= -Math.PI / 2 + 1e-9) return wrapped + Math.PI;
+  return wrapped;
+}
