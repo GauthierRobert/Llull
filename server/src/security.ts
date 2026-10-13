@@ -4,6 +4,8 @@ import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { UNAUTHORIZED_BODY, bearerToken, isUserMode, requireRole, sha256Digest, type Role } from './users';
 import { positiveInteger } from './env';
+import { consumeTicket } from './tickets';
+import { warnQueryTokenOnce } from './queryTokenWarning';
 
 const DEFAULT_ALLOWED_ORIGINS: readonly string[] = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'];
 
@@ -33,7 +35,9 @@ export function hasValidBearer(req: Request, token: string): boolean {
 /** Constant-time check of the `?access_token=` query parameter (EventSource cannot set headers). */
 function hasValidAccessToken(req: Request, token: string): boolean {
   const presented = req.query['access_token'];
-  return typeof presented === 'string' && presented.length > 0 && tokensMatch(presented, token);
+  if (typeof presented !== 'string' || presented.length === 0) return false;
+  warnQueryTokenOnce();
+  return tokensMatch(presented, token);
 }
 
 /** True for 127.0.0.0/8, ::1, ::ffff:127.*, and `localhost`. */
@@ -103,9 +107,25 @@ export function guardMutation(): RequestHandler {
   return buildGuard(false, 'editor');
 }
 
-/** Guard for /live, /live/snapshot, /export/*: `guardMutation` policy + `?access_token=` (EventSource); no token -> open. */
+/**
+ * Guard for /live, /live/snapshot, /export/*: `guardMutation` policy + a single-use `?ticket=` (EventSource, see tickets.ts)
+ * + deprecated `?access_token=`; no token -> open.
+ */
 export function guardRead(): RequestHandler {
-  return buildGuard(true, 'viewer');
+  const inner = buildGuard(true, 'viewer');
+  return (req, res, next) => {
+    const presented = req.query['ticket'];
+    if (typeof presented !== 'string' || presented === '') return inner(req, res, next);
+    const redeemed = consumeTicket(presented);
+    if (redeemed === null) return void res.status(401).json(UNAUTHORIZED_BODY);
+    if (redeemed.user !== undefined) res.locals['llullUser'] = redeemed.user;
+    next();
+  };
+}
+
+/** Guard for `POST /live/ticket`: viewer role, header auth ONLY (never a query token or a ticket). */
+export function guardTicketIssue(): RequestHandler {
+  return buildGuard(false, 'viewer');
 }
 
 /** Guard for `/admin/*`: role `admin` (named users), the shared token, or (no token) loopback peers only. */

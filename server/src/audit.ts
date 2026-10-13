@@ -96,8 +96,8 @@ interface AuditQuery {
   readonly limit: number;
 }
 
-/** Newest-last entries matching the query, across rotated files (oldest file first). */
-export function readAudit(query: AuditQuery): AuditEntry[] {
+/** Newest-last entries matching the query, across rotated files (oldest file first). Async reads: never blocks the event loop on I/O. */
+export async function readAudit(query: AuditQuery): Promise<AuditEntry[]> {
   const file = auditFilePath(defaultDirectory);
   if (file === null) return [];
   const sinceMs = query.since === undefined ? -Infinity : Date.parse(query.since);
@@ -107,7 +107,7 @@ export function readAudit(query: AuditQuery): AuditEntry[] {
   for (const candidate of files) {
     let text = '';
     try {
-      text = fs.readFileSync(candidate, 'utf8');
+      text = await fs.promises.readFile(candidate, 'utf8');
     } catch {
       /* not rotated yet */
     }

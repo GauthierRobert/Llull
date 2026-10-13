@@ -189,6 +189,51 @@ describe('createAutosaver', () => {
     expect(fs.readdirSync(dir)).toEqual(['a.json']);
   });
 
+  it('debounced write is async, never overlaps, and a sync flush supersedes an in-flight older write', async () => {
+    const file = path.join(dir, 'async.json');
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const realWrite = fs.promises.writeFile.bind(fs.promises);
+    let active = 0;
+    let maxActive = 0;
+    vi.spyOn(fs.promises, 'writeFile').mockImplementation(async (...args: Parameters<typeof fs.promises.writeFile>) => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      await gate;
+      await realWrite(...args);
+      active -= 1;
+    });
+    const docs = ['{"v":1}', '{"v":2}', '{"v":3}'];
+    let next = 0;
+    const saver = createAutosaver({ filePath: file, debounceMs: 1, serialize: () => docs[next++] ?? '' });
+    const doc = createEmptyDocument();
+    saver.schedule(doc);
+    await new Promise((resolve) => setTimeout(resolve, 20)); // async write v1 started, held at the gate
+    expect(fs.existsSync(file)).toBe(false);
+    saver.schedule(doc); // v2 pending behind the in-flight write
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(maxActive).toBe(1);
+    saver.flush(); // sync: writes v2 now
+    expect(fs.readFileSync(file, 'utf8')).toBe('{"v":2}');
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    expect(fs.readFileSync(file, 'utf8')).toBe('{"v":2}'); // the older in-flight write did not land after it
+    expect(fs.readdirSync(dir)).toEqual(['async.json']);
+    vi.restoreAllMocks();
+  });
+
+  it('flush with only an unfinished async write redoes it synchronously', async () => {
+    const file = path.join(dir, 'redo.json');
+    vi.spyOn(fs.promises, 'writeFile').mockImplementation(() => new Promise(() => undefined));
+    const saver = createAutosaver({ filePath: file, debounceMs: 1, serialize: () => '{"r":1}' });
+    saver.schedule(createEmptyDocument());
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(fs.existsSync(file)).toBe(false);
+    saver.flush();
+    expect(fs.readFileSync(file, 'utf8')).toBe('{"r":1}');
+    vi.restoreAllMocks();
+  });
+
   it('flush writes pending doc immediately; flush with nothing pending is a no-op', () => {
     const file = path.join(dir, 'b.json');
     const saver = createAutosaver({ filePath: file, debounceMs: 60_000, serialize: () => '{"x":1}' });

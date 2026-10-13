@@ -1,7 +1,9 @@
 /**
  * The live document over REST + SSE (protocol: `@mcp/liveSync`).
  *   GET  /live           SSE: `snapshot` on connect / undo / redo; `command` per mutation.
- *                        guardRead: Bearer or `?access_token=` (EventSource cannot set headers).
+ *                        guardRead: Bearer, or a single-use `?ticket=` (EventSource cannot set headers; the
+ *                        `?access_token=` query is deprecated: it leaks into access logs).
+ *   POST /live/ticket    `{ ticket, expiresInMs }`: 30 s single-use ticket (header auth only)
  *   GET  /live/snapshot  `{ seq, stateHash, document }` for resync after a gap or hash mismatch
  *   POST /command        `{ name, params?, commandId? }`; a repeated `commandId` is idempotent
  *   POST /undo, /redo    "Nothing to undo/redo." is a normal result, not an error
@@ -11,8 +13,10 @@ import { Router, type Request, type RequestHandler } from 'express';
 import { isRecord } from '@lib/isRecord';
 import { applyCommand, undo, redo } from './commandBus';
 import { subscribeLive, getLiveSnapshot, liveSubscriberCount, MAX_LIVE_SUBSCRIBERS, liveMaxPerClient } from './liveDocument';
-import { guardMutation, guardRead } from './security';
+import { guardMutation, guardRead, guardTicketIssue } from './security';
 import { actorOf } from './audit';
+import { TICKET_TTL_MS, issueTicket } from './tickets';
+import { requestUser } from './users';
 
 const KEEPALIVE_MS = 25_000;
 
@@ -31,6 +35,7 @@ export function buildLiveRouter(restLimiter: RequestHandler): Router {
   const streamsPerClient = new Map<string, number>();
   const mutationGuard = guardMutation();
   const readGuard = guardRead();
+  const ticketGuard = guardTicketIssue();
 
   router.get('/live', restLimiter, readGuard, (req, res) => {
     if (liveSubscriberCount() >= MAX_LIVE_SUBSCRIBERS) return void res.status(503).json({ error: 'Too many live subscribers.' });
@@ -54,6 +59,12 @@ export function buildLiveRouter(restLimiter: RequestHandler): Router {
       unsubscribe();
       res.end();
     });
+  });
+
+  router.post('/live/ticket', restLimiter, ticketGuard, (_req, res) => {
+    const ticket = issueTicket(requestUser(res));
+    if (ticket === null) return void res.status(503).json({ error: 'Too many outstanding tickets.' });
+    res.status(200).json({ ticket, expiresInMs: TICKET_TTL_MS });
   });
 
   router.get('/live/snapshot', restLimiter, readGuard, (_req, res) => void res.status(200).json(getLiveSnapshot()));

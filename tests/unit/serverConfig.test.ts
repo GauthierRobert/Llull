@@ -40,11 +40,29 @@ describe('serverConfig', () => {
     const config = await loadConfig();
     expect(config.liveStreamUrl()).toBe('http://localhost:3001/live');
   });
-  it('appends an encoded access_token to the /live URL when a token is set', async () => {
+  it('never puts the token in the /live URL: mints a ticket over header auth', async () => {
     vi.stubEnv('VITE_LLULL_SERVER_URL', 'https://cad.example.com');
     vi.stubEnv('VITE_LLULL_API_TOKEN', 'a b&c');
+    const fetchSpy = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ ticket: 't/1', expiresInMs: 30000 }) }));
+    vi.stubGlobal('fetch', fetchSpy);
     const config = await loadConfig();
-    expect(config.liveStreamUrl()).toBe('https://cad.example.com/live?access_token=a%20b%26c');
+    expect(config.hasApiToken()).toBe(true);
+    expect(config.liveStreamUrl()).toBe('https://cad.example.com/live');
+    const url = await config.liveTicketStreamUrl();
+    expect(url).toBe('https://cad.example.com/live?ticket=t%2F1');
+    expect(url).not.toContain('access_token');
+    expect(fetchSpy).toHaveBeenCalledWith('https://cad.example.com/live/ticket', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer a b&c' },
+    });
+    vi.unstubAllGlobals();
+  });
+  it('rejects when the ticket request fails', async () => {
+    vi.stubEnv('VITE_LLULL_API_TOKEN', 'x');
+    vi.stubGlobal('fetch', () => Promise.resolve({ ok: false, status: 401, json: () => Promise.resolve({}) }));
+    const config = await loadConfig();
+    await expect(config.liveTicketStreamUrl()).rejects.toThrow('401');
+    vi.unstubAllGlobals();
   });
   it('prefers a per-user token stored in localStorage over the build token', async () => {
     vi.stubEnv('VITE_LLULL_API_TOKEN', 'shared');

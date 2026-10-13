@@ -52,6 +52,44 @@ describe('useMcpLiveDocument', () => {
     vi.advanceTimersByTime(1);
     expect(FakeEventSource.instances).toHaveLength(3);
   });
+  it('with a token: opens the stream with a fresh ?ticket= (never the token) on each reconnect', async () => {
+    window.localStorage.setItem('llull.apiToken', 'secret-tok');
+    let issued = 0;
+    const fetchSpy = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ ticket: `tk${++issued}` }) }));
+    vi.stubGlobal('fetch', fetchSpy);
+    try {
+      render(<Harness />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(FakeEventSource.instances).toHaveLength(1);
+      expect(FakeEventSource.instances[0]?.url).toMatch(/\/live\?ticket=tk1$/);
+      expect(FakeEventSource.instances[0]?.url).not.toContain('secret-tok');
+      const [, init] = fetchSpy.mock.calls[0] as unknown as [string, { headers: Record<string, string> }];
+      expect(init.headers).toEqual({ Authorization: 'Bearer secret-tok' });
+      FakeEventSource.instances[0]?.onerror?.();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(FakeEventSource.instances[1]?.url).toMatch(/\/live\?ticket=tk2$/);
+    } finally {
+      window.localStorage.clear();
+    }
+  });
+  it('with a token: a failed ticket request marks disconnected and retries', async () => {
+    window.localStorage.setItem('llull.apiToken', 'secret-tok');
+    vi.stubGlobal('fetch', () => Promise.resolve({ ok: false, status: 401, json: () => Promise.resolve({}) }));
+    try {
+      render(<Harness />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(FakeEventSource.instances).toHaveLength(0);
+      expect(useStore.getState().liveStatus).toBe('disconnected');
+    } finally {
+      window.localStorage.clear();
+    }
+  });
   it('stops retrying after unmount', () => {
     const { unmount } = render(<Harness />);
     FakeEventSource.instances[0]?.onerror?.();
