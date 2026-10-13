@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { frameEntityIds, makeFakeRes } from './sseTestHelpers';
+import { frameEntityIds, makeFakeRes, parseSseFrame } from './sseTestHelpers';
 import request from 'supertest';
 import { app } from '../src/index';
 import { getLiveDoc, _resetLiveDoc, subscribeLive } from '../src/liveDocument';
@@ -42,6 +42,19 @@ describe('POST /command', () => {
       expect(typeof res.body.error).toBe('string');
     },
   );
+
+  it('the CLI tags its commands, so live clients can label them', async () => {
+    const fakeRes = makeFakeRes();
+    const unsub = subscribeLive(fakeRes);
+    await request(app)
+      .post('/command')
+      .send({ name: 'add_box', params: { size: [1, 1, 1] }, client: 'cli' });
+    await request(app)
+      .post('/command')
+      .send({ name: 'add_box', params: { size: [1, 1, 1] } });
+    unsub();
+    expect(fakeRes.written.slice(-2).map((frame) => parseSseFrame(frame).data['source'])).toEqual(['cli', 'rest']);
+  });
 
   it('an unknown command is 200 with isError: true', async () => {
     const res = await request(app).post('/command').send({ name: 'totally_unknown_command' });

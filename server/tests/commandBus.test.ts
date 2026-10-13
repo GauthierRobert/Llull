@@ -55,6 +55,18 @@ describe('applyCommand', () => {
     unsub();
   });
 
+  it('a command event names its channel and echoes the sender commandId', () => {
+    const fakeRes = makeFakeRes();
+    const unsub = subscribeLive(fakeRes);
+    applyCommand('add_box', BOX, 'cmd-own', { userId: 'anonymous', userName: 'anonymous', source: 'cli', named: false });
+    applyCommand('add_box', BOX2);
+    unsub();
+    const [, first, second] = fakeRes.written.map((frame) => parseSseFrame(frame).data);
+    expect(first).toMatchObject({ source: 'cli', commandId: 'cmd-own' });
+    expect(second?.['source']).toBe('rest');
+    expect(second).not.toHaveProperty('commandId');
+  });
+
   it('a query returns data without touching the document or history', () => {
     applyCommand('add_box', { size: [2, 2, 2], position: [0, 0, 0] });
     _resetHistory();

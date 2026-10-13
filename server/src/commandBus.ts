@@ -49,7 +49,7 @@ export function applyCommand(name: string, params: unknown, commandId?: string, 
     _resultsByCommandId.set(commandId, cached); // refresh LRU position
     return withHistoryFlags(cached.result);
   }
-  const result = runCommand(name, params, actor);
+  const result = runCommand(name, params, actor, commandId);
   if (!result.changed || getCommand(name)?.annotations?.readOnly === true) return result;
   _resultsByCommandId.set(commandId, { requestHash, result: boundedForReplay(result) });
   if (_resultsByCommandId.size > MAX_IDEMPOTENCY_ENTRIES) {
@@ -70,13 +70,19 @@ function boundedForReplay(result: CommandResponseBody): CommandResponseBody {
   return { ...rest, summary: `${result.summary} (replay: the result data was not kept, re-query the scene)` };
 }
 
-function runCommand(name: string, params: unknown, actor?: Actor): CommandResponseBody {
+function runCommand(name: string, params: unknown, actor?: Actor, commandId?: string): CommandResponseBody {
   const prior = getLiveDoc();
   const { document, outcome } = runCommandOutcome(prior, name, params);
   if (outcome.changed) {
     history.undo = pushCapped(history.undo, prior);
     history.redo = [];
-    setLiveDoc(document, { name, params, ...(actor?.named === true ? { user: { id: actor.userId, name: actor.userName } } : {}) });
+    setLiveDoc(document, {
+      name,
+      params,
+      source: actor?.source ?? 'rest',
+      ...(commandId !== undefined ? { commandId } : {}),
+      ...(actor?.named === true ? { user: { id: actor.userId, name: actor.userName } } : {}),
+    });
     recordAudit(actor, name, params, outcome.summary, outcome.affected.length);
   }
   return withHistoryFlags(outcome);

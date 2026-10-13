@@ -345,7 +345,7 @@ describe('llull CLI — --server backend', () => {
     expect(await runCli(['add_box', 'size=[1,1,1]', ...server], c.io)).toBe(EXIT_OK);
     expect(c.fetched[0]).toEqual({
       url: 'http://cad.local:3001/command',
-      body: { name: 'add_box', params: { size: [1, 1, 1] } },
+      body: { name: 'add_box', params: { size: [1, 1, 1] }, client: 'cli' },
       auth: 'Bearer secret',
     });
     expect(c.out[0]).toMatch(/Affected entity ids: box-1\.1/);

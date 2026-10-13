@@ -7,7 +7,7 @@ import type { Response } from 'express';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence/serialization';
 import { errorMessage } from '@lib/errorMessage';
-import { type LiveCommandEvent, type LiveSnapshotEvent, documentHash } from '@mcp/liveSync';
+import { type LiveCommandEvent, type LiveCommandSource, type LiveSnapshotEvent, documentHash } from '@mcp/liveSync';
 import { setAuditDefaultDirectory } from './audit';
 import { isTestRun, positiveInteger } from './env';
 
@@ -113,6 +113,8 @@ function broadcast(eventType: 'snapshot' | 'command', payload: unknown): void {
 interface LiveCommand {
   readonly name: string;
   readonly params: unknown;
+  readonly source?: LiveCommandSource;
+  readonly commandId?: string;
   readonly user?: { readonly id: string; readonly name: string };
 }
 
@@ -132,6 +134,8 @@ export function setLiveDoc(next: CadDocument, command?: LiveCommand): void {
     name: command.name,
     params: command.params,
     stateHash: documentHash(next),
+    ...(command.source !== undefined ? { source: command.source } : {}),
+    ...(command.commandId !== undefined ? { commandId: command.commandId } : {}),
     ...(command.user !== undefined ? { userId: command.user.id, userName: command.user.name } : {}),
   };
   broadcast('command', event);

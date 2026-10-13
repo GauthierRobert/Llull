@@ -18,6 +18,9 @@ import { GridAnnotations3D } from './GridAnnotations3D';
 import { GRID_LAYER_NAME } from './gridAnnotations';
 import { expandInstance } from '@core/geometry/instanceExpansion';
 import type { PbrMaterial } from './useMaterialProps';
+import { useLiveFxStore } from '@ui/store/liveFxStore';
+import { LiveTransitionGroup } from '../liveFx/LiveTransitionGroup';
+import { type GhostRenderer, LiveFxLayer } from '../liveFx/LiveFxLayer';
 
 /** Expands an instance; every sub-mesh click selects the INSTANCE id so it moves as a unit. */
 function InstanceEntityRenderer({
@@ -90,6 +93,18 @@ const EntityRenderer = memo(function EntityRenderer({
   }
 });
 
+const noopSelect = (): void => undefined;
+
+/** Hologram of the previous version (removed / remotely reshaped) through the same render branch. */
+const renderGhost3D: GhostRenderer = (ghost) => (
+  <EntityRenderer
+    entity={ghost.entity}
+    selected={false}
+    onSelect={noopSelect}
+    document={ghost.entity.kind === 'instance' ? ghost.document : undefined}
+  />
+);
+
 export function Entities(): React.ReactElement {
   const document = useStore((s) => s.document);
   const { order, entities, layers, materials, animations, groups } = document;
@@ -101,6 +116,8 @@ export function Entities(): React.ReactElement {
   const hiddenEntityIds = useViewportStore((s) => s.hiddenEntityIds);
   const hiddenLayerIds = useViewportStore((s) => s.hiddenLayerIds);
   const toggleClickAnimation = useViewportStore((s) => s.toggleClickAnimation);
+  // Entities mid live-transition leave their instanced batch for the per-entity path (own matrix + materials).
+  const transitions = useLiveFxStore((s) => s.transitions);
 
   const handleSelect = useCallback(
     (id: EntityId, additive: boolean): void => {
@@ -130,18 +147,19 @@ export function Entities(): React.ReactElement {
   const batches = useMemo(
     () =>
       groupEntitiesForInstancing(
-        visibleEntities.filter((entity) => !animatedIds.has(entity.id) && !hasFinish(entity)),
+        visibleEntities.filter((entity) => !animatedIds.has(entity.id) && !hasFinish(entity) && !transitions.has(entity.id)),
         materials,
       ),
-    [visibleEntities, animatedIds, materials, hasFinish],
+    [visibleEntities, animatedIds, materials, hasFinish, transitions],
   );
   const nonBatchableEntities = useMemo(
     () =>
       visibleEntities.filter(
         (entity) =>
-          (!isBatchable(entity) || animatedIds.has(entity.id) || hasFinish(entity)) && layers[entity.layerId]?.name !== GRID_LAYER_NAME,
+          (!isBatchable(entity) || animatedIds.has(entity.id) || hasFinish(entity) || transitions.has(entity.id)) &&
+          layers[entity.layerId]?.name !== GRID_LAYER_NAME,
       ),
-    [visibleEntities, animatedIds, layers, hasFinish],
+    [visibleEntities, animatedIds, layers, hasFinish, transitions],
   );
 
   return (
@@ -150,16 +168,27 @@ export function Entities(): React.ReactElement {
 
       <InstancedRenderer batches={batches} selectionSet={selectionSet} onSelect={handleSelect} />
 
-      {nonBatchableEntities.map((entity) => (
-        <EntityRenderer
-          key={entity.id}
-          entity={entity}
-          selected={selectionSet.has(entity.id)}
-          onSelect={handleSelect}
-          document={entity.kind === 'instance' ? document : undefined}
-          pbrMaterial={entity.materialId ? materials[entity.materialId] : undefined}
-        />
-      ))}
+      {nonBatchableEntities.map((entity) => {
+        const rendered = (
+          <EntityRenderer
+            key={entity.id}
+            entity={entity}
+            selected={selectionSet.has(entity.id)}
+            onSelect={handleSelect}
+            document={entity.kind === 'instance' ? document : undefined}
+            pbrMaterial={entity.materialId ? materials[entity.materialId] : undefined}
+          />
+        );
+        return transitions.has(entity.id) ? (
+          <LiveTransitionGroup key={entity.id} entity={entity}>
+            {rendered}
+          </LiveTransitionGroup>
+        ) : (
+          rendered
+        );
+      })}
+
+      <LiveFxLayer renderGhost={renderGhost3D} />
     </group>
   );
 }

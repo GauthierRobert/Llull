@@ -16,6 +16,7 @@ vi.mock('@ui/viewport/3d/entities/solidMeshes', async (importOriginal) => {
 });
 vi.mock('@ui/viewport/3d/InstancedRenderer', () => ({ InstancedRenderer: (): null => null }));
 vi.mock('@ui/viewport/3d/GridAnnotations3D', () => ({ GridAnnotations3D: (): null => null }));
+vi.mock('@ui/viewport/liveFx/LiveFxLayer', () => ({ LiveFxLayer: (): null => null }));
 
 import { Entities } from '@ui/viewport/3d/Entities';
 

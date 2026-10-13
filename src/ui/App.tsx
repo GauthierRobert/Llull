@@ -21,6 +21,8 @@ import { useMcpLiveDocument } from '@ui/hooks/useMcpLiveDocument';
 import { useKeyboardShortcuts } from '@ui/hooks/useKeyboardShortcuts';
 import { useAutoFrame } from '@ui/hooks/useAutoFrame';
 import { useAutosave } from '@ui/hooks/useAutosave';
+import { useLiveFx } from '@ui/hooks/useLiveFx';
+import { LiveActivityFeed } from '@ui/components/LiveActivityFeed';
 import { RestoredBanner } from '@ui/components/RestoredBanner';
 import { UpdateBanner } from '@ui/components/UpdateBanner';
 
@@ -34,6 +36,7 @@ export function App(): React.ReactElement {
   useKeyboardShortcuts();
   useAutoFrame();
   useAutosave();
+  useLiveFx();
 
   // On <html> so CSS variables cascade to portals.
   useEffect(() => {
@@ -78,6 +81,7 @@ export function App(): React.ReactElement {
           </div>
 
           <ViewportErrorBoundary>{viewMode === '3d' ? <Viewport3D /> : <Viewport2D />}</ViewportErrorBoundary>
+          <LiveActivityFeed />
           <HintBar />
           <PaletteResultToast />
         </main>

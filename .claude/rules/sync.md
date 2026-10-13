@@ -9,7 +9,7 @@ paths:
 # RULE: sync (live document + MCP host detail, L6 as built)
 
 - Live sync = the command log (`@mcp/liveSync`): `/live` SSE broadcasts `command`
-  `{ seq, name, params, stateHash }` and `snapshot` `{ seq, stateHash, document }` events. Clients
+  `{ seq, name, params, stateHash, source?, commandId? }` and `snapshot` `{ seq, stateHash, document }` events. Clients
   re-run each command with `execute` and check `stateHash`; a seq gap or hash mismatch ⇒
   `GET /live/snapshot`. No document-diff channel, no UI bridge.
 - Offline: the UI queues commands in an outbox (client `commandId` per entry, acked by id) and

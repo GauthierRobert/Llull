@@ -24,6 +24,7 @@ import { GROUND_PLANE_ROTATION, SceneLighting } from './SceneLighting';
 import { MechanismOverlay } from './MechanismOverlay';
 import { useViewportPalette } from '@ui/viewport/viewportPalette';
 import { StoreInvalidator, ViewportStoreInvalidator } from '../StoreInvalidator';
+import { LiveFxCamera } from '../liveFx/LiveFxCamera';
 
 // Idempotent, StrictMode-safe.
 ensureBvhSetup();
@@ -82,6 +83,8 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
       <OrbitSettle />
 
       <CameraBridge />
+
+      <LiveFxCamera />
 
       <ClippingPlane />
 

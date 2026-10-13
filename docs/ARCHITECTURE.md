@@ -193,6 +193,14 @@ snapshot fetch (`GET /live/snapshot`). Deterministic ids and the shared kernel c
 what make this replay exact. Every MCP session and every browser tab therefore edits one
 document.
 
+Events also carry `source` (`mcp` | `cli` | `rest`) and the sender's `commandId`. The browser
+uses them only for presentation: it diffs each new document against the previous one
+(`src/ui/viewport/liveFx/planLiveFx.ts`) and animates the change — new entities grow with a
+ripple, remotely moved ones travel from their old pose, reshaped / removed ones leave a fading
+hologram, and a badge plus an activity feed say who did it (`CLI · add_box`). Its own commands
+(recognised by `commandId`) get only a subtle glow. Because the plan comes from the entity diff,
+every command — present or future — is animated with no per-tool code.
+
 ## Why the backend is optional
 
 Everything — model, commands, rendering — runs in the browser. A backend is
