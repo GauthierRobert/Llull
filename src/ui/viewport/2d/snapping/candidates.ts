@@ -6,8 +6,7 @@
 
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { wrapAngle } from '@lib/angle';
-import { solidDrawing } from '../solidDrawing';
-import { drawingSnapPoints } from '../solidDrawingSnaps';
+import { solidSnaps } from '../solidDrawing';
 import type { CollectOpts, SnapPoint, SnapType } from './types';
 import {
   curveCurveIntersections,
@@ -38,7 +37,7 @@ import {
  * @pure deterministic, no side effects
  */
 export function collectSnapCandidates(
-  document: Pick<CadDocument, 'entities' | 'order'> & Partial<Pick<CadDocument, 'components'>>,
+  document: Pick<CadDocument, 'entities' | 'order' | 'components'>,
   opts: CollectOpts = {},
   fromPoint?: Vec2 | null,
   cursorPoint?: Vec2 | null,
@@ -51,6 +50,7 @@ export function collectSnapCandidates(
   const doTangents = opts.tangents !== false;
   const doExtensions = opts.extensions === true;
   const doNearest = opts.nearest === true;
+  const doSolidSnaps = doEndpoints || doMidpoints || doCenters;
   const isVisible = opts.isVisible ?? (() => true);
 
   const from = fromPoint ?? null;
@@ -230,7 +230,8 @@ export function collectSnapCandidates(
 
       // Text and dimensions have no snap geometry; 3D solids snap to their top-view outline.
       default:
-        for (const snap of drawingSnapPoints(solidDrawing(document, entity))) {
+        if (!doSolidSnaps) break;
+        for (const snap of solidSnaps(document, entity, opts.cutDepth)) {
           const wanted =
             snap.type === 'endpoint'
               ? doEndpoints

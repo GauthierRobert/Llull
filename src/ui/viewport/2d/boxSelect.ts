@@ -9,8 +9,8 @@
 
 import type { CadDocument, Entity, EntityId, Vec2 } from '@core/model/types';
 import { dimensionLabelBox, textLocalBox, underlayFrame } from './modifyHelpers';
-import { solidDrawing } from './solidDrawing';
-import { drawingSegments } from './solidDrawingEdges';
+import { currentSectionCutDepth } from './sectionCut';
+import { solidSegments } from './solidDrawing';
 import { wrapAngle } from '@lib/angle';
 import { closeLoop, rectangleCorners } from '../lineGeometry';
 import { arcPolyline } from '@lib/arc';
@@ -146,7 +146,7 @@ function sampleEntity(document: CadDocument, entity: Entity): SampledGeometry | 
     }
     default: {
       // 3D solids: the edges of their drawn top view.
-      const segments = drawingSegments(solidDrawing(document, entity));
+      const segments = solidSegments(document, entity, currentSectionCutDepth());
       return segments.length === 0 ? null : { polylines: segments, boxes: [] };
     }
   }

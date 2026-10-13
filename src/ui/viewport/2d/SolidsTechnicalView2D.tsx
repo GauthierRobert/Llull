@@ -12,8 +12,9 @@ import type { Entity, EntityId } from '@core/model/types';
 import { technicalView } from '@core/geometry/technicalView';
 import { TOP_VIEW } from '@core/geometry/viewProjection';
 import { drawingBounds } from '@core/model/drawing';
-import { useStore, useViewportStore } from '@ui/store';
+import { useStore } from '@ui/store';
 import { SELECTION_COLOR, useViewportPalette } from '../viewportPalette';
+import { useSectionCutDepth } from './sectionCut';
 import { DrawingPrimitives2D } from './DrawingPrimitives2D';
 import type { DrawingScale, StyledPrimitive } from './drawingGeometry';
 
@@ -29,10 +30,8 @@ export function SolidsTechnicalView2D({
   selectedIds: ReadonlySet<EntityId>;
 }): React.ReactElement | null {
   const components = useStore((s) => s.document.components);
-  const { enabled, axis, flipped, offset } = useViewportStore((s) => s.clipPlane);
   const palette = useViewportPalette();
-  // The flipped z plane keeps z <= -offset: looking down onto its cut face is a plan section.
-  const cutDepth = enabled && axis === 'z' && flipped ? -offset : undefined;
+  const cutDepth = useSectionCutDepth();
 
   const drawings = useMemo(
     () => technicalView({ components }, solids, { frame: TOP_VIEW, cutDepth }),

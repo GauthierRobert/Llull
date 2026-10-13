@@ -9,13 +9,20 @@
  *  - center: the crossing of each centre mark (two perpendicular centre lines sharing a midpoint).
  */
 
-import type { DrawingPrimitive } from '@core/model/drawing';
+import type { SegmentChain } from '@core/geometry/planeEdges';
+import { type DrawingPrimitive, drawingTolerance } from '@core/model/drawing';
 import type { Vec2 } from '@core/model/types';
+import { quantizedKey } from '@lib/quantize';
 import type { SnapPoint } from './snapping/types';
-import { type Chain, drawingChains, drawingTolerance } from './solidDrawingEdges';
+import { drawingChains } from './solidDrawingEdges';
 
-/** A vertex turning more than this is a corner (radians, 20 degrees). */
-const CORNER_ANGLE = (20 * Math.PI) / 180;
+/** A vertex turning at least this is always a corner (radians, 45 degrees). */
+const CORNER_ANGLE = Math.PI / 4;
+/** Turns of a regular arc agree within this relative / absolute (radians, 2 degrees) margin. */
+const TURN_MATCH = 0.2;
+const TURN_MATCH_MIN = (2 * Math.PI) / 180;
+/** Adjacent chords of a regular arc differ in length by less than this ratio. */
+const CHORD_RATIO = 1.25;
 /** A run turning less than this in total is straight (radians, 3 degrees). */
 const STRAIGHT_ANGLE = (3 * Math.PI) / 180;
 
@@ -26,19 +33,46 @@ function turnAt(a: Vec2, b: Vec2, c: Vec2): number {
   return Math.abs(Math.atan2(cross, dot));
 }
 
+const distance = (a: Vec2, b: Vec2): number => Math.hypot(b[0] - a[0], b[1] - a[1]);
+
+/**
+ * Is `points[i]` an interior vertex of a tessellated curve rather than a corner? Its turn is below
+ * CORNER_ANGLE, equals its neighbours' turns and its two chords are about equally long (a regular
+ * arc, however coarse); a lone bend or a bend between unequal segments is a real corner. @pure
+ */
+function isSmoothVertex(
+  at: (i: number) => Vec2,
+  i: number,
+  hasPrev: boolean,
+  hasNext: boolean,
+): boolean {
+  const turn = turnAt(at(i - 1), at(i), at(i + 1));
+  if (turn >= CORNER_ANGLE) return false;
+  const [before, after] = [distance(at(i - 1), at(i)), distance(at(i), at(i + 1))];
+  if (Math.max(before, after) > CHORD_RATIO * Math.min(before, after)) return false;
+  const neighbours = [
+    ...(hasPrev ? [turnAt(at(i - 2), at(i - 1), at(i))] : []),
+    ...(hasNext ? [turnAt(at(i), at(i + 1), at(i + 2))] : []),
+  ];
+  const margin = Math.max(turn * TURN_MATCH, TURN_MATCH_MIN);
+  return neighbours.length > 0 && neighbours.every((t) => Math.abs(t - turn) <= margin);
+}
+
 interface Run {
   readonly points: Vec2[];
   readonly closed: boolean;
 }
 
 /** Splits a chain at its corners; a smooth closed chain stays one closed run. */
-function chainRuns(chain: Chain): { corners: Vec2[]; runs: Run[] } {
+function chainRuns(chain: SegmentChain<Vec2>): { corners: Vec2[]; runs: Run[] } {
   const { points, closed } = chain;
   const count = points.length;
   const at = (i: number): Vec2 => points[((i % count) + count) % count] as Vec2;
   const cornerIndices: number[] = [];
   for (let i = closed ? 0 : 1; i < (closed ? count : count - 1); i++) {
-    if (turnAt(at(i - 1), at(i), at(i + 1)) > CORNER_ANGLE) cornerIndices.push(i);
+    const hasPrev = closed || i >= 2;
+    const hasNext = closed || i + 2 < count;
+    if (!isSmoothVertex(at, i, hasPrev, hasNext)) cornerIndices.push(i);
   }
   if (closed) {
     if (cornerIndices.length === 0) return { corners: [], runs: [{ points, closed: true }] };
@@ -91,7 +125,7 @@ function quadrantPoints(run: Run, tolerance: number): Vec2[] {
   return quadrants;
 }
 
-function chainSnaps(chain: Chain, tolerance: number): SnapPoint[] {
+function chainSnaps(chain: SegmentChain<Vec2>, tolerance: number): SnapPoint[] {
   const snaps: SnapPoint[] = [];
   const { corners, runs } = chainRuns(chain);
   for (const [x, y] of corners) snaps.push({ x, y, type: 'endpoint' });
@@ -154,7 +188,7 @@ export function drawingSnapPoints(primitives: ReadonlyArray<DrawingPrimitive>): 
   ];
   const seen = new Set<string>();
   return all.filter(({ x, y, type }) => {
-    const key = `${type}:${Math.round(x / (tolerance * 10))},${Math.round(y / (tolerance * 10))}`;
+    const key = `${type}:${quantizedKey([x, y], tolerance * 10)}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

@@ -27,8 +27,9 @@ import { closedShapeArea } from '@core/geometry/shapeArea';
 import { underlayCorners } from '@core/geometry/imageUnderlay';
 import { DEFAULT_OFFSET, dimensionDrawing } from './entities/dimensionGeometry';
 import { nearestOnArc } from './snapping/geometry';
-import { solidDrawing } from './solidDrawing';
-import { drawingSegments, segmentsDistSq } from './solidDrawingEdges';
+import { currentSectionCutDepth } from './sectionCut';
+import { solidSegments } from './solidDrawing';
+import { segmentsDistSq } from './solidDrawingEdges';
 import { rectangleCorners } from '../lineGeometry';
 
 /** Pick radius in screen pixels (selection and modify-tool picks). */
@@ -280,7 +281,7 @@ export function dimensionLabelDistSq(
 
 /** Squared distance to the nearest edge of a 3D solid's drawn top view. */
 function solidEdgeDistSq(document: CadDocument, solid: Entity, worldPick: Vec2): number {
-  return segmentsDistSq(drawingSegments(solidDrawing(document, solid)), worldPick);
+  return segmentsDistSq(solidSegments(document, solid, currentSectionCutDepth()), worldPick);
 }
 
 /**

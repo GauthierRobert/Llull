@@ -1,11 +1,17 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { type CadDocument, type Entity, type Vec2, createEmptyDocument } from '@core/model/types';
+import {
+  type CadDocument,
+  type Component,
+  type Entity,
+  type Vec2,
+  createEmptyDocument,
+} from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { type GeometryKernel, getGeometryKernel, setGeometryKernel } from '@core/geometry/kernel';
 import type { DrawingPrimitive } from '@core/model/drawing';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { add } from '../helpers/addEntity';
-import { solidDrawing } from '../../src/ui/viewport/2d/solidDrawing';
+import { solidDrawing, solidSegments } from '../../src/ui/viewport/2d/solidDrawing';
 import {
   drawingChains,
   drawingSegments,
@@ -57,6 +63,37 @@ describe('solidDrawing', () => {
     expect(before.length).toBeGreaterThan(0);
     const emptied = { ...comp.doc, components: {} };
     expect(solidDrawing(emptied, instance)).toEqual([]);
+  });
+
+  it('re-expands an instance when a nested component changes', () => {
+    const box = add(createEmptyDocument(), 'add_box', { size: [2, 2, 2] });
+    const inner = add(box.doc, 'create_component', { name: 'Inner', entityIds: [box.id] });
+    const outer = add(inner.doc, 'create_component', { name: 'Outer', entityIds: [inner.id] });
+    const instance = entityOf(outer.doc, outer.id);
+    expect(solidDrawing(outer.doc, instance).length).toBeGreaterThan(0);
+    const [, ...otherIds] = Object.keys(outer.doc.components);
+    const rest = Object.fromEntries(
+      otherIds.map((key) => [key, outer.doc.components[key] as Component]),
+    );
+    expect(Object.keys(rest).length).toBeLessThan(Object.keys(outer.doc.components).length);
+    expect(solidDrawing({ ...outer.doc, components: rest }, instance)).not.toBe(
+      solidDrawing(outer.doc, instance),
+    );
+  });
+
+  it('keys the memo on the section depth: the cut view is a different, cached drawing', () => {
+    const { doc, id } = add(createEmptyDocument(), 'add_box', { size: [4, 2, 4] });
+    const solid = entityOf(doc, id);
+    const uncut = solidDrawing(doc, solid);
+    const cut = solidDrawing(doc, solid, solid.position[2]);
+    expect(cut).not.toBe(uncut);
+    expect(cut.some((p) => p.style === 'cut')).toBe(true);
+    expect(uncut.some((p) => p.style === 'cut')).toBe(false);
+    expect(solidDrawing(doc, solid, solid.position[2])).toBe(cut);
+    expect(solidSegments(doc, solid, solid.position[2])).toBe(
+      solidSegments(doc, solid, solid.position[2]),
+    );
+    expect(solidSegments(doc, solid, solid.position[2]).length).toBeGreaterThan(0);
   });
 });
 
@@ -130,6 +167,55 @@ describe('drawing snap points', () => {
     expect(has(snaps, 'endpoint', 10, 8)).toBe(true);
     expect(has(snaps, 'endpoint', 10, 2)).toBe(true);
     expect(snaps.some((s) => s.type === 'midpoint')).toBe(false);
+  });
+
+  it.each([12, 16])('gives a %i-segment revolved ring centre-free quadrants only', (segments) => {
+    const { doc, id } = add(createEmptyDocument(), 'revolve_profile', {
+      profile: [
+        [2, 0],
+        [3, 0],
+        [3, 1],
+        [2, 1],
+      ],
+      axis: 'z',
+      angle: Math.PI * 2,
+      segments,
+    });
+    const snaps = snapsOf(doc, id);
+    const e = entityOf(doc, id);
+    expect(snaps.filter((s) => s.type === 'endpoint')).toHaveLength(8);
+    expect(snaps.some((s) => s.type === 'midpoint')).toBe(false);
+    for (const radius of [2, 3]) {
+      expect(has(snaps, 'endpoint', e.position[0] + radius, e.position[1])).toBe(true);
+      expect(has(snaps, 'endpoint', e.position[0], e.position[1] - radius)).toBe(true);
+    }
+  });
+
+  it('gives a sphere four quadrants and no per-chord snaps', () => {
+    const { doc, id } = add(createEmptyDocument(), 'add_sphere', { radius: 2 });
+    const snaps = snapsOf(doc, id);
+    expect(snaps.filter((s) => s.type === 'endpoint')).toHaveLength(4);
+    expect(snaps.some((s) => s.type === 'midpoint')).toBe(false);
+  });
+
+  it('keeps the corners of a hexagonal prism and of a bend between unequal segments', () => {
+    const hex = add(createEmptyDocument(), 'extrude_profile', {
+      profile: Array.from(
+        { length: 6 },
+        (_, k): Vec2 => [3 * Math.cos((k * Math.PI) / 3), 3 * Math.sin((k * Math.PI) / 3)],
+      ),
+      depth: 2,
+    });
+    const hexSnaps = snapsOf(hex.doc, hex.id);
+    expect(hexSnaps.filter((s) => s.type === 'endpoint')).toHaveLength(6);
+    expect(hexSnaps.filter((s) => s.type === 'midpoint')).toHaveLength(6);
+    const bend = drawingSnapPoints([
+      line([0, 0], [4, 0]),
+      line([4, 0], [4 + 4 * Math.cos(0.5), 4 * Math.sin(0.5)]),
+      line([4 + 4 * Math.cos(0.5), 4 * Math.sin(0.5)], [0, 3]),
+      line([0, 3], [0, 0]),
+    ]);
+    expect(bend.filter((s) => s.type === 'endpoint')).toHaveLength(4);
   });
 
   it('follows a tilted solid and snaps to its drawn corners', () => {
