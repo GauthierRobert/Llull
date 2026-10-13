@@ -17,6 +17,7 @@ function serverBaseOf(configured: string | undefined): string {
 
 export const SERVER_BASE: string = serverBaseOf(readEnvString(import.meta.env['VITE_LLULL_SERVER_URL'])).replace(/\/+$/, '');
 
+// WARNING: VITE_* values are inlined into the PUBLIC bundle; never set VITE_LLULL_API_TOKEN for a public deployment.
 const BUILD_API_TOKEN: string | undefined = readEnvString(import.meta.env['VITE_LLULL_API_TOKEN']);
 const TOKEN_STORAGE_KEY = 'llull.apiToken';
 

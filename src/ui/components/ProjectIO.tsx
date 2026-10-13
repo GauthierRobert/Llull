@@ -28,6 +28,7 @@ export function ProjectIO(): React.ReactElement {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [confirmingNew, setConfirmingNew] = useState(false);
+  const [pendingOpen, setPendingOpen] = useState<string | null>(null);
 
   const handleSave = (): void => {
     const document = useStore.getState().document;
@@ -76,10 +77,15 @@ export function ProjectIO(): React.ReactElement {
     fileInputRef.current?.click();
   };
 
+  const openJson = (json: string): void => {
+    const replacedContent = useStore.getState().document.order.length > 0;
+    dispatch('load_document', { json }, { onResult: afterOpen(replacedContent) });
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     readChosenFile(e, (json) => {
-      const replacedContent = useStore.getState().document.order.length > 0;
-      dispatch('load_document', { json }, { onResult: afterOpen(replacedContent) });
+      if (useSessionStore.getState().dirty) setPendingOpen(json);
+      else openJson(json);
     });
   };
 
@@ -128,6 +134,18 @@ export function ProjectIO(): React.ReactElement {
           confirmLabel="Clear and start new"
           onConfirm={startNewProject}
           onCancel={() => setConfirmingNew(false)}
+        />
+      )}
+      {pendingOpen !== null && (
+        <ConfirmDialog
+          title="Open another project?"
+          message="You have unsaved changes. Opening a file replaces the current model. You can undo it right after."
+          confirmLabel="Discard changes and open"
+          onConfirm={() => {
+            openJson(pendingOpen);
+            setPendingOpen(null);
+          }}
+          onCancel={() => setPendingOpen(null)}
         />
       )}
     </span>

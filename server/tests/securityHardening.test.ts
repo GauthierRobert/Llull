@@ -77,22 +77,22 @@ describe('guardMutation vs remote peers', () => {
 
 describe('Host allowlist', () => {
   it('allows localhost with any port, blocks rebinding hosts', async () => {
-    expect((await request(app).get('/health').set('Host', 'localhost:4444')).status).toBe(200);
-    expect((await request(app).get('/health').set('Host', '127.0.0.1:3001')).status).toBe(200);
-    expect((await request(app).get('/health').set('Host', '[::1]:3001')).status).toBe(200);
-    expect((await request(app).get('/health').set('Host', 'evil.example:3001')).status).toBe(403);
+    expect((await request(app).get('/live/snapshot').set('Host', 'localhost:4444')).status).toBe(200);
+    expect((await request(app).get('/live/snapshot').set('Host', '127.0.0.1:3001')).status).toBe(200);
+    expect((await request(app).get('/live/snapshot').set('Host', '[::1]:3001')).status).toBe(200);
+    expect((await request(app).get('/live/snapshot').set('Host', 'evil.example:3001')).status).toBe(403);
   });
 
   it('honours LLULL_ALLOWED_HOSTS (name = any port, name:port = exact)', async () => {
     process.env['LLULL_ALLOWED_HOSTS'] = 'cad.example, other.example:8080';
-    expect((await request(app).get('/health').set('Host', 'cad.example:9')).status).toBe(200);
-    expect((await request(app).get('/health').set('Host', 'other.example:8080')).status).toBe(200);
-    expect((await request(app).get('/health').set('Host', 'other.example:1')).status).toBe(403);
+    expect((await request(app).get('/live/snapshot').set('Host', 'cad.example:9')).status).toBe(200);
+    expect((await request(app).get('/live/snapshot').set('Host', 'other.example:8080')).status).toBe(200);
+    expect((await request(app).get('/live/snapshot').set('Host', 'other.example:1')).status).toBe(403);
   });
 
   it('accepts any Host when HOST is non-loopback and no allowlist is set', async () => {
     process.env['HOST'] = '0.0.0.0';
-    expect((await request(app).get('/health').set('Host', 'anything.example')).status).toBe(200);
+    expect((await request(app).get('/live/snapshot').set('Host', 'anything.example')).status).toBe(200);
   });
 });
 

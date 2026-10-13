@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { useLayoutStore, useStore, useToolStore } from '@ui/store';
 import { useSessionStore } from '@ui/store/sessionStore';
 import { createEmptyDocument } from '@core/model/types';
+import { serializeDocument } from '@core/commands/persistence/serialization';
 import { execute } from '@core/commands/registry';
 import { TopBar } from '@ui/components/TopBar';
 import { ProjectIO } from '@ui/components/ProjectIO';
@@ -80,6 +81,45 @@ describe('ProjectIO', () => {
     fireEvent.click(screen.getByRole('button', { name: /clear and start new/i }));
     expect(useStore.getState().document.order.length).toBe(0);
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});
+
+describe('ProjectIO — Open', () => {
+  beforeEach(resetStores);
+  afterEach(() => vi.restoreAllMocks());
+  const emptyJson = serializeDocument(createEmptyDocument());
+  const pick = (container: HTMLElement): void => {
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]');
+    fireEvent.change(input as HTMLInputElement, { target: { files: [new File([emptyJson], 'p.json', { type: 'application/json' })] } });
+  };
+  it('asks before replacing unsaved work; cancel keeps it', async () => {
+    act(() => dispatch('add_box', { size: [1, 1, 1] }));
+    act(() => useSessionStore.getState().markDirty());
+    const { container } = render(<ProjectIO />);
+    pick(container);
+    await screen.findByRole('dialog');
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(useStore.getState().document.order.length).toBe(1);
+  });
+  it('confirming opens the file; a clean document opens without asking', async () => {
+    act(() => dispatch('add_box', { size: [1, 1, 1] }));
+    act(() => useSessionStore.getState().markDirty());
+    const { container } = render(<ProjectIO />);
+    pick(container);
+    fireEvent.click(await screen.findByRole('button', { name: /discard changes and open/i }));
+    expect(useStore.getState().document.order.length).toBe(0);
+    act(() => dispatch('add_box', { size: [1, 1, 1] }));
+    act(() => useSessionStore.getState().markSaved());
+    pick(container);
+    await waitFor(() => expect(useStore.getState().document.order.length).toBe(0));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+  it('reports an unreadable file in the status message', async () => {
+    const { container } = render(<ProjectIO />);
+    const file = new File(['x'], 'bad.json');
+    vi.spyOn(file, 'text').mockRejectedValue(new Error('denied'));
+    fireEvent.change(container.querySelector('input[type="file"]') as HTMLInputElement, { target: { files: [file] } });
+    await waitFor(() => expect(useStore.getState().lastSummary).toMatch(/could not read bad\.json/i));
   });
 });
 

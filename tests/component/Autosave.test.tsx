@@ -7,6 +7,7 @@ import { execute } from '@core/commands/registry';
 import { serializeDocument } from '@core/commands/persistence/serialization';
 import { AUTOSAVE_KEY, clearAutosave, readAutosave, writeAutosave, type KeyValueStorage } from '@ui/store/autosave';
 import { AUTOSAVE_DELAY_MS, useAutosave } from '@ui/hooks/useAutosave';
+import { spyDispatch } from '../helpers/storeTestHelpers';
 import { RestoredBanner } from '@ui/components/RestoredBanner';
 
 function fakeStorage(initial: Record<string, string> = {}): KeyValueStorage & { data: Record<string, string> } {
@@ -82,7 +83,7 @@ describe('useAutosave', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     useStore.getState().setDocument(createEmptyDocument());
     useStore.setState({ liveStatus: 'disconnected', lastSummary: null });
-    useSessionStore.setState({ dirty: false, restoredAt: null });
+    useSessionStore.setState({ dirty: false, restoredAt: null, pendingLocalCopy: null });
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -120,6 +121,65 @@ describe('useAutosave', () => {
     useStore.setState({ liveStatus: 'connected' });
     renderWithAutosave(1);
     expect(useStore.getState().document.order.length).toBe(0);
+  });
+  it('offers an unsaved local copy when a live server is connected, and restores it on request', () => {
+    useStore.setState({ liveStatus: 'connected' });
+    const storage = fakeStorage();
+    writeAutosave(storage, { savedAt: 1, json: savedBoxJson() });
+    const realDispatch = useStore.getState().dispatch;
+    const dispatch = spyDispatch();
+    render(<Harness storage={storage} />);
+    expect(useStore.getState().document.order.length).toBe(0);
+    expect(screen.getByText(/unsaved work from/i)).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: /restore local copy/i }));
+    expect(dispatch).toHaveBeenCalledWith('load_document', { json: savedBoxJson() }, expect.anything());
+    useStore.setState({ dispatch: realDispatch });
+  });
+  it('discarding the offered local copy drops the record', () => {
+    useStore.setState({ liveStatus: 'connected' });
+    const storage = fakeStorage();
+    writeAutosave(storage, { savedAt: 1, json: savedBoxJson() });
+    const stored = storage.data[AUTOSAVE_KEY] ?? '';
+    window.localStorage.setItem(AUTOSAVE_KEY, stored);
+    render(<Harness storage={storage} />);
+    fireEvent.click(screen.getByRole('button', { name: /discard/i }));
+    expect(useSessionStore.getState().pendingLocalCopy).toBeNull();
+    expect(window.localStorage.getItem(AUTOSAVE_KEY)).toBeNull();
+  });
+  it('does not offer a clean record or one equal to the current document', () => {
+    useStore.setState({ liveStatus: 'connected' });
+    const storage = fakeStorage();
+    writeAutosave(storage, { savedAt: 1, json: savedBoxJson(), clean: true });
+    render(<Harness storage={storage} />);
+    expect(useSessionStore.getState().pendingLocalCopy).toBeNull();
+  });
+  it('an early edit while connecting neither skips the offer nor overwrites the previous session record', () => {
+    useStore.setState({ liveStatus: 'connecting' });
+    const storage = fakeStorage();
+    writeAutosave(storage, { savedAt: 1, json: savedBoxJson() });
+    const before = storage.data[AUTOSAVE_KEY];
+    render(<Harness storage={storage} />);
+    act(() => useStore.getState().setDocument(execute(createEmptyDocument(), 'add_box', { size: [2, 2, 2] }).document));
+    act(() => useStore.getState().setLiveStatus('disconnected'));
+    expect(useSessionStore.getState().pendingLocalCopy).not.toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(AUTOSAVE_DELAY_MS + 10);
+    });
+    expect(storage.data[AUTOSAVE_KEY]).toBe(before);
+  });
+  it('a failed write clears the stale record and reports it in the status bar message', () => {
+    const storage = fakeStorage();
+    writeAutosave(storage, { savedAt: 1, json: '{}', clean: true });
+    storage.setItem = () => {
+      throw new Error('quota');
+    };
+    render(<Harness storage={storage} />);
+    act(() => useStore.getState().dispatch('add_box', { size: [1, 1, 1] }));
+    act(() => {
+      vi.advanceTimersByTime(AUTOSAVE_DELAY_MS + 10);
+    });
+    expect(storage.data[AUTOSAVE_KEY]).toBeUndefined();
+    expect(useStore.getState().lastSummary).toMatch(/autosave unavailable/i);
   });
   it('waits for the connection attempt, then restores when it fails', () => {
     useStore.setState({ liveStatus: 'connecting' });

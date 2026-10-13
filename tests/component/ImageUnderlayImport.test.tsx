@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { ImageUnderlayImport } from '@ui/components/ImageUnderlayImport';
+import { useStore } from '@ui/store';
+import { ImageUnderlayImport, MAX_UNDERLAY_DATA_URL_CHARS } from '@ui/components/ImageUnderlayImport';
 import { spyDispatch } from '../helpers/storeTestHelpers';
 import { pngBytes } from '../helpers/imageFixtures';
 
@@ -15,6 +16,14 @@ describe('ImageUnderlayImport', () => {
     expect(name).toBe('add_image_underlay');
     expect(params['dataUrl']).toMatch(/^data:image\/png;base64,/);
     expect(params).toMatchObject({ name: 'section.png', locked: true });
+  });
+  it('refuses an oversized image with a status message', async () => {
+    const dispatch = spyDispatch();
+    render(<ImageUnderlayImport />);
+    const file = new File([new Uint8Array(MAX_UNDERLAY_DATA_URL_CHARS)], 'huge.png', { type: 'image/png' });
+    fireEvent.change(screen.getByLabelText('Image underlay file'), { target: { files: [file] } });
+    await waitFor(() => expect(useStore.getState().lastSummary).toMatch(/too large/i));
+    expect(dispatch).not.toHaveBeenCalled();
   });
   it('opens the file chooser from the button and ignores an empty choice', () => {
     const dispatch = spyDispatch();

@@ -21,9 +21,10 @@ import {
   type ExchangeOptions,
 } from './pythonExchange';
 import { exchangeDirOf, positiveInteger } from './env';
+import { trackChild } from './childProcesses';
 
 const DEFAULT_MAX_BYTES = 50 * 1024 * 1024;
-const MAX_DXF_BYTES = 512 * 1024 * 1024;
+const MAX_DXF_BYTES = 200 * 1024 * 1024; // read as one UTF-8 string (V8 limit ~512 MB)
 const MAX_CONCURRENT_CONVERSIONS = 2;
 const MAX_STDERR_BYTES = 16 * 1024;
 
@@ -79,7 +80,7 @@ function runConverter(command: string, args: string[], timeoutMs: number): Promi
       clearTimeout(timer);
       resolve(outcome);
     };
-    const child = spawn(command, args, { stdio: ['ignore', 'ignore', 'pipe'], env: bridgeEnvironment(), shell: false });
+    const child = trackChild(spawn(command, args, { stdio: ['ignore', 'ignore', 'pipe'], env: bridgeEnvironment(), shell: false }));
     const stderr = captureStderrTail(child.stderr, MAX_STDERR_BYTES);
     const timer = setTimeout(() => {
       child.kill('SIGKILL');
@@ -104,7 +105,7 @@ async function readDxfIn(dir: string, preferred: string): Promise<string | null>
 }
 
 /** @failure bad magic -> 400; too big -> 413; no converter installed -> 503; timeout -> 504; converter failure -> 422 */
-export async function convertDwgToDxf(bytes: Uint8Array, config: DwgConvertConfig = dwgConfigFromEnv()): Promise<string> {
+async function convertDwgToDxf(bytes: Uint8Array, config: DwgConvertConfig = dwgConfigFromEnv()): Promise<string> {
   if (bytes.length > config.maxBytes) {
     throw new DwgConvertError(`DWG file is ${bytes.length} bytes; the limit is ${config.maxBytes} bytes (LLULL_DWG_MAX_BYTES).`, 413);
   }
@@ -143,13 +144,20 @@ export async function convertDwgToDxf(bytes: Uint8Array, config: DwgConvertConfi
   }
 }
 
+/** The one conversion limiter: shared by the MCP port and `POST /import/dwg`. */
+const limitConversions = concurrencyLimiter(MAX_CONCURRENT_CONVERSIONS);
+
+/** `convertDwgToDxf` through the shared concurrency limit. */
+export function convertDwgLimited(bytes: Uint8Array, config: DwgConvertConfig = dwgConfigFromEnv()): Promise<string> {
+  return limitConversions(() => convertDwgToDxf(bytes, config));
+}
+
 function createDwgConverterPort(env: NodeJS.ProcessEnv = process.env): DwgConverterPort | null {
   const config = dwgConfigFromEnv(env);
   if (config.dwg2dxf === null && config.odaConverter === null) return null;
-  const limit = concurrencyLimiter(MAX_CONCURRENT_CONVERSIONS);
   const root = config.exchangeDir;
   return {
-    convertDwg: (dwgBase64) => limit(() => convertDwgToDxf(Buffer.from(dwgBase64, 'base64'), config)),
+    convertDwg: (dwgBase64) => convertDwgLimited(Buffer.from(dwgBase64, 'base64'), config),
     ...(root !== null
       ? {
           readExchangeFile: async (relative: string): Promise<string> =>

@@ -10,7 +10,7 @@ import express, { Router, type RequestHandler } from 'express';
 import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
 import { applyCommand } from './commandBus';
-import { convertDwgToDxf, dwgConfigFromEnv, DwgConvertError } from './dwgConvert';
+import { convertDwgLimited, dwgConfigFromEnv, DwgConvertError } from './dwgConvert';
 import { guardMutation } from './security';
 import { actorOf } from './audit';
 import type { DwgImportResponseBody, ErrorResponseBody } from '@mcp/restProtocol';
@@ -60,7 +60,7 @@ export function buildImportRouter(restLimiter: RequestHandler): Router {
     }
     const target = source['target'] ?? 'drawing';
     if (target !== 'drawing' && target !== 'survey') return void res.status(400).json({ error: 'target must be "drawing" or "survey".' });
-    convertDwgToDxf(bytes)
+    convertDwgLimited(bytes)
       .then((text) => {
         const command = target === 'survey' ? 'import_survey_dxf' : 'import_dxf';
         const result = applyCommand(command, commandParams(target, source, text), undefined, actorOf(res, 'rest'));

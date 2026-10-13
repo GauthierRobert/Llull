@@ -130,7 +130,9 @@ function buildGuard(acceptQueryToken: boolean, role: Role): RequestHandler {
   return userRoleOr(role, acceptQueryToken, (req, res, next) => {
     const token = process.env['MCP_AUTH_TOKEN'];
     if (!token && acceptQueryToken) {
-      next();
+      const refusal = crossSiteRefusal(req);
+      if (refusal === null) next();
+      else res.status(403).json({ error: refusal });
       return;
     }
     if (token && (hasValidBearer(req, token) || (acceptQueryToken && hasValidAccessToken(req, token)))) {
@@ -152,6 +154,64 @@ function buildGuard(acceptQueryToken: boolean, role: Role): RequestHandler {
     }
     next();
   });
+}
+
+/** Why a token-less read request must be refused as cross-site (CSRF of CPU-heavy exports), else null. */
+function crossSiteRefusal(req: Request): string | null {
+  const origin = req.headers['origin'];
+  if (typeof origin === 'string') {
+    if (getAllowedOrigins().includes(origin) || isSameHostOrigin(origin, req.headers['host'])) return null;
+    return `Origin ${origin} is not allowed.`;
+  }
+  return req.headers['sec-fetch-site'] === 'cross-site' ? 'Cross-site requests are not allowed.' : null;
+}
+
+function isSameHostOrigin(origin: string, host: string | undefined): boolean {
+  try {
+    return host !== undefined && new URL(origin).host.toLowerCase() === host.trim().toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
+/** `LLULL_TRUST_PROXY` -> Express `trust proxy` value (`true`/`false`, hop count, or a name/subnet list); undefined when unset. */
+export function trustProxySetting(raw: string | undefined): boolean | number | string | undefined {
+  const value = raw?.trim();
+  if (value === undefined || value === '') return undefined;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return /^\d+$/.test(value) ? Number(value) : value;
+}
+
+/** CSP for the served web app (wasm kernels, blob workers/images; connect-src = same origin + allowed origins). */
+export function contentSecurityPolicy(): string {
+  return [
+    "default-src 'self'",
+    "script-src 'self' 'wasm-unsafe-eval'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    ['connect-src', "'self'", ...getAllowedOrigins()].join(' '),
+    "worker-src 'self' blob:",
+    "frame-ancestors 'none'",
+    "object-src 'none'",
+    "base-uri 'self'",
+  ].join('; ');
+}
+
+/** Set the CSP on an HTML response (static `index.html` and the SPA fallback). */
+export function setHtmlSecurityHeaders(res: Response): void {
+  res.setHeader('Content-Security-Policy', contentSecurityPolicy());
+}
+
+/** Baseline hardening headers on every response. */
+export function securityHeaders(): RequestHandler {
+  return (_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    next();
+  };
 }
 
 /** Per-IP limiter: env `maxVariable` requests (default 600) per env `windowVariable` ms (default 60000). */

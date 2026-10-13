@@ -19,9 +19,15 @@ describe('service worker build', () => {
     expect(policy.navigation.fallback).toBe('/index.html');
     expect(() => parseServiceWorkerPolicy({ ...policy, runtime: { cacheFirst: '(', exclude: 'x' } })).toThrow(/regular expression/);
   });
-  it('precaches only the shell and small hashed js/css, sorted', () => {
+  it('precaches only the shell and small hashed js/css plus the manifold wasm (never occt), sorted', () => {
     const manifest = buildServiceWorkerManifest(files, policy, () => 'h', 'sw');
-    expect(manifest.precache).toEqual(['assets/index-a1.js', 'assets/index-b2.css', 'favicon.svg', 'index.html']);
+    expect(manifest.precache).toEqual([
+      'assets/index-a1.js',
+      'assets/index-b2.css',
+      'assets/manifold-e5.wasm',
+      'favicon.svg',
+      'index.html',
+    ]);
   });
   it('the version changes with file contents or worker source and is stable otherwise', () => {
     const v1 = buildServiceWorkerManifest(files, policy, () => 'h1', 'sw').version;

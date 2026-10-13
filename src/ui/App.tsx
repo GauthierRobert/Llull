@@ -80,7 +80,7 @@ export function App(): React.ReactElement {
             </button>
           </div>
 
-          <ViewportErrorBoundary>{viewMode === '3d' ? <Viewport3D /> : <Viewport2D />}</ViewportErrorBoundary>
+          <ViewportErrorBoundary key={viewMode}>{viewMode === '3d' ? <Viewport3D /> : <Viewport2D />}</ViewportErrorBoundary>
           <LiveActivityFeed />
           <HintBar />
           <PaletteResultToast />

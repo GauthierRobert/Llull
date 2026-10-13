@@ -1,7 +1,9 @@
 /**
  * Debounced autosave (1.5 s, and on pagehide / hidden), startup restore and unsaved-changes tracking (beforeunload,
  * TopBar). Restore runs once when the live connection fails with an empty document: `load_document` with `localOnly`,
- * so a later flush never replaces the shared server document. With a live server, nothing is restored/saved/marked.
+ * so a later flush never replaces the shared server document. With a live server (or an already edited document) an unsaved
+ * record that differs is NOT applied: it becomes `pendingLocalCopy` (RestoredBanner) and is never overwritten until chosen.
+ * With a live server nothing is saved/marked. A failed write clears the record and shows a status message.
  */
 
 import { useEffect } from 'react';
@@ -11,6 +13,7 @@ import { useSessionStore } from '@ui/store/sessionStore';
 import { type KeyValueStorage, browserStorage, clearAutosave, readAutosave, writeAutosave } from '@ui/store/autosave';
 
 export const AUTOSAVE_DELAY_MS = 1500;
+const AUTOSAVE_UNAVAILABLE = 'Autosave unavailable — save to file';
 
 export function useAutosave(storage: KeyValueStorage | null = browserStorage()): void {
   useEffect(() => {
@@ -23,11 +26,18 @@ export function useAutosave(storage: KeyValueStorage | null = browserStorage()):
       timer = null;
       const state = useStore.getState();
       if (storage === null || !restoreDecided || !pending || state.liveStatus === 'connected') return;
+      // Never overwrite the previous session's unrestored work before the user has chosen.
+      if (useSessionStore.getState().pendingLocalCopy !== null) return;
       pending = false;
       if (state.document.order.length === 0) clearAutosave(storage);
       else {
         const clean = !useSessionStore.getState().dirty;
-        writeAutosave(storage, { savedAt: Date.now(), json: serializeDocument(state.document), ...(clean ? { clean: true } : {}) });
+        const record = { savedAt: Date.now(), json: serializeDocument(state.document), ...(clean ? { clean: true as const } : {}) };
+        if (!writeAutosave(storage, record)) {
+          // A stale copy must never be restored as if it were current.
+          clearAutosave(storage);
+          state.setStatusMessage(AUTOSAVE_UNAVAILABLE);
+        }
       }
     };
 
@@ -35,9 +45,16 @@ export function useAutosave(storage: KeyValueStorage | null = browserStorage()):
       if (restoreDecided) return;
       restoreDecided = true;
       const state = useStore.getState();
-      if (storage === null || state.liveStatus === 'connected') return;
+      if (storage === null) return;
       const record = readAutosave(storage);
-      if (record === null || state.document.order.length > 0) return;
+      if (record === null) return;
+      if (state.liveStatus === 'connected' || state.document.order.length > 0) {
+        // Not applied automatically: offer unsaved work that differs from the current document.
+        if (record.clean !== true && record.json !== serializeDocument(state.document)) {
+          useSessionStore.getState().setPendingLocalCopy({ savedAt: record.savedAt, json: record.json });
+        }
+        return;
+      }
       state.dispatch(
         'load_document',
         { json: record.json },

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { useStore } from '@ui/store';
+import { useKernelStatusStore } from '@ui/store/kernelStatus';
 import { createEmptyDocument } from '@core/model/types';
 import { StatusBar } from '@ui/components/StatusBar';
 import { localDispatch } from '../helpers/storeTestHelpers';
@@ -158,5 +159,19 @@ describe('StatusBar — license mode', () => {
   it('shows nothing in offline local mode', () => {
     render(<StatusBar />);
     expect(screen.queryByLabelText(/^License:/)).not.toBeInTheDocument();
+  });
+});
+
+describe('StatusBar — geometry kernel', () => {
+  beforeEach(resetStore);
+  it('shows loading, then a clear failure message, and nothing once ready', () => {
+    useKernelStatusStore.setState({ status: 'loading' });
+    const { rerender } = render(<StatusBar />);
+    expect(screen.getByText(/loading geometry kernel/i)).toBeDefined();
+    act(() => useKernelStatusStore.getState().setStatus('failed'));
+    rerender(<StatusBar />);
+    expect(screen.getByRole('alert').textContent).toMatch(/failed to load/i);
+    act(() => useKernelStatusStore.getState().setStatus('ready'));
+    expect(screen.queryByText(/geometry kernel/i)).toBeNull();
   });
 });

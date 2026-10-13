@@ -27,6 +27,8 @@ export class ViewportErrorBoundary extends Component<Props, State> {
     console.error('[ViewportErrorBoundary]', error, info);
   }
 
+  private readonly retry = (): void => this.setState({ hasError: false, message: '' });
+
   render(): ReactNode {
     if (this.state.hasError) {
       return (
@@ -37,7 +39,10 @@ export class ViewportErrorBoundary extends Component<Props, State> {
             </span>
             <h2 className="vp-error__title">The viewport hit a problem</h2>
             <p className="vp-error__message">{this.state.message}</p>
-            <p className="vp-error__hint">Your document is safe. Reload the page to restore the view.</p>
+            <p className="vp-error__hint">Your document is safe. Retry, or reload the page if it keeps failing.</p>
+            <button type="button" className="btn btn--ghost btn--sm" onClick={this.retry}>
+              Retry
+            </button>
           </div>
         </div>
       );
