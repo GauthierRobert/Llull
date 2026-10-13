@@ -95,7 +95,12 @@ interface EntityDiff {
   readonly removed: Entity[];
 }
 
-/** Reference diff: commands are pure, so an untouched entity keeps its object identity. */
+/** A snapshot (connect, undo/redo, resync) deserializes fresh objects: equal content is not a change. */
+function sameContent(a: Entity, b: Entity): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/** Reference diff (commands are pure, so an untouched entity keeps its identity), confirmed by content. */
 export function diffEntities(before: CadDocument, after: CadDocument): EntityDiff {
   const diff: EntityDiff = { created: [], modified: [], removed: [] };
   if (before.entities === after.entities) return diff;
@@ -104,7 +109,7 @@ export function diffEntities(before: CadDocument, after: CadDocument): EntityDif
     if (next === undefined) continue;
     const previous = before.entities[id];
     if (previous === undefined) diff.created.push(next);
-    else if (previous !== next) diff.modified.push({ before: previous, after: next });
+    else if (previous !== next && !sameContent(previous, next)) diff.modified.push({ before: previous, after: next });
   }
   for (const id of before.order) {
     const previous = before.entities[id];

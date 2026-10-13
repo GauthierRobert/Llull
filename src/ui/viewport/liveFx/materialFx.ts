@@ -6,12 +6,16 @@ import * as THREE from 'three';
 type ColorMaterial = THREE.Material & { color?: unknown; emissive?: unknown; emissiveIntensity?: unknown };
 
 interface SavedLook {
-  readonly color: THREE.Color | null;
-  readonly emissive: THREE.Color | null;
-  readonly emissiveIntensity: number | null;
+  color: THREE.Color | null;
+  emissive: THREE.Color | null;
+  emissiveIntensity: number | null;
+  /** What `paint` last wrote: a different current value means React set a new one (selection, recolour) → re-snapshot. */
+  painted: { color: THREE.Color | null; emissive: THREE.Color | null; emissiveIntensity: number | null } | null;
 }
 
 const asColor = (value: unknown): THREE.Color | null => (value instanceof THREE.Color ? value : null);
+const intensityOf = (material: ColorMaterial): number | null =>
+  typeof material.emissiveIntensity === 'number' ? material.emissiveIntensity : null;
 
 function materialsOf(object: THREE.Object3D): THREE.Material[] {
   const material = (object as THREE.Object3D & { material?: THREE.Material | THREE.Material[] }).material;
@@ -19,7 +23,26 @@ function materialsOf(object: THREE.Object3D): THREE.Material[] {
   return Array.isArray(material) ? material : [material];
 }
 
-/** Remembers each material's original colours the first time it glows, so `restore` is exact. */
+function snapshot(material: ColorMaterial): Pick<SavedLook, 'color' | 'emissive' | 'emissiveIntensity'> {
+  return {
+    color: asColor(material.color)?.clone() ?? null,
+    emissive: asColor(material.emissive)?.clone() ?? null,
+    emissiveIntensity: intensityOf(material),
+  };
+}
+
+const sameColor = (a: THREE.Color | null, b: THREE.Color | null): boolean => (a === null ? b === null : b !== null && a.equals(b));
+
+function changedSincePaint(material: ColorMaterial, look: SavedLook): boolean {
+  if (look.painted === null) return false;
+  return (
+    !sameColor(asColor(material.color), look.painted.color) ||
+    !sameColor(asColor(material.emissive), look.painted.emissive) ||
+    intensityOf(material) !== look.painted.emissiveIntensity
+  );
+}
+
+/** Remembers each material's own colours, so `restore` is exact even when React recolours it mid-transition. */
 export class GlowTracker {
   private readonly saved = new Map<ColorMaterial, SavedLook>();
 
@@ -28,22 +51,19 @@ export class GlowTracker {
       for (const material of materialsOf(object) as ColorMaterial[]) {
         let look = this.saved.get(material);
         if (look === undefined) {
-          const emissive = asColor(material.emissive);
-          const color = asColor(material.color);
-          look = {
-            color: color?.clone() ?? null,
-            emissive: emissive?.clone() ?? null,
-            emissiveIntensity: typeof material.emissiveIntensity === 'number' ? material.emissiveIntensity : null,
-          };
+          look = { ...snapshot(material), painted: null };
           this.saved.set(material, look);
+        } else if (changedSincePaint(material, look)) {
+          Object.assign(look, snapshot(material));
         }
         paint(material, look, accent, strength);
+        look.painted = snapshot(material);
       }
     });
   }
 
   restore(): void {
-    for (const [material, look] of this.saved) paint(material, look, null, 0);
+    for (const [material, look] of this.saved) if (!changedSincePaint(material, look)) paint(material, look, null, 0);
     this.saved.clear();
   }
 }

@@ -35,7 +35,14 @@ export function useMcpLiveDocument(): void {
       }
       resyncInFlight = true;
       void fetchLiveSnapshot()
-        .then(hydrateLiveDocument)
+        .then((snapshot) => {
+          markLiveOrigin({ kind: 'snapshot' });
+          try {
+            hydrateLiveDocument(snapshot);
+          } finally {
+            markLiveOrigin(null);
+          }
+        })
         .catch(() => undefined) // next event or reconnect resyncs
         .finally(() => {
           resyncInFlight = false;

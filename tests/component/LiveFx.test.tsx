@@ -128,6 +128,24 @@ describe('liveFxStore', () => {
   });
 });
 
+describe('liveFxStore — merging', () => {
+  beforeEach(resetLiveFx);
+
+  it('keeps a running grow when the new entity is edited right away, and skips no-op plans', () => {
+    const empty = createEmptyDocument();
+    const created = execute(empty, 'add_box', BOX);
+    const id = created.affected[0]!;
+    const moved = execute(created.document, 'move_entities', { ids: [id], delta: [1, 0, 0] });
+    const origin = { kind: 'remote', name: 'x', source: 'cli' } as const;
+    useLiveFxStore.getState().apply(planLiveFx(empty, created.document, origin, 0, 1));
+    useLiveFxStore.getState().apply(planLiveFx(created.document, moved.document, origin, 100, 2));
+    expect(useLiveFxStore.getState().transitions.get(id)?.change).toBe('created');
+    const before = useLiveFxStore.getState();
+    useLiveFxStore.getState().apply(planLiveFx(moved.document, moved.document, origin, 200, 3));
+    expect(useLiveFxStore.getState()).toBe(before);
+  });
+});
+
 describe('liveOrigin', () => {
   it('hands out a marked origin once, then defaults to local', () => {
     markLiveOrigin({ kind: 'snapshot' });

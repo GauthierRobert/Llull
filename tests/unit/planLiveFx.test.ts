@@ -44,6 +44,11 @@ describe('diffEntities', () => {
     expect(diffEntities(second.doc, moved.doc).modified.map((m) => m.after.id)).toEqual([id]);
     expect(diffEntities(moved.doc, removed.doc).removed.map((e) => e.id)).toEqual(second.ids);
   });
+  it('ignores freshly deserialized but identical entities (snapshot hydration)', () => {
+    const { doc } = withBox();
+    const rehydrated: CadDocument = JSON.parse(JSON.stringify(doc)) as CadDocument;
+    expect(planLiveFx(doc, rehydrated, { kind: 'snapshot' }, 0, 1).transitions).toHaveLength(0);
+  });
   it('is empty when the entity bag is unchanged (selection only)', () => {
     const { doc } = withBox();
     const diff = diffEntities(doc, { ...doc, selection: [] });

@@ -168,25 +168,18 @@ export function Entities(): React.ReactElement {
 
       <InstancedRenderer batches={batches} selectionSet={selectionSet} onSelect={handleSelect} />
 
-      {nonBatchableEntities.map((entity) => {
-        const rendered = (
+      {/* Always wrapped (stable tree): a live transition must not remount the entity's geometry when it starts or ends. */}
+      {nonBatchableEntities.map((entity) => (
+        <LiveTransitionGroup key={entity.id} entity={entity}>
           <EntityRenderer
-            key={entity.id}
             entity={entity}
             selected={selectionSet.has(entity.id)}
             onSelect={handleSelect}
             document={entity.kind === 'instance' ? document : undefined}
             pbrMaterial={entity.materialId ? materials[entity.materialId] : undefined}
           />
-        );
-        return transitions.has(entity.id) ? (
-          <LiveTransitionGroup key={entity.id} entity={entity}>
-            {rendered}
-          </LiveTransitionGroup>
-        ) : (
-          rendered
-        );
-      })}
+        </LiveTransitionGroup>
+      ))}
 
       <LiveFxLayer renderGhost={renderGhost3D} />
     </group>

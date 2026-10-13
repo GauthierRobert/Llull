@@ -21,7 +21,7 @@ export function buildExchangeRouter(restLimiter: RequestHandler, exchange: Excha
       res.status(400).json({ error: 'Request body must be an object with a "name" field.' });
       return;
     }
-    const actor = actorOf(res, 'rest');
+    const actor = actorOf(res, isRecord(body) && body['client'] === 'cli' ? 'cli' : 'rest');
     runLiveExchangeTool(name, isRecord(body) ? body['params'] : undefined, exchange, actor)
       .then((outcome) => {
         if (outcome === null) {

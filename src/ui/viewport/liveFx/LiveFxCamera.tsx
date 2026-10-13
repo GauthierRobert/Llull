@@ -1,7 +1,7 @@
 // In-Canvas: when a remote edit lands outside the view, glide the camera (same direction, eased) until it is framed.
 // Presentation only (never set_camera: online the document camera is shared); any orbit gesture cancels the glide.
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
@@ -38,9 +38,13 @@ function fullyVisible(camera: THREE.Camera, corners: readonly THREE.Vector3[]): 
 }
 
 export function LiveFxCamera(): null {
-  const { camera, controls, invalidate } = useThree();
+  const camera = useThree((s) => s.camera);
+  const controls = useThree((s) => s.controls);
+  const invalidate = useThree((s) => s.invalidate);
   const glideRef = useRef<Glide | null>(null);
   const focus = useLiveFxStore((s) => s.focus);
+  // A focus older than this view (e.g. made while the 2D view was shown) is history, not news.
+  const [mountNonce] = useState(() => useLiveFxStore.getState().focus?.nonce ?? 0);
 
   useEffect(() => {
     const orbit = controls as OrbitControlsImpl | null;
@@ -54,7 +58,7 @@ export function LiveFxCamera(): null {
 
   useEffect(() => {
     const orbit = controls as OrbitControlsImpl | null;
-    if (focus === null || orbit === null || !(camera instanceof THREE.PerspectiveCamera)) return;
+    if (focus === null || focus.nonce <= mountNonce || orbit === null || !(camera instanceof THREE.PerspectiveCamera)) return;
     const origin = useStore.getState().renderOrigin;
     const corners = boundsCorners(focus.bounds, origin);
     if (fullyVisible(camera, corners)) return;
@@ -72,7 +76,7 @@ export function LiveFxCamera(): null {
       toPosition: sphere.center.clone().addScaledVector(direction, distance),
     };
     invalidate();
-  }, [focus, camera, controls, invalidate]);
+  }, [focus, mountNonce, camera, controls, invalidate]);
 
   useFrame(() => {
     const glide = glideRef.current;

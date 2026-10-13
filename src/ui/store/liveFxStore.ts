@@ -54,23 +54,28 @@ export const useLiveFxStore = create<LiveFxState>()((set, get) => ({
 
   apply(plan: LiveFxPlan): void {
     const state = get();
-    const activity = plan.activity === null ? state.activity : [plan.activity, ...state.activity].slice(0, ACTIVITY_LIMIT);
-    if (!state.enabled) {
-      if (activity !== state.activity) set({ activity });
-      return;
+    const patch: Partial<LiveFxState> = {};
+    if (plan.activity !== null) patch.activity = [plan.activity, ...state.activity].slice(0, ACTIVITY_LIMIT);
+    if (state.enabled) {
+      const removedIds = plan.ghosts.filter((ghost) => ghost.mode === 'removed').map((ghost) => ghost.entity.id);
+      if (plan.transitions.length > 0 || removedIds.some((id) => state.transitions.has(id))) {
+        const transitions = new Map(state.transitions);
+        for (const transition of plan.transitions) {
+          const running = transitions.get(transition.id);
+          // An edit right after a creation must not cut the grow short.
+          if (running?.change === 'created' && running.startMs + running.durationMs > transition.startMs) continue;
+          transitions.set(transition.id, transition);
+        }
+        // A removed entity's ghost replaces any transition it still had.
+        for (const id of removedIds) transitions.delete(id);
+        patch.transitions = transitions;
+      }
+      if (plan.ghosts.length > 0) patch.ghosts = [...state.ghosts, ...plan.ghosts];
+      if (plan.ripples.length > 0) patch.ripples = [...state.ripples, ...plan.ripples];
+      if (plan.badge !== null) patch.badges = [...state.badges, plan.badge];
+      if (plan.focus !== null && plan.refocus) patch.focus = { bounds: plan.focus, nonce: (state.focus?.nonce ?? 0) + 1 };
     }
-    const transitions = new Map(state.transitions);
-    for (const transition of plan.transitions) transitions.set(transition.id, transition);
-    // A removed entity's ghost replaces any transition it still had.
-    for (const ghost of plan.ghosts) if (ghost.mode === 'removed') transitions.delete(ghost.entity.id);
-    set({
-      transitions,
-      ghosts: plan.ghosts.length === 0 ? state.ghosts : [...state.ghosts, ...plan.ghosts],
-      ripples: plan.ripples.length === 0 ? state.ripples : [...state.ripples, ...plan.ripples],
-      badges: plan.badge === null ? state.badges : [...state.badges, plan.badge],
-      activity,
-      focus: plan.focus !== null && plan.refocus ? { bounds: plan.focus, nonce: (state.focus?.nonce ?? 0) + 1 } : state.focus,
-    });
+    if (Object.keys(patch).length > 0) set(patch);
   },
 
   prune(nowMs: number): void {

@@ -26,6 +26,19 @@ describe('GlowTracker', () => {
     expect(solid.emissiveIntensity).toBe(1);
     expect(line.color.getHexString()).toBe('ffffff');
   });
+
+  it('keeps a colour React sets mid-glow (selection, recolour) instead of restoring a stale one', () => {
+    const { root, solid } = scene();
+    const glow = new GlowTracker();
+    glow.apply(root, toneColor('cli'), 1);
+    solid.emissive.set('#ff0000'); // r3f applies a new prop value
+    glow.apply(root, toneColor('cli'), 0);
+    expect(solid.emissive.getHexString()).toBe('ff0000');
+    glow.apply(root, toneColor('cli'), 1);
+    solid.color.set('#00ff00');
+    glow.restore();
+    expect(solid.color.getHexString()).toBe('00ff00');
+  });
 });
 
 describe('hologramize', () => {

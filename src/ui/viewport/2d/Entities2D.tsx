@@ -58,15 +58,11 @@ export function Entities2D(): React.ReactElement {
     <group name="entities-2d">
       <BatchedLines2D lines={batchedLines} />
       <SolidsTechnicalView2D solids={solids} selectedIds={selectedIds} />
-      {individual.map(({ entity, selected }) =>
-        transitions.has(entity.id) ? (
-          <LiveTransitionGroup key={entity.id} entity={entity}>
-            <Shape2DRenderer entity={entity} selected={selected} />
-          </LiveTransitionGroup>
-        ) : (
-          <Shape2DRenderer key={entity.id} entity={entity} selected={selected} />
-        ),
-      )}
+      {individual.map(({ entity, selected }) => (
+        <LiveTransitionGroup key={entity.id} entity={entity}>
+          <Shape2DRenderer entity={entity} selected={selected} />
+        </LiveTransitionGroup>
+      ))}
       <LiveFxLayer renderGhost={renderGhost2D} />
     </group>
   );

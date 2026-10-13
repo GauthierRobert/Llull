@@ -1,14 +1,16 @@
-// Wraps an entity's render branch while it has a live transition: grow / travel / pulse via the group matrix, plus an
-// accent glow on its materials. Per-frame work only mutates refs (R9); the glow is restored exactly when it ends.
+// Wraps an entity's render branch (always, so the tree never reshapes); during a live transition: grow / travel / pulse
+// via the group matrix, plus an accent glow on its materials. Per-frame work only mutates refs (R9); the glow is restored exactly when it ends.
 
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import type * as THREE from 'three';
+import * as THREE from 'three';
 import { type Entity, is2D } from '@core/model/types';
 import { useLiveFxStore } from '@ui/store/liveFxStore';
 import { glowAt, progressAt, transitionMatrix } from './liveFxMath';
 import { GlowTracker } from './materialFx';
 import { toneColor, toneStrength } from './liveFxTones';
+
+const IDENTITY = new THREE.Matrix4();
 
 interface LiveTransitionGroupProps {
   entity: Entity;
@@ -29,7 +31,10 @@ export function LiveTransitionGroup({ entity, children }: LiveTransitionGroupPro
     const group = groupRef.current;
     if (group === null) return;
     if (transition === undefined) {
-      group.matrix.identity();
+      if (!group.matrix.equals(IDENTITY)) {
+        group.matrix.identity();
+        group.matrixWorldNeedsUpdate = true;
+      }
       return;
     }
     const t = progressAt(performance.now(), transition.startMs, transition.durationMs);
