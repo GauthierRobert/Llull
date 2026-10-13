@@ -1,21 +1,14 @@
 /**
- * Hidden-line projection of the 3D model onto an elevation / section plane (painter's algorithm
- * over the core view projection: front faces, feature + silhouette edges, cut outlines).
+ * Elevations and sections of the 3D model: the core technical view (hidden lines removed, cut
+ * faces hatched) seen from a compass side, hidden edges omitted (building convention), steel cut
+ * faces filled solid.
  * @layer domain-aec
  */
 
-import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
-import { entityToTriangles } from '@core/geometry/entityTriangles';
-import {
-  type ProjectedFace,
-  type Segment2,
-  type ViewFrame,
-  cutSegments,
-  facesOf,
-  projectFaces,
-  weldTolerance,
-} from '@core/geometry/viewProjection';
-import { chainLoops } from '@core/geometry/planeEdges';
+import type { CadDocument, Entity, Vec3 } from '@core/model/types';
+import { type DrawingPrimitive, drawingBounds } from '@core/model/drawing';
+import { technicalView } from '@core/geometry/technicalView';
+import type { ViewFrame } from '@core/geometry/viewProjection';
 
 export const ELEVATION_DIRECTIONS = ['north', 'south', 'east', 'west'] as const;
 export type ElevationDirection = (typeof ELEVATION_DIRECTIONS)[number];
@@ -36,38 +29,15 @@ const PROJECTIONS: Readonly<Record<ElevationDirection, Projection>> = {
   west: { axis: 0, sign: -1, u: (p) => -p[1] },
 };
 
-/** Poché class of a cut region. */
-type CutMaterial = 'steel' | 'concrete' | 'other';
-
-/** Filled cut face of one entity: closed loops (even-odd, so hollow sections stay hollow). */
-interface CutRegion {
-  readonly material: CutMaterial;
-  readonly loops: Vec2[][];
-}
-
-interface ElevationDrawing {
-  readonly items: ProjectedFace[];
-  readonly cutLines: Segment2[];
-  readonly cutRegions: CutRegion[];
-  /** [minU, minZ, maxU, maxZ] of the projected geometry. */
+export interface ElevationDrawing {
+  readonly primitives: DrawingPrimitive[];
+  /** [minU, minZ, maxU, maxZ] of the drawn view. */
   readonly bounds: readonly [number, number, number, number];
   readonly projection: Projection;
 }
 
-const CONCRETE_CATEGORIES: ReadonlySet<string> = new Set([
-  'wall',
-  'slab',
-  'column',
-  'beam',
-  'stair',
-  'footing',
-  'curvedWall',
-]);
-
-function cutMaterial(category: string | null): CutMaterial {
-  if (category === 'member' || category === 'plate') return 'steel';
-  return category !== null && CONCRETE_CATEGORIES.has(category) ? 'concrete' : 'other';
-}
+/** Steel cut faces are filled solid; concrete, masonry and the rest keep the 45° hatch. */
+const isSteel = (category: string | null): boolean => category === 'member' || category === 'plate';
 
 function categoryOf(tags: ReadonlyArray<string> | undefined): string | null {
   return tags?.includes('bim') === true ? (tags[1] ?? null) : null;
@@ -75,7 +45,7 @@ function categoryOf(tags: ReadonlyArray<string> | undefined): string | null {
 
 /**
  * @pure
- * @returns the projected hidden-line drawing, or null when no 3D geometry remains
+ * @returns the elevation / section line drawing, or null when no 3D geometry remains
  */
 export function buildElevationDrawing(
   doc: CadDocument,
@@ -90,40 +60,25 @@ export function buildElevationDrawing(
     toViewer: projection.axis === 0 ? [projection.sign, 0, 0] : [0, projection.sign, 0],
     project: (p) => [projection.u(p), p[2]],
   };
-  const limit = options.cutAt !== undefined ? projection.sign * options.cutAt : Infinity;
   const excluded = new Set(options.exclude ?? []);
-  const hiddenLayers = new Set(
-    Object.values(doc.layers)
-      .filter((layer) => !layer.visible)
-      .map((layer) => layer.id),
-  );
-  const items: ProjectedFace[] = [];
-  const cutLines: Segment2[] = [];
-  const cutRegions: CutRegion[] = [];
-  const bounds: [number, number, number, number] = [Infinity, Infinity, -Infinity, -Infinity];
-  const grow = (point: Vec2): void => {
-    bounds[0] = Math.min(bounds[0], point[0]);
-    bounds[1] = Math.min(bounds[1], point[1]);
-    bounds[2] = Math.max(bounds[2], point[0]);
-    bounds[3] = Math.max(bounds[3], point[1]);
-  };
-  for (const id of doc.order) {
+  const solids = doc.order.flatMap((id): Entity[] => {
     const entity = doc.entities[id];
-    if (!entity || hiddenLayers.has(entity.layerId)) continue;
+    if (!entity || doc.layers[entity.layerId]?.visible === false) return [];
     const category = categoryOf(entity.tags);
-    if (category !== null && excluded.has(category)) continue;
-    const faces = facesOf(entityToTriangles(entity, doc), frame);
-    const entityCuts = limit !== Infinity ? cutSegments(faces, frame, limit) : [];
-    for (const segment of entityCuts) segment.forEach(grow);
-    cutLines.push(...entityCuts);
-    for (const face of projectFaces(faces, frame, limit)) {
-      face.polygon.forEach(grow);
-      items.push(face);
-    }
-    const loops = chainLoops(entityCuts, weldTolerance(faces));
-    if (loops.length > 0) cutRegions.push({ material: cutMaterial(category), loops });
-  }
-  if (items.length === 0 && cutLines.length === 0) return null;
-  items.sort((a, b) => a.depth - b.depth);
-  return { items, cutLines, cutRegions, bounds, projection };
+    return category !== null && excluded.has(category) ? [] : [entity];
+  });
+  const cutDepth = options.cutAt !== undefined ? projection.sign * options.cutAt : undefined;
+  const primitives = technicalView(doc, solids, { frame, cutDepth }).flatMap(
+    ({ entityId, primitives: drawn }) => {
+      const steel = isSteel(categoryOf(doc.entities[entityId]?.tags));
+      return drawn.flatMap((primitive): DrawingPrimitive[] => {
+        if (primitive.style === 'hidden') return [];
+        return steel && primitive.type === 'polygon' && primitive.fill === 'hatch'
+          ? [{ ...primitive, fill: 'solid' }]
+          : [primitive];
+      });
+    },
+  );
+  if (primitives.length === 0) return null;
+  return { primitives, bounds: drawingBounds(primitives), projection };
 }

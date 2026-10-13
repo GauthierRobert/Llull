@@ -287,3 +287,22 @@ describe('centerLinePrimitives — round features of B-rep recipes', () => {
     ).toEqual([expect.closeTo(-0.5), expect.closeTo(4.5)]);
   });
 });
+
+describe('technicalView — centre lines under a section', () => {
+  it('drops the centre lines of features cut away in front of the plane', () => {
+    let doc = add(createEmptyDocument(), 'add_cylinder', {
+      radius: 1,
+      height: 2,
+      position: [0, 0, 0],
+      rotation: [Math.PI / 2, 0, 0],
+    }).doc;
+    doc = add(doc, 'add_cylinder', { radius: 1, height: 2, position: [5, 0, -10] }).doc;
+    // Looking down, cut at z = -5: the lying cylinder (z = 0) is removed, the upright one stays.
+    const drawings = technicalView(doc, solidsOf(doc), { frame: TOP_VIEW, cutDepth: -5 });
+    const centre = drawings.flatMap((d) => d.primitives).filter((p) => p.style === 'center');
+    expect(centre).toHaveLength(2);
+    expect(
+      centre.every((p) => p.type === 'line' && Math.abs((p.a[0] + p.b[0]) / 2 - 5) < 1e-9),
+    ).toBe(true);
+  });
+});

@@ -11,7 +11,7 @@ import type { Triangle } from './triangles';
 import { toRadians } from '../lib/angle';
 import { cross3, dot3, sub3 } from '../lib/vec3';
 import { boundsOfPoints } from './bounds';
-import { type UnitPlane, clipSegmentToSide, clipToSide, planeChords } from './planeEdges';
+import { type UnitPlane, planeChords } from './planeEdges';
 
 /** A view: the unit direction toward the viewer and the map of a world point onto the sheet. */
 export interface ViewFrame {
@@ -23,23 +23,12 @@ export interface ViewFrame {
 export const TOP_VIEW: ViewFrame = { toViewer: [0, 0, 1], project: (p) => [p[0], p[1]] };
 
 export type Segment2 = readonly [Vec2, Vec2];
-type Segment3 = readonly [Vec3, Vec3];
 
 export interface Face {
   readonly triangle: Triangle;
   readonly normal: Vec3;
   /** Faces the viewer (normal · toViewer > 0). */
   readonly front: boolean;
-}
-
-/** One front face, clipped to the near side of the cut, with the feature edges it owns. */
-export interface ProjectedFace {
-  /** Mean distance toward the viewer (painter order: draw ascending). */
-  readonly depth: number;
-  readonly polygon: Vec2[];
-  /** Lambert grey 225..255. */
-  readonly shade: number;
-  readonly edges: Segment2[];
 }
 
 const FEATURE_COS = Math.cos(toRadians(25));
@@ -83,8 +72,6 @@ export function weldTolerance(faces: ReadonlyArray<Face>): number {
 export interface FeatureEdge {
   readonly a: Vec3;
   readonly b: Vec3;
-  /** Index of an adjacent front face, if any (the face that owns the edge in painter order). */
-  readonly owner: number | undefined;
 }
 
 /** Feature, boundary and silhouette edges of a face set (shared edges welded at `tolerance`). */
@@ -112,7 +99,7 @@ export function featureEdges(faces: ReadonlyArray<Face>, tolerance: number): Fea
       (first !== undefined &&
         second !== undefined &&
         dot3(first.normal, second.normal) < FEATURE_COS);
-    if (feature) edges.push({ a, b, owner: fronts[0] });
+    if (feature) edges.push({ a, b });
   }
   return edges;
 }
@@ -127,40 +114,4 @@ export function cutSegments(
     faces.map((face) => face.triangle),
     sectionPlane(frame, cutDepth),
   ).map(([a, b]): Segment2 => [frame.project(a), frame.project(b)]);
-}
-
-/**
- * Front faces of one solid kept on the viewer's far side of the cut (depth <= `cutDepth`;
- * Infinity = no cut), projected, each with the feature edges it owns — the painter's-algorithm
- * input of a shaded elevation.
- */
-export function projectFaces(
-  faces: ReadonlyArray<Face>,
-  frame: ViewFrame,
-  cutDepth: number,
-): ProjectedFace[] {
-  const plane = sectionPlane(frame, cutDepth);
-  const owned = new Map<number, Segment3[]>();
-  for (const edge of featureEdges(faces, weldTolerance(faces))) {
-    if (edge.owner === undefined) continue;
-    owned.set(edge.owner, [...(owned.get(edge.owner) ?? []), [edge.a, edge.b]]);
-  }
-  const projected: ProjectedFace[] = [];
-  faces.forEach((face, index) => {
-    if (!face.front) return;
-    const clipped = clipToSide([...face.triangle], plane, false);
-    if (clipped.length < 3) return;
-    const edges: Segment2[] = [];
-    for (const [a, b] of owned.get(index) ?? []) {
-      const segment = clipSegmentToSide(a, b, plane);
-      if (segment) edges.push([frame.project(segment[0]), frame.project(segment[1])]);
-    }
-    projected.push({
-      depth: clipped.reduce((sum, point) => sum + depthOf(frame, point), 0) / clipped.length,
-      polygon: clipped.map(frame.project),
-      shade: Math.round(225 + 30 * dot3(face.normal, frame.toViewer)),
-      edges,
-    });
-  });
-  return projected;
 }

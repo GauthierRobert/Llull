@@ -4,6 +4,7 @@
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
+import { DrawingPainter } from '../../shared/drawingSvg';
 import { LINE_PATTERNS, dashArray } from '@core/model/drawing';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
@@ -35,7 +36,8 @@ export interface ElevationSheet {
   readonly svg: string;
   readonly paper: PaperSize;
   readonly scale: number;
-  readonly faces: number;
+  /** Drawing primitives in the view (edges, centre lines, cut faces). */
+  readonly lines: number;
   /** False when the view extents exceed the view area of the paper at this scale. */
   readonly fits: boolean;
 }
@@ -79,28 +81,9 @@ function buildElevationSheet(
   const offsetX = viewport.x + (viewport.width - (maxU - minU) * k) / 2;
   const offsetY = viewport.y + viewport.height - (viewport.height - (maxZ - minZ) * k) / 2;
   const toPaper = ([u, z]: Vec2): Vec2 => [offsetX + (u - minU) * k, offsetY - (z - minZ) * k];
-  const points = (polygon: ReadonlyArray<Vec2>): string =>
-    polygon
-      .map(toPaper)
-      .map(([x, y]) => `${n(x)},${n(y)}`)
-      .join(' ');
-  const line = ([a, b]: readonly [Vec2, Vec2], cls: string): string => {
-    const [pa, pb] = [toPaper(a), toPaper(b)];
-    return `<line x1="${n(pa[0])}" y1="${n(pa[1])}" x2="${n(pb[0])}" y2="${n(pb[1])}" class="${cls}"/>`;
-  };
-  const view: string[] = [];
-  for (const item of drawing.items) {
-    const shade = item.shade.toString(16).padStart(2, '0');
-    view.push(
-      `<polygon points="${points(item.polygon)}" fill="#${shade}${shade}${shade}" stroke="#${shade}${shade}${shade}" stroke-width="0.02"/>`,
-    );
-    for (const edge of item.edges) view.push(line(edge, 'edge'));
-  }
-  for (const region of drawing.cutRegions) {
-    const path = region.loops.map((loop) => `M${points(loop).replace(/ /g, 'L')}Z`).join('');
-    view.push(`<path d="${path}" fill-rule="evenodd" class="poche-${region.material}"/>`);
-  }
-  for (const cut of drawing.cutLines) view.push(line(cut, 'section'));
+  const painter = new DrawingPainter(toPaper, k);
+  for (const primitive of drawing.primitives) painter.paint(primitive);
+  const view = painter.parts;
 
   const building = getBuilding(doc);
   const annotations: string[] = [];
@@ -108,17 +91,19 @@ function buildElevationSheet(
   const ground = building.levelOrder
     .map((id) => building.levels[id]?.elevation)
     .filter((value): value is number => value !== undefined);
-  const groundZ = ground.length > 0 ? Math.min(...ground) : minZ;
-  const groundY = toPaper([0, groundZ])[1];
-  const belowGrade = toPaper([0, minZ])[1] - groundY;
-  if (options.cutAt === undefined && belowGrade > 0) {
-    view.push(
-      `<rect x="${n(left - 4)}" y="${n(groundY)}" width="${n(right - left + 8)}" height="${n(belowGrade + 0.5)}" fill="#fff" fill-opacity="0.7"/>`,
+  // A ground line only where there is a building to stand on (a machine part has none).
+  if (ground.length > 0) {
+    const groundY = toPaper([0, Math.min(...ground)])[1];
+    const belowGrade = toPaper([0, minZ])[1] - groundY;
+    if (options.cutAt === undefined && belowGrade > 0) {
+      view.push(
+        `<rect x="${n(left - 4)}" y="${n(groundY)}" width="${n(right - left + 8)}" height="${n(belowGrade + 0.5)}" fill="#fff" fill-opacity="0.7"/>`,
+      );
+    }
+    annotations.push(
+      `<line x1="${n(left - 4)}" y1="${n(groundY)}" x2="${n(right + 4)}" y2="${n(groundY)}" class="ground"/>`,
     );
   }
-  annotations.push(
-    `<line x1="${n(left - 4)}" y1="${n(groundY)}" x2="${n(right + 4)}" y2="${n(groundY)}" class="ground"/>`,
-  );
   for (const levelId of building.levelOrder) {
     const level = building.levels[levelId];
     if (!level) continue;
@@ -160,13 +145,12 @@ function buildElevationSheet(
     title,
     scale,
     paper,
-    caption: `${title} · 1:${scale} · levels in m`,
+    caption: `${title} · 1:${scale}${ground.length > 0 ? ' · levels in m' : ''}`,
     bodyId: 'view',
     body: view.join(''),
     style:
-      '.edge{stroke:#000;stroke-width:0.18;stroke-linecap:round}.section{stroke:#000;stroke-width:0.5;stroke-linecap:round}.ground{stroke:#000;stroke-width:0.7}' +
-      `.grid{stroke:#000;stroke-width:0.13;stroke-dasharray:${dashArray(LINE_PATTERNS.center, 1)}}` +
-      '.poche-steel{fill:#1a1a1a}.poche-concrete{fill:url(#hatch-concrete)}.poche-other{fill:#9a9a9a}',
+      '.ground{stroke:#000;stroke-width:0.7}' +
+      `.grid{stroke:#000;stroke-width:0.13;stroke-dasharray:${dashArray(LINE_PATTERNS.center, 1)}}`,
     overlays: [`<g id="annotations">${annotations.join('')}</g>`],
   });
   const project = fileSlug(building.project.name, 'project');
@@ -175,7 +159,7 @@ function buildElevationSheet(
     svg: `${svg}\n`,
     paper,
     scale,
-    faces: drawing.items.length,
+    lines: drawing.primitives.length,
     fits: (maxU - minU) * k <= viewport.width + 1e-9 && (maxZ - minZ) * k <= viewport.height + 1e-9,
   };
 }
@@ -183,7 +167,7 @@ function buildElevationSheet(
 /**
  * @command export_elevation_sheet
  * @pure read-only
- * @affects none; data = { filename, svg, paper, scale, faces }
+ * @affects none; data = { filename, svg, paper, scale, lines }
  * @failure bad direction / paper / scale / cutAt, nothing to draw -> no data
  */
 export const exportElevationSheet = defineCommand({
@@ -191,9 +175,10 @@ export const exportElevationSheet = defineCommand({
   annotations: { readOnly: true, idempotent: true },
   description:
     'Produce a printable elevation or section drawing (SVG in real millimetres, print to PDF at 100%) ' +
-    'projected from the 3D model with hidden lines removed: north / south / east / west elevation (+Y is ' +
-    'north), or a section when cutAt is given (the model nearer to the viewer than the cut plane is removed ' +
-    'and cut outlines are drawn heavy). Shows level datums, grid bubbles, scale bar and the title block. ' +
+    'drawn as an ISO 128 line drawing from the 3D model with hidden lines removed (visible edges heavy, ' +
+    'centre lines chain-dotted): north / south / east / west elevation (+Y is north), or a section when ' +
+    'cutAt is given (the model nearer to the viewer than the cut plane is removed; cut faces outlined heavy, ' +
+    'hatched at 45°, steel filled solid). Shows level datums, grid bubbles, scale bar and the title block. ' +
     'Use exclude: ["panel"] to show the steel frame behind the cladding. data.svg holds the file text.',
   params: z.object({
     direction: z
@@ -229,7 +214,7 @@ export const exportElevationSheet = defineCommand({
     }
     return report(
       doc,
-      `Elevation sheet ${sheet.filename}: ${sheet.faces} visible face(s) at 1:${sheet.scale} on ${sheet.paper}.${sheetFitWarning(sheet.fits, 'view')}`,
+      `Elevation sheet ${sheet.filename}: ${sheet.lines} drawn line(s) / cut face(s) at 1:${sheet.scale} on ${sheet.paper}.${sheetFitWarning(sheet.fits, 'view')}`,
       sheet,
     );
   },

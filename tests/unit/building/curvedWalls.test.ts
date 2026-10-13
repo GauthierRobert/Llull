@@ -148,7 +148,9 @@ describe('curved wall review regressions', () => {
     const { buildElevationDrawing } = await import('@aec/building/drawings/elevationProjection');
     const doc = execute(createEmptyDocument(), 'add_curved_wall', HALF).document;
     const drawing = buildElevationDrawing(doc, { direction: 'south', cutAt: 4000 })!;
-    expect(drawing.cutRegions.map((region) => region.material)).toEqual(['concrete']);
+    const cuts = drawing.primitives.filter((p) => p.type === 'polygon');
+    expect(cuts.length).toBeGreaterThan(0);
+    expect(cuts.every((p) => p.type === 'polygon' && p.fill === 'hatch')).toBe(true);
   });
 
   it('rejects collinear curved walls on load and gives no clash boxes without a band', async () => {

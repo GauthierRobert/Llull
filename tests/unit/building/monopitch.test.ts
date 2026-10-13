@@ -284,7 +284,7 @@ describe('monopitch hall in the drawing, IFC and quantity exports', () => {
     for (const direction of ['east', 'south'] as const) {
       const sheet = execute(doc, 'export_elevation_sheet', { direction }).data as ElevationSheet;
       expect(sheet.svg).toMatch(/^<svg xmlns/);
-      expect(sheet.faces).toBeGreaterThan(0);
+      expect(sheet.lines).toBeGreaterThan(0);
     }
     const ifc = (execute(doc, 'export_ifc', {}).data as IfcExport).ifc;
     for (const entity of ['IFCCOLUMN(', 'IFCBEAM(', 'IFCMEMBER(', 'IFCPLATE(', 'IFCFOOTING(']) {

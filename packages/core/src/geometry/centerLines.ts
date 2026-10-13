@@ -156,6 +156,19 @@ function axisWithin(axis: RoundAxis, box: Bounds): RoundAxis | null {
   return from <= to ? { ...axis, from, to } : null;
 }
 
+/** The part of `axis` on the far side of the section plane (its near side is cut away), or null. */
+function axisBehindCut(axis: RoundAxis, frame: ViewFrame, cutDepth: number): RoundAxis | null {
+  if (!Number.isFinite(cutDepth)) return axis;
+  const base = dot3(axis.origin, frame.toViewer);
+  if (axis.direction === null) return base <= cutDepth ? axis : null;
+  const rate = dot3(axis.direction, frame.toViewer);
+  if (Math.abs(rate) < 1e-12) return base <= cutDepth ? axis : null;
+  const limit = (cutDepth - base) / rate;
+  const [from, to] =
+    rate > 0 ? [axis.from, Math.min(axis.to, limit)] : [Math.max(axis.from, limit), axis.to];
+  return from <= to ? { ...axis, from, to } : null;
+}
+
 /** Round features of a 3D entity in world space (instances expanded through `doc`). */
 function roundAxes(entity: Entity, doc: Pick<CadDocument, 'components'>, depth = 0): RoundAxis[] {
   if (entity.kind === 'instance') {
@@ -228,7 +241,8 @@ function pitchCircles(
 }
 
 /**
- * Centre-line primitives (style `center`, on `layer`) of the round features of `entity` in `frame`.
+ * Centre-line primitives (style `center`, on `layer`) of the round features of `entity` in `frame`;
+ * features in front of the section plane at `cutDepth` are cut away with the material.
  * @returns [] for an entity without round features or with axes oblique to the view
  */
 export function centerLinePrimitives(
@@ -236,8 +250,12 @@ export function centerLinePrimitives(
   doc: Pick<CadDocument, 'components'>,
   frame: ViewFrame,
   layer: string,
+  cutDepth = Infinity,
 ): DrawingPrimitive[] {
-  const axes = roundAxes(entity, doc);
+  const axes = roundAxes(entity, doc).flatMap((axis) => {
+    const kept = axisBehindCut(axis, frame, cutDepth);
+    return kept ? [kept] : [];
+  });
   if (axes.length === 0) return [];
   const unit = Math.max(...axes.map((axis) => axis.radius)) * 1e-4;
   const seen = new Set<string>();

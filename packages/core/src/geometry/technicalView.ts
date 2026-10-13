@@ -166,7 +166,7 @@ export function technicalView(
     const tolerance = (cached[index] as SolidFaces).tolerance;
     primitives.push(...lines(edgeRuns.visible, 'visible', drawn, tolerance));
     if (!sectioned) primitives.push(...lines(edgeRuns.hidden, 'hidden', drawn, tolerance));
-    primitives.push(...centerLinePrimitives(entity, doc, frame, TECHNICAL_LAYERS.center));
+    primitives.push(...centerLinePrimitives(entity, doc, frame, TECHNICAL_LAYERS.center, cutDepth));
     if (primitives.length > 0) drawings.push({ entityId: entity.id, primitives });
   });
   return drawings;

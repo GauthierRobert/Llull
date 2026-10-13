@@ -235,7 +235,7 @@ describe('BuildingPanel', () => {
     fireEvent.change(screen.getByLabelText('Elevation direction'), { target: { value: 'east' } });
     fireEvent.click(screen.getByRole('button', { name: 'Elevation sheet' }));
     expect(screen.getByTestId('building-export-status')).toHaveTextContent(
-      /East_elevation.*visible face/,
+      /East_elevation.*drawn line/,
     );
     fireEvent.change(screen.getByLabelText('Section cut position'), { target: { value: '0' } });
     fireEvent.click(screen.getByRole('checkbox', { name: 'Hide cladding' }));

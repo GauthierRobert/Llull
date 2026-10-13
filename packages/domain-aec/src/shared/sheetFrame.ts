@@ -196,7 +196,10 @@ export function northArrow(x: number, y: number): string {
 }
 
 function scaleBar(x: number, y: number, scale: number): string {
-  const stepsMetres = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100];
+  // 1-2-5 steps from 1 mm (machine parts at 1:1, 2:1…) to 100 m (site plans).
+  const stepsMetres = [
+    0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100,
+  ];
   const step = stepsMetres.find((metres) => (metres * 1000) / scale >= 8) ?? 100;
   const stepMm = (step * 1000) / scale;
   const parts = [`<g id="scale-bar">`];

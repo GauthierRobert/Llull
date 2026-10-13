@@ -9,7 +9,8 @@
 
 import type { CadDocument, Entity, EntityId, Vec2 } from '@core/model/types';
 import { dimensionLabelBox, textLocalBox, underlayFrame } from './modifyHelpers';
-import { solidOutline } from './solidOutline';
+import { solidDrawing } from './solidDrawing';
+import { drawingSegments } from './solidDrawingEdges';
 import { wrapAngle } from '@lib/angle';
 import { closeLoop, rectangleCorners } from '../lineGeometry';
 import { arcPolyline } from '@lib/arc';
@@ -144,10 +145,9 @@ function sampleEntity(document: CadDocument, entity: Entity): SampledGeometry | 
       };
     }
     default: {
-      // 3D solids: their top-view outline rings (derived 'bim' geometry is drawn elsewhere).
-      if (entity.tags?.includes('bim') === true) return null;
-      const rings = solidOutline(document, entity);
-      return rings === null ? null : { polylines: rings.map((ring) => closeLoop(ring)), boxes: [] };
+      // 3D solids: the edges of their drawn top view.
+      const segments = drawingSegments(solidDrawing(document, entity));
+      return segments.length === 0 ? null : { polylines: segments, boxes: [] };
     }
   }
 }

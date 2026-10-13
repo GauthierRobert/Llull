@@ -4,9 +4,10 @@
  * Derive snap candidate points from the 2D entities of a document.
  */
 
-import { type CadDocument, type Vec2, is3D } from '@core/model/types';
+import type { CadDocument, Vec2 } from '@core/model/types';
 import { wrapAngle } from '@lib/angle';
-import { solidSnapPoints } from '../solidOutline';
+import { solidDrawing } from '../solidDrawing';
+import { drawingSnapPoints } from '../solidDrawingSnaps';
 import type { CollectOpts, SnapPoint, SnapType } from './types';
 import {
   curveCurveIntersections,
@@ -229,16 +230,14 @@ export function collectSnapCandidates(
 
       // Text and dimensions have no snap geometry; 3D solids snap to their top-view outline.
       default:
-        if (is3D(entity) && entity.tags?.includes('bim') !== true) {
-          for (const snap of solidSnapPoints(document, entity)) {
-            const wanted =
-              snap.type === 'endpoint'
-                ? doEndpoints
-                : snap.type === 'midpoint'
-                  ? doMidpoints
-                  : doCenters;
-            if (wanted) candidates.push(snap);
-          }
+        for (const snap of drawingSnapPoints(solidDrawing(document, entity))) {
+          const wanted =
+            snap.type === 'endpoint'
+              ? doEndpoints
+              : snap.type === 'midpoint'
+                ? doMidpoints
+                : doCenters;
+          if (wanted) candidates.push(snap);
         }
         break;
     }
