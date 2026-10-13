@@ -23,7 +23,7 @@
     "electron": "^38.8.6",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
-    "typescript": "~6.0.3",
+    "typescript": "~7.0.2",
     "vitest": "^5.0.4"
   },
   "engines": {
