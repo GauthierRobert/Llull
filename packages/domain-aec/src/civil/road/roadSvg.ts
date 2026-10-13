@@ -6,6 +6,7 @@
 
 import { escapeXml } from '@lib/escapeXml';
 import { n, svgPoints } from '../../shared/sheetFrame';
+import { niceStep } from '@lib/niceStep';
 
 type Point = readonly [number, number];
 
@@ -65,16 +66,6 @@ export function svgDocument(width: number, height: number, body: ReadonlyArray<s
     `<svg xmlns="http://www.w3.org/2000/svg" width="${n(width)}" height="${n(height)}" ` +
     `viewBox="0 0 ${n(width)} ${n(height)}"><rect width="100%" height="100%" fill="#fff"/>` +
     `${body.join('')}</svg>`
-  );
-}
-
-const NICE = [1, 2, 5, 10];
-
-/** Smallest 1-2-5 step (times a power of ten) that is at least `minimum`. */
-export function niceStep(minimum: number): number {
-  const power = 10 ** Math.floor(Math.log10(Math.max(minimum, 1e-9)));
-  return (
-    (NICE.map((n) => n * power).find((step) => step >= minimum - 1e-12) as number) ?? power * 10
   );
 }
 

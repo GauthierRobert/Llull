@@ -14,6 +14,8 @@ import { centerLinePrimitives } from './centerLines';
 import { entityToTriangles } from './entityTriangles';
 import { classifyEdges, type ViewSource } from './hiddenLines';
 import { chainLoops } from './planeEdges';
+import { expansionDependency } from './instanceExpansion';
+import { quantizedKey } from '../lib/quantize';
 import {
   type Face,
   type FeatureEdge,
@@ -65,7 +67,7 @@ function nestLoops(loops: ReadonlyArray<Vec2[]>): Array<{ outer: Vec2[]; holes: 
 
 const segmentKey = ([a, b]: Segment2, tolerance: number): string => {
   const [p, q] = a[0] < b[0] || (a[0] === b[0] && a[1] <= b[1]) ? [a, b] : [b, a];
-  return [...p, ...q].map((value) => Math.round(value / tolerance)).join(',');
+  return quantizedKey([...p, ...q], tolerance);
 };
 
 /** A solid's faces and feature edges as seen through one frame (independent of other solids). */
@@ -73,8 +75,8 @@ interface SolidFaces {
   readonly faces: Face[];
   readonly edges: FeatureEdge[];
   readonly tolerance: number;
-  /** The component an instance was expanded from (a cache entry is stale once it changes). */
-  readonly component: unknown;
+  /** `expansionDependency` when cached (a cache entry is stale once it changes). */
+  readonly dependency: unknown;
 }
 
 /** Per frame, per entity object: entities are immutable, so an edit yields a new key. */
@@ -85,14 +87,14 @@ function solidFaces(
   entity: Entity,
   frame: ViewFrame,
 ): SolidFaces {
-  const component = entity.kind === 'instance' ? doc.components[entity.componentId] : undefined;
+  const dependency = expansionDependency(entity, doc);
   const byEntity = facesCache.get(frame) ?? new WeakMap<Entity, SolidFaces>();
   facesCache.set(frame, byEntity);
   const cached = byEntity.get(entity);
-  if (cached && cached.component === component) return cached;
+  if (cached && cached.dependency === dependency) return cached;
   const faces = facesOf(entityToTriangles(entity, doc), frame);
   const tolerance = weldTolerance(faces);
-  const entry = { faces, edges: featureEdges(faces, tolerance), tolerance, component };
+  const entry = { faces, edges: featureEdges(faces, tolerance), tolerance, dependency };
   byEntity.set(entity, entry);
   return entry;
 }

@@ -24,7 +24,7 @@ import {
   type Viewport,
 } from '../../shared/sheetFrame';
 import { toMetres, toMm } from '@core/model/units';
-import { niceStep } from '../road/roadSvg';
+import { niceStep } from '@lib/niceStep';
 import { clipPolyline, insideRect } from './planClip';
 import { gridToLocal, localToGrid } from '../crs/crs';
 import { entityPlanPoint } from '@core/geometry/entityFrame';

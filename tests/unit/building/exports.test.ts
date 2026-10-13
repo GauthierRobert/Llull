@@ -212,7 +212,9 @@ describe('export_plan_sheet', () => {
     expect(sheet.svg).toContain('id="title-block"');
     expect(sheet.svg).toContain('Maison Dupont');
     expect(sheet.svg).toContain('1:100 @ A3');
-    expect(sheet.svg).toContain('class="cut"');
+    // Concrete cuts (walls, square and round columns) are hatched.
+    expect(sheet.svg).toContain('class="cut-hatch"');
+    expect(sheet.svg).toMatch(/<circle [^>]*class="cut-hatch"/);
     expect(sheet.svg).toContain('class="hidden"');
     expect(sheet.svg).toMatch(/<path d="M [\d.]+ [\d.]+ A /);
     expect(sheet.svg).toContain('id="north-arrow"');

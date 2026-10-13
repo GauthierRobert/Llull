@@ -29,7 +29,7 @@ const PROJECTIONS: Readonly<Record<ElevationDirection, Projection>> = {
   west: { axis: 0, sign: -1, u: (p) => -p[1] },
 };
 
-export interface ElevationDrawing {
+interface ElevationDrawing {
   readonly primitives: DrawingPrimitive[];
   /** [minU, minZ, maxU, maxZ] of the drawn view. */
   readonly bounds: readonly [number, number, number, number];

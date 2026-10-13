@@ -7,14 +7,13 @@
 import { clamp } from '@lib/clamp';
 import { wrapAngle } from '@lib/angle';
 import type { Vec2 } from '@core/model/types';
-import type { DrawingPrimitive } from '@core/model/drawing';
+import type { DrawingFill, DrawingPrimitive } from '@core/model/drawing';
 import { n, readableDimensionLabel, svgPoints, svgText } from './sheetFrame';
 
-/** Sheet style class of a line type (`filled`: a closed area that takes its poché). */
-function classOf(style: DrawingPrimitive['style'], filled: boolean): string {
+/** Sheet style class of a line type. */
+function classOf(style: DrawingPrimitive['style']): string {
   switch (style) {
     case 'cut':
-      return filled ? 'cut' : 'cut-line';
     case 'visible':
       return 'cut-line';
     case 'hidden':
@@ -26,6 +25,10 @@ function classOf(style: DrawingPrimitive['style'], filled: boolean): string {
       return 'thin';
   }
 }
+
+/** Class of a closed area: its explicit fill (solid poché, ANSI31 hatch) or just its outline. */
+const areaClass = (fill: DrawingFill | undefined, outline: string): string =>
+  fill === 'solid' ? 'cut' : fill === 'hatch' ? 'cut-hatch' : outline;
 
 /** `<line>` between two paper points. */
 export const svgLine = (a: Vec2, b: Vec2, cssClass: string): string =>
@@ -78,31 +81,28 @@ export class DrawingPainter {
   }
 
   paint(primitive: DrawingPrimitive): void {
-    const cssClass = (filled: boolean): string => classOf(primitive.style, filled);
+    const cssClass = (): string => classOf(primitive.style);
     switch (primitive.type) {
       case 'polygon': {
         const loops = [primitive.points, ...(primitive.holes ?? [])];
         const path = loops.map((loop) => `M${this.points(loop).replace(/ /g, 'L')}Z`).join('');
-        const filled = primitive.fill === 'solid' || primitive.style === 'cut';
-        const area = primitive.fill === 'hatch' ? 'cut-hatch' : cssClass(filled);
+        const area = areaClass(primitive.fill, cssClass());
         this.parts.push(`<path d="${path}" fill-rule="evenodd" class="${area}"/>`);
         return;
       }
       case 'polyline':
         this.parts.push(
-          `<polyline points="${this.points(primitive.points)}" class="${cssClass(false)}"/>`,
+          `<polyline points="${this.points(primitive.points)}" class="${cssClass()}"/>`,
         );
         return;
       case 'line':
-        this.parts.push(svgLine(this.map(primitive.a), this.map(primitive.b), cssClass(false)));
+        this.parts.push(svgLine(this.map(primitive.a), this.map(primitive.b), cssClass()));
         return;
       case 'circle': {
         const [cx, cy] = this.map(primitive.center);
         const r = n(primitive.radius * this.paperPerUnit);
-        const filled = primitive.style === 'cut';
-        this.parts.push(
-          `<circle cx="${n(cx)}" cy="${n(cy)}" r="${r}" class="${cssClass(filled)}"/>`,
-        );
+        const area = areaClass(primitive.fill, cssClass());
+        this.parts.push(`<circle cx="${n(cx)}" cy="${n(cy)}" r="${r}" class="${area}"/>`);
         return;
       }
       case 'arc': {
@@ -113,7 +113,7 @@ export class DrawingPainter {
         const large = wrapAngle(endAngle - startAngle) > Math.PI ? 1 : 0;
         const r = n(radius * this.paperPerUnit);
         this.parts.push(
-          `<path d="M ${n(start[0])} ${n(start[1])} A ${r} ${r} 0 ${large} 1 ${n(end[0])} ${n(end[1])}" class="${cssClass(false)}"/>`,
+          `<path d="M ${n(start[0])} ${n(start[1])} A ${r} ${r} 0 ${large} 1 ${n(end[0])} ${n(end[1])}" class="${cssClass()}"/>`,
         );
         return;
       }

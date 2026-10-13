@@ -123,8 +123,11 @@ describe('export_elevation_sheet', () => {
     const sheet = execute(box(), 'export_elevation_sheet', { direction: 'south', scale: 2 })
       .data as ElevationSheet;
     expect(sheet.svg).not.toContain('class="ground"');
-    // 1:2 → 5 × 20 mm steps (a 50 mm bar), not 5 × 0.1 m.
-    expect(sheet.svg).toContain('>0.1 m</text>');
+    // 1:2 → 5 × 20 mm steps (a 50 mm bar on paper), labelled in mm.
+    expect(sheet.svg).toContain('>100 mm</text>');
+    const full = execute(box(), 'export_elevation_sheet', { direction: 'south', scale: 1 })
+      .data as ElevationSheet;
+    expect(full.svg).toContain('>50 mm</text>');
     const hallSheet = execute(hall(), 'export_elevation_sheet', {}).data as ElevationSheet;
     expect(hallSheet.svg).toContain('class="ground"');
   });

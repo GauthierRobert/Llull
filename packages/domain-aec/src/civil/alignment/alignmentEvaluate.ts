@@ -8,6 +8,7 @@
 import type { Entity, Vec2 } from '@core/model/types';
 import type { AlignmentObject } from '@core/model/civil';
 import { civilLine, civilPoint, civilPolyline, civilText } from '../entities';
+import { readableAngle } from '@lib/angle';
 import {
   centrelinePoints,
   elementPointAt,
@@ -54,18 +55,11 @@ function stationTicks(context: CivilContext, alignment: AlignmentObject): Entity
         'stations',
         [x + nx * height * 2.5, y + ny * height * 2.5, 0],
         height,
-        normaliseAngle(placed.direction),
+        readableAngle(placed.direction),
       ),
     );
   }
   return entities;
-}
-
-function normaliseAngle(angle: number): number {
-  let a = angle;
-  while (a > Math.PI / 2) a -= Math.PI;
-  while (a < -Math.PI / 2) a += Math.PI;
-  return a;
 }
 
 function spiralAnnotations(

@@ -12,6 +12,7 @@ import { contourLevels, tinBounds, tinMesh, traceContour, type Tin } from './tin
 import { surfaceTin } from './surfaceTin';
 import { labelHeight, type CivilContext } from '../context';
 import { toMetres } from '@core/model/units';
+import { readableAngle } from '@lib/angle';
 
 /** Above this many points a group is kept as data only (no per-point markers). */
 export const MAX_DRAWN_POINTS = 2000;
@@ -33,9 +34,7 @@ function midpoint(line: ReadonlyArray<Vec2>): { at: Vec2; angle: number } {
   const index = Math.max(0, Math.floor((line.length - 1) / 2));
   const a = line[index] as Vec2;
   const b = (line[index + 1] ?? a) as Vec2;
-  let angle = Math.atan2(b[1] - a[1], b[0] - a[0]);
-  if (angle > Math.PI / 2) angle -= Math.PI;
-  if (angle < -Math.PI / 2) angle += Math.PI;
+  const angle = readableAngle(Math.atan2(b[1] - a[1], b[0] - a[0]));
   return { at: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], angle };
 }
 

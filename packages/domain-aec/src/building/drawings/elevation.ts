@@ -4,8 +4,7 @@
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
-import { DrawingPainter } from '../../shared/drawingSvg';
-import { LINE_PATTERNS, dashArray } from '@core/model/drawing';
+import { DrawingPainter, svgLine } from '../../shared/drawingSvg';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { toMetres, toMm } from '@core/model/units';
@@ -100,9 +99,7 @@ function buildElevationSheet(
         `<rect x="${n(left - 4)}" y="${n(groundY)}" width="${n(right - left + 8)}" height="${n(belowGrade + 0.5)}" fill="#fff" fill-opacity="0.7"/>`,
       );
     }
-    annotations.push(
-      `<line x1="${n(left - 4)}" y1="${n(groundY)}" x2="${n(right + 4)}" y2="${n(groundY)}" class="ground"/>`,
-    );
+    annotations.push(svgLine([left - 4, groundY], [right + 4, groundY], 'ground'));
   }
   for (const levelId of building.levelOrder) {
     const level = building.levels[levelId];
@@ -114,7 +111,7 @@ function buildElevationSheet(
     const namedByElevation = Math.abs(Number(level.name) - metres) < 1e-6;
     const label = namedByElevation ? datum : `${escapeXml(level.name)} ${datum}`;
     annotations.push(
-      `<line x1="${n(left)}" y1="${n(y)}" x2="${n(right)}" y2="${n(y)}" class="hidden"/>`,
+      svgLine([left, y], [right, y], 'hidden'),
       `<polygon points="${n(right + 2)},${n(y)} ${n(right)},${n(y - 2.5)} ${n(right + 4)},${n(y - 2.5)}" class="solid"/>`,
       `<text x="${n(right + 6)}" y="${n(y - 0.6)}" font-size="2.5" text-anchor="start">${label}</text>`,
     );
@@ -128,7 +125,7 @@ function buildElevationSheet(
     if (length === 0 || Math.abs((direction[screenAxis] as number) / length) > 0.01) continue;
     const x = toPaper([drawing.projection.u([grid.start[0], grid.start[1], 0]), 0])[0];
     annotations.push(
-      `<line x1="${n(x)}" y1="${n(top)}" x2="${n(x)}" y2="${n(bottom)}" class="grid"/>`,
+      svgLine([x, top], [x, bottom], 'center'),
       `<circle cx="${n(x)}" cy="${n(top - 4)}" r="4" class="frame-thin" fill="#fff"/>`,
       `<text x="${n(x)}" y="${n(top - 2.9)}" font-size="3" text-anchor="middle">${escapeXml(grid.mark)}</text>`,
     );
@@ -148,9 +145,7 @@ function buildElevationSheet(
     caption: `${title} · 1:${scale}${ground.length > 0 ? ' · levels in m' : ''}`,
     bodyId: 'view',
     body: view.join(''),
-    style:
-      '.ground{stroke:#000;stroke-width:0.7}' +
-      `.grid{stroke:#000;stroke-width:0.13;stroke-dasharray:${dashArray(LINE_PATTERNS.center, 1)}}`,
+    style: '.ground{stroke:#000;stroke-width:0.7}',
     overlays: [`<g id="annotations">${annotations.join('')}</g>`],
   });
   const project = fileSlug(building.project.name, 'project');

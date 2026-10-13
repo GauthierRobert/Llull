@@ -9,10 +9,11 @@
 
 import * as THREE from 'three';
 import type { Vec2 } from '@core/model/types';
-import { type DrawingPrimitive, LINE_PATTERNS } from '@core/model/drawing';
+import { type DrawingFill, type DrawingPrimitive, LINE_PATTERNS } from '@core/model/drawing';
 import { ansi31Hatch } from '@lib/hatch';
 import { positiveSweep } from '@lib/angle';
 import { sampleArc } from '@lib/arc';
+import { dimensionGeometry } from '@core/geometry/dimensionGeometry';
 
 const ARC_SEGMENTS = 32;
 
@@ -122,45 +123,37 @@ function addDimension(
   anchor: Vec2,
 ): void {
   const stroke = new THREE.Color(color);
-  const dx = primitive.b[0] - primitive.a[0];
-  const dy = primitive.b[1] - primitive.a[1];
-  const length = Math.hypot(dx, dy) || 1;
-  const normal: Vec2 = [dy / length, -dx / length];
-  const shift = (point: Vec2, distance: number): Vec2 => [
-    point[0] + normal[0] * distance,
-    point[1] + normal[1] * distance,
-  ];
-  const a = shift(primitive.a, primitive.offset);
-  const b = shift(primitive.b, primitive.offset);
-  buffer.add(
-    shift(primitive.a, primitive.offset * 0.15),
-    shift(primitive.a, primitive.offset * 1.1),
-    stroke,
-  );
-  buffer.add(
-    shift(primitive.b, primitive.offset * 0.15),
-    shift(primitive.b, primitive.offset * 1.1),
-    stroke,
-  );
-  buffer.add(a, b, stroke);
-  const tick = primitive.offset * 0.12;
-  for (const end of [a, b])
-    buffer.add([end[0] - tick, end[1] - tick], [end[0] + tick, end[1] + tick], stroke);
-  let angle = Math.atan2(dy, dx);
-  if (angle > Math.PI / 2 + 1e-9 || angle <= -Math.PI / 2 + 1e-9) angle += Math.PI;
-  const lift = primitive.offset * 0.22;
+  const { segments, label } = dimensionGeometry(primitive);
+  for (const [a, b] of segments) buffer.add(a, b, stroke);
   labels.push({
     key,
-    at: [
-      (a[0] + b[0]) / 2 - Math.sin(angle) * lift - anchor[0],
-      (a[1] + b[1]) / 2 + Math.cos(angle) * lift - anchor[1],
-    ],
-    height: primitive.offset * 0.25,
+    at: [label.at[0] - anchor[0], label.at[1] - anchor[1]],
+    height: label.height,
     content: primitive.label,
     color,
-    rotation: angle,
+    rotation: label.angle,
     dimension: true,
   });
+}
+
+/** An explicitly filled area: ANSI31 hatch lines (thin) or a solid poché region. */
+function fillArea(
+  buffers: DrawingBuffers,
+  { anchor, hatchSpacing }: { readonly anchor: Vec2; readonly hatchSpacing: number },
+  outer: ReadonlyArray<Vec2>,
+  holes: ReadonlyArray<ReadonlyArray<Vec2>>,
+  fill: DrawingFill | undefined,
+  stroke: THREE.Color,
+): void {
+  if (fill === 'hatch') {
+    for (const [a, b] of ansi31Hatch([outer, ...holes], hatchSpacing))
+      buffers.thin.add(a, b, stroke);
+  } else if (fill === 'solid') {
+    buffers.fills.push({
+      outer: relative(outer, anchor),
+      holes: holes.map((hole) => relative(hole, anchor)),
+    });
+  }
 }
 
 const relative = (points: ReadonlyArray<Vec2>, [ax, ay]: Vec2): Vec2[] =>
@@ -182,6 +175,7 @@ export function buildDrawingBuffers(
     fills: [],
     labels: [],
   };
+  const area = { anchor, hatchSpacing };
   items.forEach(({ primitive, color }, index) => {
     const stroke = new THREE.Color(color);
     const style = primitive.style;
@@ -198,18 +192,7 @@ export function buildDrawingBuffers(
     switch (primitive.type) {
       case 'polygon':
         ring(primitive.points, true);
-        if (primitive.fill === 'hatch') {
-          for (const [a, b] of ansi31Hatch(
-            [primitive.points, ...(primitive.holes ?? [])],
-            hatchSpacing,
-          ))
-            buffers.thin.add(a, b, stroke);
-        } else if (primitive.fill === 'solid' || style === 'cut') {
-          buffers.fills.push({
-            outer: relative(primitive.points, anchor),
-            holes: (primitive.holes ?? []).map((hole) => relative(hole, anchor)),
-          });
-        }
+        fillArea(buffers, area, primitive.points, primitive.holes ?? [], primitive.fill, stroke);
         break;
       case 'polyline':
         ring(primitive.points, false);
@@ -226,7 +209,7 @@ export function buildDrawingBuffers(
       case 'circle': {
         const points = arcPoints(primitive.center, primitive.radius, 0, Math.PI * 2).slice(0, -1);
         ring(points, true);
-        if (style === 'cut') buffers.fills.push({ outer: relative(points, anchor), holes: [] });
+        fillArea(buffers, area, points, [], primitive.fill, stroke);
         break;
       }
       case 'text':

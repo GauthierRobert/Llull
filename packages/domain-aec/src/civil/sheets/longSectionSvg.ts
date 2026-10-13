@@ -25,7 +25,6 @@ import {
   PLOT_ROW_HEIGHT,
   PLOT_TOP,
   levelFrame,
-  niceStep,
   pushLevelGrid,
   pushTableLabels,
   svgDocument,
@@ -34,6 +33,7 @@ import {
   svgRect,
   svgText,
 } from '../road/roadSvg';
+import { niceStep } from '@lib/niceStep';
 import { toMetres } from '@core/model/units';
 
 export const LONG_SECTION_LEFT = PLOT_LEFT;

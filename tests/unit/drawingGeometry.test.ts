@@ -53,7 +53,7 @@ describe('buildDrawingBuffers — ISO 128 line weights', () => {
     );
   });
 
-  it('fills a solid or unfilled cut, keeping its holes', () => {
+  it('fills only an explicit fill: solid keeps its holes, hatch draws lines, none stays open', () => {
     const buffers = buildDrawingBuffers(
       [
         styled({
@@ -68,12 +68,21 @@ describe('buildDrawingBuffers — ISO 128 line weights', () => {
           ],
         }),
         styled({ type: 'circle', layer: 'L', style: 'cut', center: [0, 0], radius: 1 }),
+        styled({
+          type: 'circle',
+          layer: 'L',
+          style: 'cut',
+          center: [9, 9],
+          radius: 4,
+          fill: 'hatch',
+        }),
       ],
       SCALE,
       [0, 0],
     );
-    expect(buffers.fills).toHaveLength(2);
+    expect(buffers.fills).toHaveLength(1);
     expect(buffers.fills[0]?.holes).toHaveLength(1);
+    expect(segmentCount(buffers.thin.positions)).toBeGreaterThan(3);
   });
 
   it('breaks a centre line into long dashes and dots (chain line)', () => {

@@ -11,6 +11,7 @@ import type { Triangle } from './triangles';
 import { toRadians } from '../lib/angle';
 import { cross3, dot3, sub3 } from '../lib/vec3';
 import { boundsOfPoints } from './bounds';
+import { quantizedKey } from '../lib/quantize';
 import { type UnitPlane, planeChords } from './planeEdges';
 
 /** A view: the unit direction toward the viewer and the map of a world point onto the sheet. */
@@ -76,7 +77,7 @@ export interface FeatureEdge {
 
 /** Feature, boundary and silhouette edges of a face set (shared edges welded at `tolerance`). */
 export function featureEdges(faces: ReadonlyArray<Face>, tolerance: number): FeatureEdge[] {
-  const pointKey = (p: Vec3): string => p.map((value) => Math.round(value / tolerance)).join(',');
+  const pointKey = (p: Vec3): string => quantizedKey(p, tolerance);
   const byEdge = new Map<string, { a: Vec3; b: Vec3; faces: number[] }>();
   faces.forEach((face, index) => {
     for (let corner = 0; corner < 3; corner++) {

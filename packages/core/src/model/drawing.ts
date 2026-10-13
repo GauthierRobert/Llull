@@ -33,7 +33,10 @@ export function dashArray(pattern: ReadonlyArray<number>, unit: number): string 
   return pattern.map((length) => Number((length * unit).toFixed(3))).join(' ');
 }
 
-/** Area fill of a cut: hatch (ANSI31, 45°) or solid (steel). */
+/**
+ * Area fill of a closed polygon or circle: hatch (ANSI31, 45°) or solid (steel). Fill is explicit
+ * data — no renderer infers it from the line style.
+ */
 export type DrawingFill = 'hatch' | 'solid';
 
 export type DrawingPrimitive =
@@ -74,6 +77,7 @@ export type DrawingPrimitive =
       readonly style: DrawingStyle;
       readonly center: Vec2;
       readonly radius: number;
+      readonly fill?: DrawingFill;
     }
   | {
       readonly type: 'text';
@@ -132,4 +136,10 @@ export function drawingBounds(
     }
   }
   return Number.isFinite(minX) ? [minX, minY, maxX, maxY] : [0, 0, 0, 0];
+}
+
+/** Join tolerance of a drawing: a millionth of its extent (at least a millionth of a unit). @pure */
+export function drawingTolerance(primitives: ReadonlyArray<DrawingPrimitive>): number {
+  const [minX, minY, maxX, maxY] = drawingBounds(primitives);
+  return Math.max(maxX - minX, maxY - minY, 1) * 1e-6;
 }

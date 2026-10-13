@@ -9,6 +9,7 @@
 
 import type { Vec3 } from '../model/types';
 import { dot3, lerp3, sub3 } from '../lib/vec3';
+import { quantizedKey } from '../lib/quantize';
 
 /** Unit-normal plane; `signedDistance(plane, p) > 0` is its positive side. */
 export interface UnitPlane {
@@ -78,36 +79,77 @@ export function planeChords(
   return segments;
 }
 
+/** Consecutive points of a chain; a closed chain does not repeat its first point. */
+export interface SegmentChain<P> {
+  readonly points: P[];
+  readonly closed: boolean;
+}
+
 /**
- * Chains unordered segments into loops by shared endpoints (welded at `tolerance`); open chains
- * are kept and implicitly closed. Works for 2D and 3D points alike.
+ * Chains unordered segments by shared endpoints (welded at `tolerance`), extending each chain both
+ * ways. `stopAtJunctions`: a chain only continues through a point where exactly two segments meet
+ * (a T or X junction ends it); otherwise it takes any unused segment. Works for 2D and 3D points.
+ */
+export function chainSegments<P extends readonly number[]>(
+  segments: ReadonlyArray<readonly [P, P]>,
+  tolerance: number,
+  stopAtJunctions: boolean,
+): SegmentChain<P>[] {
+  const key = (p: P): string => quantizedKey(p, tolerance);
+  const meeting = new Map<string, number[]>();
+  segments.forEach((segment, index) => {
+    for (const end of segment) meeting.set(key(end), [...(meeting.get(key(end)) ?? []), index]);
+  });
+  const used = new Array<boolean>(segments.length).fill(false);
+  const continuation = (point: P): number | undefined => {
+    const ids = meeting.get(key(point)) ?? [];
+    if (stopAtJunctions && ids.length !== 2) return undefined;
+    return ids.find((id) => !used[id]);
+  };
+  const otherEnd = (index: number, point: P): P => {
+    const [a, b] = segments[index] as readonly [P, P];
+    return key(a) === key(point) ? b : a;
+  };
+  const chains: SegmentChain<P>[] = [];
+  segments.forEach(([first, second], start) => {
+    if (used[start]) return;
+    used[start] = true;
+    const points: P[] = [first, second];
+    let closed = false;
+    for (
+      let next = continuation(second);
+      next !== undefined;
+      next = continuation(points[points.length - 1] as P)
+    ) {
+      used[next] = true;
+      const point = otherEnd(next, points[points.length - 1] as P);
+      if (key(point) === key(first)) {
+        closed = true;
+        break;
+      }
+      points.push(point);
+    }
+    for (
+      let prev = closed ? undefined : continuation(first);
+      prev !== undefined;
+      prev = continuation(points[0] as P)
+    ) {
+      used[prev] = true;
+      points.unshift(otherEnd(prev, points[0] as P));
+    }
+    chains.push({ points, closed });
+  });
+  return chains;
+}
+
+/**
+ * Chains unordered section segments into loops (open chains are kept and implicitly closed).
  */
 export function chainLoops<P extends readonly number[]>(
   segments: ReadonlyArray<readonly [P, P]>,
   tolerance: number,
 ): P[][] {
-  const key = (p: P): string => p.map((c) => Math.round(c / tolerance)).join(',');
-  const byEnd = new Map<string, number[]>();
-  segments.forEach(([a, b], index) => {
-    for (const k of [key(a), key(b)]) byEnd.set(k, [...(byEnd.get(k) ?? []), index]);
-  });
-  const used = new Array<boolean>(segments.length).fill(false);
-  const loops: P[][] = [];
-  segments.forEach(([first, second], start) => {
-    if (used[start]) return;
-    used[start] = true;
-    const loop: P[] = [first, second];
-    let tail = second;
-    for (;;) {
-      const next = (byEnd.get(key(tail)) ?? []).find((i) => !used[i]);
-      if (next === undefined) break;
-      used[next] = true;
-      const [a, b] = segments[next] as readonly [P, P];
-      tail = key(a) === key(tail) ? b : a;
-      if (key(tail) === key(first)) break;
-      loop.push(tail);
-    }
-    if (loop.length >= 3) loops.push(loop);
-  });
-  return loops;
+  return chainSegments(segments, tolerance, false)
+    .map((chain) => chain.points)
+    .filter((points) => points.length >= 3);
 }

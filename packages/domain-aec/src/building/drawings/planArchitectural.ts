@@ -276,6 +276,7 @@ export function columnPrimitive(column: ColumnElement): DrawingPrimitive {
       type: 'circle',
       layer,
       style: 'cut',
+      fill: 'hatch',
       center: column.location,
       radius: column.width / 2,
     };

@@ -8,8 +8,9 @@
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { LINE_PATTERNS, dashArray } from '@core/model/drawing';
 import { z } from '@core/commands/schema';
-import { toDegrees, toRadians } from '@lib/angle';
+import { readableAngle, toDegrees } from '@lib/angle';
 import { escapeXml } from '@lib/escapeXml';
+import { niceStep } from '@lib/niceStep';
 import { getBuilding } from '../building/model';
 import { round } from './numeric';
 
@@ -88,11 +89,9 @@ export function readableDimensionLabel(
   dx: number,
   dy: number,
 ): { readonly angle: number; readonly middle: Vec2 } {
-  let angle = toDegrees(Math.atan2(dy, dx));
-  if (angle > 90 || angle <= -90) angle += 180;
-  const radians = toRadians(angle);
+  const radians = readableAngle(Math.atan2(dy, dx));
   return {
-    angle,
+    angle: toDegrees(radians),
     middle: [
       (da[0] + db[0]) / 2 + Math.sin(radians) * 1.2,
       (da[1] + db[1]) / 2 - Math.cos(radians) * 1.2,
@@ -131,8 +130,7 @@ export function fitScale(widthMm: number, heightMm: number, viewport: Viewport):
   const largest = STANDARD_SCALES[STANDARD_SCALES.length - 1] as number;
   const needed = Math.max(widthMm / (viewport.width * 0.92), heightMm / (viewport.height * 0.92));
   if (!(needed > largest) || !Number.isFinite(needed)) return largest;
-  const decade = 10 ** Math.floor(Math.log10(needed));
-  return ([1, 2, 5, 10] as const).map((step) => step * decade).find((c) => c >= needed) as number;
+  return niceStep(needed);
 }
 
 /** Shared drawing-sheet stylesheet (line weights in paper millimetres). */
@@ -195,12 +193,16 @@ export function northArrow(x: number, y: number): string {
   );
 }
 
+/** A length in metres as scale-bar text: millimetres below 1 m ("5 mm", "250 mm"), metres above. */
+function lengthLabel(metres: number): string {
+  return metres < 1
+    ? `${Number((metres * 1000).toPrecision(6))} mm`
+    : `${Number(metres.toPrecision(6))} m`;
+}
+
 function scaleBar(x: number, y: number, scale: number): string {
-  // 1-2-5 steps from 1 mm (machine parts at 1:1, 2:1…) to 100 m (site plans).
-  const stepsMetres = [
-    0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100,
-  ];
-  const step = stepsMetres.find((metres) => (metres * 1000) / scale >= 8) ?? 100;
+  // A 1-2-5 step of at least 8 paper mm: millimetres for machine parts, up to kilometres for sites.
+  const step = niceStep((8 * scale) / 1000);
   const stepMm = (step * 1000) / scale;
   const parts = [`<g id="scale-bar">`];
   for (let index = 0; index < 5; index++) {
@@ -210,7 +212,7 @@ function scaleBar(x: number, y: number, scale: number): string {
   }
   parts.push(
     `<text x="${n(x)}" y="${n(y + 5.5)}" font-size="2.4" text-anchor="middle">0</text>`,
-    `<text x="${n(x + 5 * stepMm)}" y="${n(y + 5.5)}" font-size="2.4" text-anchor="middle">${n(5 * step)} m</text>`,
+    `<text x="${n(x + 5 * stepMm)}" y="${n(y + 5.5)}" font-size="2.4" text-anchor="middle">${lengthLabel(5 * step)}</text>`,
     `</g>`,
   );
   return parts.join('');

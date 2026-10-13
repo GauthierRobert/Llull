@@ -13,6 +13,7 @@ import type { DrawingPrimitive } from '../model/drawing';
 import { add3, dot3, normalize3, scale3, sub3 } from '../lib/vec3';
 import { entityLocalToWorld } from './entityFrame';
 import { expandInstance } from './instanceExpansion';
+import { quantizedKey } from '../lib/quantize';
 import type { Bounds } from './bounds';
 import { rotatedEntityBounds } from './rotatedBounds';
 import { revolutionAxisIndex } from './revolution';
@@ -160,9 +161,10 @@ function axisWithin(axis: RoundAxis, box: Bounds): RoundAxis | null {
 function axisBehindCut(axis: RoundAxis, frame: ViewFrame, cutDepth: number): RoundAxis | null {
   if (!Number.isFinite(cutDepth)) return axis;
   const base = dot3(axis.origin, frame.toViewer);
-  if (axis.direction === null) return base <= cutDepth ? axis : null;
+  // A sphere, or an axis seen side-on, keeps its line while any of its body reaches behind the cut.
+  if (axis.direction === null) return base - axis.radius <= cutDepth ? axis : null;
   const rate = dot3(axis.direction, frame.toViewer);
-  if (Math.abs(rate) < 1e-12) return base <= cutDepth ? axis : null;
+  if (Math.abs(rate) < 1e-12) return base - axis.radius <= cutDepth ? axis : null;
   const limit = (cutDepth - base) / rate;
   const [from, to] =
     rate > 0 ? [axis.from, Math.min(axis.to, limit)] : [Math.max(axis.from, limit), axis.to];
@@ -182,9 +184,6 @@ function roundAxes(entity: Entity, doc: Pick<CadDocument, 'components'>, depth =
     return kept ? [kept] : [];
   });
 }
-
-const roundKey = (values: ReadonlyArray<number>, unit: number): string =>
-  values.map((value) => Math.round(value / unit)).join(',');
 
 /** ISO centre mark of a circle: two chain lines crossing at `center`, overshooting the outline. @pure */
 export function centreMarkLines(center: Vec2, radius: number, layer: string): DrawingPrimitive[] {
@@ -213,7 +212,7 @@ function pitchCircles(
 ): Array<Omit<CentreMark, 'depth'>> {
   const groups = new Map<string, CentreMark[]>();
   for (const mark of marks) {
-    const key = roundKey([mark.radius, mark.depth], unit);
+    const key = quantizedKey([mark.radius, mark.depth], unit);
     groups.set(key, [...(groups.get(key) ?? []), mark]);
   }
   const circles: Array<Omit<CentreMark, 'depth'>> = [];
@@ -262,7 +261,7 @@ export function centerLinePrimitives(
   const primitives: DrawingPrimitive[] = [];
   const marks = new Map<string, CentreMark>();
   const line = (a: Vec2, b: Vec2): void => {
-    const key = roundKey([...a, ...b], unit);
+    const key = quantizedKey([...a, ...b], unit);
     if (seen.has(key)) return;
     seen.add(key);
     primitives.push({ type: 'line', layer, style: 'center', a, b });
@@ -278,8 +277,8 @@ export function centerLinePrimitives(
           : add3(axis.origin, scale3(axis.direction, (axis.from + axis.to) / 2));
       const center = frame.project(middle);
       const mark = { center, radius: axis.radius, depth: dot3(middle, frame.toViewer) };
-      marks.set(roundKey([...center, axis.radius, mark.depth], unit), mark);
-      const key = roundKey(center, unit);
+      marks.set(quantizedKey([...center, axis.radius, mark.depth], unit), mark);
+      const key = quantizedKey(center, unit);
       if ((crosses.get(key)?.radius ?? 0) < axis.radius) crosses.set(key, mark);
     } else if (along < SIDE_ON && axis.direction !== null) {
       const overshoot = axis.radius * OVERSHOOT;

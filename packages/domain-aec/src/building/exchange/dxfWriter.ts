@@ -5,6 +5,8 @@
 import { toDegrees } from '@lib/angle';
 import type { DocumentUnit, Vec2, Vec3 } from '@core/model/types';
 import { ansi31Hatch } from '@lib/hatch';
+import { sampleArc } from '@lib/arc';
+import { dimensionGeometry } from '@core/geometry/dimensionGeometry';
 import { triangulatePolygon } from '@lib/triangulate';
 import { round } from '../../shared/numeric';
 import type { DrawingFill, DrawingPrimitive } from '@core/model/drawing';
@@ -200,43 +202,9 @@ function writeDimension(
   writer: DxfWriter,
   primitive: Extract<DrawingPrimitive, { type: 'dimension' }>,
 ): void {
-  const dx = primitive.b[0] - primitive.a[0];
-  const dy = primitive.b[1] - primitive.a[1];
-  const length = Math.hypot(dx, dy) || 1;
-  const normal: Vec2 = [dy / length, -dx / length];
-  const shift = (point: Vec2, distance: number): Vec2 => [
-    point[0] + normal[0] * distance,
-    point[1] + normal[1] * distance,
-  ];
-  const a = shift(primitive.a, primitive.offset);
-  const b = shift(primitive.b, primitive.offset);
-  const tick = primitive.offset * 0.12;
-  writer.line(
-    primitive.layer,
-    shift(primitive.a, primitive.offset * 0.15),
-    shift(primitive.a, primitive.offset * 1.1),
-  );
-  writer.line(
-    primitive.layer,
-    shift(primitive.b, primitive.offset * 0.15),
-    shift(primitive.b, primitive.offset * 1.1),
-  );
-  writer.line(primitive.layer, a, b);
-  for (const end of [a, b]) {
-    writer.line(primitive.layer, [end[0] - tick, end[1] - tick], [end[0] + tick, end[1] + tick]);
-  }
-  let angle = Math.atan2(dy, dx);
-  if (angle > Math.PI / 2 + 1e-9 || angle <= -Math.PI / 2 + 1e-9) angle += Math.PI;
-  const middle: Vec2 = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-  const lift = -primitive.offset * 0.2;
-  writer.text(
-    primitive.layer,
-    [middle[0] - Math.sin(angle) * lift, middle[1] + Math.cos(angle) * lift],
-    primitive.offset * 0.25,
-    primitive.label,
-    'center',
-    angle,
-  );
+  const { segments, label } = dimensionGeometry(primitive);
+  for (const [a, b] of segments) writer.line(primitive.layer, a, b);
+  writer.text(primitive.layer, label.at, label.height, primitive.label, 'center', label.angle);
 }
 
 /** Pattern layer of a cut layer, e.g. A-WALL → A-WALL-PATT (AIA / NCS). */
@@ -304,15 +272,9 @@ export function writePrimitive(
       return;
     case 'circle':
       writer.circle(primitive.layer, primitive.center, primitive.radius);
-      if (primitive.style === 'cut') {
-        const ring = Array.from({ length: 32 }, (_, index): Vec2 => {
-          const angle = (index / 32) * Math.PI * 2;
-          return [
-            primitive.center[0] + primitive.radius * Math.cos(angle),
-            primitive.center[1] + primitive.radius * Math.sin(angle),
-          ];
-        });
-        writeFill(writer, primitive.layer, ring, [], 'hatch', hatchSpacing);
+      if (primitive.fill !== undefined) {
+        const ring = sampleArc(primitive.center, primitive.radius, 0, Math.PI * 2, 32);
+        writeFill(writer, primitive.layer, ring, [], primitive.fill, hatchSpacing);
       }
       return;
     case 'text':

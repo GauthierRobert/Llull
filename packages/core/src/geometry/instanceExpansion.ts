@@ -5,7 +5,14 @@
  * @layer core/commands
  */
 
-import { type Component, type Entity, type InstanceEntity, type Vec3, is3D } from '../model/types';
+import {
+  type CadDocument,
+  type Component,
+  type Entity,
+  type InstanceEntity,
+  type Vec3,
+  is3D,
+} from '../model/types';
 import { solidTriangles } from './solidTriangles';
 import { isZeroRotation } from '../lib/eulerRotation';
 import { add3 } from '../lib/vec3';
@@ -109,4 +116,17 @@ export function expandInstance(instance: InstanceEntity, component: Component): 
         rotation: add3(childEntity.rotation, rot),
       } as Entity;
     });
+}
+
+/**
+ * What an entity's expanded geometry depends on beyond the entity object itself: an instance's
+ * whole component map (nested instances reach any component), nothing for other entities. Caches
+ * keyed by the (immutable) entity compare it to stay correct.
+ * @pure
+ */
+export function expansionDependency(
+  entity: Entity,
+  doc: Pick<CadDocument, 'components'>,
+): CadDocument['components'] | undefined {
+  return entity.kind === 'instance' ? doc.components : undefined;
 }
