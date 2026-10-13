@@ -37,10 +37,9 @@ function slopeText(pipe: PipeObject, length: number): string {
 export const addPipe = defineCommand({
   name: 'add_pipe',
   description:
-    'Add a gravity pipe from the upstream manhole `fromId` to the downstream manhole `toId` (flow ' +
-    'direction). Inverts default to the manhole inverts; diameter 300 mm, PVC, n 0.013. Refuses ' +
-    'self-loops, duplicates and loops in the network; warns on adverse (uphill) slope. Then run ' +
-    'check_drainage_network or size_drainage_pipes.',
+    'Add a gravity pipe from the upstream manhole `fromId` to the downstream manhole `toId` (flow direction). Inverts default to the ' +
+    'manhole inverts; diameter 300 mm, PVC, n 0.013. Refuses self-loops, duplicates and loops in the network; warns on adverse (uphill) ' +
+    'slope. Then run check_drainage_network or size_drainage_pipes.',
   params: z.object({
     fromId: z.string().describe('Upstream manhole id, e.g. "manhole-1".'),
     toId: z.string().describe('Downstream manhole id.'),
@@ -50,21 +49,15 @@ export const addPipe = defineCommand({
     const civil = getCivil(doc);
     const from = civilObject(civil, params.fromId, 'manhole');
     const to = civilObject(civil, params.toId, 'manhole');
-    if (!from || !to) {
-      return noop(doc, `add_pipe failed: ${!from ? params.fromId : params.toId} is not a manhole in this document.`);
-    }
+    if (!from || !to) return noop(doc, `add_pipe failed: ${!from ? params.fromId : params.toId} is not a manhole in this document.`);
     if (from.id === to.id) return noop(doc, `add_pipe failed: ${from.id} cannot connect to itself.`);
     const problem = checkPipeValues(params);
     if (problem !== null) return noop(doc, `add_pipe failed: ${problem}`);
     const duplicate = civilObjectsOf(civil, 'pipe').find(
       (pipe) => (pipe.fromId === from.id && pipe.toId === to.id) || (pipe.fromId === to.id && pipe.toId === from.id),
     );
-    if (duplicate) {
-      return noop(doc, `add_pipe failed: ${duplicate.id} already connects ${from.id} and ${to.id}.`);
-    }
-    if (flowsTo(civil, to.id, from.id)) {
-      return noop(doc, `add_pipe failed: ${from.id} -> ${to.id} would close a loop in the network.`);
-    }
+    if (duplicate) return noop(doc, `add_pipe failed: ${duplicate.id} already connects ${from.id} and ${to.id}.`);
+    if (flowsTo(civil, to.id, from.id)) return noop(doc, `add_pipe failed: ${from.id} -> ${to.id} would close a loop in the network.`);
     const id = nextCivilId(civil, 'pipe');
     const pipe: PipeObject = {
       id,
@@ -102,10 +95,7 @@ export const updatePipe = defineCommand({
   description:
     'Edit a drainage pipe: diameter, material, Manning n, end invert elevations or name. ' +
     'Endpoints (fromId / toId) cannot change; delete and re-add the pipe instead.',
-  params: z.object({
-    pipeId: z.string().describe('Pipe id, e.g. "pipe-1".'),
-    ...pipeFields,
-  }),
+  params: z.object({ pipeId: z.string().describe('Pipe id, e.g. "pipe-1".'), ...pipeFields }),
   run: (doc, params): CommandResult => {
     const civil = getCivil(doc);
     const pipe = civilObject(civil, params.pipeId, 'pipe');

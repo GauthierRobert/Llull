@@ -1,6 +1,6 @@
 /**
- * ASCII DXF reader: header units, layer table, blocks and entities, flattened into world-space
- * primitives (block inserts expanded, LWPOLYLINE bulges and mirrored OCS handled).
+ * ASCII DXF reader: header units, layer table, blocks and entities, flattened into world-space primitives (block inserts expanded,
+ * LWPOLYLINE bulges and mirrored OCS handled).
  */
 
 import type { Vec3 } from '../model/vectors';
@@ -48,13 +48,7 @@ export type DxfPrimitive = Common &
       }
     | { readonly kind: 'circle'; readonly center: Vec3; readonly radius: number }
     | { readonly kind: 'point'; readonly at: Vec3 }
-    | {
-        readonly kind: 'text';
-        readonly at: Vec3;
-        readonly height: number;
-        readonly rotation: number;
-        readonly content: string;
-      }
+    | { readonly kind: 'text'; readonly at: Vec3; readonly height: number; readonly rotation: number; readonly content: string }
     | { readonly kind: 'face'; readonly corners: readonly Vec3[] }
   );
 
@@ -126,11 +120,8 @@ export function parseDxf(text: string): DxfDrawing | null {
       current = [];
       sections.set(name, current);
       index += 1;
-    } else if (code === 0 && value === 'ENDSEC') {
-      current = null;
-    } else {
-      current?.push([code, value]);
-    }
+    } else if (code === 0 && value === 'ENDSEC') current = null;
+    else current?.push([code, value]);
   }
   const entitiesSection = sections.get('ENTITIES');
   if (entitiesSection === undefined) return null;
@@ -146,18 +137,16 @@ export function parseDxf(text: string): DxfDrawing | null {
   const blocks = new Map<string, DxfBlock>();
   let block: { name: string; base: Vec3; entities: DxfRecord[] } | null = null;
   for (const record of groupPolylines(records(sections.get('BLOCKS') ?? []))) {
-    if (record.type === 'BLOCK') {
+    if (record.type === 'BLOCK')
       block = {
         name: codeValue(record, 2) ?? '',
         base: [codeNumber(record, 10, 0), codeNumber(record, 20, 0), codeNumber(record, 30, 0)],
         entities: [],
       };
-    } else if (record.type === 'ENDBLK') {
+    else if (record.type === 'ENDBLK') {
       if (block) blocks.set(block.name, { base: block.base, entities: block.entities });
       block = null;
-    } else {
-      block?.entities.push(record);
-    }
+    } else block?.entities.push(record);
   }
   return {
     insUnits: insUnits !== null && Number.isFinite(insUnits) ? insUnits : null,
@@ -274,8 +263,8 @@ export interface FlattenResult {
 const MAX_DXF_PRIMITIVES = 200000;
 
 /**
- * World-space primitives of every entity (block inserts expanded up to `maxDepth`); entities past
- * `maxPrimitives` are counted in `skipped` as "over limit".
+ * World-space primitives of every entity (block inserts expanded up to `maxDepth`); entities past `maxPrimitives` are counted in `skipped`
+ * as "over limit".
  */
 export function flattenDxf(drawing: DxfDrawing, maxDepth = 8, maxPrimitives = MAX_DXF_PRIMITIVES): FlattenResult {
   const primitives: DxfPrimitive[] = [];
@@ -294,12 +283,7 @@ export function flattenDxf(drawing: DxfDrawing, maxDepth = 8, maxPrimitives = MA
       const world = (local: Vec3): Vec3 => transform.apply(ocs(record, local));
       switch (record.type) {
         case 'LINE':
-          primitives.push({
-            ...common,
-            kind: 'line',
-            a: world(point(record)),
-            b: world(point(record, 1)),
-          });
+          primitives.push({ ...common, kind: 'line', a: world(point(record)), b: world(point(record, 1)) });
           break;
         case 'POINT':
           primitives.push({ ...common, kind: 'point', at: world(point(record)) });
@@ -321,9 +305,7 @@ export function flattenDxf(drawing: DxfDrawing, maxDepth = 8, maxPrimitives = MA
             const local = point(vertex);
             return world((flags & 8) === 8 ? local : [local[0], local[1], elevation]);
           });
-          if (points.length >= 2) {
-            primitives.push({ ...common, kind: 'polyline', points, closed: (flags & 1) === 1 });
-          }
+          if (points.length >= 2) primitives.push({ ...common, kind: 'polyline', points, closed: (flags & 1) === 1 });
           break;
         }
         case 'ARC':
@@ -339,20 +321,9 @@ export function flattenDxf(drawing: DxfDrawing, maxDepth = 8, maxPrimitives = MA
             const points = arcPoints(ocs(record, local), radius, start, record.type === 'ARC' ? end : Math.PI * 2).map((p) =>
               transform.apply(p),
             );
-            primitives.push({
-              ...common,
-              kind: 'polyline',
-              points,
-              closed: record.type === 'CIRCLE',
-            });
-          } else if (record.type === 'CIRCLE') {
-            primitives.push({
-              ...common,
-              kind: 'circle',
-              center,
-              radius: radius * transform.scale,
-            });
-          } else {
+            primitives.push({ ...common, kind: 'polyline', points, closed: record.type === 'CIRCLE' });
+          } else if (record.type === 'CIRCLE') primitives.push({ ...common, kind: 'circle', center, radius: radius * transform.scale });
+          else
             primitives.push({
               ...common,
               kind: 'arc',
@@ -361,7 +332,6 @@ export function flattenDxf(drawing: DxfDrawing, maxDepth = 8, maxPrimitives = MA
               start: start + transform.rotation,
               end: end + transform.rotation,
             });
-          }
           break;
         }
         case 'TEXT':

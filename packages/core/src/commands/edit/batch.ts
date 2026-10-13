@@ -11,28 +11,25 @@ import { translated } from '../solids/shared';
 import { changed, noop } from '../noop';
 
 type BatchIds =
-  | { readonly ok: true; readonly existing: string[]; readonly missing: string[] }
+  | { readonly ok: true; readonly existing: string[]; readonly label: string; readonly skipped: string }
   | { readonly ok: false; readonly result: CommandResult };
 
 /**
  * Validate and split the `ids` of a batch command (`delete_entities`, `move_entities`).
- *
  * @param emptyDetail summary text (after `<command>: `) used when `ids` is empty
  * @failure empty, > MAX_BATCH_IDS, or no listed entity exists -> `{ ok: false, result }` no-op
- * @invariant `existing` and `missing` are de-duplicated, in first-seen order
+ * @invariant `existing` is de-duplicated, in first-seen order; `label` = "<n> entit(y|ies) [ids]", `skipped` = missing-ids suffix
  */
 function resolveBatchIds(doc: CadDocument, command: string, ids: readonly string[], emptyDetail: string): BatchIds {
-  const fail = (summary: string): BatchIds => ({
-    ok: false,
-    result: noop(doc, `${command}: ${summary}`),
-  });
+  const fail = (summary: string): BatchIds => ({ ok: false, result: noop(doc, `${command}: ${summary}`) });
   if (ids.length === 0) return fail(emptyDetail);
   if (ids.length > MAX_BATCH_IDS) return fail(`${ids.length} ids exceeds MAX_BATCH_IDS (${MAX_BATCH_IDS}).`);
   const unique = [...new Set(ids)];
   const existing = unique.filter((id) => Object.hasOwn(doc.entities, id));
   const missing = unique.filter((id) => !Object.hasOwn(doc.entities, id));
   if (existing.length === 0) return fail(`no listed entity exists (missing: [${missing.join(', ')}]).`);
-  return { ok: true, existing, missing };
+  const label = `${existing.length} entit${existing.length === 1 ? 'y' : 'ies'} [${existing.join(', ')}]`;
+  return { ok: true, existing, label, skipped: missing.length > 0 ? ` Skipped missing: [${missing.join(', ')}].` : '' };
 }
 
 /**
@@ -46,26 +43,17 @@ export const deleteEntities = defineCommand({
   annotations: { destructive: true },
   description:
     'Permanently remove several entities in one step (one undo). Entities are also removed from groups, and groups left with fewer than ' +
-    '2 members are dissolved. Ids that do not exist are skipped and listed in the summary; ' +
-    'if none exist nothing changes.',
+    '2 members are dissolved. Ids that do not exist are skipped and listed in the summary; if none exist nothing changes.',
   params: z.object({
     ids: z.array(z.string()).describe(`Entity ids to delete (non-empty, at most ${MAX_BATCH_IDS}). Missing ids are skipped.`),
   }),
   run: (doc, { ids }): CommandResult => {
     const batch = resolveBatchIds(doc, 'delete_entities', ids, 'ids must be a non-empty array of strings.');
     if (!batch.ok) return batch.result;
-    const { existing, missing } = batch;
-
+    const { existing, label, skipped } = batch;
     const { document, dissolvedGroups, prunedReferences } = withoutEntities(doc, new Set(existing));
-
     const dissolveSuffix = dissolvedGroups.length > 0 ? ` Dissolved group(s): [${dissolvedGroups.join(', ')}] (fell below 2 members).` : '';
-    const missingSuffix = missing.length > 0 ? ` Skipped missing: [${missing.join(', ')}].` : '';
-
-    return changed(
-      document,
-      `Deleted ${existing.length} entit${existing.length === 1 ? 'y' : 'ies'} [${existing.join(', ')}].${dissolveSuffix}${referenceSuffix(prunedReferences)}${missingSuffix}`,
-      existing,
-    );
+    return changed(document, `Deleted ${label}.${dissolveSuffix}${referenceSuffix(prunedReferences)}${skipped}`, existing);
   },
 });
 
@@ -86,18 +74,13 @@ export const moveEntities = defineCommand({
   run: (doc, { ids, delta }): CommandResult => {
     const batch = resolveBatchIds(doc, 'move_entities', ids, 'ids must be a non-empty array.');
     if (!batch.ok) return batch.result;
-    const { existing, missing } = batch;
+    const { existing, label, skipped } = batch;
     const entities = { ...doc.entities };
     for (const id of existing) {
       const target = entities[id];
       if (target) entities[id] = translated(target, delta);
     }
-    const missingSuffix = missing.length > 0 ? ` Skipped missing: [${missing.join(', ')}].` : '';
-    return changed(
-      { ...doc, entities },
-      `Moved ${existing.length} entit${existing.length === 1 ? 'y' : 'ies'} [${existing.join(', ')}] by [${delta.join(', ')}].${missingSuffix}`,
-      existing,
-    );
+    return changed({ ...doc, entities }, `Moved ${label} by [${delta.join(', ')}].${skipped}`, existing);
   },
 });
 
@@ -110,8 +93,7 @@ export const duplicateEntities = defineCommand({
   name: 'duplicate_entities',
   description:
     'Clone several entities in one step (one undo), placing each copy at original.position + offset. ' +
-    'Group membership is not copied. ' +
-    'Ids that do not exist are skipped and listed in the summary; if none exist nothing changes. ' +
+    'Group membership is not copied. Ids that do not exist are skipped and listed in the summary; if none exist nothing changes. ' +
     'Returns the new entity ids in affected, in the order of the (de-duplicated) input ids.',
   params: z.object({
     ids: z.array(z.string()).describe(`Entity ids to duplicate (non-empty, at most ${MAX_BATCH_IDS}). Missing ids are skipped.`),
@@ -120,16 +102,15 @@ export const duplicateEntities = defineCommand({
   run: (doc, { ids, offset = ORIGIN }): CommandResult => {
     const batch = resolveBatchIds(doc, 'duplicate_entities', ids, 'ids must be a non-empty array.');
     if (!batch.ok) return batch.result;
-    const { existing, missing } = batch;
+    const { existing, label, skipped } = batch;
     const copies = existing.map((id): Entity => {
       const source = doc.entities[id] as Entity;
       return { ...translated(source, offset), id: nextId(source.kind) };
     });
     const newIds = copies.map((copy) => copy.id);
-    const missingSuffix = missing.length > 0 ? ` Skipped missing: [${missing.join(', ')}].` : '';
     return changed(
       withEntities(doc, copies),
-      `Duplicated ${existing.length} entit${existing.length === 1 ? 'y' : 'ies'} [${existing.join(', ')}] → [${newIds.join(', ')}] at offset [${offset.join(', ')}].${missingSuffix}`,
+      `Duplicated ${label} → [${newIds.join(', ')}] at offset [${offset.join(', ')}].${skipped}`,
       newIds,
     );
   },

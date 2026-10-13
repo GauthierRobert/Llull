@@ -20,16 +20,7 @@ const subdivision = (
   levels: number,
   position: Vec3 = [0, 0, 0],
   rotation: Vec3 = [0, 0, 0],
-): SubdivisionEntity =>
-  ({
-    id: 's',
-    kind: 'subdivision',
-    ...cage,
-    levels,
-    position,
-    rotation,
-    ...common,
-  }) as Entity as SubdivisionEntity;
+): SubdivisionEntity => ({ id: 's', kind: 'subdivision', ...cage, levels, position, rotation, ...common }) as Entity as SubdivisionEntity;
 
 /** Volume of the subdivided mesh at a deep level (converges to the limit surface from outside). */
 function limitVolume(entity: SubdivisionEntity): number {
@@ -94,11 +85,7 @@ describe('occt exact subdivision solids', () => {
       [5, y, 3],
       [10, y, 0],
     ];
-    const result = execute(createEmptyDocument(), 'surface_from_curves', {
-      curves: [bow(0), bow(8)],
-      thickness: 0.5,
-      cells: [6, 4],
-    });
+    const result = execute(createEmptyDocument(), 'surface_from_curves', { curves: [bow(0), bow(8)], thickness: 0.5, cells: [6, 4] });
     const hood = result.document.entities[result.affected[0] as string] as Entity;
     const topology = topologyOf(hood);
     expect(topology.solids).toBe(1);

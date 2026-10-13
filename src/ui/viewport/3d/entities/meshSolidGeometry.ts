@@ -1,8 +1,5 @@
-/**
- * Render geometry for `kind:'mesh'` solids. Meshes carry no normals and share vertices across
- * faces, so plain `computeVertexNormals` smooths hard edges (boolean results look rounded).
- * Creased normals keep faces flat while still smoothing fine tessellation (curved surfaces).
- */
+// `kind:'mesh'` render geometry: shared vertices + no normals would smooth hard edges, so creased normals keep faces flat
+// while fine tessellation stays smooth.
 
 import * as THREE from 'three';
 import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';

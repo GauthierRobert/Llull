@@ -1,7 +1,7 @@
 /**
- * Retired `instantiate_template`: its three hard-coded 2D generators were the same flow as a
- * `build_project` of `draw_arc` / `draw_rectangle` calls. A saved step becomes that plan; the
- * nested draws mint `circ-` / `rect-` ids in the same order, so replay keeps every id.
+ * Retired `instantiate_template`: its three hard-coded 2D generators were the same flow as a `build_project` of `draw_arc` /
+ * `draw_rectangle` calls. A saved step becomes that plan; the nested draws mint `circ-` / `rect-` ids in the same order, so replay keeps
+ * every id.
  */
 
 import type { RetiredCommandRewrite } from '../types';

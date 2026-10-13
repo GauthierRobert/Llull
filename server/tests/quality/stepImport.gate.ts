@@ -99,9 +99,7 @@ const totalVolume = (imported: Imported): number =>
     return total + ((result.data as { volume?: number } | undefined)?.volume ?? NaN);
   }, 0);
 
-const manifest = JSON.parse(readFileSync(path.join(ROOT, 'quality', 'corpus.json'), 'utf8')) as {
-  files: CorpusEntry[];
-};
+const manifest = JSON.parse(readFileSync(path.join(ROOT, 'quality', 'corpus.json'), 'utf8')) as { files: CorpusEntry[] };
 const entries = manifest.files.filter((entry) => entry.format === 'step' && TIERS.indexOf(entry.tier) <= TIERS.indexOf(TIER));
 const port = createPythonExchangePort({
   python: CADQUERY_PYTHON,
@@ -226,10 +224,7 @@ describe.each(entries)('STEP $id — $description', (entry) => {
     const { ref: r, imported: i } = await load();
     if (r.faceBox === null) throw new Error('reference: the file has no faces');
     const faceBox = r.faceBox;
-    const data = execute(i.document, 'measure_bounding_box', {}).data as {
-      min: [number, number, number];
-      max: [number, number, number];
-    };
+    const data = execute(i.document, 'measure_bounding_box', {}).data as { min: [number, number, number]; max: [number, number, number] };
     const box: Box6 = [...data.min, ...data.max];
     const error = boxDistance(box, faceBox) / diagonal(faceBox);
     metrics['boxError'] = error;
@@ -300,10 +295,7 @@ describe.each(entries)('STEP $id — $description', (entry) => {
     expect(i.meshes.length, 'bodies').toBe(design.solids);
     const volume = totalVolume(i);
     const volumeError = Math.abs(volume - design.volume) / design.volume;
-    const data = execute(i.document, 'measure_bounding_box', {}).data as {
-      min: [number, number, number];
-      max: [number, number, number];
-    };
+    const data = execute(i.document, 'measure_bounding_box', {}).data as { min: [number, number, number]; max: [number, number, number] };
     const boxError = boxDistance([...data.min, ...data.max], design.bbox);
     Object.assign(metrics, { intentVolumeError: volumeError, intentBoxError: boxError });
     expect(volumeError, 'volume vs design').toBeLessThanOrEqual(design.volumeTolerance);

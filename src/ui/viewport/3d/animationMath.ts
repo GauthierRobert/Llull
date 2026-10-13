@@ -1,42 +1,22 @@
-/**
- * Pure math helpers for the AnimationPlayer.
- * No React, no DOM — testable in isolation (rule W3).
- *
- * All THREE.js math classes are fine here (three is a ui-layer dependency).
- */
-
 import * as THREE from 'three';
 import type { Animation, Vec3 } from '@core/model/types';
 
-/**
- * Given an animation definition and the current accumulated phase (seconds),
- * return the scalar value for this frame.
- *
- * - `spin`      → `speed * phase`  (linear ramp)
- * - `oscillate` → `amplitude * sin(2π * frequency * phase)` (sinusoidal)
- *
- * The returned value is an angle (radians) for `rotation` animations and a
- * distance (world units) for `position` animations — callers interpret the
- * channel themselves.
- */
+/** Frame scalar at `phase` s: spin = speed·phase, oscillate = amplitude·sin(2π·frequency·phase). Radians for rotation, world units for position. */
 export function evaluateAnimationScalar(anim: Pick<Animation, 'mode' | 'speed' | 'amplitude' | 'frequency'>, phase: number): number {
   if (anim.mode === 'spin') return anim.speed * phase;
-  // oscillate
   return anim.amplitude * Math.sin(2 * Math.PI * anim.frequency * phase);
 }
 
-/** Rotate `point` in place by `rotation` about `pivot` (translate to the pivot, rotate, translate back). */
 function rotateAboutPivotInPlace(point: THREE.Vector3, rotation: THREE.Quaternion, pivot: THREE.Vector3): THREE.Vector3 {
   return point.sub(pivot).applyQuaternion(rotation).add(pivot);
 }
 
-/** Pose written by `composeAnimatedPoseInto`. */
 export interface AnimatedPose {
   position: THREE.Vector3;
   quaternion: THREE.Quaternion;
 }
 
-/** Temporaries reused across `composeAnimatedPoseInto` calls so a per-frame caller allocates nothing. */
+/** Reused temporaries: a per-frame caller allocates nothing. */
 interface PoseScratch {
   readonly euler: THREE.Euler;
   readonly step: THREE.Quaternion;
@@ -47,33 +27,17 @@ export function createPoseScratch(): PoseScratch {
   return { euler: new THREE.Euler(), step: new THREE.Quaternion(), offset: new THREE.Vector3() };
 }
 
-/**
- * One animation contribution that may be composed onto an existing pose.
- */
 export interface AnimationContribution {
-  /** 'rotation' applies an axis-angle on top of the current quaternion and
-   *  also rotates the position around `pivot`. */
+  /** 'rotation' also rotates the position about `pivot`. */
   channel: 'rotation' | 'position';
-  /** Normalised axis. */
   axis: THREE.Vector3;
-  /** Scalar returned by `evaluateAnimationScalar`. */
   scalar: number;
-  /** Pivot point for rotation contributions. */
   pivot: THREE.Vector3;
 }
 
 /**
- * Write into `pose` the final position and quaternion of a base entity pose (position + rotation as
- * euler XYZ) after an ordered list of animation contributions; allocation-free given `scratch`.
- *
- * Composition rules:
- * - Rotation: `q_new = contribution_q * q_accumulated` (premultiply so later
- *   contributions layer on top of earlier ones).
- * - Position from rotation: the accumulated position is also rotated about the
- *   pivot by the contribution angle each time.
- * - Position channel: offset = axis * scalar, added to accumulated position.
- *
- * @invariant mutates only `pose` and `scratch`
+ * Base pose (position + XYZ euler) after ordered contributions: rotation premultiplies (later layers on top) and
+ * rotates the position about its pivot; position adds axis·scalar. @invariant mutates only `pose` and `scratch`
  */
 export function composeAnimatedPoseInto(
   pose: AnimatedPose,

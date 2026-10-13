@@ -21,18 +21,8 @@ interface TestUser {
   readonly token: string;
 }
 
-export const VIEWER: TestUser = {
-  id: 'vera',
-  name: 'Vera Viewer',
-  role: 'viewer',
-  token: 'tok-viewer',
-};
-export const EDITOR: TestUser = {
-  id: 'ed',
-  name: 'Ed Editor',
-  role: 'editor',
-  token: 'tok-editor',
-};
+export const VIEWER: TestUser = { id: 'vera', name: 'Vera Viewer', role: 'viewer', token: 'tok-viewer' };
+export const EDITOR: TestUser = { id: 'ed', name: 'Ed Editor', role: 'editor', token: 'tok-editor' };
 export const ADMIN: TestUser = { id: 'ada', name: 'Ada Admin', role: 'admin', token: 'tok-admin' };
 
 /** Write a users file (hashes only) and point LLULL_USERS_FILE at it. */

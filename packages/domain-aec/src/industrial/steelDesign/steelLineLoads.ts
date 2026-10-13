@@ -1,7 +1,7 @@
 /**
- * Pipes and cable trays resting on beams: a run bears on a beam where it crosses the beam in plan
- * with its underside at the beam's top of steel; each support takes the run weight over half the
- * span to the neighbouring supports (the end supports also the overhang to the run end).
+ * Pipes and cable trays resting on beams: a run bears on a beam where it crosses the beam in plan with its underside at the beam's top of
+ * steel; each support takes the run weight over half the span to the neighbouring supports (the end supports also the overhang to the run
+ * end).
  */
 
 import { clamp } from '@lib/clamp';
@@ -146,13 +146,7 @@ function supportsOf(run: Run, beams: ReadonlyArray<BeamLoads>): { supports: Supp
         if (Math.abs(underside - beam.top) > SUPPORT_TOLERANCE) continue;
         const s = travelled + u * segment;
         const duplicate = supports.some((support) => support.beam === beam && Math.abs(support.s - s) < 1);
-        if (!duplicate) {
-          supports.push({
-            s,
-            beam,
-            at: clamp(t * beamLength, 0, beamLength),
-          });
-        }
+        if (!duplicate) supports.push({ s, beam, at: clamp(t * beamLength, 0, beamLength) });
       }
     }
     travelled += segment;
@@ -174,13 +168,7 @@ export function applyLineLoads(
   const warnings: string[] = [];
   const columnNodes: Array<readonly [string, ColumnNode]> = [];
   for (const run of runsOf(units, params)) {
-    const header = {
-      id: run.id,
-      mark: run.mark,
-      kind: run.kind,
-      label: run.label,
-      weightPerMetre: run.weightPerMetre,
-    };
+    const header = { id: run.id, mark: run.mark, kind: run.kind, label: run.label, weightPerMetre: run.weightPerMetre };
     const pipeRun = run.pipe ? pipeRunOf(units, run.pipe) : null;
     if (pipeRun && weightSupportsOf(units, pipeRun).length > 0) {
       const supported = applySupportedPipe(units, pipeRun, run.weightPerMetre, beams, bars);
@@ -206,13 +194,7 @@ export function applyLineLoads(
       support.beam.lineSupport = true;
       carried += weight;
     });
-    runs.push({
-      ...header,
-      lengthM: length / 1000,
-      supports: supports.length,
-      basis: nozzles ? 'nozzles' : 'resting',
-      carriedKn: carried,
-    });
+    runs.push({ ...header, lengthM: length / 1000, supports: supports.length, basis: nozzles ? 'nozzles' : 'resting', carriedKn: carried });
     if (supports.length === 0 && length > 0 && !nozzles) {
       warnings.push(
         `${run.kind} ${run.mark} (${run.label}) rests on no steel beam: its ${((run.weightPerMetre * length) / 1000).toFixed(1)} kN are not carried by any checked member${run.kind === 'pipe' ? ' (add_pipe_support: shoes on steel below or hangers from steel above)' : ''}`,

@@ -1,17 +1,11 @@
+import { idOrNext } from '../entity/explicitId';
 import { type CadDocument, type SubdivisionEntity, type Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
 import { failer } from '../noop';
 import { centroid3, distance3, sub3 } from '../../lib/vec3';
 import { newEntity } from '../entity/newEntity';
-import {
-  DEFAULT_SOLID_COLOR,
-  commitSolid,
-  existingLayerOrDefault,
-  namedSolidStyleFields,
-  explicitIdOrNext,
-  explicitIdTaken,
-} from './shared';
+import { DEFAULT_SOLID_COLOR, commitSolid, existingLayerOrDefault, namedSolidStyleFields, explicitIdTaken } from './shared';
 import { sketchPath } from './sketchCurves';
 import { catmullRomBeziers, sampleChain } from '../../geometry/curveSegments';
 import { boundaryPatchCage, coonsSides } from '../../geometry/boundaryPatch';
@@ -87,28 +81,16 @@ export const surfaceFromCurves = defineCommand({
     const problem = sizeProblem(cage, levels) ?? cageProblem(cage);
     if (problem !== null) return fail(problem);
     const origin = centroid3(cage.vertices);
-    const id = explicitIdOrNext(explicitId, 'subd');
+    const id = idOrNext(explicitId, 'subd');
     const entity = newEntity(
       'subdivision',
       id,
-      {
-        vertices: cage.vertices.map((p) => sub3(p, origin)),
-        faces: cage.faces,
-        creases: cage.creases,
-        levels,
-      },
+      { vertices: cage.vertices.map((p) => sub3(p, origin)), faces: cage.faces, creases: cage.creases, levels },
       origin,
       params.color ?? DEFAULT_SOLID_COLOR,
-      {
-        name,
-        layerId: existingLayerOrDefault(doc, layerId),
-      },
+      { name, layerId: existingLayerOrDefault(doc, layerId) },
     ) as SubdivisionEntity;
-    const result = commitSolid(
-      doc,
-      entity,
-      `surface_from_curves: created "${id}" from ${polylines.length} curves, ${thickness} thick (${cageText(cage, levels)})`,
-    );
-    return { ...result, data: cageData(entity) };
+    const summary = `surface_from_curves: created "${id}" from ${polylines.length} curves, ${thickness} thick (${cageText(cage, levels)})`;
+    return { ...commitSolid(doc, entity, summary), data: cageData(entity) };
   },
 });

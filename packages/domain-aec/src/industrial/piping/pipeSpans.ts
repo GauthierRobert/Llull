@@ -1,7 +1,4 @@
-/**
- * Maximum support spacing of horizontal, water-filled, standard-wall steel pipe per nominal size
- * (the span column of `PIPE_SIZES`).
- */
+/** Maximum support spacing of horizontal, water-filled, standard-wall steel pipe per nominal size (the span column of `PIPE_SIZES`). */
 
 import { OUTSIDE_DIAMETER_TOLERANCE_MM, PIPE_SIZES } from './pipeSizes';
 
@@ -15,9 +12,9 @@ interface PipeSpanLimit {
 }
 
 /**
- * Span limit of a pipe: its tabulated `dn`, else the size whose outside diameter is within 1.5 mm
- * of `outsideDiameterMm`, else (untabulated size) the largest tabulated size with a smaller outside
- * diameter — never more span than the table allows; below DN15 the DN15 value, above DN600 the DN600 value.
+ * Span limit of a pipe: its tabulated `dn`, else the size whose outside diameter is within 1.5 mm of `outsideDiameterMm`, else (untabulated
+ * size) the largest tabulated size with a smaller outside diameter — never more span than the table allows; below DN15 the DN15 value,
+ * above DN600 the DN600 value.
  * @invariant a given DN is never rounded up
  */
 export function pipeSpanLimit(dn: number | undefined, outsideDiameterMm: number): PipeSpanLimit {

@@ -1,8 +1,7 @@
 /**
- * Boundary patches: a Coons surface bounded by four curves (or ruled between two), sampled on a
- * grid and thickened into a closed subdivision cage (top sheet on the curves' side, an offset
- * sheet behind it, side walls). The rim and the four patch corners are creased so the smooth
- * surface keeps the boundary. Pure; used by surface_from_curves.
+ * Boundary patches: a Coons surface bounded by four curves (or ruled between two), sampled on a grid and thickened into a closed
+ * subdivision cage (top sheet on the curves' side, an offset sheet behind it, side walls). The rim and the four patch corners are creased
+ * so the smooth surface keeps the boundary. Pure; used by surface_from_curves.
  */
 
 import type { Vec3 } from '../model/types';
@@ -31,9 +30,8 @@ const first = (curve: readonly Vec3[]): Vec3 => curve[0] as Vec3;
 const last = (curve: readonly Vec3[]): Vec3 => curve[curve.length - 1] as Vec3;
 
 /**
- * The four sides as functions of a parameter in [0, 1]: bottom P00→P10, right P10→P11, top
- * P01→P11, left P00→P01. Four curves must chain end to start (any order / direction) within
- * `tolerance`; two curves are opposite sides joined by straight lines. Error text otherwise.
+ * The four sides as functions of a parameter in [0, 1]: bottom P00→P10, right P10→P11, top P01→P11, left P00→P01. Four curves must chain
+ * end to start (any order / direction) within `tolerance`; two curves are opposite sides joined by straight lines. Error text otherwise.
  */
 export function coonsSides(curves: readonly (readonly Vec3[])[], tolerance: number): Array<(t: number) => Vec3> | string {
   if (curves.some((curve) => curve.length < 2)) return 'every curve needs at least 2 points';

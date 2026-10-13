@@ -1,4 +1,4 @@
-/** PanelParts — shared panel anatomy (header, section, empty state). Presentation only. */
+// Shared panel anatomy: header, section, empty state, buttons, rows.
 
 import React, { useState } from 'react';
 import { classNames } from '@ui/classNames';
@@ -47,9 +47,9 @@ interface PanelSectionProps {
   count?: number;
   countLabel?: string;
   collapsible?: boolean;
-  /** Workflow step number shown before the title (1 = do this first). */
+  /** Workflow step shown before the title (1 = first). */
   step?: number;
-  /** One plain-language line under the header: what this section is for. */
+  /** One line under the header: what the section is for. */
   hint?: string;
   testId?: string;
   children: React.ReactNode;
@@ -147,7 +147,7 @@ export function IconButton({
   );
 }
 
-/** Inline form error; renders nothing while `text` is empty. */
+/** Nothing while `text` is empty. */
 export function FormError({ text }: { text: string }): React.ReactElement | null {
   if (text === '') return null;
   return (
@@ -157,7 +157,7 @@ export function FormError({ text }: { text: string }): React.ReactElement | null
   );
 }
 
-/** Polite status line (a command summary or a validation message); nothing while `text` is empty. */
+/** Polite status (summary or validation); nothing while `text` is empty. */
 export function StatusLine({ text, testId }: { text: string; testId?: string }): React.ReactElement | null {
   if (text === '') return null;
   return (
@@ -168,25 +168,23 @@ export function StatusLine({ text, testId }: { text: string; testId?: string }):
 }
 
 interface ListRowProps {
-  /** Highlighted row (`panel__row--selected`). */
   selected?: boolean;
-  /** Marks the row as the current item of its list (`aria-current`). */
+  /** `aria-current`. */
   current?: boolean;
   testId?: string;
-  /** Click on the row's main button. */
   onSelect: () => void;
-  /** Accessible name of the main button; omitted = its visible text. */
+  /** Defaults to the visible text. */
   label?: string;
-  /** `aria-pressed` of the main button (toggle rows). */
+  /** Toggle rows. */
   pressed?: boolean;
   buttonTestId?: string;
-  /** Row buttons (edit, delete…), shown after the main button. */
+  /** Trailing row buttons. */
   actions?: React.ReactNode;
-  /** Content of the main button: chip, `panel__row-main`, `panel__row-meta`. */
+  /** Chip, `panel__row-main`, `panel__row-meta`. */
   children: React.ReactNode;
 }
 
-/** One selectable list row: a full-width button plus optional trailing action buttons. */
+/** Full-width row button + optional trailing actions. */
 export function ListRow({
   selected = false,
   current,
@@ -220,10 +218,9 @@ export function ListRow({
 }
 
 interface DeleteButtonProps {
-  /** Accessible name, e.g. `Delete layer Walls`; also the tooltip unless `title` is given. */
+  /** e.g. `Delete layer Walls`; tooltip unless `title`. */
   label: string;
   title?: string;
-  /** Icon: `trash` (default) or `close`. */
   icon?: 'trash' | 'close';
   size?: number;
   className?: string;
@@ -232,7 +229,7 @@ interface DeleteButtonProps {
   onDelete: () => void;
 }
 
-/** Danger icon button of a row; the click never reaches the row behind it. */
+/** The click never reaches the row behind it. */
 export function DeleteButton({
   label,
   title,

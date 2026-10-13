@@ -1,9 +1,4 @@
-/**
- * Pure geometry helpers for the interactive 2D draw tools.
- *
- * All functions are deterministic and side-effect free — they compute
- * dispatch params from raw click coordinates. Unit-tested in tests/unit/.
- */
+// Pure click → draw-command param helpers of the 2D draw tools.
 
 import type { Vec2, Vec3 } from '@core/model/types';
 
@@ -13,14 +8,7 @@ interface RectParams {
   position: Vec3;
 }
 
-/**
- * Compute draw_rectangle params from two arbitrary corner clicks.
- *
- * The lower-left corner becomes the work-plane origin (position).
- * Width is always positive (|x2-x1|), height always positive (|y2-y1|).
- *
- * @failure returns null when the two corners are identical (zero area)
- */
+/** Lower-left corner becomes `position`; positive width/height. @failure zero area -> null */
 export function rectParamsFromCorners(a: Vec2, b: Vec2): RectParams | null {
   const minX = Math.min(a[0], b[0]);
   const minY = Math.min(a[1], b[1]);
@@ -29,18 +17,10 @@ export function rectParamsFromCorners(a: Vec2, b: Vec2): RectParams | null {
 
   if (width === 0 || height === 0) return null;
 
-  return {
-    width,
-    height,
-    position: [minX, minY, 0],
-  };
+  return { width, height, position: [minX, minY, 0] };
 }
 
-/**
- * Compute the radius for a full-circle draw_arc from a center point and a rim point.
- *
- * @failure returns null when center and rim are identical (radius = 0)
- */
+/** @failure center == rim -> null */
 export function circleRadiusFromPoints(center: Vec2, rim: Vec2): number | null {
   const dx = rim[0] - center[0];
   const dy = rim[1] - center[1];
@@ -48,10 +28,7 @@ export function circleRadiusFromPoints(center: Vec2, rim: Vec2): number | null {
   return r > 0 ? r : null;
 }
 
-/**
- * Drop consecutive near-duplicate vertices (a double-click to finish a chain records its last
- * point twice). "Near" = within 0.1% of the chain's bounding diagonal.
- */
+/** Drop consecutive near-duplicates (within `chainTolerance`): a double-click finish records its last point twice. */
 export function dropRepeatedPoints(points: ReadonlyArray<Vec2>): Vec2[] {
   const tolerance = chainTolerance(points);
   return points.filter((point, index) => {
@@ -74,14 +51,7 @@ interface EllipseParams {
   radiusY: number;
 }
 
-/**
- * Compute draw_ellipse params from a center click and a "corner" click.
- *
- * The corner defines the bounding box half-extents: radiusX = |dx|, radiusY = |dy|.
- * Both axes must be non-zero (the two clicks must differ on both axes).
- *
- * @failure returns null when the corner is collinear with the center on either axis
- */
+/** radiusX/Y = |corner − center| per axis. @failure zero on either axis -> null */
 export function ellipseParamsFromCenterCorner(center: Vec2, corner: Vec2): EllipseParams | null {
   const radiusX = Math.abs(corner[0] - center[0]);
   const radiusY = Math.abs(corner[1] - center[1]);

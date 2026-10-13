@@ -1,6 +1,6 @@
 /**
- * Lower a CadDocument to a FeatureProgram (program.ts): replay the feature history, diff each step's
- * solids, and bind numeric fields to the `=expr` params that produced them.
+ * Lower a CadDocument to a FeatureProgram (program.ts): replay the feature history, diff each step's solids, and bind numeric fields to the
+ * `=expr` params that produced them.
  */
 
 import { type CadDocument, type Entity, type FeatureStep, type Vec3, is2D, is3D } from '../model/types';
@@ -71,11 +71,7 @@ function lowerShape(entity: Entity, doc: CadDocument, raw: unknown, ctx: LowerCo
       return { kind: entity.kind, size: term3(entity.size, field('size'), ctx) };
     case 'cylinder':
     case 'cone':
-      return {
-        kind: entity.kind,
-        radius: term(entity.radius, field('radius'), ctx),
-        height: term(entity.height, field('height'), ctx),
-      };
+      return { kind: entity.kind, radius: term(entity.radius, field('radius'), ctx), height: term(entity.height, field('height'), ctx) };
     case 'sphere':
       return { kind: 'sphere', radius: term(entity.radius, field('radius'), ctx) };
     case 'torus':
@@ -107,13 +103,7 @@ function lowerShape(entity: Entity, doc: CadDocument, raw: unknown, ctx: LowerCo
         segments: safeSegments(entity.segments),
       };
     case 'subdivision':
-      return {
-        kind: 'subdivision',
-        vertices: entity.vertices,
-        faces: entity.faces,
-        creases: entity.creases,
-        levels: entity.levels,
-      };
+      return { kind: 'subdivision', vertices: entity.vertices, faces: entity.faces, creases: entity.creases, levels: entity.levels };
     case 'mesh':
     case 'sweep':
     case 'loft':
@@ -143,8 +133,8 @@ function solidFeature(
 }
 
 /**
- * Features creating `entity` in `variables`: a kernel result rebuilds its exact recipe; anything else
- * (or a recipe with a rotated placement / scale) is one solid feature.
+ * Features creating `entity` in `variables`: a kernel result rebuilds its exact recipe; anything else (or a recipe with a rotated placement
+ * / scale) is one solid feature.
  * @returns the features and whether the entity was exported as a triangle mesh
  */
 function entityFeatures(
@@ -220,22 +210,11 @@ function isPureTranslation(before: Entity, after: Entity, delta: unknown): delta
 }
 
 /** `boolean` op -> the emitted program's combinator. */
-const BOOLEAN_KINDS: Readonly<Record<string, 'union' | 'cut' | 'intersect'>> = {
-  union: 'union',
-  subtract: 'cut',
-  intersect: 'intersect',
-};
+const BOOLEAN_KINDS: Readonly<Record<string, 'union' | 'cut' | 'intersect'>> = { union: 'union', subtract: 'cut', intersect: 'intersect' };
 
-function lowerParameters(
-  doc: CadDocument,
-  namer: Namer,
-): {
-  parameters: ProgramParameter[];
-  identifiers: Map<string, string>;
-} {
+function lowerParameters(doc: CadDocument, namer: Namer): { parameters: ProgramParameter[]; identifiers: Map<string, string> } {
   const identifiers = new Map<string, string>();
   for (const name of Object.keys(doc.parameters)) identifiers.set(name, namer.take(name));
-
   // Depth-first topological order so each parameter is defined after the ones it references.
   const ordered: string[] = [];
   const state = new Map<string, 'visiting' | 'done'>();
@@ -252,7 +231,6 @@ function lowerParameters(
     ordered.push(name);
   };
   for (const name of Object.keys(doc.parameters).sort()) visit(name);
-
   const parameters = ordered.flatMap((name): ProgramParameter[] => {
     const parameter = doc.parameters[name];
     const identifier = identifiers.get(name);
@@ -289,11 +267,7 @@ function lowerSnapshot(doc: CadDocument, parameters: ProgramParameter[], ctx: Lo
   const variables = new Map<string, string>();
   const features: Feature[] = [];
   for (const entity of solids(doc)) {
-    const base = (variable: string): FeatureBase => ({
-      step: null,
-      command: entity.kind,
-      variable,
-    });
+    const base = (variable: string): FeatureBase => ({ step: null, command: entity.kind, variable });
     const lowered = entityFeatures(entity, doc, undefined, ctx, namer, base, variables);
     const [first, ...rest] = lowered.features;
     const named =
@@ -301,18 +275,9 @@ function lowerSnapshot(doc: CadDocument, parameters: ProgramParameter[], ctx: Lo
         ? [{ ...first, name: entity.name }]
         : [first, ...rest].filter((feature): feature is Feature => feature !== undefined);
     features.push(...named);
-    if (lowered.triangles) {
-      notes.push(`${entity.kind} '${entity.id}' has no analytic form; exported as a triangle mesh.`);
-    }
+    if (lowered.triangles) notes.push(`${entity.kind} '${entity.id}' has no analytic form; exported as a triangle mesh.`);
   }
-  return {
-    units: doc.units,
-    source: 'snapshot',
-    parameters,
-    features,
-    outputs: outputsFor(doc, variables),
-    notes,
-  };
+  return { units: doc.units, source: 'snapshot', parameters, features, outputs: outputsFor(doc, variables), notes };
 }
 
 const MODIFICATION_COMMANDS: ReadonlySet<string> = new Set(['fillet_edge', 'chamfer_edge', 'shell_solid']);
@@ -360,12 +325,7 @@ function lowerStep(
     return previous !== undefined && previous !== current ? [[previous, current]] : [];
   });
   const [createdSolid] = created;
-  const base = (variable: string): FeatureBase => ({
-    step: stepNumber,
-    command: step.name,
-    variable,
-  });
-
+  const base = (variable: string): FeatureBase => ({ step: stepNumber, command: step.name, variable });
   const booleanKind = step.name === 'boolean' ? BOOLEAN_KINDS[String(child(event.params, 'op'))] : undefined;
   const operandA = String(child(event.params, 'a'));
   const operandB = String(child(event.params, 'b'));
@@ -385,10 +345,8 @@ function lowerStep(
     variables.set(createdSolid.id, left);
     return [{ ...base(left), op: 'boolean', kind: booleanKind, left, right }];
   }
-
   const modification = modificationStep(event, created, removed, variables, ctx, base);
   if (modification !== null) return [modification];
-
   const features: Feature[] = [];
   for (const id of removed) {
     const variable = variables.get(id);
@@ -400,16 +358,11 @@ function lowerStep(
     const variable = variables.get(current.id);
     if (variable === undefined) continue;
     const delta = child(event.params, 'delta');
-    if (step.name === 'move_entities' && isPureTranslation(previous, current, delta)) {
-      features.push({
-        ...base(variable),
-        op: 'translate',
-        delta: term3(delta, child(rawParams, 'delta'), ctx),
-      });
-    } else if (geometryEqual(previous, current)) {
-      if (current.name !== undefined && current.name !== previous.name) {
+    if (step.name === 'move_entities' && isPureTranslation(previous, current, delta))
+      features.push({ ...base(variable), op: 'translate', delta: term3(delta, child(rawParams, 'delta'), ctx) });
+    else if (geometryEqual(previous, current)) {
+      if (current.name !== undefined && current.name !== previous.name)
         features.push({ ...base(variable), op: 'label', name: current.name });
-      }
     } else {
       // Re-create from the evaluated state; remove first so the old solid does not linger.
       features.push({ ...base(variable), op: 'remove' });
@@ -419,9 +372,8 @@ function lowerStep(
   for (const entity of created) {
     const lowered = entityFeatures(entity, after, rawParams, ctx, namer, base, variables);
     features.push(...lowered.features);
-    if (lowered.triangles) {
+    if (lowered.triangles)
       notes.push(`step ${stepNumber} (${step.name}): ${entity.kind} '${entity.id}' has no analytic form; exported as a triangle mesh.`);
-    }
   }
   return features;
 }
@@ -457,7 +409,6 @@ export function buildFeatureProgram(
   const notes: string[] = [];
   const activeSteps: FeatureStep[] = doc.featureHistory.filter((s) => s.suppressed !== true);
   if (activeSteps.length === 0) return lowerSnapshot(doc, parameters, ctx, namer, notes);
-
   const features: Feature[] = [];
   const variables = new Map<string, string>();
   const stepNumbers = new Map(doc.featureHistory.map((s, i) => [s.id, i + 1]));
@@ -465,7 +416,6 @@ export function buildFeatureProgram(
     const stepNumber = stepNumbers.get(event.step.id) ?? 0;
     features.push(...lowerStep(event, stepNumber, variables, ctx, namer, notes));
   });
-
   const mismatch = historyMismatch(doc, replayed);
   if (mismatch !== null) {
     notes.push(`${mismatch}; exported the current geometry without its feature history.`);
@@ -473,12 +423,5 @@ export function buildFeatureProgram(
     for (const parameter of parameters) freshNamer.take(parameter.identifier);
     return lowerSnapshot(doc, parameters, ctx, freshNamer, notes);
   }
-  return {
-    units: doc.units,
-    source: 'history',
-    parameters,
-    features,
-    outputs: outputsFor(replayed, variables),
-    notes,
-  };
+  return { units: doc.units, source: 'history', parameters, features, outputs: outputsFor(replayed, variables), notes };
 }

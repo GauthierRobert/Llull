@@ -1,7 +1,7 @@
 /**
- * Column verification (EN 1993-1-1): axial load = beam reactions at every level above the segment
- * plus self weight, checked per storey segment between beam levels as a braced column
- * (Lcr = segment length, both axes): cross-section Npl,Rd (§6.2.4) and flexural buckling Nb,Rd (§6.3.1).
+ * Column verification (EN 1993-1-1): axial load = beam reactions at every level above the segment plus self weight, checked per storey
+ * segment between beam levels as a braced column (Lcr = segment length, both axes): cross-section Npl,Rd (§6.2.4) and flexural buckling
+ * Nb,Rd (§6.3.1).
  */
 
 import { clamp } from '@lib/clamp';

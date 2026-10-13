@@ -1,12 +1,7 @@
-/** Distances closer than this are ties, broken by type priority. */
+/** Closer distances tie, broken by type priority. */
 const TIE_EPSILON = 1e-10;
 
-/**
- * The candidate nearest to the cursor within `tolerance`; candidates at (numerically) the same
- * distance are ranked by type priority (lower number wins), then by order.
- *
- * @failure no candidate within tolerance -> null
- */
+/** Nearest within `tolerance`; ties go to the lower type priority, then order. @failure none in tolerance -> null */
 export function nearestSnap<Type extends string, Candidate extends { readonly type: Type }>(
   candidates: ReadonlyArray<Candidate>,
   distanceTo: (candidate: Candidate) => number,

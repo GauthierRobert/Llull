@@ -1,6 +1,6 @@
 /**
- * Drawing-sheet envelope shared by building, industrial and civil sheets: ISO paper, scale fitting,
- * frame, title block, north arrow, scale bar.
+ * Drawing-sheet envelope shared by building, industrial and civil sheets: ISO paper, scale fitting, frame, title block, north arrow, scale
+ * bar.
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
@@ -69,8 +69,8 @@ export const paperMap =
   ];
 
 /**
- * Dimension label placement: text angle (degrees, flipped to read left-to-right / bottom-up) for a
- * baseline direction (`dx`, `dy`), and the label anchor 1.2 mm off the midpoint of the dimension line `da`-`db`.
+ * Dimension label placement: text angle (degrees, flipped to read left-to-right / bottom-up) for a baseline direction (`dx`, `dy`), and the
+ * label anchor 1.2 mm off the midpoint of the dimension line `da`-`db`.
  */
 export function readableDimensionLabel(da: Vec2, db: Vec2, dx: number, dy: number): { readonly angle: number; readonly middle: Vec2 } {
   const radians = readableAngle(Math.atan2(dy, dx));
@@ -93,12 +93,7 @@ export const svgText = (
   return `<text x="${n(x)}" y="${n(y)}" font-size="${n(size)}" text-anchor="${anchor}"${transform}>${escapeXml(content)}</text>`;
 };
 
-export interface Viewport {
-  readonly x: number;
-  readonly y: number;
-  readonly width: number;
-  readonly height: number;
-}
+export type Viewport = { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
 
 /** Smallest standard scale 1:N at which the model extents fit the viewport. */
 export function fitScale(widthMm: number, heightMm: number, viewport: Viewport): number {

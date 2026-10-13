@@ -1,12 +1,10 @@
 /**
- * Image-underlay placement math: image pixel ⇄ work-plane local ⇄ world, and the two-point
- * calibration that turns a measured pixel segment into a scale (plus optional origin and
- * axis alignment).
+ * Image-underlay placement math: image pixel ⇄ work-plane local ⇄ world, and the two-point calibration that turns a measured pixel segment
+ * into a scale (plus optional origin and axis alignment).
  *
- * Pixel space: origin at the image's TOP-left corner, +x right, +y DOWN (how image viewers and
- * agents reading a picture count pixels). Local space: the entity's work plane, origin at the
- * image's lower-left corner, +y up. World: local rotated by the entity's Euler rotation (three.js
- * XYZ, so rotation[2] is the in-plane angle) about `position`, then offset by `position`.
+ * Pixel space: origin at the image's TOP-left corner, +x right, +y DOWN (how image viewers and agents reading a picture count pixels).
+ * Local space: the entity's work plane, origin at the image's lower-left corner, +y up. World: local rotated by the entity's Euler rotation
+ * (three.js XYZ, so rotation[2] is the in-plane angle) about `position`, then offset by `position`.
  */
 
 import type { ImageEntity, Vec2, Vec3 } from '../model/types';
@@ -66,8 +64,8 @@ export type CalibrationResult =
   | { readonly ok: false; readonly error: string };
 
 /**
- * `angle` wrapped into [−π/2, π/2]: an axis is aligned in either direction, so turn the least; an
- * exact quarter turn keeps the sign that points the segment along the positive axis.
+ * `angle` wrapped into [−π/2, π/2]: an axis is aligned in either direction, so turn the least; an exact quarter turn keeps the sign that
+ * points the segment along the positive axis.
  */
 function smallestAxisTurn(angle: number): number {
   const wrapped = wrapSignedAngle(angle);
@@ -78,8 +76,8 @@ function smallestAxisTurn(angle: number): number {
 }
 
 /**
- * New placement after a two-point calibration: uniform scale `distance / |B − A|` units per pixel,
- * optional in-plane alignment of A→B with a local axis, then a translation pinning the anchor pixel.
+ * New placement after a two-point calibration: uniform scale `distance / |B − A|` units per pixel, optional in-plane alignment of A→B with
+ * a local axis, then a translation pinning the anchor pixel.
  * @failure distance not finite/> 0, or A and B the same pixel -> { ok: false }
  */
 export function calibrateUnderlay(placement: UnderlayPlacement, calibration: UnderlayCalibration): CalibrationResult {
@@ -89,7 +87,6 @@ export function calibrateUnderlay(placement: UnderlayPlacement, calibration: Und
   const dy = pixelB[1] - pixelA[1];
   const pixelDistance = Math.hypot(dx, dy);
   if (!(pixelDistance > 0)) return { ok: false, error: 'pixelA and pixelB must be two different pixels' };
-
   const unitsPerPixel = distance / pixelDistance;
   // Pixel +y is down, so the segment's in-plane angle (before rotation) is atan2(-dy, dx).
   const segmentAngle = Math.atan2(-dy, dx);
@@ -104,10 +101,5 @@ export function calibrateUnderlay(placement: UnderlayPlacement, calibration: Und
   const anchorPixel = origin?.pixel ?? pixelA;
   const anchorWorld = origin?.world ?? pixelToWorld(placement, anchorPixel);
   const offset = rotatedOffset(scaled.rotation, pixelToLocal(scaled, anchorPixel));
-  return {
-    ok: true,
-    placement: { ...scaled, position: sub3(anchorWorld, offset) },
-    unitsPerPixel,
-    pixelDistance,
-  };
+  return { ok: true, placement: { ...scaled, position: sub3(anchorWorld, offset) }, unitsPerPixel, pixelDistance };
 }

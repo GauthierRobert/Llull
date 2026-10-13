@@ -17,10 +17,9 @@ export const SOIL_SHAPE = {
     .boolean()
     .optional()
     .describe(
-      'true = the frame thrust is carried by a tie (ground slab cast around the columns or tie ' +
-        "bars): each frame's columns share the frame's net horizontal reaction for the sliding " +
-        'check and one tie-force row per frame is added. false = every pad resists its own ' +
-        'horizontal reaction by friction. Default true when the level has a slab element, else false.',
+      "true = the frame thrust is carried by a tie (ground slab cast around the columns or tie bars): each frame's columns share the " +
+        "frame's net horizontal reaction for the sliding check and one tie-force row per frame is added. false = every pad resists its " +
+        'own horizontal reaction by friction. Default true when the level has a slab element, else false.',
     ),
   soilModulus: z.number().optional().describe('Soil elastic (Young) modulus Es in MPa for the settlement rows. Default 20. Must be > 0.'),
   clayLayer: z

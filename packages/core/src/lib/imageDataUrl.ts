@@ -1,6 +1,6 @@
 /**
- * Raster data URLs (`data:image/png;base64,…`, `data:image/jpeg;base64,…`): format check and the
- * intrinsic pixel size read from the PNG IHDR chunk / JPEG SOF marker. No DOM image decoding.
+ * Raster data URLs (`data:image/png;base64,…`, `data:image/jpeg;base64,…`): format check and the intrinsic pixel size read from the PNG
+ * IHDR chunk / JPEG SOF marker. No DOM image decoding.
  */
 
 import { base64ToUint8Array } from './base64';
@@ -8,12 +8,7 @@ import { base64ToUint8Array } from './base64';
 type RasterMime = 'image/png' | 'image/jpeg';
 
 export type ParsedImageDataUrl =
-  | {
-      readonly ok: true;
-      readonly mime: RasterMime;
-      readonly pixelWidth: number;
-      readonly pixelHeight: number;
-    }
+  | { readonly ok: true; readonly mime: RasterMime; readonly pixelWidth: number; readonly pixelHeight: number }
   | { readonly ok: false; readonly error: string };
 
 const DATA_URL_PATTERN = /^data:(image\/png|image\/jpe?g);base64,/;

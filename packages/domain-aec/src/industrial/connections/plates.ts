@@ -53,12 +53,7 @@ export const addBasePlates = defineCommand({
     if (unknownLevel) return unknownLevel;
     const columns = columnsWithoutPlates(building, levelId, params.memberIds ? new Set(params.memberIds) : null);
     if (columns.length === 0) return noop(doc, 'add_base_plates failed: no steel column without a base plate found.');
-    const added = appendBasePlates(doc, building, columns, {
-      margin,
-      thickness,
-      boltCount,
-      boltDiameter,
-    });
+    const added = appendBasePlates(doc, building, columns, { margin, thickness, boltCount, boltDiameter });
     const plates = added.ids.map((id) => added.building.elements[id] as BasePlateElement);
     const kilograms = plates.reduce((sum, plate) => sum + plateMass(doc, plate), 0);
     return commitBuilding(

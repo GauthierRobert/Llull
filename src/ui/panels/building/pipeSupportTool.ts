@@ -1,7 +1,4 @@
-/**
- * "Pipe support" tool spec → `add_pipe_support` (param-gathering only, react R1). The pipe is picked
- * from the live list (`line:<number>` = every pipe of that line, `pipe:<id>` = one unnumbered pipe).
- */
+// "Pipe support" → `add_pipe_support`; pipe picked from the live list (`line:<number>` = whole line, `pipe:<id>` = one).
 
 import { FieldReader, INDUSTRIAL_TOOL_GROUP, num, result, select, txt, type ElementTool } from './elementToolForm';
 

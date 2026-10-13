@@ -20,9 +20,7 @@ const plan = (name: string): unknown[] => JSON.parse(readFileSync(path.join(__di
 
 function runUntilFillet(actions: unknown[]): ReturnType<typeof execute> {
   const filletAt = actions.findIndex((action) => (action as { command?: string }).command === 'fillet_edge');
-  return execute(createEmptyDocument(), 'build_project', {
-    actions: actions.slice(0, filletAt + 1),
-  });
+  return execute(createEmptyDocument(), 'build_project', { actions: actions.slice(0, filletAt + 1) });
 }
 
 describe('occt fillet results are checked before they are committed', () => {
@@ -40,10 +38,7 @@ describe('occt fillet results are checked before they are committed', () => {
   it('still fillets the same handle edges when the corner edges are left out', () => {
     const actions = plan('open-corner-handle.json');
     const fillet = actions.at(-1) as { params: { edgesNear: number[][] } };
-    const longEdgesOnly = {
-      ...fillet,
-      params: { ...fillet.params, edgesNear: fillet.params.edgesNear.slice(0, -4) },
-    };
+    const longEdgesOnly = { ...fillet, params: { ...fillet.params, edgesNear: fillet.params.edgesNear.slice(0, -4) } };
     const result = runUntilFillet([...actions.slice(0, -1), longEdgesOnly]);
     expect(result.summary).toMatch(/plan step\(s\) ok|Plan complete/);
     expect(result.summary).not.toMatch(/FAIL|aborted/);

@@ -22,10 +22,7 @@ export function workPlaneRotationField(): z.ZodOptional<z.ZodArray<z.ZodNumber>>
 }
 
 /** `position` + `color` params of a drafted shape (spread into `z.object`). */
-export function workPlaneStyleFields(): {
-  position: ReturnType<typeof workPlanePositionField>;
-  color: ReturnType<typeof colorField>;
-} {
+export function workPlaneStyleFields(): { position: ReturnType<typeof workPlanePositionField>; color: ReturnType<typeof colorField> } {
   return { position: workPlanePositionField(), color: colorField(DEFAULT_DRAW_COLOR) };
 }
 
@@ -55,9 +52,8 @@ export function drawPointSeries(
   color: string,
 ): CommandResult {
   if (points.length < 2) return noop(doc, `draw_${kind}: requires at least 2 points (got ${points.length}).`);
-  if (points.length > MAX_PROFILE_POINTS) {
+  if (points.length > MAX_PROFILE_POINTS)
     return noop(doc, `draw_${kind}: ${points.length} points exceeds MAX_PROFILE_POINTS (${MAX_PROFILE_POINTS}).`);
-  }
   const id = nextId(POINT_SERIES_ID_PREFIX[kind]);
   const entity = newEntity(kind, id, { points: points.map(([x, y]): Vec2 => [x ?? 0, y ?? 0]), closed }, position, color);
   return commitEntity(doc, entity, `Drew ${kind} ${id} with ${points.length} points${closed ? ' (closed)' : ''}.`);

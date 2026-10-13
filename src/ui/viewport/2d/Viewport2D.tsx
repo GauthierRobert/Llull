@@ -1,9 +1,5 @@
-/**
- * 2D drafting viewport: the same three.js scene through an orthographic top-down camera
- * (MapControls pan/zoom; pan disabled while a tool is armed, wheel zoom stays), an adaptive grid, a ScaleBar HUD
- * and floating-origin rendering. `frameloop="demand"`; presentational only, changes go through
- * dispatch.
- */
+// 2D drafting viewport: the same scene through an ortho top-down camera (MapControls; pan off while a tool is armed),
+// adaptive grid, ScaleBar HUD, floating origin, frameloop="demand".
 
 import { Suspense, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
@@ -51,7 +47,6 @@ interface SceneContents2DProps {
   onClickPoint: (point: Vec2) => void;
   onDoubleClick: () => void;
   onZoom: (zoom: number) => void;
-  /** Current ortho camera zoom — drives the adaptive snap grid + screen-constant glyph. */
   zoom: number;
   activeModifyTool: ModifyToolKind;
   modifyPhase: ModifyToolPhase;
@@ -105,19 +100,15 @@ function SceneContents2D({
         baseZ={planDepth.floor}
       />
 
-      {/* ---- Entities, snap indicator, and draw interaction are all inside
-           the same offset group so pointer e.point resolves in document
-           space — matching the snap candidate frame (architecture L7).  ---- */}
+      {/* One offset group: pointer e.point resolves in document space, the snap candidate frame. */}
       <group position={groupOffset}>
         <BuildingPlan2D />
         <Entities2D />
 
-        {/* Snap indicator + click-to-select: shown when no draw or modify tool is active */}
         {!isDrawing && !isModifying && <SnapIndicator zoom={zoom} />}
         {!isDrawing && !isModifying && <SelectPickInteraction zoom={zoom} />}
         {!isDrawing && !isModifying && <BoxSelectInteraction zoom={zoom} />}
 
-        {/* Draw interaction: click-capture + rubber-band preview */}
         <DrawInteraction
           activeTool={activeTool}
           collectedPoints={collectedPoints}
@@ -126,10 +117,8 @@ function SceneContents2D({
           zoom={zoom}
         />
 
-        {/* Modify pick interaction: entity-click capture for modify tools */}
         <ModifyPickInteraction activeTool={activeModifyTool} phase={modifyPhase} zoom={zoom} onEntityPick={onEntityPick} />
 
-        {/* Measurement bbox rectangle — shown when measure_bounding_box result is present */}
         <MeasureBBoxRect2D />
       </group>
     </>
@@ -149,8 +138,7 @@ export function Viewport2D(): React.ReactElement {
     commitValue,
   } = useModifyTool();
 
-  // Camera zoom state — updated by ZoomReader inside the canvas, displayed by
-  // ScaleBar outside it. Initial value matches the OrthographicCamera zoom prop.
+  // Set by ZoomReader inside the canvas, read by ScaleBar outside; starts at the camera's zoom prop.
   const [cameraZoom, setCameraZoom] = useState<number>(50);
 
   return (

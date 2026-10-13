@@ -1,7 +1,4 @@
-/**
- * Pure drawing of 2D dimension entities: the measured value, the label anchor and the
- * LineSegments (dimension / extension lines, arrowheads) for each dimension kind.
- */
+// Pure drawing of 2D dimensions: value, label anchor and LineSegments (dimension / extension lines, arrowheads) per kind.
 
 import { toDegrees } from '@lib/angle';
 import * as THREE from 'three';
@@ -14,12 +11,12 @@ const EPSILON = 1e-9;
 export const DEFAULT_OFFSET = 5;
 
 interface DimensionDrawing {
-  /** Measured value: a length, a radius, or an angle in degrees. */
+  /** Length, radius, or angle in degrees. */
   value: number;
   /** Label anchor in the entity's XY plane. */
   textX: number;
   textY: number;
-  /** Null when the measured geometry is degenerate (only the label is drawn). */
+  /** Null when degenerate (label only). */
   lines: THREE.LineSegments | null;
 }
 
@@ -41,7 +38,7 @@ function centroid(entity: Locatable): Vec2 {
   return [px + (entity.start[0] + entity.end[0]) / 2, py + (entity.start[1] + entity.end[1]) / 2];
 }
 
-/** The two wing segments of an arrowhead with its tip at `tip`, pointing along (dx, dy). */
+/** Wings of an arrowhead at `tip` pointing along (dx, dy). */
 function arrowhead(tip: Vec2, dx: number, dy: number): Vec2[] {
   const length = Math.sqrt(dx * dx + dy * dy);
   if (length < EPSILON) return [tip, tip, tip, tip];
@@ -128,10 +125,7 @@ function angularDrawing(vertex: Vec2, armA: Vec2, armB: Vec2, offset: number, co
   };
 }
 
-/**
- * Drawing of one dimension entity from the entities it references (null entries = dangling).
- * @failure missing or wrong-kind references -> null (nothing is drawn)
- */
+/** `null` references = dangling. @failure missing or wrong-kind references -> null */
 export function dimensionDrawing(
   kind: DimensionEntity['dimensionKind'],
   refs: ReadonlyArray<Entity | null | undefined>,

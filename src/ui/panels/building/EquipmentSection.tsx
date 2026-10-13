@@ -1,8 +1,4 @@
-/**
- * EquipmentSection — every machine / equipment of the model (all levels) with an in-place editor:
- * picking a row selects it in the viewport and opens its fields; Save dispatches `update_equipment`
- * (same element id, tag and IFC GlobalId — a revision, not a delete + re-add).
- */
+// All equipment (all levels) with an in-place editor; a row selects it; Save = `update_equipment` (a revision, same ids).
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';

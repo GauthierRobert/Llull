@@ -1,9 +1,5 @@
-/**
- * ProjectIO — Save downloads the in-store document as JSON; Open reads a chosen file and
- * dispatches `load_document` (PRIME DIRECTIVE: never mutate the document outside a command).
- * New clears it (`clear_document`) and the browser autosave. Cross-session persistence: the browser
- * autosave (`useAutosave`) offline, the server-side autosave (`server/src/liveDocument.ts`) online.
- */
+// Save downloads the document JSON; Open dispatches `load_document`; New `clear_document` + clears the browser autosave.
+// Persistence across sessions: browser autosave offline, server autosave (server/src/liveDocument.ts) online.
 
 import React, { useRef, useState } from 'react';
 import { useStore, useToolStore } from '@ui/store';
@@ -39,7 +35,7 @@ export function ProjectIO(): React.ReactElement {
     const stem = projectFileStem(document, `llull-${timestamp()}`);
     downloadBlob(new Blob([json], { type: 'application/json' }), `${stem}.json`);
     useSessionStore.getState().markSaved();
-    // Mark the browser autosave as identical to the saved file (offline only, like autosave).
+    // Offline only, like autosave: the stored copy now equals the saved file.
     const storage = browserStorage();
     if (storage !== null && useStore.getState().liveStatus !== 'connected') {
       writeAutosave(storage, { savedAt: Date.now(), json, clean: true });
@@ -64,7 +60,7 @@ export function ProjectIO(): React.ReactElement {
     else setConfirmingNew(true);
   };
 
-  /** After Open: framing an empty → loaded document is useAutoFrame's job; frame a replaced one here. */
+  /** Empty → loaded is framed by useAutoFrame; a replaced document is framed here. */
   const afterOpen =
     (replacedContent: boolean) =>
     ({ changed }: { changed: boolean }): void => {

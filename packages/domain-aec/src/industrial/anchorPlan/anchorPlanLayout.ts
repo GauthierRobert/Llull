@@ -13,11 +13,7 @@ export const INSET = 28;
 export const BAND_STEP = 6;
 export const OFFSET_TOLERANCE_MM = 1;
 
-export interface BandDim {
-  readonly from: number;
-  readonly to: number;
-  readonly label: string;
-}
+export type BandDim = { readonly from: number; readonly to: number; readonly label: string };
 
 /** Greedy interval packing: dimensions that overlap along the band get separate stack levels. */
 export function packBands(dims: ReadonlyArray<BandDim>): Array<{ dim: BandDim; level: number }> {
@@ -63,11 +59,7 @@ export interface GridAxis {
 
 /** Dimension spans between neighbouring grid axes, plus an overall span when there are more than two. */
 export function gridSpans(axes: ReadonlyArray<GridAxis>): Array<{ from: number; to: number; overall: boolean }> {
-  const spans = axes.slice(1).map((axis, index) => ({
-    from: (axes[index] as GridAxis).position,
-    to: axis.position,
-    overall: false,
-  }));
+  const spans = axes.slice(1).map((axis, index) => ({ from: (axes[index] as GridAxis).position, to: axis.position, overall: false }));
   const [first, last] = [axes[0], axes[axes.length - 1]];
   return first && last && axes.length > 2 ? [...spans, { from: first.position, to: last.position, overall: true }] : spans;
 }
@@ -96,12 +88,7 @@ export function gridAxes(
     ];
     const isVertical = Math.abs(end[0] - start[0]) < Math.abs(end[1] - start[1]);
     const [from, to] = (isVertical ? start[1] <= end[1] : start[0] <= end[0]) ? [start, end] : [end, start];
-    const axis: GridAxis = {
-      mark: grid.mark,
-      position: isVertical ? (start[0] + end[0]) / 2 : (start[1] + end[1]) / 2,
-      from,
-      to,
-    };
+    const axis: GridAxis = { mark: grid.mark, position: isVertical ? (start[0] + end[0]) / 2 : (start[1] + end[1]) / 2, from, to };
     (isVertical ? vertical : horizontal).push(axis);
   }
   const byPosition = (a: GridAxis, b: GridAxis): number => a.position - b.position;

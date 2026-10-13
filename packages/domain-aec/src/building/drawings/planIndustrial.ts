@@ -71,22 +71,8 @@ export function industrialPrimitives(
           );
         const { outer, holes } = profileOutline(profile);
         return [
-          {
-            type: 'polygon',
-            layer,
-            style: 'cut',
-            points: section(outer),
-            fill: 'solid',
-            holes: holes.map(section),
-          },
-          ...holes.map(
-            (hole): DrawingPrimitive => ({
-              type: 'polygon',
-              layer,
-              style: 'thin',
-              points: section(hole),
-            }),
-          ),
+          { type: 'polygon', layer, style: 'cut', points: section(outer), fill: 'solid', holes: holes.map(section) },
+          ...holes.map((hole): DrawingPrimitive => ({ type: 'polygon', layer, style: 'thin', points: section(hole) })),
         ];
       }
       // Roof framing (purlins, rafters, roof bracing) and side rails belong to the roof / elevation drawings.
@@ -129,15 +115,7 @@ export function industrialPrimitives(
         element.clearance <= 0
           ? []
           : round
-            ? [
-                {
-                  type: 'circle',
-                  layer,
-                  style: 'hidden',
-                  center: [cx, cy],
-                  radius: arm + element.clearance,
-                },
-              ]
+            ? [{ type: 'circle', layer, style: 'hidden', center: [cx, cy], radius: arm + element.clearance }]
             : [
                 {
                   type: 'polygon',
@@ -171,20 +149,9 @@ export function industrialPrimitives(
       if (!layout) return [];
       const layer = layerName('plate');
       return [
-        {
-          type: 'polygon',
-          layer,
-          style: 'thin',
-          points: rectangleAt(layout.center, element.length / 2, element.width / 2, layout.angle),
-        },
+        { type: 'polygon', layer, style: 'thin', points: rectangleAt(layout.center, element.length / 2, element.width / 2, layout.angle) },
         ...layout.bolts.map(
-          (center): DrawingPrimitive => ({
-            type: 'circle',
-            layer,
-            style: 'thin',
-            center,
-            radius: element.boltDiameter / 2,
-          }),
+          (center): DrawingPrimitive => ({ type: 'circle', layer, style: 'thin', center, radius: element.boltDiameter / 2 }),
         ),
       ];
     }
@@ -196,14 +163,7 @@ export function industrialPrimitives(
       if (!a || !b) {
         const half = element.width / 2;
         if (!a) return [];
-        return [
-          {
-            type: 'polygon',
-            layer,
-            style: 'thin',
-            points: rectangleAt(a, half, half),
-          },
-        ];
+        return [{ type: 'polygon', layer, style: 'thin', points: rectangleAt(a, half, half) }];
       }
       return [
         ...offsetPolyline(points, element.width / 2).map(
@@ -221,8 +181,8 @@ export function industrialPrimitives(
 }
 
 /**
- * Cut symbol, on the plan of `level`, of a concrete or vertical steel column that belongs to ANOTHER
- * level but whose vertical extent crosses the plan cut (`level.elevation + cutHeight`).
+ * Cut symbol, on the plan of `level`, of a concrete or vertical steel column that belongs to ANOTHER level but whose vertical extent
+ * crosses the plan cut (`level.elevation + cutHeight`).
  */
 export function crossingColumnPrimitives(
   doc: PlanSource,

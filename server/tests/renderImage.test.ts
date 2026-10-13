@@ -1,173 +1,57 @@
-/**
- * Unit tests for renderImage.ts — SVG rasterization helper and MCP image block builder.
- *
- * Covers:
- *   (a) rasterizeSvg — valid SVG → non-empty base64 string whose bytes decode to a PNG
- *       (magic bytes 0x89 0x50 0x4E 0x47 == "\x89PNG").
- *   (b) rasterizeSvg — malformed/empty SVG → returns null, does not throw.
- *   (c) buildImageBlock — data with svg field → returns image content block with
- *       mimeType 'image/png' and a non-empty base64 data string.
- *   (d) buildImageBlock — data without svg field (normal mutation result) → returns null.
- *   (e) buildImageBlock — data.svg empty string → returns null.
- *   (f) buildImageBlock — null/undefined/non-object data → returns null.
- *   (g) MCP shaping hook — busResult with data.svg → shaped content includes an image
- *       block AND still carries the text summary block.
- *   (h) MCP shaping hook — busResult without data.svg → no image block appended.
- */
-
 import { describe, it, expect } from 'vitest';
 import { rasterizeSvg, buildImageBlock, stripSvgFromData, MAX_RASTER_PX } from '../src/renderImage';
 import { shapeToolCallContent } from '@mcp/index';
 
-// Fixtures
-
-/** A minimal valid 100×100 SVG with one rect — the smallest valid test vector. */
-const VALID_SVG =
-  '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">' + '<rect width="100" height="100" fill="#336699"/>' + '</svg>';
-
-/** PNG magic bytes as a hex string: \x89PNG */
+const VALID_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#336699"/></svg>';
 const PNG_MAGIC_HEX = '89504e47';
+const isPng = (base64: string): boolean => Buffer.from(base64, 'base64').subarray(0, 4).toString('hex') === PNG_MAGIC_HEX;
+const pngSize = (base64: string): { width: number; height: number } => {
+  const bytes = Buffer.from(base64, 'base64');
+  return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+};
+const shaped = (data?: unknown): ReturnType<typeof shapeToolCallContent> =>
+  shapeToolCallContent({ summary: 'Rendered view.', affected: [], isError: false, ...(data !== undefined ? { data } : {}) });
 
-// (a) rasterizeSvg — valid SVG → PNG magic bytes
-
-describe('rasterizeSvg — valid SVG', () => {
-  it('returns a non-empty base64 string', () => {
+describe('rasterizeSvg', () => {
+  it('returns a non-empty base64 PNG; a wider hint renders more bytes', () => {
     const result = rasterizeSvg(VALID_SVG);
     expect(typeof result).toBe('string');
     expect(result!.length).toBeGreaterThan(0);
-  });
-
-  it('decoded bytes start with PNG magic bytes (\\x89PNG)', () => {
-    const result = rasterizeSvg(VALID_SVG);
-    expect(result).not.toBeNull();
-    const buf = Buffer.from(result as string, 'base64');
-    expect(buf.slice(0, 4).toString('hex')).toBe(PNG_MAGIC_HEX);
-  });
-
-  it('respects the width hint — wider render produces more bytes than smaller', () => {
+    expect(isPng(result!)).toBe(true);
     const narrow = rasterizeSvg(VALID_SVG, 50);
     const wide = rasterizeSvg(VALID_SVG, 400);
-    expect(narrow).not.toBeNull();
-    expect(wide).not.toBeNull();
-    // A 400px-wide PNG will be larger than a 50px-wide PNG.
-    expect(Buffer.from(wide as string, 'base64').length).toBeGreaterThan(Buffer.from(narrow as string, 'base64').length);
-  });
-});
-
-function pngSize(base64: string): { width: number; height: number } {
-  const bytes = Buffer.from(base64, 'base64');
-  return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
-}
-
-describe('rasterizeSvg — size cap', () => {
-  it('keeps the requested width when it is within the cap', () => {
-    expect(pngSize(rasterizeSvg(VALID_SVG, 400) as string)).toEqual({ width: 400, height: 400 });
+    expect(Buffer.from(wide!, 'base64').length).toBeGreaterThan(Buffer.from(narrow!, 'base64').length);
   });
 
-  it('scales an enormous width hint down to MAX_RASTER_PX, keeping the aspect', () => {
-    const wide = pngSize(rasterizeSvg(VALID_SVG, 1_000_000) as string);
-    expect(wide).toEqual({ width: MAX_RASTER_PX, height: MAX_RASTER_PX });
+  it('keeps a width within the cap and scales enormous sizes down to MAX_RASTER_PX, keeping the aspect', () => {
+    expect(pngSize(rasterizeSvg(VALID_SVG, 400)!)).toEqual({ width: 400, height: 400 });
+    expect(pngSize(rasterizeSvg(VALID_SVG, 1_000_000)!)).toEqual({ width: MAX_RASTER_PX, height: MAX_RASTER_PX });
     const tall = '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="400"><rect width="100" height="400"/></svg>';
-    const size = pngSize(rasterizeSvg(tall, 100_000) as string);
-    expect(size.height).toBe(MAX_RASTER_PX);
-    expect(size.width).toBe(MAX_RASTER_PX / 4);
-  });
-
-  it('caps an enormous intrinsic size when no width hint is given', () => {
+    expect(pngSize(rasterizeSvg(tall, 100_000)!)).toEqual({ width: MAX_RASTER_PX / 4, height: MAX_RASTER_PX });
     const huge = '<svg xmlns="http://www.w3.org/2000/svg" width="200000" height="100000"><rect width="10" height="10"/></svg>';
-    const size = pngSize(rasterizeSvg(huge) as string);
-    expect(size).toEqual({ width: MAX_RASTER_PX, height: MAX_RASTER_PX / 2 });
+    expect(pngSize(rasterizeSvg(huge)!)).toEqual({ width: MAX_RASTER_PX, height: MAX_RASTER_PX / 2 });
+  });
+
+  it.each(['', 'not-svg-at-all <<<', '<svg xmlns="http://www.w3.org/2000/svg">'])('returns null (no throw) for %j', (svg) => {
+    expect(rasterizeSvg(svg)).toBeNull();
   });
 });
 
-// (b) rasterizeSvg — malformed / empty SVG → null, no throw
-
-describe('rasterizeSvg — failure cases', () => {
-  it('returns null for an empty string (does not throw)', () => {
-    expect(rasterizeSvg('')).toBeNull();
-  });
-
-  it('returns null for completely malformed markup (does not throw)', () => {
-    expect(rasterizeSvg('not-svg-at-all <<<')).toBeNull();
-  });
-
-  it('returns null for unclosed tags (does not throw)', () => {
-    expect(rasterizeSvg('<svg xmlns="http://www.w3.org/2000/svg">')).toBeNull();
-  });
-});
-
-// (c) buildImageBlock — data with svg field → image content block
-
-describe('buildImageBlock — data with svg field', () => {
-  it('returns an image content block with mimeType image/png', () => {
-    const block = buildImageBlock({ svg: VALID_SVG, width: 100, height: 100 });
-    expect(block).not.toBeNull();
+describe('buildImageBlock', () => {
+  it.each([{ svg: VALID_SVG, width: 100, height: 100 }, { svg: VALID_SVG }])('builds an image/png block from %#', (data) => {
+    const block = buildImageBlock(data);
     expect(block!.type).toBe('image');
     expect(block!.mimeType).toBe('image/png');
+    expect(isPng(block!.data)).toBe(true);
   });
 
-  it('block.data decodes to valid PNG (magic bytes)', () => {
-    const block = buildImageBlock({ svg: VALID_SVG, width: 100, height: 100 });
-    expect(block).not.toBeNull();
-    const buf = Buffer.from(block!.data, 'base64');
-    expect(buf.slice(0, 4).toString('hex')).toBe(PNG_MAGIC_HEX);
-  });
-
-  it('works without width/height fields (uses intrinsic SVG size)', () => {
-    const block = buildImageBlock({ svg: VALID_SVG });
-    expect(block).not.toBeNull();
-    expect(block!.type).toBe('image');
+  it.each([{ volume: 42, unit: 'mm³' }, {}, { svg: '' }, null, undefined, 'hello', 42, [VALID_SVG]])('returns null for %j', (data) => {
+    expect(buildImageBlock(data)).toBeNull();
   });
 });
-
-// (d) buildImageBlock — data without svg field → null
-
-describe('buildImageBlock — no svg field', () => {
-  it('returns null when data has no svg property', () => {
-    expect(buildImageBlock({ volume: 42, unit: 'mm³' })).toBeNull();
-  });
-
-  it('returns null when data is an empty object', () => {
-    expect(buildImageBlock({})).toBeNull();
-  });
-});
-
-// (e) buildImageBlock — empty svg string → null
-
-describe('buildImageBlock — empty svg string', () => {
-  it('returns null for an empty svg string', () => {
-    expect(buildImageBlock({ svg: '' })).toBeNull();
-  });
-});
-
-// (f) buildImageBlock — non-object/null/undefined data → null
-
-describe('buildImageBlock — non-object data', () => {
-  it('returns null for null', () => {
-    expect(buildImageBlock(null)).toBeNull();
-  });
-
-  it('returns null for undefined', () => {
-    expect(buildImageBlock(undefined)).toBeNull();
-  });
-
-  it('returns null for a string', () => {
-    expect(buildImageBlock('hello')).toBeNull();
-  });
-
-  it('returns null for a number', () => {
-    expect(buildImageBlock(42)).toBeNull();
-  });
-
-  it('returns null for an array', () => {
-    expect(buildImageBlock([VALID_SVG])).toBeNull();
-  });
-});
-
-// stripSvgFromData — removes svg field, preserves metadata, leaves non-records intact
 
 describe('stripSvgFromData', () => {
-  it('removes the svg field and keeps all other fields', () => {
+  it('removes svg, keeps every other field, does not mutate', () => {
     const data = {
       svg: VALID_SVG,
       width: 800,
@@ -175,200 +59,46 @@ describe('stripSvgFromData', () => {
       bounds: { minX: 0, maxX: 10 },
       camera: { position: [0, 0, 5] },
       entityCount: 3,
-      view: 'perspective',
     };
-    const result = stripSvgFromData(data) as Record<string, unknown>;
-    expect('svg' in result).toBe(false);
-    expect(result['width']).toBe(800);
-    expect(result['height']).toBe(600);
-    expect(result['bounds']).toEqual({ minX: 0, maxX: 10 });
-    expect(result['camera']).toEqual({ position: [0, 0, 5] });
-    expect(result['entityCount']).toBe(3);
-    expect(result['view']).toBe('perspective');
-  });
-
-  it('does not mutate the original object', () => {
-    const data = { svg: VALID_SVG, width: 400 };
-    stripSvgFromData(data);
+    const stripped = stripSvgFromData(data) as Record<string, unknown>;
+    expect('svg' in stripped).toBe(false);
+    expect(stripped).toEqual({ ...data, svg: undefined });
     expect('svg' in data).toBe(true);
+    expect(stripSvgFromData({})).toEqual({});
   });
 
-  it('returns the value unchanged for null', () => {
-    expect(stripSvgFromData(null)).toBeNull();
-  });
-
-  it('returns the value unchanged for undefined', () => {
-    expect(stripSvgFromData(undefined)).toBeUndefined();
-  });
-
-  it('returns the value unchanged for an array', () => {
-    const arr = ['a', 'b'];
-    expect(stripSvgFromData(arr)).toBe(arr);
-  });
-
-  it('returns the value unchanged for a string', () => {
-    expect(stripSvgFromData('hello')).toBe('hello');
-  });
-
-  it('returns empty object when data is {} (no svg field)', () => {
-    const result = stripSvgFromData({});
-    expect(result).toEqual({});
+  it.each([null, undefined, ['a', 'b'], 'hello'])('returns %j unchanged', (value) => {
+    expect(stripSvgFromData(value)).toBe(value);
   });
 });
 
-// svg-stripping integration — text/json block must NOT contain raw svg markup
-
-describe('svg stripping in MCP content shaping', () => {
-  it('text block does not contain raw svg markup after stripping', () => {
-    const data = {
-      svg: VALID_SVG,
-      width: 800,
-      height: 600,
-      entityCount: 2,
-      view: 'perspective',
-    };
-    const imageBlock = buildImageBlock(data);
-    expect(imageBlock).not.toBeNull(); // confirms stripping should be applied
-
-    const stripped = stripSvgFromData(data);
-    const shaped = shapeToolCallContent({
-      summary: 'Rendered view.',
-      affected: [],
-      isError: false,
-      data: stripped,
-    });
-
-    // No text block should contain raw SVG markup.
-    for (const block of shaped.content) {
-      expect(block.text).not.toMatch(/<svg/i);
-      expect(block.text).not.toMatch(/<polygon/i);
-      expect(block.text).not.toMatch(/<rect/i);
-    }
+describe('MCP content shaping', () => {
+  it('stripped render data: no markup in text, metadata kept in json and structuredContent', () => {
+    const result = shaped(stripSvgFromData({ svg: VALID_SVG, width: 800, height: 600, entityCount: 5, view: 'top' }));
+    for (const block of result.content) expect(block.text).not.toMatch(/<svg|<polygon|<rect/i);
+    const json = result.content.find((b) => b.text.startsWith('```json'))!.text;
+    for (const key of ['"width"', '"height"', '"entityCount"', '"view"']) expect(json).toContain(key);
+    expect(json).not.toContain('"svg"');
+    expect('svg' in result.structuredContent!).toBe(false);
+    expect(result.structuredContent!['width']).toBe(800);
+    expect(result.structuredContent!['entityCount']).toBe(5);
   });
 
-  it('text block still contains useful metadata fields after stripping', () => {
-    const data = {
-      svg: VALID_SVG,
-      width: 800,
-      height: 600,
-      entityCount: 5,
-      view: 'top',
-    };
-    const stripped = stripSvgFromData(data);
-    const shaped = shapeToolCallContent({
-      summary: 'Rendered view.',
-      affected: [],
-      isError: false,
-      data: stripped,
-    });
-
-    const jsonBlock = shaped.content.find((b) => b.text.startsWith('```json'));
-    expect(jsonBlock).toBeDefined();
-    expect(jsonBlock!.text).toContain('"width"');
-    expect(jsonBlock!.text).toContain('"height"');
-    expect(jsonBlock!.text).toContain('"entityCount"');
-    expect(jsonBlock!.text).toContain('"view"');
-    expect(jsonBlock!.text).not.toContain('"svg"');
-  });
-
-  it('structuredContent does not contain svg key after stripping', () => {
-    const data = {
-      svg: VALID_SVG,
-      width: 800,
-      height: 600,
-      entityCount: 1,
-    };
-    const stripped = stripSvgFromData(data);
-    const shaped = shapeToolCallContent({
-      summary: 'Rendered view.',
-      affected: [],
-      isError: false,
-      data: stripped,
-    });
-
-    expect(shaped.structuredContent).toBeDefined();
-    expect('svg' in (shaped.structuredContent as Record<string, unknown>)).toBe(false);
-    expect(shaped.structuredContent!['width']).toBe(800);
-    expect(shaped.structuredContent!['entityCount']).toBe(1);
-  });
-
-  it('non-SVG busResult is shaped exactly as before — no behavior change', () => {
-    const busResult = {
-      summary: 'Added box e-001.',
-      affected: ['e-001'],
-      isError: false,
-    };
-    const imageBlock = buildImageBlock(undefined);
-    expect(imageBlock).toBeNull(); // confirms no stripping
-
-    const shaped = shapeToolCallContent(busResult);
-    expect(shaped.content[0]!.text).toBe('Added box e-001.');
-    expect(shaped.content[1]!.text).toBe('Affected entity ids: e-001');
-    expect(shaped.structuredContent).toBeUndefined();
-    expect(shaped.content.every((b) => b.type === 'text')).toBe(true);
-  });
-});
-
-// (g) MCP shaping hook — busResult with data.svg includes image block + text block
-
-const RENDERED = {
-  summary: 'Rendered view.',
-  affected: [] as string[],
-  isError: false,
-  data: { svg: VALID_SVG, width: 100, height: 100 },
-};
-
-describe('MCP shaping hook — content augmentation with SVG data', () => {
-  it('shaped content keeps the text summary block', () => {
-    const shaped = shapeToolCallContent(RENDERED);
-
-    // Text summary must still be present as first block.
-    expect(shaped.content[0]?.type).toBe('text');
-    expect(shaped.content[0]?.text).toBe('Rendered view.');
-  });
-
-  it('buildImageBlock produces an image block for a result with data.svg', () => {
-    const imageBlock = buildImageBlock(RENDERED.data);
-    expect(imageBlock).not.toBeNull();
-    expect(imageBlock!.type).toBe('image');
-    expect(imageBlock!.mimeType).toBe('image/png');
-  });
-
-  it('combined content array has text block then image block', () => {
-    const shaped = shapeToolCallContent(RENDERED);
-    const imageBlock = buildImageBlock(RENDERED.data);
-
-    const content = [...shaped.content, ...(imageBlock ? [imageBlock] : [])];
-
+  it('an svg result keeps its text summary first; the image block goes last', () => {
+    const data = { svg: VALID_SVG, width: 100, height: 100 };
+    const result = shaped(data);
+    expect(result.content[0]?.type).toBe('text');
+    expect(result.content[0]?.text).toBe('Rendered view.');
+    const content = [...result.content, buildImageBlock(data)!];
     expect(content.length).toBeGreaterThanOrEqual(2);
-    expect(content[0]?.type).toBe('text');
-    // Last block is the image.
-    expect(content[content.length - 1]?.type).toBe('image');
-  });
-});
-
-// (h) MCP shaping hook — busResult without svg → no image block
-
-describe('MCP shaping hook — no image block for non-SVG results', () => {
-  it('buildImageBlock returns null for a normal mutation result (no data)', () => {
-    expect(buildImageBlock(undefined)).toBeNull();
+    expect(content.at(-1)?.type).toBe('image');
   });
 
-  it('buildImageBlock returns null for a query result without svg', () => {
-    expect(buildImageBlock({ volume: 8, unit: 'mm³' })).toBeNull();
-  });
-
-  it('shapeToolCallContent content is unchanged when no svg data present', () => {
-    const busResult = {
-      summary: 'Added box.',
-      affected: ['e-abc'],
-      isError: false,
-    };
-    const shaped = shapeToolCallContent(busResult);
-    const imageBlock = buildImageBlock(undefined);
-
-    // No image block — content stays as-is.
-    expect(imageBlock).toBeNull();
-    expect(shaped.content.every((b) => b.type === 'text')).toBe(true);
+  it('a non-svg result is shaped as plain text blocks', () => {
+    const result = shapeToolCallContent({ summary: 'Added box e-001.', affected: ['e-001'], isError: false });
+    expect(result.content[0]!.text).toBe('Added box e-001.');
+    expect(result.content[1]!.text).toBe('Affected entity ids: e-001');
+    expect(result.structuredContent).toBeUndefined();
+    expect(result.content.every((b) => b.type === 'text')).toBe(true);
   });
 });

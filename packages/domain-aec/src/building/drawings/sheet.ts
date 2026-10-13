@@ -1,6 +1,6 @@
 /**
- * Printable floor-plan sheet: SVG at a true architectural scale on ISO A paper, with title block,
- * north arrow, scale bar and dimensions. Print / save as PDF from any browser.
+ * Printable floor-plan sheet: SVG at a true architectural scale on ISO A paper, with title block, north arrow, scale bar and dimensions.
+ * Print / save as PDF from any browser.
  */
 
 import type { CadDocument } from '@core/model/types';
@@ -84,10 +84,9 @@ export const exportPlanSheet = defineCommand({
   name: 'export_plan_sheet',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Produce a printable floor-plan drawing sheet (SVG in real millimetres, print to PDF at 100%): the ' +
-    'level plan at a true scale (1:50, 1:100…; auto-fitted when omitted) on ISO paper A4–A0 landscape, with ' +
-    'wall poché, doors, windows, grids, room tags, dimensions in mm, north arrow, scale bar and a title block ' +
-    'filled from set_project_info. data.svg holds the file text.',
+    'Produce a printable floor-plan drawing sheet (SVG in real millimetres, print to PDF at 100%): the level plan at a true scale (1:50, ' +
+    '1:100…; auto-fitted when omitted) on ISO paper A4–A0 landscape, with wall poché, doors, windows, grids, room tags, dimensions in ' +
+    'mm, north arrow, scale bar and a title block filled from set_project_info. data.svg holds the file text.',
   params: z.object({
     levelId: z.string().optional().describe('Level to draw. Default: active level.'),
     paper: PAPER_FIELD,
@@ -96,9 +95,7 @@ export const exportPlanSheet = defineCommand({
   }),
   run: (doc, { levelId, paper = 'A3', scale, title }): CommandResult => {
     const sheet = buildPlanSheet(doc, levelId, paper, scale, title);
-    if (!sheet) {
-      return noop(doc, 'export_plan_sheet failed: no such level (add_level / draw_walls first) or invalid scale (must be > 0).');
-    }
+    if (!sheet) return noop(doc, 'export_plan_sheet failed: no such level (add_level / draw_walls first) or invalid scale (must be > 0).');
     return report(
       doc,
       `Plan sheet ${sheet.filename}: level ${sheet.levelId} at 1:${sheet.scale} on ${sheet.paper}.${sheetFitWarning(sheet.fits, 'drawing')}`,

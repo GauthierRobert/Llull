@@ -7,14 +7,9 @@ import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { distance3 } from '@lib/vec3';
 import { findProfile, type SteelProfile } from '../../steel/profiles';
 
+// prettier-ignore
 const ROLE_MARK: Readonly<Record<MemberRole, string>> = {
-  column: 'SC',
-  rafter: 'RF',
-  beam: 'SB',
-  brace: 'BR',
-  purlin: 'PU',
-  rail: 'SR',
-  crane: 'CB',
+  column: 'SC', rafter: 'RF', beam: 'SB', brace: 'BR', purlin: 'PU', rail: 'SR', crane: 'CB',
 };
 
 export const MEMBER_ROLES: ReadonlyArray<MemberRole> = ['column', 'rafter', 'beam', 'brace', 'purlin', 'rail', 'crane'];

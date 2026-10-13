@@ -1,8 +1,5 @@
-/**
- * Right-docked entity inspector. Name, position and (3D only) rotation are editable; each
- * committed field dispatches set_entity_name / move_entities / rotate_entity with the delta from
- * the stored value.
- */
+// Right-docked inspector: name, position and (3D only) rotation commit set_entity_name / move_entities / rotate_entity
+// with the delta from the stored value.
 
 import { toDegrees, toRadians } from '@lib/angle';
 import React from 'react';
@@ -18,7 +15,6 @@ import { dimensionRows } from './entityDimensions';
 import { ElementInspector } from './building/ElementInspector';
 import { buildingElementOf } from '@aec/index';
 
-/** Delta vector that changes component `axisIndex` of `current` to `target`. */
 function axisDelta(current: readonly number[], axisIndex: number, target: number): number[] {
   return [0, 1, 2].map((i) => (i === axisIndex ? target - (current[i] ?? 0) : 0));
 }
@@ -93,24 +89,18 @@ function EntityDetail({ entity }: { entity: Entity }): React.ReactElement {
             values={entity.position}
             label="Position"
             onAxisCommit={(axisIndex, value) =>
-              dispatch('move_entities', {
-                ids: [entity.id],
-                delta: axisDelta(entity.position, axisIndex, value),
-              })
+              dispatch('move_entities', { ids: [entity.id], delta: axisDelta(entity.position, axisIndex, value) })
             }
           />
         </PropRow>
-        {/* 2D shapes are drawn and picked unrotated, so rotation is a 3D-only edit. */}
+        {/* 2D shapes are drawn and picked unrotated: rotation is 3D-only. */}
         {!is2D(entity) && (
           <PropRow label="Rotation°">
             <AxisFields
               values={entity.rotation.map((r) => toDegrees(r))}
               label="Rotation"
               onAxisCommit={(axisIndex, degrees) =>
-                dispatch('rotate_entity', {
-                  id: entity.id,
-                  delta: axisDelta(entity.rotation, axisIndex, toRadians(degrees)),
-                })
+                dispatch('rotate_entity', { id: entity.id, delta: axisDelta(entity.rotation, axisIndex, toRadians(degrees)) })
               }
             />
           </PropRow>
@@ -134,7 +124,7 @@ function EntityDetail({ entity }: { entity: Entity }): React.ReactElement {
 }
 
 function PropertiesBody(): React.ReactElement {
-  // Narrow slices (react R3): camera / orbit changes must not re-render the inspector.
+  // Narrow slices: camera / orbit changes must not re-render the inspector.
   const selection = useStore((s) => s.document.selection);
   const entities = useStore((s) => s.document.entities);
   const building = useStore((s) => s.document.building);

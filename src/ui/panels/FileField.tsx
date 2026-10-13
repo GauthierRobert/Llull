@@ -1,7 +1,4 @@
-/**
- * FileField — a file `<input>` (optionally in a `field` label) that hands the chosen file to the
- * caller as text or as a `File`, and clears itself so the same file can be picked again.
- */
+// File input (optionally labelled) handing the file over as text or `File`; clears itself so re-picks fire.
 
 import React from 'react';
 import { readChosenFile, takeChosenFile } from '@ui/chosenFile';

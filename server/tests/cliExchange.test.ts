@@ -23,13 +23,7 @@ import { getLiveDoc } from '../src/liveDocument';
 
 const triangle = { positions: [0, 0, 0, 10, 0, 0, 0, 10, 0], name: 'plate', color: '#336699' };
 const fakePort: CadExchangePort = {
-  runProgram: () =>
-    Promise.resolve({
-      trace: null,
-      traced: false,
-      stepBase64: Buffer.from('ISO-10303-21;').toString('base64'),
-      log: '',
-    }),
+  runProgram: () => Promise.resolve({ trace: null, traced: false, stepBase64: Buffer.from('ISO-10303-21;').toString('base64'), log: '' }),
   importStep: (stepBase64) =>
     Buffer.from(stepBase64, 'base64').toString().startsWith('ISO-10303')
       ? Promise.resolve({ bodies: [triangle] })
@@ -37,11 +31,7 @@ const fakePort: CadExchangePort = {
 };
 const fakeOptions: ExchangeOptions = { port: fakePort, dwg: null, allowCodeExecution: false };
 
-function capture(exchangeOptions: () => ExchangeOptions = () => fakeOptions): {
-  io: CliIo;
-  out: string[];
-  err: string[];
-} {
+function capture(exchangeOptions: () => ExchangeOptions = () => fakeOptions): { io: CliIo; out: string[]; err: string[] } {
   const out: string[] = [];
   const err: string[] = [];
   return {
@@ -62,18 +52,8 @@ const work = (): string => mkdtempSync(path.join(tmpdir(), 'llull-exchange-'));
 
 describe('unshapeExchangeResult', () => {
   it('recovers summary, affected ids and data from an MCP-shaped result', () => {
-    const shaped = shapeToolCallContent({
-      summary: 'done',
-      affected: ['a', 'b'],
-      isError: false,
-      data: { n: 1 },
-    });
-    expect(unshapeExchangeResult(shaped)).toEqual({
-      summary: 'done',
-      affected: ['a', 'b'],
-      isError: false,
-      data: { n: 1 },
-    });
+    const shaped = shapeToolCallContent({ summary: 'done', affected: ['a', 'b'], isError: false, data: { n: 1 } });
+    expect(unshapeExchangeResult(shaped)).toEqual({ summary: 'done', affected: ['a', 'b'], isError: false, data: { n: 1 } });
   });
 
   it('reads affected ids from the text when there is no data, and unwraps non-record data', () => {
@@ -99,10 +79,7 @@ describe('POST /exchange', () => {
   it('runs import_step through the command bus and reports the change', async () => {
     const response = await request(app)
       .post('/exchange')
-      .send({
-        name: 'import_step',
-        params: { stepBase64: Buffer.from('ISO-10303-21;').toString('base64') },
-      });
+      .send({ name: 'import_step', params: { stepBase64: Buffer.from('ISO-10303-21;').toString('base64') } });
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ isError: false, changed: true });
     const ids = (response.body as { affected: string[] }).affected;
@@ -115,10 +92,7 @@ describe('POST /exchange', () => {
     expect((await request(app).post('/exchange').send({ name: 'add_box' })).status).toBe(404);
     const bad = await request(app)
       .post('/exchange')
-      .send({
-        name: 'import_step',
-        params: { stepBase64: Buffer.from('nope').toString('base64') },
-      });
+      .send({ name: 'import_step', params: { stepBase64: Buffer.from('nope').toString('base64') } });
     expect(bad.body).toMatchObject({ isError: true, changed: false });
     expect((bad.body as { summary: string }).summary).toMatch(/not a STEP file/);
   });

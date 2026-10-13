@@ -38,8 +38,7 @@ export const addJoint = defineCommand({
     ),
     b: instanceFrameRef(
       'second',
-      'Second instance frame reference (the moving frame). ' +
-        '{ instanceId: "<id>", frame?: "origin"|"axis-x"|"axis-y"|"axis-z" }. ' +
+      'Second instance frame reference (the moving frame). { instanceId: "<id>", frame?: "origin"|"axis-x"|"axis-y"|"axis-z" }. ' +
         'instanceId must be an existing InstanceEntity. frame defaults to "origin".',
     ),
     axis: z
@@ -57,25 +56,17 @@ export const addJoint = defineCommand({
       ),
   }),
   run: (doc, { kind, a, b, axis, id }): CommandResult => {
-    if (!isValidAxis(axis)) {
+    if (!isValidAxis(axis))
       return noop(doc, `add_joint: invalid axis '${JSON.stringify(axis)}'. Use "x", "y", "z", or a [x,y,z] number array.`);
-    }
     const refProblem = instanceRefsProblem(doc, 'add_joint', { a, b });
     if (refProblem !== null) return noop(doc, refProblem);
-
     const jointId = idOrNext(id, 'joint');
     if (idTaken(doc.joints, jointId)) return noop(doc, `add_joint: joint id '${jointId}' already exists — no change made.`);
-
     const mateRef = ({ instanceId, frame }: typeof a): JointMateRef => (frame !== undefined ? { instanceId, frame } : { instanceId });
     const refs = { a: mateRef(a), b: mateRef(b), axis };
     const newJoint: Joint =
       kind === 'revolute' ? { id: jointId, kind, ...refs, angle: 0 } : { id: jointId, kind, ...refs, displacement: 0 };
-    const newDoc = {
-      ...doc,
-      joints: { ...doc.joints, [jointId]: newJoint },
-      jointOrder: [...doc.jointOrder, jointId],
-    };
-
+    const newDoc = { ...doc, joints: { ...doc.joints, [jointId]: newJoint }, jointOrder: [...doc.jointOrder, jointId] };
     return changed(
       newDoc,
       `add_joint: added '${kind}' joint '${jointId}' between instance '${a.instanceId}' (a) ` +
@@ -107,13 +98,11 @@ export const deleteJoint = defineCommand({
   run: (doc, { id }): CommandResult => {
     const joint = Object.hasOwn(doc.joints, id) ? doc.joints[id] : undefined;
     if (!joint) return noop(doc, `delete_joint: joint '${String(id)}' does not exist — no change made.`);
-
     const removedDrIds = Object.entries(doc.driveRelations)
       .filter(([, dr]) => dr.driver === id || dr.driven === id)
       .map(([drId]) => drId);
     const without = <T>(record: Record<string, T>, ids: readonly string[]): Record<string, T> =>
       Object.fromEntries(Object.entries(record).filter(([key]) => !ids.includes(key)));
-
     const newDoc = {
       ...doc,
       joints: without(doc.joints, [id]),
@@ -121,10 +110,8 @@ export const deleteJoint = defineCommand({
       driveRelations: without(doc.driveRelations, removedDrIds),
       driveRelationOrder: doc.driveRelationOrder.filter((drid) => !removedDrIds.includes(drid)),
     };
-
     const cascadeSummary =
       removedDrIds.length > 0 ? ` Also removed ${removedDrIds.length} drive relation(s): ${removedDrIds.join(', ')}.` : '';
-
     return report(newDoc, `delete_joint: removed '${joint.kind}' joint '${id}'.${cascadeSummary}`);
   },
 });
@@ -137,8 +124,7 @@ export const deleteJoint = defineCommand({
 export const setJointValue = defineCommand({
   name: 'set_joint_value',
   description:
-    'Set the current value of a kinematic joint. ' +
-    'For revolute joints, "value" is the rotation angle in radians. ' +
+    'Set the current value of a kinematic joint. For revolute joints, "value" is the rotation angle in radians. ' +
     'For prismatic joints, "value" is the displacement in document units. ' +
     '"value" may be a plain number or a parameter expression string (e.g. "=spoke_angle * 2" or "gap / 3"). ' +
     'Expression strings are stored as-is and evaluated when evaluate_motion or bake_motion is called. ' +
@@ -156,16 +142,9 @@ export const setJointValue = defineCommand({
   run: (doc, { id, value }): CommandResult => {
     const existing = Object.hasOwn(doc.joints, id) ? doc.joints[id] : undefined;
     if (!existing) return noop(doc, `set_joint_value: joint '${String(id)}' does not exist — no change made.`);
-
-    const resolved = resolveNumeric(value, doc.parameters);
     const fieldName = existing.kind === 'revolute' ? 'angle' : 'displacement';
-    const current = existing.kind === 'revolute' ? existing.angle : existing.displacement;
-    const storedValue = resolved ?? current;
-    const newDoc = {
-      ...doc,
-      joints: { ...doc.joints, [id]: { ...existing, [fieldName]: storedValue } as Joint },
-    };
-
+    const storedValue = resolveNumeric(value, doc.parameters) ?? (existing.kind === 'revolute' ? existing.angle : existing.displacement);
+    const newDoc = { ...doc, joints: { ...doc.joints, [id]: { ...existing, [fieldName]: storedValue } as Joint } };
     return changed(
       newDoc,
       `set_joint_value: joint '${id}' (${existing.kind}) ${fieldName} set to ${storedValue}` +

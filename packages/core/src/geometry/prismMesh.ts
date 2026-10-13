@@ -1,6 +1,6 @@
 /**
- * Pure closed-mesh construction from planar outlines (prisms, lofts, holes) with welded vertices,
- * so the result is watertight by construction. @layer geometry
+ * Pure closed-mesh construction from planar outlines (prisms, lofts, holes) with welded vertices, so the result is watertight by
+ * construction. @layer geometry
  */
 
 import type { MeshData } from '../model/types';
@@ -170,8 +170,7 @@ export function prismMesh(outer: ReadonlyArray<Point2>, holes: ReadonlyArray<Rea
 /** World-space copy of a local mesh: rotated (extrinsic XYZ) about the origin, then moved to `position`. */
 export function placeMesh(mesh: MeshData, position: Vec3, rotation: Vec3): MeshData {
   const positions: number[] = [];
-  for (let i = 0; i + 2 < mesh.positions.length; i += 3) {
+  for (let i = 0; i + 2 < mesh.positions.length; i += 3)
     positions.push(...entityLocalToWorld({ position, rotation }, vec3At(mesh.positions, i)));
-  }
   return { positions, indices: [...mesh.indices] };
 }

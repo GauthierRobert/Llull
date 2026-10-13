@@ -1,7 +1,4 @@
-/**
- * Coordinate reference system commands: declare the CRS, calibrate the site (local <-> grid) and
- * transform points between the two.
- */
+/** Coordinate reference system commands: declare the CRS, calibrate the site (local <-> grid) and transform points between the two. */
 
 import type { CadDocument } from '@core/model/types';
 import type { CivilCrs } from '@core/model/civil';
@@ -11,10 +8,7 @@ import { noop, report } from '@core/commands/noop';
 import { getCivil } from '../model';
 import { gridToLocal, localToGrid } from './crs';
 
-const withCrs = (doc: CadDocument, crs: CivilCrs): CadDocument => ({
-  ...doc,
-  civil: { ...getCivil(doc), crs },
-});
+const withCrs = (doc: CadDocument, crs: CivilCrs): CadDocument => ({ ...doc, civil: { ...getCivil(doc), crs } });
 
 /**
  * @affects sets civil.crs (keeps an existing calibration)
@@ -23,9 +17,8 @@ const withCrs = (doc: CadDocument, crs: CivilCrs): CadDocument => ({
 export const setCoordinateSystem = defineCommand({
   name: 'set_coordinate_system',
   description:
-    'Declare the coordinate reference system of the civil model (projected grid), e.g. name ' +
-    '"RGF93 / Lambert-93", epsg 2154, verticalDatum "NGF-IGN69". Written to LandXML ' +
-    '(<CoordinateSystem>). Keeps an existing site calibration (set_site_calibration).',
+    'Declare the coordinate reference system of the civil model (projected grid), e.g. name "RGF93 / Lambert-93", epsg 2154, ' +
+    'verticalDatum "NGF-IGN69". Written to LandXML (<CoordinateSystem>). Keeps an existing site calibration (set_site_calibration).',
   params: z.object({
     name: z.string().describe('CRS name, e.g. "RGF93 / Lambert-93". Must not be empty.'),
     epsg: z.number().optional().describe('EPSG code of the projected CRS (positive integer), e.g. 2154.'),
@@ -59,10 +52,9 @@ export const setCoordinateSystem = defineCommand({
 export const setSiteCalibration = defineCommand({
   name: 'set_site_calibration',
   description:
-    'Calibrate the local site coordinates to the projected grid with a 2D similarity (Helmert): ' +
-    'grid = gridOrigin + scaleFactor * R(rotationDeg) * (local - localOrigin), R counter-clockwise. ' +
-    'Coordinates are in document units; elevations are unchanged. Used by transform_coordinates, ' +
-    'import_survey_points (coordinates "grid") and the LandXML / DXF / sheet exports.',
+    'Calibrate the local site coordinates to the projected grid with a 2D similarity (Helmert): grid = gridOrigin + scaleFactor * ' +
+    'R(rotationDeg) * (local - localOrigin), R counter-clockwise. Coordinates are in document units; elevations are unchanged. Used by ' +
+    'transform_coordinates, import_survey_points (coordinates "grid") and the LandXML / DXF / sheet exports.',
   params: z.object({
     localOrigin: vec2('[x, y] of a control point in local (document) coordinates.'),
     gridOrigin: vec2('[easting, northing] of the same control point in grid coordinates.'),
@@ -74,10 +66,7 @@ export const setSiteCalibration = defineCommand({
     if (!values.every(Number.isFinite)) return noop(doc, 'set_site_calibration failed: all values must be finite numbers.');
     if (!(scaleFactor > 0)) return noop(doc, 'set_site_calibration failed: scaleFactor must be > 0.');
     const previous = getCivil(doc).crs ?? { name: 'Unnamed' };
-    const crs: CivilCrs = {
-      ...previous,
-      calibration: { localOrigin, gridOrigin, rotationDeg, scaleFactor },
-    };
+    const crs: CivilCrs = { ...previous, calibration: { localOrigin, gridOrigin, rotationDeg, scaleFactor } };
     return {
       document: withCrs(doc, crs),
       summary:
@@ -95,9 +84,8 @@ export const setSiteCalibration = defineCommand({
 export const transformCoordinates = defineCommand({
   name: 'transform_coordinates',
   description:
-    'Convert [x, y] points between local site coordinates and the projected grid using the site ' +
-    'calibration (set_site_calibration). Document units. data.points holds the converted points ' +
-    'in the same order.',
+    'Convert [x, y] points between local site coordinates and the projected grid using the site calibration (set_site_calibration). ' +
+    'Document units. data.points holds the converted points in the same order.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
     points: z.array(vec2('[x, y] point to convert.')).describe('Points to convert.'),

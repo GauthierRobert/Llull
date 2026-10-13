@@ -1,7 +1,4 @@
-/**
- * ElementListSection — the active level's elements (plus grids): click selects the element's
- * entities in the viewport; the delete button dispatches delete_building_element.
- */
+// Active level's elements (+ grids): click selects the element's entities; delete → delete_building_element.
 
 import React, { memo, useMemo } from 'react';
 import { useStore } from '@ui/store';
@@ -11,12 +8,7 @@ import { DeleteButton, ListRow, PanelSection } from '@ui/panels/PanelParts';
 import { CATEGORY_LABEL, describe } from './describeElement';
 import { elementsOnActiveLevel, isElementSelected } from './elementListRules';
 
-interface ElementRowProps {
-  element: BuildingElement;
-  selected: boolean;
-}
-
-const ElementRow = memo(function ElementRow({ element, selected }: ElementRowProps): React.ReactElement {
+const ElementRow = memo(function ElementRow({ element, selected }: { element: BuildingElement; selected: boolean }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const select = useStore((s) => s.select);
   const units = useStore((s) => s.document.units);

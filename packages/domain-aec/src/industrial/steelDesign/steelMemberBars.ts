@@ -1,6 +1,6 @@
 /**
- * Steel members of a document as analysis bars: absolute axis ends in mm, catalogue section, yield
- * strength and the structural kind (column / beam / brace) that decides which check applies.
+ * Steel members of a document as analysis bars: absolute axis ends in mm, catalogue section, yield strength and the structural kind (column
+ * / beam / brace) that decides which check applies.
  */
 
 import type { CadDocument, Vec3 } from '@core/model/types';
@@ -52,11 +52,7 @@ export interface ModelUnits {
 export function modelUnits(doc: CadDocument): ModelUnits {
   const building = getBuilding(doc);
   const unit = fromMm(doc, 1);
-  return {
-    building,
-    toMm: (value) => value / unit,
-    elevationMm: (levelId) => (building.levels[levelId]?.elevation ?? 0) / unit,
-  };
+  return { building, toMm: (value) => value / unit, elevationMm: (levelId) => (building.levels[levelId]?.elevation ?? 0) / unit };
 }
 
 const POINTER: Readonly<Partial<Record<MemberRole, string>>> = {
@@ -153,8 +149,7 @@ export function sectionOf(profile: SteelProfile): ReturnType<typeof sectionPrope
 }
 
 /**
- * Class of the section in pure compression (EN 1993-1-1 Tab. 5.2); null when the shape is not
- * covered (angles, channels, cold-formed C).
+ * Class of the section in pure compression (EN 1993-1-1 Tab. 5.2); null when the shape is not covered (angles, channels, cold-formed C).
  */
 export function compressionClass(profile: SteelProfile, fy: number): 1 | 2 | 3 | 4 | null {
   const epsilon = Math.sqrt(235 / fy);

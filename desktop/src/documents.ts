@@ -1,11 +1,7 @@
 /**
- * File ⇄ live document for the desktop menus. Every change goes through the backend's command
- * bus (`load_document`, `clear_document` via POST /command — undoable, broadcast to the window);
- * Save reads `GET /live/snapshot` and writes `serializeDocument` (the format the CLI's --doc reads).
- * Unsaved changes = the snapshot's stateHash differs from the one recorded at the last open/save
- * (selection is not part of the hash, so selecting does not mark the document dirty).
+ * File <-> live document for the desktop menus: changes via POST /command (`load_document`, `clear_document`), Save writes
+ * `GET /live/snapshot` in the CLI's --doc format. Unsaved = stateHash differs from the last open/save (selection excluded).
  */
-
 import fs from 'fs';
 import path from 'path';
 import type { CadDocument } from '@core/model/types';
@@ -21,12 +17,10 @@ interface Snapshot {
 }
 
 export interface DocumentSession {
-  /** Absolute path of the open file, or null for an unsaved document. */
-  readonly currentPath: () => string | null;
+  readonly currentPath: () => string | null; // absolute; null = unsaved
   open(filePath: string): Promise<void>;
-  /** Save to `filePath` (Save As) or to the current path. @failure no path -> rejects */
+  /** Save As `filePath`, or to the current path. @failure no path -> rejects */
   save(filePath?: string): Promise<string>;
-  /** Replace the document with an empty one (undoable in the app). */
   newDocument(): Promise<void>;
   hasUnsavedChanges(): Promise<boolean>;
 }
@@ -42,10 +36,7 @@ export function createDocumentSession(options: SessionOptions): DocumentSession 
   let savedHash: string | null = null;
 
   const snapshot = async (): Promise<Snapshot> => {
-    const { ok, status, body } = await requestJson(`${options.url}/live/snapshot`, {
-      token: options.token,
-      fetchImpl: options.fetchImpl,
-    });
+    const { ok, status, body } = await requestJson(`${options.url}/live/snapshot`, { token: options.token, fetchImpl: options.fetchImpl });
     if (!ok || !isRecord(body) || typeof body['stateHash'] !== 'string')
       throw new Error(`cannot read the document from the backend (HTTP ${status})`);
     return { stateHash: body['stateHash'], document: body['document'] as CadDocument };
@@ -87,8 +78,7 @@ export function createDocumentSession(options: SessionOptions): DocumentSession 
     },
     async hasUnsavedChanges() {
       const current = await snapshot();
-      if (savedHash === null) return Object.keys(current.document.entities).length > 0;
-      return current.stateHash !== savedHash;
+      return savedHash === null ? Object.keys(current.document.entities).length > 0 : current.stateHash !== savedHash;
     },
   };
 }

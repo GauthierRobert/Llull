@@ -136,14 +136,7 @@ describe('AI-agent cost estimate and budget cap (stub model)', () => {
       cacheWriteTokens: 0,
     });
     expect(usd).toBeCloseTo(4 + 2 + 0.4, 6);
-    expect(
-      estimateUsd('unknown-model', {
-        inputTokens: 1,
-        outputTokens: 1,
-        cacheReadTokens: 0,
-        cacheWriteTokens: 0,
-      }),
-    ).toBeNull();
+    expect(estimateUsd('unknown-model', { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 })).toBeNull();
   });
 
   it('stops the job when the estimated spend reaches the cap', async () => {
@@ -151,12 +144,7 @@ describe('AI-agent cost estimate and budget cap (stub model)', () => {
     let turns = 0;
     const send: SendTurn = () => {
       turns++;
-      const probe = {
-        type: 'tool_use' as const,
-        id: `toolu_${turns}`,
-        name: 'describe_building',
-        input: {},
-      };
+      const probe = { type: 'tool_use' as const, id: `toolu_${turns}`, name: 'describe_building', input: {} };
       return Promise.resolve(stubMessage([probe], { input: 500_000, output: 50_000 }));
     };
     const run = await runAgent('Budget probe.', { model: 'claude-opus-5-5', effort: 'high', maxTurns: 50, maxUsd: 5 }, send);
@@ -176,11 +164,6 @@ function stubMessage(content: unknown[], tokens: { input: number; output: number
     content,
     stop_reason: toolUse ? 'tool_use' : 'end_turn',
     stop_sequence: null,
-    usage: {
-      input_tokens: tokens.input,
-      output_tokens: tokens.output,
-      cache_read_input_tokens: 0,
-      cache_creation_input_tokens: 0,
-    },
+    usage: { input_tokens: tokens.input, output_tokens: tokens.output, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
   } as unknown as Anthropic.Beta.BetaMessage;
 }

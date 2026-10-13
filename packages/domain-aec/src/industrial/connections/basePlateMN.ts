@@ -1,6 +1,6 @@
 /**
- * Base plate under moment + axial force (EN 1993-1-8 §6.2.8, simplified): concrete bearing block with
- * fjd on the compression side, anchor bolts on the other, plate bending, and a catalogue sizing.
+ * Base plate under moment + axial force (EN 1993-1-8 §6.2.8, simplified): concrete bearing block with fjd on the compression side, anchor
+ * bolts on the other, plate bending, and a catalogue sizing.
  */
 
 import { anchorBoltResistance } from '../steelDesign/steelDesign';
@@ -46,12 +46,11 @@ function boltOffsets(geometry: PlateMnGeometry): number[] {
 }
 
 /**
- * Checks the plate for a compression N (kN, negative = uplift) and a moment M (kN·m, sign ignored):
- * Ft = max(0, (M − N zc) / z) with zc the lever from the column axis to the centroid of the bearing
- * block (length c = (N + Ft) / (B fjd)) and z that centroid to the tension bolts; uplift without a
- * bearing block shares N and M between the two bolt groups. Utilisation = max of bolt tension,
- * bearing length against the distance between the bolt lines, and plate bending (cantilever beyond
- * the flange, t ≥ c √(3 fjd / fy), and bolt prying lever of the tension row).
+ * Checks the plate for a compression N (kN, negative = uplift) and a moment M (kN·m, sign ignored): Ft = max(0, (M − N zc) / z) with zc the
+ * lever from the column axis to the centroid of the bearing block (length c = (N + Ft) / (B fjd)) and z that centroid to the tension bolts;
+ * uplift without a bearing block shares N and M between the two bolt groups. Utilisation = max of bolt tension, bearing length against the
+ * distance between the bolt lines, and plate bending (cantilever beyond the flange, t ≥ c √(3 fjd / fy), and bolt prying lever of the
+ * tension row).
  */
 export function checkPlateMN(geometry: PlateMnGeometry, normal: number, moment: number, yieldStrength: number): PlateMnCheck {
   const { length, width, thickness, boltDiameter, columnDepth } = geometry;
@@ -137,8 +136,8 @@ export interface PlateDemand {
 }
 
 /**
- * Lightest catalogue plate (margin 100–300 mm, t 25–50 mm, 4–12 bolts M24–M36) that passes every
- * demand with utilisation ≤ `target`; the most capable one when none does.
+ * Lightest catalogue plate (margin 100–300 mm, t 25–50 mm, 4–12 bolts M24–M36) that passes every demand with utilisation ≤ `target`; the
+ * most capable one when none does.
  */
 export function sizeBasePlate(
   column: { readonly depth: number; readonly width: number },
@@ -158,9 +157,7 @@ export function sizeBasePlate(
     };
     const columns = sizing.boltCount / 2;
     const edge = Math.max(2 * sizing.boltDiameter, 40);
-    if (columns > 1 && (geometry.length - 2 * edge) / (columns - 1) < MIN_PITCH_FACTOR * sizing.boltDiameter) {
-      continue;
-    }
+    if (columns > 1 && (geometry.length - 2 * edge) / (columns - 1) < MIN_PITCH_FACTOR * sizing.boltDiameter) continue;
     const worst = Math.max(0, ...demands.map((demand) => checkPlateMN(geometry, demand.normal, demand.moment, yieldStrength).utilisation));
     if (worst <= target) return { sizing, passes: true };
     if (best === null || worst < best.worst) best = { sizing, worst };

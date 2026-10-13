@@ -29,9 +29,8 @@ export const idfField = z
   })
   .optional()
   .describe(
-    'Intensity-duration-frequency curve i = a / (t + b)^c (mm/h, t = time of concentration in ' +
-      'minutes) replacing the constant intensity: each pipe uses i at its own Tc (modified rational ' +
-      'method). Do not combine with `rainfallIntensityMmH`.',
+    'Intensity-duration-frequency curve i = a / (t + b)^c (mm/h, t = time of concentration in minutes) replacing the constant intensity: ' +
+      'each pipe uses i at its own Tc (modified rational method). Do not combine with `rainfallIntensityMmH`.',
   );
 
 type CriteriaInput = {
@@ -95,19 +94,16 @@ function rainfallText(criteria: DrainageCriteria): string {
 export const checkDrainageNetwork = defineCommand({
   name: 'check_drainage_network',
   description:
-    'Hydraulic check of the whole gravity network. Rational-method flows (catchments) and point ' +
-    'inflows are accumulated downstream through the pipes; each pipe reports length, slope, design ' +
-    'and full-bore (Manning) flow, utilisation, depth ratio, velocity and cover at both ends, and ' +
-    'passes or fails against the limits. Modified rational method: Tc at each pipe = max over upstream ' +
-    'paths of (manhole `entryTimeMin`, default 5 min, + pipe travel times L/v, v = part-full velocity), ' +
-    'intensity from `idf` (i = a/(t+b)^c) or the constant intensity, flow = i * sum(C A) + inflows. A ' +
-    'manhole with several outgoing pipes splits its flow by full-bore capacity share. The hydraulic grade ' +
-    'line runs upstream from the outfall (most downstream manhole; tailwater `outfallLevel`, default the ' +
-    'outlet pipe normal depth): friction slope (Q n / (A R^(2/3)))^2 or normal depth, whichever is higher, ' +
-    'plus K v^2/2g at manholes where the pipe is pressurised; pipes get hglUpM / hglDownM / surcharged ' +
-    '(HGL above obvert) / flooding (HGL above rim - freeboard); manholes get hglM / flooding. Each pipe ' +
-    'row reports tcMin, intensityMmH, sumCAHa, designLps. Returns data { pipes, manholes, failures, ' +
-    'diverging, csv }.',
+    'Hydraulic check of the whole gravity network. Rational-method flows (catchments) and point inflows are accumulated downstream ' +
+    'through the pipes; each pipe reports length, slope, design and full-bore (Manning) flow, utilisation, depth ratio, velocity and ' +
+    'cover at both ends, and passes or fails against the limits. Modified rational method: Tc at each pipe = max over upstream paths of ' +
+    '(manhole `entryTimeMin`, default 5 min, + pipe travel times L/v, v = part-full velocity), intensity from `idf` (i = a/(t+b)^c) or ' +
+    'the constant intensity, flow = i * sum(C A) + inflows. A manhole with several outgoing pipes splits its flow by full-bore capacity ' +
+    'share. The hydraulic grade line runs upstream from the outfall (most downstream manhole; tailwater `outfallLevel`, default the ' +
+    'outlet pipe normal depth): friction slope (Q n / (A R^(2/3)))^2 or normal depth, whichever is higher, plus K v^2/2g at manholes ' +
+    'where the pipe is pressurised; pipes get hglUpM / hglDownM / surcharged (HGL above obvert) / flooding (HGL above rim - freeboard); ' +
+    'manholes get hglM / flooding. Each pipe row reports tcMin, intensityMmH, sumCAHa, designLps. Returns data { pipes, manholes, ' +
+    'failures, diverging, csv }.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
     rainfallIntensityMmH: intensityField,
@@ -185,10 +181,9 @@ export const checkDrainageNetwork = defineCommand({
     const split = diverging.length > 0 ? ` Diverging at ${diverging.join(', ')}: flow split by full-bore capacity share.` : '';
     return report(
       doc,
-      `Drainage check at ${rainfallText(criteria)}: ${pipes.length} pipes ` +
-        `(${pipes.filter((r) => r.status === 'pass').length} pass), ${manholes.length} manholes; ` +
-        `Tc ${Math.min(...tcs)}-${Math.max(...tcs)} min; HGL: ${surcharged} surcharged pipe(s), ` +
-        `${flooded} flooding manhole(s). ` +
+      `Drainage check at ${rainfallText(criteria)}: ${pipes.length} pipes (${pipes.filter((r) => r.status === 'pass').length} pass), ` +
+        `${manholes.length} manholes; Tc ${Math.min(...tcs)}-${Math.max(...tcs)} min; HGL: ${surcharged} surcharged pipe(s), ${flooded} ` +
+        'flooding manhole(s). ' +
         (failures.length === 0 ? 'No failures.' : `${failures.length} failure(s): ${worst}`) +
         split,
       { pipes, manholes, failures, diverging, csv },
@@ -256,12 +251,11 @@ export const drainageSchedule = defineCommand({
 export const sizeDrainagePipes = defineCommand({
   name: 'size_drainage_pipes',
   description:
-    'Automatic pipe sizing: sets each pipe diameter to the smallest commercial size that carries ' +
-    'its accumulated design flow at its current slope within `maxDepthRatio` (and `minVelocity` when ' +
-    'given). Flows follow the modified rational method of check_drainage_network (entry times, travel ' +
-    'times, optional `idf` curve, diverging manholes split by capacity share); sizing and velocities ' +
-    'are iterated to convergence (max 10 passes). Pipes that fail even at the largest size, or have no ' +
-    'downhill slope, are reported and left unchanged.',
+    'Automatic pipe sizing: sets each pipe diameter to the smallest commercial size that carries its accumulated design flow at its ' +
+    'current slope within `maxDepthRatio` (and `minVelocity` when given). Flows follow the modified rational method of ' +
+    'check_drainage_network (entry times, travel times, optional `idf` curve, diverging manholes split by capacity share); sizing and ' +
+    'velocities are iterated to convergence (max 10 passes). Pipes that fail even at the largest size, or have no downhill slope, are ' +
+    'reported and left unchanged.',
   params: z.object({
     rainfallIntensityMmH: intensityField,
     idf: idfField,
@@ -304,12 +298,7 @@ export const sizeDrainagePipes = defineCommand({
         document,
         sized.changed.map((entry) => entry.split(' ')[0] ?? ''),
       ),
-      data: {
-        resized: sized.changed,
-        unsized: sized.unsized,
-        iterations: sized.iterations,
-        converged: sized.converged,
-      },
+      data: { resized: sized.changed, unsized: sized.unsized, iterations: sized.iterations, converged: sized.converged },
     };
   },
 });

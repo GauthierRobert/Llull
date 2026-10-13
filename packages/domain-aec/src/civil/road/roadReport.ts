@@ -1,6 +1,6 @@
 /**
- * Alignment analysis shared by the report and the long / cross-section drawings: ground and design
- * elevations, cross-section areas and average-end-area earthwork volumes at stations.
+ * Alignment analysis shared by the report and the long / cross-section drawings: ground and design elevations, cross-section areas and
+ * average-end-area earthwork volumes at stations.
  */
 
 import type { CadDocument } from '@core/model/types';

@@ -40,12 +40,7 @@ export function runCommandOutcome(doc: CadDocument, name: string, params: unknow
 
 /** The outcome of a command that threw (`execute` or the caller's own follow-up work). */
 export function failedOutcome(name: string, error: unknown): CommandOutcome {
-  return {
-    summary: `Command ${name} failed: ${errorMessage(error)}`,
-    affected: [],
-    isError: true,
-    changed: false,
-  };
+  return { summary: `Command ${name} failed: ${errorMessage(error)}`, affected: [], isError: true, changed: false };
 }
 
 /**

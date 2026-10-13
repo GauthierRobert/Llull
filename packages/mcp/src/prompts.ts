@@ -56,16 +56,8 @@ const modelBracket: PromptTemplate = {
       'action-list you can pass directly to build_project.',
     arguments: [
       { name: 'width', description: 'Bracket width in model units (e.g. 80)', required: true },
-      {
-        name: 'height',
-        description: 'Bracket height (depth) in model units (e.g. 40)',
-        required: true,
-      },
-      {
-        name: 'thickness',
-        description: 'Bracket wall thickness in model units (e.g. 6)',
-        required: true,
-      },
+      { name: 'height', description: 'Bracket height (depth) in model units (e.g. 40)', required: true },
+      { name: 'thickness', description: 'Bracket wall thickness in model units (e.g. 6)', required: true },
       {
         name: 'hole_count',
         description: 'Number of mounting holes (1–4). Holes are evenly spaced along the bracket width.',
@@ -159,13 +151,7 @@ const orthographicSetup: PromptTemplate = {
       'Guidance for setting up and inspecting the scene from standard orthographic directions ' +
       '(front / top / right). Uses describe_scene and find_entities to orient an agent that ' +
       'cannot directly control the viewport camera.',
-    arguments: [
-      {
-        name: 'view',
-        description: 'Target view direction: "front", "top", or "right". Default: "top".',
-        required: false,
-      },
-    ],
+    arguments: [{ name: 'view', description: 'Target view direction: "front", "top", or "right". Default: "top".', required: false }],
   },
   buildMessages({ view = 'top' }) {
     const info = ORTHOGRAPHIC_VIEWS[view as keyof typeof ORTHOGRAPHIC_VIEWS] ?? ORTHOGRAPHIC_VIEWS.top;
@@ -207,13 +193,7 @@ const parametricPart: PromptTemplate = {
       'Template for modeling a parametric part using build_project alias references. ' +
       'Shows how to chain steps so each feature references the result of earlier features ' +
       'without hard-coding generated entity ids.',
-    arguments: [
-      {
-        name: 'part_name',
-        description: 'Human-readable name for the root solid (e.g. "mounting_plate").',
-        required: false,
-      },
-    ],
+    arguments: [{ name: 'part_name', description: 'Human-readable name for the root solid (e.g. "mounting_plate").', required: false }],
   },
   buildMessages({ part_name = 'my_part' }) {
     return conversation(
@@ -296,13 +276,7 @@ const designBuilding: PromptTemplate = {
       'Workflow for designing a building with the construction commands: levels, structural grid, ' +
       'walls with doors/windows, slabs, columns, beams, stairs, rooms, then quantity takeoff, cost ' +
       'estimate and DXF / plan-sheet / IFC deliverables.',
-    arguments: [
-      {
-        name: 'brief',
-        description: 'What to build, e.g. "2-storey house 10 x 8 m".',
-        required: false,
-      },
-    ],
+    arguments: [{ name: 'brief', description: 'What to build, e.g. "2-storey house 10 x 8 m".', required: false }],
   },
   buildMessages({ brief = 'a two-storey house, 10 m x 8 m' }) {
     return conversation(
@@ -341,13 +315,7 @@ const designFactory: PromptTemplate = {
       'Workflow for designing a factory / industrial hall: steel portal frames, crane runway, ' +
       'footings, cladding, machines with clearances, pipe runs, clash detection, steel tonnage and ' +
       'fabrication lists, then elevations, plan sheet and IFC deliverables.',
-    arguments: [
-      {
-        name: 'brief',
-        description: 'What to build, e.g. "30 x 60 m machining hall with a 16 t crane".',
-        required: false,
-      },
-    ],
+    arguments: [{ name: 'brief', description: 'What to build, e.g. "30 x 60 m machining hall with a 16 t crane".', required: false }],
   },
   buildMessages({ brief = 'a 24 m x 48 m production hall with a 10 t overhead crane' }) {
     return conversation(
@@ -389,11 +357,7 @@ const designSite: PromptTemplate = {
       'profile, cross-section template, report), design the storm drainage network (manholes, ' +
       'pipes, sizing, hydraulic check) and export LandXML / DXF.',
     arguments: [
-      {
-        name: 'brief',
-        description: 'The site to design, e.g. "logistics platform 120 x 80 m with access road".',
-        required: false,
-      },
+      { name: 'brief', description: 'The site to design, e.g. "logistics platform 120 x 80 m with access road".', required: false },
     ],
   },
   buildMessages({ brief = 'a 60 m x 40 m building platform with a 300 m access road' }) {
@@ -445,8 +409,5 @@ export function listMcpPrompts(): McpPromptDescriptor[] {
 export function getMcpPrompt(name: string, args: Record<string, string> = {}): McpPromptResult | null {
   const template = TEMPLATES.find((candidate) => candidate.descriptor.name === name);
   if (!template) return null;
-  return {
-    description: template.descriptor.description,
-    messages: template.buildMessages(args),
-  };
+  return { description: template.descriptor.description, messages: template.buildMessages(args) };
 }

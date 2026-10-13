@@ -19,14 +19,12 @@ export const MAX_SUPERELEVATION_RATE = 0.15;
 export const setSuperelevation = defineCommand({
   name: 'set_superelevation',
   description:
-    'Set the superelevation (banking) of an alignment: `maxRate` is the full rate on circular curves as ' +
-    'a ratio (0.07 = 7 %, at most 0.15; 0 removes the design). The section rotates about the ' +
-    'centreline with the outer side raised: normal crown on tangents, the adverse side runs out to flat ' +
-    'then up to the full rate at a constant rotation rate, reaching it at the SC / CS of a spiral (or 30 % ' +
-    'of the runoff inside a curve without spiral). `runoffLength` (document units, > 0) is the ramp ' +
-    'length from flat to full rate at each curve end; default the spiral length, or the length that ' +
-    'keeps the lane-edge relative gradient at 0.5 % (maxRate x laneWidth / 0.005). A rate below the ' +
-    'crossfall is raised to the crossfall. Corridor, cross sections, volumes and alignment_report follow.',
+    'Set the superelevation (banking) of an alignment: `maxRate` is the full rate on circular curves as a ratio (0.07 = 7 %, at most ' +
+    '0.15; 0 removes the design). The section rotates about the centreline with the outer side raised: normal crown on tangents, the ' +
+    'adverse side runs out to flat then up to the full rate at a constant rotation rate, reaching it at the SC / CS of a spiral (or 30 % ' +
+    'of the runoff inside a curve without spiral). `runoffLength` (document units, > 0) is the ramp length from flat to full rate at ' +
+    'each curve end; default the spiral length, or the length that keeps the lane-edge relative gradient at 0.5 % (maxRate x laneWidth / ' +
+    '0.005). A rate below the crossfall is raised to the crossfall. Corridor, cross sections, volumes and alignment_report follow.',
   params: z.object({
     alignmentId: alignmentIdParam,
     maxRate: z.number().describe('Full superelevation rate on curves, ratio 0..0.15 (0.07 = 7 %). 0 removes it.'),
@@ -45,12 +43,7 @@ export const setSuperelevation = defineCommand({
       return noop(doc, 'set_superelevation failed: runoffLength must be > 0.');
     const { superelevation: previous, ...rest } = alignment;
     const updated: AlignmentObject =
-      maxRate === 0
-        ? rest
-        : {
-            ...rest,
-            superelevation: { maxRate, ...(runoffLength !== undefined ? { runoffLength } : {}) },
-          };
+      maxRate === 0 ? rest : { ...rest, superelevation: { maxRate, ...(runoffLength !== undefined ? { runoffLength } : {}) } };
     if (JSON.stringify(updated) === JSON.stringify(alignment))
       return noop(doc, `set_superelevation: nothing to change on ${alignment.id}.`);
     const text =

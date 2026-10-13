@@ -1,6 +1,6 @@
 /**
- * Plan-and-profile sheet: a stationed plan strip of the alignment above its long section, both at
- * the same horizontal scale so stations line up vertically.
+ * Plan-and-profile sheet: a stationed plan strip of the alignment above its long section, both at the same horizontal scale so stations
+ * line up vertically.
  */
 
 import type { CadDocument } from '@core/model/types';
@@ -19,17 +19,9 @@ const PAPER_PER_UNIT = 0.25;
 const STRIP_HEIGHT = 42;
 const LONG_SECTION_RIGHT = 40;
 
-export interface PlanProfileOptions {
-  readonly paper: PaperSize;
-  readonly scale: number | undefined;
-  readonly verticalExaggeration: number;
-}
+export type PlanProfileOptions = { readonly paper: PaperSize; readonly scale: number | undefined; readonly verticalExaggeration: number };
 
-export interface PlanProfileSheet {
-  readonly text: string;
-  readonly scale: number;
-  readonly fits: boolean;
-}
+export type PlanProfileSheet = { readonly text: string; readonly scale: number; readonly fits: boolean };
 
 function sizeOf(svg: string): { width: number; height: number } {
   const match = /width="([\d.]+)" height="([\d.]+)"/.exec(svg);
@@ -52,10 +44,7 @@ export function buildPlanProfileSheet(
   const lengthM = toMetres(doc, endStation(alignment)) - startM;
   const scale =
     options.scale ??
-    fitScale(lengthM * 1000, 1, {
-      ...area,
-      width: area.width - (LONG_SECTION_LEFT + LONG_SECTION_RIGHT) * PAPER_PER_UNIT,
-    });
+    fitScale(lengthM * 1000, 1, { ...area, width: area.width - (LONG_SECTION_LEFT + LONG_SECTION_RIGHT) * PAPER_PER_UNIT });
   const mmPerMetre = 1000 / scale;
   const rows = reportRows(doc, alignment, analyseStations(doc, civil, alignment, reportStations(alignment, alignment.stationInterval)));
   const section = longSectionSvg(doc, civil, alignment, rows, options.verticalExaggeration, mmPerMetre / PAPER_PER_UNIT);

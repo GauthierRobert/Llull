@@ -1,6 +1,6 @@
 /**
- * OpenSCAD emitter: FeatureProgram → a .scad file. Parameters become top-level variables
- * (Customizer-friendly); every feature version becomes a module so booleans and edits keep order.
+ * OpenSCAD emitter: FeatureProgram → a .scad file. Parameters become top-level variables (Customizer-friendly); every feature version
+ * becomes a module so booleans and edits keep order.
  */
 
 import type { Feature, FeatureProgram, ShapeSpec, Term, Term2, Term3 } from './program';
@@ -118,14 +118,12 @@ export function emitOpenScad(program: FeatureProgram): string {
     ...parameterLines(program, '//', (p) => `${p.identifier} = ${p.expression ?? formatNumber(p.value)}; // ${commentText(p.name)}`),
   );
   lines.push('', '/* [Hidden] */', '');
-
   const version = new Map<string, number>();
   const current = (variable: string): string => `${variable}_v${version.get(variable) ?? 0}`;
   const next = (variable: string): string => {
     version.set(variable, (version.get(variable) ?? 0) + 1);
     return current(variable);
   };
-
   const featureLine = (feature: Feature): string => {
     const v = feature.variable;
     switch (feature.op) {
@@ -156,7 +154,6 @@ export function emitOpenScad(program: FeatureProgram): string {
     }
   };
   lines.push(...featureLinesWithHeadings(program, '//', featureLine));
-
   lines.push('', '// ── result ──');
   for (const output of program.outputs) {
     const label = output.name !== undefined ? ` // ${commentText(output.name)}` : '';

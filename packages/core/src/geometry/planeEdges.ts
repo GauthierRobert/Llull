@@ -1,7 +1,6 @@
 /**
- * Polygons and segments against a plane — signed distances, crossings, Sutherland–Hodgman
- * clipping, section chords and their chaining into loops. The one section engine shared by the
- * render cutaway, decal clipping and the technical views (sections, elevations).
+ * Polygons and segments against a plane — signed distances, crossings, Sutherland–Hodgman clipping, section chords and their chaining into
+ * loops. The one section engine shared by the render cutaway, decal clipping and the technical views (sections, elevations).
  */
 
 import type { Vec3 } from '../model/types';
@@ -74,9 +73,9 @@ export interface SegmentChain<P> {
 }
 
 /**
- * Chains unordered segments by shared endpoints (welded at `tolerance`), extending each chain both
- * ways. `stopAtJunctions`: a chain only continues through a point where exactly two segments meet
- * (a T or X junction ends it); otherwise it takes any unused segment. Works for 2D and 3D points.
+ * Chains unordered segments by shared endpoints (welded at `tolerance`), extending each chain both ways. `stopAtJunctions`: a chain only
+ * continues through a point where exactly two segments meet (a T or X junction ends it); otherwise it takes any unused segment. Works for
+ * 2D and 3D points.
  */
 export function chainSegments<P extends readonly number[]>(
   segments: ReadonlyArray<readonly [P, P]>,
@@ -122,9 +121,7 @@ export function chainSegments<P extends readonly number[]>(
   return chains;
 }
 
-/**
- * Chains unordered section segments into loops (open chains are kept and implicitly closed).
- */
+/** Chains unordered section segments into loops (open chains are kept and implicitly closed). */
 export function chainLoops<P extends readonly number[]>(segments: ReadonlyArray<readonly [P, P]>, tolerance: number): P[][] {
   return chainSegments(segments, tolerance, false)
     .map((chain) => chain.points)

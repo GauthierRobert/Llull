@@ -1,8 +1,4 @@
-/**
- * CivilFeedback — the pilot "Feedback" button of the Civil / Site panel header: a short text box
- * and a mailto: link prefilled with the app version and anonymous document statistics (no document
- * content). Presentation only: reads the store, never changes the document.
- */
+// Pilot "Feedback" button: text box + mailto: with app version and anonymous statistics (no document content).
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';

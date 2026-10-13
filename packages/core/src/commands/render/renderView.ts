@@ -1,10 +1,9 @@
 /**
  * render_view — pure SVG renderer for the "AI vision loop".
  *
- * Renders the document to a self-contained SVG string using pure math and string
- * building. No three.js, no DOM, no React. The document coordinate convention is
- * Z-up throughout: +X right, +Y forward, +Z up. This matches the model/types.ts
- * entity contracts (box, cone, pyramid, wedge, extrusion are all Z-up).
+ * Renders the document to a self-contained SVG string using pure math and string building. No three.js, no DOM, no React. The document
+ * coordinate convention is Z-up throughout: +X right, +Y forward, +Z up. This matches the model/types.ts entity contracts (box, cone,
+ * pyramid, wedge, extrusion are all Z-up).
  */
 
 import type { CommandResult } from '../types';
@@ -55,8 +54,7 @@ export const renderView = defineCommand({
     'and `data.simplifiedEntityIds` / `data.skippedEntityIds` / `data.polygonCount` report what was reduced. ' +
     'Enrichments: turntable (multi-frame strip), isolate (highlight entities), section (cut-plane view), ' +
     'showDimensions (bbox labels), showAxes (world triad, default on), showGrid (ground grid, default on), ' +
-    'showLabels (entity id/name labels + key-point markers, default off). ' +
-    'Does NOT modify the document; `affected` is always [].',
+    'showLabels (entity id/name labels + key-point markers, default off). Does NOT modify the document; `affected` is always [].',
   params: z.object({
     view: z
       .enum(['top', 'bottom', 'front', 'back', 'left', 'right', 'iso'])
@@ -65,8 +63,7 @@ export const renderView = defineCommand({
         'Camera direction. One of: "iso" (isometric — default, good for orienting in 3D), ' +
           '"top" (looking down the +Z axis), "bottom" (looking up the -Z axis), ' +
           '"front" (looking along the +Y axis), "back" (looking along the -Y axis), ' +
-          '"left" (looking along the +X axis), "right" (looking along the -X axis). ' +
-          'Omit for the default "iso" view.',
+          '"left" (looking along the +X axis), "right" (looking along the -X axis). Omit for the default "iso" view.',
       ),
     width: z.number().optional().describe('Output image width in pixels. Clamped to [64, 2000]. Default: 800.'),
     height: z.number().optional().describe('Output image height in pixels. Clamped to [64, 2000]. Default: 600.'),
@@ -152,8 +149,7 @@ export const renderView = defineCommand({
       .optional()
       .describe(
         'When true (default), overlay a world-frame X/Y/Z axis triad anchored at the world origin. ' +
-          'X=red, Y=green, Z=blue. A scale label (e.g. "1 mm = 42 px") is also shown. ' +
-          'Set to false to suppress.',
+          'X=red, Y=green, Z=blue. A scale label (e.g. "1 mm = 42 px") is also shown. Set to false to suppress.',
       ),
     showGrid: z
       .boolean()
@@ -183,9 +179,7 @@ export const renderView = defineCommand({
   run: (doc, params): CommandResult => {
     const scene = params.hide2D === true ? withoutEntities2D(doc) : doc;
     const resolved = resolveRenderOptions(scene, params);
-    if ('error' in resolved) {
-      return { document: doc, summary: `render_view rejected: ${resolved.error}.`, affected: [] };
-    }
+    if ('error' in resolved) return { document: doc, summary: `render_view rejected: ${resolved.error}.`, affected: [] };
     const { options } = resolved;
     const view: ViewName = options.direction ? 'custom' : (params.view ?? 'iso');
     const width = clampPixels(params.width, 800);
@@ -204,7 +198,6 @@ export const renderView = defineCommand({
       ].filter((c) => c !== '');
       return captions.length === 0 ? svg : appendBeforeClose(svg, captions.join('\n'));
     };
-
     if (params.turntable) {
       const frames = clamp(params.turntable.frames, 1, 12);
       const strip = buildTurntableSvg(scene, frames, view, width, height, options);
@@ -214,7 +207,6 @@ export const renderView = defineCommand({
         svg: decorate(strip.svg),
       });
     }
-
     let svg = base.svg;
     const plural = base.entityCount === 1 ? 'y' : 'ies';
     let summary = `Rendered ${view} view: ${base.entityCount} entit${plural}, ${width}×${height}.`;
@@ -233,7 +225,6 @@ export const renderView = defineCommand({
       showGrid: params.showGrid !== false,
       showLabels: params.showLabels === true,
     });
-
     return report(doc, withNotes(summary), { ...base, svg: decorate(svg) });
   },
 });

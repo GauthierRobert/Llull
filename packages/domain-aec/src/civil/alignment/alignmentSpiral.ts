@@ -1,8 +1,7 @@
 /**
- * Clothoid (Euler spiral) transition geometry: exact Fresnel-series coordinates, the shift / tangent
- * length of a symmetric spiral-circular curve-spiral, and spiral element evaluation.
- * A spiral of length L ending at radius R has constant A^2 = R L, curvature l / A^2 at distance l and
- * heading change theta = l^2 / (2 A^2) from the tangent end.
+ * Clothoid (Euler spiral) transition geometry: exact Fresnel-series coordinates, the shift / tangent length of a symmetric spiral-circular
+ * curve-spiral, and spiral element evaluation. A spiral of length L ending at radius R has constant A^2 = R L, curvature l / A^2 at
+ * distance l and heading change theta = l^2 / (2 A^2) from the tangent end.
  */
 
 import type { Vec2 } from '@core/model/types';
@@ -120,9 +119,7 @@ export function nearestAlongSpiral(element: SpiralElement, xy: Vec2): number {
   const samples = 32;
   let best = 0;
   for (let i = 1; i <= samples; i++) {
-    if (distance((element.length * i) / samples) < distance((element.length * best) / samples)) {
-      best = i;
-    }
+    if (distance((element.length * i) / samples) < distance((element.length * best) / samples)) best = i;
   }
   let low = (element.length * Math.max(best - 1, 0)) / samples;
   let high = (element.length * Math.min(best + 1, samples)) / samples;

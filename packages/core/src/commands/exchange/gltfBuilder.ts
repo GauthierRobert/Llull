@@ -1,8 +1,7 @@
 /**
- * glTF 2.0 document builder: one binary buffer holding vertex attributes and PNG images (each
- * view 4-byte aligned), with accessors, textures (one shared REPEAT sampler), materials, meshes and
- * nodes (roots, or children of empty parent nodes such as entity groups). Used by the export
- * scene (./gltfScene).
+ * glTF 2.0 document builder: one binary buffer holding vertex attributes and PNG images (each view 4-byte aligned), with accessors,
+ * textures (one shared REPEAT sampler), materials, meshes and nodes (roots, or children of empty parent nodes such as entity groups). Used
+ * by the export scene (./gltfScene).
  */
 
 import { tupleExtent } from '../../lib/extent';
@@ -99,12 +98,7 @@ export class GltfBuilder {
   }
 
   /** The glTF JSON (no buffer uri; empty lists omitted, as glTF requires) and its BIN payload. */
-  result(): {
-    json: Record<string, unknown>;
-    bin: Uint8Array;
-    nodeCount: number;
-    materialCount: number;
-  } {
+  result(): { json: Record<string, unknown>; bin: Uint8Array; nodeCount: number; materialCount: number } {
     const bin = new Uint8Array(this.byteOffset);
     let offset = 0;
     for (const chunk of this.chunks) {
@@ -122,11 +116,7 @@ export class GltfBuilder {
         ...(this.meshes.length > 0 ? { meshes: this.meshes } : {}),
         ...(this.materials.length > 0 ? { materials: this.materials } : {}),
         ...(textured
-          ? {
-              images: this.images,
-              textures: this.textures,
-              samplers: [{ magFilter: 9729, minFilter: 9987, wrapS: 10497, wrapT: 10497 }],
-            }
+          ? { images: this.images, textures: this.textures, samplers: [{ magFilter: 9729, minFilter: 9987, wrapS: 10497, wrapT: 10497 }] }
           : {}),
         ...(this.accessors.length > 0 ? { accessors: this.accessors } : {}),
         ...(this.bufferViews.length > 0 ? { bufferViews: this.bufferViews } : {}),

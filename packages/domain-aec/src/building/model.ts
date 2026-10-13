@@ -48,24 +48,10 @@ export function isVec2List(value: unknown, minimumLength: number): value is Vec2
   return Array.isArray(value) && value.length >= minimumLength && value.every(isVec2);
 }
 
+// prettier-ignore
 const MARK_PREFIX: Readonly<Record<Exclude<BimCategory, 'grid' | 'room'>, string>> = {
-  wall: 'W',
-  door: 'D',
-  window: 'WN',
-  slab: 'SL',
-  column: 'C',
-  beam: 'B',
-  stair: 'ST',
-  member: 'M',
-  footing: 'F',
-  panel: 'CL',
-  equipment: 'EQ',
-  pipe: 'PL',
-  tray: 'CT',
-  plate: 'BP',
-  curvedWall: 'W',
-  connection: 'MC',
-  pipeSupport: 'PS',
+  wall: 'W', door: 'D', window: 'WN', slab: 'SL', column: 'C', beam: 'B', stair: 'ST', member: 'M', footing: 'F', panel: 'CL',
+  equipment: 'EQ', pipe: 'PL', tray: 'CT', plate: 'BP', curvedWall: 'W', connection: 'MC', pipeSupport: 'PS',
 };
 
 /** Largest integer N among keys "<prefix>N" (0 when none). */
@@ -135,8 +121,7 @@ type LevelResolution =
   | { readonly ok: false; readonly reason: string };
 
 /**
- * Resolves the target level: explicit id → active level → lowest level → a new
- * "Level 0" (elevation 0, height 3 m) created on the fly.
+ * Resolves the target level: explicit id → active level → lowest level → a new "Level 0" (elevation 0, height 3 m) created on the fly.
  * @failure unknown explicit levelId -> ok:false
  */
 export function resolveLevel(doc: CadDocument, building: BuildingModel, levelId: string | undefined): LevelResolution {
@@ -152,22 +137,16 @@ export function resolveLevel(doc: CadDocument, building: BuildingModel, levelId:
     (building.activeLevelId !== null ? building.levels[building.activeLevelId] : undefined) ??
     building.levels[building.levelOrder[0] ?? ''];
   if (fallback) return { ok: true, building, level: fallback };
-  const level: BuildingLevel = {
-    id: nextLevelId(building),
-    name: 'Level 0',
-    elevation: 0,
-    height: fromMm(doc, 3000),
-  };
+  const level: BuildingLevel = { id: nextLevelId(building), name: 'Level 0', elevation: 0, height: fromMm(doc, 3000) };
   return { ok: true, level, building: { ...withLevel(building, level), activeLevelId: level.id } };
 }
 
 /** Level a read-only check or export runs on: `requested`, else the active / first level; undefined when it does not exist. */
 export const existingLevelId = (building: BuildingModel, requested: string | undefined): string | undefined => {
   if (requested !== undefined) return building.levels[requested] ? requested : undefined;
-  const levelId = [building.activeLevelId, building.levelOrder[0]].find(
+  return [building.activeLevelId, building.levelOrder[0]].find(
     (candidate): candidate is string => candidate != null && building.levels[candidate] !== undefined,
   );
-  return levelId;
 };
 
 /** Returns a building with `element` inserted (or replaced) by id. */
@@ -205,11 +184,7 @@ export function appendElements<Item>(
 export function withoutElements(building: BuildingModel, ids: ReadonlySet<string>): BuildingModel {
   const elements = { ...building.elements };
   for (const id of ids) delete elements[id];
-  return {
-    ...building,
-    elements,
-    elementOrder: building.elementOrder.filter((id) => !ids.has(id)),
-  };
+  return { ...building, elements, elementOrder: building.elementOrder.filter((id) => !ids.has(id)) };
 }
 
 /** ASCII file-name slug ("Rez-de-chaussée" → "Rez-de-chaussee"). */
@@ -223,16 +198,16 @@ export function fileSlug(text: string, fallback: string): string {
 }
 
 /**
- * `CommandResult.affected` for building commands: the element ids first (so history replay,
- * recipes and build_project `$alias` re-link hosts and references), then their entity ids.
+ * `CommandResult.affected` for building commands: the element ids first (so history replay, recipes and build_project `$alias` re-link
+ * hosts and references), then their entity ids.
  */
 export function elementAffected(document: CadDocument, elementIds: ReadonlyArray<string>): string[] {
   return [...elementIds, ...elementIds.flatMap((id) => document.building?.elements[id]?.entityIds ?? [])];
 }
 
 /**
- * Re-targets heights that follow the level height (walls / columns at full storey height, stairs
- * climbing the whole storey) from `oldHeight` to `newHeight`; other elements are returned as is.
+ * Re-targets heights that follow the level height (walls / columns at full storey height, stairs climbing the whole storey) from
+ * `oldHeight` to `newHeight`; other elements are returned as is.
  */
 export function followLevelHeight(element: BuildingElement, oldHeight: number, newHeight: number): BuildingElement {
   const same = (value: number): boolean => Math.abs(value - oldHeight) <= oldHeight * 1e-9;
@@ -246,8 +221,8 @@ export function followLevelHeight(element: BuildingElement, oldHeight: number, n
 }
 
 /**
- * Host of a hosted element: a door / window's wall, a base plate's column, a moment
- * connection's rafter, a pipe support's pipe (else null). The element follows its host.
+ * Host of a hosted element: a door / window's wall, a base plate's column, a moment connection's rafter, a pipe support's pipe (else null).
+ * The element follows its host.
  */
 export function hostOf(element: BuildingElement): string | null {
   if (element.category === 'door' || element.category === 'window') return element.hostId;

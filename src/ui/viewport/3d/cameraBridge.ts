@@ -1,9 +1,5 @@
-/**
- * The single camera driver. Under frameloop="demand" every programmatic camera move must call
- * BOTH `controls.update()` and `invalidate()`; `driveCamera` does that once. `CameraBridge` (mounted
- * INSIDE the Canvas) registers it so DOM overlays (view presets, named views) outside the Canvas can
- * move/read the camera. Holds only imperative callbacks, never the document.
- */
+// The single camera driver: under frameloop="demand" a programmatic move needs controls.update() AND invalidate().
+// CameraBridge (in-Canvas) registers it for DOM overlays (view presets, named views); never holds the document.
 
 import { useEffect } from 'react';
 import { useThree } from '@react-three/fiber';
@@ -14,7 +10,7 @@ import { toRenderPosition } from './floatingOrigin';
 
 type Vec3 = readonly [number, number, number];
 
-/** Place the camera at `position` looking at `target` (both WORLD space; the camera lives in render space). */
+/** WORLD-space position/target (the camera lives in render space). */
 export function driveCamera(camera: THREE.Camera, orbit: OrbitControlsImpl, invalidate: () => void, position: Vec3, target: Vec3): void {
   const { renderOrigin } = useStore.getState();
   const renderTarget = new THREE.Vector3(...toRenderPosition(target, renderOrigin));
@@ -22,7 +18,6 @@ export function driveCamera(camera: THREE.Camera, orbit: OrbitControlsImpl, inva
   camera.position.set(...toRenderPosition(position, renderOrigin));
   camera.lookAt(renderTarget);
   orbit.target.copy(renderTarget);
-  // Sync OrbitControls' internal spherical state, then queue a frame (demand frameloop).
   orbit.update();
   invalidate();
 }
@@ -33,22 +28,20 @@ const bridge: {
   getAspect: (() => number) | null;
 } = { placeCamera: null, getCameraSnapshot: null, getAspect: null };
 
-/** Move the live camera (no-op until the Canvas has mounted). */
 export function placeCamera(position: Vec3, target: Vec3): void {
   bridge.placeCamera?.(position, target);
 }
 
-/** Capture the live camera in world space; null before the Canvas has mounted. */
+/** World space; null before the Canvas mounts. */
 export function getCameraSnapshot(): NamedViewCamera | null {
   return bridge.getCameraSnapshot?.() ?? null;
 }
 
-/** Viewport width/height; 1 before the Canvas has mounted or when it has no height. */
+/** 1 before mount or with zero height. */
 export function getAspect(): number {
   return bridge.getAspect?.() ?? 1;
 }
 
-/** Mounted INSIDE the r3f Canvas; registers the camera callbacks for the DOM overlays. */
 export function CameraBridge(): null {
   const { camera, controls, invalidate, get } = useThree();
 
@@ -69,7 +62,7 @@ export function CameraBridge(): null {
       const { width, height } = get().size;
       return height > 0 ? width / height : 1;
     };
-    // Unregister so a stale closure over a disposed camera cannot fire after teardown.
+    // A stale closure over a disposed camera must not fire after teardown.
     return () => {
       bridge.placeCamera = null;
       bridge.getCameraSnapshot = null;

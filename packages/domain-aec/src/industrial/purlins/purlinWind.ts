@@ -27,12 +27,7 @@ interface PurlinWindInput {
   readonly envelope: HallEnvelope;
 }
 
-interface PurlinWind {
-  readonly zone: string;
-  readonly direction: string;
-  readonly cpe: number;
-  readonly pressureOption: WindOption;
-}
+type PurlinWind = { readonly zone: string; readonly direction: string; readonly cpe: number; readonly pressureOption: WindOption };
 
 /** Candidate of a roof zone: its governing suction and the positive pressure (0 = none) it brings. */
 const optionOf = (zone: string, coefficient: ZoneCpe | undefined, pressure = 0, direction = ''): WindOption => ({
@@ -87,12 +82,7 @@ export function purlinWind(input: PurlinWindInput): PurlinWind {
     const spanIndex = valleys.filter((valley) => valley < purlin.start[0]).length;
     if (spanIndex > 0 && spanIndex < valleys.length) {
       options = [
-        {
-          zone: 'H/I',
-          cpe: DOWNWIND_ROOF_FACTOR * Math.min(suctionOf(across.H), suctionOf(across.I)),
-          pressure: 0,
-          direction: '',
-        },
+        { zone: 'H/I', cpe: DOWNWIND_ROOF_FACTOR * Math.min(suctionOf(across.H), suctionOf(across.I)), pressure: 0, direction: '' },
       ];
     } else {
       const windwardZone: 'F' | 'G' | 'H' = horizontalEaves <= eAcross / 10 + TOLERANCE ? (nearGable(eAcross / 4) ? 'F' : 'G') : 'H';

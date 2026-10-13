@@ -1,42 +1,36 @@
-/**
- * Theme-aware canvas palette for the 2D and 3D viewports. three.js needs concrete
- * colors (CSS variables do not reach WebGL), so each theme maps to hex values that
- * match the design tokens in styles/tokens.css.
- */
+// Theme → concrete canvas colors (CSS variables do not reach WebGL), matching styles/tokens.css.
 
 import { type Theme, useThemeStore } from '@ui/store';
 import type { SnapType } from './2d/snapping/types';
 import type { Snap3DType } from './3d/snap3d';
 
-/** Tint of a selected 2D shape or text entity. */
+/** Selected 2D shape / text. */
 export const SELECTION_COLOR = '#5b8dee';
 
-/** Emissive tint + strength of a selected 3D solid (single mesh and instanced batches). */
+/** Selected 3D solid (mesh and instanced). */
 export const SELECTION_EMISSIVE = '#3a7bd5';
 export const SELECTION_EMISSIVE_INTENSITY = 0.35;
 
-/** X-ray display mode: emissive tint, emissive strength and surface opacity per selection state. */
+/** X-ray display: emissive tint, strength and opacity per selection state. */
 export const XRAY_EMISSIVE = '#4a9eff';
 export const XRAY_EMISSIVE_INTENSITY = { idle: 0.2, selected: 0.6 } as const;
 export const XRAY_OPACITY = { idle: 0.18, selected: 0.35 } as const;
 
-/** Accent of measurement / box-select / draw-preview overlays. */
+/** Measurement / box-select / draw-preview overlays. */
 export const OVERLAY_ACCENT = '#60a5fa';
 
-/** Snap-marker colour per snap type (2D drafting). */
 export const SNAP_COLORS_2D: Record<SnapType, string> = {
-  endpoint: '#e040fb', // magenta
-  midpoint: '#00e5ff', // cyan
-  center: '#ffee58', // yellow
-  intersection: '#ff9800', // orange
-  perpendicular: '#69f0ae', // green
-  tangent: '#b9f6ca', // lime
-  extension: '#26c6da', // teal
-  nearest: '#40c4ff', // blue
-  grid: '#546e7a', // muted blue-grey
+  endpoint: '#e040fb',
+  midpoint: '#00e5ff',
+  center: '#ffee58',
+  intersection: '#ff9800',
+  perpendicular: '#69f0ae',
+  tangent: '#b9f6ca',
+  extension: '#26c6da',
+  nearest: '#40c4ff',
+  grid: '#546e7a',
 };
 
-/** Snap-marker colour per snap type (3D). */
 export const SNAP_COLORS_3D: Record<Snap3DType, string> = {
   vertex: '#f5c842',
   edge: '#42d4f5',
@@ -46,17 +40,13 @@ export const SNAP_COLORS_3D: Record<Snap3DType, string> = {
 };
 
 interface ViewportPalette {
-  /** WebGL clear color behind the scene. */
   background: string;
-  /** 3D ground grid — fine cells / major sections. */
   gridCell: string;
   gridSection: string;
-  /** 2D drafting grid — minor / major lines. */
   grid2dMinor: number;
   grid2dMajor: number;
-  /** Contact-shadow strength under solids (color stays constant: drei rebuilds targets on color change). */
+  /** Color stays constant: drei rebuilds targets on a color change. */
   contactShadowOpacity: number;
-  /** Orientation gizmo axis colors (X, Y, Z) + label color. */
   axisColors: [string, string, string];
   axisLabel: string;
 }
@@ -84,7 +74,6 @@ const PALETTES: Record<Theme, ViewportPalette> = {
   },
 };
 
-/** Narrow subscription to the theme; returns the matching canvas palette. */
 export function useViewportPalette(): ViewportPalette {
   const theme = useThemeStore((s) => s.theme);
   return PALETTES[theme];

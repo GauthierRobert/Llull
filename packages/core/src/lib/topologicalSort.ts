@@ -1,6 +1,6 @@
 /**
- * Kahn's algorithm: `nodes` ordered so every `[before, after]` edge points forward. Nodes on or
- * behind a cycle never reach in-degree 0; they are returned in `cyclic` (in `nodes` order).
+ * Kahn's algorithm: `nodes` ordered so every `[before, after]` edge points forward. Nodes on or behind a cycle never reach in-degree 0;
+ * they are returned in `cyclic` (in `nodes` order).
  */
 export function topologicalSort(
   nodes: Iterable<string>,

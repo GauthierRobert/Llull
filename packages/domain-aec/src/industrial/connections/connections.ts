@@ -37,11 +37,10 @@ export function connectionMass(doc: Pick<CadDocument, 'units'>, building: Buildi
 export const addMomentConnections = defineCommand({
   name: 'add_moment_connections',
   description:
-    'Detail the portal frame moment connections: a bolted end plate at every rafter-to-column joint ' +
-    '(eaves, with a haunch under the rafter) and a pair of end plates at every rafter-to-rafter joint ' +
-    '(apex), for the given rafters or every rafter of the level. Sized from the rafter section ' +
-    '(plate 20/25 mm, M20 bolts, haunch = 1/5 of the rafter plan length). Follows the rafter; plate, ' +
-    'haunch and bolt quantities feed the takeoff and the connection schedule.',
+    'Detail the portal frame moment connections: a bolted end plate at every rafter-to-column joint (eaves, with a haunch under the ' +
+    'rafter) and a pair of end plates at every rafter-to-rafter joint (apex), for the given rafters or every rafter of the level. Sized ' +
+    'from the rafter section (plate 20/25 mm, M20 bolts, haunch = 1/5 of the rafter plan length). Follows the rafter; plate, haunch and ' +
+    'bolt quantities feed the takeoff and the connection schedule.',
   params: z.object({
     rafterIds: z.array(z.string()).optional().describe('Rafter member ids. Default: every rafter of the level.'),
     levelId: existingLevelIdParam,
@@ -63,11 +62,7 @@ export const addMomentConnections = defineCommand({
     if (joints.length === 0) {
       return noop(doc, 'add_moment_connections failed: no unconnected rafter-to-column or rafter-to-rafter joint found.');
     }
-    const added = appendConnections(doc, building, levelId, joints, {
-      plateThickness,
-      boltDiameter,
-      haunchLength,
-    });
+    const added = appendConnections(doc, building, levelId, joints, { plateThickness, boltDiameter, haunchLength });
     const connections = added.ids.map((id) => added.building.elements[id] as MomentConnectionElement);
     const eaves = connections.filter((connection) => connection.kind === 'eaves').length;
     const bolts = connections.reduce((sum, connection) => sum + 2 * connection.boltRows, 0);
@@ -76,9 +71,8 @@ export const addMomentConnections = defineCommand({
       doc,
       added.building,
       added.ids,
-      `Added ${connections.length} moment connection(s): ${eaves} eaves (haunched), ` +
-        `${connections.length - eaves} apex; ${bolts} bolt(s) ${boltSize(doc, connections[0]?.boltDiameter ?? 0)}, ` +
-        `${kilograms.toFixed(1)} kg of plates and haunches.`,
+      `Added ${connections.length} moment connection(s): ${eaves} eaves (haunched), ${connections.length - eaves} apex; ${bolts} ` +
+        `bolt(s) ${boltSize(doc, connections[0]?.boltDiameter ?? 0)}, ${kilograms.toFixed(1)} kg of plates and haunches.`,
       { elementIds: added.ids },
     );
   },
@@ -96,9 +90,8 @@ export interface ConnectionWelds {
 }
 
 /**
- * Throat / thickness ratio of a full-strength double fillet weld (EN 1993-1-8 §4.5.3.3,
- * directional method): a/t = βw · fy · γM2 / (√2 · fu · γM0). S235 0.46, S275 0.48, S355 0.58,
- * S460 0.75.
+ * Throat / thickness ratio of a full-strength double fillet weld (EN 1993-1-8 §4.5.3.3, directional method): a/t = βw · fy · γM2 / (√2 · fu
+ * · γM0). S235 0.46, S275 0.48, S355 0.58, S460 0.75.
  */
 export function fullStrengthFactor(fy: number): number {
   const grades: ReadonlyArray<readonly [number, number, number]> = [
@@ -114,8 +107,8 @@ export function fullStrengthFactor(fy: number): number {
 }
 
 /**
- * Full-strength double fillet welds of the rafter (and haunch) to the end plate(s):
- * throat a = fullStrengthFactor(fy) · t, rounded up to whole mm, ≥ 3 mm.
+ * Full-strength double fillet welds of the rafter (and haunch) to the end plate(s): throat a = fullStrengthFactor(fy) · t, rounded up to
+ * whole mm, ≥ 3 mm.
  */
 export function connectionWelds(
   doc: Pick<CadDocument, 'units'>,

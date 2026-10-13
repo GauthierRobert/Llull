@@ -1,10 +1,9 @@
 /**
- * Shape recipe: the serializable construction tree of a solid (primitive leaves, boolean / fillet /
- * chamfer / shell / placement / scale nodes). The kernel evaluates it to an exact, kernel-owned shape
- * (`ShapeHandle`); the document stores the recipe on result `mesh` entities (`brep`), never the shape.
- *
- * @invariant `recipeKey` covers every input a kernel reads; presentation fields (id, name, color,
- *   layer, tags, material) never reach it, so a recolored operand reuses the cached shape
+ * Shape recipe: the serializable construction tree of a solid (primitive leaves, boolean / fillet / chamfer / shell / placement / scale
+ * nodes). The kernel evaluates it to an exact, kernel-owned shape (`ShapeHandle`); the document stores the recipe on result `mesh` entities
+ * (`brep`), never the shape.
+ * @invariant `recipeKey` covers every input a kernel reads; presentation fields (id, name, color, layer, tags, material) never reach it, so
+ *   a recolored operand reuses the cached shape
  */
 
 import { type Entity, type MeshSolidEntity, type ShapeRecipe, type Vec3, SOLID_KINDS } from '../model/types';

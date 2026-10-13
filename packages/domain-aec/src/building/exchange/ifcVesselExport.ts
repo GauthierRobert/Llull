@@ -5,8 +5,8 @@ import { circleProfile, direction, ifcReal, point3, type Context } from './ifcSt
 import { shapeOf } from '../../industrial/equipment/equipmentShape';
 
 /**
- * @invariant vertical: axis +Z from the placement origin (level); horizontal: axis along local x,
- * centred on the element location, placement origin at the axis height (radius above the level)
+ * @invariant vertical: axis +Z from the placement origin (level); horizontal: axis along local x, centred on the element location,
+ * placement origin at the axis height (radius above the level)
  * @returns the extruded solid, or null for a box
  */
 export function vesselSolid(context: Context, element: EquipmentElement): string | null {

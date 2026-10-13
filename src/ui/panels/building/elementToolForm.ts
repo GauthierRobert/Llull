@@ -1,7 +1,4 @@
-/**
- * Form-spec types and field-reading helpers shared by the element and industrial tool
- * specs (param-gathering only, react R1).
- */
+// Form-spec types + field readers shared by the element and industrial tool specs.
 
 import { parseNumber, parseNumberList } from '@ui/numberText';
 
@@ -77,10 +74,7 @@ export function defaultedSelect(
   options: ReadonlyArray<readonly [string, string]>,
   showWhen?: ToolField['showWhen'],
 ): ToolField {
-  return {
-    ...select(key, label, '', [['', blankLabel], ...options]),
-    ...(showWhen !== undefined ? { showWhen } : {}),
-  };
+  return { ...select(key, label, '', [['', blankLabel], ...options]), ...(showWhen !== undefined ? { showWhen } : {}) };
 }
 
 /** Picker group of the steel hall / plant tools. */

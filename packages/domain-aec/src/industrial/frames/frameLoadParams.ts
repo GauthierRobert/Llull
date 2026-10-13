@@ -56,12 +56,7 @@ export function resolveFrameLoads(doc: CadDocument, params: FrameLoadParams): { 
     return { reason: 'deadLoad, snowLoad, windPressure and craneCapacity must be >= 0' };
   }
   const { hoistingClass, hoistingSpeed, craneSelfWeight, minHookApproach, wheelBase } = params;
-  const craneProblem = craneValueProblem({
-    hoistingSpeed,
-    minHookApproach,
-    craneSelfWeight,
-    wheelBase,
-  });
+  const craneProblem = craneValueProblem({ hoistingSpeed, minHookApproach, craneSelfWeight, wheelBase });
   if (craneProblem !== undefined) return { reason: craneProblem };
   const building = getBuilding(doc);
   const levelId = existingLevelId(building, params.levelId);

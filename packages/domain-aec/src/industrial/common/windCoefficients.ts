@@ -1,10 +1,9 @@
 /**
- * EN 1991-1-4 external pressure coefficients cpe,10 of roofs, linearly interpolated on the pitch α:
- * flat roofs (§7.2.3 Tab. 7.2, sharp eaves), monopitch (Tab. 7.3a) and duopitch (Tab. 7.4a / 7.4b).
- * Each zone carries two coupled load-case sets: `suction` (the set with the large suction on the
- * windward zones F / G / H) and `pressure` (the alternative set, positive on the windward zones for
- * α ≥ 5° and the larger suction on the leeward zones). Where the standard gives a single value both
- * are equal. Sign convention: cpe < 0 is suction (uplift).
+ * EN 1991-1-4 external pressure coefficients cpe,10 of roofs, linearly interpolated on the pitch α: flat roofs (§7.2.3 Tab. 7.2, sharp
+ * eaves), monopitch (Tab. 7.3a) and duopitch (Tab. 7.4a / 7.4b). Each zone carries two coupled load-case sets: `suction` (the set with the
+ * large suction on the windward zones F / G / H) and `pressure` (the alternative set, positive on the windward zones for α ≥ 5° and the
+ * larger suction on the leeward zones). Where the standard gives a single value both are equal. Sign convention: cpe < 0 is suction
+ * (uplift).
  */
 
 import { clamp } from '@lib/clamp';
@@ -12,17 +11,14 @@ import { clamp } from '@lib/clamp';
 export type RoofType = 'flat' | 'duopitch' | 'monopitch';
 
 /**
- * Wind direction θ in degrees. Duopitch: 0 across the ridge, 90 along it. Monopitch: 0 = wind on the
- * low eaves, 180 = wind on the high eaves, 90 along the eaves. Ignored for flat roofs.
+ * Wind direction θ in degrees. Duopitch: 0 across the ridge, 90 along it. Monopitch: 0 = wind on the low eaves, 180 = wind on the high
+ * eaves, 90 along the eaves. Ignored for flat roofs.
  */
 export type WindDirection = 0 | 90 | 180;
 
 export type RoofZone = 'F' | 'Fup' | 'Flow' | 'G' | 'H' | 'I' | 'J';
 
-export interface ZoneCpe {
-  readonly suction: number;
-  readonly pressure: number;
-}
+export type ZoneCpe = { readonly suction: number; readonly pressure: number };
 
 export type RoofCoefficients = Partial<Record<RoofZone, ZoneCpe>>;
 
@@ -34,37 +30,17 @@ export const FLAT_ROOF_LIMIT = 5;
 /** Share of a leeward slope covered by the ridge strip J (e/10 on a slope about b/2 wide, e ≤ b). */
 const RIDGE_STRIP_SHARE = 0.1;
 
-type Row = {
-  readonly pitch: number;
-  readonly zones: Partial<Record<RoofZone, readonly [number, number]>>;
-};
+type Row = { readonly pitch: number; readonly zones: Partial<Record<RoofZone, readonly [number, number]>> };
 
 /** Tab. 7.2, sharp eaves: F −1.8, G −1.2, H −0.7, I ±0.2 (−0.2 in the suction set, +0.2 in the pressure set). */
-const FLAT: Row['zones'] = {
-  F: [-1.8, -1.8],
-  G: [-1.2, -1.2],
-  H: [-0.7, -0.7],
-  I: [-0.2, 0.2],
-};
+const FLAT: Row['zones'] = { F: [-1.8, -1.8], G: [-1.2, -1.2], H: [-0.7, -0.7], I: [-0.2, 0.2] };
 
 /** Tab. 7.4a (duopitch, θ = 0°), cpe,10: [suction set, pressure set] per zone. */
 const DUOPITCH_ACROSS: readonly Row[] = [
-  {
-    pitch: -5,
-    zones: { F: [-2.3, -2.3], G: [-1.2, -1.2], H: [-0.8, -0.8], I: [-0.6, -0.6], J: [-0.6, -0.6] },
-  },
-  {
-    pitch: 5,
-    zones: { F: [-1.7, 0], G: [-1.2, 0], H: [-0.6, 0], I: [-0.6, -0.6], J: [0.2, -0.6] },
-  },
-  {
-    pitch: 15,
-    zones: { F: [-0.9, 0.2], G: [-0.8, 0.2], H: [-0.3, 0.2], I: [-0.4, 0], J: [-1, 0] },
-  },
-  {
-    pitch: 30,
-    zones: { F: [-0.5, 0.7], G: [-0.5, 0.7], H: [-0.2, 0.4], I: [-0.4, 0], J: [-0.5, 0] },
-  },
+  { pitch: -5, zones: { F: [-2.3, -2.3], G: [-1.2, -1.2], H: [-0.8, -0.8], I: [-0.6, -0.6], J: [-0.6, -0.6] } },
+  { pitch: 5, zones: { F: [-1.7, 0], G: [-1.2, 0], H: [-0.6, 0], I: [-0.6, -0.6], J: [0.2, -0.6] } },
+  { pitch: 15, zones: { F: [-0.9, 0.2], G: [-0.8, 0.2], H: [-0.3, 0.2], I: [-0.4, 0], J: [-1, 0] } },
+  { pitch: 30, zones: { F: [-0.5, 0.7], G: [-0.5, 0.7], H: [-0.2, 0.4], I: [-0.4, 0], J: [-0.5, 0] } },
   { pitch: 45, zones: { F: [0, 0.7], G: [0, 0.7], H: [0, 0.6], I: [-0.2, 0], J: [-0.3, 0] } },
 ];
 
@@ -95,9 +71,9 @@ const MONOPITCH_HIGH_EAVES: readonly Row[] = [
 ];
 
 /**
- * Tab. 7.3a (monopitch, θ = 90°), one set. APPROXIMATE: the 5-15° values are those the purlin check
- * has always used (F −1.6 for both F_up and F_low, G −1.8, H −0.6, I −0.5); the standard's 30° and 45°
- * rows are not reproduced from memory, so the 15° values are held (conservative).
+ * Tab. 7.3a (monopitch, θ = 90°), one set. APPROXIMATE: the 5-15° values are those the purlin check has always used (F −1.6 for both F_up
+ * and F_low, G −1.8, H −0.6, I −0.5); the standard's 30° and 45° rows are not reproduced from memory, so the 15° values are held
+ * (conservative).
  */
 const MONOPITCH_ALONG: readonly Row[] = [5, 15, 30, 45].map((pitch) => ({
   pitch,
@@ -137,8 +113,8 @@ const asZones = (zones: Row['zones']): RoofCoefficients =>
   );
 
 /**
- * cpe,10 of every roof zone at pitch α (degrees) and wind direction θ.
- * Flat roofs (and 0° ≤ α < 5° of the other types) use Tab. 7.2; α is clamped to the table range.
+ * cpe,10 of every roof zone at pitch α (degrees) and wind direction θ. Flat roofs (and 0° ≤ α < 5° of the other types) use Tab. 7.2; α is
+ * clamped to the table range.
  * @invariant duopitch θ = 0° zones F G H I J, θ = 90° F G H I; monopitch θ = 0° / 180° F G H, θ = 90° Fup Flow G H I; flat F G H I
  */
 export function roofCoefficients(roofType: RoofType, pitchDeg: number, direction: WindDirection): RoofCoefficients {
@@ -151,10 +127,9 @@ export function roofCoefficients(roofType: RoofType, pitchDeg: number, direction
 type RoofSlope = 'windward' | 'leeward';
 
 /**
- * Frame-average cpe of a roof slope (the frame sees the whole slope, not the F / G corner zones).
- * Windward slope: zone H. Leeward slope: area-weighted zones I and J (J = ridge strip,
- * `RIDGE_STRIP_SHARE`). Flat roof: windward half H, leeward half I. Monopitch has one slope: zone H of
- * the direction (θ = 0° low eaves, θ = 180° high eaves), `slope` ignored.
+ * Frame-average cpe of a roof slope (the frame sees the whole slope, not the F / G corner zones). Windward slope: zone H. Leeward slope:
+ * area-weighted zones I and J (J = ridge strip, `RIDGE_STRIP_SHARE`). Flat roof: windward half H, leeward half I. Monopitch has one slope:
+ * zone H of the direction (θ = 0° low eaves, θ = 180° high eaves), `slope` ignored.
  */
 export function frameRoofAverage(
   roofType: RoofType,

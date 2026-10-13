@@ -1,8 +1,5 @@
-/**
- * Pilot feedback e-mail: a `mailto:` link prefilled with the app version, anonymous document
- * statistics (entity count, unit, civil object counts per category) and the user's text. Never
- * includes document content (names, coordinates, survey data).
- */
+// Pilot feedback mailto: app version, anonymous statistics (entity count, unit, civil counts) + the user's text; never
+// document content.
 
 import { CIVIL_CATEGORIES, type CivilCategory } from '@core/model/civil';
 import type { CadDocument } from '@core/model/types';

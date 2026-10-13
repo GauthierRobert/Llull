@@ -1,8 +1,7 @@
 /**
- * Solid parts of a pipe support in the pipe's frame: a steel block (shoe, guide, anchor) between the
- * pipe underside and the steel below, with side stops (guide, anchor) and a cap (anchor); a hanger is
- * a clamp on the pipe top and a rod up to the steel above. On a riser every type is a clamp collar
- * with a horizontal bracket to the steel beside the pipe.
+ * Solid parts of a pipe support in the pipe's frame: a steel block (shoe, guide, anchor) between the pipe underside and the steel below,
+ * with side stops (guide, anchor) and a cap (anchor); a hanger is a clamp on the pipe top and a rod up to the steel above. On a riser every
+ * type is a clamp collar with a horizontal bracket to the steel beside the pipe.
  */
 
 import type { CadDocument } from '@core/model/types';
@@ -50,25 +49,9 @@ function riserShape(support: PipeSupportElement, diameter: number, mm: (value: n
   const label = `Pipe support ${support.mark} ${support.type}`;
   const [z, collar] = [support.position[2], diameter + mm(40)];
   const arm = support.memberId !== null && support.standoff !== undefined ? support.standoff - mm(20) : 0;
-  const parts: SupportPart[] = [
-    {
-      kind: 'box',
-      name: 'clamp',
-      label: `${label} clamp`,
-      across: 0,
-      z,
-      size: [collar, collar, mm(80)],
-    },
-  ];
+  const parts: SupportPart[] = [{ kind: 'box', name: 'clamp', label: `${label} clamp`, across: 0, z, size: [collar, collar, mm(80)] }];
   if (arm > mm(5)) {
-    parts.push({
-      kind: 'box',
-      name: 'bracket',
-      label: `${label} bracket`,
-      across: collar / 2 + arm / 2,
-      z,
-      size: [mm(60), arm, mm(40)],
-    });
+    parts.push({ kind: 'box', name: 'bracket', label: `${label} bracket`, across: collar / 2 + arm / 2, z, size: [mm(60), arm, mm(40)] });
   }
   return { angle: (support.standoffAngle ?? Math.PI / 2) - Math.PI / 2, parts };
 }
@@ -124,8 +107,6 @@ export function supportShape(doc: Pick<CadDocument, 'units'>, support: PipeSuppo
       );
     }
   }
-  if (support.type === 'anchor') {
-    parts.push(box('cap', 'cap', 0, top + mm(5), [mm(30), diameter + mm(40), mm(10)]));
-  }
+  if (support.type === 'anchor') parts.push(box('cap', 'cap', 0, top + mm(5), [mm(30), diameter + mm(40), mm(10)]));
   return { angle, parts };
 }

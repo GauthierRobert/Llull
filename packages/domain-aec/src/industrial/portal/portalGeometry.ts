@@ -13,13 +13,7 @@ export interface PortalProfiles {
 }
 
 /** One roof slope of a span: from its low end at a column line up to its high end. */
-export interface Slope {
-  readonly side: -1 | 1;
-  readonly lowX: number;
-  readonly lowZ: number;
-  readonly highX: number;
-  readonly highZ: number;
-}
+export type Slope = { readonly side: -1 | 1; readonly lowX: number; readonly lowZ: number; readonly highX: number; readonly highZ: number };
 
 interface HallGeometryInput {
   readonly originX: number;

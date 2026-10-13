@@ -33,11 +33,7 @@ function capture(options: { stdin?: string; env?: Record<string, string>; reply?
     prepareKernel: () => Promise.resolve(),
     fetchImpl: (url, init) => {
       const headers = new Headers(init.headers);
-      fetched.push({
-        url,
-        body: JSON.parse(String(init.body)) as unknown,
-        auth: headers.get('Authorization'),
-      });
+      fetched.push({ url, body: JSON.parse(String(init.body)) as unknown, auth: headers.get('Authorization') });
       if (options.reply === 'throw') return Promise.reject(new Error('ECONNREFUSED'));
       const text = typeof options.reply === 'string' ? options.reply : JSON.stringify(options.reply);
       return Promise.resolve(new Response(text, { status: options.status ?? 200 }));
@@ -223,10 +219,7 @@ describe('llull CLI — local document', () => {
 
     const json = capture({ stdin: JSON.stringify(plan) });
     await runCli(['run', '-', '--json', '--force', ...docFlag()], json.io);
-    const report = JSON.parse(json.out[0] ?? '') as {
-      aliases: Record<string, string[]>;
-      consumedAliases: string[];
-    };
+    const report = JSON.parse(json.out[0] ?? '') as { aliases: Record<string, string[]>; consumedAliases: string[] };
     expect(report.aliases).toEqual({ part: expect.any(Array) });
     expect(report.consumedAliases).toEqual(['body', 'hole']);
   });
@@ -249,10 +242,7 @@ describe('llull CLI — local document', () => {
     const stlPath = path.join(workDir, 'out', 'part.stl');
     const stl = capture();
     expect(await runCli(['exec', 'export_stl', 'format=binary', '--save', stlPath, '--json', ...docFlag()], stl.io)).toBe(EXIT_OK);
-    const printed = JSON.parse(stl.out[0] ?? '') as {
-      data: { stlBase64: string };
-      saved: { path: string; bytes: number }[];
-    };
+    const printed = JSON.parse(stl.out[0] ?? '') as { data: { stlBase64: string }; saved: { path: string; bytes: number }[] };
     expect(printed.data.stlBase64).toMatch(/chars, saved>$/);
     expect(printed.saved[0]).toEqual({ path: stlPath, bytes: 84 + 12 * 50 });
     expect(readFileSync(stlPath)).toHaveLength(84 + 12 * 50);
@@ -349,12 +339,7 @@ describe('llull CLI — --server backend', () => {
 
   it('posts commands to /command with the bearer token and prints the bus result', async () => {
     const c = capture({
-      reply: {
-        summary: 'Added box box-1.1.',
-        affected: ['box-1.1'],
-        isError: false,
-        changed: true,
-      },
+      reply: { summary: 'Added box box-1.1.', affected: ['box-1.1'], isError: false, changed: true },
       env: { LLULL_TOKEN: 'secret' },
     });
     expect(await runCli(['add_box', 'size=[1,1,1]', ...server], c.io)).toBe(EXIT_OK);

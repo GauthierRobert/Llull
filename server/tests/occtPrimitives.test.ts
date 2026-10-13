@@ -69,15 +69,7 @@ describe.each(shapes)('occt %s', (name, make, analyticVolume) => {
 // to the analytic value for OCC and to Manifold within the chord tolerance of that polygon.
 describe('occt torus', () => {
   const torus = (position: Vec3, rotation: Vec3): Entity =>
-    ({
-      id: 't',
-      kind: 'torus',
-      position,
-      rotation,
-      ringRadius: 3,
-      tubeRadius: 1,
-      ...common,
-    }) as Entity;
+    ({ id: 't', kind: 'torus', position, rotation, ringRadius: 3, tubeRadius: 1, ...common }) as Entity;
   const analyticVolume = 2 * Math.PI ** 2 * 3 * 1 ** 2;
 
   it.each(placements)('has the analytic volume and Manifold bounds (%s)', (_label, position, rotation) => {

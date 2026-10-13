@@ -1,8 +1,5 @@
-/**
- * Generic param-gathering for ANY registry command: its `paramsSchema` becomes a list of form
- * fields; the string values typed into them become the params object passed to `dispatch`.
- * Validation of meaning stays in the command (`execute` + `run`); this only parses input shapes.
- */
+// Generic param form for ANY registry command: `paramsSchema` → fields; typed strings → the params passed to `dispatch`.
+// Only input shapes are parsed here; meaning is validated by the command.
 
 import type { ParamSpec, ParamsSchema, ParamType } from '@core/commands/types';
 import type { EntityId } from '@core/model/types';
@@ -13,15 +10,14 @@ type FieldKind = 'number' | 'text' | 'enum' | 'boolean' | 'numberList' | 'textLi
 export interface FormField {
   name: string;
   kind: FieldKind;
-  /** Human label derived from the param name (`entityId` -> "Entity id"). */
+  /** `entityId` -> "Entity id". */
   label: string;
   description: string;
   required: boolean;
-  /** Allowed values for `kind: 'enum'`. */
   options: readonly string[];
 }
 
-/** Raw text per field name, as typed by the user. Empty string = not provided. */
+/** Raw text per field; '' = not provided. */
 export type FormValues = Readonly<Record<string, string>>;
 
 type ParseResult = { ok: true; params: Record<string, unknown> } | { ok: false; errors: Readonly<Record<string, string>> };
@@ -85,17 +81,15 @@ export function initialValues(fields: readonly FormField[], selection: readonly 
   const values: Record<string, string> = {};
   for (const field of fields) {
     const selectedId = field.kind === 'text' ? selectedIdFor(field.name, selection) : undefined;
-    if (selectedId !== undefined) {
-      values[field.name] = selectedId;
-    } else if (field.kind === 'textList' && MULTI_ID_FIELD.test(field.name)) {
-      values[field.name] = selection.join(', ');
-    } else if (field.kind === 'enum' && field.required) {
-      values[field.name] = field.options[0] ?? '';
-    } else if (field.kind === 'boolean' && field.required) {
-      values[field.name] = 'true';
-    } else {
-      values[field.name] = '';
-    }
+    values[field.name] =
+      selectedId ??
+      (field.kind === 'textList' && MULTI_ID_FIELD.test(field.name)
+        ? selection.join(', ')
+        : field.kind === 'enum' && field.required
+          ? (field.options[0] ?? '')
+          : field.kind === 'boolean' && field.required
+            ? 'true'
+            : '');
   }
   return values;
 }

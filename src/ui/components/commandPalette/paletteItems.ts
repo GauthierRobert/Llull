@@ -1,12 +1,8 @@
-/**
- * The palette catalog: app actions (tools, views, panels, edit) plus EVERY registry command
- * (architecture L5 — menus iterate `listCommands()`), so each command the MCP surface exposes is
- * reachable from the UI too. Actions only call store actions; commands go through `dispatch`.
- */
+// Palette catalog: app actions + EVERY registry command (L5), so all MCP-exposed commands are reachable from the UI.
 
 import type { CommandDefinition } from '@core/commands/types';
 import { listCommands } from '@core/commands/registry';
-import { useLayoutStore, useStore, useThemeStore, useToolStore } from '@ui/store';
+import { type GizmoMode, useLayoutStore, useStore, useThemeStore, useToolStore } from '@ui/store';
 import type { IconName } from '@ui/components/Icon';
 import { deleteSelection, duplicateSelection } from '@ui/actions/selectionActions';
 import { createSolid } from '@ui/actions/createSolid';
@@ -20,13 +16,12 @@ import { humanizeName } from './paramForm';
 type PaletteGroup = 'Recent' | 'Create' | 'Draw' | 'View' | 'Edit' | 'Panels' | 'Commands';
 
 interface PaletteItemBase {
-  /** Stable id, used for recents (`action:…` / `command:<name>`). */
+  /** Recents key: `action:…` / `command:<name>`. */
   id: string;
   label: string;
   group: PaletteGroup;
-  /** Secondary line: what it does. */
   hint: string;
-  /** Extra search text (command name, synonyms). */
+  /** Command name, synonyms. */
   keywords: string;
   icon: IconName;
   shortcut?: string;
@@ -44,32 +39,74 @@ interface PaletteCommand extends PaletteItemBase {
 
 export type PaletteItem = PaletteAction | PaletteCommand;
 
-function action(
+type ActionRow = [
   id: string,
   group: PaletteGroup,
   label: string,
   hint: string,
   icon: IconName,
   run: () => void,
-  extra: { keywords?: string; shortcut?: string | undefined } = {},
-): PaletteAction {
-  const item: PaletteAction = {
-    kind: 'action',
-    id: `action:${id}`,
-    group,
-    label,
-    hint,
-    icon,
-    keywords: extra.keywords ?? '',
-    run,
-  };
-  if (extra.shortcut !== undefined) item.shortcut = extra.shortcut;
-  return item;
+  keywords?: string,
+  shortcut?: string,
+];
+
+function action(...[id, group, label, hint, icon, run, keywords = '', shortcut]: ActionRow): PaletteAction {
+  return { kind: 'action', id: `action:${id}`, group, label, hint, icon, keywords, run, ...(shortcut !== undefined && { shortcut }) };
 }
 
 const tools = (): ReturnType<typeof useToolStore.getState> => useToolStore.getState();
 const layout = (): ReturnType<typeof useLayoutStore.getState> => useLayoutStore.getState();
 const store = (): ReturnType<typeof useStore.getState> => useStore.getState();
+const gizmoRow = (mode: GizmoMode, verb: string, hint: string, icon: IconName, keywords: string): ActionRow => [
+  `gizmo-${mode}`,
+  'View',
+  `${verb} gizmo`,
+  hint,
+  icon,
+  () => tools().setGizmoMode(mode),
+  keywords,
+  GIZMO_KEYS[mode],
+];
+
+const STATIC_ACTIONS: ReadonlyArray<ActionRow> = [
+  ['view-3d', 'View', 'Switch to 3D view', 'Perspective modeling view', 'cube', () => tools().setViewMode('3d'), '', '3'],
+  ['view-2d', 'View', 'Switch to 2D view', 'Top-down drafting view', 'square', () => tools().setViewMode('2d'), '', '2'],
+  gizmoRow('translate', 'Move', 'Drag selected solids along axes (3D)', 'transformMove', 'translate transform'),
+  gizmoRow('rotate', 'Rotate', 'Rotate selected solids (3D)', 'transformRotate', 'transform'),
+  gizmoRow('scale', 'Scale', 'Scale selected solids (3D)', 'transformScale', 'transform resize'),
+  [
+    'theme',
+    'View',
+    'Toggle light / dark theme',
+    'Switch the color theme',
+    'sun',
+    () => useThemeStore.getState().toggleTheme(),
+    'appearance mode color',
+  ],
+  ['undo', 'Edit', 'Undo', 'Revert the last change', 'undo', () => store().undo(), '', 'Ctrl Z'],
+  ['redo', 'Edit', 'Redo', 'Re-apply the last undone change', 'redo', () => store().redo(), '', 'Ctrl Y'],
+  ['duplicate', 'Edit', 'Duplicate selection', 'Copy the selected entities', 'copy', duplicateSelection, '', 'Ctrl D'],
+  ['delete', 'Edit', 'Delete selection', 'Remove the selected entities', 'trash', deleteSelection, 'remove erase', 'Del'],
+  ['clear-selection', 'Edit', 'Clear selection', 'Deselect everything', 'cursor', () => store().clearSelection(), 'deselect', 'Esc'],
+  [
+    'toggle-sidebar',
+    'Panels',
+    'Toggle document browser',
+    'Show or hide the left panel',
+    'panelLeft',
+    () => layout().toggleSidebar(),
+    'sidebar',
+  ],
+  [
+    'toggle-inspector',
+    'Panels',
+    'Toggle properties inspector',
+    'Show or hide the right panel',
+    'panelRight',
+    () => layout().toggleInspector(),
+    'properties',
+  ],
+];
 
 function appActions(): PaletteAction[] {
   return [
@@ -81,7 +118,7 @@ function appActions(): PaletteAction[] {
         'One click: default size, placed in view and selected',
         preset.icon,
         () => createSolid(preset),
-        { keywords: `${preset.command} solid 3d primitive` },
+        `${preset.command} solid 3d primitive`,
       ),
     ),
     ...DRAW_TOOLS.map((spec) =>
@@ -92,79 +129,30 @@ function appActions(): PaletteAction[] {
         `2D tool: ${spec.tip}`,
         spec.icon,
         () => tools().setDrawTool(spec.tool),
-        { keywords: 'sketch 2d tool', shortcut: DRAW_TOOL_KEYS[spec.tool] },
+        'sketch 2d tool',
+        DRAW_TOOL_KEYS[spec.tool],
       ),
     ),
-    action('view-3d', 'View', 'Switch to 3D view', 'Perspective modeling view', 'cube', () => tools().setViewMode('3d'), { shortcut: '3' }),
-    action('view-2d', 'View', 'Switch to 2D view', 'Top-down drafting view', 'square', () => tools().setViewMode('2d'), { shortcut: '2' }),
-    action(
-      'gizmo-translate',
-      'View',
-      'Move gizmo',
-      'Drag selected solids along axes (3D)',
-      'transformMove',
-      () => tools().setGizmoMode('translate'),
-      { keywords: 'translate transform', shortcut: GIZMO_KEYS.translate },
-    ),
-    action('gizmo-rotate', 'View', 'Rotate gizmo', 'Rotate selected solids (3D)', 'transformRotate', () => tools().setGizmoMode('rotate'), {
-      keywords: 'transform',
-      shortcut: GIZMO_KEYS.rotate,
-    }),
-    action('gizmo-scale', 'View', 'Scale gizmo', 'Scale selected solids (3D)', 'transformScale', () => tools().setGizmoMode('scale'), {
-      keywords: 'transform resize',
-      shortcut: GIZMO_KEYS.scale,
-    }),
-    action('theme', 'View', 'Toggle light / dark theme', 'Switch the color theme', 'sun', () => useThemeStore.getState().toggleTheme(), {
-      keywords: 'appearance mode color',
-    }),
-    action('undo', 'Edit', 'Undo', 'Revert the last change', 'undo', () => store().undo(), {
-      shortcut: 'Ctrl Z',
-    }),
-    action('redo', 'Edit', 'Redo', 'Re-apply the last undone change', 'redo', () => store().redo(), {
-      shortcut: 'Ctrl Y',
-    }),
-    action('duplicate', 'Edit', 'Duplicate selection', 'Copy the selected entities', 'copy', duplicateSelection, { shortcut: 'Ctrl D' }),
-    action('delete', 'Edit', 'Delete selection', 'Remove the selected entities', 'trash', deleteSelection, {
-      keywords: 'remove erase',
-      shortcut: 'Del',
-    }),
-    action('clear-selection', 'Edit', 'Clear selection', 'Deselect everything', 'cursor', () => store().clearSelection(), {
-      keywords: 'deselect',
-      shortcut: 'Esc',
-    }),
-    action(
-      'toggle-sidebar',
-      'Panels',
-      'Toggle document browser',
-      'Show or hide the left panel',
-      'panelLeft',
-      () => layout().toggleSidebar(),
-      { keywords: 'sidebar' },
-    ),
-    action(
-      'toggle-inspector',
-      'Panels',
-      'Toggle properties inspector',
-      'Show or hide the right panel',
-      'panelRight',
-      () => layout().toggleInspector(),
-      { keywords: 'properties' },
-    ),
+    ...STATIC_ACTIONS.map((row) => action(...row)),
     ...SIDEBAR_TAB_SPECS.map((spec) =>
       action(`panel-${spec.tab}`, 'Panels', `Open ${spec.label}`, `Show the ${spec.label} panel`, spec.icon, () => {
-        if (!(layout().sidebarOpen && layout().sidebarTab === spec.tab)) {
-          layout().selectSidebarTab(spec.tab);
-        }
+        if (!(layout().sidebarOpen && layout().sidebarTab === spec.tab)) layout().selectSidebarTab(spec.tab);
       }),
     ),
-    action('shortcuts', 'Panels', 'Keyboard shortcuts', 'Show every shortcut', 'keyboard', () => tools().setShortcutsOpen(true), {
-      keywords: 'help keys',
-      shortcut: '?',
-    }),
+    action(
+      'shortcuts',
+      'Panels',
+      'Keyboard shortcuts',
+      'Show every shortcut',
+      'keyboard',
+      () => tools().setShortcutsOpen(true),
+      'help keys',
+      '?',
+    ),
   ];
 }
 
-/** Commands that need input get the conventional "…" (opens a form instead of running). */
+/** Commands needing input get "…" (they open a form). */
 function commandItem(command: CommandDefinition<unknown>): PaletteCommand {
   const needsInput = Object.keys(command.paramsSchema.properties).length > 0;
   return {
@@ -179,15 +167,12 @@ function commandItem(command: CommandDefinition<unknown>): PaletteCommand {
   };
 }
 
-/** Every palette item: app actions first, then every registry command in registry order. */
+/** App actions first, then registry order. */
 export function allPaletteItems(): PaletteItem[] {
   return [...appActions(), ...listCommands().map(commandItem)];
 }
 
-/**
- * Filter + rank for a query. Empty query: recents (as group 'Recent') then everything else in
- * catalog order. Non-empty: best score first; ties keep catalog order (actions before commands).
- */
+/** Empty query: recents (group 'Recent') then catalog order; else best score first, ties in catalog order. */
 export function searchPaletteItems(items: readonly PaletteItem[], query: string, recentIds: readonly string[]): PaletteItem[] {
   if (query.trim() === '') {
     const byId = new Map(items.map((item) => [item.id, item]));

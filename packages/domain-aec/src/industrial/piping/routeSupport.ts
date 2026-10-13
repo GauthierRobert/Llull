@@ -45,12 +45,7 @@ function segmentsOf(route: ReadonlyArray<Vec3>): Segment[] {
     const a = route[index] as Vec3;
     const delta = sub3(b, a);
     const length = Math.hypot(...delta);
-    return {
-      a,
-      delta,
-      length,
-      direction: [delta[0] / length, delta[1] / length, delta[2] / length],
-    };
+    return { a, delta, length, direction: [delta[0] / length, delta[1] / length, delta[2] / length] };
   });
 }
 
@@ -116,8 +111,8 @@ export function arcLengths(route: ReadonlyArray<Vec3>): number[] {
 export const RISER_SLOPE = 0.7;
 
 /**
- * Span coordinate at arc length `arc`: the arc length travelled on segments that are not risers
- * (a vertical pipe does not sag, so its length adds no span).
+ * Span coordinate at arc length `arc`: the arc length travelled on segments that are not risers (a vertical pipe does not sag, so its
+ * length adds no span).
  */
 export function spanCoordinate(route: ReadonlyArray<Vec3>, arc: number): number {
   let travelled = 0;
@@ -156,13 +151,7 @@ export function riserRuns(route: ReadonlyArray<Vec3>): RiserRun[] {
     open = null;
     const [startArc, endArc] = [arcs[fromIndex] as number, arcs[toIndex] as number];
     if (endArc - startArc < MIN_RISER_LENGTH) return;
-    runs.push({
-      startArc,
-      endArc,
-      length: endArc - startArc,
-      from: route[fromIndex] as Vec3,
-      to: route[toIndex] as Vec3,
-    });
+    runs.push({ startArc, endArc, length: endArc - startArc, from: route[fromIndex] as Vec3, to: route[toIndex] as Vec3 });
   };
   segmentsOf(route).forEach(({ delta, length }, index) => {
     const steep = length > 0 && Math.abs(delta[2]) / length > RISER_SLOPE;

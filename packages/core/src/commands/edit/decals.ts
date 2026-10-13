@@ -1,7 +1,7 @@
 /**
- * Text decals: paint a line of text onto a solid's surface (logos, part numbers, sidewall lettering).
- * Decals live on the solid (entity-local frame) so they follow its moves and rotations; they are
- * paint — shown in the viewport and exported to glTF, never part of STL / STEP solids.
+ * Text decals: paint a line of text onto a solid's surface (logos, part numbers, sidewall lettering). Decals live on the solid
+ * (entity-local frame) so they follow its moves and rotations; they are paint — shown in the viewport and exported to glTF, never part of
+ * STL / STEP solids.
  */
 
 import { type CadDocument, type Decal, type Entity, is3D } from '../../model/types';
@@ -30,8 +30,8 @@ function target(doc: CadDocument, id: string): Entity | string {
 /**
  * @affects appends 1 decal to the target solid's `decals`
  * @invariant decal stored in the solid's local frame; it must land on the surface
- * @failure missing / non-solid target, empty or too long text, bad sizes or colours, zero normal,
- *   decal missing the surface, too many decals -> no-op, affected:[]
+ * @failure missing / non-solid target, empty or too long text, bad sizes or colours, zero normal, decal missing the surface, too many
+ *   decals -> no-op, affected:[]
  */
 export const addDecal = defineCommand({
   name: 'add_decal',

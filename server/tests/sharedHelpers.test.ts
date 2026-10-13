@@ -32,10 +32,7 @@ describe('parseCommandResponse', () => {
   });
 
   it('turns an error body or a non-2xx status into an error outcome', () => {
-    expect(parseCommandResponse({ error: 'nope' }, 401)).toMatchObject({
-      isError: true,
-      summary: 'Server answered HTTP 401: nope.',
-    });
+    expect(parseCommandResponse({ error: 'nope' }, 401)).toMatchObject({ isError: true, summary: 'Server answered HTTP 401: nope.' });
     expect(parseCommandResponse({ summary: 's', affected: [] }, 500).isError).toBe(true);
   });
 });
@@ -158,17 +155,12 @@ describe('restClient', () => {
       },
     });
     expect(reply).toMatchObject({ status: 200, ok: true, body: { summary: 's' } });
-    expect(seen).toMatchObject({
-      url: 'http://h/command',
-      init: { method: 'POST', body: '{"name":"x"}' },
-    });
+    expect(seen).toMatchObject({ url: 'http://h/command', init: { method: 'POST', body: '{"name":"x"}' } });
     expect(JSON.stringify(seen)).toContain('Bearer t');
   });
 
   it('wraps a non-JSON answer as { error } and probes /health', async () => {
-    const reply = await requestJson('http://h/x', {
-      fetchImpl: () => Promise.resolve(new Response('<html>502</html>', { status: 502 })),
-    });
+    const reply = await requestJson('http://h/x', { fetchImpl: () => Promise.resolve(new Response('<html>502</html>', { status: 502 })) });
     expect(reply).toMatchObject({ status: 502, ok: false, body: { error: '<html>502</html>' } });
     expect(await isHealthy('http://h', () => Promise.resolve(jsonResponse({})))).toBe(true);
     expect(await isHealthy('http://h', () => Promise.reject(new Error('refused')))).toBe(false);

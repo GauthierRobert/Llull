@@ -5,11 +5,7 @@ import { dot3 } from '@lib/vec3';
 import { panelFrame } from '../evaluate';
 import type { HallGeometry, PortalProfiles } from './portalGeometry';
 
-interface CladdingPanel {
-  readonly corners: Vec3[];
-  readonly role: 'roof' | 'wall';
-  readonly outward: Vec3;
-}
+type CladdingPanel = { readonly corners: Vec3[]; readonly role: 'roof' | 'wall'; readonly outward: Vec3 };
 
 /** Outward-facing panel corners: reversed when the Newell normal points against `outward`. */
 export function facing(corners: Vec3[], outward: Vec3): Vec3[] {

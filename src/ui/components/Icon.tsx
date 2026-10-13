@@ -1,7 +1,4 @@
-/**
- * Icon — the single inline-SVG icon set for llull chrome (24×24 grid, stroke icons).
- * Decorative by default (aria-hidden); pair with a labelled control.
- */
+// The single inline-SVG icon set (24×24 stroke icons); aria-hidden, pair with a labelled control.
 
 import React from 'react';
 import { classNames } from '@ui/classNames';

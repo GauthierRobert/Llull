@@ -82,16 +82,8 @@ function fixtureActions(): unknown[] {
   const actions: unknown[] = [
     { command: 'set_parameter', params: { name: 'width', expression: '80' } },
     { command: 'set_parameter', params: { name: 'thickness', expression: 'width / 10' } },
-    {
-      command: 'add_box',
-      as: 'plate',
-      params: { size: ['=width', 40, '=thickness'], position: [0, 0, '=thickness / 2'] },
-    },
-    {
-      command: 'add_cylinder',
-      as: 'hole',
-      params: { radius: 6, height: 30, position: [40, 20, 4] },
-    },
+    { command: 'add_box', as: 'plate', params: { size: ['=width', 40, '=thickness'], position: [0, 0, '=thickness / 2'] } },
+    { command: 'add_cylinder', as: 'hole', params: { radius: 6, height: 30, position: [40, 20, 4] } },
     { command: 'boolean', as: 'cut', params: { op: 'subtract', a: '$plate', b: '$hole' } },
     { command: 'set_entity_name', params: { id: '$cut', name: 'Base plate' } },
   ];
@@ -165,12 +157,7 @@ function exportedCode(doc: CadDocument, language: PythonBackend): string {
   return text;
 }
 
-const deviationTable: Array<{
-  language: string;
-  name: string;
-  deviation: number;
-  tolerance: number;
-}> = [];
+const deviationTable: Array<{ language: string; name: string; deviation: number; tolerance: number }> = [];
 
 // Suites
 
@@ -196,19 +183,12 @@ function describeLanguage(language: PythonBackend, enabled: boolean): void {
     });
 
     it('rebuilds an editable parametric history from the generated code trace', async () => {
-      const run = await port.runProgram({
-        language,
-        source: exportedCode(doc, language),
-        step: false,
-      });
+      const run = await port.runProgram({ language, source: exportedCode(doc, language), step: false });
       expect(run.traced).toBe(true);
       const applied = execute(createEmptyDocument(), 'apply_code_trace', { trace: run.trace });
       expect(applied.affected.length).toBe(PRIMITIVES.length + 1);
       expect(JSON.stringify(applied.document.featureHistory)).toContain('=width');
-      const changed = execute(applied.document, 'set_parameter', {
-        name: 'width',
-        expression: '120',
-      });
+      const changed = execute(applied.document, 'set_parameter', { name: 'width', expression: '120' });
       const replayed = execute(changed.document, 'replay_history', {});
       const plate = Object.values(replayed.document.entities).find((e) => e.name === 'Base plate');
       const box = llullBox(plate!, replayed.document);
@@ -274,10 +254,7 @@ describe.skipIf(!hasCadQuery)('parametric round trip (cadquery)', () => {
 
   const widenedPlate = (): { document: CadDocument } => {
     const applied = execute(createEmptyDocument(), 'apply_code_trace', { trace: traced });
-    const changed = execute(applied.document, 'set_parameter', {
-      name: 'width',
-      expression: '120',
-    });
+    const changed = execute(applied.document, 'set_parameter', { name: 'width', expression: '120' });
     return execute(changed.document, 'replay_history', {});
   };
 
@@ -329,11 +306,7 @@ describe.skipIf(!hasCadQuery)('non-llull scripts (cadquery)', () => {
 
   it('a raising script surfaces its error message', async () => {
     await expect(
-      port.runProgram({
-        language: 'cadquery',
-        source: 'import cadquery as cq\nraise ValueError("kaboom 42")\n',
-        step: false,
-      }),
+      port.runProgram({ language: 'cadquery', source: 'import cadquery as cq\nraise ValueError("kaboom 42")\n', step: false }),
     ).rejects.toThrow(/kaboom 42/);
   });
 
@@ -355,15 +328,8 @@ describe.skipIf(!hasCadQuery)('STEP names and colours (cadquery)', () => {
     expect(await installGeometryKernel()).toBe(true);
     let current = createEmptyDocument();
     const added = execute(current, 'add_box', { size: [10, 10, 10], color: '#aa3300' });
-    current = execute(added.document, 'set_entity_name', {
-      id: added.affected[0]!,
-      name: 'Base plate',
-    }).document;
-    const run = await port.runProgram({
-      language: 'cadquery',
-      source: exportedCode(current, 'cadquery'),
-      step: true,
-    });
+    current = execute(added.document, 'set_entity_name', { id: added.affected[0]!, name: 'Base plate' }).document;
+    const run = await port.runProgram({ language: 'cadquery', source: exportedCode(current, 'cadquery'), step: true });
     const imported = await port.importStep(run.stepBase64 as string);
     const result = execute(createEmptyDocument(), 'import_mesh', { bodies: imported.bodies });
     expect(result.affected).toHaveLength(1);

@@ -1,20 +1,14 @@
-/**
- * Pure vertex builder for rendering many simple `line` entities as ONE LineSegments draw call.
- * World positions (entity rotation about Z + position applied) are stored relative to an anchor
- * so float32 vertex data stays precise far from the origin; per-line colour goes in a colour
- * attribute.
- */
+// Many `line` entities as ONE LineSegments: world positions relative to an anchor (float32-safe) + per-vertex color.
 
 import * as THREE from 'three';
 import type { LineEntity } from '@core/model/types';
 import { localToWorld2D } from './snapping/geometry';
 
 interface LineBatch {
-  /** Object position: world position of the first line's start (float64 on the CPU). */
+  /** First line's world start (float64 on the CPU). */
   readonly anchor: [number, number, number];
-  /** xyz per vertex (two vertices per line), relative to `anchor`. */
+  /** Two vertices per line, relative to `anchor`. */
   readonly positions: number[];
-  /** rgb per vertex, matching `positions`. */
   readonly colors: number[];
 }
 

@@ -1,6 +1,4 @@
-/* ==========================================================================
-   Viewport empty state — non-blocking glass card, centered over the canvas
-   ========================================================================== */
+/* ==== Viewport empty state — non-blocking glass card, centered over the canvas ==== */
 
 .empty-state {
   position: absolute;

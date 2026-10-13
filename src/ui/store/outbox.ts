@@ -1,8 +1,5 @@
-/**
- * Offline outbox: queued local commands, their replay to the server on reconnect, and the
- * sync retry/backoff bookkeeping. On failure syncState='failed' and the flush retries with
- * exponential backoff. Live events received during a flush are superseded by the post-flush snapshot.
- */
+// Offline outbox: queued local commands, replay on reconnect, retry/backoff (syncState 'failed' meanwhile).
+// Live events received during a flush are superseded by the post-flush snapshot.
 
 import type { CadDocument, EntityId } from '@core/model/types';
 import { extendIdMap, mapStringLeaves, remapIds } from '@core/commands/history/regenerate';
@@ -14,7 +11,6 @@ import { resetGraceRuns } from './graceRuns';
 const SYNC_RETRY_BASE_MS = 1000;
 const SYNC_RETRY_MAX_MS = 30000;
 
-/** Guards against concurrent pushes. */
 let syncInFlight = false;
 let syncRetryTimer: ReturnType<typeof setTimeout> | null = null;
 let syncAttempt = 0;

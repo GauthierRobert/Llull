@@ -1,21 +1,18 @@
-/**
- * Writes a batch's per-instance matrices and colors into a THREE.InstancedMesh and refreshes its
- * cached bounds. Without the bounds refresh, three keeps the sphere computed from the FIRST
- * matrices, so moved instances are frustum-culled and unpickable.
- */
+// Per-instance matrices + colors of a batch into an InstancedMesh, then a bounds refresh (three otherwise keeps the
+// FIRST matrices' sphere, so moved instances get frustum-culled and unpickable).
 
 import * as THREE from 'three';
 import type { EntityId } from '@core/model/types';
 import { SELECTION_EMISSIVE, SELECTION_EMISSIVE_INTENSITY } from '../viewportPalette';
 import type { InstanceBatch } from './grouping';
 
-/** Selected-highlight tint color. Matches useMaterialProps.ts emissive. */
+/** Matches useMaterialProps' emissive. */
 const SELECTED_EMISSIVE = new THREE.Color(SELECTION_EMISSIVE);
 
-/** White — used to force allocation of the instance color buffer. */
+/** Forces allocation of the instance color buffer. */
 const WHITE = new THREE.Color(1, 1, 1);
 
-/** Scratch objects reused by every batch write (single-threaded, synchronous). */
+/** Scratch reused by every (synchronous) batch write. */
 const DUMMY = new THREE.Object3D();
 const SCRATCH_COLOR = new THREE.Color();
 
@@ -28,7 +25,7 @@ export function writeBatchInstances(mesh: THREE.InstancedMesh, batch: InstanceBa
     DUMMY.updateMatrix();
     mesh.setMatrixAt(i, DUMMY.matrix);
 
-    // Shaded mode with an assigned material uses its diffuse color; selection tints on top.
+    // An assigned material's diffuse color; selection tints on top.
     SCRATCH_COLOR.set(batch.pbrMaterial ? batch.pbrMaterial.color : entity.color);
     if (selectionSet.has(entity.id)) {
       SCRATCH_COLOR.lerp(SELECTED_EMISSIVE, SELECTION_EMISSIVE_INTENSITY);

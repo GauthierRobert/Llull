@@ -1,6 +1,6 @@
 /**
- * Drainage network analysis: plan geometry, flow accumulation down the pipe DAG and per-pipe /
- * per-manhole design checks (SI units in the result rows).
+ * Drainage network analysis: plan geometry, flow accumulation down the pipe DAG and per-pipe / per-manhole design checks (SI units in the
+ * result rows).
  */
 
 import type { CadDocument } from '@core/model/types';
@@ -97,9 +97,7 @@ function pipeRow(
     ['upstream', coverFromM],
     ['downstream', coverToM],
   ] as const) {
-    if (cover < criteria.minCoverM) {
-      reasons.push(`${end} cover ${cover.toFixed(2)} m < ${criteria.minCoverM} m`);
-    }
+    if (cover < criteria.minCoverM) reasons.push(`${end} cover ${cover.toFixed(2)} m < ${criteria.minCoverM} m`);
   }
   if (hgl?.surcharged && !flow.surcharged) reasons.push('HGL above obvert (surcharged)');
   return {
@@ -145,9 +143,7 @@ function manholeRow(
   const reasons: string[] = [];
   if (dropM !== null && dropM < 0) reasons.push(`outgoing invert ${(-dropM).toFixed(3)} m above incoming`);
   if (!(manhole.rimElevation > manhole.invertElevation)) reasons.push('rim not above invert');
-  if (hgl?.flooding) {
-    reasons.push(`HGL ${hgl.hglM.toFixed(3)} m above rim - freeboard ${criteria.freeboardM} m: flooding risk`);
-  }
+  if (hgl?.flooding) reasons.push(`HGL ${hgl.hglM.toFixed(3)} m above rim - freeboard ${criteria.freeboardM} m: flooding risk`);
   return {
     id: manhole.id,
     name: manhole.name,

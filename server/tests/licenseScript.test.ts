@@ -8,9 +8,7 @@ import { tempDir } from './userTestSupport';
 
 const script = path.resolve(__dirname, '..', 'scripts', 'license.mjs');
 const run = (...args: string[]): string =>
-  execFileSync(process.execPath, [script, ...args], {
-    stdio: ['ignore', 'pipe', 'ignore'],
-  }).toString();
+  execFileSync(process.execPath, [script, ...args], { stdio: ['ignore', 'pipe', 'ignore'] }).toString();
 
 describe('scripts/license.mjs', () => {
   it('keygen + sign produce a license the server accepts', () => {

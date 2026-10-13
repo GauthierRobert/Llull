@@ -3,22 +3,10 @@
 import { DEFAULT_DOCUMENT_PATH } from '@mcp/documentFiles';
 
 /** Flags that never take a value (`--json`, not `--json yes`). */
-const BOOLEAN_FLAGS: ReadonlySet<string> = new Set([
-  'json',
-  'dry-run',
-  'validate',
-  'continue',
-  'force',
-  'help',
-  'quiet',
-  'progress',
-  'app',
-]);
+const BOOLEAN_FLAGS: ReadonlySet<string> = new Set('json dry-run validate continue force help quiet progress app'.split(' '));
 
 export interface ParsedArgv {
-  /** Non-flag arguments in order (the subcommand first). */
-  readonly positionals: readonly string[];
-  /** `--name value`, `--name=value`, or `true` for a boolean flag. */
+  readonly positionals: readonly string[]; // the subcommand first
   readonly flags: Readonly<Record<string, string | true>>;
 }
 
@@ -63,7 +51,6 @@ export function parseArgv(argv: readonly string[]): ParsedArgv {
 /** Flags that need a value; `--save` alone is a mistake, never "on". */
 const VALUE_FLAGS = ['doc', 'server', 'token', 'save', 'kernel', 'toolset', 'limit', 'timeout'] as const;
 
-/** The first value flag given without a value, or undefined. */
 export function missingValueFlag(parsed: ParsedArgv): string | undefined {
   return VALUE_FLAGS.find((name) => parsed.flags[name] === true);
 }
@@ -77,17 +64,12 @@ export function stringFlag(parsed: ParsedArgv, name: string): string | undefined
 /** A boolean flag: present (with no value, or any value but `false`/`0`). */
 export function booleanFlag(parsed: ParsedArgv, name: string): boolean {
   const value = parsed.flags[name];
-  if (value === undefined) return false;
-  return value === true || (value !== 'false' && value !== '0');
+  return value !== undefined && value !== 'false' && value !== '0';
 }
 
-/** A JSON-looking token: object, array, quoted string. */
-function looksLikeJson(text: string): boolean {
-  const trimmed = text.trim();
-  return trimmed.startsWith('{') || trimmed.startsWith('[') || trimmed.startsWith('"');
-}
+const looksLikeJson = (text: string): boolean => /^[{["]/.test(text.trim());
 
-/** `value` as JSON when it parses (numbers, booleans, arrays, objects, null), else the raw string. */
+/** `value` as JSON when it parses, else the raw string. */
 function scalarValue(value: string): unknown {
   try {
     return JSON.parse(value) as unknown;
@@ -103,9 +85,8 @@ export type ParamsSource =
   | { readonly kind: 'pairs'; readonly params: Record<string, unknown> };
 
 /**
- * Where a command's params come from: one JSON literal, `@file.json`, `-` (stdin), or
- * `key=value` pairs (each value parsed as JSON when it can be: `width=10 position=[0,0,5]`, except
- * keys in `stringKeys` — string-typed params — which stay raw: `name=123` is the string "123").
+ * Params from one JSON literal, `@file.json`, `-` (stdin), or `key=value` pairs (values JSON-parsed when they can be,
+ * except `stringKeys`: `name=123` stays "123").
  * @failure a token that is none of these -> Error naming it
  */
 export function paramsSource(tokens: readonly string[], stringKeys: ReadonlySet<string> = new Set()): ParamsSource {
@@ -123,8 +104,7 @@ export function paramsSource(tokens: readonly string[], stringKeys: ReadonlySet<
       throw new Error(`"${token}" is not key=value; pass params as key=value pairs, one JSON object, @file.json or - (stdin).`);
     }
     const key = token.slice(0, equals);
-    const raw = token.slice(equals + 1);
-    params[key] = stringKeys.has(key) ? raw : scalarValue(raw);
+    params[key] = stringKeys.has(key) ? token.slice(equals + 1) : scalarValue(token.slice(equals + 1));
   }
   return { kind: 'pairs', params };
 }
@@ -133,20 +113,14 @@ export function paramsSource(tokens: readonly string[], stringKeys: ReadonlySet<
 export const APP_SERVER = 'app';
 
 export interface CliTarget {
-  /** A server URL, `APP_SERVER`, or undefined for a local document file. */
-  readonly server: string | undefined;
-  /** The local document path (`--doc`, `$LLULL_DOC`, else the default file). */
+  readonly server: string | undefined; // URL, `APP_SERVER`, or undefined = local doc file
   readonly doc: string;
 }
 
-/**
- * Where a CLI invocation acts: `--app`, then `--server`, then `$LLULL_SERVER` choose a server;
- * otherwise the `--doc` file. The one resolution used by the supervisor, the CLI and its commands.
- */
+/** The one target resolution: `--app` > `--server` > `$LLULL_SERVER`; doc: `--doc` > `$LLULL_DOC` > default. */
 export function cliTarget(parsed: ParsedArgv, env: Readonly<Record<string, string | undefined>>): CliTarget {
-  const server = booleanFlag(parsed, 'app') ? APP_SERVER : (stringFlag(parsed, 'server') ?? env['LLULL_SERVER']);
   return {
-    server,
+    server: booleanFlag(parsed, 'app') ? APP_SERVER : (stringFlag(parsed, 'server') ?? env['LLULL_SERVER']),
     doc: stringFlag(parsed, 'doc') ?? env['LLULL_DOC'] ?? DEFAULT_DOCUMENT_PATH,
   };
 }

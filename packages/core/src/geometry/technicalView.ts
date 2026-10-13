@@ -1,8 +1,7 @@
 /**
- * Technical (ISO 128) orthographic view of 3D solids as drawing primitives: thick visible edges,
- * thin dashed hidden edges, chain centre lines and — under a section plane — the cut faces
- * outlined thick and hatched at 45° (hidden edges are omitted from a section view, per ISO 128-50).
- * The 2D viewport and the DXF export draw solids through this one function.
+ * Technical (ISO 128) orthographic view of 3D solids as drawing primitives: thick visible edges, thin dashed hidden edges, chain centre
+ * lines and — under a section plane — the cut faces outlined thick and hatched at 45° (hidden edges are omitted from a section view, per
+ * ISO 128-50). The 2D viewport and the DXF export draw solids through this one function.
  */
 
 import { type CadDocument, type Entity, type EntityId, type Vec2, is3D } from '../model/types';
@@ -26,12 +25,7 @@ import {
 } from './viewProjection';
 
 /** DXF / CAD layers of a technical view, one per line type. */
-export const TECHNICAL_LAYERS = {
-  visible: 'OBJ-VISIBLE',
-  hidden: 'OBJ-HIDDEN',
-  center: 'OBJ-CENTER',
-  cut: 'OBJ-CUT',
-} as const;
+export const TECHNICAL_LAYERS = { visible: 'OBJ-VISIBLE', hidden: 'OBJ-HIDDEN', center: 'OBJ-CENTER', cut: 'OBJ-CUT' } as const;
 
 export interface EntityDrawing {
   readonly entityId: EntityId;
@@ -103,8 +97,8 @@ function lines(segments: ReadonlyArray<Segment2>, style: 'visible' | 'hidden', d
 }
 
 /**
- * The technical view of `entities` (3D solids; anything else is skipped) through `frame`. Edges
- * are hidden by every solid of the set, not only their own.
+ * The technical view of `entities` (3D solids; anything else is skipped) through `frame`. Edges are hidden by every solid of the set, not
+ * only their own.
  * @returns one drawing per solid that produced any primitive, in input order
  */
 export function technicalView(
@@ -128,22 +122,10 @@ export function technicalView(
     if (source.faces.length === 0 || !edgeRuns) return;
     const primitives: DrawingPrimitive[] = [];
     for (const { outer, holes } of nestLoops(source.cutLoops as Vec2[][])) {
-      primitives.push({
-        type: 'polygon',
-        layer: TECHNICAL_LAYERS.cut,
-        style: 'cut',
-        points: outer,
-        fill: 'hatch',
-        holes,
-      });
+      primitives.push({ type: 'polygon', layer: TECHNICAL_LAYERS.cut, style: 'cut', points: outer, fill: 'hatch', holes });
       for (const hole of holes) {
         // A closed outline, not a polygon: an unfilled cut polygon reads as solid poché.
-        primitives.push({
-          type: 'polyline',
-          layer: TECHNICAL_LAYERS.cut,
-          style: 'cut',
-          points: [...hole, hole[0] as Vec2],
-        });
+        primitives.push({ type: 'polyline', layer: TECHNICAL_LAYERS.cut, style: 'cut', points: [...hole, hole[0] as Vec2] });
       }
     }
     // Visible first: a hidden run coinciding with a visible one is not drawn (visible lines win).

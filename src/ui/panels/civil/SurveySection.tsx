@@ -1,8 +1,4 @@
-/**
- * SurveySection — switch the document to metres (`set_units`) for real survey coordinates, load a
- * survey file (.csv / .txt, or paste it), choose its column format and unit, dispatch
- * `import_survey_points`; lists the point groups.
- */
+// Metres (`set_units`), survey file (.csv / .txt or pasted) with column format + unit → `import_survey_points`; groups.
 
 import React, { useState } from 'react';
 import { DOCUMENT_UNITS, type DocumentUnit } from '@core/model/types';
@@ -43,12 +39,7 @@ export function SurveySection(): React.ReactElement {
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
     if (text.trim() === '') return;
-    dispatch('import_survey_points', {
-      text,
-      format,
-      sourceUnit: unit,
-      ...optionalText('name', name),
-    });
+    dispatch('import_survey_points', { text, format, sourceUnit: unit, ...optionalText('name', name) });
     setText('');
     setName('');
   };

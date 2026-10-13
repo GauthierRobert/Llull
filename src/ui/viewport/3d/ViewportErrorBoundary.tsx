@@ -1,8 +1,4 @@
-/**
- * React error boundary wrapping the r3f Canvas.
- * Catches render errors in the 3D scene and shows a minimal fallback
- * so the rest of the app keeps running.
- */
+// Error boundary around the r3f Canvas: a scene crash shows a fallback, the app keeps running.
 
 import { type ErrorInfo, type ReactNode, Component } from 'react';
 import { Icon } from '@ui/components/Icon';

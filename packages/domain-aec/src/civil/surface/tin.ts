@@ -1,7 +1,4 @@
-/**
- * Terrain TIN: triangulated surface from 3D points, spot-elevation queries through a bucket grid,
- * and contour tracing.
- */
+/** Terrain TIN: triangulated surface from 3D points, spot-elevation queries through a bucket grid, and contour tracing. */
 
 import type { Vec2, Vec3 } from '@core/model/types';
 import { distance, pointInPolygon } from '@lib/polygon';
@@ -14,10 +11,7 @@ export interface Tin {
   readonly triangles: readonly number[];
 }
 
-export interface TinOptions {
-  readonly boundary?: readonly Vec2[];
-  readonly maxEdgeLength?: number;
-}
+export type TinOptions = { readonly boundary?: readonly Vec2[]; readonly maxEdgeLength?: number };
 
 /** Points closer than this in plan are merged (the first one wins). */
 const MERGE_TOLERANCE = 1e-6;
@@ -83,10 +77,7 @@ export function tinPlanArea(tin: Tin): number {
   return area;
 }
 
-export interface TinBounds {
-  readonly min: Vec3;
-  readonly max: Vec3;
-}
+export type TinBounds = { readonly min: Vec3; readonly max: Vec3 };
 
 /** Bounds of the vertices used by at least one triangle; null for an empty TIN. */
 export function tinBounds(tin: Tin): TinBounds | null {

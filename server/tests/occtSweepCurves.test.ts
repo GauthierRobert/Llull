@@ -34,10 +34,7 @@ function volumes(entity: Entity): { occt: number; manifold: number } {
   const man = meshOf(kernels.manifold, entity);
   expect(occ).not.toBeNull();
   expect(man).not.toBeNull();
-  return {
-    occt: volume(occ as NonNullable<typeof occ>),
-    manifold: volume(man as NonNullable<typeof man>),
-  };
+  return { occt: volume(occ as NonNullable<typeof occ>), manifold: volume(man as NonNullable<typeof man>) };
 }
 
 function topologyOf(entity: Entity): ShapeTopology {
@@ -82,16 +79,9 @@ describe('sweep_profile on the live kernels', () => {
   });
 
   it('hollow pipe: volume is the annulus area times the path length', () => {
-    const tube = created(empty, 'sweep_profile', {
-      path: L_PATH,
-      radius: 2,
-      innerRadius: 1.5,
-      bendRadius: 6,
-    });
+    const tube = created(empty, 'sweep_profile', { path: L_PATH, radius: 2, innerRadius: 1.5, bendRadius: 6 });
     const exact = (
-      execute({ ...empty, entities: { [tube.id]: tube } }, 'mass_properties', {
-        entityId: tube.id,
-      }).data as { volume: number }
+      execute({ ...empty, entities: { [tube.id]: tube } }, 'mass_properties', { entityId: tube.id }).data as { volume: number }
     ).volume;
     const { occt, manifold } = volumes(tube);
     for (const measured of [occt, manifold]) {

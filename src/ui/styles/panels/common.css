@@ -1,7 +1,4 @@
-/* ==========================================================================
-   Panel anatomy — shared by every sidebar browser panel and the inspector
-   header → sections → rows → sticky footer form
-   ========================================================================== */
+/* ==== Panel anatomy (browser panels + inspector): header → sections → rows → sticky footer form ==== */
 
 .panel {
   display: flex;
@@ -342,8 +339,7 @@
 
 /* ---- Forms -------------------------------------------------------------- */
 
-/* Sticky footer form, pinned to the bottom of the scrolling panel; capped so a
-   tall form never hides the list above it on short windows. */
+/* Sticky footer form, capped so a tall form never hides the list above it on short windows. */
 .panel__form {
   position: sticky;
   bottom: 0;

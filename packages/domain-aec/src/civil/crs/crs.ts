@@ -1,6 +1,6 @@
 /**
- * Coordinate reference system helpers: the 2D similarity (Helmert) between local site coordinates
- * and the projected grid, and a grid-coordinate copy of the civil model for exchange files.
+ * Coordinate reference system helpers: the 2D similarity (Helmert) between local site coordinates and the projected grid, and a
+ * grid-coordinate copy of the civil model for exchange files.
  */
 
 import { toRadians } from '@lib/angle';
@@ -65,11 +65,7 @@ function gridObject(calibration: SiteCalibration, object: CivilObject): CivilObj
     case 'platform':
       return { ...object, boundary: object.boundary.map(move) };
     case 'alignment':
-      return {
-        ...object,
-        points: object.points.map(move),
-        radii: object.radii.map((radius) => radius * k),
-      };
+      return { ...object, points: object.points.map(move), radii: object.radii.map((radius) => radius * k) };
     case 'manhole':
       return { ...object, position: move(object.position) };
     case 'pipe':

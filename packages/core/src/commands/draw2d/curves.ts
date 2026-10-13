@@ -30,9 +30,8 @@ export const drawEllipse = defineCommand({
     ...workPlaneStyleFields(),
   }),
   run: (doc, { center, radiusX, radiusY, position = ORIGIN, color = DEFAULT_DRAW_COLOR }): CommandResult => {
-    if (radiusX <= 0 || radiusY <= 0) {
+    if (radiusX <= 0 || radiusY <= 0)
       return noop(doc, `draw_ellipse: radiusX and radiusY must both be > 0 (got radiusX=${radiusX}, radiusY=${radiusY}).`);
-    }
     const id = nextId('ellipse');
     const safeCenter: Vec2 = [center[0], center[1]];
     const entity = newEntity('ellipse', id, { center: safeCenter, radiusX, radiusY }, position, color);
@@ -55,7 +54,7 @@ export const drawSpline = defineCommand({
   params: z.object({
     points: z
       .array(z.array(z.number()))
-      .describe('Ordered list of through-points in local 2D work-plane coordinates. ' + 'Each point is [x, y]. Minimum 2 points required.'),
+      .describe('Ordered list of through-points in local 2D work-plane coordinates. Each point is [x, y]. Minimum 2 points required.'),
     closed: z
       .boolean()
       .describe('When true, the spline loops back from the last point to the first, forming a closed curve. Defaults to false.')
@@ -63,9 +62,8 @@ export const drawSpline = defineCommand({
     ...workPlaneStyleFields(),
   }),
   run: (doc, { points, closed = false, position = ORIGIN, color = DEFAULT_DRAW_COLOR }): CommandResult => {
-    if (points.length > MAX_SPLINE_CONTROL_POINTS) {
+    if (points.length > MAX_SPLINE_CONTROL_POINTS)
       return noop(doc, `draw_spline: ${points.length} points exceeds MAX_SPLINE_CONTROL_POINTS (${MAX_SPLINE_CONTROL_POINTS}).`);
-    }
     return drawPointSeries(doc, 'spline', points, closed, position, color);
   },
 });
@@ -122,22 +120,16 @@ export const drawInvolute = defineCommand({
   ): CommandResult => {
     if (baseRadius <= 0) return noop(doc, `draw_involute: baseRadius must be > 0, got ${baseRadius}.`);
     const samplesInt = Math.round(samples);
-    if (samplesInt < 2 || samplesInt > MAX_CURVE_SAMPLES) {
+    if (samplesInt < 2 || samplesInt > MAX_CURVE_SAMPLES)
       return noop(doc, `draw_involute: samples must be in [2, ${MAX_CURVE_SAMPLES}], got ${samples}.`);
-    }
-    if (endAngle <= startAngle) {
-      return noop(doc, `draw_involute: endAngle (${endAngle}) must be > startAngle (${startAngle}).`);
-    }
-
+    if (endAngle <= startAngle) return noop(doc, `draw_involute: endAngle (${endAngle}) must be > startAngle (${startAngle}).`);
     const points: ReadonlyArray<Vec2> = sampleInvolute(baseRadius, startAngle, endAngle, samplesInt).map(([x, y]) => [x, y]);
     const { minX, minY, maxX, maxY } = pointsExtent(points);
-
     const id = nextId('inv');
     const entity = newEntity('polyline', id, { points, closed: false }, finiteVec3OrZero(position), color, {
       rotation: finiteVec3OrZero(rotation),
       name,
     });
-
     return commitEntity(
       doc,
       entity,

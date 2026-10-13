@@ -1,9 +1,8 @@
 /**
- * Catmull-Clark subdivision of a closed polygon cage with sharp creases (DeRose et al. rules for
- * infinitely sharp edges): crease edge points are midpoints, a vertex on two creases follows the
- * crease curve, a vertex on three or more stays a corner. Every level turns each n-gon into n
- * quads, so a level-L surface has (sum of face sides) × 4^(L-1) quads. Pure; shared by the
- * viewport, export, measurement and both kernels.
+ * Catmull-Clark subdivision of a closed polygon cage with sharp creases (DeRose et al. rules for infinitely sharp edges): crease edge
+ * points are midpoints, a vertex on two creases follows the crease curve, a vertex on three or more stays a corner. Every level turns each
+ * n-gon into n quads, so a level-L surface has (sum of face sides) × 4^(L-1) quads. Pure; shared by the viewport, export, measurement and
+ * both kernels.
  */
 
 import type { SubdivisionEntity, Vec3 } from '../model/types';
@@ -175,9 +174,7 @@ export function subdivisionTriangles(
   const at = (v: number): Vec3 => add3(surface.vertices[v] as Vec3, origin);
   return surface.faces.flatMap((face) => {
     const triangles: Triangle[] = [];
-    for (let k = 1; k + 1 < face.length; k++) {
-      triangles.push([at(face[0] as number), at(face[k] as number), at(face[k + 1] as number)]);
-    }
+    for (let k = 1; k + 1 < face.length; k++) triangles.push([at(face[0] as number), at(face[k] as number), at(face[k + 1] as number)]);
     return triangles;
   });
 }
@@ -232,9 +229,7 @@ export function cylinderCage(radius: number, height: number, sides: number, segm
   const at = (k: number, i: number): number => k * sides + (i % sides);
   const faces: number[][] = [];
   for (let k = 0; k < segments; k++) {
-    for (let i = 0; i < sides; i++) {
-      faces.push([at(k, i), at(k, i + 1), at(k + 1, i + 1), at(k + 1, i)]);
-    }
+    for (let i = 0; i < sides; i++) faces.push([at(k, i), at(k, i + 1), at(k + 1, i + 1), at(k + 1, i)]);
   }
   const ring = (k: number): number[] => Array.from({ length: sides }, (_, i) => at(k, i));
   faces.push(ring(segments), ring(0).reverse());

@@ -1,7 +1,4 @@
-/**
- * Properties inspector for a selected building element (derived geometry is read-only, so the
- * element — not its mesh — is what an engineer edits). Editors dispatch update_* commands.
- */
+// Inspector of a selected building element (its derived geometry is read-only); editors dispatch update_*.
 
 import React from 'react';
 import { useStore } from '@ui/store';
@@ -36,11 +33,7 @@ function ElementEditor({ element }: { element: BuildingElement }): React.ReactEl
   }
 }
 
-interface ElementInspectorProps {
-  elementId: string;
-}
-
-export function ElementInspector({ elementId }: ElementInspectorProps): React.ReactElement {
+export function ElementInspector({ elementId }: { elementId: string }): React.ReactElement {
   const building = useStore((s) => s.document.building);
   const units = useStore((s) => s.document.units);
   const element = building?.elements[elementId];

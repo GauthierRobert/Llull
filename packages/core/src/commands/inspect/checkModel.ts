@@ -50,9 +50,8 @@ function checkDegenerateGeometry(e: Entity): Issue[] {
   } else if (e.kind === 'sweep') {
     if (e.section.shape === 'circle' && !isPositiveNumber(e.section.radius))
       issues.push(degenerate(`has section radius ${e.section.radius}; it must be finite and > 0`));
-  } else if (e.kind === 'text' && e.content.trim().length === 0) {
+  } else if (e.kind === 'text' && e.content.trim().length === 0)
     issues.push(degenerate('has empty content; content must be a non-empty string'));
-  }
   return issues;
 }
 
@@ -232,19 +231,11 @@ export const checkModel = defineCommand({
   run: (doc, params): CommandResult => {
     const farThreshold = params.farThreshold ?? 1e6;
     const result = runModelChecks(doc, farThreshold);
-
     const count = (severity: IssueSeverity): number => result.issues.filter((i) => i.severity === severity).length;
-
     const summary =
       result.issues.length === 0
         ? 'check_model: no issues found — model is clean.'
         : `check_model: ${result.issues.length} issue(s) — ${count('error')} error(s), ${count('warning')} warning(s), ${count('info')} info(s). ok=${result.ok}.`;
-
-    return {
-      document: doc,
-      summary,
-      affected: [],
-      data: result,
-    };
+    return { document: doc, summary, affected: [], data: result };
   },
 });

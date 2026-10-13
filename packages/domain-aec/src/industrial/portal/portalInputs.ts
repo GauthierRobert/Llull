@@ -27,9 +27,7 @@ interface PortalInputs {
 
 /** @failure any invalid dimension / profile / combination -> `{ reason }` (full failure summary) */
 export function portalInputs(doc: CadDocument, params: PortalParams): PortalInputs | { reason: string } {
-  const fail = (reason: string): { reason: string } => ({
-    reason: `add_portal_frame_building failed: ${reason}`,
-  });
+  const fail = (reason: string): { reason: string } => ({ reason: `add_portal_frame_building failed: ${reason}` });
   const mm = (value: number): number => fromMm(doc, value);
   const origin = params.origin ?? [0, 0];
   const span = params.spans ? Math.max(...params.spans) : (params.span ?? mm(24000));

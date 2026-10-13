@@ -45,8 +45,8 @@ export function appendBasePlates(
 }
 
 /**
- * Keeps the base plates of `member` consistent after an edit: re-sized (same overhang) when its
- * profile changed from `previousProfile`, removed when it is no longer a column.
+ * Keeps the base plates of `member` consistent after an edit: re-sized (same overhang) when its profile changed from `previousProfile`,
+ * removed when it is no longer a column.
  */
 export function refitPlates(
   doc: Pick<CadDocument, 'units'>,

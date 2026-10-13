@@ -1,7 +1,7 @@
 /**
- * export_gltf: read-only glTF 2.0 / GLB export (scene layout: ./gltfScene.ts) — one named node +
- * mesh per entity (each child of an instance), one PBR material per distinct appearance, entity
- * groups as parent nodes, finishes as textures, decals as overlays (document returned unchanged).
+ * export_gltf: read-only glTF 2.0 / GLB export (scene layout: ./gltfScene.ts) — one named node + mesh per entity (each child of an
+ * instance), one PBR material per distinct appearance, entity groups as parent nodes, finishes as textures, decals as overlays (document
+ * returned unchanged).
  */
 
 import type { CommandResult } from '../types';
@@ -85,8 +85,7 @@ export const exportGltf = defineCommand({
     '2D shape entities are silently skipped. Revolution and instance entities are fully expanded. ' +
     'Returns the UNCHANGED document, affected:[], and a data object with: ' +
     '  format ("gltf" or "glb"), triangleCount, nodeCount, materialCount, ' +
-    '  text (glTF 2.0 JSON string — when binary=false, default), ' +
-    '  base64 (GLB binary blob base64-encoded — when binary=true). ' +
+    '  text (glTF 2.0 JSON string — when binary=false, default),   base64 (GLB binary blob base64-encoded — when binary=true). ' +
     'Structure: one glTF node + mesh per entity (node.name = the entity name from set_entity_name, ' +
     'else its id; each child of an instance is its own node), and entities that belong to a group ' +
     '(group_entities) are children of a node named after the group. Node extras carry the llull ' +
@@ -98,8 +97,7 @@ export const exportGltf = defineCommand({
     'alpha-blended textured meshes. The BIN buffer is inlined as a data: URI in JSON mode. ' +
     'In GLB mode the 12-byte header + JSON chunk + BIN chunk are packed per the glTF 2.0 spec. ' +
     'entityIds: omit to export all 3D entities; provide an array to export a subset. ' +
-    'binary: false (default) → data.text contains JSON; true → data.base64 contains GLB. ' +
-    'Does NOT modify the document.',
+    'binary: false (default) → data.text contains JSON; true → data.base64 contains GLB. Does NOT modify the document.',
   params: z.object({
     entityIds: entityIdsField,
     binary: z
@@ -107,8 +105,7 @@ export const exportGltf = defineCommand({
       .optional()
       .describe(
         'Output format selector. false (default): data.text contains a glTF 2.0 JSON string ' +
-          'with the binary buffer inlined as a data: URI. ' +
-          'true: data.base64 contains a base64-encoded GLB binary container ' +
+          'with the binary buffer inlined as a data: URI. true: data.base64 contains a base64-encoded GLB binary container ' +
           '(12-byte header + JSON chunk + BIN chunk per glTF 2.0 spec). ' +
           'Most web viewers accept JSON glTF; most desktop importers accept GLB.',
       ),
@@ -119,11 +116,7 @@ export const exportGltf = defineCommand({
     const ids = collected.parts.map((part) => part.id);
     const scene = buildGltfScene(collectSceneParts(doc, ids), collectDecalParts(doc, ids), groupIndex(doc));
     const tris = collected.parts.flatMap((part) => part.tris);
-    const counts = {
-      triangleCount: tris.length,
-      nodeCount: scene.nodeCount,
-      materialCount: scene.materialCount,
-    };
+    const counts = { triangleCount: tris.length, nodeCount: scene.nodeCount, materialCount: scene.materialCount };
     const summary =
       exportSummary('export_gltf', binary ? 'glb' : 'gltf', { ...collected, tris }) +
       ` ${scene.nodeCount} node(s), ${scene.materialCount} material(s).`;

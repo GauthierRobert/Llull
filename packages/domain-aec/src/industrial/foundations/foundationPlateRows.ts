@@ -67,13 +67,9 @@ export function plateRows(
     }
   }
   const tensionWorst = worst(tension);
-  if (wind && tensionWorst) {
-    rows.push(row(`anchor tension Ft,Rd M${Math.round(toMm(plate.boltDiameter))} 8.8`, tensionWorst, 'kN/bolt'));
-  }
+  if (wind && tensionWorst) rows.push(row(`anchor tension Ft,Rd M${Math.round(toMm(plate.boltDiameter))} 8.8`, tensionWorst, 'kN/bolt'));
   const interactionWorst = worst(interaction);
-  if (interactionWorst) {
-    rows.push(row('anchor shear + tension (Fv/Fv,Rd + Ft/1.4Ft,Rd)', interactionWorst, '-'));
-  }
+  if (interactionWorst) rows.push(row('anchor shear + tension (Fv/Fv,Rd + Ft/1.4Ft,Rd)', interactionWorst, '-'));
   const column = building.elements[plate.memberId];
   const profile = column?.category === 'member' ? findProfile(column.profile) : undefined;
   if (plate.fixity === 'fixed' && column?.category === 'member' && profile) {
@@ -97,9 +93,7 @@ export function plateRows(
       };
     });
     const momentWorst = worst(moments);
-    if (momentWorst) {
-      rows.push(row(`base plate M+N (${momentWorst.detail})`, momentWorst, 'kN/bolt'));
-    }
+    if (momentWorst) rows.push(row(`base plate M+N (${momentWorst.detail})`, momentWorst, 'kN/bolt'));
   }
   return rows;
 }

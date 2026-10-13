@@ -1,9 +1,8 @@
 /**
- * Bracing of a multi-storey steel structure: EN 1993-1-1 §5.3.2 equivalent horizontal forces
- * (φ × the factored vertical load at each floor level, both directions) accumulate down the storeys;
- * each storey's shear is shared equally by the bracing planes of a direction, and inside a plane by
- * its braced bays. X-bracing is tension-only (one diagonal carries the panel shear / cos θ), a
- * single diagonal also buckles; the chords of a braced bay take the panel shear as a strut force.
+ * Bracing of a multi-storey steel structure: EN 1993-1-1 §5.3.2 equivalent horizontal forces (φ × the factored vertical load at each floor
+ * level, both directions) accumulate down the storeys; each storey's shear is shared equally by the bracing planes of a direction, and
+ * inside a plane by its braced bays. X-bracing is tension-only (one diagonal carries the panel shear / cos θ), a single diagonal also
+ * buckles; the chords of a braced bay take the panel shear as a strut force.
  */
 
 import type { StrutForce } from './steelBeamChecks';
@@ -65,10 +64,7 @@ export const notionalLabel = (factor: number): string =>
 const snap = (value: number): number => Math.round(value / COORDINATE_STEP) * COORDINATE_STEP;
 
 /** Floor levels (top of steel, ascending) of the beams, and the nearest-level lookup. */
-function floorLevels(beams: ReadonlyArray<BeamResult>): {
-  levels: number[];
-  levelOf: (top: number) => number;
-} {
+function floorLevels(beams: ReadonlyArray<BeamResult>): { levels: number[]; levelOf: (top: number) => number } {
   const levels = clusterMeans(
     beams.map((beam) => beam.loads.top),
     LEVEL_TOLERANCE,
@@ -127,10 +123,7 @@ function braceRow(geometry: BraceGeometry, panelShear: number, crossing: boolean
         `${profile.name}: single diagonal also acts in compression and its class ${sectionClass ?? 'is not covered'} cannot be verified`,
       );
     }
-    const buckling = memberBuckling(profile, bar.fy, force * 1000, 0, {
-      major: bar.length,
-      minor: bar.length,
-    });
+    const buckling = memberBuckling(profile, bar.fy, force * 1000, 0, { major: bar.length, minor: bar.length });
     lines.push({
       name: 'flexural buckling (§6.3.1)',
       utilisation: buckling.utilisation,
@@ -222,11 +215,7 @@ export function checkBracing(
       const total = [...bays.entries()]
         .filter(([k]) => k.startsWith(`${storey}|${direction}|`))
         .reduce((sum, [, set]) => sum + set.size, 0);
-      return {
-        planes: slot,
-        bays: total,
-        perBay: slot === 0 || total === 0 ? 0 : shearOf(storey) / total,
-      };
+      return { planes: slot, bays: total, perBay: slot === 0 || total === 0 ? 0 : shearOf(storey) / total };
     };
     const framed = (direction: Direction): number =>
       frames.filter((frame) => frame.direction === direction && frame.beamTops.some((top) => levelOf(top) >= storey)).length;

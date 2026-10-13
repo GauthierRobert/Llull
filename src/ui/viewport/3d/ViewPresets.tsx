@@ -1,14 +1,4 @@
-/**
- * ViewPresets — floating overlay buttons for standard 3D view orientations (Front / Top / Right /
- * Iso) and fit-to-all / fit-to-selection.
- *
- * CRITICAL: under frameloop="demand", any programmatic camera/target change MUST call both
- * invalidate() AND controls.update(). Without invalidate() the demand loop never fires; without
- * controls.update() the OrbitControls internal state is stale (the RenderOriginSyncer's useFrame
- * relies on these invalidation sources).
- *
- * Purely presentational: reads the store and never mutates the document (PRIME DIRECTIVE).
- */
+// DOM overlay: Front / Top / Right / Iso views and fit all / fit selection (camera moves go through cameraBridge).
 
 import React from 'react';
 import * as THREE from 'three';
@@ -28,12 +18,11 @@ const PRESETS: ReadonlyArray<{ name: PresetName; label: string }> = [
   { name: 'iso', label: 'Iso' },
 ];
 
-/** Rendered OUTSIDE the Canvas as a DOM overlay. */
 export function ViewPresetsOverlay(): React.ReactElement {
   const selection = useStore((s) => s.document.selection);
   const allEntityIds = useStore((s) => s.document.order);
 
-  /** View `ids` from `direction`, framed to fit; nothing to frame -> origin from distance 10. */
+  /** Nothing to frame -> origin from distance 10. */
   const frame = (direction: PresetDirection, ids: string[]): void => {
     const framing = computeFitFraming(useStore.getState().document, ids, getAspect());
     const center = framing?.center ?? ORIGIN;

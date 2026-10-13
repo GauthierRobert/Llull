@@ -1,8 +1,4 @@
-/**
- * ParametersPanel — lists `document.parameters` with their evaluated value; edits expressions
- * (set_parameter), adds parameters (set_parameter) and deletes them (delete_parameter).
- * A parameter `error` is shown under its row in an aria-live region.
- */
+// `document.parameters` with evaluated values: set_parameter (edit / add), delete_parameter; errors in an aria-live region.
 
 import React, { useState } from 'react';
 import { classNames } from '@ui/classNames';
@@ -15,11 +11,7 @@ import { useDraftSubmit } from '@ui/hooks/useDraftSubmit';
 import { isParameterNameValid, parameterDraftOf } from '@ui/panels/parameterRules';
 import { PanelEmpty, PanelHeader, DeleteButton } from '@ui/panels/PanelParts';
 
-interface ParameterRowProps {
-  param: Parameter;
-}
-
-function ParameterRow({ param }: ParameterRowProps): React.ReactElement {
+function ParameterRow({ param }: { param: Parameter }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
 
   const hasError = param.error != null;
@@ -112,11 +104,7 @@ function AddParameterRow(): React.ReactElement {
   );
 }
 
-interface ParametersPanelProps {
-  className?: string;
-}
-
-export function ParametersPanel({ className }: ParametersPanelProps): React.ReactElement {
+export function ParametersPanel({ className }: { className?: string }): React.ReactElement {
   const parameters = useStore((s) => s.document.parameters);
   const paramList = Object.values(parameters);
 

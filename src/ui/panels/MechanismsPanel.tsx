@@ -1,9 +1,5 @@
-/**
- * MechanismsPanel — collapsible sections for constraints (solve_constraints, delete_constraint),
- * joints (set_joint_value, delete_joint) and drive relations (delete_drive_relation).
- * Selecting a constraint / joint row highlights it in `mechanismSelection` so `MechanismOverlay`
- * can draw a cue in the 3D viewport.
- */
+// Constraints (solve/delete), joints (set value/delete) and drive relations (delete); a highlighted constraint/joint
+// row sets `mechanismSelection` for MechanismOverlay.
 
 import { toDegrees, toRadians } from '@lib/angle';
 import React from 'react';
@@ -26,15 +22,12 @@ const CONSTRAINT_CHIP_TONE: Record<string, ChipTone> = {
   angle: 'accent',
 };
 
-const JOINT_CHIP_TONE: Record<string, ChipTone> = {
-  revolute: 'accent',
-  prismatic: 'agent',
-};
+const JOINT_CHIP_TONE: Record<string, ChipTone> = { revolute: 'accent', prismatic: 'agent' };
 
 const mechanismRowClass = (highlighted: boolean): string =>
   classNames('panel__row panel__row--overlay-actions mechanisms-row', highlighted && 'panel__row--selected mechanisms-row--highlighted');
 
-/** Format an EntityRef for display: "entityId[:kind]". */
+/** "entityId[:kind]" (last 6 id chars). */
 function fmtEntityRef(ref: Constraint['a'] | Constraint['b']): string {
   const shortId = ref.entityId.slice(-6);
   if ('kind' in ref && ref.kind) return `${shortId}:${ref.kind}`;
@@ -53,7 +46,6 @@ interface MechanismRowProps {
   info: React.ReactNode;
   /** Controls between the info text and the action buttons. */
   inline?: React.ReactNode;
-  /** Buttons after the highlight toggle. */
   actions: React.ReactNode;
 }
 
@@ -90,13 +82,15 @@ function MechanismRow({
   );
 }
 
-interface ConstraintRowProps {
+function ConstraintRow({
+  constraint,
+  highlighted,
+  onHighlight,
+}: {
   constraint: Constraint;
   highlighted: boolean;
   onHighlight: (id: string) => void;
-}
-
-function ConstraintRow({ constraint, highlighted, onHighlight }: ConstraintRowProps): React.ReactElement {
+}): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
 
   const chipTone = CONSTRAINT_CHIP_TONE[constraint.kind] ?? 'accent';
@@ -146,28 +140,26 @@ function ConstraintRow({ constraint, highlighted, onHighlight }: ConstraintRowPr
   );
 }
 
-interface JointRowProps {
+function JointRow({
+  joint,
+  highlighted,
+  onHighlight,
+}: {
   joint: Joint;
   highlighted: boolean;
   onHighlight: (id: string) => void;
-}
-
-function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.ReactElement {
+}): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
 
   const documentUnits = useStore((s) => s.document.units);
   const revolute = joint.kind === 'revolute';
-  // Presentation only: revolute angles are shown in degrees (like Properties); the command
-  // keeps radians.
+  // Revolute angles shown in degrees (like Properties); the command takes radians.
   const currentValue = revolute ? toDegrees(joint.angle, 6) : joint.displacement;
 
   const commitInput = (text: string): void => {
     const parsed = parseNumber(text);
     if (parsed !== undefined && parsed !== currentValue) {
-      dispatch('set_joint_value', {
-        id: joint.id,
-        value: revolute ? toRadians(parsed) : parsed,
-      });
+      dispatch('set_joint_value', { id: joint.id, value: revolute ? toRadians(parsed) : parsed });
     }
   };
 
@@ -212,11 +204,7 @@ function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.Rea
   );
 }
 
-interface DriveRelationRowProps {
-  relation: DriveRelation;
-}
-
-function DriveRelationRow({ relation }: DriveRelationRowProps): React.ReactElement {
+function DriveRelationRow({ relation }: { relation: DriveRelation }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
 
   const offsetLabel = relation.offset !== undefined && relation.offset !== 0 ? ` + ${relation.offset.toFixed(3)}` : '';
@@ -270,11 +258,7 @@ function MechanismSection({ title, testId, listLabel, rows }: MechanismSectionPr
   );
 }
 
-interface MechanismsPanelProps {
-  className?: string;
-}
-
-export function MechanismsPanel({ className }: MechanismsPanelProps): React.ReactElement {
+export function MechanismsPanel({ className }: { className?: string }): React.ReactElement {
   const constraints = useStore((s) => s.document.constraints);
   const constraintOrder = useStore((s) => s.document.constraintOrder);
   const joints = useStore((s) => s.document.joints);

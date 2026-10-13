@@ -1,14 +1,13 @@
 /**
- * Image underlays: a scanned drawing placed on a work plane, calibrated to real units, and read
- * back as model coordinates ("trace from a drawing"). Geometry lives in
- * `geometry/imageUnderlay.ts`; these commands validate and commit it.
+ * Image underlays: a scanned drawing placed on a work plane, calibrated to real units, and read back as model coordinates ("trace from a
+ * drawing"). Geometry lives in `geometry/imageUnderlay.ts`; these commands validate and commit it.
  */
 
-import { type CadDocument, type ImageEntity, type Vec3, DEFAULT_LAYER_ID } from '../../model/types';
+import { type ImageEntity, type Vec3, DEFAULT_LAYER_ID } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, nameField, vec2, vec3, z } from '../schema';
 import { nextId } from '../../lib/id';
-import { ORIGIN } from '../../lib/vec3';
+import { ORIGIN, map3 } from '../../lib/vec3';
 import { parseImageDataUrl } from '../../lib/imageDataUrl';
 import { calibrateUnderlay, pixelToWorld } from '../../geometry/imageUnderlay';
 import { commitEntity } from '../entity/commitEntity';
@@ -27,14 +26,6 @@ const PIXEL_CONVENTION =
   '+py DOWN (as read off the image); fractional values are fine.';
 
 const formatPoint = (point: readonly number[]): string => `[${point.map((value) => roundTo(value, 6)).join(', ')}]`;
-
-/** The image entity `id`, or a no-op result explaining why there is none. */
-function underlayOf(doc: CadDocument, id: string, command: string): ImageEntity | CommandResult {
-  const found = entityOfKind(doc, id, ['image']);
-  return typeof found === 'string' ? noop(doc, `${command}: ${found}.`) : found;
-}
-
-const isImage = (value: ImageEntity | CommandResult): value is ImageEntity => 'kind' in value;
 
 const opacityField = (note: string): z.ZodOptional<z.ZodNumber> =>
   z.number().describe(`Opacity in [0, 1] (0 = invisible, 1 = opaque). ${note}`).optional();
@@ -83,7 +74,6 @@ export const addImageUnderlay = defineCommand({
     const unitsPerPixel = width !== undefined ? width / pixelWidth : (pixelSize ?? 1);
     if (!Number.isFinite(unitsPerPixel) || unitsPerPixel <= 0) return fail(`width/pixelSize must be > 0 (got ${width ?? pixelSize})`);
     if (!(opacity >= 0 && opacity <= 1)) return fail(`opacity must be in [0, 1] (got ${opacity})`);
-
     const id = nextId('image');
     const entity: ImageEntity = {
       id,
@@ -144,8 +134,8 @@ export const calibrateUnderlayCommand = defineCommand({
       .optional(),
   }),
   run: (doc, { id, pixelA, pixelB, distance, origin, align = 'none' }): CommandResult => {
-    const image = underlayOf(doc, id, 'calibrate_underlay');
-    if (!isImage(image)) return image;
+    const image = entityOfKind(doc, id, ['image']);
+    if (typeof image === 'string') return noop(doc, `calibrate_underlay: ${image}.`);
     const result = calibrateUnderlay(image, {
       pixelA,
       pixelB,
@@ -184,16 +174,12 @@ export const setUnderlay = defineCommand({
     locked: z.boolean().describe('Lock (true) or unlock (false). Omit to keep.').optional(),
   }),
   run: (doc, { id, opacity, locked }): CommandResult => {
-    const image = underlayOf(doc, id, 'set_underlay');
-    if (!isImage(image)) return image;
+    const image = entityOfKind(doc, id, ['image']);
+    if (typeof image === 'string') return noop(doc, `set_underlay: ${image}.`);
     if (opacity === undefined && locked === undefined) return noop(doc, `set_underlay: give opacity and/or locked; ${id} unchanged.`);
     if (opacity !== undefined && !(opacity >= 0 && opacity <= 1))
       return noop(doc, `set_underlay: opacity must be in [0, 1] (got ${opacity}); ${id} unchanged.`);
-    const next: ImageEntity = {
-      ...image,
-      ...(opacity !== undefined ? { opacity } : {}),
-      ...(locked !== undefined ? { locked } : {}),
-    };
+    const next: ImageEntity = { ...image, ...(opacity !== undefined ? { opacity } : {}), ...(locked !== undefined ? { locked } : {}) };
     return changed(replaceEntity(doc, next), `Underlay ${id}: opacity ${next.opacity}, ${next.locked ? 'locked' : 'unlocked'}.`, [id]);
   },
 });
@@ -216,14 +202,11 @@ export const imageToWorld = defineCommand({
     points: z.array(vec2(PIXEL_CONVENTION)).describe(`Pixel points [[px, py], …] to convert (1..${MAX_PROFILE_POINTS}).`),
   }),
   run: (doc, { id, points }): CommandResult => {
-    const image = underlayOf(doc, id, 'image_to_world');
-    if (!isImage(image)) return image;
+    const image = entityOfKind(doc, id, ['image']);
+    if (typeof image === 'string') return noop(doc, `image_to_world: ${image}.`);
     if (points.length === 0 || points.length > MAX_PROFILE_POINTS)
       return noop(doc, `image_to_world: give 1..${MAX_PROFILE_POINTS} points (got ${points.length}).`);
-    const world = points.map((pixel): Vec3 => {
-      const [x, y, z] = pixelToWorld(image, pixel);
-      return [roundTo(x, 6), roundTo(y, 6), roundTo(z, 6)];
-    });
+    const world = points.map((pixel): Vec3 => map3(pixelToWorld(image, pixel), (v) => roundTo(v, 6)));
     const xy = world.map(([x, y]) => [x, y]);
     const unitsPerPixel = roundTo(image.width / image.pixelWidth, 6);
     return report(

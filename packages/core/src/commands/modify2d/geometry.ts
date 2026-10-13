@@ -11,21 +11,13 @@ export function resolvePolyline(doc: CadDocument, command: string, id: string): 
   return typeof found === 'string' ? noop(doc, `${command}: ${found}.`) : found;
 }
 
-/**
- * Offset a single segment (p→q) by `distance` (positive = left of travel direction).
- * Returns the two endpoints of the offset segment.
- */
+/** Segment p→q offset by `distance` (positive = left of travel). */
 export function offsetSegment(p: Vec2, q: Vec2, distance: number): [Vec2, Vec2] {
   const shift = scale2(normalize2(perp2(sub2(q, p))), distance);
   return [add2(p, shift), add2(q, shift)];
 }
 
-/**
- * Miter-join two consecutive offset segments.
- * Given the endpoints of two consecutive offset segments [a0,a1] and [b0,b1],
- * returns the intersection of the infinite lines through them (the miter point).
- * Falls back to a[1] (simple butt join) if the lines are parallel.
- */
+/** Miter point of consecutive offset segments [a0,a1], [b0,b1] (their lines' intersection); a1 (butt join) when parallel. */
 export function miterJoin(a0: Vec2, a1: Vec2, b0: Vec2, b1: Vec2): Vec2 {
-  return lineIntersection(a0, a1, b0, b1) ?? a1; // parallel — butt join
+  return lineIntersection(a0, a1, b0, b1) ?? a1;
 }

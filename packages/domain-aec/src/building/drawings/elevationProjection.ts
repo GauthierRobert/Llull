@@ -1,7 +1,6 @@
 /**
- * Elevations and sections of the 3D model: the core technical view (hidden lines removed, cut
- * faces hatched) seen from a compass side, hidden edges omitted (building convention), steel cut
- * faces filled solid.
+ * Elevations and sections of the 3D model: the core technical view (hidden lines removed, cut faces hatched) seen from a compass side,
+ * hidden edges omitted (building convention), steel cut faces filled solid.
  */
 
 import type { CadDocument, Entity, Vec3 } from '@core/model/types';
@@ -45,11 +44,7 @@ function categoryOf(tags: ReadonlyArray<string> | undefined): string | null {
 /** @returns the elevation / section line drawing, or null when no 3D geometry remains */
 export function buildElevationDrawing(
   doc: CadDocument,
-  options: {
-    direction: ElevationDirection;
-    cutAt?: number | undefined;
-    exclude?: ReadonlyArray<string> | undefined;
-  },
+  options: { direction: ElevationDirection; cutAt?: number | undefined; exclude?: ReadonlyArray<string> | undefined },
 ): ElevationDrawing | null {
   const projection = PROJECTIONS[options.direction];
   const frame: ViewFrame = {

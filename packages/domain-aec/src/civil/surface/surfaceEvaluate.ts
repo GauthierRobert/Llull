@@ -1,7 +1,4 @@
-/**
- * Evaluates survey point groups (point markers) and surfaces (TIN mesh, minor / major contours and
- * major-contour elevation labels).
- */
+/** Evaluates survey point groups (point markers) and surfaces (TIN mesh, minor / major contours and major-contour elevation labels). */
 
 import type { Entity, Vec2 } from '@core/model/types';
 import type { PointGroupObject, SurfaceObject } from '@core/model/civil';

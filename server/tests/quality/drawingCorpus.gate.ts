@@ -29,9 +29,7 @@ interface DrawingPart {
   readonly extents: readonly [number, number, number];
 }
 
-const manifest = JSON.parse(readFileSync(path.join(DIR, 'manifest.json'), 'utf8')) as {
-  readonly parts: readonly DrawingPart[];
-};
+const manifest = JSON.parse(readFileSync(path.join(DIR, 'manifest.json'), 'utf8')) as { readonly parts: readonly DrawingPart[] };
 
 beforeAll(async () => setGeometryKernel(await createNodeOcctKernel()), 120_000);
 
@@ -62,10 +60,7 @@ function sortedExtents(doc: CadDocument): number[] {
   for (const id of doc.order) {
     const entity = doc.entities[id];
     if (entity === undefined || !is3D(entity)) continue;
-    const box = execute(doc, 'measure_bounding_box', { entityId: id }).data as {
-      min: number[];
-      max: number[];
-    };
+    const box = execute(doc, 'measure_bounding_box', { entityId: id }).data as { min: number[]; max: number[] };
     for (let axis = 0; axis < 3; axis++) {
       min[axis] = Math.min(min[axis] ?? Infinity, box.min[axis] ?? Infinity);
       max[axis] = Math.max(max[axis] ?? -Infinity, box.max[axis] ?? -Infinity);

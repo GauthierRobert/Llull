@@ -1,7 +1,4 @@
-/**
- * Wall inspector editor: Save dispatches ONE `update_wall` with the changed thickness / height /
- * material.
- */
+// Wall editor: Save dispatches ONE `update_wall` with the changed thickness / height / material.
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';

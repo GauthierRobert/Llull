@@ -1,7 +1,4 @@
-/**
- * add_spline_shaft (DIN 5480-style involute spline) and add_keyed_shaft (DIN 6885 keyway), built
- * directly from profiles — no booleans.
- */
+/** add_spline_shaft (DIN 5480-style involute spline) and add_keyed_shaft (DIN 6885 keyway), built directly from profiles — no booleans. */
 
 import type { Entity, MeshData, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
@@ -14,7 +11,7 @@ import { arcPolyline } from '../../lib/arc';
 import { DEFAULT_FLANK_SAMPLES, pitchRadiusOf, toothOutline } from '../../lib/gearOutline';
 import { addCap, addWalls, createMeshBuilder, prismMesh } from '../../geometry/prismMesh';
 import { rotatedEntityBounds } from '../../geometry/rotatedBounds';
-import { withEntity } from '../entity/entityOps';
+import { withEntities } from '../entity/entityOps';
 import { newEntity } from '../entity/newEntity';
 import { boundsText, commitSolid, positionField, rotationField } from './shared';
 import { moduleProblem, placedMeshEntity, pressureAngleProblem, teethCountProblem } from './gearSolid';
@@ -51,9 +48,8 @@ export const addSplineShaft = defineCommand({
     { referenceDiameter, module: mod, teeth, length, pressureAngle = Math.PI / 6, position, rotation, color = '#9aa3ad', name },
   ): CommandResult => {
     const fail = failedWith(doc, 'add_spline_shaft');
-    if (!(referenceDiameter > 0 && Number.isFinite(referenceDiameter))) {
+    if (!(referenceDiameter > 0 && Number.isFinite(referenceDiameter)))
       return fail(`referenceDiameter must be finite and > 0, got ${String(referenceDiameter)}.`);
-    }
     const moduleIssue = moduleProblem(mod);
     if (moduleIssue !== null) return fail(moduleIssue);
     const count = Math.round(teeth ?? referenceDiameter / mod - 2);
@@ -78,10 +74,7 @@ export const addSplineShaft = defineCommand({
     });
     const at = finiteVec3OrZero(position);
     const id = nextId('spline');
-    const entity = newEntity('extrusion', id, { profile, depth: length }, at, color, {
-      rotation: finiteVec3OrZero(rotation),
-      name,
-    });
+    const entity = newEntity('extrusion', id, { profile, depth: length }, at, color, { rotation: finiteVec3OrZero(rotation), name });
     return commitSolid(
       doc,
       entity,
@@ -230,17 +223,14 @@ export const addKeyedShaft = defineCommand({
     const radius = diameter / 2;
     if (!(width > 0 && width < 1.8 * radius)) return fail(`keyWidth must be in (0, ${fmt(1.8 * radius)}), got ${String(width)}.`);
     const sagitta = radius - Math.sqrt(radius * radius - (width * width) / 4);
-    if (!(depth > sagitta && depth <= 0.9 * radius)) {
+    if (!(depth > sagitta && depth <= 0.9 * radius))
       return fail(`keyDepth must be in (${fmt(sagitta)}, ${fmt(0.9 * radius)}], got ${String(depth)}.`);
-    }
     if (!(height > depth)) return fail(`keyHeight must be > keyDepth (${fmt(depth)}), got ${String(height)}.`);
     const span = keyLength ?? 0.6 * length;
     if (!(span > 0 && span <= length)) return fail(`keyLength must be in (0, ${fmt(length)}], got ${String(span)}.`);
     const start = keyOffset ?? (length - span) / 2;
-    if (!(start >= 0 && start + span <= length + 1e-9)) {
+    if (!(start >= 0 && start + span <= length + 1e-9))
       return fail(`keyOffset must be in [0, ${fmt(length - span)}] for keyLength ${fmt(span)}, got ${String(start)}.`);
-    }
-
     const at: Vec3 = finiteVec3OrZero(position);
     const turn: Vec3 = finiteVec3OrZero(rotation);
     const shaftId = nextId('shaft');
@@ -255,14 +245,11 @@ export const addKeyedShaft = defineCommand({
         [x0, width / 2],
       ];
       const slab = prismMesh(rectangle, [], span);
-      const lifted: MeshData = {
-        positions: slab.positions.map((v, i) => (i % 3 === 2 ? v + start : v)),
-        indices: slab.indices,
-      };
+      const lifted: MeshData = { positions: slab.positions.map((v, i) => (i % 3 === 2 ? v + start : v)), indices: slab.indices };
       entities.push(placedMeshEntity(nextId('key'), lifted, at, turn, keyColor, name ? `${name}_key` : undefined));
     }
     return {
-      document: entities.reduce(withEntity, doc),
+      document: withEntities(doc, entities),
       summary:
         `Created keyed_shaft ${shaftId}: d=${fmt(diameter)} length=${fmt(length)} keyway b=${fmt(width)} t1=${fmt(depth)} ` +
         `length=${fmt(span)} from z=${fmt(start)}${includeKey ? ` plus key ${entities[1]!.id} (h=${fmt(height)})` : ''} ` +

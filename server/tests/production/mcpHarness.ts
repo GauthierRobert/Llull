@@ -74,11 +74,7 @@ export async function openSession(name: string): Promise<McpSession> {
     client,
     call: async (tool, args) => {
       const result = await client.callTool({ name: tool, arguments: args });
-      return {
-        text: textOf(result.content),
-        isError: result.isError === true,
-        structured: result.structuredContent,
-      };
+      return { text: textOf(result.content), isError: result.isError === true, structured: result.structuredContent };
     },
     close: () => client.close(),
   };

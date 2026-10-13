@@ -36,8 +36,8 @@ export function internalGearMesh(
 
 /**
  * @affects creates 1 mesh entity (ring gear, teeth pointing inward)
- * @invariant module > 0; teeth integer in [12, MAX_GEAR_TEETH]; pressureAngle in (0, π/2); faceWidth > 0;
- *            outerRadius >= pitchRadius + 2.25·module
+ * @invariant module > 0; teeth integer in [12, MAX_GEAR_TEETH]; pressureAngle in (0, π/2); faceWidth > 0; outerRadius >= pitchRadius +
+ *   2.25·module
  * @failure invalid params -> unchanged doc, summary names the violated param, affected:[]
  */
 export const addInternalGear = defineCommand({
@@ -77,9 +77,8 @@ export const addInternalGear = defineCommand({
       moduleProblem(mod) ?? teethCountProblem('teeth', teethInt, 12, teeth) ?? toothShapeProblem(pressureAngle, faceWidth);
     if (shapeProblem !== null) return fail(shapeProblem);
     const minRim = minRingOuterRadius(mod, teethInt);
-    if (!(outerRadius >= minRim && Number.isFinite(outerRadius))) {
+    if (!(outerRadius >= minRim && Number.isFinite(outerRadius)))
       return fail(`outerRadius must be >= ${fmt(minRim)} (pitchRadius + 2.25*module), got ${String(outerRadius)}.`);
-    }
     const at = finiteVec3OrZero(position);
     const turn = finiteVec3OrZero(rotation);
     const id = nextId('ring');

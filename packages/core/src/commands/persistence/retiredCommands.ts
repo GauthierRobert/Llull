@@ -1,7 +1,7 @@
 /**
- * Retired commands: tools merged into a more general command. Saved documents still name them in
- * feature-history and recipe steps (and in the actions of recorded `build_project` plans), so
- * `migrate()` rewrites every such call onto its replacement before the document is validated.
+ * Retired commands: tools merged into a more general command. Saved documents still name them in feature-history and recipe steps (and in
+ * the actions of recorded `build_project` plans), so `migrate()` rewrites every such call onto its replacement before the document is
+ * validated.
  */
 
 import type { RetiredCommandRewrite } from '../types';

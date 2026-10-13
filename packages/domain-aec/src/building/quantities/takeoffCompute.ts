@@ -105,9 +105,7 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
       ['m3', 'volume', scale.volume(footing.width * footing.length * footing.thickness)],
     ]);
     const rebar = footingRebarMass(footing, scale);
-    if (rebar > 0) {
-      takeoff.add('footing', 'rebar', 'Pad footing reinforcement B500', [['kg', 'mass (both ways, 10% laps)', rebar]]);
-    }
+    if (rebar > 0) takeoff.add('footing', 'rebar', 'Pad footing reinforcement B500', [['kg', 'mass (both ways, 10% laps)', rebar]]);
   }
   for (const panel of elementsOf(building, 'panel')) {
     takeoff.add(

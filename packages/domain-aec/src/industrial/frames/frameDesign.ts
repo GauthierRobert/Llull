@@ -1,7 +1,4 @@
-/**
- * Portal frame design: iterative up-sizing of frame sections and sizing of moment-connection bolt
- * groups against check_portal_frames.
- */
+/** Portal frame design: iterative up-sizing of frame sections and sizing of moment-connection bolt groups against check_portal_frames. */
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { fromMm } from '@core/model/units';
@@ -39,16 +36,12 @@ import { sweepFrame } from '../../shared/mesh';
 export const designPortalFrames = defineCommand({
   name: 'design_portal_frames',
   description:
-    'Preliminary design of the portal frames of a level with the same loads, combinations and ' +
-    'checks as check_portal_frames (strength, buckling, sway stability, SLS deflections): ' +
-    'repeatedly analyses the frames and up-sizes the rafter / column sections that exceed ' +
-    'targetUtilisation to the next heavier profile of the same family (uniformly for all frames), ' +
-    'then sizes the bolt groups of the moment connections (bolt diameter M20–M30 and rows) per ' +
-    'connection type for every combination. Reports every change and the final utilisations.',
-  params: z.object({
-    ...FRAME_LOAD_SHAPE,
-    targetUtilisation: targetUtilisationParam,
-  }),
+    'Preliminary design of the portal frames of a level with the same loads, combinations and checks as check_portal_frames (strength, ' +
+    'buckling, sway stability, SLS deflections): repeatedly analyses the frames and up-sizes the rafter / column sections that exceed ' +
+    'targetUtilisation to the next heavier profile of the same family (uniformly for all frames), then sizes the bolt groups of the ' +
+    'moment connections (bolt diameter M20–M30 and rows) per connection type for every combination. Reports every change and the final ' +
+    'utilisations.',
+  params: z.object({ ...FRAME_LOAD_SHAPE, targetUtilisation: targetUtilisationParam }),
   run: (doc, params): CommandResult => {
     const { targetUtilisation = 0.95 } = params;
     if (!isValidTargetUtilisation(targetUtilisation))
@@ -120,10 +113,8 @@ export const designPortalFrames = defineCommand({
     return designResult(
       document,
       `Designed ${final.frames} frame(s) for ${final.combinations.length} ULS combination(s) + SLS (${describeLoads(loads)}): ` +
-        `${changes.length > 0 ? changes.join('; ') : 'no change needed'}. ` +
-        `${finalUtilisationText(stats, 'element(s)', limited)} ` +
-        `Frames only (verify bracing, foundations and runways with their checks)` +
-        `${unanalysedPosts ? '; gable posts are not analysed' : ''}.`,
+        `${changes.length > 0 ? changes.join('; ') : 'no change needed'}. ${finalUtilisationText(stats, 'element(s)', limited)} Frames ` +
+        `only (verify bracing, foundations and runways with their checks)${unanalysedPosts ? '; gable posts are not analysed' : ''}.`,
       changed,
       changes,
       stats,
@@ -132,9 +123,8 @@ export const designPortalFrames = defineCommand({
 });
 
 /**
- * Members placed from a resized member's depth follow it: purlins on a rafter move along the
- * rafter normal, gable-post tops drop under a deeper rafter, side rails move out with a deeper
- * column (by half the depth change).
+ * Members placed from a resized member's depth follow it: purlins on a rafter move along the rafter normal, gable-post tops drop under a
+ * deeper rafter, side rails move out with a deeper column (by half the depth change).
  */
 function reseatDependents(
   doc: Pick<CadDocument, 'units'>,

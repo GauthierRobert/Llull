@@ -1,17 +1,7 @@
 /**
- * useMcpLiveDocument — subscribes to the server-side SSE command log.
- *
- * Opens `GET <SERVER_BASE>/live` as an EventSource (URL + optional `?access_token=` from
- * `liveStreamUrl()` in @ui/serverConfig).
- *
- * Protocol (named SSE events, types in `@mcp/liveSync`; `epoch` = server process id, seq is per epoch):
- *   - `snapshot` `{ seq, stateHash, document }`: on connect and after undo/redo → hydrateLiveDocument.
- *   - `command` `{ seq, name, params, stateHash }`: after every mutating command. The store re-runs
- *     it through `execute` (applyLiveCommand); on a seq gap or hash mismatch this hook fetches
- *     `GET /live/snapshot` and hydrates from it.
- *
- * Lifecycle: onopen → 'connected'; onerror → 'disconnected', close, reconnect with exponential
- * backoff (1s..30s); unmount → close. EventSource is a browser API — ui/ layer only (L2).
+ * Subscribes to the server SSE command log (`GET <SERVER_BASE>/live`, token via liveStreamUrl). Events (`@mcp/liveSync`,
+ * seq per server `epoch`): `snapshot` (connect, undo/redo) → hydrateLiveDocument; `command` → applyLiveCommand, and on a
+ * seq gap / hash mismatch a `GET /live/snapshot` resync. onerror → 'disconnected', reconnect with 1s..30s backoff.
  */
 
 import { useEffect } from 'react';
@@ -23,10 +13,6 @@ import { fetchLiveSnapshot } from '@ui/store/serverCommands';
 const RETRY_BASE_MS = 1000;
 const RETRY_MAX_MS = 30000;
 
-/**
- * Open the SSE stream and keep the Zustand store hydrated.
- * No return value — side-effects managed via useEffect cleanup.
- */
 export function useMcpLiveDocument(): void {
   const hydrateLiveDocument = useStore((s) => s.hydrateLiveDocument);
   const applyLiveCommand = useStore((s) => s.applyLiveCommand);

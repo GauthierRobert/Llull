@@ -1,9 +1,5 @@
-/**
- * Generated param form for one registry command: one control per `paramsSchema` property,
- * entity-id fields pre-filled from the selection; a destructive command shows a warning and a
- * danger-styled Run. Submitting parses the text and dispatches the
- * command (react R1: gather params -> dispatch). Escape / Back returns to the command list.
- */
+// Generated param form for one registry command (ids pre-filled from the selection); destructive commands warn and
+// use a danger Run. Submit parses + dispatches; Escape / Back returns to the list.
 
 import React, { useId, useMemo, useRef, useState } from 'react';
 import type { CommandDefinition } from '@core/commands/types';
@@ -16,13 +12,13 @@ interface CommandParamFormProps {
   command: CommandDefinition<unknown>;
   onBack: () => void;
   onSubmit: (params: Record<string, unknown>) => void;
-  /** Edit mode: pre-fill from these params instead of the selection. */
+  /** Edit mode: pre-fill from these instead of the selection. */
   initialParams?: Readonly<Record<string, unknown>>;
-  /** Label of the submit button (default "Run"). */
+  /** Default "Run". */
   submitLabel?: string;
-  /** Label of the back/cancel button (default "Back to commands"). */
+  /** Default "Back to commands". */
   backLabel?: string;
-  /** A refusal / result message from the last submit, shown above the footer. */
+  /** Last submit's refusal / result. */
   statusMessage?: string | null;
 }
 
@@ -46,7 +42,6 @@ interface FieldControlProps {
   onChange: (value: string) => void;
 }
 
-/** Typed characters accumulate for this long before a new search starts. */
 const TYPEAHEAD_RESET_MS = 700;
 
 interface TypeaheadSelectProps {
@@ -57,7 +52,7 @@ interface TypeaheadSelectProps {
   onChange: (value: string) => void;
 }
 
-/** `<select>` whose type-to-select prefers an exact option over the first prefix match. */
+/** Type-to-select prefers an exact option over the first prefix match. */
 function TypeaheadSelect({ common, value, options, optional, onChange }: TypeaheadSelectProps): React.ReactElement {
   const typed = useRef({ text: '', at: 0 });
   return (
@@ -87,13 +82,7 @@ function TypeaheadSelect({ common, value, options, optional, onChange }: Typeahe
 }
 
 function FieldControl({ field, id, value, describedBy, invalid, autoFocus, onChange }: FieldControlProps): React.ReactElement {
-  const common = {
-    id,
-    'aria-describedby': describedBy,
-    'aria-invalid': invalid,
-    'aria-required': field.required,
-    autoFocus,
-  };
+  const common = { id, 'aria-describedby': describedBy, 'aria-invalid': invalid, 'aria-required': field.required, autoFocus };
   if (field.kind === 'enum' || field.kind === 'boolean') {
     const options = field.kind === 'boolean' ? ['true', 'false'] : field.options;
     return <TypeaheadSelect common={common} value={value} options={options} optional={!field.required} onChange={onChange} />;

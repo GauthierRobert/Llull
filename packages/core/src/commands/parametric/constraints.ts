@@ -1,10 +1,9 @@
 /**
- * @affects constraints record and constraintOrder in CadDocument; solve_constraints also
- *          updates entity positions in entities record.
- * @invariant Constraint ids are unique; each EntityRef.entityId must exist in the document
- *            at solve time (dangling refs produce a graceful no-op per constraint).
- * @failure Unknown constraint id / malformed input → no-op, affected:[].
- *          Solver non-convergence → best-effort positions returned, converged:false in data.
+ * @affects constraints record and constraintOrder in CadDocument; solve_constraints also updates entity positions in entities record.
+ * @invariant Constraint ids are unique; each EntityRef.entityId must exist in the document at solve time (dangling refs produce a graceful
+ *   no-op per constraint).
+ * @failure Unknown constraint id / malformed input → no-op, affected:[]. Solver non-convergence → best-effort positions returned,
+ *   converged:false in data.
  */
 
 import { type CadDocument, type Constraint, CONSTRAINT_KINDS } from '../../model/types';
@@ -19,10 +18,7 @@ import { expressionSyntaxError } from './expression';
 const SUB_POINT = z.enum(['start', 'end', 'center', 'mid']).optional();
 
 const entityRef = (entityIdDescription: string, kindDescription: string): z.ZodObject<{ entityId: z.ZodString; kind: typeof SUB_POINT }> =>
-  z.object({
-    entityId: z.string().describe(entityIdDescription),
-    kind: SUB_POINT.describe(kindDescription),
-  });
+  z.object({ entityId: z.string().describe(entityIdDescription), kind: SUB_POINT.describe(kindDescription) });
 
 /** Semantic checks zod cannot express: non-empty entity ids; `value` on dimensional kinds. */
 function validateConstraintShape(c: { kind: string; a: { entityId: string }; b: { entityId: string }; value?: unknown }): string | null {
@@ -46,8 +42,7 @@ export const addConstraint = defineCommand({
     'Geometric kinds (coincident, parallel, perpendicular, tangent) impose a ' +
     'positional or directional relationship with no numeric target. ' +
     'Dimensional kinds (distance, angle) require a numeric "value" field. ' +
-    'Call solve_constraints afterward to update entity positions. ' +
-    'Returns the new constraint id in affected[0].',
+    'Call solve_constraints afterward to update entity positions. Returns the new constraint id in affected[0].',
   params: z.object({
     constraint: z
       .object({
@@ -74,14 +69,12 @@ export const addConstraint = defineCommand({
           .optional()
           .describe(
             'Required for dimensional constraints (distance, angle). ' +
-              'A numeric literal ("10", "1.5708") or a parameter expression string ' +
-              '("width", "height / 2"). Angle is in radians.',
+              'A numeric literal ("10", "1.5708") or a parameter expression string ("width", "height / 2"). Angle is in radians.',
           ),
       })
       .describe(
         'The constraint to add. Must have: "kind" (one of coincident|parallel|perpendicular|tangent|distance|angle), ' +
-          '"a" (EntityRef: { entityId: string, kind?: "start"|"end"|"center"|"mid" }), ' +
-          '"b" (EntityRef: same shape). ' +
+          '"a" (EntityRef: { entityId: string, kind?: "start"|"end"|"center"|"mid" }), "b" (EntityRef: same shape). ' +
           'Dimensional kinds also require "value": a number or parameter expression string.',
       ),
     id: z
@@ -95,32 +88,23 @@ export const addConstraint = defineCommand({
   run: (doc, { constraint, id }): CommandResult => {
     const err = validateConstraintShape(constraint);
     if (err !== null) return noop(doc, `add_constraint failed: ${err}.`);
-
     const unknownEntity = [constraint.a.entityId, constraint.b.entityId].find((entityId) => !Object.hasOwn(doc.entities, entityId));
-    if (unknownEntity !== undefined) {
+    if (unknownEntity !== undefined)
       return noop(doc, `add_constraint failed: entity '${unknownEntity}' does not exist in the document; create it first.`);
-    }
     if (typeof constraint.value === 'string') {
       const syntaxError = expressionSyntaxError(constraint.value);
-      if (syntaxError !== null) {
+      if (syntaxError !== null)
         return noop(doc, `add_constraint failed: value '${constraint.value}' is not a valid expression — ${syntaxError}.`);
-      }
     }
-
     const constraintId = idOrNext(id, 'con');
-
-    if (idTaken(doc.constraints, constraintId)) {
+    if (idTaken(doc.constraints, constraintId))
       return noop(doc, `add_constraint: constraint id '${constraintId}' already exists — no change made.`);
-    }
-
     const newConstraint = { ...constraint, id: constraintId } as Constraint;
-
     const newDoc: CadDocument = {
       ...doc,
       constraints: { ...doc.constraints, [constraintId]: newConstraint },
       constraintOrder: [...doc.constraintOrder, constraintId],
     };
-
     return changed(
       newDoc,
       `add_constraint: added '${constraint.kind}' constraint ${constraintId} between entities '${constraint.a.entityId}' and '${constraint.b.entityId}'.`,
@@ -152,16 +136,9 @@ export const deleteConstraint = defineCommand({
   run: (doc, { id }): CommandResult => {
     const constraint = Object.hasOwn(doc.constraints, id) ? doc.constraints[id] : undefined;
     if (!constraint) return noop(doc, `delete_constraint: constraint '${id}' does not exist — no change made.`);
-
     const newConstraints = { ...doc.constraints };
     delete newConstraints[id];
-
-    const newDoc: CadDocument = {
-      ...doc,
-      constraints: newConstraints,
-      constraintOrder: doc.constraintOrder.filter((cid) => cid !== id),
-    };
-
+    const newDoc: CadDocument = { ...doc, constraints: newConstraints, constraintOrder: doc.constraintOrder.filter((cid) => cid !== id) };
     return report(newDoc, `delete_constraint: removed '${constraint.kind}' constraint '${id}'.`);
   },
 });
@@ -199,41 +176,27 @@ export const updateConstraint = defineCommand({
   run: (doc, { id, patch }): CommandResult => {
     const existing = Object.hasOwn(doc.constraints, id) ? doc.constraints[id] : undefined;
     if (!existing) return noop(doc, `update_constraint: constraint '${id}' does not exist — no change made.`);
-
     const updates: Record<string, unknown> = {};
-
     for (const key of ['a', 'b'] as const) {
       const ref = patch[key];
       if (ref === undefined) continue;
-      if (ref.entityId.length === 0) {
-        return noop(doc, `update_constraint: patch.${key} is not a valid EntityRef — no change made.`);
-      }
-      if (!Object.hasOwn(doc.entities, ref.entityId)) {
+      if (ref.entityId.length === 0) return noop(doc, `update_constraint: patch.${key} is not a valid EntityRef — no change made.`);
+      if (!Object.hasOwn(doc.entities, ref.entityId))
         return noop(doc, `update_constraint: patch.${key} entity '${ref.entityId}' does not exist in the document — no change made.`);
-      }
       updates[key] = ref;
     }
-
     if (patch.value !== undefined) {
-      if (existing.kind !== 'distance' && existing.kind !== 'angle') {
+      if (existing.kind !== 'distance' && existing.kind !== 'angle')
         return noop(doc, `update_constraint: constraint '${id}' is kind '${existing.kind}' which has no 'value' field — no change made.`);
-      }
       if (typeof patch.value === 'string') {
         const syntaxError = expressionSyntaxError(patch.value);
-        if (syntaxError !== null) {
+        if (syntaxError !== null)
           return noop(doc, `update_constraint: value '${patch.value}' is not a valid expression — ${syntaxError}. No change made.`);
-        }
       }
       updates['value'] = patch.value;
     }
-
     const updatedConstraint = { ...existing, ...updates } as Constraint;
-
-    const newDoc: CadDocument = {
-      ...doc,
-      constraints: { ...doc.constraints, [id]: updatedConstraint },
-    };
-
+    const newDoc: CadDocument = { ...doc, constraints: { ...doc.constraints, [id]: updatedConstraint } };
     const changedFields = Object.keys(updates).join(', ');
     return changed(
       newDoc,
@@ -257,28 +220,19 @@ export const solveConstraints = defineCommand({
     'perpendicular turn line b about its midpoint (line a is the reference). It iterates up to 64 steps, stopping early when the ' +
     'total constraint residual is below 1e-8. Returns convergence info in data: ' +
     '{ residual: number, iterations: number, converged: boolean }. ' +
-    'Non-convergent results are returned with the best-effort positions and converged:false. ' +
-    'No parameters required.',
+    'Non-convergent results are returned with the best-effort positions and converged:false. No parameters required.',
   params: z.object({}),
   run: (doc, _params): CommandResult => {
     const { document: newDoc, residual, iterations, converged } = runSolver(doc);
-
     const movedIds = doc.constraintOrder.flatMap((cid) => {
       const c = doc.constraints[cid];
       if (!c) return [];
       return [c.a.entityId, c.b.entityId];
     });
     const uniqueMoved = [...new Set(movedIds)].filter((id) => id in doc.entities);
-
     const summary = converged
       ? `solve_constraints: converged in ${iterations} iteration(s). Residual: ${residual.toExponential(3)}. ${uniqueMoved.length} entity/entities may have moved.`
       : `solve_constraints: did NOT converge after ${iterations} iteration(s). Residual: ${residual.toExponential(3)} (threshold 1e-8). Positions reflect best-effort result.`;
-
-    return {
-      document: newDoc,
-      summary,
-      affected: uniqueMoved,
-      data: { residual, iterations, converged },
-    };
+    return { document: newDoc, summary, affected: uniqueMoved, data: { residual, iterations, converged } };
   },
 });

@@ -1,8 +1,5 @@
 /**
- * Per-user audit trail: one JSONL line per applied command, written at the transport layer
- * (`commandBus` callers), never inside commands. Size-based rotation: `audit.jsonl` ->
- * `audit.jsonl.1` ... `.N`.
- *
+ * Audit trail: one JSONL line per applied command (transport layer, never inside commands), size-rotated to `.1` ... `.N`.
  * Env: LLULL_AUDIT_FILE (default `audit.jsonl` next to the autosave; under tests only when set),
  * LLULL_AUDIT_MAX_BYTES (10 MiB), LLULL_AUDIT_KEEP (rotated files kept, 5).
  */
@@ -21,8 +18,7 @@ export interface Actor {
   readonly userId: string;
   readonly userName: string;
   readonly source: AuditSource;
-  /** True for an authenticated named user (live events then carry the id). */
-  readonly named: boolean;
+  readonly named: boolean; // authenticated named user (live events then carry the id)
 }
 
 export interface AuditEntry {
@@ -38,14 +34,8 @@ export interface AuditEntry {
   readonly seq: number;
 }
 
-export const ANONYMOUS_ACTOR = (source: AuditSource): Actor => ({
-  userId: 'anonymous',
-  userName: 'anonymous',
-  source,
-  named: false,
-});
+export const ANONYMOUS_ACTOR = (source: AuditSource): Actor => ({ userId: 'anonymous', userName: 'anonymous', source, named: false });
 
-/** The acting user of an authenticated request (anonymous outside named-user mode). */
 export function actorOf(res: Response, source: AuditSource): Actor {
   const user = requestUser(res);
   return user === undefined ? ANONYMOUS_ACTOR(source) : { userId: user.id, userName: user.name, source, named: true };
@@ -55,13 +45,12 @@ export function actorOf(res: Response, source: AuditSource): Actor {
 function auditFilePath(defaultDirectory: string): string | null {
   const configured = process.env['LLULL_AUDIT_FILE']?.trim();
   if (configured !== undefined && configured !== '') return configured;
-  if (isTestRun()) return null;
-  return path.join(defaultDirectory, 'audit.jsonl');
+  return isTestRun() ? null : path.join(defaultDirectory, 'audit.jsonl');
 }
 
 let defaultDirectory = path.resolve(__dirname, '..');
 
-/** Directory holding the default audit file (set by liveDocument to the autosave directory). */
+/** Set by liveDocument to the autosave directory. */
 export function setAuditDefaultDirectory(directory: string): void {
   defaultDirectory = directory;
 }
@@ -115,21 +104,19 @@ export function readAudit(query: AuditQuery): AuditEntry[] {
   const keep = positiveInteger(process.env['LLULL_AUDIT_KEEP'], 5);
   const files = [file, ...Array.from({ length: keep }, (_, i) => `${file}.${i + 1}`)].reverse();
   for (const candidate of files) {
-    let text: string;
+    let text = '';
     try {
       text = fs.readFileSync(candidate, 'utf8');
     } catch {
-      continue;
+      /* not rotated yet */
     }
     for (const line of text.split('\n')) {
-      if (line === '') continue;
       try {
         const entry = JSON.parse(line) as AuditEntry;
-        if (Date.parse(entry.ts) < sinceMs) continue;
-        if (query.user !== undefined && entry.userId !== query.user) continue;
+        if (Date.parse(entry.ts) < sinceMs || (query.user !== undefined && entry.userId !== query.user)) continue;
         matches.push(entry);
       } catch {
-        // skip a torn line
+        /* empty or torn line */
       }
     }
   }

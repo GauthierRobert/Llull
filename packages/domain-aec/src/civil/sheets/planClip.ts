@@ -2,12 +2,7 @@
 
 import type { Vec2 } from '@core/model/types';
 
-export interface ClipRect {
-  readonly x: number;
-  readonly y: number;
-  readonly width: number;
-  readonly height: number;
-}
+export type ClipRect = { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
 
 export function insideRect([x, y]: Vec2, rect: ClipRect): boolean {
   return x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;

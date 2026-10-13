@@ -19,11 +19,10 @@ import { levelIdParam } from '../levelParams';
 export const addCurvedWall = defineCommand({
   name: 'add_curved_wall',
   description:
-    'Add a curved (arc) wall on a level: its centreline is the circular arc from start through a point ' +
-    'on the arc to end (all [x, y]). Thickness, height (default: level height), base offset and ' +
-    'material as for draw_walls. Counted with the walls in quantities and schedules. Hosts doors and ' +
-    'windows (add_door / add_window with its id; offset = distance along the arc). Refused if the same ' +
-    'arc (either direction) and base offset already exists on the level.',
+    'Add a curved (arc) wall on a level: its centreline is the circular arc from start through a point on the arc to end (all [x, y]). ' +
+    'Thickness, height (default: level height), base offset and material as for draw_walls. Counted with the walls in quantities and ' +
+    'schedules. Hosts doors and windows (add_door / add_window with its id; offset = distance along the arc). Refused if the same arc ' +
+    '(either direction) and base offset already exists on the level.',
   params: z.object({
     start: vec2('Arc start [x, y].'),
     through: vec2('Any point on the arc between start and end [x, y] (sets the curvature).'),

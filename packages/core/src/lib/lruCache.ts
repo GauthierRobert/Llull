@@ -1,7 +1,4 @@
-/**
- * Bounded least-recently-used map: `get` and `set` mark a key most recent; `set` beyond
- * `capacity` evicts the least recent. @layer lib
- */
+/** Bounded least-recently-used map: `get` and `set` mark a key most recent; `set` beyond `capacity` evicts the least recent. @layer lib */
 export class LruCache<V> {
   private readonly entries = new Map<string, V>();
 

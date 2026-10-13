@@ -1,7 +1,6 @@
 /**
- * 2D model of a moment frame for the direct-stiffness solver: column pieces between the levels
- * where beams join, beams meshed at their point loads, the loads split into permanent / imposed.
- * Units: N, mm; vertical loads positive downward.
+ * 2D model of a moment frame for the direct-stiffness solver: column pieces between the levels where beams join, beams meshed at their
+ * point loads, the loads split into permanent / imposed. Units: N, mm; vertical loads positive downward.
  */
 
 import { clamp } from '@lib/clamp';
@@ -72,14 +71,8 @@ const STATION_MERGE = 0.002;
 
 const FREE: FrameNode['restraint'] = [false, false, false];
 
-interface ColumnState {
-  readonly bar: SteelBar;
-  readonly u: number;
-  readonly zs: number[];
-  readonly nodes: number[];
-}
+type ColumnState = { readonly bar: SteelBar; readonly u: number; readonly zs: number[]; readonly nodes: number[] };
 
-/** Beam end z (axis) at the given end. */
 const endZ = (beam: BeamResult, end: 0 | 1): number => beam.loads.bar[end === 0 ? 'start' : 'end'][2];
 
 /**
@@ -209,11 +202,7 @@ export function buildFrameSystem(frame: MomentFrame, nonFrameReactions: Readonly
     for (const reaction of reactions) {
       if (frameBeamIds.has(reaction.beamId) || !states.has(columnId)) continue;
       const node = columnNode(columnId, snapZ(reaction.zAxis));
-      nodeLoads.push({
-        node,
-        permanent: reaction.permanent * 1000,
-        imposed: reaction.imposed * 1000,
-      });
+      nodeLoads.push({ node, permanent: reaction.permanent * 1000, imposed: reaction.imposed * 1000 });
       const level = levelAt(reaction.zAxis);
       if (level) {
         level.permanent += reaction.permanent * 1000;
@@ -292,11 +281,7 @@ export function buildFrameSystem(frame: MomentFrame, nonFrameReactions: Readonly
     }
     for (const point of points) {
       const station = nearestIndex(stations, clamp(point.at, 0, lengthM));
-      nodeLoads.push({
-        node: indices[station] as number,
-        permanent: point.permanent * 1000,
-        imposed: point.imposed * 1000,
-      });
+      nodeLoads.push({ node: indices[station] as number, permanent: point.permanent * 1000, imposed: point.imposed * 1000 });
     }
     const totals = loadTotals(pieces, points);
     const level = levelAt((from.z + to.z) / 2);

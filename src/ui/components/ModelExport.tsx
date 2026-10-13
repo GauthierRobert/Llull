@@ -1,8 +1,5 @@
-/**
- * ModelExport — download the model as parametric code (CadQuery, build123d, OpenSCAD, FreeCAD
- * macro) via the read-only `export_code` command, or as an exact STEP file from the server's
- * `/export/step` route (Python bridge). Presentation + download only; no document mutation.
- */
+// Download the model as code (CadQuery, build123d, OpenSCAD, FreeCAD; read-only `export_code`) or exact STEP from the
+// server's `/export/step` (Python bridge).
 
 import React, { useState } from 'react';
 import { runQuery } from '@ui/services/localQuery';

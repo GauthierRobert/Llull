@@ -32,8 +32,8 @@ function hasMalformedPosition(entity: unknown): boolean {
 const ID_LIKE_KEY = /^id$|Ids?$|^ids$/;
 
 /**
- * True when an id-like param value is an Object.prototype key (`constructor`, `__proto__`, ...),
- * which would alias plain-object entity-bag lookups. Free text (names, content) is never scanned.
+ * True when an id-like param value is an Object.prototype key (`constructor`, `__proto__`, ...), which would alias plain-object entity-bag
+ * lookups. Free text (names, content) is never scanned.
  */
 function hasPrototypeIdKey(value: unknown, keyHint = '', depth = 0): boolean {
   if (typeof value === 'string') return ID_LIKE_KEY.test(keyHint) && value in Object.prototype;
@@ -50,10 +50,7 @@ function describePositionContract(schema: ParamsSchema): ParamsSchema {
   if (!position || position.type !== 'array') return schema;
   return {
     ...schema,
-    properties: {
-      ...schema.properties,
-      position: { ...position, description: position.description + POSITION_CONTRACT },
-    },
+    properties: { ...schema.properties, position: { ...position, description: position.description + POSITION_CONTRACT } },
   };
 }
 
@@ -83,12 +80,11 @@ export function guardCommand(def: CommandDefinition<unknown>): CommandDefinition
     paramsSchema: describePositionContract(def.paramsSchema),
     run: (doc, params, ctx): CommandResult => {
       const safeParams = padPlanarPosition(typeof params === 'object' && params !== null ? params : {});
-      if (hasPrototypeIdKey(safeParams)) {
+      if (hasPrototypeIdKey(safeParams))
         return rejection(
           doc,
           `${def.name} rejected: an id param is a reserved JavaScript property name (e.g. constructor, __proto__, toString). Use a different id.`,
         );
-      }
       if (def.paramsValidator) {
         let checked: ReturnType<typeof def.paramsValidator.safeParse>;
         try {
@@ -97,9 +93,8 @@ export function guardCommand(def: CommandDefinition<unknown>): CommandDefinition
           const reason = warnAndDescribe(`command '${def.name}' params validation threw:`, error);
           return rejection(doc, `${def.name} rejected: invalid params — ${reason}`);
         }
-        if (!checked.success) {
+        if (!checked.success)
           return rejection(doc, `${def.name} rejected: invalid params — ${formatIssues(checked.error)}. Document unchanged.`);
-        }
       }
       let result: CommandResult;
       try {
@@ -113,9 +108,7 @@ export function guardCommand(def: CommandDefinition<unknown>): CommandDefinition
       if (result.document !== doc) {
         for (const id of result.affected) {
           const reason = corruptionReason(result.document.entities[id]);
-          if (reason !== null) {
-            return rejection(doc, `${def.name} rejected: result for ${id} contains ${reason}. Document unchanged.`);
-          }
+          if (reason !== null) return rejection(doc, `${def.name} rejected: result for ${id} contains ${reason}. Document unchanged.`);
         }
       }
       return result;

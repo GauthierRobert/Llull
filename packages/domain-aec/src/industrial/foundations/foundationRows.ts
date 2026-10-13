@@ -120,9 +120,7 @@ export function footingRows(context: FootingCheckContext, footing: FootingElemen
       });
     }
     const overturningWorst = worst(overturning);
-    if (overturningWorst) {
-      rows.push(row('overturning EQU (stabilising 0.9G·B/2 vs destabilising moment)', overturningWorst, 'kNm'));
-    }
+    if (overturningWorst) rows.push(row('overturning EQU (stabilising 0.9G·B/2 vs destabilising moment)', overturningWorst, 'kNm'));
   }
 
   const sliding: Candidate[] = [];
@@ -131,12 +129,7 @@ export function footingRows(context: FootingCheckContext, footing: FootingElemen
     const h = slidingHorizontal(combination.factors);
     const resistance = (FRICTION * Math.max(0, v + weights + slabShare)) / GAMMA_R_H;
     const demand = Math.abs(h);
-    sliding.push({
-      value: demand,
-      limit: resistance,
-      combination: combination.name,
-      utilisation: demandRatio(demand, resistance),
-    });
+    sliding.push({ value: demand, limit: resistance, combination: combination.name, utilisation: demandRatio(demand, resistance) });
   }
   const slidingWorst = worst(sliding);
   if (slidingWorst) rows.push(row(`sliding (mu ${FRICTION}, gammaR,h ${GAMMA_R_H})`, slidingWorst, 'kN'));

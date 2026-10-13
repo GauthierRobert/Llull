@@ -1,8 +1,7 @@
 /**
  * CadQuery / build123d emitter: FeatureProgram → a standalone, traced Python script.
- *
- * @invariant running the script records LLULL_TRACE, which apply_code_trace turns back into the same
- *   llull feature history (parameters + expressions + order) — the code is a round-trippable recipe.
+ * @invariant running the script records LLULL_TRACE, which apply_code_trace turns back into the same llull feature history (parameters +
+ *   expressions + order) — the code is a round-trippable recipe.
  */
 
 import type { Feature, FeatureProgram } from './program';
@@ -10,10 +9,7 @@ import { formatNumber, provenance, quote } from './format';
 import { modifierLine, parametersAndModel, placementKwargs, pythonTuple, shapeCallOpen } from './pythonCalls';
 import { pythonRuntime, type PythonBackend } from './pythonRuntime';
 
-const LIBRARY: Readonly<Record<PythonBackend, string>> = {
-  cadquery: 'CadQuery',
-  build123d: 'build123d',
-};
+const LIBRARY: Readonly<Record<PythonBackend, string>> = { cadquery: 'CadQuery', build123d: 'build123d' };
 
 function featureLine(feature: Feature): string {
   const v = feature.variable;

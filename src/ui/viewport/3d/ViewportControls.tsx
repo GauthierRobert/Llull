@@ -1,9 +1,4 @@
-/**
- * ViewportControls — floating glass toolbar (top-left) mounted OUTSIDE the Canvas.
- * Groups: display mode, section plane, 3D snap, render quality, animation transport.
- * Section options open as a popover under the toolbar. Render-only state (viewport store);
- * never mutates the document.
- */
+// Floating 3D toolbar (outside the Canvas): display mode, section plane (popover), 3D snap, quality, animation transport.
 
 import React, { useId } from 'react';
 import { type DisplayMode, type ClipAxis, type QualityOverride, useViewportStore, useStore } from '@ui/store';
@@ -14,33 +9,44 @@ function Divider(): React.ReactElement {
   return <span className="vp-divider" aria-hidden="true" />;
 }
 
-function Snap3DToggle(): React.ReactElement {
-  const snap3dEnabled = useViewportStore((s) => s.snap3dEnabled);
-  const toggleSnap3d = useViewportStore((s) => s.toggleSnap3d);
+function ToggleButton({ group, text, label, icon, pressed, title, onClick }: ToggleButtonProps): React.ReactElement {
   return (
-    <div className="vp-group" role="group" aria-label="3D snap">
+    <div className="vp-group" role="group" aria-label={group}>
       <button
         type="button"
-        className={`vp-btn${snap3dEnabled ? ' vp-btn--toggled' : ''}`}
-        aria-pressed={snap3dEnabled}
-        title={snap3dEnabled ? 'Disable 3D snap (vertex/edge/face-center/grid)' : 'Enable 3D snap'}
-        onClick={toggleSnap3d}
+        className={`vp-btn${pressed ? ' vp-btn--toggled' : ''}`}
+        aria-pressed={pressed}
+        aria-label={label}
+        title={title}
+        onClick={onClick}
       >
-        <Icon name="magnet" size={14} />
-        <span className="vp-btn__text">Snap</span>
+        <Icon name={icon} size={14} />
+        <span className="vp-btn__text">{text}</span>
       </button>
     </div>
   );
 }
 
+interface ToggleButtonProps {
+  group: string;
+  text: string;
+  label?: string;
+  icon: IconName;
+  pressed: boolean;
+  title: string;
+  onClick: () => void;
+}
+
+function Snap3DToggle(): React.ReactElement {
+  const enabled = useViewportStore((s) => s.snap3dEnabled);
+  const toggle = useViewportStore((s) => s.toggleSnap3d);
+  const title = enabled ? 'Disable 3D snap (vertex/edge/face-center/grid)' : 'Enable 3D snap';
+  return <ToggleButton group="3D snap" text="Snap" icon="magnet" pressed={enabled} title={title} onClick={toggle} />;
+}
+
 const DISPLAY_MODES: { value: DisplayMode; label: string; title: string; icon: IconName }[] = [
   { value: 'shaded', label: 'Shaded', title: 'Shaded — standard PBR rendering', icon: 'shaded' },
-  {
-    value: 'wireframe',
-    label: 'Wire',
-    title: 'Wireframe — show mesh edges only',
-    icon: 'wireframe',
-  },
+  { value: 'wireframe', label: 'Wire', title: 'Wireframe — show mesh edges only', icon: 'wireframe' },
   { value: 'xray', label: 'X-Ray', title: 'X-Ray — transparent surfaces', icon: 'xray' },
 ];
 
@@ -76,21 +82,10 @@ const CLIP_AXES: { value: ClipAxis; label: string }[] = [
 
 function SectionToggle(): React.ReactElement {
   const enabled = useViewportStore((s) => s.clipPlane.enabled);
-  const toggleClip = useViewportStore((s) => s.toggleClipPlane);
+  const toggle = useViewportStore((s) => s.toggleClipPlane);
+  const title = enabled ? 'Disable section plane' : 'Enable section plane';
   return (
-    <div className="vp-group" role="group" aria-label="Section plane">
-      <button
-        type="button"
-        className={`vp-btn${enabled ? ' vp-btn--toggled' : ''}`}
-        aria-pressed={enabled}
-        aria-label="Section"
-        title={enabled ? 'Disable section plane' : 'Enable section plane'}
-        onClick={toggleClip}
-      >
-        <Icon name="section" size={14} />
-        <span className="vp-btn__text">Section</span>
-      </button>
-    </div>
+    <ToggleButton group="Section plane" text="Section" label="Section" icon="section" pressed={enabled} title={title} onClick={toggle} />
   );
 }
 
@@ -199,17 +194,9 @@ function AnimationTransportControls(): React.ReactElement | null {
 
 const QUALITY_OPTIONS: { value: QualityOverride; label: string; title: string }[] = [
   { value: 'auto', label: 'Auto', title: 'Auto — tier scales with scene size (recommended)' },
-  {
-    value: 'high',
-    label: 'High',
-    title: 'High — PCSS 16 samples, 2048² shadows (≤ 50 entities ideal)',
-  },
+  { value: 'high', label: 'High', title: 'High — PCSS 16 samples, 2048² shadows (≤ 50 entities ideal)' },
   { value: 'medium', label: 'Medium', title: 'Medium — PCSS 8 samples, 1024² shadows' },
-  {
-    value: 'low',
-    label: 'Low',
-    title: 'Low — flat shadows, no contact shadows (best for 200+ entities)',
-  },
+  { value: 'low', label: 'Low', title: 'Low — flat shadows, no contact shadows (best for 200+ entities)' },
 ];
 
 function QualityControl(): React.ReactElement {

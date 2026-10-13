@@ -79,10 +79,7 @@ export function evaluatePlate(
       (bolt, index): CylinderEntity => ({
         ...base(
           plate,
-          {
-            part: `bolt-${index}`,
-            label: `Anchor bolt ${plate.mark} ${boltSize(doc, plate.boltDiameter)}`,
-          },
+          { part: `bolt-${index}`, label: `Anchor bolt ${plate.mark} ${boltSize(doc, plate.boltDiameter)}` },
           [bolt[0], bolt[1], (top + layout.boltAbove + bottom - layout.boltBelow) / 2],
           [0, 0, 0],
           '#3d4650',
@@ -126,11 +123,7 @@ export function connectionSolids(...args: ConnectionSolidsArgs): ConnectionSolid
   const into = (
     member: SteelMemberElement,
     end: 'start' | 'end',
-  ): {
-    joint: Vec3;
-    frame: SweepFrame;
-    plate: { x: Vec3; y: Vec3; along: Vec3; slope: number };
-  } | null => {
+  ): { joint: Vec3; frame: SweepFrame; plate: { x: Vec3; y: Vec3; along: Vec3; slope: number } } | null => {
     const [start, finish] = [atLevel(level, member.start), atLevel(level, member.end)];
     const [joint, away] = end === 'start' ? [start, finish] : [finish, start];
     const frame = sweepFrame(joint, away, member.roll);

@@ -1,7 +1,6 @@
 /**
- * Which steel a pipe support bears on, and keeping that true when the model is edited: a deleted
- * member re-attaches its supports to the nearest steel in reach (else they become unattached), a moved
- * pipe or member re-runs the reach test at the new position.
+ * Which steel a pipe support bears on, and keeping that true when the model is edited: a deleted member re-attaches its supports to the
+ * nearest steel in reach (else they become unattached), a moved pipe or member re-runs the reach test at the new position.
  */
 
 import type { BuildingModel, PipeSupportElement } from '@core/model/building';
@@ -36,8 +35,8 @@ export function isRiserPoint(points: ReadonlyArray<Vec3>, point: Vec3): boolean 
 }
 
 /**
- * Steel for a support of `type` at `point` (absolute mm on the pipe centreline): `explicit` when
- * given (its failure reason is returned), else the nearest member in reach, else null.
+ * Steel for a support of `type` at `point` (absolute mm on the pipe centreline): `explicit` when given (its failure reason is returned),
+ * else the nearest member in reach, else null.
  */
 export function resolveBearing(
   bars: ReadonlyArray<SteelBar>,
@@ -68,12 +67,7 @@ export function attachmentFields(
     memberId: bearing?.memberId ?? null,
     rodLength: bearing && type === 'hanger' ? gap : 0,
     pedestalHeight: bearing && type !== 'hanger' ? gap : 0,
-    ...(bearing?.riser
-      ? {
-          standoff: clean(fromMm(doc, bearing.riser.standoff)),
-          standoffAngle: clean(bearing.riser.angle),
-        }
-      : {}),
+    ...(bearing?.riser ? { standoff: clean(fromMm(doc, bearing.riser.standoff)), standoffAngle: clean(bearing.riser.angle) } : {}),
   };
 }
 
@@ -114,19 +108,13 @@ function attachmentSignature(building: BuildingModel, support: PipeSupportElemen
 }
 
 /**
- * Re-runs the attachment of every support of `next` whose pipe, position or member changed relative
- * to `doc.building` (or whose id is in `alsoIds`), or whose member no longer exists: the current
- * member is kept while it is still in reach, else the nearest member in reach, else the support is
- * unattached. Reach limits are the defaults, widened to the support's current pedestal / rod / bracket.
+ * Re-runs the attachment of every support of `next` whose pipe, position or member changed relative to `doc.building` (or whose id is in
+ * `alsoIds`), or whose member no longer exists: the current member is kept while it is still in reach, else the nearest member in reach,
+ * else the support is unattached. Reach limits are the defaults, widened to the support's current pedestal / rod / bracket.
  */
 export function reconcilePipeSupports(doc: CadDocument, next: BuildingModel, alsoIds: ReadonlyArray<string> = []): SupportReconciliation {
   const previous = doc.building;
-  const unchanged: SupportReconciliation = {
-    building: next,
-    reattached: [],
-    detached: [],
-    kept: [],
-  };
+  const unchanged: SupportReconciliation = { building: next, reattached: [], detached: [], kept: [] };
   if (!previous) return unchanged;
   const candidates = elementsOf(next, 'pipeSupport').filter((support) => {
     const before = previous.elements[support.id];
@@ -149,10 +137,7 @@ export function reconcilePipeSupports(doc: CadDocument, next: BuildingModel, als
     const riser = isRiserPoint(run.points, point);
     const current = (riser ? (support.standoff ?? 0) : support.rodLength + support.pedestalHeight) / unit;
     const below = support.type !== 'hanger';
-    const limits: BearingLimits = {
-      maxReach: Math.max(REACH[below ? 'below' : 'above'], current),
-      planTolerance: PLAN_TOLERANCE,
-    };
+    const limits: BearingLimits = { maxReach: Math.max(REACH[below ? 'below' : 'above'], current), planTolerance: PLAN_TOLERANCE };
     const member = bars.find((bar) => bar.id === support.memberId);
     const kind = support.type;
     const tryMember = member ? resolveBearing(bars, kind, point, run.diameterMm, limits, riser, member) : null;

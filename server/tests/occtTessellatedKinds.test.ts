@@ -85,17 +85,7 @@ describe('occt revolution frames', () => {
     [1, 2],
   ];
   const revolution = (profile: Array<[number, number]>, axis: Vec3, angle: number, position: Vec3 = [1, -2, 3]): Entity =>
-    ({
-      id: 'v',
-      kind: 'revolution',
-      profile,
-      axis,
-      angle,
-      segments: 48,
-      position,
-      rotation: [0, 0, 0],
-      ...common,
-    }) as Entity;
+    ({ id: 'v', kind: 'revolution', profile, axis, angle, segments: 48, position, rotation: [0, 0, 0], ...common }) as Entity;
 
   const spans = (mesh: MeshData): number[] => {
     const lo = [Infinity, Infinity, Infinity];

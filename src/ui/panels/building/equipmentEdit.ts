@@ -1,8 +1,4 @@
-/**
- * Equipment editor form spec: element → field texts, field texts → the `update_equipment` params
- * that changed (param-gathering only, react R1). Untouched fields are omitted so the history
- * step records exactly the revision.
- */
+// Equipment form spec: element → texts → changed `update_equipment` params (untouched fields omitted: exact revision).
 
 import type { EquipmentElement } from '@core/model/building';
 import { toDegrees, toRadians } from '@lib/angle';

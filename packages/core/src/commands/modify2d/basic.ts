@@ -21,36 +21,19 @@ export const explodePolyline = defineCommand({
     'Explode a polyline entity into individual line segments. Each consecutive pair of vertices becomes a separate line entity. ' +
     'If the polyline is closed, a final segment is added from the last point back to the first. ' +
     'The original polyline is removed. No-op if the entity is not a polyline or has fewer than 2 points.',
-  params: z.object({
-    id: z.string().describe('Id of the polyline entity to explode.'),
-  }),
+  params: z.object({ id: z.string().describe('Id of the polyline entity to explode.') }),
   run: (doc, { id }): CommandResult => {
     const polyline = resolvePolyline(doc, 'explode_polyline', id);
     if ('summary' in polyline) return polyline;
-    if (polyline.points.length < 2) {
-      return noop(doc, `explode_polyline: polyline ${id} has fewer than 2 points — nothing to explode.`);
-    }
-
+    if (polyline.points.length < 2) return noop(doc, `explode_polyline: polyline ${id} has fewer than 2 points — nothing to explode.`);
     const ring = polyline.closed ? [...polyline.points, elementAt(polyline.points, 0)] : polyline.points;
     const segments = ring.slice(1).map((end, i): [Vec2, Vec2] => [elementAt(ring, i), end]);
-
-    // Remove the polyline, add one line per segment
     const { document: baseDoc, prunedReferences } = withoutEntities(doc, new Set([id]));
-    const createdIds: string[] = [];
-    const lines: Entity[] = [];
-    for (const [start, end] of segments) {
-      const lineId = nextId('line');
-      createdIds.push(lineId);
-      const line = newEntity('line', lineId, { start, end }, polyline.position, polyline.color, {
-        rotation: polyline.rotation,
-        layerId: polyline.layerId,
-      });
-      lines.push(line);
-    }
-    const newDoc = withEntities(baseDoc, lines);
-
+    const { position, color, rotation, layerId } = polyline;
+    const lines = segments.map(([start, end]) => newEntity('line', nextId('line'), { start, end }, position, color, { rotation, layerId }));
+    const createdIds = lines.map((line) => line.id);
     return changed(
-      newDoc,
+      withEntities(baseDoc, lines),
       `Exploded polyline ${id} into ${createdIds.length} line(s): [${createdIds.join(', ')}].${referenceSuffix(prunedReferences)}`,
       createdIds,
     );
@@ -73,8 +56,7 @@ export const offset2D = defineCommand({
   description:
     'Create a parallel-offset copy of a 2D shape at the given distance. ' +
     'Supported kinds: line (offset perpendicular to direction, positive=left of start→end), ' +
-    'polyline (each segment offset then joined at miter intersections), ' +
-    'circle (concentric: positive=larger, negative=smaller), ' +
+    'polyline (each segment offset then joined at miter intersections), circle (concentric: positive=larger, negative=smaller), ' +
     'rectangle (all sides expand/shrink: positive=outward, negative=inward). ' +
     'The original entity is unchanged; a new entity is added. ' +
     'No-op for unsupported kinds or if the resulting shape would be degenerate (e.g. negative circle radius).',
@@ -90,17 +72,10 @@ export const offset2D = defineCommand({
     const entity = entityOfKind(doc, id);
     if (typeof entity === 'string') return noop(doc, `offset_2d: ${entity}.`);
     if (distance === 0) return noop(doc, `offset_2d: distance is 0 — no-op.`);
-
     const newId = nextId('offset');
-    const base = {
-      position: entity.position,
-      rotation: entity.rotation,
-      layerId: entity.layerId,
-      color: entity.color,
-    };
+    const base = { position: entity.position, rotation: entity.rotation, layerId: entity.layerId, color: entity.color };
     let offsetEntity: Entity;
     let summary: string;
-
     switch (entity.kind) {
       case 'line': {
         const [start, end] = offsetSegment(entity.start, entity.end, distance);
@@ -134,26 +109,16 @@ export const offset2D = defineCommand({
       case 'rectangle': {
         const width = entity.width + 2 * distance;
         const height = entity.height + 2 * distance;
-        if (width <= 0 || height <= 0) {
-          return noop(doc, `offset_2d: resulting rectangle ${width}×${height} is degenerate — no-op.`);
-        }
+        if (width <= 0 || height <= 0) return noop(doc, `offset_2d: resulting rectangle ${width}×${height} is degenerate — no-op.`);
         // The origin shifts by -distance on X and Y so the rectangle grows/shrinks on every side.
         const [x, y, z] = entity.position;
-        offsetEntity = {
-          ...base,
-          id: newId,
-          kind: 'rectangle',
-          width,
-          height,
-          position: [x - distance, y - distance, z],
-        };
+        offsetEntity = { ...base, id: newId, kind: 'rectangle', width, height, position: [x - distance, y - distance, z] };
         summary = `Offset rectangle ${id} by ${distance} → new rectangle ${newId} ${width}×${height}.`;
         break;
       }
       default:
         return noop(doc, `offset_2d: entity ${id} has unsupported kind '${entity.kind}'. Supported: line, polyline, circle, rectangle.`);
     }
-
     return commitEntity(doc, offsetEntity, summary);
   },
 });

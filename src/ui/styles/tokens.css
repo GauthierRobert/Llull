@@ -1,10 +1,5 @@
-/* ==========================================================================
-   llull design tokens
-   --------------------------------------------------------------------------
-   Single source of truth for color, type, spacing, radius, elevation, motion.
-   Dark is the default; [data-theme="light"] overrides color tokens only.
-   Components reference ONLY these variables — never raw color values.
-   ========================================================================== */
+/* ==== Design tokens: the only source of color/type/spacing/radius/elevation/motion. Dark default; [data-theme="light"]
+   overrides colors only. Components use ONLY these variables, never raw colors. ==== */
 
 :root {
   color-scheme: dark;
@@ -55,8 +50,7 @@
   --axis-z: oklch(0.66 0.16 255);
 
   /* ---- Typography ---- */
-  --font-sans:
-    'Geist Sans', 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-sans: 'Geist Sans', 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Consolas, monospace;
   --text-2xs: 10px;
   --text-xs: 11px;
@@ -96,9 +90,7 @@
 
   /* ---- Elevation ---- */
   --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.3);
-  --shadow-float:
-    0 1px 0 oklch(1 0 0 / 0.04) inset, 0 8px 24px -6px oklch(0 0 0 / 0.5),
-    0 2px 6px oklch(0 0 0 / 0.25);
+  --shadow-float: 0 1px 0 oklch(1 0 0 / 0.04) inset, 0 8px 24px -6px oklch(0 0 0 / 0.5), 0 2px 6px oklch(0 0 0 / 0.25);
   --shadow-popover: 0 24px 64px -12px oklch(0 0 0 / 0.65), 0 4px 16px oklch(0 0 0 / 0.3);
   --backdrop: blur(14px) saturate(1.4);
 
@@ -151,9 +143,6 @@
   --agent-soft: oklch(0.6 0.15 45 / 0.12);
 
   --shadow-sm: 0 1px 2px oklch(0.2 0.01 260 / 0.08);
-  --shadow-float:
-    0 0 0 0.5px oklch(0.2 0.01 260 / 0.04), 0 6px 20px -6px oklch(0.2 0.01 260 / 0.18),
-    0 1px 3px oklch(0.2 0.01 260 / 0.08);
-  --shadow-popover:
-    0 24px 64px -12px oklch(0.2 0.01 260 / 0.3), 0 4px 12px oklch(0.2 0.01 260 / 0.08);
+  --shadow-float: 0 0 0 0.5px oklch(0.2 0.01 260 / 0.04), 0 6px 20px -6px oklch(0.2 0.01 260 / 0.18), 0 1px 3px oklch(0.2 0.01 260 / 0.08);
+  --shadow-popover: 0 24px 64px -12px oklch(0.2 0.01 260 / 0.3), 0 4px 12px oklch(0.2 0.01 260 / 0.08);
 }

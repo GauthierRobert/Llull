@@ -1,9 +1,5 @@
-/**
- * FeatureHistoryPanel — timeline of `document.featureHistory` steps.
- * Dispatches: set_step_suppressed, reorder_step, delete_step, replay_history, edit_step_params
- * (a refused edit keeps the form open and shows the command's summary).
- * The step label is read-only: no rename_step command exists yet.
- */
+// `document.featureHistory` timeline: set_step_suppressed, reorder_step, delete_step, replay_history, edit_step_params
+// (a refused edit keeps the form open with the summary). Labels are read-only (no rename_step command).
 
 import React, { memo, useState } from 'react';
 import { getCommand } from '@core/commands/registry';
@@ -15,13 +11,15 @@ import { useDispatchThen } from '@ui/hooks/useDispatchThen';
 import { Icon } from '@ui/components/Icon';
 import { PanelEmpty, PanelHeader, IconButton, DeleteButton } from '@ui/panels/PanelParts';
 
-interface FeatureStepRowProps {
+const FeatureStepRow = memo(function FeatureStepRow({
+  step,
+  index,
+  totalCount,
+}: {
   step: FeatureStep;
   index: number;
   totalCount: number;
-}
-
-const FeatureStepRow = memo(function FeatureStepRow({ step, index, totalCount }: FeatureStepRowProps): React.ReactElement {
+}): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const [editing, setEditing] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
@@ -116,11 +114,7 @@ const FeatureStepRow = memo(function FeatureStepRow({ step, index, totalCount }:
   );
 });
 
-interface FeatureHistoryPanelProps {
-  className?: string;
-}
-
-export function FeatureHistoryPanel({ className }: FeatureHistoryPanelProps): React.ReactElement {
+export function FeatureHistoryPanel({ className }: { className?: string }): React.ReactElement {
   const featureHistory = useStore((s) => s.document.featureHistory);
   const dispatch = useStore((s) => s.dispatch);
 

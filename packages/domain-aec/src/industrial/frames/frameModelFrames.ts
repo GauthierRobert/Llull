@@ -23,8 +23,8 @@ import {
 } from './frameModelTypes';
 
 /**
- * Frames of a level. Planes are grouped per hall (overlapping rafter x-ranges) for tributary
- * widths; a hall with a single frame plane has no tributary width and is reported in `skipped`.
+ * Frames of a level. Planes are grouped per hall (overlapping rafter x-ranges) for tributary widths; a hall with a single frame plane has
+ * no tributary width and is reported in `skipped`.
  */
 export function framesOf(
   doc: Pick<CadDocument, 'units'>,
@@ -71,12 +71,7 @@ export function framesOf(
     const free: FrameNode['restraint'] = [false, false, false];
     const purlins = purlinXs(y);
     const fixedColumns = new Set(elementsOf(building, 'plate').flatMap((plate) => (plate.fixity === 'fixed' ? [plate.memberId] : [])));
-    const valleys = valleyLines(
-      candidate.rafters.map((rafter) => ({
-        start: rafter.start.map(mm),
-        end: rafter.end.map(mm),
-      })),
-    );
+    const valleys = valleyLines(candidate.rafters.map((rafter) => ({ start: rafter.start.map(mm), end: rafter.end.map(mm) })));
     const { rafterEnds, roofCpe } = frameRoofWind({ low, high, rafters: candidate.rafters, valleys }, mm, near);
     const windCases = [
       ...WIND_CASES,
@@ -96,13 +91,7 @@ export function framesOf(
       const purlinGap = Math.max(...stations.slice(1).map((x, index) => x - (stations[index] as number)));
       const unbraced = (purlinGap * length) / Math.max(Math.abs(x1 - x0), 1);
       analysis.push({
-        geometry: {
-          a: nodeAt(x0, z0, free),
-          b: nodeAt(x1, z1, free),
-          E: E_STEEL,
-          A: section.area,
-          I: section.inertia,
-        },
+        geometry: { a: nodeAt(x0, z0, free), b: nodeAt(x1, z1, free), E: E_STEEL, A: section.area, I: section.inertia },
         elementId: rafter.id,
         role: 'rafter',
         reversed: flip,
@@ -113,10 +102,7 @@ export function framesOf(
           ...Object.fromEntries(
             windCases.map((windCase) => [
               windCase.loadCase,
-              {
-                qx: 0,
-                qy: perLength((windCase.internalPressure - roofCpe(rafter, windCase)) * loads.windPressure),
-              },
+              { qx: 0, qy: perLength((windCase.internalPressure - roofCpe(rafter, windCase)) * loads.windPressure) },
             ]),
           ),
         },
@@ -173,13 +159,7 @@ export function framesOf(
             sum + (selfWeight(beam.profile) * Math.hypot(mm(beam.end[0] - beam.start[0]), mm(beam.end[1] - beam.start[1]))) / 2,
           0,
         );
-        rails.push({
-          node: nodeAt(x, z, free),
-          x: endX,
-          eccentricity: endX - x,
-          capacity,
-          self: runwayWeight,
-        });
+        rails.push({ node: nodeAt(x, z, free), x: endX, eccentricity: endX - x, capacity, self: runwayWeight });
         craneNodes.push({ node: nodeAt(x, z, free), height: z - zBottom, elementId: column.id });
       }
       const chain = [
@@ -199,32 +179,17 @@ export function framesOf(
                     ? WIND_COEFFICIENTS.windward - windCase.internalPressure
                     : WIND_COEFFICIENTS.leeward + windCase.internalPressure;
                 const direction = windCase.from === 'left' ? 1 : -1;
-                return [
-                  windCase.loadCase,
-                  {
-                    qx: direction * area(coefficient * loads.windPressure) * tributary,
-                    qy: 0,
-                  },
-                ];
+                return [windCase.loadCase, { qx: direction * area(coefficient * loads.windPressure) * tributary, qy: 0 }];
               }),
             );
       chain.slice(1).forEach((node, index) => {
         analysis.push({
-          geometry: {
-            a: chain[index] as number,
-            b: node,
-            E: E_STEEL,
-            A: section.area,
-            I: section.inertia,
-          },
+          geometry: { a: chain[index] as number, b: node, E: E_STEEL, A: section.area, I: section.inertia },
           elementId: column.id,
           role: 'column',
           reversed: column.start[2] > column.end[2],
           ends: [index === 0, index === chain.length - 2],
-          loads: {
-            G: { qx: 0, qy: -selfWeight(column.profile) },
-            ...windLoads,
-          },
+          loads: { G: { qx: 0, qy: -selfWeight(column.profile) }, ...windLoads },
           lengths: { major: height, minor: height, lateralTorsional: railGap },
         });
       });

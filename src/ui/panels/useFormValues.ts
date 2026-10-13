@@ -1,7 +1,4 @@
-/**
- * Controlled form state shared by the panel forms: field values, one inline error that clears on
- * every edit.
- */
+// Controlled panel form state: field values + one inline error cleared on every edit.
 
 import { useState } from 'react';
 

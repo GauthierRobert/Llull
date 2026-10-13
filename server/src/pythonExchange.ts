@@ -1,9 +1,6 @@
 /**
- * `CadExchangePort` backed by a Python child process (server/python/llull_bridge.py) running
- * CadQuery / build123d on OpenCascade. One short-lived process per request: no shared state,
- * a hard timeout, and script stdout kept out of the JSON response.
- *
- * Environment:
+ * `CadExchangePort` over one short-lived Python process per request (server/python/llull_bridge.py, CadQuery /
+ * build123d): no shared state, a hard timeout, script stdout kept out of the JSON response. Environment:
  *   LLULL_PYTHON              python with CadQuery (default "python3"; "off" disables the bridge)
  *   LLULL_PYTHON_BUILD123D    python with build123d (default: LLULL_PYTHON)
  *   LLULL_PYTHON_TIMEOUT_MS   per-request timeout (default 120000)
@@ -19,26 +16,21 @@ import type { PythonBackend } from '@core/codegen/pythonRuntime';
 import type { CadExchangePort, DwgConverterPort, ProgramRun } from '@mcp/index';
 import { exchangeDirOf, positiveInteger } from './env';
 
-/** Response size cap (it is JSON.parse'd in memory). ~96 MB of STEP once base64-encoded. */
-const MAX_OUTPUT_BYTES = 128 * 1024 * 1024;
-/** Only the tail of stderr is kept for error messages. */
-const MAX_STDERR_BYTES = 64 * 1024;
-/** CadQuery processes are heavy; at most this many run at once, the rest queue. */
-const MAX_CONCURRENT_RUNS = 2;
+const MAX_OUTPUT_BYTES = 128 * 1024 * 1024; // JSON.parse'd in memory; ~96 MB of base64 STEP
+const MAX_STDERR_BYTES = 64 * 1024; // tail kept for error messages
+const MAX_CONCURRENT_RUNS = 2; // CadQuery processes are heavy; the rest queue
 
-/** Environment variables the Python child may see — never the server's secrets (tokens, keys). */
+/** Environment the Python child may see — never the server's secrets. */
 const ENV_ALLOWLIST =
   /^(PATH|HOME|USER|LOGNAME|LANG|LC_\w+|TZ|TMPDIR|TEMP|TMP|SYSTEMROOT|COMSPEC|PYTHON\w*|VIRTUAL_ENV|CONDA_\w+|LD_LIBRARY_PATH|DYLD_LIBRARY_PATH|CASROOT)$/;
 
-/** The subset of `env` passed to the bridge process. */
 export function bridgeEnvironment(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   return Object.fromEntries(Object.entries(env).filter(([key]) => ENV_ALLOWLIST.test(key)));
 }
 
-/** STEP / parametric-code exchange wiring (Python bridge), injected into each MCP server. */
+/** STEP / code exchange wiring injected into each MCP server; `dwg` = DWG -> DXF converter. */
 export interface ExchangeOptions {
   readonly port: CadExchangePort | null;
-  /** DWG -> DXF converter (LibreDWG / ODA); null when none is configured. */
   readonly dwg?: DwgConverterPort | null;
   readonly allowCodeExecution: boolean;
 }
@@ -58,7 +50,7 @@ interface BridgeResponse {
   [key: string]: unknown;
 }
 
-/** Resolve the exchange config from the environment; null when the bridge is disabled. */
+/** null when the bridge is disabled (`LLULL_PYTHON=off`). */
 export function pythonExchangeConfigFromEnv(env: NodeJS.ProcessEnv = process.env): PythonExchangeConfig | null {
   const python = env['LLULL_PYTHON'] ?? 'python3';
   if (python === 'off') return null;
@@ -84,7 +76,6 @@ export function captureStderrTail(stderr: Readable, maxBytes: number): () => str
   return () => tail.toString('utf8');
 }
 
-/** Run the bridge once with a JSON request; resolves with its parsed response. */
 export function callBridge(
   python: string,
   bridgeScript: string,
@@ -92,10 +83,7 @@ export function callBridge(
   timeoutMs: number,
 ): Promise<BridgeResponse> {
   return new Promise((resolve, reject) => {
-    const child = spawn(python, [bridgeScript], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: bridgeEnvironment(),
-    });
+    const child = spawn(python, [bridgeScript], { stdio: ['pipe', 'pipe', 'pipe'], env: bridgeEnvironment() });
     const stdout: Buffer[] = [];
     const stderr = captureStderrTail(child.stderr, MAX_STDERR_BYTES);
     let size = 0;
@@ -111,7 +99,6 @@ export function callBridge(
       child.kill('SIGKILL');
       finish(new Error(`Python bridge timed out after ${timeoutMs} ms`));
     }, timeoutMs);
-
     child.stdout.on('data', (chunk: Buffer) => {
       size += chunk.length;
       if (size > MAX_OUTPUT_BYTES) {
@@ -121,21 +108,17 @@ export function callBridge(
       }
       stdout.push(chunk);
     });
-    child.on('error', (error) => {
-      finish(new Error(`cannot start Python "${python}": ${error.message}. Set LLULL_PYTHON to a python with CadQuery.`));
-    });
+    child.on('error', (error) =>
+      finish(new Error(`cannot start Python "${python}": ${error.message}. Set LLULL_PYTHON to a python with CadQuery.`)),
+    );
     child.on('close', (code) => {
-      const text = Buffer.concat(stdout).toString('utf8');
       try {
-        finish(null, JSON.parse(text) as BridgeResponse);
+        finish(null, JSON.parse(Buffer.concat(stdout).toString('utf8')) as BridgeResponse);
       } catch {
-        const detail = stderr().trim().slice(-2000);
-        finish(new Error(`Python bridge exited with code ${String(code)} without a response. ${detail}`));
+        finish(new Error(`Python bridge exited with code ${String(code)} without a response. ${stderr().trim().slice(-2000)}`));
       }
     });
-    child.stdin.on('error', () => {
-      /* the close handler reports the failure */
-    });
+    child.stdin.on('error', () => undefined); // the close handler reports the failure
     child.stdin.end(JSON.stringify(request));
   });
 }
@@ -158,10 +141,7 @@ export function resolveInside(root: string, relative: string): string {
   return resolved;
 }
 
-/**
- * Resolve `relative` inside `root` and re-check after following symlinks, so a link placed in the
- * exchange directory cannot read or write outside it. Writes refuse an existing symlink target.
- */
+/** `resolveInside`, re-checked after following symlinks; writes refuse an existing symlink target. */
 export async function confinedPath(root: string, relative: string, mode: 'read' | 'write'): Promise<string> {
   const target = resolveInside(root, relative);
   const realRoot = await realpath(root);
@@ -170,11 +150,8 @@ export async function confinedPath(root: string, relative: string, mode: 'read' 
   if (fromRealRoot.startsWith('..') || path.isAbsolute(fromRealRoot)) {
     throw new Error(`path "${relative}" resolves outside the exchange directory (symbolic link)`);
   }
-  if (mode === 'write') {
-    const existing = await lstat(target).catch(() => null);
-    if (existing?.isSymbolicLink() === true) {
-      throw new Error(`path "${relative}" is a symbolic link; refusing to overwrite it`);
-    }
+  if (mode === 'write' && (await lstat(target).catch(() => null))?.isSymbolicLink() === true) {
+    throw new Error(`path "${relative}" is a symbolic link; refusing to overwrite it`);
   }
   return target;
 }
@@ -227,8 +204,7 @@ export function createPythonExchangePort(config: PythonExchangeConfig): CadExcha
   return {
     ...port,
     async readExchangeFile(relative, encoding): Promise<string> {
-      const target = await confinedPath(root, relative, 'read');
-      return readFile(target, encoding);
+      return readFile(await confinedPath(root, relative, 'read'), encoding);
     },
     async writeExchangeFile(fileName, base64): Promise<string> {
       await mkdir(root, { recursive: true });
@@ -239,11 +215,7 @@ export function createPythonExchangePort(config: PythonExchangeConfig): CadExcha
   };
 }
 
-/** Exchange options from the environment (LLULL_PYTHON, LLULL_ALLOW_CODE_EXECUTION, ...). */
 export function exchangeOptionsFromEnv(env: NodeJS.ProcessEnv = process.env): ExchangeOptions {
   const config = pythonExchangeConfigFromEnv(env);
-  return {
-    port: config === null ? null : createPythonExchangePort(config),
-    allowCodeExecution: codeExecutionAllowed(env),
-  };
+  return { port: config === null ? null : createPythonExchangePort(config), allowCodeExecution: codeExecutionAllowed(env) };
 }

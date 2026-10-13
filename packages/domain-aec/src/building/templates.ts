@@ -20,8 +20,8 @@ type Step = (doc: CadDocument) => CommandResult;
 type BuildingTemplate = 'house' | 'office';
 
 /**
- * Template steps. Ids are looked up in `created` (filled by the run loop with the element / level ids
- * each step actually created, per kind, in order) — never predicted.
+ * Template steps. Ids are looked up in `created` (filled by the run loop with the element / level ids each step actually created, per kind,
+ * in order) — never predicted.
  */
 function steps(doc: CadDocument, template: BuildingTemplate, origin: Vec2, created: Record<string, string[]>): Step[] {
   const mm = (value: number): number => fromMm(doc, value);
@@ -55,28 +55,14 @@ function steps(doc: CadDocument, template: BuildingTemplate, origin: Vec2, creat
   const gridStep =
     (xSpacings: number[], ySpacings: number[]): Step =>
     (d) =>
-      addGridSystem.run(d, {
-        xSpacings: xSpacings.map(mm),
-        ySpacings: ySpacings.map(mm),
-        origin: at(0, 0),
-      });
+      addGridSystem.run(d, { xSpacings: xSpacings.map(mm), ySpacings: ySpacings.map(mm), origin: at(0, 0) });
   const perimeterWallsStep =
     (width: number, depth: number, thickness: number, material: string): Step =>
     (d) =>
-      drawWalls.run(d, {
-        points: rectangle(0, 0, width, depth),
-        closed: true,
-        thickness: mm(thickness),
-        material,
-      });
+      drawWalls.run(d, { points: rectangle(0, 0, width, depth), closed: true, thickness: mm(thickness), material });
   const naming: Step[] =
     building.project.name === 'Untitled project'
-      ? [
-          (d) =>
-            setProjectInfo.run(d, {
-              name: template === 'house' ? 'Two-storey house' : 'Office building',
-            }),
-        ]
+      ? [(d) => setProjectInfo.run(d, { name: template === 'house' ? 'Two-storey house' : 'Office building' })]
       : [];
   if (template === 'house') {
     return [
@@ -86,12 +72,7 @@ function steps(doc: CadDocument, template: BuildingTemplate, origin: Vec2, creat
       levelStep('Roof', 5800, 1000),
       gridStep([5000, 5000], [8000]),
       perimeterWallsStep(10000, 8000, 300, 'masonry'),
-      (d) =>
-        drawWalls.run(d, {
-          points: [at(5000, 0), at(5000, 8000)],
-          thickness: mm(100),
-          material: 'gypsum',
-        }),
+      (d) => drawWalls.run(d, { points: [at(5000, 0), at(5000, 8000)], thickness: mm(100), material: 'gypsum' }),
       (d) => addDoor.run(d, { wallId: wall(1), offset: mm(2500) }),
       (d) => addDoor.run(d, { wallId: wall(5), offset: mm(4000), swing: 'right', width: mm(800) }),
       windowStep(1, 7500, 1800),
@@ -103,27 +84,12 @@ function steps(doc: CadDocument, template: BuildingTemplate, origin: Vec2, creat
       (d) => addStair.run(d, { start: at(5400, 6900), angle: 0, width: mm(900), treadDepth: mm(250) }),
       (d) => addRoom.run(d, { name: 'Living room', boundary: rectangle(150, 150, 4950, 7850) }),
       (d) => addRoom.run(d, { name: 'Kitchen', boundary: rectangle(5050, 150, 9850, 7850) }),
-      (d) =>
-        copyLevelElements.run(d, {
-          sourceLevelId: level(1),
-          targetLevelIds: [level(2)],
-          categories: ['wall', 'slab'],
-        }),
+      (d) => copyLevelElements.run(d, { sourceLevelId: level(1), targetLevelIds: [level(2)], categories: ['wall', 'slab'] }),
       (d) => deleteBuildingElement.run(d, { elementIds: [door(3)] }),
       (d) => addSlabOpening.run(d, { stairId: stair(1) }),
       windowStep(6, 2500, 1400),
-      (d) =>
-        addRoom.run(d, {
-          name: 'Bedroom',
-          boundary: rectangle(150, 150, 4950, 7850),
-          levelId: level(2),
-        }),
-      (d) =>
-        addRoom.run(d, {
-          name: 'Bedroom',
-          boundary: rectangle(5050, 150, 9850, 7850),
-          levelId: level(2),
-        }),
+      (d) => addRoom.run(d, { name: 'Bedroom', boundary: rectangle(150, 150, 4950, 7850), levelId: level(2) }),
+      (d) => addRoom.run(d, { name: 'Bedroom', boundary: rectangle(5050, 150, 9850, 7850), levelId: level(2) }),
       (d) =>
         addSlab.run(d, {
           boundary: rectangle(-300, -300, 10300, 8300),

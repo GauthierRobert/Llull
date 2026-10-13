@@ -1,7 +1,4 @@
-/**
- * ProjectSection — title-block / IFC project metadata form → `set_project_info` (also on an
- * empty document: the command creates the building model).
- */
+// Title-block / IFC project form → `set_project_info` (creates the building model on an empty document).
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
@@ -25,11 +22,7 @@ const FIELDS: ReadonlyArray<readonly [keyof ProjectInfo, string]> = [
 /** Shown (and submitted as a diff) while the document has no building model yet. */
 const NEW_PROJECT: ProjectInfo = createEmptyBuilding().project;
 
-interface ProjectFormProps {
-  project: ProjectInfo;
-}
-
-function ProjectForm({ project }: ProjectFormProps): React.ReactElement {
+function ProjectForm({ project }: { project: ProjectInfo }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const [values, setValues] = useState<ProjectInfo>(project);
   const changes = changedFields(

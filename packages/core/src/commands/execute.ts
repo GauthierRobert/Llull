@@ -9,9 +9,9 @@ import { rejection } from './noop';
 import { stepIdSource } from '../lib/id';
 
 /**
- * @invariant a mutating command (not `readOnly` / `metaHistory`) that changes the document appends
- * FeatureStep `step-<n>` (n = doc.nextStepNumber) and mints ids `<prefix>-<n>.<k>`, so replay
- * re-mints identical ids; an execute nested inside a running step joins it (no extra step)
+ * @invariant a mutating command (not `readOnly` / `metaHistory`) that changes the document appends FeatureStep `step-<n>` (n =
+ *   doc.nextStepNumber) and mints ids `<prefix>-<n>.<k>`, so replay re-mints identical ids; an execute nested inside a running step joins
+ *   it (no extra step)
  * @failure unknown command, or `requiresKernel` while ctx.kernel is null -> no-op, affected:[], rejected:true
  */
 export function execute(doc: CadDocument, commandName: string, params: unknown, ctx: ExecutionContext = currentContext()): CommandResult {
@@ -24,22 +24,12 @@ export function execute(doc: CadDocument, commandName: string, params: unknown, 
     // Queries, history meta-commands, and executes nested inside a running step append nothing.
     return runInContext(ctx, () => def.run(doc, params, ctx));
   }
-
   const stepNumber = doc.nextStepNumber ?? 1;
   const stepKey = String(stepNumber);
   const stepContext: ExecutionContext = { ...ctx, ids: stepIdSource(stepKey), stepKey };
   const result = runInContext(stepContext, () => def.run(doc, params, stepContext));
-
   if (result.document === doc) return result;
-
-  const step: FeatureStep = {
-    id: `step-${stepKey}`,
-    name: commandName,
-    params,
-    suppressed: false,
-    affected: result.affected,
-  };
-
+  const step: FeatureStep = { id: `step-${stepKey}`, name: commandName, params, suppressed: false, affected: result.affected };
   return {
     ...result,
     document: {

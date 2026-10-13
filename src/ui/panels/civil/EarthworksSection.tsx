@@ -1,8 +1,4 @@
-/**
- * EarthworksSection — `add_platform` (outline typed or taken from the selected polyline), each
- * platform's cut / fill (`platform_earthworks`) with a Balance button (`balance_platform`), and a
- * surface-to-surface volume comparison (`compare_surfaces`).
- */
+// `add_platform` (typed or selected-polyline outline), cut / fill + Balance per platform, `compare_surfaces` volumes.
 
 import React, { useState } from 'react';
 import type { PlatformObject } from '@core/model/civil';
@@ -28,10 +24,7 @@ function PlatformRow({ platform }: { platform: PlatformObject }): React.ReactEle
         label: 'Balance',
         title: 'Set the pad level so that cut and fill balance',
         run: (text) => {
-          dispatch('balance_platform', {
-            platformId: platform.id,
-            ...optionalNumber('swellFactor', text),
-          });
+          dispatch('balance_platform', { platformId: platform.id, ...optionalNumber('swellFactor', text) });
           return false;
         },
       }}
@@ -52,14 +45,7 @@ function CompareSurfaces(): React.ReactElement {
         type="button"
         className="btn btn--ghost btn--sm"
         disabled={surfaces.length < 2}
-        onClick={() =>
-          setStatus(
-            runQuery('compare_surfaces', {
-              baseSurfaceId: baseId,
-              comparisonSurfaceId: comparisonId,
-            }).summary,
-          )
-        }
+        onClick={() => setStatus(runQuery('compare_surfaces', { baseSurfaceId: baseId, comparisonSurfaceId: comparisonId }).summary)}
       >
         Compare volumes
       </button>

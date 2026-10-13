@@ -161,28 +161,20 @@ function parseCall(s: ParseState, name: string): EvalResult {
       consume(s);
     }
   }
-  if (peek(s).kind !== 'rparen') {
-    return { ok: false, error: `expected ')' in call to ${name}` };
-  }
+  if (peek(s).kind !== 'rparen') return { ok: false, error: `expected ')' in call to ${name}` };
   consume(s);
-  if (args.length < def.min || args.length > def.max) {
-    return {
-      ok: false,
-      error: `${name}() takes ${def.min}-${def.max} argument(s), got ${args.length}`,
-    };
-  }
+  if (args.length < def.min || args.length > def.max)
+    return { ok: false, error: `${name}() takes ${def.min}-${def.max} argument(s), got ${args.length}` };
   const value = def.fn(...args);
   return Number.isNaN(value) ? { ok: false, error: `${name}() is undefined for these arguments` } : { ok: true, value };
 }
 
 function parsePrimary(s: ParseState): EvalResult {
   const t = peek(s);
-
   if (t.kind === 'number') {
     consume(s);
     return { ok: true, value: parseFloat(t.text) };
   }
-
   if (t.kind === 'ident') {
     consume(s);
     if (peek(s).kind === 'lparen') return parseCall(s, t.text);
@@ -191,24 +183,16 @@ function parsePrimary(s: ParseState): EvalResult {
       (Object.hasOwn(BUILTIN_CONSTANTS, t.text) ? BUILTIN_CONSTANTS[t.text] : undefined);
     return value === undefined ? { ok: false, error: `unknown parameter: ${t.text}` } : { ok: true, value };
   }
-
   if (t.kind === 'lparen') {
     consume(s); // consume '('
     const inner = parseExpr(s);
     if (!inner.ok) return inner;
     const closing = peek(s);
-    if (closing.kind !== 'rparen') {
-      return {
-        ok: false,
-        error: `expected ')' but found '${closing.text || 'end of expression'}'`,
-      };
-    }
+    if (closing.kind !== 'rparen') return { ok: false, error: `expected ')' but found '${closing.text || 'end of expression'}'` };
     consume(s); // consume ')'
     return inner;
   }
-
   if (t.kind === 'eof') return { ok: false, error: 'unexpected end of expression' };
-
   return { ok: false, error: `unexpected token '${t.text}'` };
 }
 
@@ -225,17 +209,13 @@ function parsePrimary(s: ParseState): EvalResult {
  */
 export function evaluateExpression(expression: string, env: Readonly<Record<string, number>>): EvalResult {
   if (expression.trim() === '') return { ok: false, error: 'expression is empty' };
-
   const tokensOrError = tokenize(expression);
   if (typeof tokensOrError === 'string') return { ok: false, error: tokensOrError };
-
   const state: ParseState = { tokens: tokensOrError, pos: 0, env };
   const result = parseExpr(state);
   if (!result.ok) return result;
-
   // Ensure the entire input was consumed.
   if (peek(state).kind !== 'eof') return { ok: false, error: `unexpected token '${peek(state).text}' after expression` };
-
   if (!Number.isFinite(result.value)) return { ok: false, error: 'expression result is not a finite number (divide by zero?)' };
   return result;
 }

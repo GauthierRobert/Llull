@@ -1,8 +1,5 @@
 /**
- * POST /import/dwg — convert an uploaded DWG to ASCII DXF (`dwgConvert.ts`), then run
- * `import_dxf` / `import_survey_dxf` through the command bus (live document, undo, live-sync
- * broadcast). No geometry or entity logic here (L1, L6).
- *
+ * POST /import/dwg: DWG -> ASCII DXF (`dwgConvert.ts`), then `import_dxf` / `import_survey_dxf` on the command bus.
  * Body: raw `application/octet-stream` bytes (params in the query string) or JSON
  * `{ base64, target, ...params }`. `target` = drawing (default) | survey.
  * Query/body params: sourceUnit, layers (comma list / array), and for survey: name, sources,
@@ -23,7 +20,7 @@ const BOOLEAN_KEYS = new Set(['keepZeroElevation']);
 const DRAWING_KEYS = ['sourceUnit', 'layers'];
 const SURVEY_KEYS = ['name', 'layers', 'sources', 'sourceUnit', 'keepZeroElevation'];
 
-/** Coerce a query string / JSON value for `key` (lists: comma string or array; booleans: "true"). */
+/** Lists: comma string or array; booleans: "true"/"1". */
 function coerce(key: string, value: unknown): unknown {
   if (LIST_KEYS.has(key)) {
     const items = Array.isArray(value) ? value : typeof value === 'string' ? value.split(',') : [];
@@ -59,32 +56,19 @@ export function buildImportRouter(restLimiter: RequestHandler): Router {
       bytes = Buffer.from(body['base64'], 'base64');
       source = { ...req.query, ...body };
     } else {
-      res.status(400).json({
-        error: 'Send the DWG as application/octet-stream bytes or JSON { "base64": "..." }.',
-      });
-      return;
+      return void res.status(400).json({ error: 'Send the DWG as application/octet-stream bytes or JSON { "base64": "..." }.' });
     }
     const target = source['target'] ?? 'drawing';
-    if (target !== 'drawing' && target !== 'survey') {
-      res.status(400).json({ error: 'target must be "drawing" or "survey".' });
-      return;
-    }
+    if (target !== 'drawing' && target !== 'survey') return void res.status(400).json({ error: 'target must be "drawing" or "survey".' });
     convertDwgToDxf(bytes)
       .then((text) => {
         const command = target === 'survey' ? 'import_survey_dxf' : 'import_dxf';
         const result = applyCommand(command, commandParams(target, source, text), undefined, actorOf(res, 'rest'));
-        const reply: DwgImportResponseBody = {
-          ...result,
-          command,
-          dxfBytes: Buffer.byteLength(text),
-        };
-        res.status(200).json(reply);
+        res.status(200).json({ ...result, command, dxfBytes: Buffer.byteLength(text) } satisfies DwgImportResponseBody);
       })
-      .catch((error: unknown) => {
-        const status = error instanceof DwgConvertError ? error.status : 500;
-        const reply: ErrorResponseBody = { error: errorMessage(error) };
-        res.status(status).json(reply);
-      });
+      .catch((error: unknown) =>
+        res.status(error instanceof DwgConvertError ? error.status : 500).json({ error: errorMessage(error) } satisfies ErrorResponseBody),
+      );
   });
 
   return router;

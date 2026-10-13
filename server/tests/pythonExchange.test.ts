@@ -49,10 +49,7 @@ describe('pythonExchangeConfigFromEnv', () => {
 
   it('build123d python falls back to LLULL_PYTHON, and can be overridden', () => {
     expect(pythonExchangeConfigFromEnv({ LLULL_PYTHON: '/opt/py' })?.build123dPython).toBe('/opt/py');
-    const config = pythonExchangeConfigFromEnv({
-      LLULL_PYTHON: '/opt/py',
-      LLULL_PYTHON_BUILD123D: '/opt/b123/bin/python',
-    });
+    const config = pythonExchangeConfigFromEnv({ LLULL_PYTHON: '/opt/py', LLULL_PYTHON_BUILD123D: '/opt/b123/bin/python' });
     expect(config?.python).toBe('/opt/py');
     expect(config?.build123dPython).toBe('/opt/b123/bin/python');
   });
@@ -173,12 +170,7 @@ let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{
   it('runProgram maps the bridge response (trace, traced, log, optional step)', async () => {
     const port = await portWith(fakeBridge, null);
     const withStep = await port.runProgram({ language: 'cadquery', source: 'x', step: true });
-    expect(withStep).toEqual({
-      trace: { lang: 'cadquery' },
-      traced: true,
-      log: 'hi',
-      stepBase64: 'QUJD',
-    });
+    expect(withStep).toEqual({ trace: { lang: 'cadquery' }, traced: true, log: 'hi', stepBase64: 'QUJD' });
     const without = await port.runProgram({ language: 'build123d', source: 'x', step: false });
     expect(without.stepBase64).toBeUndefined();
     expect(without.trace).toEqual({ lang: 'build123d' });

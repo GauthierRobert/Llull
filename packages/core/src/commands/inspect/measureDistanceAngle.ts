@@ -27,11 +27,11 @@ export const measureDistance = defineCommand({
     entityId1: z
       .string()
       .optional()
-      .describe('Id of the first entity. Its bounding-box centroid is used as the first location ' + 'when point1 is not provided.'),
+      .describe('Id of the first entity. Its bounding-box centroid is used as the first location when point1 is not provided.'),
     entityId2: z
       .string()
       .optional()
-      .describe('Id of the second entity. Its bounding-box centroid is used as the second location ' + 'when point2 is not provided.'),
+      .describe('Id of the second entity. Its bounding-box centroid is used as the second location when point2 is not provided.'),
   }),
   run: (doc, { point1, point2, entityId1, entityId2 }): CommandResult => {
     const sides = [
@@ -44,14 +44,11 @@ export const measureDistance = defineCommand({
       const entity = entityId ? doc.entities[entityId] : undefined;
       return point ?? (entity && boundsCenter(entityBoundsInDoc(doc, entity)));
     });
-
-    if (!locA || !locB) {
+    if (!locA || !locB)
       return noop(
         doc,
-        'measure_distance: provide two locations — each as a point [x,y,z] (point1/point2) ' + 'or an entity id (entityId1/entityId2).',
+        'measure_distance: provide two locations — each as a point [x,y,z] (point1/point2) or an entity id (entityId1/entityId2).',
       );
-    }
-
     const distance = distance3(locA, locB);
     return report(doc, `Distance = ${formatLength(doc, distance)}.`, { distance, unit: doc.units });
   },
@@ -88,7 +85,6 @@ export const measureAngle = defineCommand({
   }),
   run: (doc, { points, lineId1, lineId2 }): CommandResult => {
     let vA: Vec3, vB: Vec3;
-
     if (points) {
       const [vertex, arm1, arm2] = points;
       vA = sub3(arm1, vertex);
@@ -100,14 +96,10 @@ export const measureAngle = defineCommand({
       if (typeof e2 === 'string') return noop(doc, `measure_angle: ${e2}.`);
       vA = [e1.end[0] - e1.start[0], e1.end[1] - e1.start[1], 0];
       vB = [e2.end[0] - e2.start[0], e2.end[1] - e2.start[1], 0];
-    } else {
-      return noop(doc, 'measure_angle: provide either points (3 world-space points) or lineId1 + lineId2.');
-    }
-
+    } else return noop(doc, 'measure_angle: provide either points (3 world-space points) or lineId1 + lineId2.');
     const lenA = len3(vA);
     const lenB = len3(vB);
     if (lenA < 1e-12 || lenB < 1e-12) return noop(doc, 'measure_angle: degenerate vector (zero length) — cannot compute angle.');
-
     const radians = angleFromCosine(dot3(vA, vB) / (lenA * lenB));
     const degrees = toDegrees(radians);
     return report(doc, `Angle = ${degrees.toFixed(doc.displayPrecision)}° (${radians.toFixed(doc.displayPrecision)} rad).`, {

@@ -11,8 +11,7 @@ export function ellipsePoint(center: readonly [number, number], radiusX: number,
 }
 
 /**
- * `segments + 1` points from `startAngle` to `startAngle + sweep` inclusive (radians, CCW for a
- * positive sweep), evenly spaced in angle.
+ * `segments + 1` points from `startAngle` to `startAngle + sweep` inclusive (radians, CCW for a positive sweep), evenly spaced in angle.
  */
 export function arcPolyline(
   center: readonly [number, number],
@@ -29,8 +28,8 @@ export function arcPolyline(
 }
 
 /**
- * `count` points on the circle of `radius` about `center`, starting just after `startAngle` and
- * ending at `startAngle + sweep` (radians, CCW for positive sweep).
+ * `count` points on the circle of `radius` about `center`, starting just after `startAngle` and ending at `startAngle + sweep` (radians,
+ * CCW for positive sweep).
  */
 export function sampleArc(
   center: readonly [number, number],

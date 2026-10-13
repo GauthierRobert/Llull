@@ -1,8 +1,4 @@
-/**
- * Pure helper: structural-grid entities (line axes, circle bubbles, text labels on layer S-GRID) →
- * 3D annotation primitives sized relative to the grid extent so they stay readable at building
- * scale. No React / three.js.
- */
+// Pure: S-GRID entities (axes, bubbles, labels) → 3D annotation primitives sized to the grid extent.
 
 import type { Entity } from '@core/model/types';
 

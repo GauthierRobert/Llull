@@ -1,11 +1,5 @@
-/**
- * Snap points of a solid's drawing — read off the drawn edges, so a snap is always on a line the
- * user sees:
- *  - endpoint: chain ends and real corners (turn above CORNER_ANGLE; a tessellated curve is smooth
- *    and gives none per chord) plus the quadrant points of smooth curves;
- *  - midpoint: the middle of each straight run (collinear segments merged);
- *  - center: the crossing of each centre mark (two perpendicular centre lines sharing a midpoint).
- */
+// Solid drawing snaps read off the drawn edges: endpoint = chain ends, real corners (tessellated curves give none) and
+// smooth-curve quadrants; midpoint = middle of each straight run; center = crossing of each centre mark.
 
 import type { SegmentChain } from '@core/geometry/planeEdges';
 import { type DrawingPrimitive, drawingTolerance } from '@core/model/drawing';
@@ -68,10 +62,7 @@ function chainRuns(chain: SegmentChain<Vec2>): { corners: Vec2[]; runs: Run[] } 
     if (cornerIndices.length === 0) return { corners: [], runs: [{ points, closed: true }] };
     const runs = cornerIndices.map((from, k): Run => {
       const to = (cornerIndices[(k + 1) % cornerIndices.length] as number) + (k + 1 === cornerIndices.length ? count : 0);
-      return {
-        points: Array.from({ length: to - from + 1 }, (_, j) => at(from + j)),
-        closed: false,
-      };
+      return { points: Array.from({ length: to - from + 1 }, (_, j) => at(from + j)), closed: false };
     });
     return { corners: cornerIndices.map(at), runs };
   }

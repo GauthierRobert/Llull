@@ -1,7 +1,6 @@
 /**
- * DXF (R12) of every civil-generated entity on its C-* layer: survey points (POINT), contours and
- * plan linework (POLYLINE / LINE at their elevation), labels (TEXT) and meshes (one 3DFACE per
- * triangle, so the TIN opens as faces in Civil 3D / BricsCAD).
+ * DXF (R12) of every civil-generated entity on its C-* layer: survey points (POINT), contours and plan linework (POLYLINE / LINE at their
+ * elevation), labels (TEXT) and meshes (one 3DFACE per triangle, so the TIN opens as faces in Civil 3D / BricsCAD).
  */
 
 import { toRadians } from '@lib/angle';
@@ -12,11 +11,7 @@ import { assembleDxf } from '../../building/exchange/dxfExport';
 import { localToGrid, resolveFrame, type CoordinateFrame } from '../crs/crs';
 import { entityPlanPoint } from '@core/geometry/entityFrame';
 
-export interface CivilDxf {
-  readonly text: string;
-  readonly entityCount: number;
-  readonly layers: string[];
-}
+export type CivilDxf = { readonly text: string; readonly entityCount: number; readonly layers: string[] };
 
 type Frame = (point: Vec2) => Vec2;
 
@@ -86,9 +81,5 @@ export function buildCivilDxf(doc: CadDocument, coordinates?: CoordinateFrame): 
     if (!entity?.tags?.includes('civil')) continue;
     writeEntity(writer, doc.layers[entity.layerId]?.name ?? '0', entity, frame, rotationDeg);
   }
-  return {
-    text: `${assembleDxf(doc, writer)}\n`,
-    entityCount: writer.entityCount,
-    layers: [...writer.layers.keys()],
-  };
+  return { text: `${assembleDxf(doc, writer)}\n`, entityCount: writer.entityCount, layers: [...writer.layers.keys()] };
 }

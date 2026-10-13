@@ -1,9 +1,9 @@
 /**
- * Freeform solids: Catmull-Clark subdivision surfaces over an editable polygon cage (saddles,
- * shifter hoods, dropouts, grips, fairings). The cage is the definition; the smooth surface is
- * derived (geometry/subdivision).
+ * Freeform solids: Catmull-Clark subdivision surfaces over an editable polygon cage (saddles, shifter hoods, dropouts, grips, fairings).
+ * The cage is the definition; the smooth surface is derived (geometry/subdivision).
  */
 
+import { idOrNext } from '../entity/explicitId';
 import type { SubdivisionEntity, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
@@ -11,15 +11,7 @@ import { failer } from '../noop';
 import { finiteVec3OrZero, map3 } from '../../lib/vec3';
 import { entityLocalToWorld } from '../../geometry/entityFrame';
 import { newEntity } from '../entity/newEntity';
-import {
-  DEFAULT_SOLID_COLOR,
-  commitSolid,
-  rotationField,
-  existingLayerOrDefault,
-  namedSolidStyleFields,
-  explicitIdOrNext,
-  explicitIdTaken,
-} from './shared';
+import { DEFAULT_SOLID_COLOR, commitSolid, rotationField, existingLayerOrDefault, namedSolidStyleFields, explicitIdTaken } from './shared';
 import { type Cage, edgeKey, MAX_SUBDIVISION_LEVELS, boxCage, cageProblem, cylinderCage } from '../../geometry/subdivision';
 import { roundTo } from '../../lib/compactNumber';
 
@@ -41,14 +33,7 @@ const creasesField = z
 
 type Preset =
   | { box: { size: Vec3; segments?: [number, number, number] | undefined } }
-  | {
-      cylinder: {
-        radius: number;
-        height: number;
-        sides?: number | undefined;
-        segments?: number | undefined;
-      };
-    };
+  | { cylinder: { radius: number; height: number; sides?: number | undefined; segments?: number | undefined } };
 
 function presetCage(preset: Preset): Cage | string {
   const intIn = (value: number, min: number, max: number): boolean => Number.isInteger(value) && value >= min && value <= max;
@@ -85,7 +70,6 @@ function uniqueEdges(edges: ReadonlyArray<readonly [number, number]>): Array<[nu
   return [...seen.values()];
 }
 
-/** Summary line of a cage. */
 export const cageText = (cage: Cage, levels: number): string =>
   `${cage.vertices.length}-vertex / ${cage.faces.length}-face cage, ${levels} level(s)` +
   (cage.creases.length > 0 ? `, ${cage.creases.length} crease(s)` : '');
@@ -159,21 +143,16 @@ export const addSubdivisionSolid = defineCommand({
     const cage: Cage = { ...base, creases: uniqueEdges(creases) };
     const problem = sizeProblem(cage, levels) ?? cageProblem(cage);
     if (problem !== null) return fail(problem);
-    const id = explicitIdOrNext(explicitId, 'subd');
+    const id = idOrNext(explicitId, 'subd');
     const entity: SubdivisionEntity = newEntity(
       'subdivision',
       id,
       { vertices: cage.vertices, faces: cage.faces, creases: cage.creases, levels },
       position,
       params.color ?? DEFAULT_SOLID_COLOR,
-      {
-        rotation: finiteVec3OrZero(rotation),
-        name,
-        layerId: existingLayerOrDefault(doc, layerId),
-      },
+      { rotation: finiteVec3OrZero(rotation), name, layerId: existingLayerOrDefault(doc, layerId) },
     ) as SubdivisionEntity;
-    const result = commitSolid(doc, entity, `add_subdivision_solid: created "${id}" (${cageText(cage, levels)})`);
-    return { ...result, data: cageData(entity) };
+    return { ...commitSolid(doc, entity, `add_subdivision_solid: created "${id}" (${cageText(cage, levels)})`), data: cageData(entity) };
   },
 });
 
@@ -183,11 +162,7 @@ export function cageData(entity: { vertices: readonly Vec3[]; faces: readonly un
   faceCount: number;
   vertices: Vec3[];
 } {
-  return {
-    vertexCount: entity.vertices.length,
-    faceCount: entity.faces.length,
-    vertices: entity.vertices.map((p) => worldOf(p, entity)),
-  };
+  return { vertexCount: entity.vertices.length, faceCount: entity.faces.length, vertices: entity.vertices.map((p) => worldOf(p, entity)) };
 }
 
 /** World coordinates of a cage point. */

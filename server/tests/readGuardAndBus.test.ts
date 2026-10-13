@@ -9,7 +9,7 @@ import os from 'os';
 import path from 'path';
 import request from 'supertest';
 import { app } from '../src/index';
-import { _resetLiveDoc, subscribeLive, _subscriberCount, MAX_LIVE_SUBSCRIBERS } from '../src/liveDocument';
+import { _resetLiveDoc, subscribeLive, liveSubscriberCount, MAX_LIVE_SUBSCRIBERS } from '../src/liveDocument';
 import { _resetHistory, applyCommand, canUndo, undo } from '../src/commandBus';
 import { evictForCapacity, sessions } from '../src/mcp/sessions';
 import type { Response } from 'express';
@@ -68,10 +68,10 @@ describe('SSE backpressure and cap', () => {
 
   it('drops and destroys a subscriber whose backlog exceeds 8 MB', () => {
     const slow = fakeResponse(9 * 1024 * 1024);
-    const before = _subscriberCount();
+    const before = liveSubscriberCount();
     subscribeLive(slow);
     expect(slow.destroy).toHaveBeenCalled();
-    expect(_subscriberCount()).toBe(before);
+    expect(liveSubscriberCount()).toBe(before);
   });
 
   it('GET /live answers 503 at the subscriber cap', async () => {

@@ -1,7 +1,4 @@
-/**
- * CivilCrsSection — coordinate reference system (`set_coordinate_system`) and local-to-grid site
- * calibration (`set_site_calibration`). Param gathering only; the commands validate.
- */
+// CRS (`set_coordinate_system`) and local-to-grid site calibration (`set_site_calibration`).
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
@@ -11,15 +8,7 @@ import { parsePoints } from './civilInput';
 import { NumberTextField, TextField } from './CivilParts';
 import { useFormValues } from '@ui/panels/useFormValues';
 
-const CRS_FORM = {
-  name: '',
-  epsg: '',
-  datum: '',
-  localOrigin: '',
-  gridOrigin: '',
-  rotation: '',
-  scale: '',
-};
+const CRS_FORM = { name: '', epsg: '', datum: '', localOrigin: '', gridOrigin: '', rotation: '', scale: '' };
 
 export function CivilCrsSection(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);

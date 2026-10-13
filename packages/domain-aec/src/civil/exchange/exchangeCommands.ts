@@ -18,10 +18,9 @@ const COORDINATES = z.enum(['local', 'grid']).optional();
 export const exportLandxml = defineCommand({
   name: 'export_landxml',
   description:
-    'Export the civil model as LandXML 1.2 (Civil 3D, BricsCAD, 12d, Trimble Business Center…): ' +
-    'survey point groups (CgPoints), TIN surfaces (points + faces), alignments and the storm pipe ' +
-    'network (structures + pipes). Coordinates are "northing easting elevation" in metres. ' +
-    'data.text holds the file, data.fileName its name.',
+    'Export the civil model as LandXML 1.2 (Civil 3D, BricsCAD, 12d, Trimble Business Center…): survey point groups (CgPoints), TIN ' +
+    'surfaces (points + faces), alignments and the storm pipe network (structures + pipes). Coordinates are "northing easting elevation" ' +
+    'in metres. data.text holds the file, data.fileName its name.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
     date: z.string().regex(ISO_DATE).optional().describe('Header date yyyy-mm-dd. Default: the project date, else 1970-01-01.'),

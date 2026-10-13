@@ -88,22 +88,12 @@ type Group = readonly [code: number, value: string | number];
 
 const flatten = (groups: ReadonlyArray<Group>): string[] => groups.flatMap(([code, value]) => [String(code), String(value)]);
 
+// prettier-ignore
 function header(doc: Pick<CadDocument, 'units'>, bounds: readonly [number, number, number, number]): string[] {
   return flatten([
-    [0, 'SECTION'],
-    [2, 'HEADER'],
-    [9, '$ACADVER'],
-    [1, 'AC1009'],
-    [9, '$INSUNITS'],
-    [70, INSUNITS[doc.units]],
-    [9, '$EXTMIN'],
-    [10, fmt(bounds[0])],
-    [20, fmt(bounds[1])],
-    [30, 0],
-    [9, '$EXTMAX'],
-    [10, fmt(bounds[2])],
-    [20, fmt(bounds[3])],
-    [30, 0],
+    [0, 'SECTION'], [2, 'HEADER'], [9, '$ACADVER'], [1, 'AC1009'], [9, '$INSUNITS'], [70, INSUNITS[doc.units]],
+    [9, '$EXTMIN'], [10, fmt(bounds[0])], [20, fmt(bounds[1])], [30, 0],
+    [9, '$EXTMAX'], [10, fmt(bounds[2])], [20, fmt(bounds[3])], [30, 0],
     [0, 'ENDSEC'],
   ]);
 }
@@ -112,83 +102,47 @@ function header(doc: Pick<CadDocument, 'units'>, bounds: readonly [number, numbe
 const LTYPE_UNIT = 0.25;
 
 /** An LTYPE table entry for an ISO pattern (dashes positive, gaps negative). */
+// prettier-ignore
 function lineType(name: string, description: string, pattern: ReadonlyArray<number>): Group[] {
   const lengths = pattern.map((length, index) => length * LTYPE_UNIT * (index % 2 === 0 ? 1 : -1));
   return [
-    [0, 'LTYPE'],
-    [2, name],
-    [70, 0],
-    [3, description],
-    [72, 65],
-    [73, pattern.length],
+    [0, 'LTYPE'], [2, name], [70, 0], [3, description], [72, 65], [73, pattern.length],
     [40, fmt(lengths.reduce((sum, length) => sum + Math.abs(length), 0))],
     ...lengths.map((length): Group => [49, fmt(length)]),
   ];
 }
 
+// prettier-ignore
 function tables(layers: ReadonlyMap<string, number>): string[] {
   const groups: Group[] = [
-    [0, 'SECTION'],
-    [2, 'TABLES'],
-    [0, 'TABLE'],
-    [2, 'LTYPE'],
-    [70, 3],
-    [0, 'LTYPE'],
-    [2, 'CONTINUOUS'],
-    [70, 0],
-    [3, 'Solid line'],
-    [72, 65],
-    [73, 0],
-    [40, '0.0'],
+    [0, 'SECTION'], [2, 'TABLES'],
+    [0, 'TABLE'], [2, 'LTYPE'], [70, 3],
+    [0, 'LTYPE'], [2, 'CONTINUOUS'], [70, 0], [3, 'Solid line'], [72, 65], [73, 0], [40, '0.0'],
     ...lineType('DASHED', '__ __ __', LINE_PATTERNS.hidden),
     ...lineType('CENTER', '____ _ ____ _', LINE_PATTERNS.center),
     [0, 'ENDTAB'],
-    [0, 'TABLE'],
-    [2, 'LAYER'],
-    [70, layers.size + 1],
-    [0, 'LAYER'],
-    [2, '0'],
-    [70, 0],
-    [62, 7],
-    [6, 'CONTINUOUS'],
+    [0, 'TABLE'], [2, 'LAYER'], [70, layers.size + 1],
+    [0, 'LAYER'], [2, '0'], [70, 0], [62, 7], [6, 'CONTINUOUS'],
   ];
   for (const [name, color] of layers) {
     if (name === '0') continue;
-    groups.push(
-      [0, 'LAYER'],
-      [2, name],
-      [70, 0],
-      [62, color],
-      [6, HIDDEN_LAYERS.has(name) ? 'DASHED' : CENTER_LAYERS.has(name) ? 'CENTER' : 'CONTINUOUS'],
-    );
+    const lineTypeName = HIDDEN_LAYERS.has(name) ? 'DASHED' : CENTER_LAYERS.has(name) ? 'CENTER' : 'CONTINUOUS';
+    groups.push([0, 'LAYER'], [2, name], [70, 0], [62, color], [6, lineTypeName]);
   }
   groups.push([0, 'ENDTAB'], [0, 'ENDSEC']);
   return flatten(groups);
 }
 
 /** The complete R12 file text (header, layer table, entities) of everything `writer` holds. */
+// prettier-ignore
 export function assembleDxf(doc: Pick<CadDocument, 'units'>, writer: DxfWriter): string {
   return [
-    ...header(doc, writer.bounds()),
-    ...tables(writer.layers),
-    ...flatten([
-      [0, 'SECTION'],
-      [2, 'ENTITIES'],
-    ]),
-    ...writer.lines,
-    ...flatten([
-      [0, 'ENDSEC'],
-      [0, 'EOF'],
-    ]),
+    ...header(doc, writer.bounds()), ...tables(writer.layers), ...flatten([[0, 'SECTION'], [2, 'ENTITIES']]),
+    ...writer.lines, ...flatten([[0, 'ENDSEC'], [0, 'EOF']]),
   ].join('\n');
 }
 
-export interface DxfExport {
-  readonly filename: string;
-  readonly dxf: string;
-  readonly entityCount: number;
-  readonly layers: string[];
-}
+export type DxfExport = { readonly filename: string; readonly dxf: string; readonly entityCount: number; readonly layers: string[] };
 
 /**
  * Builds the DXF text. @pure
@@ -226,10 +180,9 @@ export const exportDxf = defineCommand({
   name: 'export_dxf',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Export a DXF (AutoCAD R12 ASCII, opens in AutoCAD, BricsCAD, DraftSight, LibreCAD, Revit…) of a ' +
-    'level floor plan: wall poché cut at 1.2 m, door swings, windows, columns, beams (dashed), stairs, ' +
-    'room tags, grid bubbles and overall / grid dimensions on AIA layers (A-WALL, A-DOOR, A-GLAZ, S-GRID…), ' +
-    'plus the document’s own 2D drafting and its 3D solids as a technical top view (visible edges on ' +
+    'Export a DXF (AutoCAD R12 ASCII, opens in AutoCAD, BricsCAD, DraftSight, LibreCAD, Revit…) of a level floor plan: wall poché cut at ' +
+    '1.2 m, door swings, windows, columns, beams (dashed), stairs, room tags, grid bubbles and overall / grid dimensions on AIA layers ' +
+    '(A-WALL, A-DOOR, A-GLAZ, S-GRID…), plus the document’s own 2D drafting and its 3D solids as a technical top view (visible edges on ' +
     'OBJ-VISIBLE, hidden edges dashed on OBJ-HIDDEN, centre lines on OBJ-CENTER). data.dxf holds the file text.',
   params: z.object({
     levelId: z.string().optional().describe('Level to plot. Default: the active level.'),

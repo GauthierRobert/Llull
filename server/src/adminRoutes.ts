@@ -38,10 +38,9 @@ export function buildAdminRouter(restLimiter: RequestHandler): Router {
   router.get('/admin/users', restLimiter, adminGuard, (_req, res) => {
     const users = loadUsers();
     const licensed = licensedUserIds(users, getLicense().seats);
-    res.status(200).json({
-      userMode: isUserMode(),
-      users: users.map(({ id, name, role }) => ({ id, name, role, licensed: licensed.has(id) })),
-    });
+    res
+      .status(200)
+      .json({ userMode: isUserMode(), users: users.map(({ id, name, role }) => ({ id, name, role, licensed: licensed.has(id) })) });
   });
 
   router.get('/admin/audit', restLimiter, adminGuard, (req, res) => {

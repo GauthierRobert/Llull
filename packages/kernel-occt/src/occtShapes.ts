@@ -131,10 +131,7 @@ export function placementTransform(api: OccApi, rotation: Vec3, position: Vec3, 
 
 /** Copy of `shape` moved by `transform` (geometry copied); neither input is released. */
 export function transformedCopy(api: OccApi, shape: OccShape, transform: OccHandle): OccShape {
-  const transformer = new api.BRepBuilderAPI_Transform_2(shape, transform, true) as {
-    Shape(): OccShape;
-    delete(): void;
-  };
+  const transformer = new api.BRepBuilderAPI_Transform_2(shape, transform, true) as { Shape(): OccShape; delete(): void };
   const moved = transformer.Shape();
   transformer.delete();
   return moved;
@@ -185,10 +182,7 @@ function revolvedPrimitive(api: OccApi, entity: Entity): OccShape | null {
 /** Sweep `face` along `offset` into a prism, placed at the entity's rotation and position. */
 function prism(api: OccApi, face: OccShape, offset: Vec3, entity: Entity): OccShape {
   const direction: OccHandle = new api.gp_Vec_4(...offset);
-  const maker = new api.BRepPrimAPI_MakePrism_1(face, direction, false, true) as {
-    Shape(): OccShape;
-    delete(): void;
-  };
+  const maker = new api.BRepPrimAPI_MakePrism_1(face, direction, false, true) as { Shape(): OccShape; delete(): void };
   const shape = maker.Shape();
   [maker, direction, face].forEach(release);
   return placed(api, shape, entity);
@@ -243,10 +237,7 @@ function revolvedProfile(api: OccApi, entity: Entity): OccShape | null {
   const origin: OccHandle = new api.gp_Pnt_3(0, 0, 0);
   const direction: OccHandle = new api.gp_Dir_4(...sweepAxis);
   const axis: OccHandle = new api.gp_Ax1_2(origin, direction);
-  const maker = new api.BRepPrimAPI_MakeRevol_1(face, axis, entity.angle, false) as {
-    Shape(): OccShape;
-    delete(): void;
-  };
+  const maker = new api.BRepPrimAPI_MakeRevol_1(face, axis, entity.angle, false) as { Shape(): OccShape; delete(): void };
   const shape = maker.Shape();
   [maker, axis, direction, origin, face].forEach(release);
   return placed(api, shape, entity);
@@ -294,10 +285,7 @@ export function entityToOccShape(api: OccApi, entity: Entity): OccShape | null {
   const rotated = entity.rotation.some((angle) => angle !== 0);
   const [ox, oy, oz] = rotated ? [-sx / 2, -sy / 2, -sz / 2] : [px - sx / 2, py - sy / 2, pz - sz / 2];
   const origin: OccHandle = new api.gp_Pnt_3(ox, oy, oz);
-  const maker = new api.BRepPrimAPI_MakeBox_2(origin, sx, sy, sz) as {
-    Shape(): OccShape;
-    delete(): void;
-  };
+  const maker = new api.BRepPrimAPI_MakeBox_2(origin, sx, sy, sz) as { Shape(): OccShape; delete(): void };
   const shape = maker.Shape();
   origin.delete();
   maker.delete();

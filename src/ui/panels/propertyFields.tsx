@@ -4,12 +4,12 @@ import { parseNumber } from '@ui/numberText';
 
 const AXES = ['x', 'y', 'z'] as const;
 
-/** Read-only number display: always 3 decimals. */
+/** Always 3 decimals. */
 function formatReadout(n: number): string {
   return n.toFixed(3);
 }
 
-/** Shortest text for an editable field: 3 decimals at most, no trailing zeros, no "-0". */
+/** ≤ 3 decimals, no trailing zeros, no "-0". */
 function formatEditableNumber(n: number): string {
   return fixedNumber(n, 3);
 }
@@ -34,7 +34,7 @@ export function ScalarRow({ label, value, unit }: { label: string; value: number
   );
 }
 
-/** Text input that reports its value on Enter or blur; Esc reverts. */
+/** Reports on Enter or blur; Esc reverts. */
 export function CommitInput({
   value,
   label,
@@ -54,10 +54,10 @@ export function CommitInput({
   inputMode?: 'decimal';
   autoFocus?: boolean;
   onCommit: (text: string) => void;
-  /** Called after every blur (committed, unchanged or cancelled) so a caller can close the editor. */
+  /** After every blur (committed, unchanged or cancelled), e.g. to close the editor. */
   onFinish?: () => void;
   testId?: string;
-  /** Extra native attributes (type, title, aria-*); the editing handlers stay ours. */
+  /** Native attributes; the editing handlers stay ours. */
   inputProps?: Omit<
     React.InputHTMLAttributes<HTMLInputElement>,
     'value' | 'onChange' | 'onBlur' | 'onKeyDown' | 'className' | 'placeholder' | 'inputMode'
@@ -67,7 +67,7 @@ export function CommitInput({
   const [seenValue, setSeenValue] = useState(value);
   const [focused, setFocused] = useState(false);
   const cancelledRef = useRef(false);
-  // An external change (undo, live sync, an agent) replaces the draft — unless the user is typing.
+  // External changes (undo, live sync, an agent) replace the draft unless the user is typing.
   if (value !== seenValue && !focused) {
     setSeenValue(value);
     setDraft(value);
@@ -87,15 +87,13 @@ export function CommitInput({
       onFocus={() => setFocused(true)}
       onBlur={() => {
         setFocused(false);
-        // Escape sets the flag before blurring: the blur handler would otherwise still see the
-        // typed draft in its closure and commit it.
+        // Set before blurring: the blur handler's closure would otherwise commit the typed draft.
         const cancelled = cancelledRef.current;
         cancelledRef.current = false;
         if (cancelled) setDraft(value);
         else if (draft !== value) {
           onCommit(draft);
-          // A rejected edit (unparseable number) leaves the stored value as is: show it again.
-          // An accepted one changes `value`, which the prop sync above turns into the new draft.
+          // Rejected edit: show the stored value again (an accepted one arrives via the prop sync above).
           setDraft(value);
         }
         onFinish?.();
@@ -113,13 +111,13 @@ export function CommitInput({
 
 interface AxisFieldsProps {
   values: readonly number[];
-  /** Accessible label prefix; required with `onAxisCommit`. */
+  /** Required with `onAxisCommit`. */
   label?: string;
-  /** When set the triple is editable and receives the parsed finite value only. */
+  /** Editable when set; receives parsed finite values only. */
   onAxisCommit?: (axisIndex: number, value: number) => void;
 }
 
-/** X/Y/Z triple; editable fields are keyed by stored value so they reset when the document changes. */
+/** Editable fields are keyed by stored value so they reset when the document changes. */
 export function AxisFields({ values, label, onAxisCommit }: AxisFieldsProps): React.ReactElement {
   return (
     <div className="axis-fields">

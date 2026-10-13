@@ -1,9 +1,8 @@
 /**
- * Superelevation: the cross slope of each carriageway side along an alignment. Normal crown on
- * tangents; per curve, the adverse (outer) side runs out to flat and on to the full rate at a constant
- * rotation rate, then the whole section tilts as one plane about the centreline, outer side raised.
- * Entry / exit ramps end at the SC / CS (spiral) or 30 % of the runoff into the circle (no spiral).
- * Slopes are ratios "falling away from the centreline" (negative = rising).
+ * Superelevation: the cross slope of each carriageway side along an alignment. Normal crown on tangents; per curve, the adverse (outer)
+ * side runs out to flat and on to the full rate at a constant rotation rate, then the whole section tilts as one plane about the
+ * centreline, outer side raised. Entry / exit ramps end at the SC / CS (spiral) or 30 % of the runoff into the circle (no spiral). Slopes
+ * are ratios "falling away from the centreline" (negative = rising).
  */
 
 import type { AlignmentObject } from '@core/model/civil';
@@ -89,9 +88,8 @@ function curvePlan(alignment: AlignmentObject, crossfall: number, laneWidth: num
 }
 
 /**
- * Cross slopes of both carriageway sides at each requested station. `crossfall` is the normal crown
- * and `laneWidth` sizes the relative-gradient runoff of curves without a spiral. Without a
- * superelevation design the result is the normal crown everywhere.
+ * Cross slopes of both carriageway sides at each requested station. `crossfall` is the normal crown and `laneWidth` sizes the
+ * relative-gradient runoff of curves without a spiral. Without a superelevation design the result is the normal crown everywhere.
  */
 export function crossSlopesAt(alignment: AlignmentObject, crossfall: number, laneWidth: number, station: number): CrossSlopes {
   const crown: CrossSlopes = { left: crossfall, right: crossfall };
@@ -113,8 +111,8 @@ export function crossSlopesAt(alignment: AlignmentObject, crossfall: number, lan
 }
 
 /**
- * Signed superelevation rate: (left fall - right fall) / 2. Positive = banked for a left-hand curve
- * (section falls to the left), negative = right-hand, 0 on the normal crown.
+ * Signed superelevation rate: (left fall - right fall) / 2. Positive = banked for a left-hand curve (section falls to the left), negative =
+ * right-hand, 0 on the normal crown.
  */
 export function superelevationRate(slopes: CrossSlopes): number {
   return (slopes.left - slopes.right) / 2;

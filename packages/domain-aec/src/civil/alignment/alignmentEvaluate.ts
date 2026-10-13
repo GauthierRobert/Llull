@@ -1,6 +1,6 @@
 /**
- * Evaluates a road alignment: centreline, station ticks + labels, curve annotations, and (with a
- * profile and road section) the corridor mesh, side slopes and daylight lines.
+ * Evaluates a road alignment: centreline, station ticks + labels, curve annotations, and (with a profile and road section) the corridor
+ * mesh, side slopes and daylight lines.
  */
 
 import type { Entity, Vec2 } from '@core/model/types';

@@ -1,17 +1,7 @@
 /**
- * State machine for interactive 2D draw tools.
- *
- * Collects snapped click points, manages in-progress state, and on
- * completion calls store.dispatch with the matching draw_* command.
- *
- * Rules:
- * - NO entity is built here (PRIME DIRECTIVE). Dispatch only.
- * - Snap is applied by the caller via useSnap; this hook receives
- *   already-snapped world coords.
- * - Esc cancels the current in-progress shape; Esc with nothing in progress returns to Select.
- * - Enter or double-click finishes a polyline, wall chain or spline in progress.
- * - 'move' translates the current selection by (second click - first click) via move_entities.
- * - The hook is purely React state + callbacks — no three.js here.
+ * 2D draw-tool state machine over already-snapped world points → draw_* dispatch (no entity built here).
+ * Esc cancels the shape in progress, then returns to Select; Enter / double-click finishes a chain (polyline, wall, spline);
+ * 'move' translates the selection by (second − first click) via move_entities.
  */
 
 import { useState, useCallback, useRef } from 'react';
@@ -23,18 +13,11 @@ import { useToolKeys } from '@ui/hooks/useToolKeys';
 import { drawToolDescriptor, isChainTool } from './drawToolTable';
 
 interface UseDrawToolResult {
-  /** The currently active tool. */
   activeTool: DrawToolKind;
-  /** Points collected so far in the current drawing operation. */
   collectedPoints: Vec2[];
-  /** Set the active draw tool; resets in-progress state. */
   setActiveTool: (tool: DrawToolKind) => void;
-  /**
-   * Record a snapped click at world position.
-   * Handles the state transitions and dispatch for each tool.
-   */
   handleClick: (point: Vec2) => void;
-  /** Finish the polyline / wall chain / spline in progress (double-click or Enter). */
+  /** Double-click or Enter. */
   finishChain: () => void;
 }
 
@@ -50,22 +33,17 @@ export function useDrawTool(): UseDrawToolResult {
   const dispatch = useStore((s) => s.dispatch);
   const activeTool = useToolStore((s) => s.drawTool);
   const setDrawTool = useToolStore((s) => s.setDrawTool);
-  // Points belong to the tool that collected them; switching tools (toolbar, shortcut, palette)
-  // therefore drops them without an effect.
+  // Points belong to the tool that collected them, so switching tools drops them without an effect.
   const [progress, setProgress] = useState<DrawProgress>(EMPTY_PROGRESS);
   const collectedPoints = progress.tool === activeTool ? progress.points : EMPTY_POINTS;
   const inProgress = collectedPoints.length > 0;
-  // Synchronous mirror of `progress`: a fast double-click delivers click, click, dblclick before the
-  // canvas root re-renders, so finishChain must not read the points from its render closure.
+  // Synchronous mirror: a fast double-click delivers click, click, dblclick before the root re-renders.
   const progressRef = useRef<DrawProgress>(EMPTY_PROGRESS);
   const setCollectedPoints = useCallback(
     (next: Vec2[] | ((previous: Vec2[]) => Vec2[])) => {
       const previous = progressRef.current;
       const current = previous.tool === activeTool ? previous.points : EMPTY_POINTS;
-      progressRef.current = {
-        tool: activeTool,
-        points: typeof next === 'function' ? next(current) : next,
-      };
+      progressRef.current = { tool: activeTool, points: typeof next === 'function' ? next(current) : next };
       setProgress(progressRef.current);
     },
     [activeTool],
@@ -79,7 +57,7 @@ export function useDrawTool(): UseDrawToolResult {
     [setDrawTool, setCollectedPoints],
   );
 
-  /** Points of the shape in progress, read from the synchronous mirror (never the render closure). */
+  /** Read from the synchronous mirror, never the render closure. */
   const livePoints = useCallback(
     (): Vec2[] => (progressRef.current.tool === activeTool ? progressRef.current.points : EMPTY_POINTS),
     [activeTool],
@@ -95,11 +73,9 @@ export function useDrawTool(): UseDrawToolResult {
     (point: Vec2) => {
       const descriptor = drawToolDescriptor(activeTool);
       if (!descriptor) return;
-      if (descriptor.requiresSelection && useStore.getState().document.selection.length === 0) {
-        return;
-      }
+      if (descriptor.requiresSelection && useStore.getState().document.selection.length === 0) return;
       const next = [...livePoints(), point];
-      // Chains keep appending until finishChain() (Enter / double-click); the others commit at maxPoints.
+      // Chains append until finishChain(); the others commit at maxPoints.
       if (descriptor.maxPoints === null || next.length < descriptor.maxPoints) {
         setCollectedPoints(next);
         return;
@@ -110,7 +86,6 @@ export function useDrawTool(): UseDrawToolResult {
     [activeTool, dispatch, livePoints, setCollectedPoints],
   );
 
-  // Keyboard: Escape cancels; Enter finishes a polyline, wall chain or spline.
   const clearPoints = useCallback(() => setCollectedPoints([]), [setCollectedPoints]);
   const disarm = useCallback(() => setActiveTool('none'), [setActiveTool]);
   useToolKeys({
@@ -121,8 +96,7 @@ export function useDrawTool(): UseDrawToolResult {
     onEnter: isChainTool(activeTool) ? finishChain : null,
   });
 
-  // Ctrl/Cmd+Z mid-operation removes the last collected point instead of undoing the document.
-  // stopPropagation so the global undo shortcut never sees it.
+  // Ctrl/Cmd+Z mid-operation drops the last point; stopPropagation hides it from the global undo shortcut.
   const onUndoKey = useCallback(
     (e: KeyboardEvent): void => {
       if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.key.toLowerCase() !== 'z') return;

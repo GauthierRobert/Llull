@@ -1,11 +1,9 @@
 /**
- * Names and colors for STEP text written by a kernel: the kernel transfers each solid as its own
- * product (`Open CASCADE STEP translator <ver> <n>`) in input order, which `labelStep` rewrites to
- * the entity label and tags with a STYLED_ITEM color chain. Text-level on purpose: kernels expose
- * only `exportStep(shapes)`, and the label data lives in the document, not in the shape.
- *
- * @failure text that is not recognizably kernel STEP, or a product/solid count that does not match
- *   the labels -> that part is left untouched (never throws, never corrupts)
+ * Names and colors for STEP text written by a kernel: the kernel transfers each solid as its own product (`Open CASCADE STEP translator
+ * <ver> <n>`) in input order, which `labelStep` rewrites to the entity label and tags with a STYLED_ITEM color chain. Text-level on
+ * purpose: kernels expose only `exportStep(shapes)`, and the label data lives in the document, not in the shape.
+ * @failure text that is not recognizably kernel STEP, or a product/solid count that does not match the labels -> that part is left
+ *   untouched (never throws, never corrupts)
  */
 
 import { isHexColor, parseHexRgb } from '../../lib/isHexColor';
@@ -35,9 +33,7 @@ export function stepString(text: string): string {
   for (const char of text.replace(/[\p{Cc}\u2028\u2029]+/gu, ' ')) {
     const code = char.codePointAt(0) ?? 0;
     if (code > 126) {
-      for (let i = 0; i < char.length; i++) {
-        wide += char.charCodeAt(i).toString(16).toUpperCase().padStart(4, '0');
-      }
+      for (let i = 0; i < char.length; i++) wide += char.charCodeAt(i).toString(16).toUpperCase().padStart(4, '0');
       continue;
     }
     flush();
@@ -122,12 +118,11 @@ export function labelStep(step: string, labels: readonly StepLabel[]): string {
     const label = labels[index];
     if (label === undefined) return;
     const items = geometryItems(labeled, match[2] ?? '');
-    for (const item of items) {
+    for (const item of items)
       withNames = withNames.replace(
         new RegExp(`(${item} = (?:MANIFOLD_SOLID_BREP|BREP_WITH_VOIDS)\\()''`),
         `$1'${stepString(label.name)}'`,
       );
-    }
     const rgb = rgbOf(label.color);
     if (rgb !== null && items.length > 0) styled.push({ items, rgb });
   });

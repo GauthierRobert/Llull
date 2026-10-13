@@ -1,7 +1,4 @@
-/**
- * RestoredBanner — tells the user their unsaved work was restored from autosave and offers
- * "Start fresh" (dispatches `clear_document`, drops the autosave). Presentation only.
- */
+// "Restored from autosave" banner with "Start fresh" (dispatches `clear_document`, drops the autosave).
 
 import React, { useEffect } from 'react';
 import { useStore } from '@ui/store';

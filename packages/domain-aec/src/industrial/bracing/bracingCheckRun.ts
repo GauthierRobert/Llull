@@ -20,34 +20,28 @@ export const checkBracing = defineCommand({
   name: 'check_bracing',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Preliminary wind-bracing check of the steel hall on a level (members with role brace, e.g. from ' +
-    'add_portal_frame_building). Longitudinal wind on the gable: ULS force = 1.5 · qp · (0.8 + 0.5) · ' +
-    'gable area (span × eaves + roof triangle, from the end-frame rafters/columns). Half goes to the ' +
-    'roof level and, with the EN 1993-1-1 §5.3.3 equivalent stabilising force (1/200 of the roof ULS ' +
-    'vertical load 1.35 deadLoad + 1.5 snowLoad), is carried by the roof X-bracing as a horizontal ' +
-    'truss, shared equally by the braced end bays; the roof reactions go to the wall X-bracing. ' +
-    'Diagonals are tension-only: one per X carries the panel shear / cos θ, checked against ' +
-    'Npl,Rd = A·fy (γM0 = 1, net = gross for welded ends). The transverse component is carried in ' +
-    'compression by the rafter (roof) or column (wall), checked for minor-axis buckling χ·Npl,Rd ' +
-    'with Lcr = bay length. Gable posts: net pressure cpe + cpi = 0.8 + 0.2 = 1.0 on one wall, simply supported bending ' +
-    'q·tributary·h²/8 vs Mpl and shear. The roof truss spans the full hall width on the two outer ' +
-    'walls: panel shear V = w·(W/2 − d) (w = bay force / W, d = distance of the panel edge from the ' +
-    'nearest wall), so wall-side panels carry about half the bay force. Struts: wall = column, Lcr = ' +
-    'column height; roof = rafter, Lcr = purlin gap along the rafter; plus the eaves purlin carrying ' +
-    'the truss reaction (bay force / 2) with Lcr = bay length (row flagged utilisation 99 if absent). ' +
-    'On multi-span halls the internal column lines carry no wall bracing, so the roof truss still spans ' +
-    'the full hall width and the reaction (bay force / 2) acts at the two OUTER wall lines only: the ' +
-    'eaves-strut force equals that of a single-span hall of the same gable area (it grows with the gable, ' +
-    'e.g. a monopitch gable is larger than a duopitch one), and a light eaves purlin such as the default ' +
-    'C200x75x2.5 over a 6 m bay (about 36 kN) can fail at qp above about 0.7 kN/m²: fit a heavier eaves ' +
-    'purlin (update_steel_member) rather than treating the force as an error.' +
-    ' Crane longitudinal path (runway beams, role crane, on a long wall): per runway line the force at rail level is max(1.35 HL,i = ' +
-    '1.35 φ5 K/nr of groups 1/5, HB,1/nr of group 7 with accidental γ = 1.0, HB,1 = 1.25 · 0.7 travelSpeed · √(mc SB), crane mass only) ' +
-    'and is added to the shear of the wall X-bracing panels on that side (shared equally by the braced bays of that wall; ' +
-    'assumes the existing wall X-bracing takes it, no separate crane bracing below the rail). Rows "crane longitudinal (group 1 / group 7)" ' +
-    'report the crane-only part; data.crane gives the horizontal force (along y) at the foundations of the braced-bay columns. ' +
-    'Rows are grouped (roof bracing, wall bracing per side, gable posts); utilisation > 1 ' +
-    'fails. Not covered: frame action, uplift, self-weight, connections - a preliminary check.',
+    'Preliminary wind-bracing check of the steel hall on a level (members with role brace, e.g. from add_portal_frame_building). ' +
+    'Longitudinal wind on the gable: ULS force = 1.5 · qp · (0.8 + 0.5) · gable area (span × eaves + roof triangle, from the end-frame ' +
+    'rafters/columns). Half goes to the roof level and, with the EN 1993-1-1 §5.3.3 equivalent stabilising force (1/200 of the roof ULS ' +
+    'vertical load 1.35 deadLoad + 1.5 snowLoad), is carried by the roof X-bracing as a horizontal truss, shared equally by the braced ' +
+    'end bays; the roof reactions go to the wall X-bracing. Diagonals are tension-only: one per X carries the panel shear / cos θ, ' +
+    'checked against Npl,Rd = A·fy (γM0 = 1, net = gross for welded ends). The transverse component is carried in compression by the ' +
+    'rafter (roof) or column (wall), checked for minor-axis buckling χ·Npl,Rd with Lcr = bay length. Gable posts: net pressure cpe + cpi ' +
+    '= 0.8 + 0.2 = 1.0 on one wall, simply supported bending q·tributary·h²/8 vs Mpl and shear. The roof truss spans the full hall width ' +
+    'on the two outer walls: panel shear V = w·(W/2 − d) (w = bay force / W, d = distance of the panel edge from the nearest wall), so ' +
+    'wall-side panels carry about half the bay force. Struts: wall = column, Lcr = column height; roof = rafter, Lcr = purlin gap along ' +
+    'the rafter; plus the eaves purlin carrying the truss reaction (bay force / 2) with Lcr = bay length (row flagged utilisation 99 if ' +
+    'absent). On multi-span halls the internal column lines carry no wall bracing, so the roof truss still spans the full hall width and ' +
+    'the reaction (bay force / 2) acts at the two OUTER wall lines only: the eaves-strut force equals that of a single-span hall of the ' +
+    'same gable area (it grows with the gable, e.g. a monopitch gable is larger than a duopitch one), and a light eaves purlin such as ' +
+    'the default C200x75x2.5 over a 6 m bay (about 36 kN) can fail at qp above about 0.7 kN/m²: fit a heavier eaves purlin ' +
+    '(update_steel_member) rather than treating the force as an error. Crane longitudinal path (runway beams, role crane, on a long ' +
+    'wall): per runway line the force at rail level is max(1.35 HL,i = 1.35 φ5 K/nr of groups 1/5, HB,1/nr of group 7 with accidental γ ' +
+    '= 1.0, HB,1 = 1.25 · 0.7 travelSpeed · √(mc SB), crane mass only) and is added to the shear of the wall X-bracing panels on that ' +
+    'side (shared equally by the braced bays of that wall; assumes the existing wall X-bracing takes it, no separate crane bracing below ' +
+    'the rail). Rows "crane longitudinal (group 1 / group 7)" report the crane-only part; data.crane gives the horizontal force (along ' +
+    'y) at the foundations of the braced-bay columns. Rows are grouped (roof bracing, wall bracing per side, gable posts); utilisation > ' +
+    '1 fails. Not covered: frame action, uplift, self-weight, connections - a preliminary check.',
   params: z.object({
     windPressure: z
       .number()

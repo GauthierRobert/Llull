@@ -1,10 +1,8 @@
 /**
  * Query commands — read-only document inspection that returns structured data.
  *
- * These commands never mutate the document. They return the unchanged doc,
- * `affected:[]`, a factual `summary`, and structured results in `data`.
- * Designed so AI/MCP agents can filter and locate entities by meaning rather
- * than juggling generated ids.
+ * These commands never mutate the document. They return the unchanged doc, `affected:[]`, a factual `summary`, and structured results in
+ * `data`. Designed so AI/MCP agents can filter and locate entities by meaning rather than juggling generated ids.
  */
 
 import { type EntityKind, SHAPE2D_KINDS, SOLID_KINDS } from '../../model/types';
@@ -156,7 +154,6 @@ export const findEntities = defineCommand({
       nameFuzzy,
       tagFuzzy,
     } = params;
-
     const fail = failer(doc, 'find_entities');
     if ((bboxMin === undefined) !== (bboxMax === undefined)) return fail('bboxMin and bboxMax must both be provided or both omitted');
     if (nearPoint !== undefined && nearPoint.radius <= 0) return fail('nearPoint.radius must be a finite number > 0');
@@ -170,7 +167,6 @@ export const findEntities = defineCommand({
     const nameLc = name?.toLowerCase();
     const nameFuzzyLc = nameFuzzy?.toLowerCase();
     const tagFuzzyLc = tagFuzzy?.toLowerCase();
-
     const matches: EntityMatch[] = [];
     for (const e of orderedEntities(doc)) {
       if (kind !== undefined && e.kind !== kind) continue;
@@ -183,7 +179,6 @@ export const findEntities = defineCommand({
       if (nameFuzzyLc !== undefined && !e.name?.toLowerCase().includes(nameFuzzyLc)) continue;
       if (tagFuzzyLc !== undefined && !e.tags?.some((t) => t.toLowerCase().includes(tagFuzzyLc))) continue;
       if (touchingId !== undefined && e.id === touchingId) continue;
-
       const needsBounds = bboxMin || nearPoint || insideBBox || overlapsBBox || touchingBounds;
       if (needsBounds) {
         const b = entityBoundsInDoc(doc, e);
@@ -193,7 +188,6 @@ export const findEntities = defineCommand({
         if (overlapsBBox && !boundsOverlap(b, { min: overlapsBBox[0], max: overlapsBBox[1] })) continue;
         if (touchingBounds && !boundsOverlap(b, touchingBounds)) continue;
       }
-
       matches.push({
         id: e.id,
         kind: e.kind,
@@ -202,7 +196,6 @@ export const findEntities = defineCommand({
         ...(e.tags !== undefined ? { tags: e.tags } : {}),
       });
     }
-
     // --- Build summary ---
     const filterParts: string[] = [];
     if (kind !== undefined) filterParts.push(`kind=${kind}`);
@@ -217,9 +210,7 @@ export const findEntities = defineCommand({
     if (nameFuzzy !== undefined) filterParts.push(`nameFuzzy~"${nameFuzzy}"`);
     if (tagFuzzy !== undefined) filterParts.push(`tagFuzzy~"${tagFuzzy}"`);
     const filterDesc = filterParts.length > 0 ? ` [${filterParts.join(', ')}]` : '';
-
     const result: FindEntitiesResult = { matches, count: matches.length };
-
     return report(
       doc,
       `find_entities${filterDesc}: ${matches.length} match${matches.length === 1 ? '' : 'es'} (of ${doc.order.length} total).`,

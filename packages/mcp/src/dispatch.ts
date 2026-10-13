@@ -16,11 +16,7 @@ interface McpTextContent {
  * @invariant a type alias, not an interface: only an alias is assignable to the SDK's
  *            index-signatured CallToolResult (server/src/mcp/server.ts relies on it, no casts).
  */
-export type McpShapedResult = {
-  content: McpTextContent[];
-  isError: boolean;
-  structuredContent?: Record<string, unknown>;
-};
+export type McpShapedResult = { content: McpTextContent[]; isError: boolean; structuredContent?: Record<string, unknown> };
 
 /** The `text` of a `{ format: 'code', text }` data record, else null. */
 function codeText(data: unknown): string | null {
@@ -92,10 +88,7 @@ export function shapeToolCallContent(result: { summary: string; affected: string
   const jsonData = isRecord(data) && code !== null ? { ...data, text: '(source code in the next block)' } : data;
   content.push({ type: 'text', text: `\`\`\`json\n${jsonText(jsonData)}\n\`\`\`` });
   if (code !== null) {
-    content.push({
-      type: 'text',
-      text: clip(code, MAX_CODE_TEXT_CHARS, 'the full source is in structuredContent.text'),
-    });
+    content.push({ type: 'text', text: clip(code, MAX_CODE_TEXT_CHARS, 'the full source is in structuredContent.text') });
   }
   return { content, isError, structuredContent: structuredOf(data, affected) };
 }

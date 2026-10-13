@@ -18,14 +18,9 @@ interface FootingDesignOutcome {
   readonly change?: string;
 }
 
+// prettier-ignore
 const emptyRow = {
-  barDiameter: null,
-  spacing: null,
-  asProvided: null,
-  asRequired: 0,
-  shearUtilisation: 0,
-  punchingUtilisation: 0,
-  punchingDistance: 0,
+  barDiameter: null, spacing: null, asProvided: null, asRequired: 0, shearUtilisation: 0, punchingUtilisation: 0, punchingDistance: 0,
   combination: '-',
 } as const;
 
@@ -81,11 +76,7 @@ export function designFootingRow(inputs: FootingDesignInputs): FootingDesignOutc
   const chosen = verdict.passes ? verdict.mat?.chosen : null;
   if (chosen) {
     const resized = isResized(size, current);
-    const reinforcement = {
-      barDiameter: fromMm(doc, chosen.diameter),
-      spacing: fromMm(doc, chosen.spacing),
-      cover: fromMm(doc, COVER_MM),
-    };
+    const reinforcement = { barDiameter: fromMm(doc, chosen.diameter), spacing: fromMm(doc, chosen.spacing), cover: fromMm(doc, COVER_MM) };
     const { reinforcement: previous, ...bare } = footing;
     const row: FootingDesignRow = {
       ...base,
@@ -114,13 +105,7 @@ export function designFootingRow(inputs: FootingDesignInputs): FootingDesignOutc
       row,
       updated: {
         ...bare,
-        ...(resized
-          ? {
-              width: fromMm(doc, size[0]),
-              length: fromMm(doc, size[1]),
-              thickness: fromMm(doc, size[2]),
-            }
-          : {}),
+        ...(resized ? { width: fromMm(doc, size[0]), length: fromMm(doc, size[1]), thickness: fromMm(doc, size[2]) } : {}),
         reinforcement,
       },
       change: `${footing.mark}${resized ? ` ${sizeText(current)} → ${sizeText(size)}` : ''} H${chosen.diameter} @ ${chosen.spacing}`,

@@ -1,6 +1,6 @@
 /**
- * The single replay-step runner shared by `replayHistory` (history.ts) and recipe
- * instantiation (recipes.ts): resolve `=expr` params, remap stale ids, run, extend the id map.
+ * The single replay-step runner shared by `replayHistory` (history.ts) and recipe instantiation (recipes.ts): resolve `=expr` params, remap
+ * stale ids, run, extend the id map.
  */
 
 import type { CadDocument, FeatureStep } from '../../model/types';
@@ -11,9 +11,8 @@ import type { CommandDefinition, CommandResult } from '../types';
 import { buildParamEnv, extendIdMap, remapIds, resolveStepParams } from './regenerate';
 
 /**
- * Params a recorded `step` receives when replayed on `doc`: `=expr` resolved against
- * `doc.parameters` (failures pushed to `warnings` as `<warningLabel> '<name>' param ...`),
- * then ids remapped through `idMap`.
+ * Params a recorded `step` receives when replayed on `doc`: `=expr` resolved against `doc.parameters` (failures pushed to `warnings` as
+ * `<warningLabel> '<name>' param ...`), then ids remapped through `idMap`.
  */
 export function resolveStepForReplay(
   step: FeatureStep,
@@ -25,9 +24,7 @@ export function resolveStepForReplay(
   // A recorded plan (loop) resolves its own `=expr` per iteration, with its loop variables.
   if (step.name === 'build_project') return remapIds(step.params, idMap);
   const { resolved, errors } = resolveStepParams(step.params, buildParamEnv(doc.parameters));
-  for (const e of errors) {
-    warnings?.push(`${warningLabel} '${step.name}' param '${e.path}': ${e.expression} — ${e.reason}`);
-  }
+  for (const e of errors) warnings?.push(`${warningLabel} '${step.name}' param '${e.path}': ${e.expression} — ${e.reason}`);
   return remapIds(resolved, idMap);
 }
 
@@ -59,9 +56,7 @@ export function runReplayStep(
       const stepKey = stepKeyOf(step.id);
       const stepContext: ExecutionContext = { ...context, ids: stepIdSource(stepKey), stepKey };
       result = runInContext(stepContext, () => cmd.run(doc, params, stepContext));
-    } else {
-      result = cmd.run(doc, params, context);
-    }
+    } else result = cmd.run(doc, params, context);
     extendIdMap(idMap, step.affected, result.affected);
     return result;
   } catch {

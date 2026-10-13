@@ -1,8 +1,4 @@
-/**
- * CivilPanel — the civil / site-engineering workspace, in workflow order: 1 survey, 2 terrain,
- * 3 earthworks, 4 roads, 5 drainage, 6 exports. Every change goes through dispatch (PRIME
- * DIRECTIVE); reports and exports run read-only commands locally.
- */
+// Civil / site workspace in workflow order: 1 survey, 2 terrain, 3 earthworks, 4 roads, 5 drainage, 6 exports.
 
 import React from 'react';
 import { classNames } from '@ui/classNames';

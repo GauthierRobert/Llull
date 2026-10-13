@@ -121,9 +121,7 @@ export const drawRectangle = defineCommand({
     color: colorField(DEFAULT_DRAW_COLOR),
   }),
   run: (doc, { width, height, position = ORIGIN, color = DEFAULT_DRAW_COLOR }): CommandResult => {
-    if (width <= 0 || height <= 0) {
-      return noop(doc, `draw_rectangle: width and height must both be > 0 (got ${width}×${height}).`);
-    }
+    if (width <= 0 || height <= 0) return noop(doc, `draw_rectangle: width and height must both be > 0 (got ${width}×${height}).`);
     const id = nextId('rect');
     const entity = newEntity('rectangle', id, { width, height }, position, color);
     return commitEntity(doc, entity, `Drew rectangle ${id} ${width}×${height} at [${position.join(', ')}].`);

@@ -1,7 +1,4 @@
-/**
- * LabeledSelect — the `field` label + native select over `[value, text]` options, with an optional
- * blank first choice.
- */
+// `field` label + select over `[value, text]` options, optional blank first choice.
 
 import React from 'react';
 import { PairSelect } from '@ui/panels/OptionSelect';

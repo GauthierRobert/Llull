@@ -1,9 +1,5 @@
-/**
- * BuildingPanel — the construction (AEC/BIM) workspace, in workflow order: starter templates (empty)
- * or view actions, 1 levels, 2 element tools + the active level's elements, equipment editor,
- * 3 structural / clash checks, 4 quantities & cost, project title block, 5 deliverables.
- * Every change goes through dispatch (PRIME DIRECTIVE); exports run read-only commands.
- */
+// AEC/BIM workspace in workflow order: starters (empty) or view actions, 1 levels, 2 element tools + active level's
+// elements, equipment, 3 structural / clash checks, 4 quantities & cost, project title block, 5 deliverables.
 
 import React from 'react';
 import { classNames } from '@ui/classNames';
@@ -19,7 +15,7 @@ import { BuildingExportsSection } from './BuildingExportsSection';
 import { ClashSection } from './ClashSection';
 import { StructuralSection } from './StructuralSection';
 
-/** Layer the AEC plugin puts cladding panels on (packages/domain-aec entities.ts). */
+/** AEC plugin cladding layer (domain-aec entities.ts). */
 const CLADDING_LAYER_NAME = 'A-CLAD';
 
 function StarterTemplates(): React.ReactElement {
@@ -55,7 +51,7 @@ function StarterTemplates(): React.ReactElement {
   );
 }
 
-/** View helpers once a building exists: frame it, and peel the cladding off to see the structure. */
+/** Frame the building, and peel the cladding off to see the structure. */
 function BuildingViewActions(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const claddingLayerId = useStore((s) => Object.values(s.document.layers).find((layer) => layer.name === CLADDING_LAYER_NAME)?.id);

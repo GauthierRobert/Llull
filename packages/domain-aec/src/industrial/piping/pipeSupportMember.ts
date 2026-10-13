@@ -1,6 +1,6 @@
 /**
- * Steel a pipe support bears on: the nearest member below (shoe / guide / anchor) or above
- * (hanger) the pipe, found by plan distance and vertical reach.
+ * Steel a pipe support bears on: the nearest member below (shoe / guide / anchor) or above (hanger) the pipe, found by plan distance and
+ * vertical reach.
  */
 
 import type { PipeSupportType } from '@core/model/building';
@@ -36,12 +36,7 @@ function planProjection(bar: SteelBar, point: Vec3): { distance: number; t: numb
 }
 
 /** Section width/depth (mm), axis slope (|dz| / length) and a reason formatter naming `bar`. */
-function barTraits(bar: SteelBar): {
-  width: number;
-  depth: number;
-  slope: number;
-  failure: (reason: string) => string;
-} {
+function barTraits(bar: SteelBar): { width: number; depth: number; slope: number; failure: (reason: string) => string } {
   return {
     width: bar.profile?.b ?? 0,
     depth: bar.profile?.h ?? 0,
@@ -51,8 +46,8 @@ function barTraits(bar: SteelBar): {
 }
 
 /**
- * Whether `bar` can carry a support of `type` at the pipe centreline point `point` (absolute mm,
- * pipe outside diameter `diameter`); the gap and plan distance when it can, else the reason.
+ * Whether `bar` can carry a support of `type` at the pipe centreline point `point` (absolute mm, pipe outside diameter `diameter`); the gap
+ * and plan distance when it can, else the reason.
  */
 export function bearingOf(bar: SteelBar, type: PipeSupportType, point: Vec3, diameter: number, limits: BearingLimits): BearingHit | string {
   const { width, depth, slope, failure } = barTraits(bar);
@@ -82,11 +77,7 @@ export function bearingOf(bar: SteelBar, type: PipeSupportType, point: Vec3, dia
   if (gap < minimum || gap > limits.maxReach) {
     return failure(`is ${Math.round(gap)} mm ${side} the pipe (needs ${minimum}…${limits.maxReach} mm)`);
   }
-  return {
-    memberId: bar.id,
-    gap: Math.max(0, gap),
-    planDistance: projection.distance,
-  };
+  return { memberId: bar.id, gap: Math.max(0, gap), planDistance: projection.distance };
 }
 
 /** Steel a riser support (clamp with a bracket) bears on: its bracket length and direction. */
@@ -98,10 +89,9 @@ interface RiserHit extends BearingHit {
 }
 
 /**
- * Whether `bar` can take a clamp at the riser point `point` (absolute mm, pipe outside diameter
- * `diameter`) through a horizontal bracket: a column or a horizontal member whose section reaches the
- * clamp elevation (± `planTolerance`) and whose face is within `maxReach` of the pipe surface.
- * The bracket length and direction when it can, else the reason.
+ * Whether `bar` can take a clamp at the riser point `point` (absolute mm, pipe outside diameter `diameter`) through a horizontal bracket: a
+ * column or a horizontal member whose section reaches the clamp elevation (± `planTolerance`) and whose face is within `maxReach` of the
+ * pipe surface. The bracket length and direction when it can, else the reason.
  */
 export function riserBearingOf(bar: SteelBar, point: Vec3, diameter: number, limits: BearingLimits): RiserHit | string {
   const { width, depth, slope, failure } = barTraits(bar);
@@ -121,9 +111,7 @@ export function riserBearingOf(bar: SteelBar, point: Vec3, diameter: number, lim
   }
   const clearance = planDistance - (column ? Math.max(width, depth) : width) / 2 - diameter / 2;
   if (clearance < -PENETRATION) return failure('would pass through the riser');
-  if (clearance > limits.maxReach) {
-    return failure(`is ${Math.round(clearance)} mm from the pipe surface (reach ${limits.maxReach} mm)`);
-  }
+  if (clearance > limits.maxReach) return failure(`is ${Math.round(clearance)} mm from the pipe surface (reach ${limits.maxReach} mm)`);
   return {
     memberId: bar.id,
     gap: 0,

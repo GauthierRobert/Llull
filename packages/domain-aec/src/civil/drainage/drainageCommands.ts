@@ -73,26 +73,19 @@ export const addManhole = defineCommand({
     'Add a drainage manhole / inspection chamber / outfall at a plan position. Give `invertElevation` ' +
     'and either `rimElevation` or a `surfaceId` (rim = ground level there). Optional catchment ' +
     '(area in ha, runoff coefficient), point inflow and `entryTimeMin` (inlet time, default 5 min) feed the network check. Connect manholes with add_pipe.',
-  params: z.object({
-    location: vec2('Plan position [x, y] of the chamber centre, document units.'),
-    ...manholeFields,
-  }),
+  params: z.object({ location: vec2('Plan position [x, y] of the chamber centre, document units.'), ...manholeFields }),
   run: (doc, params): CommandResult => {
     const problem = checkOptions(params);
     if (problem !== null) return noop(doc, `add_manhole failed: ${problem}`);
     const civil = getCivil(doc);
     let rim = params.rimElevation;
     if (rim === undefined) {
-      if (params.surfaceId === undefined) {
-        return noop(doc, 'add_manhole failed: give rimElevation or a surfaceId to take the rim from.');
-      }
+      if (params.surfaceId === undefined) return noop(doc, 'add_manhole failed: give rimElevation or a surfaceId to take the rim from.');
       const ground = groundLevel(civil, params.surfaceId, params.location);
       if (typeof ground === 'string') return noop(doc, `add_manhole failed: ${ground}`);
       rim = ground;
     }
-    if (!(rim > params.invertElevation)) {
-      return noop(doc, `add_manhole failed: rim ${rim} must be above invert ${params.invertElevation}.`);
-    }
+    if (!(rim > params.invertElevation)) return noop(doc, `add_manhole failed: rim ${rim} must be above invert ${params.invertElevation}.`);
     const id = nextCivilId(civil, 'manhole');
     const catchment = catchmentOf(params.catchmentAreaHa, params.runoffCoefficient);
     const manhole: ManholeObject = {
@@ -112,9 +105,8 @@ export const addManhole = defineCommand({
       doc,
       withObject(civil, manhole),
       [id],
-      `Added manhole ${manhole.name} (${id}) at [${manhole.position.join(', ')}]: ` +
-        `invert ${toMetresText(doc, manhole.invertElevation)} m, rim ${toMetresText(doc, rim)} m, ` +
-        `depth ${toMetresText(doc, rim - manhole.invertElevation)} m.`,
+      `Added manhole ${manhole.name} (${id}) at [${manhole.position.join(', ')}]: invert ${toMetresText(doc, manhole.invertElevation)} ` +
+        `m, rim ${toMetresText(doc, rim)} m, depth ${toMetresText(doc, rim - manhole.invertElevation)} m.`,
       { manholeId: id },
     );
   },

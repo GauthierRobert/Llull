@@ -1,7 +1,6 @@
 /**
- * Interval halving on a monotone predicate: each step moves `low` to the midpoint when
- * `isBelow(midpoint)` holds, else moves `high` to it. Returns the final bracket so callers pick
- * the end (or midpoint) their contract needs.
+ * Interval halving on a monotone predicate: each step moves `low` to the midpoint when `isBelow(midpoint)` holds, else moves `high` to it.
+ * Returns the final bracket so callers pick the end (or midpoint) their contract needs.
  */
 export function bisect(
   isBelow: (value: number) => boolean,

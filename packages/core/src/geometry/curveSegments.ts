@@ -1,7 +1,6 @@
 /**
- * Pure math over exact curve chains (`CurveSegment`): evaluation, tangents, sampling, centripetal
- * Catmull-Rom → cubic Bézier conversion and polyline corner filleting. 2D points are lifted to
- * z = 0 internally, so every helper works for both `Vec2` profiles and `Vec3` paths.
+ * Pure math over exact curve chains (`CurveSegment`): evaluation, tangents, sampling, centripetal Catmull-Rom → cubic Bézier conversion and
+ * polyline corner filleting. 2D points are lifted to z = 0 internally, so every helper works for both `Vec2` profiles and `Vec3` paths.
  */
 
 import type { CurveSegment } from '../model/curve';
@@ -151,8 +150,8 @@ const start = (segment: CurveSegment<Point>): Vec3 => lift(segment.points[0]);
 const end = (segment: CurveSegment<Point>): Vec3 => lift(segment.points[segment.points.length - 1] as Point);
 
 /**
- * First problem of a chain, or null: empty, disconnected joints, degenerate arcs, and (closed) an
- * end that does not return to the start / (open) an end that does.
+ * First problem of a chain, or null: empty, disconnected joints, degenerate arcs, and (closed) an end that does not return to the start /
+ * (open) an end that does.
  */
 export function chainIssue(segments: ReadonlyArray<CurveSegment<Point>>, closed: boolean): string | null {
   const first = segments[0];
@@ -213,10 +212,7 @@ export function catmullRomBeziers<P extends Point>(points: ReadonlyArray<P>, clo
       scale3(add3(sub3(scale3(sub3(b, a), 1 / d0), scale3(sub3(c, a), 1 / (d0 + d1))), scale3(sub3(c, b), 1 / d1)), dt1);
     const m1 = tangent(p0, p1, p2, dt0, dt1);
     const m2 = tangent(p1, p2, p3, dt1, dt2);
-    segments.push({
-      type: 'bezier',
-      points: [out(p1), out(add3(p1, scale3(m1, 1 / 3))), out(sub3(p2, scale3(m2, 1 / 3))), out(p2)],
-    });
+    segments.push({ type: 'bezier', points: [out(p1), out(add3(p1, scale3(m1, 1 / 3))), out(sub3(p2, scale3(m2, 1 / 3))), out(p2)] });
   }
   return segments;
 }
@@ -227,12 +223,7 @@ export function catmullRomBeziers<P extends Point>(points: ReadonlyArray<P>, clo
  * @failure a U-turn, or bends that overlap on a run -> error string
  */
 export function filletPolyline(points: ReadonlyArray<Vec3>, bendRadius: number): CurveSegment<Vec3>[] | string {
-  type Bend = {
-    readonly enter: Vec3;
-    readonly mid: Vec3;
-    readonly exit: Vec3;
-    readonly cut: number;
-  };
+  type Bend = { readonly enter: Vec3; readonly mid: Vec3; readonly exit: Vec3; readonly cut: number };
   const bends: Array<Bend | null> = [];
   for (let i = 1; i < points.length - 1; i++) {
     const [prev, corner, next] = [points[i - 1], points[i], points[i + 1]] as [Vec3, Vec3, Vec3];
@@ -268,9 +259,7 @@ export function filletPolyline(points: ReadonlyArray<Vec3>, bendRadius: number):
     if (bend !== null) {
       segments.push({ type: 'arc', points: [bend.enter, bend.mid, bend.exit] });
       cursor = bend.exit;
-    } else {
-      cursor = lineEnd;
-    }
+    } else cursor = lineEnd;
   }
   return segments;
 }

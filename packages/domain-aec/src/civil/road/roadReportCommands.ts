@@ -1,6 +1,6 @@
 /**
- * Read-only road queries and drawings: alignment report (stations, volumes, design-speed checks),
- * long section and cross-section SVG sheets.
+ * Read-only road queries and drawings: alignment report (stations, volumes, design-speed checks), long section and cross-section SVG
+ * sheets.
  */
 
 import type { CadDocument } from '@core/model/types';
@@ -42,13 +42,12 @@ function checkedAlignment(
 export const alignmentReport = defineCommand({
   name: 'alignment_report',
   description:
-    'Station-by-station report of an alignment (metres): x, y, ground, design, cut/fill (design - ground, ' +
-    '+ = fill), cross-section cut / fill areas (m2, need profile + road section + surface), cumulative ' +
-    'cut / fill volumes (m3, average-end-area method) and the mass-haul ordinate (cum. cut - cum. fill, ' +
-    'no bulking). Also `data.csv`. With `designSpeedKmh` it checks horizontal curve radii against ' +
-    'R = V^2 / (127 (e + f)) with e = 0.07 and f from a simple speed table (0.28 at 30 .. 0.09 at 120 ' +
-    'km/h), and vertical curve K against minimum crest / sag K (AASHTO-style stopping sight distance ' +
-    'table), plus grade breaks over 0.5 % without a vertical curve; failures are listed.',
+    'Station-by-station report of an alignment (metres): x, y, ground, design, cut/fill (design - ground, + = fill), cross-section cut / ' +
+    'fill areas (m2, need profile + road section + surface), cumulative cut / fill volumes (m3, average-end-area method) and the ' +
+    'mass-haul ordinate (cum. cut - cum. fill, no bulking). Also `data.csv`. With `designSpeedKmh` it checks horizontal curve radii ' +
+    'against R = V^2 / (127 (e + f)) with e = 0.07 and f from a simple speed table (0.28 at 30 .. 0.09 at 120 km/h), and vertical curve ' +
+    'K against minimum crest / sag K (AASHTO-style stopping sight distance table), plus grade breaks over 0.5 % without a vertical ' +
+    'curve; failures are listed.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
     alignmentId: alignmentIdParam,
@@ -94,10 +93,9 @@ export const alignmentReport = defineCommand({
 export const exportLongSection = defineCommand({
   name: 'export_long_section',
   description:
-    'Long section (profile) drawing of an alignment as SVG text in `data.text` (`data.fileName`): ground ' +
-    'line, design line, PVIs with vertical-curve length / K / high-low point, grades, and a table band ' +
-    '(station, ground, design, cut/fill) under the plot. Needs set_alignment_profile; ground needs a ' +
-    'linked surface. Vertical exaggeration scales the vertical axis against the horizontal one.',
+    'Long section (profile) drawing of an alignment as SVG text in `data.text` (`data.fileName`): ground line, design line, PVIs with ' +
+    'vertical-curve length / K / high-low point, grades, and a table band (station, ground, design, cut/fill) under the plot. Needs ' +
+    'set_alignment_profile; ground needs a linked surface. Vertical exaggeration scales the vertical axis against the horizontal one.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
     alignmentId: alignmentIdParam,
@@ -119,10 +117,7 @@ export const exportLongSection = defineCommand({
     const text = longSectionSvg(doc, civil, alignment, rows, exaggeration);
     if (text === null) return noop(doc, 'export_long_section failed: the profile has no stations on the alignment.');
     const fileName = `${safeFileName(alignment.name, alignment.id)}_long_section.svg`;
-    return report(doc, `Long section of ${alignment.name}: ${fileName} (${text.length} bytes, VE x${exaggeration}).`, {
-      text,
-      fileName,
-    });
+    return report(doc, `Long section of ${alignment.name}: ${fileName} (${text.length} bytes, VE x${exaggeration}).`, { text, fileName });
   },
 });
 
@@ -133,15 +128,11 @@ export const exportLongSection = defineCommand({
 export const exportCrossSections = defineCommand({
   name: 'export_cross_sections',
   description:
-    'Cross-section sheet of an alignment as SVG text in `data.text` (`data.fileName`): one panel per ' +
-    'station with the existing ground, the road template with batters to daylight, and the cut / fill ' +
-    'areas (m2), all at one 1:1 scale. Needs set_alignment_profile and set_road_section; ground and ' +
-    'areas need a linked surface. At most 60 stations are drawn (the spacing is widened).',
+    'Cross-section sheet of an alignment as SVG text in `data.text` (`data.fileName`): one panel per station with the existing ground, ' +
+    'the road template with batters to daylight, and the cut / fill areas (m2), all at one 1:1 scale. Needs set_alignment_profile and ' +
+    'set_road_section; ground and areas need a linked surface. At most 60 stations are drawn (the spacing is widened).',
   annotations: { readOnly: true, idempotent: true },
-  params: z.object({
-    alignmentId: alignmentIdParam,
-    interval: intervalField('Section', 'the station interval'),
-  }),
+  params: z.object({ alignmentId: alignmentIdParam, interval: intervalField('Section', 'the station interval') }),
   run: (doc, params): CommandResult => {
     const checked = checkedAlignment(doc, params, 'export_cross_sections');
     if ('summary' in checked) return checked;
@@ -161,11 +152,7 @@ export const exportCrossSections = defineCommand({
     if (text === null) return noop(doc, 'export_cross_sections failed: no station lies on the design profile.');
     const fileName = `${safeFileName(alignment.name, alignment.id)}_cross_sections.svg`;
     const drawn = analysis.filter((entry) => entry.cross !== null).length;
-    return report(doc, `Cross sections of ${alignment.name}: ${drawn} stations, ${fileName}.`, {
-      text,
-      fileName,
-      stations: drawn,
-    });
+    return report(doc, `Cross sections of ${alignment.name}: ${drawn} stations, ${fileName}.`, { text, fileName, stations: drawn });
   },
 });
 

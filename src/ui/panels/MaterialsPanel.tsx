@@ -1,7 +1,4 @@
-/**
- * MaterialsPanel — lists `document.materials` (swatch, name, density); creates
- * (create_material) and assigns them to the selection (assign_material).
- */
+// `document.materials` (swatch, name, density): create_material, assign_material to the selection.
 
 import React, { memo, useCallback, useState } from 'react';
 import { classNames } from '@ui/classNames';
@@ -14,20 +11,22 @@ import { LabeledInput } from '@ui/panels/LabeledInput';
 import { parseNumber } from '@ui/numberText';
 import { significantNumber } from '@lib/compactNumber';
 
-/** 3 significant digits without exponent notation for ordinary magnitudes (7850, not "7.85e+3"). */
+/** 3 significant digits, no exponent for ordinary magnitudes (7850, not "7.85e+3"). */
 function formatDensity(density: number): string {
   return significantNumber(density, 3);
 }
 
-interface MaterialRowProps {
+const MaterialRow = memo(function MaterialRow({
+  material,
+  isSelected,
+  onSelect,
+}: {
   material: Material;
   isSelected: boolean;
   onSelect: (name: string) => void;
-}
-
-const MaterialRow = memo(function MaterialRow({ material, isSelected, onSelect }: MaterialRowProps): React.ReactElement {
+}): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
-  // A count (not the id array) keeps rows from re-rendering on every selection change.
+  // A count, not the id array: rows do not re-render on every selection change.
   const selectedCount = useStore((s) => s.document.selection.length);
 
   const handleAssign = (): void => {
@@ -75,13 +74,7 @@ const MaterialRow = memo(function MaterialRow({ material, isSelected, onSelect }
   );
 });
 
-const EMPTY_FORM = {
-  name: '',
-  density: '',
-  color: '#b0b0b0',
-  metalness: '0.08',
-  roughness: '0.45',
-};
+const EMPTY_FORM = { name: '', density: '', color: '#b0b0b0', metalness: '0.08', roughness: '0.45' };
 
 const SLIDERS = [
   { field: 'metalness', title: 'Metalness' },
@@ -98,7 +91,7 @@ function CreateMaterialForm(): React.ReactElement {
 
   const draft = materialDraftOf(form);
 
-  // A rejected create (e.g. duplicate name) keeps the typed values for correction.
+  // A rejected create (e.g. duplicate name) keeps the typed values.
   const handleSubmit = useDraftSubmit('create_material', draft, () => setForm(EMPTY_FORM));
 
   return (
@@ -181,11 +174,7 @@ function CreateMaterialForm(): React.ReactElement {
   );
 }
 
-interface MaterialsPanelProps {
-  className?: string;
-}
-
-export function MaterialsPanel({ className }: MaterialsPanelProps): React.ReactElement {
+export function MaterialsPanel({ className }: { className?: string }): React.ReactElement {
   const materials = useStore((s) => s.document.materials);
   const materialList = Object.values(materials);
 

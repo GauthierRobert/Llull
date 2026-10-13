@@ -1,7 +1,6 @@
 /**
- * apply_code_trace — rebuild the document from the LLULL_TRACE recorded by running a generated (and
- * possibly agent-edited) CadQuery / build123d script, so code edits regenerate an editable model.
- *
+ * apply_code_trace — rebuild the document from the LLULL_TRACE recorded by running a generated (and possibly agent-edited) CadQuery /
+ * build123d script, so code edits regenerate an editable model.
  * @see export_code (code_exchange.ts), packages/core/src/codegen/pythonRuntime.ts (the recorder)
  */
 
@@ -218,19 +217,16 @@ export const applyCodeTrace = defineCommand({
     const invalid = validateTrace(rawTrace);
     if (invalid !== null) return abort(doc, invalid);
     const trace = rawTrace as unknown as CodeTrace;
-
     const start = mode === 'append' ? doc : replaceBase(doc);
     let current = start;
     for (const { name, expression } of trace.parameters) {
       const parameter = { name, expression: stripOuterParens(expression) };
       const result = execute(current, 'set_parameter', parameter);
       const stored = result.document.parameters[parameter.name];
-      if (stored === undefined || stored.error !== undefined) {
+      if (stored === undefined || stored.error !== undefined)
         return abort(doc, `parameter ${parameter.name} = ${parameter.expression}: ${result.summary}`);
-      }
       current = result.document;
     }
-
     // `ref` names the FIRST solid a feature created (every runtime helper creates exactly one).
     const refs = new Map<string, string>();
     for (const [i, feature] of trace.features.entries()) {
@@ -241,15 +237,11 @@ export const applyCodeTrace = defineCommand({
       if (result.document === current && result.affected.length === 0)
         return abort(doc, `feature ${i} (${feature.command}) failed: ${result.summary}`);
       current = result.document;
-      if (feature.ref !== undefined && result.affected[0] !== undefined) {
-        refs.set(feature.ref, result.affected[0]);
-      }
+      if (feature.ref !== undefined && result.affected[0] !== undefined) refs.set(feature.ref, result.affected[0]);
       const id = feature.ref !== undefined ? refs.get(feature.ref) : undefined;
-      if (typeof feature.name === 'string' && feature.name !== '' && id !== undefined) {
+      if (typeof feature.name === 'string' && feature.name !== '' && id !== undefined)
         current = execute(current, 'set_entity_name', { id, name: feature.name }).document;
-      }
     }
-
     const live = current.order.filter((id) => start.entities[id] === undefined);
     const parameterNames = trace.parameters.map((p) => p.name);
     return changed(

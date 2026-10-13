@@ -51,10 +51,7 @@ function partHash(part: object, key: string): PartHash {
   const known = hashByPart.get(part);
   if (known !== undefined) return known;
   const hex = hashText(JSON.stringify([key, part]));
-  const hash = {
-    high: Number.parseInt(hex.slice(0, 8), 16),
-    low: Number.parseInt(hex.slice(8), 16),
-  };
+  const hash = { high: Number.parseInt(hex.slice(0, 8), 16), low: Number.parseInt(hex.slice(8), 16) };
   hashByPart.set(part, hash);
   return hash;
 }

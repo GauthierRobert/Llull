@@ -1,11 +1,6 @@
-/**
- * Click-to-select for the 2D view while no draw or modify tool is armed.
- * Plain click selects the entity under the cursor (nearest outline, else the smallest closed
- * shape containing the point), Shift/Ctrl/Meta-click toggles it, a click on empty
- * space clears the selection. A drag (pan) is not a click. Selection is local view state.
- * The capture plane sits in front of the snap plane: the snap plane stops pointer propagation,
- * which would otherwise occlude this one; having no move handler, this plane lets moves through.
- */
+// Click-to-select in 2D with no tool armed: plain click selects (nearest outline, else smallest enclosing closed
+// shape), Shift/Ctrl/Meta toggles, empty space clears; a pan is not a click. The plane sits in front of the snap plane
+// (which stops propagation) and, with no move handler, lets moves through.
 
 import { useStore } from '@ui/store';
 import { pickEntityId } from './modifyHelpers';
@@ -17,7 +12,7 @@ import { isAdditiveSelect } from '../selectClick';
 const CLICK_MAX_TRAVEL_PX = 4;
 
 interface SelectPickInteractionProps {
-  /** Current ortho camera zoom (px per world unit) — scales the pick radius. */
+  /** Px per world unit; scales the pick radius. */
   zoom: number;
 }
 
@@ -28,7 +23,7 @@ export function SelectPickInteraction({ zoom }: SelectPickInteractionProps): Rea
       onClick={(e) => {
         if (e.delta > CLICK_MAX_TRAVEL_PX) return;
         const state = useStore.getState();
-        // Only what the 2D view draws is pickable (same filters as Entities2D).
+        // Same visibility filters as Entities2D.
         const { document, tolerance, accepts } = pickContext(zoom);
         const id = pickEntityId(document, toDocumentPoint(e.point), tolerance, accepts);
         const additive = isAdditiveSelect(e);

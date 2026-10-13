@@ -1,20 +1,11 @@
 /**
- * CAD exchange tools — STEP import/export and parametric-code import over MCP.
- *
- * These need a Python geometry kernel (CadQuery / build123d via OpenCascade), so they are not pure
- * registry commands: the I/O lives behind the injected `CadExchangePort` (implemented in `server/`),
- * and every document change still goes through registry commands (`import_mesh`,
- * `apply_code_trace`) via the injected `applyCommand` — the PRIME DIRECTIVE holds.
- *
+ * CAD exchange tools (transport-level, hand-written schemas): Python I/O behind the injected `CadExchangePort`
+ * (server/); every document change still goes through registry commands via the injected `applyCommand`.
  *   export_step  doc → export_code (CadQuery) → port runs it → exact B-rep STEP
  *   import_step  STEP → port tessellates (names + colours kept) → import_mesh
  *   import_dwg   DWG → DwgConverterPort (LibreDWG / ODA) → ASCII DXF → import_dxf | import_survey_dxf
  *   import_code  CadQuery/build123d source → port runs it → LLULL_TRACE → apply_code_trace
- *
- * Their schemas are hand-written because they are transport-level tools, not registry commands;
- * the registry commands they call keep `toToolSchemas()` as their contract (L5).
  */
-
 import type { CadDocument } from '@core/model/types';
 import type { PythonBackend } from '@core/codegen/pythonRuntime';
 import { execute } from '@core/commands/registry';
@@ -27,45 +18,36 @@ import { shapeToolCallContent, type McpShapedResult } from './dispatch';
 import type { CommandOutcome } from './restProtocol';
 
 export interface ProgramRun {
-  /** LLULL_TRACE of a llull-runtime script, or an import_mesh trace for any other script. */
-  readonly trace: unknown;
-  /** true when the script used the llull runtime (parametric); false = tessellated fallback. */
-  readonly traced: boolean;
+  readonly trace: unknown; // LLULL_TRACE (llull runtime) or an import_mesh trace
+  readonly traced: boolean; // used the llull runtime (parametric); false = tessellated fallback
   readonly stepBase64?: string;
-  /** Captured script stdout (truncated). */
-  readonly log: string;
+  readonly log: string; // script stdout (truncated)
 }
 
 /** Port to the Python exchange process. Implementations throw Error with an agent-readable message. */
 export interface CadExchangePort {
   runProgram(request: { language: PythonBackend; source: string; step: boolean }): Promise<ProgramRun>;
   importStep(stepBase64: string): Promise<{ bodies: unknown[] }>;
-  /** Read a file from the configured exchange directory as base64 (or text when `encoding` is utf8). */
-  readExchangeFile?(path: string, encoding: 'base64' | 'utf8'): Promise<string>;
-  /** Write base64 bytes into the exchange directory; returns the absolute path written. */
+  readExchangeFile?(path: string, encoding: 'base64' | 'utf8'): Promise<string>; // inside the exchange directory
+  /** Returns the absolute path written. */
   writeExchangeFile?(fileName: string, base64: string): Promise<string>;
 }
 
 /** Port to a DWG → ASCII DXF converter (implemented in `server/`). Throws Error with an agent-readable message. */
 export interface DwgConverterPort {
   convertDwg(dwgBase64: string): Promise<string>;
-  /** Read a file from the configured exchange directory as base64. */
   readExchangeFile?(path: string): Promise<string>;
 }
 
-/** What an exchange tool needs from a command run: a `CommandOutcome` without `changed`. */
 export type ExchangeCommandResult = Omit<CommandOutcome, 'changed'>;
 
+/** null ports: the tools explain how to enable them. */
 export interface ExchangeDeps {
-  /** null when Python/CadQuery is not configured; tools then explain how to enable it. */
   readonly port: CadExchangePort | null;
-  /** null/absent when no DWG converter is configured; import_dwg then explains how to enable it. */
   readonly dwg?: DwgConverterPort | null;
   readonly getDoc: () => CadDocument;
-  /** The server command bus (records undo + broadcasts). */
-  readonly applyCommand: (name: string, params: unknown) => ExchangeCommandResult;
-  /** import_code executes arbitrary Python; it is refused unless the host opted in. */
-  readonly allowCodeExecution: boolean;
+  readonly applyCommand: (name: string, params: unknown) => ExchangeCommandResult; // the command bus (undo + broadcast)
+  readonly allowCodeExecution: boolean; // import_code runs arbitrary Python
 }
 
 const LANGUAGE_SCHEMA = {
@@ -131,10 +113,7 @@ export function buildExchangeToolDefinitions(): McpToolDefinition[] {
             description: '"drawing" (default; import_dxf) or "survey" (import_survey_dxf).',
             enum: ['drawing', 'survey'],
           },
-          sourceUnit: {
-            type: 'string',
-            description: 'Drawing unit when $INSUNITS is missing or wrong (e.g. "m", "mm", "ft").',
-          },
+          sourceUnit: { type: 'string', description: 'Drawing unit when $INSUNITS is missing or wrong (e.g. "m", "mm", "ft").' },
           layers: {
             type: 'array',
             items: { type: 'string' },
@@ -146,10 +125,7 @@ export function buildExchangeToolDefinitions(): McpToolDefinition[] {
             items: { type: 'string' },
             description: 'Survey: what becomes a point (points, vertices, faces, text).',
           },
-          keepZeroElevation: {
-            type: 'boolean',
-            description: 'Survey: keep points at z = 0. Default false.',
-          },
+          keepZeroElevation: { type: 'boolean', description: 'Survey: keep points at z = 0. Default false.' },
         },
         required: [],
       },
@@ -166,16 +142,9 @@ export function buildExchangeToolDefinitions(): McpToolDefinition[] {
         type: 'object',
         properties: {
           code: { type: 'string', description: 'Python source text.' },
-          path: {
-            type: 'string',
-            description: 'Script path inside the server exchange directory.',
-          },
+          path: { type: 'string', description: 'Script path inside the server exchange directory.' },
           language: LANGUAGE_SCHEMA,
-          mode: {
-            type: 'string',
-            description: '"replace" (default) or "append".',
-            enum: ['replace', 'append'],
-          },
+          mode: { type: 'string', description: '"replace" (default) or "append".', enum: ['replace', 'append'] },
         },
         required: [],
       },
@@ -184,11 +153,9 @@ export function buildExchangeToolDefinitions(): McpToolDefinition[] {
   ];
 }
 
-function failure(message: string): McpShapedResult {
-  return shapeToolCallContent({ summary: message, affected: [], isError: true });
-}
+const failure = (message: string): McpShapedResult => shapeToolCallContent({ summary: message, affected: [], isError: true });
 
-/** A tool's `language` argument (default cadquery), or null when it names another library. */
+/** `language` (default cadquery), or null for another library. */
 function pythonLanguage(raw: unknown): PythonBackend | null {
   const value = raw ?? 'cadquery';
   return value === 'cadquery' || value === 'build123d' ? value : null;
@@ -207,9 +174,8 @@ async function readInput(
 ): Promise<string> {
   if (inline !== undefined) return inline;
   if (path === undefined) throw new Error(`provide ${encoding === 'base64' ? 'stepBase64' : 'code'} or path`);
-  if (port.readExchangeFile === undefined) {
+  if (port.readExchangeFile === undefined)
     throw new Error('path is unavailable: the server has no exchange directory (LLULL_EXCHANGE_DIR)');
-  }
   return port.readExchangeFile(path, encoding);
 }
 
@@ -223,7 +189,7 @@ interface StepFile {
 
 const NO_STEP_BACKEND = 'STEP export needs the Python bridge (LLULL_PYTHON is off) or the exact OCC kernel (LLULL_KERNEL=occt).';
 
-/** Without the Python bridge: the exact B-rep kernel writes the STEP itself (`export_step_exact`). */
+/** Without the Python bridge the exact kernel writes the STEP (`export_step_exact`). */
 function exportStepExact(getDoc: () => CadDocument, name?: string): StepFile | { error: string } {
   const exact = execute(getDoc(), 'export_step_exact', {});
   const data = exact.data as { step?: string; solidCount?: number } | undefined;
@@ -241,8 +207,7 @@ function exportStepExact(getDoc: () => CadDocument, name?: string): StepFile | {
 }
 
 /**
- * Generate the model's STEP file: export_code → Python port → exact B-rep. Shared by the
- * export_step tool and the server's GET /export/step route.
+ * The model's STEP: export_code → Python port → exact B-rep (export_step tool + GET /export/step).
  * @failure no solids / bad language / bridge error → { error } (port errors propagate as throws)
  */
 export async function exportStepFile(
@@ -257,7 +222,6 @@ export async function exportStepFile(
   const codeData = code.data as { text: string; fileName: string; solidCount: number; source: string } | undefined;
   if (codeData === undefined) return { error: `export_step: ${code.summary}` };
   if (codeData.solidCount === 0) return { error: 'export_step: the model has no 3D solids to export.' };
-
   const run = await port.runProgram({ language, source: codeData.text, step: true });
   if (run.stepBase64 === undefined) return { error: 'export_step: the Python bridge returned no STEP data.' };
   // export_code already sanitised the base name; only the extension changes.
@@ -269,13 +233,7 @@ export async function exportStepFile(
     `export_step: ${codeData.solidCount} solid(s) from ${codeData.source} → ${fileName} ` +
     `(${bytes} bytes, exact B-rep via ${language})` +
     (savedTo !== undefined ? `; saved to ${savedTo}.` : '; returned as data.stepBase64.');
-  return {
-    stepBase64: run.stepBase64,
-    fileName,
-    bytes,
-    summary,
-    ...(savedTo !== undefined ? { savedTo } : {}),
-  };
+  return { stepBase64: run.stepBase64, fileName, bytes, summary, ...(savedTo !== undefined ? { savedTo } : {}) };
 }
 
 async function exportStep(deps: ExchangeDeps, port: CadExchangePort | null, args: Record<string, unknown>): Promise<McpShapedResult> {
@@ -295,11 +253,7 @@ async function exportStep(deps: ExchangeDeps, port: CadExchangePort | null, args
 
 /** An import tool's outcome: a command that created nothing counts as a failure. */
 function importOutcome(summary: string, result: ExchangeCommandResult): McpShapedResult {
-  return shapeToolCallContent({
-    summary,
-    affected: result.affected,
-    isError: result.isError || result.affected.length === 0,
-  });
+  return shapeToolCallContent({ summary, affected: result.affected, isError: result.isError || result.affected.length === 0 });
 }
 
 async function importStep(deps: ExchangeDeps, port: CadExchangePort, args: Record<string, unknown>): Promise<McpShapedResult> {
@@ -333,9 +287,7 @@ async function importDwg(deps: ExchangeDeps, dwg: DwgConverterPort, args: Record
   }
   const text = await dwg.convertDwg(dwgBase64);
   const params: Record<string, unknown> = { text };
-  for (const key of DWG_COMMAND_PARAMS[target]) {
-    if (args[key] !== undefined) params[key] = args[key];
-  }
+  for (const key of DWG_COMMAND_PARAMS[target]) if (args[key] !== undefined) params[key] = args[key];
   const command = target === 'survey' ? 'import_survey_dxf' : 'import_dxf';
   const result = deps.applyCommand(command, params);
   return importOutcome(`import_dwg (${command}): ${result.summary}`, result);

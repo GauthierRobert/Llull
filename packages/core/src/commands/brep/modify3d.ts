@@ -1,7 +1,7 @@
 /**
- * Fillet, chamfer and shell: the injected GeometryKernel rounds/bevels the exact edges of a 3D solid
- * (or hollows it) — on its B-rep, never on triangles; the source entity is replaced by a `mesh` entity
- * whose `brep` records the modification recipe. A null kernel result is a no-op.
+ * Fillet, chamfer and shell: the injected GeometryKernel rounds/bevels the exact edges of a 3D solid (or hollows it) — on its B-rep, never
+ * on triangles; the source entity is replaced by a `mesh` entity whose `brep` records the modification recipe. A null kernel result is a
+ * no-op.
  */
 
 import { type CadDocument, type Entity, type Vec3, is3D } from '../../model/types';
@@ -22,15 +22,13 @@ export const OCC_KERNEL_HINT = 'the OCC kernel (?kernel=occt in the browser, LLU
 function validateSolidTarget(doc: CadDocument, opName: string, id: string): { entity: Entity } | CommandResult {
   const entity = doc.entities[id];
   if (!entity) return noop(doc, `${opName}: entity '${id}' not found.`);
-  if (!is3D(entity)) {
+  if (!is3D(entity))
     return noop(
       doc,
       `${opName}: entity '${id}' is a 2D shape (kind '${entity.kind}'); only 3D solids can be filleted, chamfered or shelled.`,
     );
-  }
-  if (entity.kind === 'instance') {
+  if (entity.kind === 'instance')
     return noop(doc, `${opName}: entity '${id}' is a component instance; run explode_instance first to get solids.`);
-  }
   return { entity };
 }
 
@@ -83,23 +81,20 @@ function modifyEdges(
   const validation = validateSolidTarget(doc, command, id);
   if ('summary' in validation) return validation;
   const { entity } = validation;
-
   const kernel = (ctx ?? currentContext()).kernel;
   if (!kernel) return noop(doc, kernelUnavailable(command));
   const source = operandRecipe(kernel, entity);
   const sourceShape = kernel.evaluate(source);
-  if (sourceShape === null) {
+  if (sourceShape === null)
     return noop(
       doc,
       `${command}: kernel could not build entity '${id}' (kind '${entity.kind}'). The entity may have degenerate geometry or an unsupported kind for this kernel.`,
     );
-  }
   const selection = selectEdges(kernel.topology(sourceShape), edges, near);
   if ('problem' in selection) return noop(doc, `${command}: ${selection.problem} on '${id}'; document unchanged.`);
   const modified = recipe(source, selection.edges);
   const result = evaluateRecipe(kernel, modified);
   if (typeof result === 'string') return noop(doc, modifyFailure(command, kernel, modified, result));
-
   const picked = near.length > 0 ? ` edgesNear selected edges ${selection.edges.join(', ')}.` : '';
   return commitKernelResult(
     doc,

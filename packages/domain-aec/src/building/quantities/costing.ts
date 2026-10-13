@@ -22,11 +22,7 @@ export function priceTakeoff(
 ): { lines: CostLine[]; total: number; unpriced: string[] } {
   const lines = takeoff.map((line): CostLine => {
     const rate = rateFor(rates, line);
-    return {
-      ...line,
-      rate,
-      amount: rate === null ? null : round(rate * line.quantity),
-    };
+    return { ...line, rate, amount: rate === null ? null : round(rate * line.quantity) };
   });
   return {
     lines,

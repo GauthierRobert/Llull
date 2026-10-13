@@ -11,15 +11,7 @@ import { createNodeOcctKernel } from '../src/occtNode';
 import { booleanMesh, bounds, meshOf } from './kernelTestSupport';
 
 function box(position: Vec3, rotation: Vec3, size: Vec3 = [4, 2, 2]): Entity {
-  return {
-    id: 'b',
-    kind: 'box',
-    position,
-    rotation,
-    size,
-    layerId: 'layer-default',
-    color: '#888888',
-  } as unknown as Entity;
+  return { id: 'b', kind: 'box', position, rotation, size, layerId: 'layer-default', color: '#888888' } as unknown as Entity;
 }
 
 function expectSameBounds(a: MeshData | null, b: MeshData | null): void {

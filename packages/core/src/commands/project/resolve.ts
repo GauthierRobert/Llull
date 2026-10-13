@@ -23,12 +23,7 @@ export function resolveRef(text: string, bindings: Record<string, string[]>): Re
   if (ids === undefined) return { value: undefined, error: `references undefined alias $${name}` };
   const index = m[2] === undefined ? 0 : Number(m[2]);
   const id = ids[index];
-  if (id === undefined) {
-    return {
-      value: undefined,
-      error: `alias $${name} has no id at index ${index} (bound ${ids.length})`,
-    };
-  }
+  if (id === undefined) return { value: undefined, error: `alias $${name} has no id at index ${index} (bound ${ids.length})` };
   return { value: id, error: null };
 }
 
@@ -37,9 +32,7 @@ export function findUndefinedRef(value: unknown, defined: ReadonlySet<string>): 
   let firstError: string | null = null;
   mapStringLeaves(value, (text) => {
     const m = REF.exec(text);
-    if (firstError === null && m && m[1] !== undefined && !defined.has(m[1])) {
-      firstError = `references undefined alias $${m[1]}`;
-    }
+    if (firstError === null && m && m[1] !== undefined && !defined.has(m[1])) firstError = `references undefined alias $${m[1]}`;
     return text;
   });
   return firstError;

@@ -36,25 +36,16 @@ export const measureArea = defineCommand({
   run: (doc, { entityId, points }): CommandResult => {
     const areaUnit = `${doc.units}²`;
     const measured = (area: number, subject: string): CommandResult =>
-      report(doc, `Area${subject} = ${area.toFixed(doc.displayPrecision)} ${areaUnit}.`, {
-        area,
-        unit: areaUnit,
-      });
-
+      report(doc, `Area${subject} = ${area.toFixed(doc.displayPrecision)} ${areaUnit}.`, { area, unit: areaUnit });
     if (points) {
       if (points.length < 3) return noop(doc, `measure_area: points must have >= 3 vertices, got ${points.length}.`);
       return measured(polygonArea(points), '');
     }
-
     if (!entityId) return noop(doc, 'measure_area: provide either entityId or points.');
-
     const e = doc.entities[entityId];
     if (!e) return noop(doc, `measure_area: entity '${entityId}' not found.`);
-
     if (e.kind === 'polyline') {
-      if (!e.closed) {
-        return noop(doc, `measure_area: polyline '${entityId}' is not closed — cannot compute area.`);
-      }
+      if (!e.closed) return noop(doc, `measure_area: polyline '${entityId}' is not closed — cannot compute area.`);
       if (e.points.length < 3) return noop(doc, `measure_area: polyline '${entityId}' has fewer than 3 points.`);
     }
     const area = closedShapeArea(e);
@@ -88,7 +79,6 @@ export const measurePerimeter = defineCommand({
   run: (doc, { entityId }): CommandResult => {
     const e = doc.entities[entityId];
     if (!e) return noop(doc, `measure_perimeter: entity '${entityId}' not found.`);
-
     let perimeter: number;
     switch (e.kind) {
       case 'line':
@@ -117,10 +107,6 @@ export const measurePerimeter = defineCommand({
             "supported kinds are 'line', 'polyline', 'rectangle', 'circle', 'arc'.",
         );
     }
-
-    return report(doc, `Perimeter of ${entityId} = ${formatLength(doc, perimeter)}.`, {
-      perimeter,
-      unit: doc.units,
-    });
+    return report(doc, `Perimeter of ${entityId} = ${formatLength(doc, perimeter)}.`, { perimeter, unit: doc.units });
   },
 });

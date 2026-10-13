@@ -32,20 +32,17 @@ export function renderDocument(
 ): RenderViewData {
   const snapshot = computeSceneSnapshot(doc);
   const bounds = options.frame !== undefined ? options.frame : snapshot.bounds;
-
   const radius = bounds ? boundsRadius(bounds) : 5; // 5 frames an empty scene
   const center = options.target ?? (bounds ? boundsCenter(bounds) : ORIGIN);
   const cam = cameraForView(view, center, radius, options.direction);
   const basis = cameraBasis(cam);
   const orthoHalf = (radius * 1.2) / (options.zoom ?? 1);
   const budget = options.maxPolygons ?? MAX_POLYGONS;
-
   const cut = options.cut;
   const planes = cut ? unitPlanes(cut) : [];
   const cutIds = cut?.entityIds ? new Set(cut.entityIds) : null;
   const tolerance = Math.max(radius, 1e-6) * 1e-6;
   const cutEntityIds: string[] = [];
-
   const items: EntityPolygons[] = [];
   for (const e of orderedEntities(doc)) {
     const id = e.id;
@@ -57,7 +54,6 @@ export function renderDocument(
     }
     items.push({ id, polygons });
   }
-
   const fitted = applyBudget(items, budget);
   const polygons: Polygon3D[] = fitted.polygons.map((p) => {
     // Caps sit on the nearest face of their outline; everything else sorts by centroid.
@@ -69,7 +65,6 @@ export function renderDocument(
   const background = options.background === undefined ? DEFAULT_BACKGROUND : options.background;
   // Underlays are never capped by MAX_POLYGONS: they are one <image> each, painted first.
   const underlays = orderedEntities(doc).flatMap((e) => drawableEntities(doc, e).filter((d): d is ImageEntity => d.kind === 'image'));
-
   return {
     view,
     width,

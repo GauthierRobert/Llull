@@ -1,9 +1,8 @@
 /**
- * One schema per command: a zod object is the single source of the params TS type,
- * the agent-facing `paramsSchema` (MCP JSON Schema) and runtime validation in `execute`.
- *
- * @invariant `toParamsSchema(schema)` emits only the `ParamSpec` vocabulary (type, description,
- *   enum, items, properties, required) — the MCP tool surface is unchanged by migration.
+ * One schema per command: a zod object is the single source of the params TS type, the agent-facing `paramsSchema` (MCP JSON Schema) and
+ * runtime validation in `execute`.
+ * @invariant `toParamsSchema(schema)` emits only the `ParamSpec` vocabulary (type, description, enum, items, properties, required) — the
+ *   MCP tool surface is unchanged by migration.
  */
 
 import { z } from 'zod';
@@ -46,9 +45,8 @@ function enumValues(core: z.ZodType): readonly (string | number)[] | undefined {
     options?: readonly z.ZodType[];
   };
   if (def.type === 'enum' && def.entries) return Object.values(def.entries);
-  if (def.type === 'literal' && def.values) {
+  if (def.type === 'literal' && def.values)
     return def.values.filter((v): v is string | number => typeof v === 'string' || typeof v === 'number');
-  }
   if (def.type === 'union' && def.options) {
     const nested = def.options.map((option) => enumValues(unwrap(option).core));
     if (nested.every((values) => values !== undefined)) return nested.flat() as (string | number)[];
@@ -97,10 +95,7 @@ function objectShape(core: z.ZodType): Record<string, z.ZodType> | undefined {
   return def.type === 'object' ? def.shape : undefined;
 }
 
-function describeChildren(shape: Record<string, z.ZodType>): {
-  properties: Record<string, ParamSpec>;
-  required: string[];
-} {
+function describeChildren(shape: Record<string, z.ZodType>): { properties: Record<string, ParamSpec>; required: string[] } {
   const properties: Record<string, ParamSpec> = {};
   const required: string[] = [];
   for (const [key, child] of Object.entries(shape)) {
@@ -135,9 +130,7 @@ function fillStructure(spec: ParamItemSpec, core: z.ZodType): void {
 
 function toParamSpec(schema: z.ZodType, key: string): { spec: ParamSpec; optional: boolean } {
   const { core, optional, description } = unwrap(schema);
-  if (description === undefined) {
-    throw new Error(`paramsSchema property '${key}' needs a .describe() text for agents`);
-  }
+  if (description === undefined) throw new Error(`paramsSchema property '${key}' needs a .describe() text for agents`);
   const spec: ParamSpec = { type: paramType(core), description };
   fillStructure(spec, core);
   return { spec, optional };

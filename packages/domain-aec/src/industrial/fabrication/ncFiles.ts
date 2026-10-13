@@ -47,9 +47,7 @@ function renderPiece(piece: NcPiece, quantity: number, orderNumber: string, draw
     ].map(numberField),
     textField(''),
   ];
-  if (piece.contour.length > 0) {
-    lines.push('AK', ...piece.contour.map(([x, y]) => `  o${numberField(x)}${numberField(y)}`));
-  }
+  if (piece.contour.length > 0) lines.push('AK', ...piece.contour.map(([x, y]) => `  o${numberField(x)}${numberField(y)}`));
   if (piece.holes.length > 0) {
     lines.push(
       'BO',

@@ -1,6 +1,5 @@
 /**
- * Building (AEC / BIM) commands — levels, walls, openings, slabs, sheets, IFC, takeoff — the
- * `building` plugin's catalog (see plugin.ts).
+ * Building (AEC / BIM) commands — levels, walls, openings, slabs, sheets, IFC, takeoff — the `building` plugin's catalog (see plugin.ts).
  */
 
 import { commandCatalog } from '@core/commands/schema';
@@ -20,40 +19,10 @@ import { addCurvedWall } from './elements/curvedWalls';
 import { setWallLayers } from './elements/wallLayers';
 import { quantityTakeoff, buildingSchedule, setCostRates, estimateCost } from './quantities/takeoff';
 
-/** AEC / BIM commands (levels, walls, openings, slabs, sheets, IFC, takeoff). */
+// prettier-ignore
 export const buildingCommands = commandCatalog(
-  addLevel,
-  updateLevel,
-  deleteLevel,
-  setActiveLevel,
-  setProjectInfo,
-  describeBuilding,
-  addGridLine,
-  addGridSystem,
-  drawWalls,
-  updateWall,
-  addDoor,
-  addWindow,
-  updateOpening,
-  addSlab,
-  addColumn,
-  addBeam,
-  addStair,
-  addSlabOpening,
-  deleteSlabOpening,
-  addRoom,
-  deleteBuildingElement,
-  moveBuildingElement,
-  copyLevelElements,
-  quantityTakeoff,
-  buildingSchedule,
-  setCostRates,
-  estimateCost,
-  exportDxf,
-  exportPlanSheet,
-  exportElevationSheet,
-  exportIfc,
-  addBuildingTemplate,
-  addCurvedWall,
-  setWallLayers,
+  addLevel, updateLevel, deleteLevel, setActiveLevel, setProjectInfo, describeBuilding, addGridLine, addGridSystem, drawWalls, updateWall,
+  addDoor, addWindow, updateOpening, addSlab, addColumn, addBeam, addStair, addSlabOpening, deleteSlabOpening, addRoom,
+  deleteBuildingElement, moveBuildingElement, copyLevelElements, quantityTakeoff, buildingSchedule, setCostRates, estimateCost, exportDxf,
+  exportPlanSheet, exportElevationSheet, exportIfc, addBuildingTemplate, addCurvedWall, setWallLayers,
 );

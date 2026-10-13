@@ -1,6 +1,6 @@
 /**
- * Axis-direction rotations in the repo's Euler convention (three.js intrinsic 'XYZ': M = Rx·Ry·Rz,
- * see `eulerRotation.ts`). Matrices are row-major 3x3 as 9-tuples.
+ * Axis-direction rotations in the repo's Euler convention (three.js intrinsic 'XYZ': M = Rx·Ry·Rz, see `eulerRotation.ts`). Matrices are
+ * row-major 3x3 as 9-tuples.
  */
 
 import type { Vec3 } from '../model/vectors';
@@ -89,8 +89,8 @@ export function matFromAxis(axis: Vec3, spin = 0): Mat3 {
 }
 
 /**
- * Euler XYZ angles (radians) of the rotation sending local +Z to `axis` (normalized here), after
- * spinning `spin` radians about local +Z first. `null` for a zero or malformed axis.
+ * Euler XYZ angles (radians) of the rotation sending local +Z to `axis` (normalized here), after spinning `spin` radians about local +Z
+ * first. `null` for a zero or malformed axis.
  */
 export function eulerFromAxis(axis: unknown, spin = 0): [number, number, number] | null {
   const u = unitAxisOrNull(axis);

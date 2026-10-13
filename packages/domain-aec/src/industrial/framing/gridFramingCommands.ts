@@ -86,7 +86,8 @@ const selected = (lines: ReadonlyArray<GridElement>, axes: ReadonlyArray<string>
 
 /**
  * @affects creates one column member per grid intersection (exact section meshes)
- * @invariant skips intersections already holding a column on the level or a column of any level whose vertical span covers the base level elevation (same plan xy, 1 mm)
+ * @invariant skips intersections already holding a column on the level or a column of any level whose vertical span covers the base level
+ * elevation (same plan xy, 1 mm)
  * @failure no grid / unknown profile, axis, level / topLevel not above base / no intersections -> no-op
  */
 export const addGridColumns = defineCommand({
@@ -125,9 +126,7 @@ export const addGridColumns = defineCommand({
         const pair = parseCrossingName(name);
         if (!pair) return noop(doc, `${tool} failed: exclude entry '${name}' must look like "A/1".`);
         const unknown = unknownLabels(lines, pair);
-        if (unknown.length > 0) {
-          return noop(doc, `${tool} failed: exclude '${name}' has unknown grid label(s) ${unknown.join(', ')}.`);
-        }
+        if (unknown.length > 0) return noop(doc, `${tool} failed: exclude '${name}' has unknown grid label(s) ${unknown.join(', ')}.`);
         excluded.push(pair);
       }
       let top = prepared.height;
@@ -188,9 +187,7 @@ export const addGridColumns = defineCommand({
             : `${tool} failed: no grid intersections to place columns on.`,
         );
       }
-      if (specs.length === 0) {
-        return noop(doc, `${tool}: all ${skipped} intersection(s) already hold a column; nothing added.`);
-      }
+      if (specs.length === 0) return noop(doc, `${tool}: all ${skipped} intersection(s) already hold a column; nothing added.`);
       const kg = toMetres(doc, top) * (findProfile(params.profile)?.massPerMetre ?? 0) * specs.length;
       return placed(
         doc,

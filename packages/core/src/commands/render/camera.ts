@@ -15,7 +15,6 @@ export function cameraForView(view: ViewName, center: Vec3, radius: number, dire
   const d = radius * 2.5;
   const [cx, cy, cz] = center;
   const target: [number, number, number] = [cx, cy, cz];
-
   const at = (offset: Vec3, up: Camera['up']): Camera => ({
     position: [cx + offset[0] * d, cy + offset[1] * d, cz + offset[2] * d],
     target,

@@ -1,7 +1,4 @@
-/**
- * ElementToolsSection — pick a building tool (grid, walls, doors, windows, slabs…), fill its
- * parameters, dispatch the single command it maps to (see elementTools.ts).
- */
+// Pick a building tool, fill its parameters, dispatch its single command (elementTools.ts).
 
 import React, { useMemo, useState } from 'react';
 import { useStore } from '@ui/store';
@@ -79,11 +76,7 @@ function FieldInput({ field, value, lists, units, onChange }: FieldInputProps): 
   );
 }
 
-interface ToolFormProps {
-  tool: ElementTool;
-}
-
-function ToolForm({ tool }: ToolFormProps): React.ReactElement {
+function ToolForm({ tool }: { tool: ElementTool }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const building = useStore((s) => s.document.building);
   const units = useStore((s) => s.document.units);

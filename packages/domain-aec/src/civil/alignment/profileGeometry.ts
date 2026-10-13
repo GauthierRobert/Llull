@@ -1,6 +1,6 @@
 /**
- * Vertical alignment geometry: straight grades between PVIs joined by symmetric parabolic curves.
- * Stations and elevations are in document units; grades are ratios (0.025 = 2.5 %).
+ * Vertical alignment geometry: straight grades between PVIs joined by symmetric parabolic curves. Stations and elevations are in document
+ * units; grades are ratios (0.025 = 2.5 %).
  */
 
 import type { ProfilePvi } from '@core/model/civil';
@@ -85,10 +85,7 @@ export function verticalCurves(profile: ReadonlyArray<ProfilePvi>): VerticalCurv
       kind: change < 0 ? 'crest' : 'sag',
       turning:
         x > 0 && x < pvi.curveLength
-          ? {
-              station: pvi.station - half + x,
-              elevation: startElevation + gradeIn * x + (change * x * x) / (2 * pvi.curveLength),
-            }
+          ? { station: pvi.station - half + x, elevation: startElevation + gradeIn * x + (change * x * x) / (2 * pvi.curveLength) }
           : null,
     });
   }

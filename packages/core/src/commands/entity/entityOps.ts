@@ -10,16 +10,12 @@ export function orderedEntities(doc: CadDocument): Entity[] {
 
 /** `doc` with `entity` stored and appended to `order`. */
 export function withEntity(doc: CadDocument, entity: Entity): CadDocument {
-  return {
-    ...doc,
-    entities: { ...doc.entities, [entity.id]: entity },
-    order: [...doc.order, entity.id],
-  };
+  return { ...doc, entities: { ...doc.entities, [entity.id]: entity }, order: [...doc.order, entity.id] };
 }
 
 /**
- * `doc` with every entity of `created` stored and appended to `order` (same result as folding
- * `withEntity`, but one pass instead of re-spreading the entity bag per entity).
+ * `doc` with every entity of `created` stored and appended to `order` (same result as folding `withEntity`, but one pass instead of
+ * re-spreading the entity bag per entity).
  */
 export function withEntities(doc: CadDocument, created: ReadonlyArray<Entity>): CadDocument {
   if (created.length === 0) return doc;
@@ -28,10 +24,7 @@ export function withEntities(doc: CadDocument, created: ReadonlyArray<Entity>): 
   return { ...doc, entities, order: [...doc.order, ...created.map((entity) => entity.id)] };
 }
 
-/**
- * `doc` with every entity of `changed` stored under its id (order unchanged); one pass, equal to
- * folding `replaceEntity`.
- */
+/** `doc` with every entity of `changed` stored under its id (order unchanged); one pass, equal to folding `replaceEntity`. */
 export function replaceEntitiesById(doc: CadDocument, changed: ReadonlyArray<Entity>): CadDocument {
   if (changed.length === 0) return doc;
   const entities: CadDocument['entities'] = { ...doc.entities };
@@ -45,8 +38,8 @@ export function replaceEntity(doc: CadDocument, entity: Entity): CadDocument {
 }
 
 /**
- * Remove `removedIds` from every group's `memberIds`; a group left with fewer than 2 members is
- * dissolved (omitted from `nextGroups`, listed in `dissolvedGroups`).
+ * Remove `removedIds` from every group's `memberIds`; a group left with fewer than 2 members is dissolved (omitted from `nextGroups`,
+ * listed in `dissolvedGroups`).
  */
 function pruneGroupMembers(
   groups: Readonly<Record<string, EntityGroup>> | undefined,
@@ -100,9 +93,8 @@ function pruneReferences(doc: CadDocument, removed: ReadonlySet<string>): { refe
 }
 
 /**
- * `doc` without `removed` entities: entities/order/selection, group memberships (groups left with
- * fewer than 2 members are dissolved and listed), and every constraint / joint / drive relation
- * that referenced a removed entity (counted in `prunedReferences`).
+ * `doc` without `removed` entities: entities/order/selection, group memberships (groups left with fewer than 2 members are dissolved and
+ * listed), and every constraint / joint / drive relation that referenced a removed entity (counted in `prunedReferences`).
  */
 export function withoutEntities(
   doc: CadDocument,
@@ -123,10 +115,7 @@ export function withoutEntities(
   return { document, dissolvedGroups, prunedReferences };
 }
 
-/**
- * `doc` with every `removedIds` entity consumed (entities/order/selection/groups) and `result`
- * stored and appended to `order`.
- */
+/** `doc` with every `removedIds` entity consumed (entities/order/selection/groups) and `result` stored and appended to `order`. */
 export function replaceEntities(doc: CadDocument, removedIds: readonly string[], result: Entity): CadDocument {
   return withEntity(withoutEntities(doc, new Set(removedIds)).document, result);
 }

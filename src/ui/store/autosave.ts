@@ -1,7 +1,4 @@
-/**
- * Autosave storage adapter: persists the serialized working document (same format as Save) to a
- * key/value storage. Never throws — quota or corruption problems are warned about and dropped.
- */
+// Autosave storage adapter for the serialized document (Save format); never throws (quota / corruption: warn, drop).
 
 export interface KeyValueStorage {
   getItem(key: string): string | null;
@@ -14,7 +11,7 @@ export interface AutosaveRecord {
   savedAt: number;
   /** `serializeDocument` output. */
   json: string;
-  /** Present when the stored document equals what the user last saved to a file. */
+  /** Equals what the user last saved to a file. */
   clean?: true;
 }
 
@@ -38,7 +35,7 @@ export function clearAutosave(storage: KeyValueStorage): void {
   }
 }
 
-/** The stored record, or null when absent. A corrupted record is cleared and ignored. */
+/** null when absent; a corrupted record is cleared and ignored. */
 export function readAutosave(storage: KeyValueStorage): AutosaveRecord | null {
   let raw: string | null;
   try {
@@ -69,7 +66,7 @@ export function readAutosave(storage: KeyValueStorage): AutosaveRecord | null {
   return null;
 }
 
-/** The browser's localStorage, or null when unavailable (private mode, SSR, blocked storage). */
+/** null when unavailable (private mode, SSR, blocked). */
 export function browserStorage(): KeyValueStorage | null {
   try {
     return typeof window === 'undefined' ? null : window.localStorage;

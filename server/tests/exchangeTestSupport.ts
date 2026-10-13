@@ -20,11 +20,7 @@ interface ProbeResult {
 /** Ask the bridge which CAD libraries `python` has (synchronously, for describe.skipIf); never throws. */
 export function probePython(python: string): ProbeResult {
   const none: ProbeResult = { cadquery: null, build123d: null };
-  const run = spawnSync(python, [BRIDGE_SCRIPT], {
-    input: JSON.stringify({ op: 'probe' }),
-    encoding: 'utf8',
-    timeout: 60_000,
-  });
+  const run = spawnSync(python, [BRIDGE_SCRIPT], { input: JSON.stringify({ op: 'probe' }), encoding: 'utf8', timeout: 60_000 });
   if (run.error !== undefined || run.status !== 0) return none;
   try {
     const response = JSON.parse(run.stdout) as Record<string, unknown>;

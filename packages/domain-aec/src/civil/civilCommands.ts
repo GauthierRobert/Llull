@@ -15,9 +15,7 @@ export const describeCivil = defineCommand({
     'List the civil / site model: point groups, surfaces, platforms, alignments, manholes and pipes ' +
     'with their ids, names and the objects they reference. Optional `category` filter.',
   annotations: { readOnly: true, idempotent: true },
-  params: z.object({
-    category: z.enum(CIVIL_CATEGORIES).optional().describe('Only list objects of this category.'),
-  }),
+  params: z.object({ category: z.enum(CIVIL_CATEGORIES).optional().describe('Only list objects of this category.') }),
   run: (doc, { category }): CommandResult => {
     const civil = getCivil(doc);
     const objects = civil.order
@@ -51,9 +49,8 @@ export const describeCivil = defineCommand({
 export const deleteCivilObject = defineCommand({
   name: 'delete_civil_object',
   description:
-    'Delete a civil object (point group, surface, platform, alignment, manhole or pipe) and its ' +
-    'generated geometry. Refused when other objects reference it unless `cascade` is true, which ' +
-    'deletes those dependents too (e.g. the pipes of a manhole).',
+    'Delete a civil object (point group, surface, platform, alignment, manhole or pipe) and its generated geometry. Refused when other ' +
+    'objects reference it unless `cascade` is true, which deletes those dependents too (e.g. the pipes of a manhole).',
   annotations: { destructive: true },
   params: z.object({
     id: z.string().describe('Civil object id, e.g. "manhole-2".'),
@@ -77,10 +74,6 @@ export const deleteCivilObject = defineCommand({
       return noop(doc, `delete_civil_object refused: ${others.join(', ')} reference ${id}. Delete them first or pass cascade: true.`);
     }
     const document = regenerateCivil(doc, withoutObjects(civil, doomed));
-    return {
-      document,
-      summary: `Deleted ${[...doomed].join(', ')}.`,
-      affected: [...doomed],
-    };
+    return { document, summary: `Deleted ${[...doomed].join(', ')}.`, affected: [...doomed] };
   },
 });

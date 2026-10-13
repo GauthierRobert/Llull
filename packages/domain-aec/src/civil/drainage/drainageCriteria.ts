@@ -1,11 +1,7 @@
 /** Drainage design criteria and rainfall intensity (constant or IDF curve i = a / (t + b)^c). */
 
 /** Intensity-duration-frequency curve: i (mm/h) = a / (t + b)^c, t in minutes. */
-export interface Idf {
-  readonly a: number;
-  readonly b: number;
-  readonly c: number;
-}
+export type Idf = { readonly a: number; readonly b: number; readonly c: number };
 
 export interface DrainageCriteria {
   readonly rainfallIntensityMmH: number;
@@ -20,16 +16,10 @@ export interface DrainageCriteria {
   readonly outfallLevel: number | null;
 }
 
+// prettier-ignore
 export const DEFAULT_CRITERIA: DrainageCriteria = {
-  rainfallIntensityMmH: 50,
-  idf: null,
-  minVelocity: 0.6,
-  maxVelocity: 3,
-  minCoverM: 0.9,
-  maxDepthRatio: 0.8,
-  manholeLossK: 0.5,
-  freeboardM: 0.3,
-  outfallLevel: null,
+  rainfallIntensityMmH: 50, idf: null, minVelocity: 0.6, maxVelocity: 3, minCoverM: 0.9, maxDepthRatio: 0.8, manholeLossK: 0.5,
+  freeboardM: 0.3, outfallLevel: null,
 };
 
 /** Inlet time (minutes) of a manhole without `entryTimeMin`. */

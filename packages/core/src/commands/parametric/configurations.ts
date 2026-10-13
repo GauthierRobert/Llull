@@ -1,6 +1,5 @@
 /**
- * create_configuration / activate_configuration: design-table variants. Configurations are document
- * INPUT state, so both are `metaHistory`.
+ * create_configuration / activate_configuration: design-table variants. Configurations are document INPUT state, so both are `metaHistory`.
  */
 
 import type { CadDocument, Configuration } from '../../model/types';
@@ -47,23 +46,13 @@ export const createConfiguration = defineCommand({
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, { name, parameterValues }): CommandResult => {
     if (name.trim() === '') return noop(doc, 'create_configuration failed: name must be a non-empty string.');
-
     const expressions: Record<string, string> = {};
     for (const [k, v] of Object.entries(parameterValues)) {
-      if (typeof v === 'string') {
-        expressions[k] = v;
-      } else {
-        return noop(doc, `create_configuration '${name}' failed: parameterValues['${k}'] must be a string expression, got ${typeof v}.`);
-      }
+      if (typeof v === 'string') expressions[k] = v;
+      else return noop(doc, `create_configuration '${name}' failed: parameterValues['${k}'] must be a string expression, got ${typeof v}.`);
     }
-
     const configuration: Configuration = { name, parameterValues: expressions };
-
-    const newDoc: CadDocument = {
-      ...doc,
-      configurations: { ...doc.configurations, [name]: configuration },
-    };
-
+    const newDoc: CadDocument = { ...doc, configurations: { ...doc.configurations, [name]: configuration } };
     const paramCount = Object.keys(parameterValues).length;
     return report(
       newDoc,
@@ -90,14 +79,12 @@ export const activateConfiguration = defineCommand({
       .string()
       .describe(
         'Name of the configuration to activate. Must match an existing configuration ' +
-          'created by create_configuration (case-sensitive). ' +
-          'Example: "small", "large", "production_v2".',
+          'created by create_configuration (case-sensitive). Example: "small", "large", "production_v2".',
       ),
   }),
   annotations: { idempotent: true, metaHistory: true },
   run: (doc, { name }, ctx): CommandResult => {
     if (name.trim() === '') return noop(doc, 'activate_configuration failed: name must be a non-empty string.');
-
     const config = doc.configurations[name];
     if (!config) {
       const available = Object.keys(doc.configurations);
@@ -107,7 +94,6 @@ export const activateConfiguration = defineCommand({
           : ' No configurations have been defined yet (use create_configuration first).';
       return noop(doc, `activate_configuration failed: configuration '${name}' not found.${hint}`);
     }
-
     // Parameters named in the config but absent from the document are created (and reported).
     const unknownParams = Object.keys(config.parameterValues).filter((paramName) => !(paramName in doc.parameters));
     const changedParams = Object.entries(config.parameterValues).map(([paramName, expression]) => `${paramName}="${expression}"`);
@@ -117,20 +103,16 @@ export const activateConfiguration = defineCommand({
       doc.parameters,
     );
     const baseDoc: CadDocument = { ...doc, parameters: reEvaluateAll(updatedParameters) };
-
     const context = ctx ?? currentContext();
     const warnings: string[] = [];
     const refused = kernelRefusal(baseDoc, doc.featureHistory, context);
     if (refused !== null) return noop(doc, `activate_configuration: ${refused}`);
     const regenerated = replayHistory(baseDoc, doc.featureHistory, context.registry, warnings);
-
     const entityCount = Object.keys(regenerated.entities).length;
-
     const createdNote =
       unknownParams.length > 0
         ? ` Warning: created ${unknownParams.length} new parameter(s) not previously in the document: ${unknownParams.join(', ')}.`
         : '';
-
     return changed(
       regenerated,
       `activate_configuration '${name}': applied ${changedParams.length} parameter${changedParams.length === 1 ? '' : 's'} (${changedParams.join(', ')}) ` +

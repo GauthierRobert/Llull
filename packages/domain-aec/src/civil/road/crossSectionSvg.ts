@@ -1,6 +1,6 @@
 /**
- * Cross-section sheet as SVG: one panel per station with the ground line, the road template with
- * batters to daylight, and the cut / fill areas, all drawn at one common 1:1 scale.
+ * Cross-section sheet as SVG: one panel per station with the ground line, the road template with batters to daylight, and the cut / fill
+ * areas, all drawn at one common 1:1 scale.
  */
 
 import type { CadDocument } from '@core/model/types';
@@ -56,12 +56,7 @@ export function crossSectionSvg(
     const px = (offset: number): number => centreX + offset * metre * scale;
     const py = (z: number): number => baseY - (z * metre - designM) * scale;
     body.push(svgRect(left, top, PANEL_WIDTH, PANEL_HEIGHT, '#bbb'));
-    body.push(
-      svgText(left + 6, top + 14, `${stationText(doc, cross.station)}  CL ${designM.toFixed(2)}`, {
-        size: 10,
-        weight: 'bold',
-      }),
-    );
+    body.push(svgText(left + 6, top + 14, `${stationText(doc, cross.station)}  CL ${designM.toFixed(2)}`, { size: 10, weight: 'bold' }));
     body.push(svgLine([centreX, top + 22], [centreX, top + PANEL_HEIGHT - 28], '#ddd', 1, '4,3'));
     const designLine = cross.design.map((node): Pair => [px(node.offset), py(node.z)]);
     if (tin) {

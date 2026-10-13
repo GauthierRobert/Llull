@@ -1,9 +1,8 @@
 /**
- * Sweep tessellation shared by export, kernels' mesh path and the viewport: the section is carried
- * along the sampled path by a rotation-minimizing frame (double reflection, Wang et al. 2008).
- * Start frame: binormal (section +y) is world +Z projected off the tangent (+Y when the path starts
- * vertical), normal (section +x) = binormal × tangent. Variable sections (`stations`) blend
- * section rings (./sectionRing) along the arc length and are skinned by ./skin.
+ * Sweep tessellation shared by export, kernels' mesh path and the viewport: the section is carried along the sampled path by a
+ * rotation-minimizing frame (double reflection, Wang et al. 2008). Start frame: binormal (section +y) is world +Z projected off the tangent
+ * (+Y when the path starts vertical), normal (section +x) = binormal × tangent. Variable sections (`stations`) blend section rings
+ * (./sectionRing) along the arc length and are skinned by ./skin.
  */
 
 import type { CurveSegment } from '../model/curve';
@@ -47,13 +46,8 @@ export function sweepFrames(path: ReadonlyArray<CurveSegment<Vec3>>): SweepFrame
   const samples: Array<{ point: Vec3; tangent: Vec3; segment: number }> = [];
   path.forEach((segment, index) => {
     const steps = segmentSteps(segment);
-    for (let s = index === 0 ? 0 : 1; s <= steps; s++) {
-      samples.push({
-        point: segmentPoint(segment, s / steps),
-        tangent: segmentTangent(segment, s / steps),
-        segment: index,
-      });
-    }
+    for (let s = index === 0 ? 0 : 1; s <= steps; s++)
+      samples.push({ point: segmentPoint(segment, s / steps), tangent: segmentTangent(segment, s / steps), segment: index });
   });
   const first = samples[0];
   if (first === undefined) return [];
@@ -77,9 +71,8 @@ export function sweepFrames(path: ReadonlyArray<CurveSegment<Vec3>>): SweepFrame
 }
 
 /**
- * Frames of a closed path: the duplicated end sample is dropped and the rotation-minimizing
- * frame's holonomy (the twist it gains going once round) is spread linearly along the arc length,
- * so the last frame meets the first without a jump.
+ * Frames of a closed path: the duplicated end sample is dropped and the rotation-minimizing frame's holonomy (the twist it gains going once
+ * round) is spread linearly along the arc length, so the last frame meets the first without a jump.
  */
 function closeFrames(frames: SweepFrame[]): SweepFrame[] {
   const open = frames.slice(0, -1);
@@ -106,15 +99,12 @@ function sectionLoops(section: SweepSection): { outer: Vec2[]; inner: Vec2[] | n
       return [radius * Math.cos(angle), radius * Math.sin(angle)];
     });
   const bore = section.innerRadius;
-  return {
-    outer: ring(section.radius),
-    inner: bore !== undefined && bore > 0 && bore < section.radius ? ring(bore) : null,
-  };
+  return { outer: ring(section.radius), inner: bore !== undefined && bore > 0 && bore < section.radius ? ring(bore) : null };
 }
 
 /**
- * Outer section rings grouped per path segment (each group includes the joint ring it starts
- * from), carried by the same continuous frames as `sweepTriangles`.
+ * Outer section rings grouped per path segment (each group includes the joint ring it starts from), carried by the same continuous frames
+ * as `sweepTriangles`.
  */
 export function sweepSegmentRings(sweep: SweepShape): Vec3[][] {
   const { path, section, stations } = sweep;
@@ -133,9 +123,7 @@ export function sweepSegmentRings(sweep: SweepShape): Vec3[][] {
 }
 
 /** What a sweep's geometry depends on (a SweepEntity satisfies it). */
-export type SweepShape = Pick<SweepEntity, 'path' | 'section'> & {
-  readonly stations?: SweepEntity['stations'];
-};
+export type SweepShape = Pick<SweepEntity, 'path' | 'section'> & { readonly stations?: SweepEntity['stations'] };
 
 /** Arc-length fraction (0..1) of every frame along the path. */
 function frameFractions(frames: readonly SweepFrame[]): number[] {
@@ -165,8 +153,8 @@ export function frameAtFraction(path: ReadonlyArray<CurveSegment<Vec3>>, t: numb
 }
 
 /**
- * Section ring (SECTION_RING_POINTS points, section coordinates) at path fraction `t`: the two
- * neighbouring station rings blended with a smoothstep weight (tangent-continuous at stations).
+ * Section ring (SECTION_RING_POINTS points, section coordinates) at path fraction `t`: the two neighbouring station rings blended with a
+ * smoothstep weight (tangent-continuous at stations).
  */
 export function stationRingAt(stations: ReadonlyArray<SweepStation>, t: number): Vec2[] {
   let span = 0;

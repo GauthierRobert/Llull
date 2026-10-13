@@ -1,7 +1,4 @@
-/**
- * ConfigurationsPanel — lists `document.configurations`; creates (create_configuration) and
- * activates (activate_configuration) them.
- */
+// `document.configurations`: create_configuration, activate_configuration.
 
 import React, { useRef, useState } from 'react';
 import { classNames } from '@ui/classNames';
@@ -199,11 +196,7 @@ function CreateConfigurationForm(): React.ReactElement {
   );
 }
 
-interface ConfigurationsPanelProps {
-  className?: string;
-}
-
-export function ConfigurationsPanel({ className }: ConfigurationsPanelProps): React.ReactElement {
+export function ConfigurationsPanel({ className }: { className?: string }): React.ReactElement {
   const configurations = useStore((s) => s.document.configurations);
   const parameters = useStore((s) => s.document.parameters);
   const configList = Object.values(configurations);

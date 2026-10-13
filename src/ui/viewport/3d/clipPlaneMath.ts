@@ -1,8 +1,4 @@
-/**
- * Section-plane equation in RENDER space (world − renderOrigin, the space three.js clips in).
- * The plane passes through the world point `normal * offset`; with the floating origin that point
- * sits at `normal * offset − renderOrigin`, so the constant gains `+ normal · renderOrigin`.
- */
+// Section plane in RENDER space: through world `normal * offset`, so the constant gains `+ normal · renderOrigin`.
 
 import type { Vec3 } from '@core/model/types';
 import type { ClipAxis } from '@ui/store';
@@ -10,9 +6,9 @@ import type { ClipAxis } from '@ui/store';
 const AXIS_INDEX: Record<ClipAxis, number> = { x: 0, y: 1, z: 2 };
 
 export interface RenderClipPlane {
-  /** Unit normal (±X / ±Y / ±Z). */
+  /** ±X / ±Y / ±Z. */
   readonly normal: Vec3;
-  /** `normal · X + constant = 0` in render space. */
+  /** `normal · X + constant = 0`, render space. */
   readonly constant: number;
 }
 

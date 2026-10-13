@@ -1,15 +1,6 @@
-/**
- * Render branch for `kind:'dimension'` entities in the 2D orthographic drafting viewport.
- *
- * Supports four dimension kinds (see dimensionGeometry): linear (horizontal distance between two
- * point/line entities), aligned (full distance, line parallel to the segment), radial (radius of a
- * circle, arc or ellipse) and angular (angle at the vertex of two arms).
- *
- * Lines are memoized on the referenced entities and disposed by PlacedLineObject (R9); the value
- * text is drei <Text> (no disposal needed). Missing or wrong-kind references render nothing.
- * Value = entity.label if set, else computed. Precision = entity.precision if set, else document
- * displayPrecision. Must be rendered inside the -renderOrigin group in Viewport2D.tsx.
- */
+// 2D `kind:'dimension'` (linear / aligned / radial / angular, dimensionGeometry): lines memoized on the referenced
+// entities (disposed by PlacedLineObject), value as drei <Text> = label ?? computed at precision ?? displayPrecision.
+// Bad references render nothing. Lives inside Viewport2D's -renderOrigin group.
 
 import { useMemo, useRef } from 'react';
 import type * as THREE from 'three';
@@ -27,19 +18,14 @@ import { DEFAULT_OFFSET, dimensionDrawing } from './dimensionGeometry';
 const DIM_LINE_COLOR = '#333333';
 const TEXT_HEIGHT = 0.5;
 
-interface DimensionRenderer2DProps {
-  entity: DimensionEntity;
-  selected: boolean;
-}
-
-export function DimensionRenderer2D({ entity, selected }: DimensionRenderer2DProps): React.ReactElement | null {
+export function DimensionRenderer2D({ entity, selected }: { entity: DimensionEntity; selected: boolean }): React.ReactElement | null {
   const { dimensionKind, entityIds, offset: rawOffset, precision, label, color, position } = entity;
   const offset = rawOffset ?? DEFAULT_OFFSET;
   const textRef = useRef<THREE.Group>(null);
   useMinScreenSize(textRef, TEXT_HEIGHT);
   const dimColor = selected ? SELECTION_COLOR : color || DIM_LINE_COLOR;
 
-  // Only the referenced entities (shallow-compared) — unrelated document edits do not rebuild.
+  // Only the referenced entities (shallow): unrelated edits do not rebuild.
   const referenced = useStore(useShallow((s) => entityIds.map((id) => s.document.entities[id])));
   const displayPrecision = useStore((s) => s.document.displayPrecision);
 

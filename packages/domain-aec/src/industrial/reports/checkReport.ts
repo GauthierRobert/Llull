@@ -32,13 +32,6 @@ export const LIMIT_COLUMNS = ['Check', 'Value', 'Limit', 'Unit', 'Utilisation', 
 
 /** Cells of `LIMIT_COLUMNS` for one row. */
 export const limitCells = (
-  row: {
-    check: string;
-    value: number;
-    limit: number;
-    unit: string;
-    utilisation: number;
-    combination: string;
-  },
+  row: { check: string; value: number; limit: number; unit: string; utilisation: number; combination: string },
   status: 'FAIL' | 'OK',
 ): (string | number)[] => [row.check, round(row.value), round(row.limit), row.unit, round(row.utilisation), status, row.combination];

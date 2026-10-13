@@ -1,6 +1,6 @@
 /**
- * Pure polygon-with-holes triangulation (hole bridging + ear clipping). Small inputs only
- * (O(n²)); used to mesh slabs with openings. @layer lib
+ * Pure polygon-with-holes triangulation (hole bridging + ear clipping). Small inputs only (O(n²)); used to mesh slabs with openings. @layer
+ * lib
  */
 
 import { orient2 } from './vec2';
@@ -74,8 +74,8 @@ function bridge(
 
 /**
  * Triangulates `outer` minus `holes`.
- * @returns the flat vertex list (outer, then each hole, all as given), CCW index triples into it,
- *          and whether the whole region was covered (false when ear clipping stalled)
+ * @returns the flat vertex list (outer, then each hole, all as given), CCW index triples into it, and whether the whole region was covered
+ *   (false when ear clipping stalled)
  */
 interface Triangulation {
   readonly vertices: Point2[];
@@ -119,7 +119,6 @@ function triangulateWith(
   const reach = (loop: ReadonlyArray<Vertex>): number => Math.max(...loop.map((vertex) => extremity(vertex.point)));
   const pending = [...holeRings].sort((a, b) => reach(b) - reach(a));
   for (const [index, hole] of pending.entries()) ring = bridge(ring, hole, pending.slice(index + 1), extremity);
-
   const triangles: Array<[number, number, number]> = [];
   const remaining = [...ring];
   const neighbours = (i: number): [Vertex, Vertex, Vertex] => [

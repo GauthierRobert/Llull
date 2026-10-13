@@ -1,8 +1,7 @@
 /**
- * Decal projection (like three.js DecalGeometry): the solid's triangles facing the decal are
- * clipped to the decal box (±width/2, ±height/2, ±depth/2 around `center`, z along `normal`) and
- * given UVs in glTF convention (u right, v down from the top of the image). The patch is lifted
- * slightly off the surface so it never z-fights. Pure; the viewport and glTF export share it.
+ * Decal projection (like three.js DecalGeometry): the solid's triangles facing the decal are clipped to the decal box (±width/2, ±height/2,
+ * ±depth/2 around `center`, z along `normal`) and given UVs in glTF convention (u right, v down from the top of the image). The patch is
+ * lifted slightly off the surface so it never z-fights. Pure; the viewport and glTF export share it.
  */
 
 import type { Decal, Vec3 } from '../model/types';
@@ -34,8 +33,8 @@ function clip(polygon: Vec3[], axis: 0 | 1 | 2, sign: 1 | -1, limit: number): Ve
 }
 
 /**
- * The decal patch over `triangles` (same frame as the decal): triangles with positions and UVs.
- * Only faces turned toward the decal (normal · decal normal > 0.2) receive it.
+ * The decal patch over `triangles` (same frame as the decal): triangles with positions and UVs. Only faces turned toward the decal (normal
+ * · decal normal > 0.2) receive it.
  */
 export function decalPatch(decal: Decal, triangles: readonly Triangle[]): { positions: number[]; uvs: number[] } {
   const { x, y, z } = decalAxes(decal);

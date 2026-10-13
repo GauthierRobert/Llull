@@ -77,13 +77,7 @@ describe('getLicense / GET /license', () => {
 
   it('defaults to evaluation with 3 users and a banner flag', async () => {
     const res = await request(app).get('/license');
-    expect(res.body).toMatchObject({
-      mode: 'evaluation',
-      seats: 3,
-      customer: null,
-      evaluation: true,
-      label: 'Evaluation — 3 users',
-    });
+    expect(res.body).toMatchObject({ mode: 'evaluation', seats: 3, customer: null, evaluation: true, label: 'Evaluation — 3 users' });
   });
 
   it('reports a valid license publicly (no features, no warning)', async () => {

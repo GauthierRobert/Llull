@@ -1,8 +1,4 @@
-/**
- * Dispatch a command and react to its outcome, but only while the component is still mounted:
- * `onChanged` when the document changed (e.g. reset the form), `onRefused(summary)` otherwise (e.g.
- * keep the typed values and show why).
- */
+// Dispatch, then (only while mounted) `onChanged` when the document changed or `onRefused(summary)` otherwise.
 
 import { useCallback } from 'react';
 import { useStore } from '@ui/store';

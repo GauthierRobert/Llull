@@ -1,17 +1,11 @@
-/**
- * Pairwise segment intersections via sweep-and-prune on the x axis: only pairs whose x and y
- * extents overlap reach the exact test, so scenes with thousands of segments stay near-linear.
- */
+// Pairwise segment intersections by x sweep-and-prune: only x/y-overlapping pairs reach the exact test (near-linear).
 
 import { segmentIntersection } from '@lib/polygon';
 import type { Segment } from './geometry';
 
 const EPSILON = 1e-9;
 
-/**
- * Every intersection point between two distinct segments of `segments`.
- * @invariant same point set as testing all i<j pairs with `segmentIntersection`
- */
+/** @invariant same points as testing every i<j pair with `segmentIntersection` */
 export function allSegmentIntersections(segments: ReadonlyArray<Segment>): Array<[number, number]> {
   const minX = segments.map(([ax, , bx]) => Math.min(ax, bx) - EPSILON);
   const maxX = segments.map(([ax, , bx]) => Math.max(ax, bx) + EPSILON);

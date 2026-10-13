@@ -1,5 +1,5 @@
 /**
- * Vertical field of view (degrees) of the 3D perspective viewport camera; `fit_view` sizes the orbit
- * distance from it, so the viewport must render with exactly this value.
+ * Vertical field of view (degrees) of the 3D perspective viewport camera; `fit_view` sizes the orbit distance from it, so the viewport must
+ * render with exactly this value.
  */
 export const VIEWPORT_FOV_DEGREES = 45;

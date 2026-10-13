@@ -1,6 +1,6 @@
 /**
- * Exact-shape queries over the kernel's B-rep: topology inspection (the edge indices fillet_edge /
- * chamfer_edge select) and STEP export straight from the kernel shapes.
+ * Exact-shape queries over the kernel's B-rep: topology inspection (the edge indices fillet_edge / chamfer_edge select) and STEP export
+ * straight from the kernel shapes.
  */
 
 import { type CadDocument, type Entity, type Vec3, is3D } from '../../model/types';
@@ -53,29 +53,19 @@ export const inspectTopology = defineCommand({
     'is at the top front). Works on primitives and on boolean / fillet / chamfer / shell results (they keep their ' +
     `exact construction). Requires ${OCC_HINT}; the default Manifold kernel has no B-rep and gracefully no-ops. ` +
     'Does not modify the document.',
-  params: z.object({
-    id: z.string().describe('Id of the 3D solid entity to inspect.'),
-  }),
+  params: z.object({ id: z.string().describe('Id of the 3D solid entity to inspect.') }),
   run: (doc, { id }, ctx): CommandResult => {
     const entity = doc.entities[id];
     if (!entity) return noop(doc, `inspect_topology: entity '${id}' not found.`);
-    if (!is3D(entity) || entity.kind === 'instance') {
+    if (!is3D(entity) || entity.kind === 'instance')
       return noop(doc, `inspect_topology: entity '${id}' (kind '${entity.kind}') is not a 3D solid; explode instances first.`);
-    }
     const kernel = (ctx ?? currentContext()).kernel;
     if (!kernel) return noop(doc, kernelUnavailable('inspect_topology'));
     const shape = kernel.evaluate(operandRecipe(kernel, entity));
-    if (shape === null) {
-      return noop(doc, `inspect_topology: the kernel could not build entity '${id}' (kind '${entity.kind}').`);
-    }
+    if (shape === null) return noop(doc, `inspect_topology: the kernel could not build entity '${id}' (kind '${entity.kind}').`);
     const topology = kernel.topology(shape);
-    if (topology === null) {
-      return noop(doc, `inspect_topology: this kernel has no exact B-rep topology; use ${OCC_HINT}.`);
-    }
-    return report(doc, topologySummary(id, topology, doc.displayPrecision), {
-      entityId: id,
-      ...topology,
-    });
+    if (topology === null) return noop(doc, `inspect_topology: this kernel has no exact B-rep topology; use ${OCC_HINT}.`);
+    return report(doc, topologySummary(id, topology, doc.displayPrecision), { entityId: id, ...topology });
   },
 });
 
@@ -92,11 +82,7 @@ function stepLabels(doc: CadDocument, solids: readonly Entity[]): StepLabel[] {
   const groups = Object.values(doc.groups);
   return solids.map((entity) => {
     const group = groups.find((candidate) => candidate.memberIds.includes(entity.id));
-    return {
-      name: entity.name ?? entity.id,
-      color: entity.color,
-      ...(group !== undefined ? { description: group.name } : {}),
-    };
+    return { name: entity.name ?? entity.id, color: entity.color, ...(group !== undefined ? { description: group.name } : {}) };
   });
 }
 
@@ -148,22 +134,15 @@ export const exportStepExact = defineCommand({
     const shapes: ShapeHandle[] = [];
     for (const entity of solids) {
       const shape = kernel.evaluate(operandRecipe(kernel, entity));
-      if (shape === null) {
+      if (shape === null)
         return noop(doc, `export_step_exact: the kernel could not build '${entity.id}' (kind '${entity.kind}'); nothing exported.`);
-      }
       shapes.push(shape);
     }
     const exactStep = kernel.exportStep(shapes);
     const step = exactStep === null ? null : labelStep(exactStep, stepLabels(doc, solids));
     if (step === null) return noop(doc, `export_step_exact: this kernel cannot write exact STEP; use ${OCC_HINT}.`);
     const exported = solids.map((entity) => entity.id);
-    const data: ExportStepExactData = {
-      format: 'step',
-      step,
-      solidCount: solids.length,
-      entityIds: exported,
-      skipped,
-    };
+    const data: ExportStepExactData = { format: 'step', step, solidCount: solids.length, entityIds: exported, skipped };
     return report(
       doc,
       `export_step_exact: ${solids.length} exact solid(s) (${exported.join(', ')}) → STEP AP214, ${step.length} bytes` +

@@ -1,15 +1,15 @@
 /** add_planetary_gearset: sun + N planets + ring with the tooth phasing that lets them mesh. */
 
-import type { CadDocument, Entity, Vec3 } from '../../model/types';
+import type { Entity, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { nextId } from '../../lib/id';
 import { compactNumber as fmt, vecText } from '../../lib/compactNumber';
 import { applyEulerXYZ } from '../../lib/eulerRotation';
-import { finiteVec3OrZero } from '../../lib/vec3';
+import { add3, finiteVec3OrZero } from '../../lib/vec3';
 import { DEFAULT_FLANK_SAMPLES, externalGearPattern, pitchRadiusOf, toothOutline } from '../../lib/gearOutline';
 import { MAX_GEAR_TEETH } from '../limits';
-import { withEntity } from '../entity/entityOps';
+import { withEntities } from '../entity/entityOps';
 import { newEntity } from '../entity/newEntity';
 import { positionField } from './shared';
 import { AXIS_ROTATION, placedMeshEntity, moduleProblem, toothShapeProblem } from './gearSolid';
@@ -19,8 +19,8 @@ import { failedWith } from '../noop';
 const MAX_PLANETS = 12;
 
 /**
- * Tooth-pattern phases (angle of tooth 0 / space 0, radians) that let every planet mesh with sun
- * (tooth 0 at angle 0) and ring. Planet i sits at carrier angle `2π·i/planetCount`.
+ * Tooth-pattern phases (angle of tooth 0 / space 0, radians) that let every planet mesh with sun (tooth 0 at angle 0) and ring. Planet i
+ * sits at carrier angle `2π·i/planetCount`.
  * @invariant requires (sunTeeth + ringTeeth) % planetCount === 0
  */
 export function planetaryPhases(sunTeeth: number, planetTeeth: number, planetCount: number): { planets: number[]; ring: number } {
@@ -91,14 +91,12 @@ export const addPlanetaryGearset = defineCommand({
     if (moduleIssue !== null) return fail(moduleIssue);
     const [sun, planet, count] = [sunTeeth, planetTeeth, planetCount].map(Math.round) as [number, number, number];
     const ring = sun + 2 * planet;
-    if (!(sun >= 6 && planet >= 6 && ring <= MAX_GEAR_TEETH)) {
+    if (!(sun >= 6 && planet >= 6 && ring <= MAX_GEAR_TEETH))
       return fail(
         `sunTeeth and planetTeeth must be integers >= 6 with ringTeeth <= ${MAX_GEAR_TEETH}, got sun=${String(sunTeeth)} planet=${String(planetTeeth)}.`,
       );
-    }
-    if (!(count >= 1 && count <= MAX_PLANETS)) {
+    if (!(count >= 1 && count <= MAX_PLANETS))
       return fail(`planetCount must be an integer in [1, ${MAX_PLANETS}], got ${String(planetCount)}.`);
-    }
     const shapeProblem = toothShapeProblem(pressureAngle, faceWidth);
     if (shapeProblem !== null) return fail(shapeProblem);
     if ((sun + ring) % count !== 0) {
@@ -109,55 +107,37 @@ export const addPlanetaryGearset = defineCommand({
       );
     }
     const minRim = minRingOuterRadius(mod, ring);
-    if (!(ringOuterRadius >= minRim && Number.isFinite(ringOuterRadius))) {
+    if (!(ringOuterRadius >= minRim && Number.isFinite(ringOuterRadius)))
       return fail(`ringOuterRadius must be >= ${fmt(minRim)} (ring pitch radius + 2.25*module), got ${String(ringOuterRadius)}.`);
-    }
     const centerDistance = pitchRadiusOf(mod, sun + planet);
-    if (count > 1 && 2 * centerDistance * Math.sin(Math.PI / count) <= mod * (planet + 2.2)) {
+    if (count > 1 && 2 * centerDistance * Math.sin(Math.PI / count) <= mod * (planet + 2.2))
       return fail(
         `neighbouring planets would collide: ${count} planets of ${planet} teeth do not fit on centre distance ${fmt(centerDistance)}. Use fewer planets or fewer planet teeth.`,
       );
-    }
-
     const centre = finiteVec3OrZero(position);
     const turn = AXIS_ROTATION[axis];
     const phases = planetaryPhases(sun, planet, count);
     const outline = (teeth: number, phase: number): ReadonlyArray<readonly [number, number]> =>
       toothOutline(externalGearPattern(mod, teeth, pressureAngle, DEFAULT_FLANK_SAMPLES, phase));
     const toothed = (id: string, teeth: number, phase: number, at: Vec3, color: string, name: string): Entity =>
-      newEntity('extrusion', id, { profile: outline(teeth, phase), depth: faceWidth }, at, color, {
-        rotation: turn,
-        name,
-      });
-
+      newEntity('extrusion', id, { profile: outline(teeth, phase), depth: faceWidth }, at, color, { rotation: turn, name });
     const sunId = nextId('sun');
     const entities: Entity[] = [toothed(sunId, sun, 0, centre, sunColor, `${namePrefix}_sun`)];
     const planetIds: string[] = [];
     phases.planets.forEach((phase, i) => {
       const carrier = (2 * Math.PI * i) / count;
       const local: Vec3 = [centerDistance * Math.cos(carrier), centerDistance * Math.sin(carrier), 0];
-      const offset = applyEulerXYZ(local, [0, 0, 0], turn);
-      const at: Vec3 = [centre[0] + offset[0], centre[1] + offset[1], centre[2] + offset[2]];
+      const at = add3(centre, applyEulerXYZ(local, [0, 0, 0], turn));
       const id = nextId('planet');
       planetIds.push(id);
       entities.push(toothed(id, planet, phase, at, planetColor, `${namePrefix}_planet_${i + 1}`));
     });
     const ringId = nextId('ring');
-    entities.push(
-      placedMeshEntity(
-        ringId,
-        internalGearMesh(mod, ring, pressureAngle, faceWidth, ringOuterRadius, phases.ring),
-        centre,
-        turn,
-        ringColor,
-        `${namePrefix}_ring`,
-      ),
-    );
-
-    const next: CadDocument = entities.reduce(withEntity, doc);
+    const ringMesh = internalGearMesh(mod, ring, pressureAngle, faceWidth, ringOuterRadius, phases.ring);
+    entities.push(placedMeshEntity(ringId, ringMesh, centre, turn, ringColor, `${namePrefix}_ring`));
     const ratio = 1 + ring / sun;
     return {
-      document: next,
+      document: withEntities(doc, entities),
       summary:
         `Created planetary gearset: sun ${sunId} (${sun}T), ${count} planets [${planetIds.join(', ')}] (${planet}T), ` +
         `ring ${ringId} (${ring}T). module=${fmt(mod)} centerDistance=${fmt(centerDistance)} ` +

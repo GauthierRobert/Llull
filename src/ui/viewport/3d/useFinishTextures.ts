@@ -1,8 +1,5 @@
-/**
- * three.js textures of a material finish, built from the same core procedural maps the glTF export
- * embeds (`@core/geometry/finishMaps`), plus the box-projected UV attribute a mesh needs to show
- * them. Textures are memoized per finish and disposed when it changes (R9).
- */
+// Material finish textures from the same core procedural maps the glTF export embeds, memoized per finish and disposed
+// on change (R9), plus the box-projected UVs they need.
 
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
@@ -32,7 +29,7 @@ function dataTexture(rgba: Uint8Array, size: number, srgb: boolean): THREE.DataT
   return texture;
 }
 
-/** Textures of `material`'s finish, or null (no material, no finish). */
+/** null without material / finish. */
 export function useFinishTextures(material: FinishSource | undefined): FinishTextures | null {
   const textures = useMemo((): FinishTextures | null => {
     if (material?.finish === undefined) return null;
@@ -57,11 +54,7 @@ export function useFinishTextures(material: FinishSource | undefined): FinishTex
   return textures;
 }
 
-/**
- * Writes a box-projected `uv` attribute (one tile per `scale` units). A non-indexed triangle soup
- * projects each triangle by its facet normal, exactly like the glTF export (core boxUv); indexed
- * geometry falls back to its vertex normals.
- */
+/** Box-projected `uv` (one tile per `scale`): triangle soups by facet normal (= glTF export boxUv), indexed geometry by vertex normals. */
 export function applyBoxUvs(geometry: THREE.BufferGeometry, scale: number): void {
   const position = geometry.getAttribute('position');
   const corner = (i: number): [number, number, number] => [position.getX(i), position.getY(i), position.getZ(i)];

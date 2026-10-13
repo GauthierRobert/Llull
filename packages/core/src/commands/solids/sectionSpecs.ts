@@ -1,7 +1,7 @@
 /**
- * Section specs shared by variable sweeps (`stations`) and lofts (`sections`): one of a circle
- * (`radius`), an ellipse (`radiusX` + `radiusY`), a polygon (`section` points) or a closed sketch
- * (`sectionId`), resolved to a section ring (geometry/sectionRing). Pure helpers.
+ * Section specs shared by variable sweeps (`stations`) and lofts (`sections`): one of a circle (`radius`), an ellipse (`radiusX` +
+ * `radiusY`), a polygon (`section` points) or a closed sketch (`sectionId`), resolved to a section ring (geometry/sectionRing). Pure
+ * helpers.
  */
 
 import type { CurveSegment } from '../../model/curve';
@@ -33,8 +33,8 @@ export interface SectionSpec {
 const ELLIPSE_POINTS = 96;
 
 /**
- * The closed loop of an explicit `section` point list (no exact curves) or of the `sectionId`
- * sketch (with its exact curves), or an error message; exactly one of the two must be given.
+ * The closed loop of an explicit `section` point list (no exact curves) or of the `sectionId` sketch (with its exact curves), or an error
+ * message; exactly one of the two must be given.
  */
 export function sectionLoop(
   doc: CadDocument,
@@ -79,8 +79,5 @@ export function specPolygon(doc: CadDocument, spec: SectionSpec): Vec2[] | strin
 export function specRing(doc: CadDocument, spec: SectionSpec): { ring: Vec2[]; halfSize: number } | string {
   const polygon = specPolygon(doc, spec);
   if (typeof polygon === 'string') return polygon;
-  return {
-    ring: resampleRing(polygon),
-    halfSize: Math.max(...polygon.map(([x, y]) => Math.hypot(x, y))),
-  };
+  return { ring: resampleRing(polygon), halfSize: Math.max(...polygon.map(([x, y]) => Math.hypot(x, y))) };
 }

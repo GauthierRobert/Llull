@@ -73,21 +73,12 @@ describe('audit trail', () => {
         jsonrpc: '2.0',
         id: 1,
         method: 'initialize',
-        params: {
-          protocolVersion: '2024-11-05',
-          capabilities: {},
-          clientInfo: { name: 't', version: '1' },
-        },
+        params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 't', version: '1' } },
       });
     const session = init.headers['mcp-session-id'] as string;
     await mcpRequest(app, session)
       .set(...bearer(EDITOR.token))
-      .send({
-        jsonrpc: '2.0',
-        id: 2,
-        method: 'tools/call',
-        params: { name: 'add_box', arguments: { size: [1, 1, 1] } },
-      });
+      .send({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'add_box', arguments: { size: [1, 1, 1] } } });
     expect(lines()[0]).toMatchObject({ userId: 'ed', source: 'mcp', command: 'add_box' });
   });
 

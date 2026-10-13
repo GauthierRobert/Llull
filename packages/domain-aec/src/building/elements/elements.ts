@@ -89,13 +89,10 @@ export const deleteBuildingElement = defineCommand({
   name: 'delete_building_element',
   annotations: { destructive: true },
   description:
-    'Delete building elements by element id (walls, doors, windows, slabs, columns, beams, stairs, rooms, ' +
-    'grid axes). Deleting a wall also deletes its doors and windows; joined walls are re-trimmed. Deleting a ' +
-    'steel member re-attaches the pipe supports bearing on it to the nearest steel in reach, or leaves them ' +
-    'unattached (the summary says which).',
-  params: z.object({
-    elementIds: z.array(z.string()).describe('Element ids, e.g. ["wall-2", "door-1"].'),
-  }),
+    'Delete building elements by element id (walls, doors, windows, slabs, columns, beams, stairs, rooms, grid axes). Deleting a wall ' +
+    'also deletes its doors and windows; joined walls are re-trimmed. Deleting a steel member re-attaches the pipe supports bearing on ' +
+    'it to the nearest steel in reach, or leaves them unattached (the summary says which).',
+  params: z.object({ elementIds: z.array(z.string()).describe('Element ids, e.g. ["wall-2", "door-1"].') }),
   run: (doc, { elementIds }): CommandResult => {
     const building = getBuilding(doc);
     const known = elementIds.filter((id) => building.elements[id] !== undefined);
@@ -121,12 +118,7 @@ function translated(element: BuildingElement, dx: number, dy: number): BuildingE
     case 'beam':
       return { ...element, start: shift(element.start), end: shift(element.end) };
     case 'curvedWall':
-      return {
-        ...element,
-        start: shift(element.start),
-        through: shift(element.through),
-        end: shift(element.end),
-      };
+      return { ...element, start: shift(element.start), through: shift(element.through), end: shift(element.end) };
     case 'slab':
       return {
         ...element,
@@ -166,14 +158,10 @@ function translated(element: BuildingElement, dx: number, dy: number): BuildingE
 export const moveBuildingElement = defineCommand({
   name: 'move_building_element',
   description:
-    'Move building elements in plan by delta [dx, dy]. Doors/windows travel with their wall (to slide ' +
-    'an opening along its wall use update_opening). Corner joins are recomputed. A moved pipe takes its pipe ' +
-    'supports along and a moved steel member makes its supports re-check their reach: they re-attach to the ' +
-    'steel at the new position or become unattached (the summary says which).',
-  params: z.object({
-    elementIds: z.array(z.string()).describe('Element ids to move.'),
-    delta: vec2('Plan translation [dx, dy].'),
-  }),
+    'Move building elements in plan by delta [dx, dy]. Doors/windows travel with their wall (to slide an opening along its wall use ' +
+    'update_opening). Corner joins are recomputed. A moved pipe takes its pipe supports along and a moved steel member makes its ' +
+    'supports re-check their reach: they re-attach to the steel at the new position or become unattached (the summary says which).',
+  params: z.object({ elementIds: z.array(z.string()).describe('Element ids to move.'), delta: vec2('Plan translation [dx, dy].') }),
   run: (doc, { elementIds, delta }): CommandResult => {
     const building = getBuilding(doc);
     const known = [...new Set(elementIds)].filter((id) => building.elements[id] !== undefined);
@@ -233,9 +221,8 @@ export const moveBuildingElement = defineCommand({
 });
 
 /**
- * Room number for a copy on the level at `levelIndex`: numeric numbers keep their last two digits
- * under the level's hundred ("003" → "103"); other marks get a level suffix ("Lobby" → "Lobby-L1").
- * A numeric suffix is appended until the number is unused.
+ * Room number for a copy on the level at `levelIndex`: numeric numbers keep their last two digits under the level's hundred ("003" →
+ * "103"); other marks get a level suffix ("Lobby" → "Lobby-L1"). A numeric suffix is appended until the number is unused.
  */
 export function copiedRoomNumber(building: BuildingModel, mark: string, levelIndex: number): string {
   const used = new Set(
@@ -272,10 +259,9 @@ export const COPYABLE = [
 export const copyLevelElements = defineCommand({
   name: 'copy_level_elements',
   description:
-    'Repeat a floor: copy every wall (with its doors/windows), slab, column, beam, stair and room of the ' +
-    'source level onto each target level (typical floors of a multi-storey building). Optionally restrict ' +
-    'to some categories. Copied pipes bring their pipe supports, re-attached to the steel found at their new ' +
-    'position (unattached when none is in reach).',
+    'Repeat a floor: copy every wall (with its doors/windows), slab, column, beam, stair and room of the source level onto each target ' +
+    'level (typical floors of a multi-storey building). Optionally restrict to some categories. Copied pipes bring their pipe supports, ' +
+    're-attached to the steel found at their new position (unattached when none is in reach).',
   params: z.object({
     sourceLevelId: z.string().describe('Level to copy from.'),
     targetLevelIds: z.array(z.string()).describe('Levels to copy to.'),

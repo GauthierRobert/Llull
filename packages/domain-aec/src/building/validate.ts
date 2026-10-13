@@ -11,59 +11,35 @@ import { isVec2 } from './model';
 import { EQUIPMENT_SHAPES } from '../industrial/equipment/equipmentShape';
 
 /** Numeric fields each category must carry (finite numbers). */
+// prettier-ignore
 const NUMBERS: Readonly<Record<string, ReadonlyArray<string>>> = {
-  grid: [],
-  wall: ['thickness', 'height', 'baseOffset'],
-  door: ['offset', 'width', 'height', 'sillHeight'],
-  window: ['offset', 'width', 'height', 'sillHeight'],
-  slab: ['thickness', 'offset'],
-  column: ['width', 'depth', 'height'],
-  beam: ['width', 'depth', 'topOffset'],
-  stair: ['angle', 'width', 'riserCount', 'riserHeight', 'treadDepth'],
-  room: [],
-  member: ['roll'],
-  footing: ['width', 'length', 'thickness', 'topOffset'],
-  panel: ['thickness'],
-  equipment: ['angle', 'clearance', 'weight'],
-  pipe: ['diameter'],
-  tray: ['width', 'height'],
-  plate: ['length', 'width', 'thickness', 'boltCount', 'boltDiameter'],
-  curvedWall: ['thickness', 'height', 'baseOffset'],
-  connection: ['plateThickness', 'boltRows', 'boltDiameter', 'haunchLength'],
+  grid: [], wall: ['thickness', 'height', 'baseOffset'], door: ['offset', 'width', 'height', 'sillHeight'],
+  window: ['offset', 'width', 'height', 'sillHeight'], slab: ['thickness', 'offset'], column: ['width', 'depth', 'height'],
+  beam: ['width', 'depth', 'topOffset'], stair: ['angle', 'width', 'riserCount', 'riserHeight', 'treadDepth'], room: [], member: ['roll'],
+  footing: ['width', 'length', 'thickness', 'topOffset'], panel: ['thickness'], equipment: ['angle', 'clearance', 'weight'],
+  pipe: ['diameter'], tray: ['width', 'height'], plate: ['length', 'width', 'thickness', 'boltCount', 'boltDiameter'],
+  curvedWall: ['thickness', 'height', 'baseOffset'], connection: ['plateThickness', 'boltRows', 'boltDiameter', 'haunchLength'],
   pipeSupport: ['rodLength', 'pedestalHeight'],
 };
 
 const CATEGORIES: ReadonlySet<string> = new Set(Object.keys(NUMBERS));
 
 /** Numeric fields that may be zero or negative (every other numeric field must be > 0). */
+// prettier-ignore
 const SIGNED: Readonly<Record<string, ReadonlyArray<string>>> = {
-  wall: ['baseOffset'],
-  door: ['offset', 'sillHeight'],
-  window: ['offset', 'sillHeight'],
-  slab: ['offset'],
-  beam: ['topOffset'],
-  stair: ['angle', 'riserCount'],
-  member: ['roll'],
-  footing: ['topOffset'],
-  equipment: ['angle', 'clearance', 'weight'],
-  curvedWall: ['baseOffset'],
-  connection: ['haunchLength'],
-  pipeSupport: ['rodLength', 'pedestalHeight'],
+  wall: ['baseOffset'], door: ['offset', 'sillHeight'], window: ['offset', 'sillHeight'], slab: ['offset'], beam: ['topOffset'],
+  stair: ['angle', 'riserCount'], member: ['roll'], footing: ['topOffset'], equipment: ['angle', 'clearance', 'weight'],
+  curvedWall: ['baseOffset'], connection: ['haunchLength'], pipeSupport: ['rodLength', 'pedestalHeight'],
 };
 
 /** Fields that must be strictly positive. */
 const positiveFields = (category: string): string[] => (NUMBERS[category] ?? []).filter((field) => !SIGNED[category]?.includes(field));
 
 /** Plan-point fields each category must carry (categories not listed carry none). */
+// prettier-ignore
 const POINTS: Readonly<Record<string, ReadonlyArray<string>>> = {
-  grid: ['start', 'end'],
-  wall: ['start', 'end'],
-  column: ['location'],
-  beam: ['start', 'end'],
-  stair: ['start'],
-  footing: ['location'],
-  equipment: ['location'],
-  curvedWall: ['start', 'through', 'end'],
+  grid: ['start', 'end'], wall: ['start', 'end'], column: ['location'], beam: ['start', 'end'], stair: ['start'], footing: ['location'],
+  equipment: ['location'], curvedWall: ['start', 'through', 'end'],
 };
 
 const isPoint = (value: unknown): boolean => Array.isArray(value) && value.length >= 2 && value.every(isFiniteNumber);
@@ -96,12 +72,8 @@ function connectionErrors(key: string, element: Elements, elements: Elements): s
       errors.push(`building element ${key}: ${field} '${String(id)}' is not a steel member`);
     }
   }
-  if (element['kind'] !== 'eaves' && element['kind'] !== 'apex') {
-    errors.push(`building element ${key}: kind must be eaves or apex`);
-  }
-  if (element['end'] !== 'start' && element['end'] !== 'end') {
-    errors.push(`building element ${key}: end must be start or end`);
-  }
+  if (element['kind'] !== 'eaves' && element['kind'] !== 'apex') errors.push(`building element ${key}: kind must be eaves or apex`);
+  if (element['end'] !== 'start' && element['end'] !== 'end') errors.push(`building element ${key}: end must be start or end`);
   return errors;
 }
 
@@ -127,29 +99,19 @@ function pipeSupportErrors(key: string, element: Elements, elements: Elements): 
   const errors: string[] = [];
   const pipeId = element['pipeId'];
   const pipe = typeof pipeId === 'string' ? elements[pipeId] : undefined;
-  if (!isRecord(pipe) || pipe['category'] !== 'pipe') {
-    errors.push(`building element ${key}: pipeId '${String(pipeId)}' is not a pipe`);
-  }
+  if (!isRecord(pipe) || pipe['category'] !== 'pipe') errors.push(`building element ${key}: pipeId '${String(pipeId)}' is not a pipe`);
   if (!['shoe', 'hanger', 'guide', 'anchor'].includes(String(element['type']))) {
     errors.push(`building element ${key}: type must be shoe, hanger, guide or anchor`);
   }
-  if (!isVec3(element['position'])) {
-    errors.push(`building element ${key}: position must be [x, y, z]`);
-  }
+  if (!isVec3(element['position'])) errors.push(`building element ${key}: position must be [x, y, z]`);
   const memberId = element['memberId'];
-  if (memberId !== null && typeof memberId !== 'string') {
-    errors.push(`building element ${key}: memberId must be a steel member id or null`);
-  }
+  if (memberId !== null && typeof memberId !== 'string') errors.push(`building element ${key}: memberId must be a steel member id or null`);
   for (const field of ['rodLength', 'pedestalHeight', 'standoff']) {
     const value = element[field];
-    if (typeof value === 'number' && value < 0) {
-      errors.push(`building element ${key}: ${field} must be >= 0`);
-    }
+    if (typeof value === 'number' && value < 0) errors.push(`building element ${key}: ${field} must be >= 0`);
   }
   const angle = element['standoffAngle'];
-  if (angle !== undefined && !isFiniteNumber(angle)) {
-    errors.push(`building element ${key}: standoffAngle must be a finite number`);
-  }
+  if (angle !== undefined && !isFiniteNumber(angle)) errors.push(`building element ${key}: standoffAngle must be a finite number`);
   return errors;
 }
 
@@ -172,9 +134,7 @@ function elementErrors(key: string, element: unknown, levels: Record<string, unk
   if (!isStringArray(element['entityIds'])) errors.push(`building element ${key}: entityIds must be a string array`);
   for (const field of NUMBERS[category] ?? []) {
     const value = element[field];
-    if (!isFiniteNumber(value)) {
-      errors.push(`building element ${key}: ${field} must be a finite number`);
-    }
+    if (!isFiniteNumber(value)) errors.push(`building element ${key}: ${field} must be a finite number`);
   }
   for (const field of positiveFields(category)) {
     const value = element[field];
@@ -192,9 +152,7 @@ function elementErrors(key: string, element: unknown, levels: Record<string, unk
         const value = reinforcement[field];
         return isPositiveNumber(value);
       });
-    if (!valid) {
-      errors.push(`building element ${key}: reinforcement must have barDiameter, spacing and cover > 0`);
-    }
+    if (!valid) errors.push(`building element ${key}: reinforcement must have barDiameter, spacing and cover > 0`);
   }
   if (category === 'stair') {
     const risers = element['riserCount'];
@@ -210,16 +168,12 @@ function elementErrors(key: string, element: unknown, levels: Record<string, unk
   }
   if (category === 'slab' && element['openings'] !== undefined) {
     const openings = element['openings'];
-    if (!Array.isArray(openings) || !openings.every(isPolygon)) {
-      errors.push(`building element ${key}: openings must be polygons`);
-    }
+    if (!Array.isArray(openings) || !openings.every(isPolygon)) errors.push(`building element ${key}: openings must be polygons`);
   }
   if (category === 'member' && (!isVec3(element['start']) || !isVec3(element['end']))) {
     errors.push(`building element ${key}: start and end must be [x, y, z]`);
   }
-  if (category === 'member' && typeof element['profile'] !== 'string') {
-    errors.push(`building element ${key}: profile must be a string`);
-  }
+  if (category === 'member' && typeof element['profile'] !== 'string') errors.push(`building element ${key}: profile must be a string`);
   if (category === 'member') {
     const allowed: Readonly<Record<string, ReadonlyArray<string>>> = {
       startJoint: ['pinned', 'rigid'],
@@ -244,9 +198,7 @@ function elementErrors(key: string, element: unknown, levels: Record<string, unk
   if (category === 'member' && !(typeof role === 'string' && Object.keys(MEMBER_LAYER).includes(role))) {
     errors.push(`building element ${key}: role must be one of ${Object.keys(MEMBER_LAYER).join(', ')}`);
   }
-  if (category === 'panel' && role !== 'roof' && role !== 'wall') {
-    errors.push(`building element ${key}: role must be roof or wall`);
-  }
+  if (category === 'panel' && role !== 'roof' && role !== 'wall') errors.push(`building element ${key}: role must be roof or wall`);
   const textFields: Partial<Record<string, ReadonlyArray<string>>> = {
     wall: ['material'],
     door: ['material'],
@@ -266,9 +218,7 @@ function elementErrors(key: string, element: unknown, levels: Record<string, unk
     connection: ['material'],
   };
   for (const field of textFields[category] ?? []) {
-    if (typeof element[field] !== 'string') {
-      errors.push(`building element ${key}: ${field} must be a string`);
-    }
+    if (typeof element[field] !== 'string') errors.push(`building element ${key}: ${field} must be a string`);
   }
   if (category === 'pipe') {
     for (const field of ['line', 'from', 'to']) {
@@ -310,9 +260,7 @@ function elementErrors(key: string, element: unknown, levels: Record<string, unk
   if (category === 'connection') errors.push(...connectionErrors(key, element, elements));
   if (category === 'plate') errors.push(...plateErrors(key, element, elements));
   if (category === 'pipeSupport') errors.push(...pipeSupportErrors(key, element, elements));
-  if (category === 'door' || category === 'window') {
-    errors.push(...openingHostErrors(key, element, elements));
-  }
+  if (category === 'door' || category === 'window') errors.push(...openingHostErrors(key, element, elements));
   return errors;
 }
 
@@ -348,9 +296,7 @@ export function buildingErrors(raw: unknown): string[] {
     ['elementOrder', elements],
   ] as const) {
     const order = raw[field];
-    if (!isStringArray(order) || !(order as string[]).every((id) => id in table)) {
-      errors.push(`building.${field} must list known ids`);
-    }
+    if (!isStringArray(order) || !(order as string[]).every((id) => id in table)) errors.push(`building.${field} must list known ids`);
   }
   for (const [key, element] of Object.entries(elements)) errors.push(...elementErrors(key, element, levels, elements));
   return errors;

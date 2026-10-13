@@ -23,11 +23,10 @@ function sectionModulus(segments: readonly Segment[], top: number): number {
 }
 
 /**
- * Effective / gross section modulus of a cold-formed C in strong-axis bending (thin-walled model,
- * compression flange on top; symmetric so gravity and uplift share the ratio).
- * Flange: internal element, kσ = 4, bp = b - t (centreline flat width), ρ·bp split at the flange ends, extra 0.9 when λp > 0.673.
- * Web: ψ = -1, kσ = 23.9, compression zone h/2, ρ·hc split 0.4 / 0.6 (EN 1993-1-5 Tab. 4.1).
- * Lips fully effective (no distortional buckling χd); neutral axis shift not iterated.
+ * Effective / gross section modulus of a cold-formed C in strong-axis bending (thin-walled model, compression flange on top; symmetric so
+ * gravity and uplift share the ratio). Flange: internal element, kσ = 4, bp = b - t (centreline flat width), ρ·bp split at the flange ends,
+ * extra 0.9 when λp > 0.673. Web: ψ = -1, kσ = 23.9, compression zone h/2, ρ·hc split 0.4 / 0.6 (EN 1993-1-5 Tab. 4.1). Lips fully
+ * effective (no distortional buckling χd); neutral axis shift not iterated.
  * @returns ratio <= 1 and the flange / web reduction factors
  */
 export function effectiveModulusRatio(profile: SteelProfile, fy: number): { ratio: number; flangeRho: number; webRho: number } {
@@ -41,11 +40,7 @@ export function effectiveModulusRatio(profile: SteelProfile, fy: number): { rati
   const flangeRho = plateReduction(flangeSlenderness, 0.22) * (flangeSlenderness > 0.673 ? 0.9 : 1);
   const webRho = plateReduction(webSlenderness, 0.11);
   const half = web / 2;
-  const vertical = (length: number, y: number): Segment => ({
-    area: t * length,
-    y,
-    inertia: (t * length ** 3) / 12,
-  });
+  const vertical = (length: number, y: number): Segment => ({ area: t * length, y, inertia: (t * length ** 3) / 12 });
   const horizontal = (length: number, y: number): Segment => ({ area: t * length, y, inertia: 0 });
   const bottom = (): Segment[] => [horizontal(flange, -half), vertical(lip, -half + lip / 2)];
   const gross: Segment[] = [...bottom(), horizontal(flange, half), vertical(lip, half - lip / 2), vertical(web, 0)];
@@ -61,11 +56,7 @@ export function effectiveModulusRatio(profile: SteelProfile, fy: number): { rati
     vertical(lowerPart, lowerPart / 2),
   ];
   const top = half + t / 2;
-  return {
-    ratio: Math.min(1, sectionModulus(effective, top) / sectionModulus(gross, top)),
-    flangeRho,
-    webRho,
-  };
+  return { ratio: Math.min(1, sectionModulus(effective, top) / sectionModulus(gross, top)), flangeRho, webRho };
 }
 
 /** Design bending resistance, N·mm: Wpl fy for I, Weff fy for cold-formed C, Wel fy otherwise. */

@@ -137,10 +137,7 @@ describe('llull run — --timeout', () => {
   });
 
   it('applies to --server calls as a request timeout', async () => {
-    const c = capture({
-      stdin: PLAN,
-      fetchImpl: () => Promise.reject(new DOMException('timed out', 'TimeoutError')),
-    });
+    const c = capture({ stdin: PLAN, fetchImpl: () => Promise.reject(new DOMException('timed out', 'TimeoutError')) });
     expect(await runCli(['run', '-', '--timeout', '5', '--server', 'http://cad.local:3001'], c.io)).toBe(EXIT_COMMAND_ERROR);
     expect(c.out[0]).toMatch(/Timed out after 5s waiting for the llull server .*\(--timeout\)/);
   });
@@ -173,10 +170,7 @@ describe('llull --timeout supervisor (real launcher)', () => {
   }, 120_000);
 
   it('kills a child that never finishes (blocked on stdin) and exits 1 with the timeout message', async () => {
-    const stuck = await run(['run', '-', '--timeout', '1', '--doc', docPath], {
-      ...process.env,
-      LLULL_CLI_KILL_GRACE_SECONDS: '0',
-    });
+    const stuck = await run(['run', '-', '--timeout', '1', '--doc', docPath], { ...process.env, LLULL_CLI_KILL_GRACE_SECONDS: '0' });
     expect(stuck.code).toBe(1);
     expect(stuck.stderr).toMatch(/llull: timed out after 1s \(--timeout\); the run was killed/);
   }, 120_000);

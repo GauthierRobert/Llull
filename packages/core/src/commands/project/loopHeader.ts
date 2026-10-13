@@ -1,6 +1,6 @@
 /**
- * Header resolution of nestable loops (`{ repeat | for, actions }`): variable name and the list of
- * values to iterate, evaluated over the document parameters and the enclosing loop variables.
+ * Header resolution of nestable loops (`{ repeat | for, actions }`): variable name and the list of values to iterate, evaluated over the
+ * document parameters and the enclosing loop variables.
  */
 
 import { evaluateExpression } from '../parametric/expression';
@@ -16,9 +16,7 @@ export function isLoopNode(value: unknown): value is LoopNode {
 }
 
 function evaluate(raw: unknown, env: Record<string, number>, what: string): number | string {
-  if (typeof raw === 'number') {
-    return Number.isFinite(raw) ? raw : `${what} must be a finite number`;
-  }
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : `${what} must be a finite number`;
   if (typeof raw !== 'string') return `${what} must be a number or an "=expr" string`;
   const result = evaluateExpression(raw.startsWith('=') ? raw.slice(1) : raw, env);
   if (!result.ok) return `${what} expression "${raw}": ${result.error}`;
@@ -39,12 +37,8 @@ function resolveRepeat(spec: NonNullable<LoopNode['repeat']>, env: Record<string
   if (!IDENT.test(variable)) return failure(variable, `repeat.as "${variable}" is not a valid name`);
   const count = evaluate(spec.count, env, 'repeat.count');
   if (typeof count === 'string') return failure(variable, count);
-  if (!Number.isInteger(count) || count < 0) {
-    return failure(variable, `repeat.count must be a non-negative integer (got ${count})`);
-  }
-  if (count > MAX_LOOP_ITERATIONS) {
-    return failure(variable, `repeat.count ${count} exceeds MAX_LOOP_ITERATIONS (${MAX_LOOP_ITERATIONS})`);
-  }
+  if (!Number.isInteger(count) || count < 0) return failure(variable, `repeat.count must be a non-negative integer (got ${count})`);
+  if (count > MAX_LOOP_ITERATIONS) return failure(variable, `repeat.count ${count} exceeds MAX_LOOP_ITERATIONS (${MAX_LOOP_ITERATIONS})`);
   return { variable, values: Array.from({ length: count }, (_, k) => k), error: null };
 }
 
@@ -59,9 +53,7 @@ function resolveFor(spec: NonNullable<LoopNode['for']>, env: Record<string, numb
   if (typeof step === 'string') return failure(variable, step);
   if (step === 0) return failure(variable, 'for.step must not be 0');
   const length = Math.floor((to - from) / step + 1e-9) + 1;
-  if (length > MAX_LOOP_ITERATIONS) {
-    return failure(variable, `for loop of ${length} iterations exceeds MAX_LOOP_ITERATIONS`);
-  }
+  if (length > MAX_LOOP_ITERATIONS) return failure(variable, `for loop of ${length} iterations exceeds MAX_LOOP_ITERATIONS`);
   const values = Array.from({ length: Math.max(0, length) }, (_, k) => from + k * step);
   return { variable, values, error: null };
 }

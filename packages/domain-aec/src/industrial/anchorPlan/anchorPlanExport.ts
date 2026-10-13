@@ -48,11 +48,7 @@ function addOffsetDimension(dims: BandDim[], drawn: Set<string>, axis: GridAxis 
   const key = `${axis.mark}:${mmText(offsetMm)}`;
   if (drawn.has(key)) return;
   drawn.add(key);
-  dims.push({
-    from: Math.min(axis.position, centre),
-    to: Math.max(axis.position, centre),
-    label: mmText(Math.abs(offsetMm)),
-  });
+  dims.push({ from: Math.min(axis.position, centre), to: Math.max(axis.position, centre), label: mmText(Math.abs(offsetMm)) });
 }
 
 /**
@@ -63,12 +59,11 @@ export const exportAnchorPlan = defineCommand({
   name: 'export_anchor_plan',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Produce the anchor bolt setting-out plan (SVG in real millimetres, print to PDF at 100%): grid lines ' +
-    'with bubbles, dashed footing outlines, base plate outlines and EVERY anchor bolt (circle with cross), ' +
-    'dimensioned from the grid lines (grid spacing, grid line to each bolt group centre, bolt spacing of a ' +
-    'typical group), a label per plate with top-of-concrete / grout level, and a bolt schedule (plate mark, ' +
-    'grid ref like A/1, bolt count x size, embedment, projection above concrete, plate size). Needs steel ' +
-    'columns with base plates (add_base_plates). data.svg holds the file text.',
+    'Produce the anchor bolt setting-out plan (SVG in real millimetres, print to PDF at 100%): grid lines with bubbles, dashed footing ' +
+    'outlines, base plate outlines and EVERY anchor bolt (circle with cross), dimensioned from the grid lines (grid spacing, grid line ' +
+    'to each bolt group centre, bolt spacing of a typical group), a label per plate with top-of-concrete / grout level, and a bolt ' +
+    'schedule (plate mark, grid ref like A/1, bolt count x size, embedment, projection above concrete, plate size). Needs steel columns ' +
+    'with base plates (add_base_plates). data.svg holds the file text.',
   params: z.object({
     levelId: z.string().optional().describe('Level whose base plates are drawn. Default: active level.'),
     scale: z
@@ -97,9 +92,7 @@ export const exportAnchorPlan = defineCommand({
     }
     const mm = unitsToMm(doc);
     const plates = placePlates(doc, level, mm);
-    if (plates.length === 0) {
-      return noop(doc, `export_anchor_plan failed: no base plates on level ${level.id} (add_base_plates first).`);
-    }
+    if (plates.length === 0) return noop(doc, `export_anchor_plan failed: no base plates on level ${level.id} (add_base_plates first).`);
     const { vertical, horizontal } = gridAxes(elementsOf(building, 'grid'), mm);
     const embedmentMm = embedment !== undefined ? mm(embedment) : DEFAULT_EMBEDMENT_MM;
 
@@ -195,12 +188,8 @@ export const exportAnchorPlan = defineCommand({
       if (index === 0) {
         const perRow = Math.max(1, Math.floor(placed.bolts.length / 2));
         const [first, second, across] = [placed.bolts[0], placed.bolts[1], placed.bolts[perRow]];
-        if (first && second && perRow > 1) {
-          canvas.dimension(first, second, 6, mmText(distance(first, second)));
-        }
-        if (first && across) {
-          canvas.dimension(first, across, -6, mmText(distance(first, across)));
-        }
+        if (first && second && perRow > 1) canvas.dimension(first, second, 6, mmText(distance(first, second)));
+        if (first && across) canvas.dimension(first, across, -6, mmText(distance(first, across)));
       }
       const projection = placed.thickness + GROUT_MM + 2 * placed.diameter;
       rows.push([
@@ -270,16 +259,7 @@ export const exportAnchorPlan = defineCommand({
       doc,
       `Anchor plan ${filename}: ${plates.length} base plate(s), ${boltCount} anchor bolt(s), ${vertical.length + horizontal.length} grid line(s) at 1:${sheetScale} on ${sheetPaper}, embedment ${mmText(embedmentMm)} mm.` +
         sheetFitWarning(fits, 'plan'),
-      {
-        svg: `${svg}\n`,
-        filename,
-        boltCount,
-        plates: plates.length,
-        paper: sheetPaper,
-        scale: sheetScale,
-        levelId: level.id,
-        fits,
-      },
+      { svg: `${svg}\n`, filename, boltCount, plates: plates.length, paper: sheetPaper, scale: sheetScale, levelId: level.id, fits },
     );
   },
 });

@@ -1,7 +1,4 @@
-/**
- * LevelSelect — native select over building levels (by id, shown by name), optionally with a blank
- * first choice and a visible field label.
- */
+// Select over building levels (id → name), optional blank choice and visible label.
 
 import React from 'react';
 import type { BuildingLevel } from '@core/model/building';
@@ -11,11 +8,10 @@ import { PairSelect } from '@ui/panels/OptionSelect';
 interface LevelSelectProps {
   levels: ReadonlyArray<BuildingLevel>;
   value: string;
-  /** Accessible name (and visible label when `showLabel`). */
+  /** Accessible name (visible with `showLabel`). */
   label: string;
-  /** Show `label` as a `field` label around the select. */
   showLabel?: boolean;
-  /** Text of the empty first choice (value ''); omitted = none. */
+  /** Empty first choice (value ''); omitted = none. */
   blankLabel?: string;
   testId?: string | undefined;
   title?: string | undefined;

@@ -1,8 +1,5 @@
-/**
- * ONLINE mode: POST /command, /undo, /redo; the document itself arrives over the /live SSE stream.
- * A POST network error while SSE is open never goes local (the command may have executed
- * server-side); HTTP 4xx/5xx never fall back either.
- */
+// ONLINE mode: POST /command, /undo, /redo; the document arrives over /live SSE. A POST network error while SSE is
+// open never goes local (it may have executed server-side); HTTP 4xx/5xx never fall back either.
 
 import type { CadDocument, EntityId } from '@core/model/types';
 import { isCommandRefusal, isConnectionRefusal, postCommand, postRedo, postUndo, ServerCommandError } from './serverCommands';
@@ -15,14 +12,11 @@ import type { CadStoreState, DispatchOptions, StoreGet, StoreSet } from './store
 
 const isHttpError = (err: unknown): boolean => err instanceof ServerCommandError && err.kind === 'http';
 
-/**
- * Before the /live stream has connected once, a POST gets this long to answer; past it the command
- * runs locally under the same commandId (replayed idempotently on connect). A refused connection
- * can take seconds to fail, which would otherwise leave the document unchanged that long.
- */
+/** Before /live first connects, a POST gets this long; then it runs locally under the same commandId (replayed
+ * idempotently on connect) — a refused connection can take seconds to fail. */
 export const CONNECT_GRACE_MS = 400;
 
-/** True when a failed POST means "server never reachable": safe to run locally. */
+/** "Server never reachable": safe to run locally. */
 function sseIsDown(state: CadStoreState): boolean {
   return state.liveStatus === 'disconnected' || (state.liveStatus === 'connecting' && !state.sseEverConnected);
 }
@@ -32,7 +26,7 @@ function postFailureMessage(err: unknown, what: string): string {
   return `${what} failed: ${String(err)}`;
 }
 
-/** Handle a failed POST: local fallback only when SSE is down; otherwise surface the error. */
+/** Local fallback only when SSE is down; else surface the error. */
 function handlePostFailure(
   set: StoreSet,
   get: StoreGet,
@@ -51,11 +45,7 @@ function handlePostFailure(
   onFailure?.(summary);
 }
 
-/**
- * The affected entities may arrive over SSE after the response, so the selection is taken as-is
- * (snapshot hydration later filters any id that never materialised). If the user changed the
- * selection while the request was in flight, their newer selection wins.
- */
+/** Affected ids are taken as-is (may arrive over SSE later; hydration filters ghosts); a newer user selection wins. */
 function selectAffectedIn(
   doc: CadDocument,
   selectionAtDispatch: readonly EntityId[],
@@ -69,16 +59,12 @@ function selectAffectedIn(
   return selection === doc.selection ? doc : { ...doc, selection };
 }
 
-/** `changed` from the server; older servers omit it, so fall back to a non-error with affected ids. */
+/** Older servers omit `changed`: fall back to a non-error with affected ids. */
 function responseChanged(response: ServerCommandResponse): boolean {
   return response.changed ?? (!response.isError && response.affected.length > 0);
 }
 
-/**
- * A grace-run command the server then refused (400/413/422) would be re-POSTed forever by the
- * flush: drop its outbox entry, poison the ids it created (later entries using them are dropped
- * by the flush), and tell the user (the post-flush snapshot reconciles the document).
- */
+/** A refused grace run would be re-POSTed forever: drop its entry, poison its ids, tell the user. */
 function dropRefusedGraceRun(set: StoreSet, get: StoreGet, commandId: string, message: string): void {
   const { localOutbox, liveBase } = get();
   const entry = localOutbox.find((queued) => queued.commandId === commandId);
@@ -89,13 +75,13 @@ function dropRefusedGraceRun(set: StoreSet, get: StoreGet, commandId: string, me
   }));
 }
 
-/** Fire-and-forget: the document update comes from the /live SSE stream. */
+/** Fire-and-forget: the document update comes over /live. */
 export function postDispatch(set: StoreSet, get: StoreGet, name: string, params: unknown, options?: DispatchOptions): void {
   const selectionAtDispatch = get().document.selection;
   const commandId = newCommandId();
   const dispatchSeq = nextDispatchSeq();
   let ranLocally = false;
-  /** The document was replaced while this dispatch was in its grace period (`resetGraceRuns`). */
+  /** Document replaced during this dispatch's grace period (`resetGraceRuns`). */
   let cancelled = false;
   const runLocalOnce = (): void => {
     if (ranLocally || cancelled) return;
@@ -145,9 +131,7 @@ export function postDispatch(set: StoreSet, get: StoreGet, name: string, params:
       if (ranLocally) {
         if (isCommandRefusal(err)) dropRefusedGraceRun(set, get, commandId, err.message);
         else if (isConnectionRefusal(err)) {
-          set({
-            lastSummary: `${err.message} — server refused the connection (auth/origin), offline edits kept.`,
-          });
+          set({ lastSummary: `${err.message} — server refused the connection (auth/origin), offline edits kept.` });
         }
         return;
       }
@@ -158,11 +142,7 @@ export function postDispatch(set: StoreSet, get: StoreGet, name: string, params:
 export function postHistoryStep(set: StoreSet, get: StoreGet, direction: 'undo' | 'redo'): void {
   void (direction === 'undo' ? postUndo() : postRedo())
     .then((response) => {
-      set({
-        lastSummary: response.summary,
-        canUndo: response.canUndo,
-        canRedo: response.canRedo,
-      });
+      set({ lastSummary: response.summary, canUndo: response.canUndo, canRedo: response.canRedo });
     })
     .catch((err: unknown) => {
       handlePostFailure(set, get, err, direction === 'undo' ? 'Undo' : 'Redo', () => stepLocalHistory(set, get, direction));

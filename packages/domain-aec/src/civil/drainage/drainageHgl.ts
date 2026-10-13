@@ -1,7 +1,7 @@
 /**
- * Hydraulic grade line (metres) from the outfall(s) upstream. Per pipe: friction slope
- * Sf = (Q n / (A R^(2/3)))^2 (full bore), water level = max(normal-depth level, downstream HGL +
- * Sf L); a manhole loss K v^2 / 2g is added where the pipe runs under pressure at its upstream end.
+ * Hydraulic grade line (metres) from the outfall(s) upstream. Per pipe: friction slope Sf = (Q n / (A R^(2/3)))^2 (full bore), water level
+ * = max(normal-depth level, downstream HGL + Sf L); a manhole loss K v^2 / 2g is added where the pipe runs under pressure at its upstream
+ * end.
  */
 
 import type { CadDocument } from '@core/model/types';
@@ -26,15 +26,9 @@ export interface PipeHgl {
   readonly flooding: boolean;
 }
 
-export interface ManholeHgl {
-  readonly hglM: number;
-  readonly flooding: boolean;
-}
+export type ManholeHgl = { readonly hglM: number; readonly flooding: boolean };
 
-export interface HglResult {
-  readonly pipes: ReadonlyMap<string, PipeHgl>;
-  readonly manholes: ReadonlyMap<string, ManholeHgl>;
-}
+export type HglResult = { readonly pipes: ReadonlyMap<string, PipeHgl>; readonly manholes: ReadonlyMap<string, ManholeHgl> };
 
 interface PipeState {
   readonly diameterM: number;
@@ -105,10 +99,7 @@ export function computeHgl(doc: CadDocument, civil: CivilModel, criteria: Draina
   const manholes = new Map<string, ManholeHgl>();
   for (const manhole of civilObjectsOf(civil, 'manhole')) {
     const hglM = nodeLevel.get(manhole.id) ?? toMetres(doc, manhole.invertElevation);
-    manholes.set(manhole.id, {
-      hglM,
-      flooding: hglM > toMetres(doc, manhole.rimElevation) - criteria.freeboardM,
-    });
+    manholes.set(manhole.id, { hglM, flooding: hglM > toMetres(doc, manhole.rimElevation) - criteria.freeboardM });
   }
   const floods = (id: string): boolean => manholes.get(id)?.flooding ?? false;
   const pipeHgl = new Map<string, PipeHgl>();

@@ -102,9 +102,8 @@ export const surfaceReport = defineCommand({
     };
     return report(
       doc,
-      `${surface.name}: ${data.points} points, ${data.triangles} triangles, ${data.planAreaM2} m²; ` +
-        `elevation ${data.minElevationM}–${data.maxElevationM} m (mean ${data.meanElevationM} m); ` +
-        `mean slope ${data.meanSlopePercent} %.`,
+      `${surface.name}: ${data.points} points, ${data.triangles} triangles, ${data.planAreaM2} m²; elevation ` +
+        `${data.minElevationM}–${data.maxElevationM} m (mean ${data.meanElevationM} m); mean slope ${data.meanSlopePercent} %.`,
       data,
     );
   },

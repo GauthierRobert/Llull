@@ -1,11 +1,11 @@
 /** add_helix_spring: compression spring as one `sweep` entity (round wire along a smooth helix spline). */
 
-import type { CadDocument, Vec3 } from '../../model/types';
+import type { Vec3 } from '../../model/types';
 import { catmullRomBeziers, mapSegment } from '../../geometry/curveSegments';
 import type { CommandResult } from '../types';
 import { defineCommand, z, looseVec3 as vec3, colorField } from '../schema';
 import { nextId } from '../../lib/id';
-import { ORIGIN } from '../../lib/vec3';
+import { ORIGIN, add3, sub3 } from '../../lib/vec3';
 import { applyMat3, eulerFromMat, matFromAxis, unitAxisOrNull } from '../../lib/axisRotation';
 import { compactNumber as fmt, vecText } from '../../lib/compactNumber';
 import { commitSolid, positionField } from './shared';
@@ -45,10 +45,6 @@ function helixPoints(shape: SpringShape): Vec3[] {
   });
 }
 
-function reject(doc: CadDocument, reason: string): CommandResult {
-  return noop(doc, `add_helix_spring failed: ${reason}; no-op.`);
-}
-
 /** Resolve wire radius (from radius or diameter) or an error string. */
 function wireRadiusOf(radius: number | undefined, diameter: number | undefined): number | string {
   const value = radius ?? (diameter === undefined ? undefined : diameter / 2);
@@ -56,10 +52,7 @@ function wireRadiusOf(radius: number | undefined, diameter: number | undefined):
   return Number.isFinite(value) && value > 0 ? value : `wire size must be finite and > 0, got ${value}`;
 }
 
-/**
- * Resolve the `{ turns, rise }` pair from any two of pitch / turns / length (`length` = free length
- * incl. wire thickness, so rise = length - wire diameter); `pitch` + `turns` win when all three given.
- */
+/** `{ turns, rise }` from any two of pitch / turns / length (free length incl. wire: rise = length - d); pitch + turns win. */
 function resolveRise(
   d: number,
   pitch: number | undefined,
@@ -67,9 +60,7 @@ function resolveRise(
   length: number | undefined,
 ): { turns: number; rise: number } | string {
   const positive = (v: number | undefined): boolean => v === undefined || (Number.isFinite(v) && v > 0);
-  if (!positive(pitch) || !positive(turns) || !positive(length)) {
-    return 'pitch, turns and length must be finite and > 0';
-  }
+  if (!positive(pitch) || !positive(turns) || !positive(length)) return 'pitch, turns and length must be finite and > 0';
   if (pitch !== undefined && turns !== undefined) return { turns, rise: pitch * turns };
   if (turns !== undefined && length !== undefined) return { turns, rise: length - d };
   if (pitch !== undefined && length !== undefined) return { turns: (length - d) / pitch, rise: length - d };
@@ -109,52 +100,42 @@ export const addHelixSpring = defineCommand({
     doc,
     { wireRadius, wireDiameter, coilRadius, pitch, turns, length, closedEnds = false, position = ORIGIN, axis, color = '#8a8f98', name },
   ): CommandResult => {
+    const fail = (reason: string): CommandResult => noop(doc, `add_helix_spring failed: ${reason}; no-op.`);
     const r = wireRadiusOf(wireRadius, wireDiameter);
-    if (typeof r === 'string') return reject(doc, r);
-    if (!Number.isFinite(coilRadius) || coilRadius <= r) {
-      return reject(doc, `coilRadius (${coilRadius}) must be finite and > wireRadius (${fmt(r)})`);
-    }
+    if (typeof r === 'string') return fail(r);
+    if (!Number.isFinite(coilRadius) || coilRadius <= r)
+      return fail(`coilRadius (${coilRadius}) must be finite and > wireRadius (${fmt(r)})`);
     const resolved = resolveRise(2 * r, pitch, turns, length);
-    if (typeof resolved === 'string') return reject(doc, resolved);
-    if (resolved.turns > MAX_SPRING_TURNS || resolved.turns <= 0) {
-      return reject(doc, `turns must be in (0, ${MAX_SPRING_TURNS}], got ${fmt(resolved.turns)}`);
-    }
+    if (typeof resolved === 'string') return fail(resolved);
+    if (resolved.turns > MAX_SPRING_TURNS || resolved.turns <= 0)
+      return fail(`turns must be in (0, ${MAX_SPRING_TURNS}], got ${fmt(resolved.turns)}`);
     const unitAxis = axis === undefined ? ([0, 0, 1] as Vec3) : unitAxisOrNull(axis);
-    if (!unitAxis) return reject(doc, 'axis must be 3 finite numbers with non-zero length');
-    if (position.length !== 3 || !position.every(Number.isFinite)) {
-      return reject(doc, 'position must be 3 finite numbers');
-    }
+    if (!unitAxis) return fail('axis must be 3 finite numbers with non-zero length');
+    if (position.length !== 3 || !position.every(Number.isFinite)) return fail('position must be 3 finite numbers');
     const shape: SpringShape = { wireRadius: r, coilRadius, closedEnds, ...resolved };
     const pitchOut = resolved.rise / resolved.turns;
     const middlePitch = closedEnds ? (resolved.rise - 4 * r) / (resolved.turns - 2) : pitchOut;
-    if (closedEnds && resolved.turns <= 2) return reject(doc, 'closedEnds needs turns > 2');
-    if (resolved.rise <= 0 || middlePitch < 2 * r * 0.999) {
-      return reject(doc, `pitch ${fmt(middlePitch)} is below the wire diameter ${fmt(2 * r)} (coils would overlap) or length is too short`);
-    }
+    if (closedEnds && resolved.turns <= 2) return fail('closedEnds needs turns > 2');
+    if (resolved.rise <= 0 || middlePitch < 2 * r * 0.999)
+      return fail(`pitch ${fmt(middlePitch)} is below the wire diameter ${fmt(2 * r)} (coils would overlap) or length is too short`);
     const matrix = matFromAxis(unitAxis);
     const points = helixPoints(shape);
     const startLocal = points[0] as Vec3;
-    const [sx, sy, sz] = applyMat3(matrix, startLocal);
-    const path = catmullRomBeziers(points, false).map((segment) =>
-      mapSegment(segment, (p: Vec3): Vec3 => [p[0] - startLocal[0], p[1] - startLocal[1], p[2] - startLocal[2]]),
-    );
+    const path = catmullRomBeziers(points, false).map((segment) => mapSegment(segment, (p: Vec3): Vec3 => sub3(p, startLocal)));
     const id = nextId('spring');
     const entity = newEntity(
       'sweep',
       id,
       { path, section: { shape: 'circle', radius: r } },
-      [position[0] + sx, position[1] + sy, position[2] + sz],
+      add3(position, applyMat3(matrix, startLocal)),
       color,
-      { rotation: eulerFromMat(matrix), name },
+      {
+        rotation: eulerFromMat(matrix),
+        name,
+      },
     );
     const freeLength = resolved.rise + 2 * r;
-    const data = {
-      freeLength,
-      turns: resolved.turns,
-      pitch: middlePitch,
-      wireDiameter: 2 * r,
-      outerDiameter: 2 * (coilRadius + r),
-    };
+    const data = { freeLength, turns: resolved.turns, pitch: middlePitch, wireDiameter: 2 * r, outerDiameter: 2 * (coilRadius + r) };
     return {
       ...commitSolid(
         doc,

@@ -1,7 +1,6 @@
 /**
- * Civil / site-engineering plugin: its command catalog (catalog.ts), the `civil` MCP toolset, the
- * derivation guard and the document extension that validates the civil model and re-derives its
- * geometry on load.
+ * Civil / site-engineering plugin: its command catalog (catalog.ts), the `civil` MCP toolset, the derivation guard and the document
+ * extension that validates the civil model and re-derives its geometry on load.
  */
 
 import type { CadPlugin } from '@core/plugins/plugin';

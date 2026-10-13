@@ -1,7 +1,4 @@
-/**
- * LevelsSection — storey list (activate / delete) + add-level form.
- * Dispatches: add_level, set_active_level, delete_level, update_level, copy_level_elements.
- */
+// Storeys (activate / delete) + add form: add_level, set_active_level, delete_level, update_level, copy_level_elements.
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
@@ -87,10 +84,7 @@ function AddLevelForm(): React.ReactElement {
 
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
-    dispatch('add_level', {
-      ...optionalText('name', name),
-      ...optionalNumber('height', height),
-    });
+    dispatch('add_level', { ...optionalText('name', name), ...optionalNumber('height', height) });
     setName('');
   };
 

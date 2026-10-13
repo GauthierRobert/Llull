@@ -22,12 +22,6 @@ export const addBox = defineCommand({
     size: looseVec3('[width, height, depth] in document units. All three components must be > 0.'),
     ...placedSolidFields('box', 'center'),
   }),
-  run: (doc, { size, position = ORIGIN, rotation, color = DEFAULT_SOLID_COLOR, anchor }): CommandResult => {
-    return placeSizedSolid(doc, 'box', 'box', 'center', size, {
-      position,
-      rotation,
-      color,
-      anchor,
-    });
-  },
+  run: (doc, { size, position = ORIGIN, rotation, color = DEFAULT_SOLID_COLOR, anchor }): CommandResult =>
+    placeSizedSolid(doc, 'box', 'box', 'center', size, { position, rotation, color, anchor }),
 });

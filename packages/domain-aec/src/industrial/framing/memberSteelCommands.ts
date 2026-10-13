@@ -41,14 +41,13 @@ const fixityText = (startJoint: string | undefined, endJoint: string | undefined
 export const addSteelMember = defineCommand({
   name: 'add_steel_member',
   description:
-    'Add a steel member with a catalogue section (e.g. "HEA300", "IPE400", "CHS76.1x3.6") between two 3D ' +
-    'points [x, y, z] (z above the level). Role sets the layer, mark and IFC class: column, rafter, beam, ' +
-    'brace, purlin, rail (side rail / girt) or crane (runway beam). Section depth points up for beams and ' +
-    'along +X for vertical columns (roll π/2 turns it along +Y); roll (radians) turns it about the axis. ' +
-    'Beams may declare startJoint / endJoint "rigid" (moment connection to the column they frame into; ' +
-    'default pinned) and columns baseFixity "fixed" (column foot restrains rotation; default pinned or the ' +
-    'base plate fixity): check_steel_members analyses rigidly connected beams and columns as planar moment frames. ' +
-    'Refused if an identical member (section, role, roll, end points in either direction) already exists on the level.',
+    'Add a steel member with a catalogue section (e.g. "HEA300", "IPE400", "CHS76.1x3.6") between two 3D points [x, y, z] (z above the ' +
+    'level). Role sets the layer, mark and IFC class: column, rafter, beam, brace, purlin, rail (side rail / girt) or crane (runway ' +
+    'beam). Section depth points up for beams and along +X for vertical columns (roll π/2 turns it along +Y); roll (radians) turns it ' +
+    'about the axis. Beams may declare startJoint / endJoint "rigid" (moment connection to the column they frame into; default pinned) ' +
+    'and columns baseFixity "fixed" (column foot restrains rotation; default pinned or the base plate fixity): check_steel_members ' +
+    'analyses rigidly connected beams and columns as planar moment frames. Refused if an identical member (section, role, roll, end ' +
+    'points in either direction) already exists on the level.',
   params: z.object({
     profile: z.string().describe('Catalogue section name (list_steel_profiles).'),
     start: looseVec3('Axis start [x, y, z], z relative to the level; [x, y] means z = 0.'),
@@ -92,22 +91,9 @@ export const addSteelMember = defineCommand({
         element.roll === roll &&
         sameSegment(element.start, element.end, from, to),
     );
-    if (memberTwin) {
-      return noop(doc, duplicateSummary('add_steel_member', memberTwin, `a ${role} ${profile} between these points`));
-    }
+    if (memberTwin) return noop(doc, duplicateSummary('add_steel_member', memberTwin, `a ${role} ${profile} between these points`));
     const added = appendMembers(resolution.building, resolution.level.id, [
-      {
-        role,
-        profile,
-        start: from,
-        end: to,
-        roll,
-        material,
-        note,
-        startJoint,
-        endJoint,
-        baseFixity,
-      },
+      { role, profile, start: from, end: to, roll, material, note, startJoint, endJoint, baseFixity },
     ]);
     if ('reason' in added) return noop(doc, `add_steel_member failed: ${added.reason}.`);
     const section = findProfile(profile) as SteelProfile;
@@ -163,9 +149,8 @@ export const updateSteelMember = defineCommand({
       .boolean()
       .optional()
       .describe(
-        'Horizontal members with a new profile and no new start / end: shift the axis down by half the ' +
-          'depth increase (up for a decrease) so the top of steel stays where it was, e.g. under a grating. ' +
-          'Default false (the axis stays).',
+        'Horizontal members with a new profile and no new start / end: shift the axis down by half the depth increase (up for a ' +
+          'decrease) so the top of steel stays where it was, e.g. under a grating. Default false (the axis stays).',
       ),
   }),
   run: (
@@ -180,9 +165,7 @@ export const updateSteelMember = defineCommand({
     const topShift = keepTopOfSteel && start === undefined && end === undefined ? topOfSteelShift(doc, member, section) : 0;
     const from = start !== undefined ? toVec3(start) : shiftZ(member.start, topShift);
     const to = end !== undefined ? toVec3(end) : shiftZ(member.end, topShift);
-    if (!from || !to) {
-      return noop(doc, 'update_steel_member failed: start/end must be [x, y, z] (or [x, y] with z = 0).');
-    }
+    if (!from || !to) return noop(doc, 'update_steel_member failed: start/end must be [x, y, z] (or [x, y] with z = 0).');
     if (distance3(to, from) === 0) return noop(doc, 'update_steel_member failed: start and end would coincide.');
     const nextRole = role ?? member.role;
     const problem = fixityProblem(nextRole, { startJoint, endJoint, baseFixity });
@@ -226,9 +209,8 @@ export const updateSteelMember = defineCommand({
     return {
       document,
       summary:
-        `Updated ${updated.role} ${updated.mark} (${memberId}): ${profileSummary(section)}` +
-        `${topShift !== 0 ? `, axis moved ${topShift > 0 ? 'up' : 'down'} ${Math.abs(topShift).toFixed(1)} ${doc.units} to keep the top of steel` : ''}.${plateNote}` +
-        `${stale.removed.length > 0 ? ` Moment connection(s) ${stale.removed.join(', ')} removed (joint no longer exists).` : ''}${reconciliationNote(supports)}`,
+        `Updated ${updated.role} ${updated.mark} (${memberId}): ` +
+        `${profileSummary(section)}${topShift !== 0 ? `, axis moved ${topShift > 0 ? 'up' : 'down'} ${Math.abs(topShift).toFixed(1)} ${doc.units} to keep the top of steel` : ''}.${plateNote}${stale.removed.length > 0 ? ` Moment connection(s) ${stale.removed.join(', ')} removed (joint no longer exists).` : ''}${reconciliationNote(supports)}`,
       affected: [
         ...elementAffected(document, [
           memberId,

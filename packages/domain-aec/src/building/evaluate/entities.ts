@@ -1,42 +1,26 @@
-/**
- * Entity factory shared by the building evaluators: standard layers, material colours and the
- * common fields of every evaluated entity.
- */
+/** Entity factory shared by the building evaluators: standard layers, material colours and the common fields of every evaluated entity. */
 
 import type { BaseEntity, BoxEntity, MeshData, MeshSolidEntity, Vec3 } from '@core/model/types';
 import type { BimCategory, BuildingElement, MemberRole } from '@core/model/building';
 
 /** AIA / US National CAD Standard layer per category. */
+// prettier-ignore
 export const CATEGORY_LAYER: Readonly<Record<BimCategory, { name: string; color: string }>> = {
-  grid: { name: 'S-GRID', color: '#d04a4a' },
-  wall: { name: 'A-WALL', color: '#8a8a8a' },
-  door: { name: 'A-DOOR', color: '#8b5a2b' },
-  window: { name: 'A-GLAZ', color: '#4a90c2' },
-  slab: { name: 'S-SLAB', color: '#9a9a90' },
-  column: { name: 'S-COLS', color: '#6d6d6d' },
-  beam: { name: 'S-BEAM', color: '#7d8a96' },
-  stair: { name: 'A-FLOR-STRS', color: '#a08060' },
-  room: { name: 'A-AREA', color: '#3c8d5a' },
-  member: { name: 'S-STEL', color: '#5b7a99' },
-  footing: { name: 'S-FNDN', color: '#8f8a7e' },
-  panel: { name: 'A-CLAD', color: '#7aa0b8' },
-  equipment: { name: 'Q-EQPM', color: '#c27c2c' },
-  pipe: { name: 'P-PIPE', color: '#2f9c8f' },
-  tray: { name: 'E-TRAY', color: '#a07c2c' },
-  plate: { name: 'S-CONN', color: '#5d6f80' },
-  curvedWall: { name: 'A-WALL', color: '#8a8a8a' },
-  connection: { name: 'S-CONN', color: '#5d6f80' },
+  grid: { name: 'S-GRID', color: '#d04a4a' }, wall: { name: 'A-WALL', color: '#8a8a8a' }, door: { name: 'A-DOOR', color: '#8b5a2b' },
+  window: { name: 'A-GLAZ', color: '#4a90c2' }, slab: { name: 'S-SLAB', color: '#9a9a90' }, column: { name: 'S-COLS', color: '#6d6d6d' },
+  beam: { name: 'S-BEAM', color: '#7d8a96' }, stair: { name: 'A-FLOR-STRS', color: '#a08060' },
+  room: { name: 'A-AREA', color: '#3c8d5a' }, member: { name: 'S-STEL', color: '#5b7a99' }, footing: { name: 'S-FNDN', color: '#8f8a7e' },
+  panel: { name: 'A-CLAD', color: '#7aa0b8' }, equipment: { name: 'Q-EQPM', color: '#c27c2c' },
+  pipe: { name: 'P-PIPE', color: '#2f9c8f' }, tray: { name: 'E-TRAY', color: '#a07c2c' }, plate: { name: 'S-CONN', color: '#5d6f80' },
+  curvedWall: { name: 'A-WALL', color: '#8a8a8a' }, connection: { name: 'S-CONN', color: '#5d6f80' },
   pipeSupport: { name: 'P-SUPP', color: '#c9a227' },
 };
 
 /** Layer per steel member role (AIA structural sub-layers). */
+// prettier-ignore
 export const MEMBER_LAYER: Readonly<Record<MemberRole, { name: string; color: string }>> = {
-  column: { name: 'S-COLS', color: '#6d6d6d' },
-  rafter: { name: 'S-BEAM', color: '#7d8a96' },
-  beam: { name: 'S-BEAM', color: '#7d8a96' },
-  brace: { name: 'S-BRAC', color: '#b5556a' },
-  purlin: { name: 'S-JOIS', color: '#6f9d6a' },
-  rail: { name: 'S-JOIS', color: '#6f9d6a' },
+  column: { name: 'S-COLS', color: '#6d6d6d' }, rafter: { name: 'S-BEAM', color: '#7d8a96' }, beam: { name: 'S-BEAM', color: '#7d8a96' },
+  brace: { name: 'S-BRAC', color: '#b5556a' }, purlin: { name: 'S-JOIS', color: '#6f9d6a' }, rail: { name: 'S-JOIS', color: '#6f9d6a' },
   crane: { name: 'S-CRAN', color: '#d39b2a' },
 };
 
@@ -48,24 +32,11 @@ function layerIdFor(category: BimCategory): string {
   return `layer-${CATEGORY_LAYER[category].name}`;
 }
 
+// prettier-ignore
 const MATERIAL_COLOR: Readonly<Record<string, string>> = {
-  concrete: '#b4b2aa',
-  masonry: '#b0623a',
-  brick: '#b0623a',
-  block: '#a7a39a',
-  timber: '#c19a6b',
-  wood: '#c19a6b',
-  steel: '#7d8a96',
-  s235: '#7d8a96',
-  s275: '#7d8a96',
-  s355: '#6e8296',
-  galvanized: '#a9b4bd',
-  glass: '#8ec9e8',
-  gypsum: '#e6e2d8',
-  drywall: '#e6e2d8',
-  stone: '#9c968a',
-  'steel-sheet': '#9fb3c4',
-  'sandwich-panel': '#c9d3db',
+  concrete: '#b4b2aa', masonry: '#b0623a', brick: '#b0623a', block: '#a7a39a', timber: '#c19a6b', wood: '#c19a6b', steel: '#7d8a96',
+  s235: '#7d8a96', s275: '#7d8a96', s355: '#6e8296', galvanized: '#a9b4bd', glass: '#8ec9e8', gypsum: '#e6e2d8', drywall: '#e6e2d8',
+  stone: '#9c968a', 'steel-sheet': '#9fb3c4', 'sandwich-panel': '#c9d3db',
 };
 
 export function colorForMaterial(material: string, fallback: string): string {

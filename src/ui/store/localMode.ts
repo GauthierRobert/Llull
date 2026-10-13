@@ -25,21 +25,15 @@ export function refuseDuringSync(set: StoreSet, get: StoreGet): boolean {
   return true;
 }
 
-/**
- * UI policy: a result touching more ids than this (a building template, a big array) is not
- * auto-selected — selecting hundreds of entities is noise, not a useful selection.
- */
+/** Larger results (a building template, a big array) are not auto-selected: noise, not a selection. */
 export const MAX_AUTO_SELECT = 100;
 
-/**
- * Selection after a command: its affected ids when requested, non-empty and within
- * MAX_AUTO_SELECT, else unchanged.
- */
+/** Affected ids when requested, non-empty and ≤ MAX_AUTO_SELECT; else unchanged. */
 export function selectionAfter(current: EntityId[], affected: readonly EntityId[], options: DispatchOptions | undefined): EntityId[] {
   return options?.selectAffected === true && affected.length > 0 && affected.length <= MAX_AUTO_SELECT ? [...affected] : current;
 }
 
-/** Run a command locally via `execute`. Pushes history only if the doc changed. */
+/** Pushes history only when the document changed. */
 export function runLocally(
   set: StoreSet,
   get: StoreGet,
@@ -62,10 +56,7 @@ export function runLocally(
   const coalesce = options?.coalesce === true && state.localUndoStack.length > 0 && state.localOutbox.length > 0;
   const localOnly = options?.localOnly === true || (coalesce && state.localOutbox[state.localOutbox.length - 1]?.localOnly === true);
   set({
-    document: {
-      ...result.document,
-      selection: selectionAfter(result.document.selection, result.affected, options),
-    },
+    document: { ...result.document, selection: selectionAfter(result.document.selection, result.affected, options) },
     lastSummary: shown,
     lastMeasure,
     localUndoStack: coalesce ? state.localUndoStack : [...state.localUndoStack, state.document].slice(-LOCAL_HISTORY_LIMIT),
@@ -90,7 +81,6 @@ export function runLocally(
   options?.onResult?.({ summary, changed: true });
 }
 
-/** Step the local snapshot history (offline undo/redo). */
 export function stepLocalHistory(set: StoreSet, get: StoreGet, direction: 'undo' | 'redo'): void {
   const state = get();
   const source = direction === 'undo' ? state.localUndoStack : state.localRedoStack;
@@ -105,10 +95,7 @@ export function stepLocalHistory(set: StoreSet, get: StoreGet, direction: 'undo'
   const redoStack = direction === 'undo' ? other : remaining;
   set({
     ...moveLastOutboxEntry(state, direction),
-    document: {
-      ...withMonotonicStepCounter(target, state.document),
-      selection: target.selection.filter((id) => id in target.entities),
-    },
+    document: { ...withMonotonicStepCounter(target, state.document), selection: target.selection.filter((id) => id in target.entities) },
     localUndoStack: undoStack,
     localRedoStack: redoStack,
     canUndo: undoStack.length > 0,

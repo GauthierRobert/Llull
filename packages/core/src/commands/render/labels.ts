@@ -50,14 +50,12 @@ function evenlySampled<T>(points: T[]): T[] {
 }
 
 /**
- * World-space key points of an entity. 2D geometry is local to the work plane, so it is lifted by
- * `position` (plane origin, z = position z). Solids use the 8 corners of their AABB (rotation is
- * not applied).
+ * World-space key points of an entity. 2D geometry is local to the work plane, so it is lifted by `position` (plane origin, z = position
+ * z). Solids use the 8 corners of their AABB (rotation is not applied).
  */
 function entityKeyPoints(e: Entity): Vec3[] {
   const pos = e.position;
   const lift = (x: number, y: number): Vec3 => planeToWorld(pos, e.rotation, [x, y]);
-
   switch (e.kind) {
     case 'point':
     case 'text':
@@ -96,20 +94,17 @@ function labelAnchor(keyPoints: Vec3[], project: Projector): [number, number] {
 }
 
 /**
- * Append per-entity id/name labels, key-point markers (circles in the category colour) and a
- * category legend (top-right) to an SVG string, projected like the other overlays.
+ * Append per-entity id/name labels, key-point markers (circles in the category colour) and a category legend (top-right) to an SVG string,
+ * projected like the other overlays.
  */
 export function appendEntityLabels(svgString: string, data: RenderViewData, entities: ReadonlyArray<Entity>): string {
   const { camera, width, height } = data;
   const project = makeProjector(camera, data.orthoHalf, width, height);
-
   const lines: string[] = ['  <!-- entity labels overlay -->'];
   const labelStyle = `font-family="monospace" font-size="10" stroke="#0d0d1a" stroke-width="2.5" paint-order="stroke"`;
-
   for (const e of entities) {
     const { color } = CATEGORY_STYLE[entityCategory(e)];
     const keyPoints = entityKeyPoints(e);
-
     lines.push(`  <g data-entity-id="${escapeXml(e.id)}" data-kind="${escapeXml(e.kind)}">`);
     for (const point of keyPoints) {
       const screen = project(point);
@@ -117,7 +112,6 @@ export function appendEntityLabels(svgString: string, data: RenderViewData, enti
       if (screen[0] < -20 || screen[0] > width + 20 || screen[1] < -20 || screen[1] > height + 20) continue;
       lines.push(`    ${svgDot(screen, `fill="${color}" opacity="0.85" stroke="#0d0d1a" stroke-width="0.8"`)}`);
     }
-
     // The label is always drawn (clamped inside the viewport), even if its markers clip.
     const [lx, ly] = labelAnchor(keyPoints, project);
     const clampedLx = clamp(lx, 4, width - 4);
@@ -127,7 +121,6 @@ export function appendEntityLabels(svgString: string, data: RenderViewData, enti
     );
     lines.push(`  </g>`);
   }
-
   const legendX = width - 4;
   lines.push(`  <g id="entity-labels-legend" font-family="monospace" font-size="10">`);
   Object.values(CATEGORY_STYLE).forEach(({ color, caption }, i) => {
@@ -138,6 +131,5 @@ export function appendEntityLabels(svgString: string, data: RenderViewData, enti
     );
   });
   lines.push(`  </g>`);
-
   return appendBeforeClose(svgString, lines.join('\n'));
 }

@@ -125,11 +125,7 @@ describe('autosaver stop mode', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'llull-stop-'));
     try {
       const file = path.join(dir, 's.json');
-      const saver = createAutosaver({
-        filePath: file,
-        debounceMs: 60_000,
-        serialize: () => '{"late":1}',
-      });
+      const saver = createAutosaver({ filePath: file, debounceMs: 60_000, serialize: () => '{"late":1}' });
       saver.stop();
       expect(fs.existsSync(file)).toBe(false);
       saver.schedule(createEmptyDocument());
@@ -143,11 +139,7 @@ describe('autosaver stop mode', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'llull-stop-'));
     try {
       const file = path.join(dir, 't.json');
-      const saver = createAutosaver({
-        filePath: file,
-        debounceMs: 60_000,
-        serialize: () => '{"p":1}',
-      });
+      const saver = createAutosaver({ filePath: file, debounceMs: 60_000, serialize: () => '{"p":1}' });
       saver.schedule(createEmptyDocument());
       saver.stop();
       expect(fs.readFileSync(file, 'utf8')).toBe('{"p":1}');

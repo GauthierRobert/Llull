@@ -1,6 +1,6 @@
 /**
- * Value validation of a raw (loaded) civil model: persistence rejects files with errors, so a
- * crafted or corrupt file can never reach regeneration with values it cannot evaluate.
+ * Value validation of a raw (loaded) civil model: persistence rejects files with errors, so a crafted or corrupt file can never reach
+ * regeneration with values it cannot evaluate.
  */
 
 import { type ProfilePvi, CIVIL_CATEGORIES } from '@core/model/civil';
@@ -173,9 +173,7 @@ function pointTotalErrors(objects: Record<string, unknown>): string[] {
     const groups = Array.isArray(object['pointGroupIds']) ? object['pointGroupIds'] : [];
     const extra = Array.isArray(object['extraPoints']) ? object['extraPoints'].length : 0;
     const total = groups.reduce((sum: number, group) => sum + groupSize(group), extra);
-    if (total > MAX_SURFACE_POINTS) {
-      errors.push(`civil.objects.${id}: ${total} points exceed the ${MAX_SURFACE_POINTS} limit`);
-    }
+    if (total > MAX_SURFACE_POINTS) errors.push(`civil.objects.${id}: ${total} points exceed the ${MAX_SURFACE_POINTS} limit`);
   }
   return errors;
 }
@@ -187,9 +185,7 @@ function crsErrors(raw: unknown): string[] {
   if (!optional(raw['epsg'], (code) => Number.isInteger(code) && (code as number) > 0)) {
     errors.push('civil.crs.epsg must be a positive integer');
   }
-  if (!optional(raw['verticalDatum'], (datum) => typeof datum === 'string')) {
-    errors.push('civil.crs.verticalDatum must be a string');
-  }
+  if (!optional(raw['verticalDatum'], (datum) => typeof datum === 'string')) errors.push('civil.crs.verticalDatum must be a string');
   const calibration = raw['calibration'];
   if (
     calibration !== undefined &&

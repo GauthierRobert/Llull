@@ -1,7 +1,7 @@
 /**
- * Hidden-line classification of projected feature edges: each edge is split into the runs a
- * viewer sees (visible) and the runs other front faces cover (hidden), across every solid of the
- * view. A section plane removes the material in front of it and its cap hides what lies under it.
+ * Hidden-line classification of projected feature edges: each edge is split into the runs a viewer sees (visible) and the runs other front
+ * faces cover (hidden), across every solid of the view. A section plane removes the material in front of it and its cap hides what lies
+ * under it.
  */
 
 import type { Vec2, Vec3 } from '../model/vectors';
@@ -122,8 +122,8 @@ function underCap(point: Vec2, { loops, box }: Cap, tolerance: number): boolean 
 }
 
 /**
- * Visible and hidden runs of every source's feature edges, as seen through `frame`; material on the
- * viewer's side of `cutDepth` is removed (Infinity = no section).
+ * Visible and hidden runs of every source's feature edges, as seen through `frame`; material on the viewer's side of `cutDepth` is removed
+ * (Infinity = no section).
  * @returns one entry per source, in order
  */
 export function classifyEdges(sources: ReadonlyArray<ViewSource>, frame: ViewFrame, cutDepth: number): EdgeRuns[] {
@@ -147,8 +147,8 @@ export function classifyEdges(sources: ReadonlyArray<ViewSource>, frame: ViewFra
   const nudge = step * 0.01;
   const coveredAt = (at: Vec2, depth: number): boolean =>
     occluders.covers(at, depth, tolerance, cutDepth) || (depth < cutDepth - tolerance && caps.some((cap) => underCap(at, cap, nudge * 2)));
-  // Hidden only when covered on both sides of the edge: an edge on a shared triangle border inside
-  // a face is hidden, an edge along an occluder's outline stays visible (visible lines win).
+  // Hidden only when covered on both sides of the edge: an edge on a shared triangle border inside a face is hidden, an edge along an
+  // occluder's outline stays visible (visible lines win).
   const hiddenAt = (point: Vec3, side: Vec2): boolean => {
     const [x, y] = frame.project(point);
     const depth = depthOf(frame, point);

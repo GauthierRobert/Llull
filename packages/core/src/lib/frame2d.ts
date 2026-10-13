@@ -1,7 +1,6 @@
 /**
- * Linear-elastic 2D frame analysis (direct stiffness method, 3 DOF per node).
- * Units are the caller's (e.g. N, mm). Member loads are uniformly distributed, global components
- * per unit member length.
+ * Linear-elastic 2D frame analysis (direct stiffness method, 3 DOF per node). Units are the caller's (e.g. N, mm). Member loads are
+ * uniformly distributed, global components per unit member length.
  */
 
 export interface FrameNode {
@@ -101,10 +100,7 @@ function condense(k: number[][], f0: number[], r: number): { k: number[][]; f0: 
   const reduced = k.map((row, i) =>
     row.map((value, j) => (i === r || j === r ? 0 : value - ((column[i] as number) * ((k[r] as number[])[j] as number)) / pivot)),
   );
-  return {
-    k: reduced,
-    f0: f0.map((value, i) => (i === r ? 0 : value - ((column[i] as number) * (f0[r] as number)) / pivot)),
-  };
+  return { k: reduced, f0: f0.map((value, i) => (i === r ? 0 : value - ((column[i] as number) * (f0[r] as number)) / pivot)) };
 }
 
 function localOf(nodes: ReadonlyArray<FrameNode>, member: FrameMember): Local | null {
@@ -153,9 +149,8 @@ function withReleasedRotations(local: Local, member: FrameMember, d: number[]): 
       (f0[r] as number) - (k[r] as number[]).reduce((sum, value, j) => (released.includes(j) ? sum : sum + value * (d[j] as number)), 0),
   );
   const entry = (i: number, j: number): number => (k[released[i] as number] as number[])[released[j] as number] as number;
-  if (released.length === 1) {
-    result[released[0] as number] = (rhs[0] as number) / entry(0, 0);
-  } else {
+  if (released.length === 1) result[released[0] as number] = (rhs[0] as number) / entry(0, 0);
+  else {
     const determinant = entry(0, 0) * entry(1, 1) - entry(0, 1) * entry(1, 0);
     result[released[0] as number] = ((rhs[0] as number) * entry(1, 1) - entry(0, 1) * (rhs[1] as number)) / determinant;
     result[released[1] as number] = (entry(0, 0) * (rhs[1] as number) - entry(1, 0) * (rhs[0] as number)) / determinant;
@@ -180,9 +175,7 @@ function memberDofs(member: FrameMember): number[] {
   return [a, a + 1, a + 2, b, b + 1, b + 2];
 }
 
-/**
- * @returns displacements and member forces, or null for a mechanism / invalid model
- */
+/** @returns displacements and member forces, or null for a mechanism / invalid model */
 export function solveFrame(nodes: ReadonlyArray<FrameNode>, members: ReadonlyArray<FrameMember>): FrameResult | null {
   const size = nodes.length * 3;
   const K = Array.from({ length: size }, () => new Array<number>(size).fill(0));

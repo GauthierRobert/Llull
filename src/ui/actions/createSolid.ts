@@ -1,7 +1,4 @@
-/**
- * Create a primitive from a preset: drop it at the nearest free spot, select it, and show it in
- * the 3D view with the move gizmo ready. Dispatch only (PRIME DIRECTIVE).
- */
+// Preset primitive dropped at the nearest free spot, selected, shown in 3D with the move gizmo ready.
 
 import type { Vec3 } from '@core/model/types';
 import { useStore, useToolStore } from '@ui/store';

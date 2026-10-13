@@ -30,13 +30,7 @@ export function band(axis: Pick<WallElement, 'start' | 'end'>, s0: number, s1: n
   ];
 }
 
-export const thinLine = (layer: string, a: Vec2, b: Vec2): DrawingPrimitive => ({
-  type: 'line',
-  layer,
-  style: 'thin',
-  a,
-  b,
-});
+export const thinLine = (layer: string, a: Vec2, b: Vec2): DrawingPrimitive => ({ type: 'line', layer, style: 'thin', a, b });
 
 export const annotationText = (layer: string, at: Vec2, height: number, content: string): DrawingPrimitive => ({
   type: 'text',

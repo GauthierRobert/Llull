@@ -20,8 +20,8 @@ export interface FramingOptions {
 }
 
 /**
- * Eye distance at which the bounding sphere of `bounds` fits the narrower of the vertical and
- * horizontal half-angles of the viewport camera, times `padding`.
+ * Eye distance at which the bounding sphere of `bounds` fits the narrower of the vertical and horizontal half-angles of the viewport
+ * camera, times `padding`.
  * @param aspect viewport width / height (default square)
  */
 export function fitFraming(bounds: Bounds, aspect = 1, padding = 1.2, options: FramingOptions = {}): Framing {

@@ -1,6 +1,6 @@
 /**
- * LandXML `<Alignments>` block: horizontal geometry (Line / Curve with N E coordinates) and the
- * design profile (PVI / ParaCurve) of every alignment, in metres.
+ * LandXML `<Alignments>` block: horizontal geometry (Line / Curve with N E coordinates) and the design profile (PVI / ParaCurve) of every
+ * alignment, in metres.
  */
 
 import { toDegrees } from '@lib/angle';
@@ -36,11 +36,10 @@ function spiralXml(doc: Doc, element: SpiralElement): string {
   const degrees = Number(toDegrees(theta).toFixed(6));
   return (
     `        <Spiral length="${metres(doc, element.length)}" radiusStart="${radiusText(doc, element.radiusStart)}" ` +
-    `radiusEnd="${radiusText(doc, element.radiusEnd)}" rot="${element.rotation}" spiType="clothoid" ` +
-    `theta="${degrees}" totalX="${metres(doc, totalX)}" totalY="${metres(doc, totalY)}" ` +
-    `tanLong="${metres(doc, totalX - totalY / Math.tan(theta))}" tanShort="${metres(doc, totalY / Math.sin(theta))}" ` +
-    `staStart="${metres(doc, element.startStation)}"><Start>${northEast(doc, element.start)}</Start>` +
-    `<PI>${northEast(doc, element.pi)}</PI><End>${northEast(doc, element.end)}</End></Spiral>`
+    `radiusEnd="${radiusText(doc, element.radiusEnd)}" rot="${element.rotation}" spiType="clothoid" theta="${degrees}" ` +
+    `totalX="${metres(doc, totalX)}" totalY="${metres(doc, totalY)}" tanLong="${metres(doc, totalX - totalY / Math.tan(theta))}" ` +
+    `tanShort="${metres(doc, totalY / Math.sin(theta))}" ` +
+    `staStart="${metres(doc, element.startStation)}"><Start>${northEast(doc, element.start)}</Start><PI>${northEast(doc, element.pi)}</PI><End>${northEast(doc, element.end)}</End></Spiral>`
   );
 }
 
@@ -53,10 +52,8 @@ function alignmentXml(doc: Doc, alignment: AlignmentObject): string[] {
     if (element.kind === 'spiral') return spiralXml(doc, element);
     const delta = Number(toDegrees(element.deflection).toFixed(6));
     return (
-      `        <Curve rot="${element.rotation}" crvType="arc" radius="${metres(doc, element.radius)}" ` +
-      `delta="${delta}" ${common}><Start>${northEast(doc, element.start)}</Start>` +
-      `<Center>${northEast(doc, element.center)}</Center><End>${northEast(doc, element.end)}</End>` +
-      `<PI>${northEast(doc, element.pi)}</PI></Curve>`
+      `        <Curve rot="${element.rotation}" crvType="arc" radius="${metres(doc, element.radius)}" delta="${delta}" ` +
+      `${common}><Start>${northEast(doc, element.start)}</Start><Center>${northEast(doc, element.center)}</Center><End>${northEast(doc, element.end)}</End><PI>${northEast(doc, element.pi)}</PI></Curve>`
     );
   });
   const name = escapeXml(alignment.name);

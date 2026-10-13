@@ -1,6 +1,6 @@
 /**
- * Command-side bridge to the shape kernel: operand recipes (exact tree, or the mesh fallback when
- * this kernel cannot rebuild it), evaluation, and the `mesh` result entity that carries the recipe.
+ * Command-side bridge to the shape kernel: operand recipes (exact tree, or the mesh fallback when this kernel cannot rebuild it),
+ * evaluation, and the `mesh` result entity that carries the recipe.
  */
 
 import type { CadDocument, Entity } from '../../model/types';
@@ -34,9 +34,8 @@ function unsupportedOp(kernel: GeometryKernel, recipe: ShapeRecipe): ShapeRecipe
 }
 
 /**
- * Recipe of an operand entity: its exact construction tree, or — only when this kernel lacks an op
- * of that tree (a fillet recipe loaded under Manifold) — its stored triangles. A transient refusal
- * never downgrades the exact tree.
+ * Recipe of an operand entity: its exact construction tree, or — only when this kernel lacks an op of that tree (a fillet recipe loaded
+ * under Manifold) — its stored triangles. A transient refusal never downgrades the exact tree.
  */
 export function operandRecipe(kernel: GeometryKernel, entity: Entity): ShapeRecipe {
   const fallback = meshRecipeOf(entity);
@@ -76,9 +75,7 @@ export function evaluateRecipe(kernel: GeometryKernel, recipe: ShapeRecipe): Ker
 
 /** The `mesh` entity of a kernel result (world space), styled after `source`. */
 function kernelResultEntity(id: string, result: KernelResult, source: Entity): Entity {
-  return newEntity('mesh', id, { mesh: result.mesh, brep: result.recipe }, [0, 0, 0], source.color, {
-    layerId: source.layerId,
-  });
+  return newEntity('mesh', id, { mesh: result.mesh, brep: result.recipe }, [0, 0, 0], source.color, { layerId: source.layerId });
 }
 
 /** Summary suffix describing the exact topology kept by the kernel ('' for mesh-only kernels). */

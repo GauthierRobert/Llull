@@ -10,29 +10,13 @@ import { TECHNICAL_LAYERS } from '@core/geometry/technicalView';
 import { DIMENSION_LAYER } from '../drawings/planModel';
 
 /** AutoCAD $INSUNITS codes. */
-export const INSUNITS: Readonly<Record<DocumentUnit, number>> = {
-  in: 1,
-  ft: 2,
-  mm: 4,
-  cm: 5,
-  m: 6,
-};
+export const INSUNITS: Readonly<Record<DocumentUnit, number>> = { in: 1, ft: 2, mm: 4, cm: 5, m: 6 };
 
 /** AutoCAD Color Index per standard layer. */
+// prettier-ignore
 const LAYER_COLOR: Readonly<Record<string, number>> = {
-  'A-WALL': 7,
-  'A-DOOR': 30,
-  'A-GLAZ': 5,
-  'S-GRID': 1,
-  'S-COLS': 8,
-  'S-BEAM': 4,
-  'S-SLAB': 9,
-  'A-FLOR-STRS': 6,
-  'A-AREA': 3,
-  [DIMENSION_LAYER]: 2,
-  [TECHNICAL_LAYERS.visible]: 7,
-  [TECHNICAL_LAYERS.hidden]: 8,
-  [TECHNICAL_LAYERS.center]: 1,
+  'A-WALL': 7, 'A-DOOR': 30, 'A-GLAZ': 5, 'S-GRID': 1, 'S-COLS': 8, 'S-BEAM': 4, 'S-SLAB': 9, 'A-FLOR-STRS': 6, 'A-AREA': 3,
+  [DIMENSION_LAYER]: 2, [TECHNICAL_LAYERS.visible]: 7, [TECHNICAL_LAYERS.hidden]: 8, [TECHNICAL_LAYERS.center]: 1,
   [TECHNICAL_LAYERS.cut]: 7,
 };
 
@@ -77,8 +61,8 @@ export class DxfWriter {
   }
 
   /**
-   * R12 name of a source layer. Sources whose sanitised names collide ("A B" / "A_B") keep distinct
-   * layers: later ones get `_2`, `_3`, … in first-seen order.
+   * R12 name of a source layer. Sources whose sanitised names collide ("A B" / "A_B") keep distinct layers: later ones get `_2`, `_3`, … in
+   * first-seen order.
    */
   private layerName(layer: string): string {
     const known = this.layerNames.get(layer);

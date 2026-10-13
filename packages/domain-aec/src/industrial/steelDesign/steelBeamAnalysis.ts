@@ -1,29 +1,16 @@
 /**
- * Simply supported beam under piecewise-uniform line loads and point loads: reactions, exact
- * maximum moment and shear, mid-span deflection by double integration of the exact moment diagram.
- * Units: positions m, line loads kN/m, point loads kN, moments kNm, deflection mm.
+ * Simply supported beam under piecewise-uniform line loads and point loads: reactions, exact maximum moment and shear, mid-span deflection
+ * by double integration of the exact moment diagram. Units: positions m, line loads kN/m, point loads kN, moments kNm, deflection mm.
  */
 
 import { clamp } from '@lib/clamp';
 
 /** A uniform load `from`–`to` (m from the start), split into permanent and imposed parts. */
-export interface LinePiece {
-  readonly from: number;
-  readonly to: number;
-  readonly permanent: number;
-  readonly imposed: number;
-}
+export type LinePiece = { readonly from: number; readonly to: number; readonly permanent: number; readonly imposed: number };
 
-export interface PointLoad {
-  readonly at: number;
-  readonly permanent: number;
-  readonly imposed: number;
-}
+export type PointLoad = { readonly at: number; readonly permanent: number; readonly imposed: number };
 
-export interface LoadFactors {
-  readonly permanent: number;
-  readonly imposed: number;
-}
+export type LoadFactors = { readonly permanent: number; readonly imposed: number };
 
 export interface BeamResponse {
   readonly reactionStart: number;
@@ -58,16 +45,9 @@ export function loadTotals(pieces: ReadonlyArray<LinePiece>, points: ReadonlyArr
   return { permanent, imposed };
 }
 
-interface Line {
-  readonly from: number;
-  readonly to: number;
-  readonly q: number;
-}
+type Line = { readonly from: number; readonly to: number; readonly q: number };
 
-interface Point {
-  readonly at: number;
-  readonly force: number;
-}
+type Point = { readonly at: number; readonly force: number };
 
 /** Deflection (mm, downward positive) from the moment diagram M(x) given by interval data. */
 function deflectionOf(
@@ -126,10 +106,7 @@ export function analyseSimpleBeam(
     }))
     .filter((line) => line.to - line.from > EPSILON && line.q !== 0);
   const concentrated: Point[] = points
-    .map((point) => ({
-      at: clamp(point.at, 0, length),
-      force: factors.permanent * point.permanent + factors.imposed * point.imposed,
-    }))
+    .map((point) => ({ at: clamp(point.at, 0, length), force: factors.permanent * point.permanent + factors.imposed * point.imposed }))
     .filter((point) => point.force !== 0);
   let totalLoad = 0;
   let firstMoment = 0;

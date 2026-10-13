@@ -14,20 +14,9 @@ import {
 import { EXIT_OK, EXIT_USAGE, runCli, type CliIo } from '../src/cli/main';
 
 const newHome = (): string => mkdtempSync(path.join(tmpdir(), 'llull-home-'));
-const app = {
-  url: 'http://127.0.0.1:47827',
-  token: 'launch-token',
-  pid: process.pid,
-  documentPath: null,
-  version: '0.1.0',
-};
+const app = { url: 'http://127.0.0.1:47827', token: 'launch-token', pid: process.pid, documentPath: null, version: '0.1.0' };
 
-function capture(env: Record<string, string>): {
-  io: CliIo;
-  out: string[];
-  err: string[];
-  calls: { url: string; auth: string | null }[];
-} {
+function capture(env: Record<string, string>): { io: CliIo; out: string[]; err: string[]; calls: { url: string; auth: string | null }[] } {
   const out: string[] = [];
   const err: string[] = [];
   const calls: { url: string; auth: string | null }[] = [];

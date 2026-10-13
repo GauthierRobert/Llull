@@ -1,9 +1,6 @@
 /**
- * NumberField — `<input type="number">` for a numeric value owned elsewhere (a store field). It
- * keeps the typed text locally so intermediate input ("0.", "-", "1e-") is never rewritten, and
- * reports only finite parsed numbers through `onValueChange`. An external change of `value`
- * replaces the text unless it already parses to that value. Its `ref` (a React 19 prop) reaches the
- * `<input>`.
+ * Number input over an external value: keeps the typed text ("0.", "-", "1e-" never rewritten), reports finite numbers
+ * only; an external `value` change replaces the text unless it already parses to it. `ref` reaches the <input>.
  */
 
 import React, { useState } from 'react';

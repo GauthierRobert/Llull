@@ -74,11 +74,7 @@ export function listMcpResources(): McpResourceDescriptor[] {
   ];
 }
 
-const jsonResource = (uri: string, text: string): McpResourceContent => ({
-  uri,
-  mimeType: 'application/json',
-  text,
-});
+const jsonResource = (uri: string, text: string): McpResourceContent => ({ uri, mimeType: 'application/json', text });
 
 /** Lists in `cad://scene` / `cad://selection` are cut here so a huge model cannot flood a context. */
 export const MAX_RESOURCE_ITEMS = 500;

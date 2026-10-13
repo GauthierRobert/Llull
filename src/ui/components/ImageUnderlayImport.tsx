@@ -1,8 +1,4 @@
-/**
- * ImageUnderlayImport — pick a PNG/JPEG (a scanned drawing) and dispatch `add_image_underlay` with
- * it as a data URL. Calibration and tracing are the commands' job (`calibrate_underlay`,
- * `image_to_world`); this component only reads the file (PRIME DIRECTIVE).
- */
+// Pick a PNG/JPEG (scanned drawing) → `add_image_underlay` as a data URL; calibration / tracing are commands.
 
 import React, { useRef } from 'react';
 import { useStore } from '@ui/store';

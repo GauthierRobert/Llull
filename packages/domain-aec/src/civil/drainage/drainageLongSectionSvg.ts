@@ -1,6 +1,6 @@
 /**
- * Pipe-run long section as SVG: ground (rim) line, manhole shafts, pipe invert / obvert, hydraulic
- * grade line and a chainage / rim / invert / pipe / HGL table band. Levels in metres.
+ * Pipe-run long section as SVG: ground (rim) line, manhole shafts, pipe invert / obvert, hydraulic grade line and a chainage / rim / invert
+ * / pipe / HGL table band. Levels in metres.
  */
 
 import {

@@ -1,7 +1,6 @@
 /**
- * Whole-structure load path and member verification behind check_steel_members:
- * loads → beams → columns, notional horizontal forces → bracing and moment frames, one row per
- * steel member.
+ * Whole-structure load path and member verification behind check_steel_members: loads → beams → columns, notional horizontal forces →
+ * bracing and moment frames, one row per steel member.
  */
 
 import type { CadDocument } from '@core/model/types';

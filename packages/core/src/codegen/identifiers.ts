@@ -1,6 +1,6 @@
 /**
- * Source identifiers for generated code: collision-free names that are legal in Python, OpenSCAD
- * and FreeCAD, and translation of llull expressions onto those names.
+ * Source identifiers for generated code: collision-free names that are legal in Python, OpenSCAD and FreeCAD, and translation of llull
+ * expressions onto those names.
  */
 
 /** Identifiers that must never be used for a parameter or a variable in any target language. */

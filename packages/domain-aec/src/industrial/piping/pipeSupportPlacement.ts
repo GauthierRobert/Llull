@@ -1,6 +1,6 @@
 /**
- * Where supports go along a pipe for a maximum spacing: one near each free end and bend, then equal
- * subdivisions of every longer stretch. Positions are arc lengths in mm along the centreline.
+ * Where supports go along a pipe for a maximum spacing: one near each free end and bend, then equal subdivisions of every longer stretch.
+ * Positions are arc lengths in mm along the centreline.
  */
 
 import { clamp } from '@lib/clamp';
@@ -17,9 +17,8 @@ export function isPlaceable(run: PipeRun, arc: number): boolean {
 }
 
 /**
- * Arc lengths of new supports so that no stretch between supports (or carried ends) exceeds
- * `spacing`, given `existing` support arcs. A free end gets a support `offset` from it, every bend
- * one `offset` along its longer leg (`offset` = min(300 mm, spacing / 4)).
+ * Arc lengths of new supports so that no stretch between supports (or carried ends) exceeds `spacing`, given `existing` support arcs. A
+ * free end gets a support `offset` from it, every bend one `offset` along its longer leg (`offset` = min(300 mm, spacing / 4)).
  * @invariant results are placeable, ≥ 100 mm from each other and from `existing`, ascending
  */
 export function autoSupportArcs(
@@ -33,9 +32,7 @@ export function autoSupportArcs(
   const chosen: number[] = [...existing];
   const add = (arc: number): void => {
     const clamped = clamp(arc, 0, length);
-    if (isPlaceable(run, clamped) && chosen.every((other) => Math.abs(other - clamped) >= SAME_SUPPORT_DISTANCE)) {
-      chosen.push(clamped);
-    }
+    if (isPlaceable(run, clamped) && chosen.every((other) => Math.abs(other - clamped) >= SAME_SUPPORT_DISTANCE)) chosen.push(clamped);
   };
   const nodes = arcLengths(run.points);
   if (carriers[0] === null) add(Math.min(offset, length / 2));

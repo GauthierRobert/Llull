@@ -48,13 +48,7 @@ export function checkFoundations(
         false,
       ).filter((combination) => !/W/.test(combination.name));
       const tie = gravity
-        .flatMap((combination) =>
-          siblings.map((other) => ({
-            other,
-            combination,
-            force: Math.abs(combine(other, combination.factors).h),
-          })),
-        )
+        .flatMap((combination) => siblings.map((other) => ({ other, combination, force: Math.abs(combine(other, combination.factors).h) })))
         .reduce((best, item) => (item.force > best.force ? item : best));
       rows.push({
         column: reaction.frame,
@@ -72,20 +66,7 @@ export function checkFoundations(
       footings += 1;
       checkedFootings.add(footing.id);
       rows.push(
-        ...footingRows(
-          {
-            doc,
-            reaction,
-            wind,
-            soilBearing,
-            soilModulus,
-            clayLayer,
-            slidingHorizontal,
-            slabShare,
-          },
-          footing,
-          column.mark,
-        ),
+        ...footingRows({ doc, reaction, wind, soilBearing, soilModulus, clayLayer, slidingHorizontal, slabShare }, footing, column.mark),
       );
       settlements.push({
         frame: reaction.frame,

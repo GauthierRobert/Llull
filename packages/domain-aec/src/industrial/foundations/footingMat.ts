@@ -31,21 +31,11 @@ function pressureProfile(
     const mean = load.normal / area;
     const maximum = mean * (1 + (6 * eccentricity) / widthM);
     const gradient = (12 * mean * eccentricity) / widthM ** 2;
-    return {
-      at: (t) => Math.max(0, maximum - gradient * t),
-      mean,
-      contact: widthM,
-      eccentricity,
-    };
+    return { at: (t) => Math.max(0, maximum - gradient * t), mean, contact: widthM, eccentricity };
   }
   const contact = Math.max(3 * (widthM / 2 - eccentricity), 0.01 * widthM);
   const maximum = (2 * load.normal) / (contact * lengthM);
-  return {
-    at: (t) => Math.max(0, maximum * (1 - t / contact)),
-    mean: load.normal / area,
-    contact,
-    eccentricity,
-  };
+  return { at: (t) => Math.max(0, maximum * (1 - t / contact)), mean: load.normal / area, contact, eccentricity };
 }
 
 function integrate(from: number, to: number, f: (t: number) => number): number {
@@ -183,9 +173,7 @@ export function designMat(
       punchingDistance,
       combination: demand.combination,
     };
-    if (closest === null || Math.max(shear, punching) < Math.max(closest.shear, closest.punching)) {
-      closest = attempt;
-    }
+    if (closest === null || Math.max(shear, punching) < Math.max(closest.shear, closest.punching)) closest = attempt;
     if (flexure !== null && shear <= 1 && punching <= 1) {
       if (candidate.mass >= flexure) return { chosen: attempt, closest, bendingLimited };
       bendingLimited = true;

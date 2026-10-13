@@ -1,7 +1,4 @@
-/**
- * Evaluators of the architectural building elements: wall, opening, slab, column, beam, stair,
- * room and grid → document entities.
- */
+/** Evaluators of the architectural building elements: wall, opening, slab, column, beam, stair, room and grid → document entities. */
 
 import type {
   ArcEntity,
@@ -40,22 +37,13 @@ import { doorSwing, openingsOf, pointAlong, wallExtent, wallFrame, wallPieces } 
 import type { WallExtent } from '../geometry/wallExtent';
 import { stairPoint } from '../geometry/stairGeometry';
 
-export interface EvaluationContext {
-  readonly doc: CadDocument;
-  readonly building: BuildingModel;
-}
+export type EvaluationContext = { readonly doc: CadDocument; readonly building: BuildingModel };
 
 /** A wall and the level it stands on. */
-export interface WallHost {
-  readonly wall: WallElement;
-  readonly level: BuildingLevel;
-}
+export type WallHost = { readonly wall: WallElement; readonly level: BuildingLevel };
 
 /** Plan frame of the wall and the elevation of its base. */
-function wallPlacement({ wall, level }: WallHost): {
-  frame: ReturnType<typeof wallFrame>;
-  baseZ: number;
-} {
+function wallPlacement({ wall, level }: WallHost): { frame: ReturnType<typeof wallFrame>; baseZ: number } {
   return { frame: wallFrame(wall), baseZ: level.elevation + wall.baseOffset };
 }
 

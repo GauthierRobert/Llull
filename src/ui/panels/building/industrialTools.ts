@@ -1,7 +1,4 @@
-/**
- * Declarative form specs for the industrial (steel hall / plant) tools: each maps form values to
- * ONE command + params (param-gathering only, react R1).
- */
+// Declarative industrial (steel hall / plant) tool specs: form values → ONE command + params.
 
 import { toRadians } from '@lib/angle';
 import { PIPE_OUTSIDE_DIAMETER_MM } from '@aec/industrial/piping/pipeSizes';

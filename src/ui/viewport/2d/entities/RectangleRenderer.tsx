@@ -1,7 +1,4 @@
-/**
- * Render branch for `kind:'rectangle'`: closed 4-corner loop, lower-left at the entity origin,
- * width along +X and height along +Y.
- */
+// `kind:'rectangle'`: closed loop, lower-left at the origin, width +X, height +Y.
 
 import { useMemo } from 'react';
 import type { RectangleEntity } from '@core/model/types';

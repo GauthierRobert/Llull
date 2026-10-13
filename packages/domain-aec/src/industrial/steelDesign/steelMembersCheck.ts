@@ -32,31 +32,27 @@ export const checkSteelMembers = defineCommand({
   name: 'check_steel_members',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'General EN 1993-1-1 member verification of a steel structure built from add_steel_member (multi-storey ' +
-    'process structures, pipe racks, platforms, halls), with the loads derived from the model: self weight, ' +
-    'floor slabs (add_slab role floor) with dead + imposed load, equipment operating weight (add_equipment ' +
-    'weight, kg), pipes (add_pipe_run, steel + contents; carried by their add_pipe_support supports, else resting on beams) and cable trays resting on beams. ULS 1.35 G + 1.5 Q, ' +
-    'SLS G + Q. Beams (role beam, horizontal) are simply supported between end nodes, with floor load shared by ' +
-    'the 45° tributary rule and equipment by footprint area per bay; checked for bending (+ lateral-torsional ' +
-    'buckling when nothing restrains the top flange), shear and deflection ≤ span/250. Columns are checked per ' +
-    'storey segment between beam levels for Npl,Rd and flexural buckling Nb,Rd (Lcr = segment length). Braces ' +
-    '(role brace, in an X or Y vertical plane) carry the EN 1993-1-1 §5.3.2 equivalent horizontal forces ' +
-    '(notionalFactor × factored vertical load per level), tension-only in X-bracing, with slenderness ≤ 300; ' +
-    'the horizontal members of a braced bay are checked as struts. Returns data.members: one row per steel ' +
-    'member { id, mark, role, profile, check (governing check), utilisation (1.0 = at resistance), ok, ' +
-    'governing (combination), detail, checks, forces } — members that cannot be analysed (profile not in the ' +
-    'catalogue, class 4, roles rafter / purlin / rail / crane, inclined columns) appear with check "not ' +
-    'analysed", ok false and the reason; data.ok is true only when every member is analysed and passes. ' +
-    'data.warnings lists model gaps (equipment on grade, pipes resting on nothing, directions without bracing or ' +
-    'moment frames, beam ends bearing on nothing). Beam-column connections are pinned unless a beam declares ' +
-    'startJoint / endJoint "rigid" (add_steel_member / update_steel_member): columns and rigidly connected beams in ' +
-    'one X or Y vertical plane (a pipe rack bent) are then analysed as a 2D moment frame (column bases pinned or ' +
-    'baseFixity "fixed"): 1.35 G + 1.5 Q with the notional forces in both directions, joint moments in ' +
-    'forces.jointMomentStart / jointMomentEnd, N + M interaction, storey drift ≤ h / swayRatio, αcr ≥ 3 (moments ' +
-    'amplified below 10); data.frames lists them and they count as the lateral system of their direction. A rigid ' +
-    'joint to nothing or to a beam, a frame mechanism or a column roll between the principal axes leave the members ' +
-    '"not analysed" with the reason. A preliminary check, not a substitute for the engineer of record. See ' +
-    'data.loads.assumptions for every load-path rule.',
+    'General EN 1993-1-1 member verification of a steel structure built from add_steel_member (multi-storey process structures, pipe ' +
+    'racks, platforms, halls), with the loads derived from the model: self weight, floor slabs (add_slab role floor) with dead + imposed ' +
+    'load, equipment operating weight (add_equipment weight, kg), pipes (add_pipe_run, steel + contents; carried by their ' +
+    'add_pipe_support supports, else resting on beams) and cable trays resting on beams. ULS 1.35 G + 1.5 Q, SLS G + Q. Beams (role ' +
+    'beam, horizontal) are simply supported between end nodes, with floor load shared by the 45° tributary rule and equipment by ' +
+    'footprint area per bay; checked for bending (+ lateral-torsional buckling when nothing restrains the top flange), shear and ' +
+    'deflection ≤ span/250. Columns are checked per storey segment between beam levels for Npl,Rd and flexural buckling Nb,Rd (Lcr = ' +
+    'segment length). Braces (role brace, in an X or Y vertical plane) carry the EN 1993-1-1 §5.3.2 equivalent horizontal forces ' +
+    '(notionalFactor × factored vertical load per level), tension-only in X-bracing, with slenderness ≤ 300; the horizontal members of a ' +
+    'braced bay are checked as struts. Returns data.members: one row per steel member { id, mark, role, profile, check (governing ' +
+    'check), utilisation (1.0 = at resistance), ok, governing (combination), detail, checks, forces } — members that cannot be analysed ' +
+    '(profile not in the catalogue, class 4, roles rafter / purlin / rail / crane, inclined columns) appear with check "not analysed", ' +
+    'ok false and the reason; data.ok is true only when every member is analysed and passes. data.warnings lists model gaps (equipment ' +
+    'on grade, pipes resting on nothing, directions without bracing or moment frames, beam ends bearing on nothing). Beam-column ' +
+    'connections are pinned unless a beam declares startJoint / endJoint "rigid" (add_steel_member / update_steel_member): columns and ' +
+    'rigidly connected beams in one X or Y vertical plane (a pipe rack bent) are then analysed as a 2D moment frame (column bases pinned ' +
+    'or baseFixity "fixed"): 1.35 G + 1.5 Q with the notional forces in both directions, joint moments in forces.jointMomentStart / ' +
+    'jointMomentEnd, N + M interaction, storey drift ≤ h / swayRatio, αcr ≥ 3 (moments amplified below 10); data.frames lists them and ' +
+    'they count as the lateral system of their direction. A rigid joint to nothing or to a beam, a frame mechanism or a column roll ' +
+    'between the principal axes leave the members "not analysed" with the reason. A preliminary check, not a substitute for the engineer ' +
+    'of record. See data.loads.assumptions for every load-path rule.',
   params: z.object({
     floorDeadLoad: z
       .number()
@@ -123,13 +119,9 @@ export const checkSteelMembers = defineCommand({
       deflectionRatio,
       swayRatio,
     });
-    if (analysis.rows.length === 0) {
-      return noop(doc, 'check_steel_members failed: the model has no steel members (add_steel_member).');
-    }
+    if (analysis.rows.length === 0) return noop(doc, 'check_steel_members failed: the model has no steel members (add_steel_member).');
     const members = analysis.rows.filter((row) => params.levelId === undefined || row.levelId === params.levelId);
-    if (members.length === 0) {
-      return noop(doc, `check_steel_members failed: level '${params.levelId ?? ''}' has no steel members.`);
-    }
+    if (members.length === 0) return noop(doc, `check_steel_members failed: level '${params.levelId ?? ''}' has no steel members.`);
     const analysed = members.filter((row) => row.analysed);
     const failing = analysed.filter((row) => !row.ok);
     const notAnalysed = members.filter((row) => !row.analysed);

@@ -26,10 +26,7 @@ interface InterferencePair {
 export interface MotionStudyData {
   steps: MotionStep[];
   interferences: InterferencePair[];
-  summary: {
-    totalSteps: number;
-    framesWithInterference: number;
-  };
+  summary: { totalSteps: number; framesWithInterference: number };
 }
 
 /** World AABB per instance id with each instance moved to its position at the step. @pure */
@@ -52,9 +49,7 @@ function detectInterferences(bounds: Record<string, Bounds>): [string, string][]
     for (let j = i + 1; j < entries.length; j++) {
       const [idA, boundsA] = elementAt(entries, i);
       const [idB, boundsB] = elementAt(entries, j);
-      if (boundsOverlap(boundsA, boundsB)) {
-        pairs.push([idA, idB]);
-      }
+      if (boundsOverlap(boundsA, boundsB)) pairs.push([idA, idB]);
     }
   }
   return pairs;
@@ -76,12 +71,10 @@ export const motionStudy = defineCommand({
     'Evaluate the mechanism across a value sweep and return per-step instance transforms plus interference flags. ' +
     'mode="joint": sweep a single joint (by jointId) through a value range (radians for revolute, units for prismatic). ' +
     'mode="parameter": sweep a named doc.parameters entry through a value range, propagating to any joints that reference it. ' +
-    '"target" is the joint id or parameter name to sweep. ' +
-    '"start" and "end" define the sweep range (inclusive). ' +
+    '"target" is the joint id or parameter name to sweep. "start" and "end" define the sweep range (inclusive). ' +
     '"steps" is the number of samples (default 24; clamped to [2, 360]; non-integers rounded). ' +
     '"interferenceCheck" (default false): when true, runs a lightweight AABB overlap test on every instance pair at each step. ' +
-    'Returns the input document unchanged (affected:[]) with data: ' +
-    '{ steps: MotionStep[], interferences: InterferencePair[], ' +
+    'Returns the input document unchanged (affected:[]) with data: { steps: MotionStep[], interferences: InterferencePair[], ' +
     '  summary: { totalSteps: number, framesWithInterference: number } }. ' +
     'Failure cases (unknown target, start===end, steps<2) return an explanatory summary with empty data.',
   params: z.object({
@@ -127,46 +120,29 @@ export const motionStudy = defineCommand({
   }),
   run: (doc, { mode, target, start, end, steps, interferenceCheck }): CommandResult => {
     if (target.length === 0) return noop(doc, 'motion_study: "target" must be a non-empty string.');
-
-    const emptyStudy = {
-      steps: [],
-      interferences: [],
-      summary: { totalSteps: 0, framesWithInterference: 0 },
-    } satisfies MotionStudyData;
-
-    if (start === end) {
+    const emptyStudy = { steps: [], interferences: [], summary: { totalSteps: 0, framesWithInterference: 0 } } satisfies MotionStudyData;
+    if (start === end)
       return report(doc, `motion_study: start === end (${start}). Sweep has zero length — no steps to evaluate.`, emptyStudy);
-    }
-
     const rawSteps = steps ?? 24;
-    if (rawSteps < 2) {
-      return report(doc, `motion_study: steps must be at least 2 (got ${String(steps)}). No sweep performed.`, emptyStudy);
-    }
+    if (rawSteps < 2) return report(doc, `motion_study: steps must be at least 2 (got ${String(steps)}). No sweep performed.`, emptyStudy);
     const clampedSteps = Math.min(360, rawSteps);
-
     if (mode === 'joint') {
       if (!(target in doc.joints)) return noop(doc, `motion_study: joint '${target}' does not exist in doc.joints.`);
     } else {
       // mode === 'parameter'
       const param = Object.hasOwn(doc.parameters, target) ? doc.parameters[target] : undefined;
       if (!param) return noop(doc, `motion_study: parameter '${target}' does not exist in doc.parameters.`);
-      if (typeof param.value !== 'number' || !Number.isFinite(param.value)) {
+      if (typeof param.value !== 'number' || !Number.isFinite(param.value))
         return noop(doc, `motion_study: parameter '${target}' is not numeric (value: ${String(param.value)}).`);
-      }
     }
-
     const motionSteps: MotionStep[] = [];
     const allInterferences: InterferencePair[] = [];
     const stepsWithInterference = new Set<number>();
-
     for (let k = 0; k < clampedSteps; k++) {
       const sweepValue = start + ((end - start) * k) / (clampedSteps - 1);
-
       let baseValues: Record<string, number>;
-
-      if (mode === 'joint') {
-        baseValues = { [target]: sweepValue };
-      } else {
+      if (mode === 'joint') baseValues = { [target]: sweepValue };
+      else {
         // Joints whose stored value equals the parameter's current value follow the sweep;
         // the rest keep their stored value (drive relations propagate in evaluateMotionInternal).
         const currentParamValue = doc.parameters[target]?.value ?? 0;
@@ -177,17 +153,8 @@ export const motionStudy = defineCommand({
           baseValues[jid] = currentParamValue !== 0 && stored === currentParamValue ? sweepValue : stored;
         }
       }
-
       const { instancePositions, instanceRotations, resolvedJoints } = evaluateMotionInternal(doc, baseValues);
-
-      motionSteps.push({
-        stepIndex: k,
-        sweepValue,
-        instancePositions,
-        instanceRotations,
-        resolvedJoints,
-      });
-
+      motionSteps.push({ stepIndex: k, sweepValue, instancePositions, instanceRotations, resolvedJoints });
       if (interferenceCheck === true) {
         const bounds = boundsAtStep(doc, instancePositions);
         const pairs = detectInterferences(bounds);
@@ -197,15 +164,12 @@ export const motionStudy = defineCommand({
         }
       }
     }
-
     const framesWithInterference = stepsWithInterference.size;
-
     const summaryText =
       `motion_study: swept ${mode}='${target}' from ${start} to ${end} in ${clampedSteps} step(s). ` +
       (interferenceCheck === true
         ? `${allInterferences.length} interference pair(s) across ${framesWithInterference} frame(s).`
         : 'Interference check disabled.');
-
     return report(doc, summaryText, {
       steps: motionSteps,
       interferences: allInterferences,

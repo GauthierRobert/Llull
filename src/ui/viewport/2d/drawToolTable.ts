@@ -1,11 +1,5 @@
-/**
- * ONE descriptor per interactive draw tool: how many clicks complete it, which command its points
- * dispatch, and how it previews. The click state machine (`useDrawTool`), the rubber-band preview
- * (`DrawPreview`) and the double-click handling (`DrawInteraction`) all derive from this table —
- * adding a tool means adding one descriptor here (plus its toolbar spec in `drawTools.ts`).
- *
- * Params are gathered from the clicked points only; no entity is built here (PRIME DIRECTIVE).
- */
+// ONE descriptor per draw tool (clicks to complete, command dispatched, preview), read by useDrawTool, DrawPreview and
+// DrawInteraction. A new tool = one descriptor here + its toolbar spec in drawTools.ts. Params come from clicks only.
 
 import type { Vec2 } from '@core/model/types';
 import type { DrawToolKind } from '@ui/store';
@@ -23,7 +17,7 @@ const OUTLINE_SEGMENTS = 32;
 
 type Dispatch = (name: string, params?: unknown) => void;
 
-/** Rubber band previewed from the single placed point to the cursor; null while degenerate. */
+/** Rubber band from the single placed point to the cursor; null while degenerate. */
 type AnchoredOutline = (anchor: Vec2, cursor: Vec2) => Vec2[] | null;
 
 interface DrawToolDescriptor {
@@ -31,16 +25,13 @@ interface DrawToolDescriptor {
   maxPoints: number | null;
   /** The move tool needs something selected before its first click is accepted. */
   requiresSelection?: true;
-  /** Dispatch the command for the collected points (degenerate input dispatches nothing). */
+  /** Degenerate input dispatches nothing. */
   commit: (points: ReadonlyArray<Vec2>, dispatch: Dispatch) => void;
   /** 'chain' = straight segments through every placed point; else an outline from one anchor. */
   preview: 'chain' | AnchoredOutline;
 }
 
-/**
- * Wall-chain params: consecutive near-duplicate clicks (a double-click to finish adds the last
- * point twice) are merged; clicking the first point again closes the loop.
- */
+/** Near-duplicate clicks (double-click finish) merge; re-clicking the first point closes the loop. */
 export function wallChainParams(points: ReadonlyArray<Vec2>, closed: boolean): { points: Vec2[]; closed: boolean } {
   const distinct = dropRepeatedPoints(points);
   const first = distinct[0];
@@ -81,11 +72,7 @@ const DESCRIPTORS: Partial<Record<DrawToolKind, DrawToolDescriptor>> = {
     },
   },
   spline: openChain('draw_spline'),
-  wall: {
-    maxPoints: null,
-    preview: 'chain',
-    commit: (points, dispatch) => dispatch('draw_walls', wallChainParams(points, false)),
-  },
+  wall: { maxPoints: null, preview: 'chain', commit: (points, dispatch) => dispatch('draw_walls', wallChainParams(points, false)) },
   point: {
     maxPoints: 1,
     preview: () => null,
@@ -146,7 +133,6 @@ const DESCRIPTORS: Partial<Record<DrawToolKind, DrawToolDescriptor>> = {
   },
 };
 
-/** The descriptor of a tool; undefined for 'none'. */
 export function drawToolDescriptor(tool: DrawToolKind): DrawToolDescriptor | undefined {
   return DESCRIPTORS[tool];
 }

@@ -29,10 +29,7 @@ export interface DaylightPoint {
   readonly clipped: boolean;
 }
 
-interface RingPoint {
-  readonly at: Vec2;
-  readonly normal: Vec2;
-}
+type RingPoint = { readonly at: Vec2; readonly normal: Vec2 };
 
 /** Pad outline (CCW) as points with outward normals; vertices get the corner bisector. */
 export function outlineRing(boundary: ReadonlyArray<Vec2>): RingPoint[] {

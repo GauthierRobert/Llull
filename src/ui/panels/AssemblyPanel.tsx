@@ -1,8 +1,4 @@
-/**
- * AssemblyPanel — component library + instance tree.
- * Components: name, entity count, "Insert" (insert_instance at the origin).
- * Instances: component name + position; click selects, "Explode" dispatches explode_instance.
- */
+// Component library (Insert → insert_instance at the origin) + instance tree (click selects, Explode → explode_instance).
 
 import React from 'react';
 import { classNames } from '@ui/classNames';
@@ -13,11 +9,7 @@ import { Icon } from '@ui/components/Icon';
 import { PanelEmpty, PanelHeader, PanelSection } from '@ui/panels/PanelParts';
 import { orderedValues } from '@ui/panels/orderedValues';
 
-interface ComponentRowProps {
-  component: Component;
-}
-
-function ComponentRow({ component }: ComponentRowProps): React.ReactElement {
+function ComponentRow({ component }: { component: Component }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
 
   const entityCount = component.order.length;
@@ -55,13 +47,15 @@ function ComponentRow({ component }: ComponentRowProps): React.ReactElement {
   );
 }
 
-interface InstanceRowProps {
+function InstanceRow({
+  instance,
+  componentName,
+  selected,
+}: {
   instance: InstanceEntity;
   componentName: string;
   selected: boolean;
-}
-
-function InstanceRow({ instance, componentName, selected }: InstanceRowProps): React.ReactElement {
+}): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const select = useStore((s) => s.select);
 
@@ -104,11 +98,7 @@ function InstanceRow({ instance, componentName, selected }: InstanceRowProps): R
   );
 }
 
-interface AssemblyPanelProps {
-  className?: string;
-}
-
-export function AssemblyPanel({ className }: AssemblyPanelProps): React.ReactElement {
+export function AssemblyPanel({ className }: { className?: string }): React.ReactElement {
   const components = useStore((s) => s.document.components);
   const entities = useStore((s) => s.document.entities);
   const order = useStore((s) => s.document.order);

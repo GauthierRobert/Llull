@@ -1,8 +1,4 @@
-/**
- * App shell: top bar, toolbar, content row (sidebar | viewport with hint bar | inspector), status
- * bar. View mode (2D / 3D) lives in useToolStore (architecture L7); the theme is mirrored to
- * `data-theme` on <html> so portals inherit it. Edits go through the command layer.
- */
+// App shell: top bar, toolbar, sidebar | viewport + hint bar | inspector, status bar.
 
 import React, { useEffect } from 'react';
 import { useLayoutStore, useThemeStore, useToolStore } from '@ui/store';
@@ -34,13 +30,12 @@ export function App(): React.ReactElement {
   const viewMode = useToolStore((s) => s.viewMode);
   const setViewMode = useToolStore((s) => s.setViewMode);
 
-  // Mirror the server-authoritative CadDocument into the store via SSE.
   useMcpLiveDocument();
   useKeyboardShortcuts();
   useAutoFrame();
   useAutosave();
 
-  // Apply the theme on <html> so CSS variables cascade to portals too.
+  // On <html> so CSS variables cascade to portals.
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);

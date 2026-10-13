@@ -1,9 +1,4 @@
-/**
- * MeasurementHUD — overlay showing the result of the most recent read-only query command
- * (`lastMeasure`: measure_distance / angle / area / perimeter / bounding_box,
- * mass_properties). Renders nothing without a measurement; the close button clears it.
- * Presentation ONLY (PRIME DIRECTIVE).
- */
+// Overlay of `lastMeasure` (measure_distance / angle / area / perimeter / bounding_box, mass_properties); close clears it.
 
 import React from 'react';
 import { useStore } from '@ui/store';
@@ -39,7 +34,7 @@ interface MassPropertiesData {
   unit: string;
 }
 
-/** Shape probe: an object holding every `required` key and none of the `forbidden` ones. */
+/** Holds every `required` key and none of `forbidden`. */
 function hasShape(data: unknown, required: readonly string[], forbidden: readonly string[] = []): boolean {
   return isRecord(data) && required.every((key) => key in data) && !forbidden.some((key) => key in data);
 }
@@ -76,13 +71,7 @@ function fmtVec3(v: readonly [number, number, number], precision = 3): string {
   return `(${fmt(v[0], precision)}, ${fmt(v[1], precision)}, ${fmt(v[2], precision)})`;
 }
 
-interface RowProps {
-  label: string;
-  value: string;
-  unit?: string;
-}
-
-function Row({ label, value, unit }: RowProps): React.ReactElement {
+function Row({ label, value, unit }: { label: string; value: string; unit?: string }): React.ReactElement {
   return (
     <div className="mhud-row">
       <span className="mhud-label">{label}</span>

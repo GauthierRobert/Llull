@@ -1,8 +1,4 @@
-/**
- * AlignmentEditor — one road alignment: design profile PVIs (`set_alignment_profile`), road
- * template (`set_road_section`), superelevation (`set_superelevation`) and its deliverables
- * (report CSV, long / cross section SVG, plan-profile sheet on the chosen paper).
- */
+// One road alignment: profile PVIs, road template, superelevation, deliverables (report CSV, long / cross SVG, sheet).
 
 import React, { useState } from 'react';
 import type { AlignmentObject } from '@core/model/civil';

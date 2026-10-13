@@ -1,7 +1,6 @@
 /**
- * Orthographic projection of solids onto a view plane — the one engine behind every technical view
- * (the 2D viewport's top view, elevations, sections): front/back faces, feature + silhouette edges
- * and the cut by a section plane.
+ * Orthographic projection of solids onto a view plane — the one engine behind every technical view (the 2D viewport's top view, elevations,
+ * sections): front/back faces, feature + silhouette edges and the cut by a section plane.
  */
 
 import type { Vec2, Vec3 } from '../model/vectors';
@@ -52,15 +51,9 @@ export function facesOf(triangles: ReadonlyArray<Triangle>, frame: ViewFrame): F
 }
 
 /** The section plane of `frame` at `cutDepth`: its positive side (toward the viewer) is removed. */
-export const sectionPlane = (frame: ViewFrame, cutDepth: number): UnitPlane => ({
-  normal: [...frame.toViewer],
-  offset: cutDepth,
-});
+export const sectionPlane = (frame: ViewFrame, cutDepth: number): UnitPlane => ({ normal: [...frame.toViewer], offset: cutDepth });
 
-/**
- * Welding distance for a face set: one millionth of its size, so millimetre and metre documents
- * weld alike.
- */
+/** Welding distance for a face set: one millionth of its size, so millimetre and metre documents weld alike. */
 export function weldTolerance(faces: ReadonlyArray<Face>): number {
   const { min, max } = boundsOfPoints(faces.flatMap((face) => [...face.triangle]));
   const size = Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]);

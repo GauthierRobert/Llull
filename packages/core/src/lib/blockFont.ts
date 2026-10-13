@@ -1,7 +1,6 @@
 /**
- * Built-in 5×7 block font and a text rasterizer (RGBA, transparent or solid background), used for
- * text decals so the viewport and the glTF export show identical pixels without a font engine.
- * Lower-case letters render as capitals; unknown characters render as a blank.
+ * Built-in 5×7 block font and a text rasterizer (RGBA, transparent or solid background), used for text decals so the viewport and the glTF
+ * export show identical pixels without a font engine. Lower-case letters render as capitals; unknown characters render as a blank.
  */
 
 import { parseHexRgb } from './isHexColor';
@@ -77,8 +76,8 @@ function hexRgba(hex: string | undefined, alpha: number): Rgba {
 }
 
 /**
- * RGBA image of one line of `text` in `color` over `background` (transparent when absent).
- * Width/height are powers of two so the texture mipmaps; `aspect` is the inked width / height.
+ * RGBA image of one line of `text` in `color` over `background` (transparent when absent). Width/height are powers of two so the texture
+ * mipmaps; `aspect` is the inked width / height.
  */
 export function rasterizeText(
   text: string,

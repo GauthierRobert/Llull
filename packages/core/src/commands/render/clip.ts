@@ -1,6 +1,5 @@
 /**
- * Cutaway for render_view: clips solid polygons against half-spaces (split, not dropped) and
- * rebuilds the section outline as capped loops.
+ * Cutaway for render_view: clips solid polygons against half-spaces (split, not dropped) and rebuilds the section outline as capped loops.
  */
 
 import type { Vec3 } from '../../model/types';
@@ -66,8 +65,7 @@ function capFor(
     ),
     tolerance,
   )) {
-    // The removed region's face on this plane lies inside every other cut side (intersection)
-    // or outside all of them (union).
+    // The removed region's face on this plane lies inside every other cut side (intersection) or outside all of them (union).
     let clipped: Vec3[] = loop;
     for (const other of others) {
       clipped = clipToSide(clipped, other, mode === 'intersection');

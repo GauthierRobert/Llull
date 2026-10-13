@@ -26,11 +26,7 @@ import { round, weightKnPerMetre } from '../../shared/numeric';
 import { distance3 } from '@lib/vec3';
 import { boundsOfPoints } from '@core/geometry/bounds';
 
-interface PurlinLoads {
-  readonly windPressure: number;
-  readonly snowLoad: number;
-  readonly roofDeadLoad: number;
-}
+type PurlinLoads = { readonly windPressure: number; readonly snowLoad: number; readonly roofDeadLoad: number };
 
 /** Steel members of `levelId` with endpoints in mm; `skipped` = marks of purlins / rails without a usable profile or length. */
 export function locatePurlinMembers(doc: CadDocument, levelId: string): { members: Located[]; skipped: string[] } {
@@ -42,15 +38,7 @@ export function locatePurlinMembers(doc: CadDocument, levelId: string): { member
       if (member.role === 'purlin' || member.role === 'rail') skipped.push(member.mark);
       continue;
     }
-    members.push({
-      member,
-      profile,
-      start,
-      end,
-      length,
-      yMin: Math.min(start[1], end[1]),
-      yMax: Math.max(start[1], end[1]),
-    });
+    members.push({ member, profile, start, end, length, yMin: Math.min(start[1], end[1]), yMax: Math.max(start[1], end[1]) });
   }
   return { members, skipped };
 }
@@ -239,11 +227,7 @@ export function analysePurlins(
     const pressure = CPE_WALL.D + CPI_PRESSURE;
     // Suction: inner flange free and in compression (χLT as purlin uplift); pressure: sheeting-restrained.
     const cases = [
-      {
-        zone: suctionZone,
-        net: suction,
-        reduction: freeFlangeReduction(rail.profile, fy, rail.length),
-      },
+      { zone: suctionZone, net: suction, reduction: freeFlangeReduction(rail.profile, fy, rail.length) },
       { zone: 'D' as WallZone, net: pressure, reduction: 1 },
     ].map((windCase) => ({
       zone: windCase.zone,

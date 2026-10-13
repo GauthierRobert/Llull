@@ -1,6 +1,6 @@
 /**
- * Minimal PNG encoder: 8-bit RGBA, filter 0, zlib "stored" (uncompressed) deflate blocks.
- * Pure (no DOM, no zlib dependency) so core can embed textures in glTF exports.
+ * Minimal PNG encoder: 8-bit RGBA, filter 0, zlib "stored" (uncompressed) deflate blocks. Pure (no DOM, no zlib dependency) so core can
+ * embed textures in glTF exports.
  */
 
 const CRC_TABLE = ((): Uint32Array => {
@@ -72,9 +72,7 @@ export function encodePng(width: number, height: number, rgba: Uint8Array): Uint
   view.setUint32(4, height);
   header.set([8, 6, 0, 0, 0], 8);
   const raw = new Uint8Array(height * (width * 4 + 1));
-  for (let y = 0; y < height; y++) {
-    raw.set(rgba.subarray(y * width * 4, (y + 1) * width * 4), y * (width * 4 + 1) + 1);
-  }
+  for (let y = 0; y < height; y++) raw.set(rgba.subarray(y * width * 4, (y + 1) * width * 4), y * (width * 4 + 1) + 1);
   const parts = [
     new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     chunk('IHDR', header),

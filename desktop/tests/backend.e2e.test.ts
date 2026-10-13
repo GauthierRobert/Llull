@@ -47,23 +47,11 @@ beforeAll(async () => {
     (entry, env) => fork(entry, [], { env, stdio: 'ignore' }),
     layout.serverEntry,
     // Vitest sets TEST/VITEST, which keep the server from listening; the app never has them.
-    backendEnv({
-      port,
-      token,
-      layout,
-      userDataDir: userData,
-      baseEnv: { ...process.env, TEST: undefined, VITEST: undefined },
-    }),
+    backendEnv({ port, token, layout, userDataDir: userData, baseEnv: { ...process.env, TEST: undefined, VITEST: undefined } }),
     url,
   );
   session = createDocumentSession({ url, token });
-  writeDesktopDiscovery(home, {
-    url,
-    token,
-    pid: process.pid,
-    documentPath: null,
-    version: 'test',
-  });
+  writeDesktopDiscovery(home, { url, token, pid: process.pid, documentPath: null, version: 'test' });
 }, 60_000);
 
 afterAll(async () => {

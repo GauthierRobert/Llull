@@ -1,8 +1,7 @@
 /**
- * Area-load path of floor slabs and equipment onto the beams under them.
- * Every load is rastered into small cells; a cell bears on the NEAREST supporting beam in plan,
- * which for a rectangular bay is the 45° tributary rule (two triangles on the short sides, two
- * trapezoids on the long sides). Cells equidistant from two beams split between them.
+ * Area-load path of floor slabs and equipment onto the beams under them. Every load is rastered into small cells; a cell bears on the
+ * NEAREST supporting beam in plan, which for a rectangular bay is the 45° tributary rule (two triangles on the short sides, two trapezoids
+ * on the long sides). Cells equidistant from two beams split between them.
  */
 
 import { clamp } from '@lib/clamp';
@@ -42,11 +41,7 @@ export interface EquipmentLoadReport {
   readonly support: 'floor' | 'beams' | 'mixed' | 'grade';
 }
 
-interface AreaLoadResult {
-  readonly floors: FloorLoadReport[];
-  readonly equipment: EquipmentLoadReport[];
-  readonly warnings: string[];
-}
+type AreaLoadResult = { readonly floors: FloorLoadReport[]; readonly equipment: EquipmentLoadReport[]; readonly warnings: string[] };
 
 interface Surface {
   readonly slabId: string;
@@ -58,12 +53,7 @@ interface Surface {
   readonly beams: BeamLoads[];
 }
 
-interface Footprint {
-  readonly center: Point2;
-  readonly size: readonly [number, number];
-  readonly angle: number;
-  readonly base: number;
-}
+type Footprint = { readonly center: Point2; readonly size: readonly [number, number]; readonly angle: number; readonly base: number };
 
 const TIE = 1e-6;
 const BEAM_BAND_BELOW = 60;

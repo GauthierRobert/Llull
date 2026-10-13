@@ -1,6 +1,6 @@
 /**
- * Circular-arc path for `pattern_along_path`: the sweep from `startAngle` to `endAngle` about
- * `center` in the plane normal to `normal`, as exact arc segments (a full turn is a closed loop).
+ * Circular-arc path for `pattern_along_path`: the sweep from `startAngle` to `endAngle` about `center` in the plane normal to `normal`, as
+ * exact arc segments (a full turn is a closed loop).
  */
 
 import type { CurveSegment } from '../../model/curve';

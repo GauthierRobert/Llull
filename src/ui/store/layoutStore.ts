@@ -1,9 +1,5 @@
-/**
- * Layout store — which sidebar tab is open and whether the docks are expanded.
- * Presentation-only UI state, persisted to localStorage; never part of CadDocument.
- * On a narrow window (drawer layout, see shell.css) both docks start closed so the viewport is
- * visible; the stored desktop preference is left untouched until the user toggles a dock.
- */
+// Persisted layout UI state: open sidebar tab, dock expansion. In the narrow drawer layout (shell.css) both docks start
+// closed without touching the stored desktop preference until the user toggles one.
 
 import { create } from 'zustand';
 import { isRecord } from '@lib/isRecord';
@@ -25,7 +21,7 @@ export type SidebarTab = (typeof SIDEBAR_TABS)[number];
 
 const STORAGE_KEY = 'llull-layout';
 
-/** Matches the shell.css breakpoint below which the docks float over the viewport as drawers. */
+/** The shell.css drawer-layout breakpoint. */
 const DRAWER_LAYOUT_QUERY = '(max-width: 1024px)';
 
 function isDrawerLayout(): boolean {
@@ -38,11 +34,7 @@ interface PersistedLayout {
   inspectorOpen: boolean;
 }
 
-const DEFAULT_LAYOUT: PersistedLayout = {
-  sidebarTab: 'layers',
-  sidebarOpen: true,
-  inspectorOpen: true,
-};
+const DEFAULT_LAYOUT: PersistedLayout = { sidebarTab: 'layers', sidebarOpen: true, inspectorOpen: true };
 
 function isSidebarTab(value: unknown): value is SidebarTab {
   return SIDEBAR_TABS.some((tab) => tab === value);
@@ -61,15 +53,14 @@ function readStoredLayout(): PersistedLayout {
 }
 
 interface LayoutStoreState extends PersistedLayout {
-  /** Open `tab`; selecting the already-open tab collapses the sidebar. */
+  /** Re-selecting the open tab collapses the sidebar. */
   selectSidebarTab(tab: SidebarTab): void;
   toggleSidebar(): void;
   toggleInspector(): void;
 }
 
 export const useLayoutStore = create<LayoutStoreState>()((set, get) => {
-  // Persist only what changed, over the stored layout: a dock forced closed by the drawer layout
-  // never overwrites the stored desktop preference.
+  // Persist only the changed fields: a dock forced closed by the drawer layout never overwrites the desktop preference.
   const commit = (patch: Partial<PersistedLayout>): void => {
     writeStored(STORAGE_KEY, { ...readStoredLayout(), ...patch });
     set(patch);

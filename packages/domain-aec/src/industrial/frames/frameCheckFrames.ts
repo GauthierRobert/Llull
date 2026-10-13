@@ -15,13 +15,7 @@ export function checkFrames(
   doc: CadDocument,
   levelId: string,
   loads: FrameLoads,
-): {
-  rows: CheckRow[];
-  frames: number;
-  skipped: string[];
-  combinations: string[];
-  minAlphaCritical: number;
-} {
+): { rows: CheckRow[]; frames: number; skipped: string[]; combinations: string[]; minAlphaCritical: number } {
   const building = getBuilding(doc);
   const { frames, skipped } = framesOf(doc, building, levelId, loads);
   const wind = loads.windPressure > 0;
@@ -36,10 +30,7 @@ export function checkFrames(
   let unstable = 0;
   let minAlphaCritical = Infinity;
   for (const frame of frames) {
-    const ultimate = combinations.map((combination) => ({
-      combination,
-      outcome: solveUltimate(frame, combination),
-    }));
+    const ultimate = combinations.map((combination) => ({ combination, outcome: solveUltimate(frame, combination) }));
     if (ultimate.some(({ outcome }) => outcome === null)) {
       skipped.push(`${frame.label} (unstable)`);
       unstable += 1;
@@ -50,12 +41,7 @@ export function checkFrames(
       if (!outcome) continue;
       const { result, amplification } = outcome;
       if (outcome.criticalMember !== null && (stability === null || outcome.alphaCritical < stability.alpha)) {
-        stability = {
-          alpha: outcome.alphaCritical,
-          column: outcome.criticalMember,
-          combination: combination.name,
-          method: outcome.method,
-        };
+        stability = { alpha: outcome.alphaCritical, column: outcome.criticalMember, combination: combination.name, method: outcome.method };
       }
       frame.members.forEach((analysis, index) => {
         const member = building.elements[analysis.elementId];
@@ -161,18 +147,10 @@ export function checkFrames(
         `${frame.label}:vertical`,
       );
     });
-    const swayCases: {
-      name: string;
-      factors: Partial<Record<LoadCase, number>>;
-      crane: boolean;
-    }[] = [];
+    const swayCases: { name: string; factors: Partial<Record<LoadCase, number>>; crane: boolean }[] = [];
     if (wind) {
       swayCases.push(
-        ...windCasesOf([frame]).map((windCase) => ({
-          name: `SLS ${windCase.label}`,
-          factors: { [windCase.loadCase]: 1 },
-          crane: false,
-        })),
+        ...windCasesOf([frame]).map((windCase) => ({ name: `SLS ${windCase.label}`, factors: { [windCase.loadCase]: 1 }, crane: false })),
       );
     }
     if (frame.craneNodes.length > 0) {

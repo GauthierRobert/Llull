@@ -1,7 +1,4 @@
-/**
- * Top-level error boundary: a render crash anywhere shows a recoverable screen
- * instead of a blank page.
- */
+// Top-level error boundary: a render crash shows a recoverable screen, not a blank page.
 
 import { type ErrorInfo, type ReactNode, Component } from 'react';
 import { errorMessage } from '@lib/errorMessage';

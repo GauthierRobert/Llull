@@ -8,12 +8,7 @@ import { elementsOf } from '../model';
 import type { WallExtent } from './wallExtent';
 
 /** Circle arc through three points: centre, radius, start angle and signed sweep (radians). */
-interface Arc {
-  readonly center: Vec2;
-  readonly radius: number;
-  readonly startAngle: number;
-  readonly sweep: number;
-}
+type Arc = { readonly center: Vec2; readonly radius: number; readonly startAngle: number; readonly sweep: number };
 
 /** @failure collinear or coincident points -> null */
 export function arcThrough(start: Vec2, through: Vec2, end: Vec2): Arc | null {
@@ -86,8 +81,8 @@ export function arcOffsetOf(wall: CurvedWallElement, at: Vec2): number {
 }
 
 /**
- * Straight stand-in for a curved wall around arc length `offset`: the tangent there, with the
- * same parametrisation (pointAlong(offset) is the arc point) and the wall's other properties.
+ * Straight stand-in for a curved wall around arc length `offset`: the tangent there, with the same parametrisation (pointAlong(offset) is
+ * the arc point) and the wall's other properties.
  */
 export function tangentWall(wall: CurvedWallElement, offset: number): WallElement {
   const arc = curvedWallArc(wall);
@@ -115,11 +110,7 @@ export function curvedBandBetween(wall: CurvedWallElement, s0: number, s1: numbe
   const arc = curvedWallArc(wall);
   if (!arc || wall.thickness / 2 >= arc.radius || !(s1 > s0)) return null;
   const sign = Math.sign(arc.sweep);
-  const piece: Arc = {
-    ...arc,
-    startAngle: arc.startAngle + (sign * s0) / arc.radius,
-    sweep: (sign * (s1 - s0)) / arc.radius,
-  };
+  const piece: Arc = { ...arc, startAngle: arc.startAngle + (sign * s0) / arc.radius, sweep: (sign * (s1 - s0)) / arc.radius };
   return toCounterClockwise([
     ...arcPoints(piece, arc.radius + wall.thickness / 2),
     ...arcPoints(piece, arc.radius - wall.thickness / 2).reverse(),
@@ -127,8 +118,8 @@ export function curvedBandBetween(wall: CurvedWallElement, s0: number, s1: numbe
 }
 
 /**
- * Arc-length interval actually built: each end is cut back where a straight wall closes the
- * corner (that wall extends over the curved wall's end, as in straight L joints).
+ * Arc-length interval actually built: each end is cut back where a straight wall closes the corner (that wall extends over the curved
+ * wall's end, as in straight L joints).
  */
 export function curvedWallExtent(building: BuildingModel, wall: CurvedWallElement): WallExtent {
   const length = curvedWallLength(wall);

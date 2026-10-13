@@ -3,7 +3,7 @@ import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
 import { entityOfKind } from '../entity/entityOfKind';
 import { changed, failer } from '../noop';
-import { add3, distance3, map3, scale3, sub3 } from '../../lib/vec3';
+import { add3, centroid3, distance3, map3, scale3, sub3 } from '../../lib/vec3';
 import { inverseEulerXYZ } from '../../lib/eulerRotation';
 import { replaceEntity } from '../entity/entityOps';
 import { edgeKey } from '../../geometry/subdivision';
@@ -43,7 +43,7 @@ function recreased(entity: SubdivisionEntity, selected: ReadonlySet<number>, on:
   const kept = entity.creases.filter(([a, b]) => on || !(selected.has(a) && selected.has(b)));
   if (!on) return kept;
   const keys = new Set(kept.map(([a, b]) => edgeKey(a, b)));
-  for (const face of entity.faces) {
+  for (const face of entity.faces)
     face.forEach((a, i) => {
       const b = face[(i + 1) % face.length] as number;
       if (selected.has(a) && selected.has(b) && !keys.has(edgeKey(a, b))) {
@@ -51,7 +51,6 @@ function recreased(entity: SubdivisionEntity, selected: ReadonlySet<number>, on:
         kept.push([a, b]);
       }
     });
-  }
   return kept;
 }
 
@@ -67,10 +66,6 @@ function reported(doc: CadDocument, id: string, updated: SubdivisionEntity, sele
     ),
     data: { ...cageData(updated), selected },
   };
-}
-
-function subdivisionTarget(doc: CadDocument, id: string): SubdivisionEntity | string {
-  return entityOfKind(doc, id, ['subdivision']);
 }
 
 /**
@@ -109,7 +104,7 @@ export const editSubdivisionCage = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const fail = failer(doc, 'edit_subdivision_cage');
-    const entity = subdivisionTarget(doc, params.id);
+    const entity = entityOfKind(doc, params.id, ['subdivision']);
     if (typeof entity === 'string') return fail(entity);
     const { vertexIndices, region, falloff = 0, translate, scale, pivot, crease } = params;
     if (translate === undefined && scale === undefined && crease === undefined && params.levels === undefined)
@@ -127,21 +122,13 @@ export const editSubdivisionCage = defineCommand({
     const selected = weights.flatMap((w, v) => (w === 1 ? [v] : []));
     const moving = translate !== undefined || scale !== undefined || crease !== undefined;
     if (moving && selected.length === 0) return fail('the selection is empty');
-    const centre = scale3(
-      selected.reduce<Vec3>((sum, v) => add3(sum, world[v] as Vec3), [0, 0, 0]),
-      1 / Math.max(1, selected.length),
-    );
+    const centre = centroid3(selected.map((v) => world[v] as Vec3));
     const localPivot = inverseEulerXYZ(sub3(pivot ?? centre, entity.position), entity.rotation);
     const localMove = inverseEulerXYZ(translate ?? [0, 0, 0], entity.rotation);
     const factors = scale ?? [1, 1, 1];
-    if (translate === undefined && scale === undefined) {
-      const updated: SubdivisionEntity = {
-        ...entity,
-        creases: crease === undefined ? entity.creases : recreased(entity, new Set(selected), crease),
-        levels,
-      };
-      return reported(doc, entity.id, updated, selected, selected.length);
-    }
+    const creases = crease === undefined ? entity.creases : recreased(entity, new Set(selected), crease);
+    if (translate === undefined && scale === undefined)
+      return reported(doc, entity.id, { ...entity, creases, levels }, selected, selected.length);
     const vertices = entity.vertices.map((p, v): Vec3 => {
       const w = weights[v] as number;
       if (w === 0) return p;
@@ -154,7 +141,6 @@ export const editSubdivisionCage = defineCommand({
         scale3(localMove, w),
       );
     });
-    const creases = crease === undefined ? entity.creases : recreased(entity, new Set(selected), crease);
     const moved = weights.filter((w) => w > 0).length;
     return reported(doc, entity.id, { ...entity, vertices, creases, levels }, selected, moved);
   },

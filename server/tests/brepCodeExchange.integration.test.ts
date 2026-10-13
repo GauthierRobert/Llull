@@ -35,19 +35,11 @@ function run(doc: CadDocument, name: string, params: unknown): ReturnType<typeof
 function filletedBlock(): { doc: CadDocument; id: string } {
   const block = run(createEmptyDocument(), 'add_box', { size: [40, 40, 20], name: 'Block' });
   const drill = run(block.document, 'add_cylinder', { radius: 6, height: 40 });
-  const drilled = run(drill.document, 'boolean', {
-    op: 'subtract',
-    a: block.affected[0],
-    b: drill.affected[0],
-  });
+  const drilled = run(drill.document, 'boolean', { op: 'subtract', a: block.affected[0], b: drill.affected[0] });
   const holed = drilled.affected[0]!;
   const topology = run(drilled.document, 'inspect_topology', { id: holed }).data as ShapeTopology;
   const lip = topology.edges.find((edge) => edge.curve === 'circle' && edge.mid[2] > 9);
-  const filleted = run(drilled.document, 'fillet_edge', {
-    id: holed,
-    edgeIndices: [lip!.index],
-    radius: 2,
-  });
+  const filleted = run(drilled.document, 'fillet_edge', { id: holed, edgeIndices: [lip!.index], radius: 2 });
   return { doc: filleted.document, id: filleted.affected[0]! };
 }
 
@@ -92,16 +84,8 @@ describe.skipIf(!hasCadQuery)('exact recipes through CadQuery', () => {
   it('chamfer and shell also rebuild exactly through CadQuery (same volume as OCC)', async () => {
     const box = run(createEmptyDocument(), 'add_box', { size: [30, 30, 30] });
     const hollow = run(box.document, 'shell_solid', { id: box.affected[0], thickness: 2 });
-    const shelled = run(hollow.document, 'chamfer_edge', {
-      id: hollow.affected[0],
-      edgeIndices: [0],
-      distance: 3,
-    });
-    const source = (
-      execute(shelled.document, 'export_code', { language: 'cadquery' }).data as {
-        text: string;
-      }
-    ).text;
+    const shelled = run(hollow.document, 'chamfer_edge', { id: hollow.affected[0], edgeIndices: [0], distance: 3 });
+    const source = (execute(shelled.document, 'export_code', { language: 'cadquery' }).data as { text: string }).text;
     expect(source).toMatch(/= chamfer\(/);
     expect(source).toMatch(/= shell\(\w+, 2\)/);
     const result = await port.runProgram({ language: 'cadquery', source, step: false });

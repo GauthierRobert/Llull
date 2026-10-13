@@ -17,12 +17,7 @@ const scratch = (): string => mkdtempSync(path.join(tmpdir(), 'llull-desktop-'))
 
 describe('desktopLayout', () => {
   it('reads every part from resources when packaged', () => {
-    const layout = desktopLayout({
-      packaged: true,
-      resourcesPath: '/r',
-      repoRoot: '/repo',
-      platform: 'linux',
-    });
+    const layout = desktopLayout({ packaged: true, resourcesPath: '/r', repoRoot: '/repo', platform: 'linux' });
     expect(layout).toEqual({
       webDir: path.join('/r', 'web'),
       serverEntry: path.join('/r', 'server', 'dist', 'index.js'),
@@ -50,12 +45,7 @@ describe('desktopLayout', () => {
 
 describe('backendEnv', () => {
   it('locks the backend to loopback with a required token and the app origin', () => {
-    const layout = desktopLayout({
-      packaged: true,
-      resourcesPath: '/r',
-      repoRoot: '',
-      platform: 'linux',
-    });
+    const layout = desktopLayout({ packaged: true, resourcesPath: '/r', repoRoot: '', platform: 'linux' });
     const env = backendEnv({
       port: 4000,
       token: 'tok',
@@ -76,13 +66,7 @@ describe('backendEnv', () => {
     });
     expect(env['LLULL_KERNEL']).toBeUndefined();
     expect(env['LLULL_ALLOW_CODE_EXECUTION']).toBeUndefined();
-    const optedIn = backendEnv({
-      port: 1,
-      token: 't',
-      layout,
-      userDataDir: '/u',
-      baseEnv: { LLULL_ALLOW_CODE_EXECUTION: '1' },
-    });
+    const optedIn = backendEnv({ port: 1, token: 't', layout, userDataDir: '/u', baseEnv: { LLULL_ALLOW_CODE_EXECUTION: '1' } });
     expect(optedIn['LLULL_ALLOW_CODE_EXECUTION']).toBe('1');
     expect('EMPTY' in env).toBe(false);
     expect(backendOrigin(1)).toBe('http://127.0.0.1:1');

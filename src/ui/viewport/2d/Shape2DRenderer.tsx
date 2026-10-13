@@ -1,8 +1,4 @@
-/**
- * One pure render branch per Shape2DKind, shared by the top-down 2D view and the 3D view (2D
- * shapes sit on their own work plane, so lifted shapes draw at their elevation in both). Non-2D
- * kinds render nothing.
- */
+// One render branch per Shape2DKind for both views (shapes sit on their work plane, at elevation in 3D); others: nothing.
 
 import type { Entity, Shape2DKind } from '@core/model/types';
 import { LineRenderer } from './entities/LineRenderer';

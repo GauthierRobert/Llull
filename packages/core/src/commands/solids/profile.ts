@@ -1,3 +1,4 @@
+import { idOrNext } from '../entity/explicitId';
 import type { CadDocument, Vec2, Vec3 } from '../../model/types';
 import type { CurveSegment } from '../../model/curve';
 import type { CommandResult } from '../types';
@@ -21,7 +22,6 @@ import {
   rotationField,
   existingLayerOrDefault,
   solidStyleFields,
-  explicitIdOrNext,
   explicitIdTaken,
 } from './shared';
 import { sketchLoop } from './sketchCurves';
@@ -30,10 +30,10 @@ import { mapSegment } from '../../geometry/curveSegments';
 /**
  * @affects creates 1 extrusion entity; sources (id/ids) are kept
  * @invariant depth > 0; exactly one of profile (>= 3 finite [x,y] points), id, ids
- * @invariant sketch sources store their exact `curves` and sit at the (first) source position unless
- *   `position` is given; the source rotation is not inherited
- * @failure no/ambiguous source, profile < 3 points or non-finite, open/unsupported sketch, pieces
- *   that do not close, depth <= 0, zero-length axis -> no-op, affected:[]
+ * @invariant sketch sources store their exact `curves` and sit at the (first) source position unless `position` is given; the source
+ *   rotation is not inherited
+ * @failure no/ambiguous source, profile < 3 points or non-finite, open/unsupported sketch, pieces that do not close, depth <= 0,
+ *   zero-length axis -> no-op, affected:[]
  * @failure malformed rotation -> entity still created with rotation [0,0,0]
  */
 export const extrudeProfile = defineCommand({
@@ -152,11 +152,7 @@ function extrusionResult(
   const entity = newEntity(
     'extrusion',
     id,
-    {
-      profile: extrusion.profile,
-      depth: extrusion.depth,
-      ...exactCurves(extrusion.curves ?? []),
-    },
+    { profile: extrusion.profile, depth: extrusion.depth, ...exactCurves(extrusion.curves ?? []) },
     extrusion.position,
     extrusion.color,
     { rotation: resolved.rotation },
@@ -180,9 +176,7 @@ function singleSourceIssue(doc: CadDocument, id: string): string | null {
 const CLOSED_SHAPE_KINDS: ReadonlySet<string> = new Set(['circle', 'rectangle', 'ellipse', 'polyline', 'spline']);
 
 /** `{ curves }` when the loop has an arc or Bézier (a pure polygon needs no exact copy). */
-function exactCurves(curves: ReadonlyArray<CurveSegment<Vec2>>): {
-  curves?: ReadonlyArray<CurveSegment<Vec2>>;
-} {
+function exactCurves(curves: ReadonlyArray<CurveSegment<Vec2>>): { curves?: ReadonlyArray<CurveSegment<Vec2>> } {
   return curves.some((segment) => segment.type !== 'line') ? { curves } : {};
 }
 
@@ -216,8 +210,7 @@ function resolveAxis(raw: unknown): Vec3 | null {
 export const revolveProfile = defineCommand({
   name: 'revolve_profile',
   description:
-    'Create a surface of revolution by rotating a closed 2D profile around an axis. ' +
-    'Right-handed world frame, +Z up. ' +
+    'Create a surface of revolution by rotating a closed 2D profile around an axis. Right-handed world frame, +Z up. ' +
     'Either pass profile, an array of [x, y] points where x is the radial offset from the axis and y is the axial offset ' +
     '(at least 3 points, implicitly closed), or profileIds: drawn 2D sketch entities (spline, arc, line, polyline, circle, ellipse) ' +
     'that form one closed loop, read in their sketch-plane coordinates (x = radial, y = axial). ' +
@@ -298,55 +291,40 @@ export const revolveProfile = defineCommand({
       profile = loop.profile.map(shift);
       curves = loop.curves.map((segment) => mapSegment(segment, shift));
     }
-    if (profile.length < 3) {
+    if (profile.length < 3)
       return noop(doc, `revolve_profile: profile must be an array of at least 3 [x,y] points (got ${profile.length}); no-op.`);
-    }
-    if (profile.length > MAX_PROFILE_POINTS) {
+    if (profile.length > MAX_PROFILE_POINTS)
       return noop(
         doc,
         `revolve_profile: profile has ${profile.length} points, exceeding MAX_PROFILE_POINTS (${MAX_PROFILE_POINTS}); no-op.`,
       );
-    }
-    if (rawSegments !== undefined && rawSegments > MAX_REVOLVE_SEGMENTS) {
+    if (rawSegments !== undefined && rawSegments > MAX_REVOLVE_SEGMENTS)
       return noop(doc, `revolve_profile: segments ${rawSegments} exceeds MAX_REVOLVE_SEGMENTS (${MAX_REVOLVE_SEGMENTS}); no-op.`);
-    }
     const badProfile = rejectBadProfile(doc, 'revolve_profile', profile);
     if (badProfile) return badProfile;
     const flatProfile = rejectZeroAreaProfile(doc, 'revolve_profile', profile);
     if (flatProfile) return flatProfile;
-    if (explicitIdTaken(doc, explicitId)) {
+    if (explicitIdTaken(doc, explicitId))
       return noop(doc, `revolve_profile: entity id "${explicitId}" already exists; choose another id or omit it; no-op.`);
-    }
-
     const TWO_PI = 2 * Math.PI;
     const angle = rawAngle ?? TWO_PI;
-    if (angle <= 0) {
-      return noop(doc, `revolve_profile: angle must be a finite number > 0 (got ${String(angle)}); no-op.`);
-    }
-
+    if (angle <= 0) return noop(doc, `revolve_profile: angle must be a finite number > 0 (got ${String(angle)}); no-op.`);
     const axis = resolveAxis(rawAxis);
-    if (axis === null) {
+    if (axis === null)
       return noop(
         doc,
         `revolve_profile: axis must be 'x', 'y', 'z', or a [dx,dy,dz] direction array (got ${JSON.stringify(rawAxis)}); no-op.`,
       );
-    }
-
     const segments = Math.max(3, rawSegments ?? 32);
-
-    const id = explicitIdOrNext(explicitId, 'rev');
+    const id = idOrNext(explicitId, 'rev');
     const entity = newEntity(
       'revolution',
       id,
       { profile, axis, angle: Math.min(angle, TWO_PI), segments, ...exactCurves(curves) },
       position,
       color,
-      {
-        rotation: finiteVec3OrZero(rotation),
-        layerId: existingLayerOrDefault(doc, layerId),
-      },
+      { rotation: finiteVec3OrZero(rotation), layerId: existingLayerOrDefault(doc, layerId) },
     );
-
     const axisLabel =
       rawAxis === 'x' || rawAxis === 'y' || rawAxis === 'z' ? rawAxis : `[${axis.map((v) => fixedNumber(v, 3)).join(', ')}]`;
     return commitSolid(

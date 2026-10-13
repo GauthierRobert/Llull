@@ -14,9 +14,7 @@ export function escapeXml(text: string): string {
     if (code >= 0xd800 && code <= 0xdbff && !isIllegalXmlChar(code, text.charCodeAt(i + 1))) {
       kept += text.slice(i, i + 2); // valid surrogate pair
       i++;
-    } else if (!isIllegalXmlChar(code, 0)) {
-      kept += text[i];
-    }
+    } else if (!isIllegalXmlChar(code, 0)) kept += text[i];
   }
   return kept.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }

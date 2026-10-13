@@ -1,6 +1,6 @@
 /**
- * Road corridor geometry: carriageway + shoulder mesh along the design profile, side-slope batters
- * to daylight on the existing ground, and the daylight lines.
+ * Road corridor geometry: carriageway + shoulder mesh along the design profile, side-slope batters to daylight on the existing ground, and
+ * the daylight lines.
  */
 
 import type { Entity, Vec2 } from '@core/model/types';
@@ -14,10 +14,7 @@ import { surfaceTinById } from '../surface/surfaceTin';
 import type { CivilContext } from '../context';
 import { toMetres } from '@core/model/units';
 
-interface MeshBuffers {
-  readonly positions: number[];
-  readonly indices: number[];
-}
+type MeshBuffers = { readonly positions: number[]; readonly indices: number[] };
 
 function vertex(cross: RoadCrossSection, node: SectionNode): [number, number, number] {
   return [cross.origin[0] - Math.sin(cross.direction) * node.offset, cross.origin[1] + Math.cos(cross.direction) * node.offset, node.z];
@@ -87,33 +84,18 @@ export function evaluateCorridor(context: CivilContext, alignment: AlignmentObje
     edge: (c: RoadCrossSection) => SectionNode;
     edgeFirst: boolean;
   }> = [
-    {
-      part: 'left',
-      pick: (c) => c.left,
-      edge: (c) => c.template[c.template.length - 1] as SectionNode,
-      edgeFirst: true,
-    },
-    {
-      part: 'right',
-      pick: (c) => c.right,
-      edge: (c) => c.template[0] as SectionNode,
-      edgeFirst: false,
-    },
+    { part: 'left', pick: (c) => c.left, edge: (c) => c.template[c.template.length - 1] as SectionNode, edgeFirst: true },
+    { part: 'right', pick: (c) => c.right, edge: (c) => c.template[0] as SectionNode, edgeFirst: false },
   ];
   for (const side of sides) {
     for (const run of daylightRuns(sections, side.pick)) {
       addStrip(
         batters,
-        run.map(({ cross, node }) => ({
-          cross,
-          nodes: side.edgeFirst ? [side.edge(cross), node] : [node, side.edge(cross)],
-        })),
+        run.map(({ cross, node }) => ({ cross, nodes: side.edgeFirst ? [side.edge(cross), node] : [node, side.edge(cross)] })),
       );
     }
   }
-  if (batters.indices.length > 0) {
-    entities.push(civilMesh(alignment, 'batters', `${alignment.name} side slopes`, 'daylight', batters));
-  }
+  if (batters.indices.length > 0) entities.push(civilMesh(alignment, 'batters', `${alignment.name} side slopes`, 'daylight', batters));
   let lineIndex = 0;
   for (const side of sides) {
     for (const run of daylightRuns(sections, side.pick)) {

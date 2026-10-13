@@ -1,9 +1,5 @@
-/**
- * DrawingPrimitives2D — renders technical-drawing primitives with ISO 128 line weights: thick
- * continuous outlines (screen-constant width), thin lines, dashed hidden lines, chain centre lines,
- * 45° hatching and solid poché. The one renderer of every 2D technical drawing (the building plan
- * and the solids' views); pure presentation of primitives built in core / plugins.
- */
+// The one renderer of 2D technical drawings (building plan, solid views): ISO 128 weights — thick screen-constant
+// outlines, thin, dashed hidden, chain centre lines, 45° hatching, solid poché.
 
 import React, { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
@@ -18,7 +14,7 @@ import { type DrawingLabel, type DrawingScale, type SegmentBuffer, type StyledPr
 import { planAnchor } from './planAnchor';
 import { useMinScreenSize } from './useMinScreenSize';
 
-/** Thick (visible / cut) line width in screen pixels; thin lines are 1 px. */
+/** Screen px; thin lines are 1 px. */
 const THICK_PX = 2;
 
 interface DrawingObjects {
@@ -34,7 +30,7 @@ function thinSegments(buffer: SegmentBuffer, material: THREE.LineBasicMaterial |
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(buffer.positions, 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(buffer.colors, 3));
   if (material instanceof THREE.LineDashedMaterial) {
-    // Each segment restarts the pattern on a dash (ISO 128: dashed lines start with a dash).
+    // ISO 128: each dashed segment starts on a dash.
     const distances: number[] = [];
     for (let index = 0; index < buffer.positions.length; index += 6) {
       const [ax, ay, , bx, by] = buffer.positions.slice(index, index + 6) as number[];
@@ -110,13 +106,12 @@ interface DrawingPrimitives2DProps {
   readonly name: string;
   readonly items: ReadonlyArray<StyledPrimitive>;
   readonly scale: DrawingScale;
-  /** Colour of solid poché fills. */
   readonly fillColor: string;
 }
 
 export function DrawingPrimitives2D({ name, items, scale, fillColor }: DrawingPrimitives2DProps): React.ReactElement | null {
   const size = useThree((state) => state.size);
-  // Vertices are stored relative to this point (float32 precision); the group re-adds it.
+  // Float32 precision: vertices relative to this, re-added by the group.
   const anchor = useMemo(() => planAnchor(items.map((item) => item.primitive)), [items]);
   const objects = useMemo(
     () => (items.length > 0 ? buildObjects(items, scale, fillColor, anchor) : null),

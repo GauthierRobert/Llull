@@ -15,8 +15,8 @@ export function pitchRadiusOf(mod: number, teeth: number): number {
 }
 
 /**
- * `samples` points of the involute of a circle of radius `rb` (x = rb(cos t + t sin t),
- * y = rb(sin t - t cos t)), t linear from `tStart` to `tEnd`. Shared by `draw_involute`.
+ * `samples` points of the involute of a circle of radius `rb` (x = rb(cos t + t sin t), y = rb(sin t - t cos t)), t linear from `tStart` to
+ * `tEnd`. Shared by `draw_involute`.
  */
 export function sampleInvolute(rb: number, tStart: number, tEnd: number, samples: number): ReadonlyArray<Point2> {
   const n = Math.max(samples - 1, 1);
@@ -27,9 +27,9 @@ export function sampleInvolute(rb: number, tStart: number, tEnd: number, samples
 }
 
 /**
- * One tooth-pattern description. The outline carries `teeth` teeth, tooth 0 centred on angle `phase`.
- * Flanks are involutes of `baseRadius`; `halfAngleAtRef` is the half angular thickness of a tooth
- * at `refRadius` (π/(2·teeth) for a standard tooth of thickness πm/2 on the pitch circle).
+ * One tooth-pattern description. The outline carries `teeth` teeth, tooth 0 centred on angle `phase`. Flanks are involutes of `baseRadius`;
+ * `halfAngleAtRef` is the half angular thickness of a tooth at `refRadius` (π/(2·teeth) for a standard tooth of thickness πm/2 on the pitch
+ * circle).
  */
 export interface ToothPattern {
   readonly teeth: number;
@@ -65,11 +65,7 @@ interface FlankSample {
   readonly t: number;
 }
 
-function flankSamplesOf(pattern: ToothPattern): {
-  flank: FlankSample[];
-  undercut: boolean;
-  halfAngle: (t: number) => number;
-} {
+function flankSamplesOf(pattern: ToothPattern): { flank: FlankSample[]; undercut: boolean; halfAngle: (t: number) => number } {
   const { baseRadius, tipRadius, rootRadius, refRadius, halfAngleAtRef } = pattern;
   const samples = Math.max(2, Math.round(pattern.flankSamples));
   const tRef = involuteT(baseRadius, refRadius);
@@ -99,17 +95,14 @@ function flankSamplesOf(pattern: ToothPattern): {
 const polar = (radius: number, angle: number): Point2 => polarAbout([0, 0], radius, angle);
 
 /**
- * Closed CCW tooth outline (first point NOT repeated), tooth 0 centred at `phase`, plus the exact
- * boundary chain (line lead-ins, one cubic Bézier per involute flank, circular tip/root arcs).
- * Per tooth the traversal is: root lead-in → left flank up → tip land → right flank down → root land.
+ * Closed CCW tooth outline (first point NOT repeated), tooth 0 centred at `phase`, plus the exact boundary chain (line lead-ins, one cubic
+ * Bézier per involute flank, circular tip/root arcs). Per tooth the traversal is: root lead-in → left flank up → tip land → right flank
+ * down → root land.
  * @invariant when baseRadius > rootRadius (few teeth) each flank starts with a radial lead-in to the root circle
  * @invariant the tip radius is lowered when the involute would make the tooth pointed
  * @invariant `curves` is a closed chain whose segment end points are all points of `points`
  */
-export function toothProfile(pattern: ToothPattern): {
-  points: Point2[];
-  curves: ToothSegment[];
-} {
+export function toothProfile(pattern: ToothPattern): { points: Point2[]; curves: ToothSegment[] } {
   const { teeth, baseRadius, rootRadius, phase } = pattern;
   const { flank, undercut } = flankSamplesOf(pattern);
   const first = flank[0]!;
@@ -134,7 +127,6 @@ export function toothProfile(pattern: ToothPattern): {
     const [pa, pb, ta, tb] = [point(a), point(b), tangent(a), tangent(b)];
     return [pa, [pa[0] + h * ta[0], pa[1] + h * ta[1]], [pb[0] - h * tb[0], pb[1] - h * tb[1]], pb];
   };
-
   const points: Point2[] = [];
   const curves: ToothSegment[] = [];
   for (let k = 0; k < teeth; k++) {
@@ -143,15 +135,10 @@ export function toothProfile(pattern: ToothPattern): {
     const rightLead = polar(rootRadius, centre + first.half);
     if (undercut) points.push(leftLead);
     for (const { radius, half } of flank) points.push(polar(radius, centre - half));
-    for (let i = 1; i < tipSteps; i++) {
-      points.push(polar(last.radius, centre - last.half + (2 * last.half * i) / tipSteps));
-    }
+    for (let i = 1; i < tipSteps; i++) points.push(polar(last.radius, centre - last.half + (2 * last.half * i) / tipSteps));
     for (const { radius, half } of [...flank].reverse()) points.push(polar(radius, centre + half));
     if (undercut) points.push(rightLead);
-    for (let i = 1; i < rootSteps; i++) {
-      points.push(polar(rootRadius, centre + first.half + (rootSpan * i) / rootSteps));
-    }
-
+    for (let i = 1; i < rootSteps; i++) points.push(polar(rootRadius, centre + first.half + (rootSpan * i) / rootSteps));
     const leftFoot = polar(first.radius, centre - first.half);
     if (undercut) curves.push({ type: 'line', points: [leftLead, leftFoot] });
     curves.push({ type: 'bezier', points: flankBezier(centre, -1, first, last) });
@@ -163,10 +150,7 @@ export function toothProfile(pattern: ToothPattern): {
     if (undercut) curves.push({ type: 'line', points: [polar(first.radius, centre + first.half), rightLead] });
     const rootStart = undercut ? rightLead : polar(first.radius, centre + first.half);
     const nextLeft = polar(undercut ? rootRadius : first.radius, centre + pitchAngle - first.half);
-    curves.push({
-      type: 'arc',
-      points: [rootStart, polar(rootRadius, centre + pitchAngle / 2), nextLeft],
-    });
+    curves.push({ type: 'arc', points: [rootStart, polar(rootRadius, centre + pitchAngle / 2), nextLeft] });
   }
   return { points, curves };
 }
@@ -216,8 +200,8 @@ const patternWith =
 export const externalGearPattern = patternWith({ tip: 1, root: 1.25, backlashSign: -1 });
 
 /**
- * Cavity outline of an internal (ring) gear. The outline is a tooth pattern whose "teeth" are the
- * ring's tooth SPACES: tip = ring root (pitch + 1.25m), root = ring tip (pitch − m), spaces widened
- * by the backlash so an external gear of the same module meshes without interference.
+ * Cavity outline of an internal (ring) gear. The outline is a tooth pattern whose "teeth" are the ring's tooth SPACES: tip = ring root
+ * (pitch + 1.25m), root = ring tip (pitch − m), spaces widened by the backlash so an external gear of the same module meshes without
+ * interference.
  */
 export const internalCavityPattern = patternWith({ tip: 1.25, root: 1, backlashSign: 1 });

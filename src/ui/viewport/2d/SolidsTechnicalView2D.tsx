@@ -1,9 +1,5 @@
-/**
- * SolidsTechnicalView2D — the 3D solids in the 2D drafting view as a technical top view
- * (`technicalView`, the same projection the DXF export writes): thick visible edges, dashed hidden
- * edges (hidden by every solid, not only their own), chain centre lines and, while a downward-kept
- * horizontal section plane is active (the 3D clipping plane, axis z flipped), the hatched cut.
- */
+// 3D solids in the 2D view as one technical top view (`technicalView`, as the DXF export writes): thick visible, dashed
+// hidden (by any solid), chain centre lines, and the hatched cut while a plan section is active (z clip plane, flipped).
 
 import React, { useMemo } from 'react';
 import type { Entity, EntityId } from '@core/model/types';
@@ -16,7 +12,7 @@ import { useSectionCutDepth } from './sectionCut';
 import { DrawingPrimitives2D } from './DrawingPrimitives2D';
 import type { DrawingScale, StyledPrimitive } from './drawingGeometry';
 
-/** Line-pattern unit and hatch pitch as fractions of the solids' plan extent. */
+/** Fractions of the solids' plan extent. */
 const PATTERN_FRACTION = 1 / 240;
 const HATCH_FRACTION = 1 / 80;
 

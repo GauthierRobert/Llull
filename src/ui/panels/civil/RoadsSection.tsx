@@ -1,7 +1,4 @@
-/**
- * RoadsSection — `add_alignment` (PIs typed or taken from the selected polyline, curve radii,
- * clothoid spiral lengths, ground surface) and one AlignmentEditor per alignment.
- */
+// `add_alignment` (PIs typed or from the selected polyline, radii, spirals, ground) + one AlignmentEditor each.
 
 import React from 'react';
 import { useStore } from '@ui/store';

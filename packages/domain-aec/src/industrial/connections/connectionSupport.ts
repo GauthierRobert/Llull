@@ -87,8 +87,8 @@ export function appendConnections(
 }
 
 /**
- * Connections of `memberId` whose joint no longer exists (rafter no longer a rafter, the column
- * top / partner rafter end moved away from the rafter end) are removed.
+ * Connections of `memberId` whose joint no longer exists (rafter no longer a rafter, the column top / partner rafter end moved away from
+ * the rafter end) are removed.
  */
 export function dropStaleConnections(
   building: BuildingModel,

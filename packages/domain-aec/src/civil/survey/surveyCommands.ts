@@ -46,10 +46,9 @@ const pointInput = z.object({
 export const importSurveyPoints = defineCommand({
   name: 'import_survey_points',
   description:
-    'Import survey points (topographic survey, total station / GNSS export) as a named point group. ' +
-    'Give `text` (CSV / TXT file content, one point per line; header and # comment lines skipped) in ' +
-    '`format` PENZD (default: number, easting, northing, elevation, description), PNEZD, PENZ, PNEZ, ' +
-    'ENZ or NEZ, and/or `points` [{ x, y, z }]. Coordinates are in `sourceUnit` (default m) and are ' +
+    'Import survey points (topographic survey, total station / GNSS export) as a named point group. Give `text` (CSV / TXT file content, ' +
+    'one point per line; header and # comment lines skipped) in `format` PENZD (default: number, easting, northing, elevation, ' +
+    'description), PNEZD, PENZ, PNEZ, ENZ or NEZ, and/or `points` [{ x, y, z }]. Coordinates are in `sourceUnit` (default m) and are ' +
     'converted to the document unit. Then build a terrain with create_surface.',
   params: z.object({
     name: z.string().optional().describe('Point group name. Default "Survey <n>".'),
@@ -129,10 +128,9 @@ function surfaceSummary(doc: Parameters<typeof getCivil>[0], surface: SurfaceObj
 export const createSurface = defineCommand({
   name: 'create_surface',
   description:
-    'Build an existing-ground terrain surface (Delaunay TIN) from survey point groups and/or extra ' +
-    '[x, y, z] points, with minor and major contours (labelled with elevations in m). Optional plan ' +
-    '`boundary` clips the TIN; `maxEdgeLength` drops long hull triangles on concave sites. Defaults: ' +
-    'every point group, 1 m contour interval, every 5th contour major.',
+    'Build an existing-ground terrain surface (Delaunay TIN) from survey point groups and/or extra [x, y, z] points, with minor and ' +
+    'major contours (labelled with elevations in m). Optional plan `boundary` clips the TIN; `maxEdgeLength` drops long hull triangles ' +
+    'on concave sites. Defaults: every point group, 1 m contour interval, every 5th contour major.',
   params: z.object({
     name: z.string().optional().describe('Surface name. Default "EG <n>" (existing ground).'),
     pointGroupIds: z.array(z.string()).optional().describe('Point groups to triangulate. Default: every point group.'),

@@ -19,11 +19,6 @@ export const SIDEBAR_TAB_SPECS: readonly SidebarTabSpec[] = [
   { tab: 'mechanisms', label: 'Mechanisms', shortLabel: 'Motion', icon: 'mechanism' },
   { tab: 'parameters', label: 'Parameters', shortLabel: 'Params', icon: 'parameters' },
   { tab: 'history', label: 'History', shortLabel: 'History', icon: 'history' },
-  {
-    tab: 'configurations',
-    label: 'Configurations',
-    shortLabel: 'Variants',
-    icon: 'configurations',
-  },
+  { tab: 'configurations', label: 'Configurations', shortLabel: 'Variants', icon: 'configurations' },
   { tab: 'materials', label: 'Materials', shortLabel: 'Materials', icon: 'materials' },
 ];

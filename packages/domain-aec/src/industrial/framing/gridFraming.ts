@@ -18,10 +18,7 @@ export function gridLinesOf(building: BuildingModel): GridElement[] {
   return elementsOf(building, 'grid');
 }
 
-/**
- * Crossing of two grid segments, or null when parallel or when the crossing lies outside either
- * segment by more than `tolerance`.
- */
+/** Crossing of two grid segments, or null when parallel or when the crossing lies outside either segment by more than `tolerance`. */
 export function crossGridLines(a: GridElement, b: GridElement, tolerance: number): { point: Vec2; along: number } | null {
   const dx = a.end[0] - a.start[0];
   const dy = a.end[1] - a.start[1];

@@ -18,10 +18,9 @@ export const quantityTakeoff = defineCommand({
   name: 'quantity_takeoff',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Read-only bill of quantities of the building model, metric: wall length / net face area / volume, ' +
-    'slab area / volume, column and beam volume, stair volume, door and window counts and areas, room ' +
-    'floor area — grouped by category and material. Each line has a key like "wall.concrete.m3" used by ' +
-    'estimate_cost. data.csv is spreadsheet-ready.',
+    'Read-only bill of quantities of the building model, metric: wall length / net face area / volume, slab area / volume, column and ' +
+    'beam volume, stair volume, door and window counts and areas, room floor area — grouped by category and material. Each line has a ' +
+    'key like "wall.concrete.m3" used by estimate_cost. data.csv is spreadsheet-ready.',
   params: z.object({}),
   run: (doc): CommandResult => {
     const lines = computeTakeoff(doc);
@@ -35,10 +34,7 @@ export const quantityTakeoff = defineCommand({
     const highlights = lines
       .filter((line) => line.unit === 'm3' || line.unit === 'ea' || line.unit === 'kg')
       .map((line) => `${line.description.split(' — ')[0]}: ${line.quantity} ${UNIT_LABEL[line.unit]}`);
-    return report(doc, `Quantity takeoff (${lines.length} lines). ${highlights.join('; ')}.`, {
-      lines,
-      csv,
-    });
+    return report(doc, `Quantity takeoff (${lines.length} lines). ${highlights.join('; ')}.`, { lines, csv });
   },
 });
 
@@ -50,11 +46,10 @@ export const buildingSchedule = defineCommand({
   name: 'building_schedule',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Read-only schedule table (like Revit schedules) for one element category: wall, door, window, room, ' +
-    'slab, column, beam, stair, member (steel cut list), footing, panel, equipment, pipe (line list), tray, plate, ' +
-    'connection or support (pipe supports: mark, line, pipe, type, steel it bears on, position, hanger rod length, ' +
-    'attached / UNATTACHED) — one row per element with mark, level, dimensions, material and quantities. ' +
-    'data.csv is spreadsheet-ready.',
+    'Read-only schedule table (like Revit schedules) for one element category: wall, door, window, room, slab, column, beam, stair, ' +
+    'member (steel cut list), footing, panel, equipment, pipe (line list), tray, plate, connection or support (pipe supports: mark, ' +
+    'line, pipe, type, steel it bears on, position, hanger rod length, attached / UNATTACHED) — one row per element with mark, level, ' +
+    'dimensions, material and quantities. data.csv is spreadsheet-ready.',
   params: z.object({ kind: z.enum(SCHEDULE_KINDS).describe('Which schedule to produce.') }),
   run: (doc, { kind }): CommandResult => {
     const schedule = buildSchedule(doc, kind);
@@ -113,9 +108,8 @@ export const estimateCost = defineCommand({
   name: 'estimate_cost',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Read-only priced bill of quantities: multiplies each quantity_takeoff line by its unit rate ' +
-    '(stored rates from set_cost_rates, overridden by the rates param) and totals the estimate. Lines ' +
-    'without a rate are listed as unpriced.',
+    'Read-only priced bill of quantities: multiplies each quantity_takeoff line by its unit rate (stored rates from set_cost_rates, ' +
+    'overridden by the rates param) and totals the estimate. Lines without a rate are listed as unpriced.',
   params: z.object({
     rates: z.looseObject({}).optional().describe('Optional extra / overriding rates, same keys as set_cost_rates.'),
     currency: z.string().optional().describe('Currency label. Default: the stored currency or EUR.'),
@@ -124,10 +118,7 @@ export const estimateCost = defineCommand({
     if (rates !== undefined && !validRates(rates)) return noop(doc, 'estimate_cost failed: rates must be a map of key → number >= 0.');
     const building = getBuilding(doc);
     const resolvedCurrency = currency?.trim() || building.currency || 'EUR';
-    const priced = priceTakeoff(computeTakeoff(doc), {
-      ...(building.costRates ?? {}),
-      ...(rates ?? {}),
-    });
+    const priced = priceTakeoff(computeTakeoff(doc), { ...(building.costRates ?? {}), ...(rates ?? {}) });
     const csv = toCsv(
       ['Key', 'Description', 'Quantity', 'Unit', `Rate (${resolvedCurrency})`, `Amount (${resolvedCurrency})`],
       [

@@ -3,13 +3,7 @@
 import type { CadDocument, DocumentUnit } from './types';
 
 /** Millimetres in one document unit. */
-export const MM_PER_UNIT: Readonly<Record<DocumentUnit, number>> = {
-  mm: 1,
-  cm: 10,
-  m: 1000,
-  in: 25.4,
-  ft: 304.8,
-};
+export const MM_PER_UNIT: Readonly<Record<DocumentUnit, number>> = { mm: 1, cm: 10, m: 1000, in: 25.4, ft: 304.8 };
 
 const metresPerUnit = (units: DocumentUnit): number => MM_PER_UNIT[units] / 1000;
 

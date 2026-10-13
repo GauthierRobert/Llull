@@ -49,7 +49,6 @@ export function buildSvg(
   // faces paint on top. Strokes (2D) always draw on top; image underlays sit below everything.
   const filled = polygons.filter((p) => !p.stroke).sort((a, b) => b.depth - a.depth);
   const stroked = polygons.filter((p) => p.stroke);
-
   const hasCap = filled.some((p) => p.loops !== undefined);
   return svgDocument(
     width,
@@ -112,9 +111,8 @@ function polygonSvg(poly: Polygon3D, project: Projector): string {
   if (poly.stroke)
     return `  <polyline points="${points}" fill="none" stroke="${poly.color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`;
   const fill = shade(poly.normal, poly.color);
-  if (poly.inflate) {
+  if (poly.inflate)
     return `  <polygon points="${points}" fill="${fill}" stroke="${fill}" stroke-width="${r2(gapBridgeWidth(poly, project))}" stroke-linejoin="round"/>`;
-  }
   return `  <polygon points="${points}" fill="${fill}" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>`;
 }
 
@@ -143,12 +141,10 @@ function buildAxisTriad(project: Projector, origin: Vec3, width: number, height:
     [add3(origin, scale3([0, 0, 1], armLen)), '#4488ff', 'Z'],
   ];
   const [osx, osy] = project(origin);
-
   // Draw the triad in the bottom-left corner by offsetting screen coords.
   const triadX = 40;
   const triadY = height - 40;
   const triadScale = 30;
-
   const parts: string[] = [];
   for (const [tip, color, label] of axes) {
     const [tsx, tsy] = project(tip);

@@ -1,10 +1,11 @@
+import { idOrNext } from '../entity/explicitId';
 import type { CadDocument, Vec2, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
 import { failer } from '../noop';
 import { centroid3, distance3, dot3, sub3 } from '../../lib/vec3';
 import { newEntity } from '../entity/newEntity';
-import { DEFAULT_SOLID_COLOR, commitSolid, existingLayerOrDefault, solidStyleFields, explicitIdOrNext, explicitIdTaken } from './shared';
+import { DEFAULT_SOLID_COLOR, commitSolid, existingLayerOrDefault, solidStyleFields, explicitIdTaken } from './shared';
 import { sketchLoop } from './sketchCurves';
 import { type SectionSpec, sectionSpecFields, specPolygon } from './sectionSpecs';
 import { alignRing, resampleRing } from '../../geometry/sectionRing';
@@ -113,10 +114,8 @@ export const loftSections = defineCommand({
     if (typeof world === 'string') return fail(world);
     const origin = centroid3(world[0] as Vec3[]);
     const rings = world.map((ring) => ring.map((p) => sub3(p, origin)));
-    const id = explicitIdOrNext(explicitId, 'loft');
-    const entity = newEntity('loft', id, { rings, ruled }, origin, color, {
-      layerId: existingLayerOrDefault(doc, layerId),
-    });
+    const id = idOrNext(explicitId, 'loft');
+    const entity = newEntity('loft', id, { rings, ruled }, origin, color, { layerId: existingLayerOrDefault(doc, layerId) });
     const span = distance3(origin, centroid3(world[world.length - 1] as Vec3[]));
     return commitSolid(
       doc,

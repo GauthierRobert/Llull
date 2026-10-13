@@ -1,17 +1,13 @@
 /**
- * Frame load inputs: candidate frames of a level (rafters chained into halls), frame-average roof
- * wind coefficients and crane rail wheel loads (EN 1991-3). Lengths in mm.
+ * Frame load inputs: candidate frames of a level (rafters chained into halls), frame-average roof wind coefficients and crane rail wheel
+ * loads (EN 1991-3). Lengths in mm.
  */
 import { toDegrees } from '@lib/angle';
 import type { SteelMemberElement } from '@core/model/building';
 import { FLAT_ROOF_LIMIT, frameRoofAverage } from '../common/windCoefficients';
 import { DOWNWIND_ROOF_FACTOR, type WindCase, CRANE_FACTORS, type FrameLoads, type NodeCaseLoad, craneActions } from './frameModelTypes';
 
-interface FrameCandidate {
-  readonly y: number;
-  range: [number, number];
-  readonly rafters: SteelMemberElement[];
-}
+type FrameCandidate = { readonly y: number; range: [number, number]; readonly rafters: SteelMemberElement[] };
 
 export function frameCandidates(
   rafters: ReadonlyArray<SteelMemberElement>,
@@ -79,21 +75,12 @@ export function frameRoofWind(
   roof: FrameRoof,
   mm: (value: number) => number,
   near: (a: number, b: number) => boolean,
-): {
-  rafterEnds: (rafter: SteelMemberElement) => RafterEnds;
-  roofCpe: (rafter: SteelMemberElement, windCase: WindCase) => number;
-} {
+): { rafterEnds: (rafter: SteelMemberElement) => RafterEnds; roofCpe: (rafter: SteelMemberElement, windCase: WindCase) => number } {
   const { low, high, valleys } = roof;
   const rafterEnds = (rafter: SteelMemberElement): RafterEnds => {
     const flip = rafter.start[0] > rafter.end[0];
     const [first, second] = flip ? [rafter.end, rafter.start] : [rafter.start, rafter.end];
-    return {
-      x0: mm(first[0]),
-      z0: mm(first[2]),
-      x1: mm(second[0]),
-      z1: mm(second[2]),
-      flip,
-    };
+    return { x0: mm(first[0]), z0: mm(first[2]), x1: mm(second[0]), z1: mm(second[2]), flip };
   };
   // A monopitch rafter has no partner meeting it at its high end (no apex).
   const highEnd = (point: readonly number[], other: readonly number[]): boolean => (point[2] ?? 0) >= (other[2] ?? 0);
@@ -107,10 +94,9 @@ export function frameRoofWind(
       return mine.every((value, axis) => near(mm(value), mm(theirs[axis] ?? 0)));
     });
   /**
-   * Frame-average roof cpe,10 of a rafter for a wind case (EN 1991-1-4 via windCoefficients.ts):
-   * duopitch windward slope H, leeward I/J; monopitch H of the wind direction; flat (< 5°) roofs H on the
-   * windward half of the hall and I on the other, weighted by the rafter length in each half. Spans
-   * downwind of the windward span (Fig. 7.10, simplified) keep their suction × DOWNWIND_ROOF_FACTOR.
+   * Frame-average roof cpe,10 of a rafter for a wind case (EN 1991-1-4 via windCoefficients.ts): duopitch windward slope H, leeward I/J;
+   * monopitch H of the wind direction; flat (< 5°) roofs H on the windward half of the hall and I on the other, weighted by the rafter
+   * length in each half. Spans downwind of the windward span (Fig. 7.10, simplified) keep their suction × DOWNWIND_ROOF_FACTOR.
    */
   const roofCpe = (rafter: SteelMemberElement, windCase: WindCase): number => {
     const { x0, z0, x1, z1 } = rafterEnds(rafter);
@@ -153,13 +139,7 @@ export function craneRailLoads(rails: ReadonlyArray<CraneRail>, craneModel: Fram
     const isLeft = index % 2 === 0;
     const partner = ordered[isLeft ? index + 1 : index - 1];
     const actions = craneActions(rail.capacity, partner ? Math.abs(partner.x - rail.x) : bayWidth, craneModel);
-    nodeLoads.push({
-      node: rail.node,
-      loadCase: 'G',
-      fx: 0,
-      fy: -rail.self,
-      mz: -rail.self * rail.eccentricity,
-    });
+    nodeLoads.push({ node: rail.node, loadCase: 'G', fx: 0, fy: -rail.self, mz: -rail.self * rail.eccentricity });
     // Drive HT acts in the same direction on both rails (CL / CR = +x / −x); skewing HS is a
     // guide reaction balanced by the other rail, hence opposite directions.
     const groups = [

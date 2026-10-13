@@ -1,7 +1,4 @@
-/**
- * TerrainSection — `create_surface` (TIN + contours) from the point groups, each surface with its
- * `surface_report` statistics and a contour-interval edit (`update_surface`).
- */
+// `create_surface` (TIN + contours) from point groups; per surface its `surface_report` and contour interval (`update_surface`).
 
 import React from 'react';
 import type { SurfaceObject } from '@core/model/civil';

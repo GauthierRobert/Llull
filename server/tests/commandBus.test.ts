@@ -16,239 +16,122 @@ import { boxRowPlan } from '../../tests/helpers/boxRowPlan';
 import { applyCommand, undo, redo, canUndo, canRedo, _resetHistory } from '../src/commandBus';
 import { getLiveDoc, _resetLiveDoc, subscribeLive } from '../src/liveDocument';
 
-// Reset shared state before each test.
+const BOX = { size: [1, 1, 1], position: [0, 0, 0] };
+const BOX2 = { size: [2, 2, 2], position: [5, 0, 0] };
+const entityCount = (): number => Object.keys(getLiveDoc().entities).length;
 
 beforeEach(() => {
   _resetLiveDoc();
   _resetHistory();
 });
 
-// (a) Mutating command updates live doc + pushes undo history
-
-describe('applyCommand — mutating command', () => {
-  it('adds an entity to the live document', () => {
-    const result = applyCommand('add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-
+describe('applyCommand', () => {
+  it('a mutation adds to the live document, enables undo and accumulates', () => {
+    expect(canUndo()).toBe(false);
+    expect(canRedo()).toBe(false);
+    const result = applyCommand('add_box', BOX);
     expect(result.isError).toBe(false);
     expect(result.affected).toHaveLength(1);
-    expect(Object.keys(getLiveDoc().entities)).toHaveLength(1);
-  });
-
-  it('updates canUndo to true after a mutation', () => {
-    const result = applyCommand('add_box', { size: [1, 1, 1], position: [0, 0, 0] });
     expect(result.canUndo).toBe(true);
     expect(result.canRedo).toBe(false);
-  });
-
-  it('accumulates entities across successive calls', () => {
-    applyCommand('add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    applyCommand('add_box', { size: [2, 2, 2], position: [5, 0, 0] });
-
-    expect(Object.keys(getLiveDoc().entities)).toHaveLength(2);
+    expect(entityCount()).toBe(1);
+    applyCommand('add_box', BOX2);
+    expect(entityCount()).toBe(2);
     expect(canUndo()).toBe(true);
   });
 
-  it('broadcasts to SSE subscribers after a mutation', () => {
+  it('broadcasts a mutation as a command event, but not a query', () => {
     const fakeRes = makeFakeRes();
     const unsub = subscribeLive(fakeRes);
-
-    // Initial snapshot write (1 total).
-    expect(fakeRes.written).toHaveLength(1);
-
-    applyCommand('add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-
-    // Mutation broadcast (2 total).
+    expect(fakeRes.written).toHaveLength(1); // opening snapshot
+    applyCommand('add_box', BOX);
     expect(fakeRes.written).toHaveLength(2);
-
     const msg = fakeRes.written[1] ?? '';
     expect(parseSseFrame(msg).event).toBe('command');
     expect(parseSseFrame(msg).data['name']).toBe('add_box');
     expect(frameEntityIds(msg)).toHaveLength(1);
-
+    applyCommand('mass_properties', { entityId: Object.keys(getLiveDoc().entities)[0] ?? '' });
+    expect(fakeRes.written).toHaveLength(2);
     unsub();
   });
-});
 
-// (b) Query command — data returned, no history push, no doc change
-
-describe('applyCommand — query command (mass_properties)', () => {
-  it('returns data and leaves the live document unchanged', () => {
-    // First add a box so there is something to measure.
+  it('a query returns data without touching the document or history', () => {
     applyCommand('add_box', { size: [2, 2, 2], position: [0, 0, 0] });
-    _resetHistory(); // reset so we start clean for the query test
-
+    _resetHistory();
     const docBefore = getLiveDoc();
-    const entityIds = Object.keys(docBefore.entities);
-    expect(entityIds).toHaveLength(1);
-
-    const result = applyCommand('mass_properties', { entityId: entityIds[0] });
-
+    const result = applyCommand('mass_properties', { entityId: Object.keys(docBefore.entities)[0] });
     expect(result.isError).toBe(false);
     expect(result.data).toBeDefined();
-    // Document reference must be identical — no mutation.
     expect(getLiveDoc()).toBe(docBefore);
-    // History was not pushed — canUndo is still false after reset.
     expect(result.canUndo).toBe(false);
   });
 
-  it('does not broadcast to SSE subscribers for a query', () => {
-    applyCommand('add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    const entityId = Object.keys(getLiveDoc().entities)[0] ?? '';
-
-    const fakeRes = makeFakeRes();
-    const unsub = subscribeLive(fakeRes);
-    const writeCountBefore = fakeRes.written.length;
-
-    applyCommand('mass_properties', { entityId });
-
-    // No additional write after the query.
-    expect(fakeRes.written).toHaveLength(writeCountBefore);
-
-    unsub();
-  });
-});
-
-// (c) No-op — graceful bad params, no history push
-
-describe('applyCommand — no-op (bad params)', () => {
-  it('does not push history when the document is unchanged', () => {
-    // delete_entities with a non-existent id is a graceful no-op.
+  it('a graceful no-op pushes no history', () => {
     const result = applyCommand('delete_entities', { ids: ['nonexistent-id'] });
-
     expect(result.isError).toBe(false);
-    expect(getLiveDoc()).toBeDefined();
-    // No history pushed — canUndo remains false.
-    expect(result.canUndo).toBe(false);
-  });
-});
-
-// (d) Unknown command → isError true
-
-describe('applyCommand — unknown command', () => {
-  it('returns isError true and leaves the doc unchanged', () => {
-    const docBefore = getLiveDoc();
-    const result = applyCommand('totally_unknown_command', {});
-
-    expect(result.isError).toBe(true);
-    expect(getLiveDoc()).toBe(docBefore);
     expect(result.canUndo).toBe(false);
   });
 
-  it('returns isError true when execute rejects schema-invalid params', () => {
+  it.each([
+    ['totally_unknown_command', {}, /./],
+    ['add_box', { size: 'big' }, /rejected: invalid params/],
+  ])('%s %j is an error and leaves the doc unchanged', (name, params, summary) => {
     const docBefore = getLiveDoc();
-    const result = applyCommand('add_box', { size: 'big' });
-
+    const result = applyCommand(name, params);
     expect(result.isError).toBe(true);
-    expect(result.summary).toMatch(/rejected: invalid params/);
+    expect(result.summary).toMatch(summary);
     expect(getLiveDoc()).toBe(docBefore);
+    expect(result.canUndo).toBe(false);
   });
 });
-
-// (e) undo / redo
 
 describe('undo / redo', () => {
-  it('undo with empty stack returns "Nothing to undo." without error', () => {
-    const result = undo();
+  it.each([
+    [undo, 'Nothing to undo.'],
+    [redo, 'Nothing to redo.'],
+  ])('an empty stack is a normal result: %#', (travel, summary) => {
+    const result = travel();
     expect(result.isError).toBe(false);
-    expect(result.summary).toBe('Nothing to undo.');
+    expect(result.summary).toBe(summary);
     expect(result.canUndo).toBe(false);
-  });
-
-  it('redo with empty stack returns "Nothing to redo." without error', () => {
-    const result = redo();
-    expect(result.isError).toBe(false);
-    expect(result.summary).toBe('Nothing to redo.');
     expect(result.canRedo).toBe(false);
   });
 
-  it('undo reverts the last mutation', () => {
-    applyCommand('add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    expect(Object.keys(getLiveDoc().entities)).toHaveLength(1);
-
-    const undoResult = undo();
-    expect(undoResult.summary).toBe('Undid last change.');
-    expect(undoResult.canRedo).toBe(true);
-    expect(Object.keys(getLiveDoc().entities)).toHaveLength(0);
+  it('undo reverts, redo re-applies, and flags follow the stacks', () => {
+    applyCommand('add_box', BOX);
+    applyCommand('add_box', BOX2);
+    const u1 = undo();
+    expect(u1.summary).toBe('Undid last change.');
+    expect([u1.canUndo, u1.canRedo]).toEqual([true, true]);
+    expect(entityCount()).toBe(1);
+    const u2 = undo();
+    expect([u2.canUndo, u2.canRedo]).toEqual([false, true]);
+    expect(entityCount()).toBe(0);
+    const r1 = redo();
+    expect(r1.summary).toBe('Redid last change.');
+    expect([r1.canUndo, r1.canRedo]).toEqual([true, true]);
+    expect(entityCount()).toBe(1);
   });
 
-  it('redo re-applies the undone mutation', () => {
-    applyCommand('add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    undo();
-    expect(Object.keys(getLiveDoc().entities)).toHaveLength(0);
-
-    const redoResult = redo();
-    expect(redoResult.summary).toBe('Redid last change.');
-    expect(redoResult.canUndo).toBe(true);
-    expect(Object.keys(getLiveDoc().entities)).toHaveLength(1);
-  });
-
-  it('redo stack is cleared after a new mutation', () => {
-    applyCommand('add_box', { size: [1, 1, 1], position: [0, 0, 0] });
+  it('a new mutation clears redo', () => {
+    applyCommand('add_box', BOX);
     undo();
     expect(canRedo()).toBe(true);
-
-    // New mutation clears redo.
-    applyCommand('add_box', { size: [2, 2, 2], position: [5, 0, 0] });
+    applyCommand('add_box', BOX2);
     expect(canRedo()).toBe(false);
   });
 
-  it('undo/redo update canUndo/canRedo correctly through a sequence', () => {
-    // 2 mutations.
-    applyCommand('add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    applyCommand('add_box', { size: [2, 2, 2], position: [5, 0, 0] });
-    expect(canUndo()).toBe(true);
-    expect(canRedo()).toBe(false);
-
-    // Undo once.
-    const u1 = undo();
-    expect(u1.canUndo).toBe(true); // still 1 step left
-    expect(u1.canRedo).toBe(true);
-
-    // Undo again.
-    const u2 = undo();
-    expect(u2.canUndo).toBe(false); // stack empty
-    expect(u2.canRedo).toBe(true);
-
-    // Redo once.
-    const r1 = redo();
-    expect(r1.canUndo).toBe(true);
-    expect(r1.canRedo).toBe(true);
-  });
-
-  it('undo broadcasts the restored document to SSE subscribers', () => {
-    applyCommand('add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-
+  it('undo broadcasts the restored document as a snapshot', () => {
+    applyCommand('add_box', BOX);
     const fakeRes = makeFakeRes();
     const unsub = subscribeLive(fakeRes);
     const writesBefore = fakeRes.written.length;
-
     undo();
-
-    // Undo should broadcast (1 extra write).
     expect(fakeRes.written).toHaveLength(writesBefore + 1);
-
-    const msg = fakeRes.written[fakeRes.written.length - 1] ?? '';
-    // Undo reverted the add_box → full snapshot with 0 entities.
+    const msg = fakeRes.written.at(-1) ?? '';
     expect(parseSseFrame(msg).event).toBe('snapshot');
     expect(frameEntityIds(msg)).toHaveLength(0);
-
     unsub();
-  });
-});
-
-// (f) canUndo / canRedo module-level helpers
-
-describe('canUndo / canRedo', () => {
-  it('start false on a clean state', () => {
-    expect(canUndo()).toBe(false);
-    expect(canRedo()).toBe(false);
-  });
-
-  it('canUndo becomes true after a mutation, false after undo to bottom', () => {
-    applyCommand('add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    expect(canUndo()).toBe(true);
-    undo();
-    expect(canUndo()).toBe(false);
   });
 });
 
@@ -286,9 +169,7 @@ describe('applyCommand — idempotent commandId', () => {
 
   it('the cache is a bounded LRU: the oldest id is evicted after 1000 entries', () => {
     applyCommand('add_box', { size: [1, 1, 1] }, 'first');
-    for (let index = 0; index < 1000; index++) {
-      applyCommand('add_box', { size: [1, 1, index + 2] }, `q-${index}`);
-    }
+    for (let index = 0; index < 1000; index++) applyCommand('add_box', { size: [1, 1, index + 2] }, `q-${index}`);
     const before = getLiveDoc().order.length;
     applyCommand('add_box', { size: [1, 1, 1] }, 'first'); // evicted -> applies again
     expect(getLiveDoc().order.length).toBe(before + 1);
@@ -296,9 +177,7 @@ describe('applyCommand — idempotent commandId', () => {
 
   it('a recently used id survives eviction', () => {
     applyCommand('add_box', { size: [1, 1, 1] }, 'keep');
-    for (let index = 0; index < 998; index++) {
-      applyCommand('mass_properties', { id: 'none' }, `f-${index}`);
-    }
+    for (let index = 0; index < 998; index++) applyCommand('mass_properties', { id: 'none' }, `f-${index}`);
     applyCommand('add_box', { size: [1, 1, 1] }, 'keep'); // refresh LRU position
     applyCommand('mass_properties', { id: 'none' }, 'push-1');
     applyCommand('mass_properties', { id: 'none' }, 'push-2');

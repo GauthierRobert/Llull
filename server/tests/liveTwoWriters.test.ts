@@ -53,11 +53,7 @@ function replay(follower: Follower): { document: CadDocument; seq: number; comma
 const writer = (name: string, index: number, commandId: string): request.Test =>
   request(app)
     .post('/command')
-    .send({
-      name: 'add_box',
-      params: { size: [1, 1, 1], position: [index, name === 'a' ? 0 : 5, 0] },
-      commandId,
-    });
+    .send({ name: 'add_box', params: { size: [1, 1, 1], position: [index, name === 'a' ? 0 : 5, 0] }, commandId });
 
 describe('two concurrent writers', () => {
   beforeEach(() => {

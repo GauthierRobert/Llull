@@ -28,9 +28,7 @@ export function craneWallForce(
   travelSpeed: number,
   bufferStiffness: number,
 ): CraneWallForce {
-  const actions = craneActions(capacityTonnes, spanMm, {
-    ...(craneSelfWeight !== undefined ? { craneSelfWeight } : {}),
-  });
+  const actions = craneActions(capacityTonnes, spanMm, { ...(craneSelfWeight !== undefined ? { craneSelfWeight } : {}) });
   const driveGroup1 = (GAMMA_CRANE * actions.group1.longitudinal) / 1000;
   const bufferGroup7 = (GAMMA_BUFFER * bufferForce(actions.selfWeight, travelSpeed, bufferStiffness)) / CRANE_FACTORS.rails / 1000;
   return {
@@ -83,12 +81,7 @@ export interface BracingRow {
 
 export type Point = readonly [number, number, number];
 
-export interface Located {
-  readonly member: SteelMemberElement;
-  readonly profile: SteelProfile;
-  readonly start: Point;
-  readonly end: Point;
-}
+export type Located = { readonly member: SteelMemberElement; readonly profile: SteelProfile; readonly start: Point; readonly end: Point };
 
 export const near = (a: number, b: number): boolean => Math.abs(a - b) <= TOLERANCE;
 
@@ -107,9 +100,4 @@ export function bucklingResistance(profile: SteelProfile, fy: number, length: nu
   return bucklingReduction(Math.sqrt(npl / critical), minorImperfection(profile)) * npl;
 }
 
-export interface Panel {
-  readonly group: string;
-  readonly roof: boolean;
-  readonly bay: string;
-  readonly braces: Located[];
-}
+export type Panel = { readonly group: string; readonly roof: boolean; readonly bay: string; readonly braces: Located[] };

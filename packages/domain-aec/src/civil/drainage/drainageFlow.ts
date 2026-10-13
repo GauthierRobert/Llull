@@ -1,7 +1,6 @@
 /**
- * Modified rational method down the pipe DAG: time of concentration (entry time + travel times),
- * IDF intensity at that time, accumulated C*A and point inflow. A manhole with several outgoing
- * pipes splits its accumulated flow by full-bore capacity share.
+ * Modified rational method down the pipe DAG: time of concentration (entry time + travel times), IDF intensity at that time, accumulated
+ * C*A and point inflow. A manhole with several outgoing pipes splits its accumulated flow by full-bore capacity share.
  */
 
 import type { CadDocument } from '@core/model/types';
@@ -62,9 +61,7 @@ export function computeFlows(doc: CadDocument, civil: CivilModel, criteria: Drai
       if (!upstream) continue;
       sumCA += upstream.sumCAHa;
       inflow += upstream.inflowLps;
-      if (upstream.sumCAHa > 0 || upstream.inflowLps > 0) {
-        tc = Math.max(tc, upstream.tcMin + upstream.travelMin);
-      }
+      if (upstream.sumCAHa > 0 || upstream.inflowLps > 0) tc = Math.max(tc, upstream.tcMin + upstream.travelMin);
     }
     const outgoing = pipes.filter((p) => p.fromId === manhole.id);
     if (outgoing.length > 1) diverging.push(manhole.id);

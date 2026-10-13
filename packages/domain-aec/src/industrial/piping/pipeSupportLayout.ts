@@ -1,6 +1,6 @@
 /**
- * Pipes as absolute mm routes with their supports: arc-length stations along the centreline and
- * the ends carried by equipment nozzles or other pipes. Shared by the support loads and the span check.
+ * Pipes as absolute mm routes with their supports: arc-length stations along the centreline and the ends carried by equipment nozzles or
+ * other pipes. Shared by the support loads and the span check.
  */
 
 import type { PipeElement, PipeSupportElement } from '@core/model/building';
@@ -47,12 +47,7 @@ export function absolutePointMm(units: ModelUnits, levelId: string, point: Vec3)
 /** Absolute mm route of a pipe element. */
 export function pipeRunOf(units: ModelUnits, element: PipeElement): PipeRun {
   const points = element.points.map((point) => absolutePointMm(units, element.levelId, point));
-  return {
-    element,
-    points,
-    diameterMm: units.toMm(element.diameter),
-    lengthMm: arcLengths(points).at(-1) ?? 0,
-  };
+  return { element, points, diameterMm: units.toMm(element.diameter), lengthMm: arcLengths(points).at(-1) ?? 0 };
 }
 
 /** Every pipe of the building, in model order. */
@@ -117,8 +112,8 @@ function insideEquipment(units: ModelUnits, point: Vec3): boolean {
 }
 
 /**
- * What carries each end of `run`: equipment whose footprint contains the end point (a nozzle), else
- * a different pipe whose centreline passes within the larger outside diameter (a branch on a header).
+ * What carries each end of `run`: equipment whose footprint contains the end point (a nozzle), else a different pipe whose centreline
+ * passes within the larger outside diameter (a branch on a header).
  */
 export function endCarriers(units: ModelUnits, run: PipeRun, runs: ReadonlyArray<PipeRun>): [EndCarrier | null, EndCarrier | null] {
   const carrier = (point: Vec3 | undefined): EndCarrier | null => {
@@ -135,8 +130,8 @@ export function endCarriers(units: ModelUnits, run: PipeRun, runs: ReadonlyArray
 }
 
 /**
- * True when both ends of `run` are carried (equipment nozzle / header) and its span length — risers
- * not counted — is within the table span of its size: it needs no support of its own.
+ * True when both ends of `run` are carried (equipment nozzle / header) and its span length — risers not counted — is within the table span
+ * of its size: it needs no support of its own.
  */
 export function carriedByEnds(units: ModelUnits, run: PipeRun): boolean {
   const [start, end] = endCarriers(units, run, pipeRunsOf(units));

@@ -1,6 +1,6 @@
 /**
- * Public API of the AEC domain package: the plugins the composition root installs
- * (`src/app/plugins.ts`) and the helpers the UI renders with.
+ * Public API of the AEC domain package: the plugins the composition root installs (`src/app/plugins.ts`) and the helpers the UI renders
+ * with.
  */
 
 export { buildingPlugin } from './building/plugin';

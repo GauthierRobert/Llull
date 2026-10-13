@@ -1,6 +1,6 @@
 /**
- * Python call-expression fragments shared by the CadQuery/build123d and FreeCAD emitters, whose
- * runtimes expose the same helper signatures (`box(size, position=…, rotation=…)`, …).
+ * Python call-expression fragments shared by the CadQuery/build123d and FreeCAD emitters, whose runtimes expose the same helper signatures
+ * (`box(size, position=…, rotation=…)`, …).
  */
 
 import type { Feature, FeatureProgram, ShapeSpec, Term, Term2, Term3 } from './program';

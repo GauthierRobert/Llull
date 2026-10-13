@@ -1,6 +1,6 @@
 /**
- * DSTV NC1 export: one numerical-control file per steel piece (members, base plates, connection
- * end plates) for CNC saw / drill / profile-cutting lines. All lengths are millimetres.
+ * DSTV NC1 export: one numerical-control file per steel piece (members, base plates, connection end plates) for CNC saw / drill /
+ * profile-cutting lines. All lengths are millimetres.
  */
 
 import type { BasePlateElement, MomentConnectionElement, SteelMemberElement } from '@core/model/building';
@@ -25,22 +25,11 @@ import {
   outlineMean,
 } from './ncMemberPieces';
 
-export interface NcExport {
-  readonly files: NcFile[];
-  readonly count: number;
-}
+export type NcExport = { readonly files: NcFile[]; readonly count: number };
 
 function platePiece(
   doc: CadDocument,
-  parts: {
-    mark: string;
-    grade: string;
-    length: number;
-    width: number;
-    thickness: number;
-    holes: ReadonlyArray<NcHole>;
-    sourceId: string;
-  },
+  parts: { mark: string; grade: string; length: number; width: number; thickness: number; holes: ReadonlyArray<NcHole>; sourceId: string },
 ): NcPiece {
   const [length, width, thickness] = [round(toMm(doc, parts.length)), round(toMm(doc, parts.width)), round(toMm(doc, parts.thickness))];
   return {
@@ -135,13 +124,11 @@ export const exportNcFiles = defineCommand({
   name: 'export_nc_files',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Export DSTV NC1 numerical-control files (one per distinct piece) for CNC saw-drill-cutting lines. ' +
-    'Steel members get an ST header (profile, code letter I/U/M/RO/L, length, section sizes, mass, ' +
-    'painted surface, cut angles; rafters are cut to the roof pitch) and a BO block for bolt holes ' +
-    'where the model has them (column flange holes at eaves moment connections). Base plates and ' +
-    'connection end plates become separate code-B files with an AK contour and BO holes. Identical ' +
-    'pieces are grouped into one file with a quantity. All numbers are millimetres whatever the ' +
-    'document unit. data.files[].content holds each NC1 file text.',
+    'Export DSTV NC1 numerical-control files (one per distinct piece) for CNC saw-drill-cutting lines. Steel members get an ST header ' +
+    '(profile, code letter I/U/M/RO/L, length, section sizes, mass, painted surface, cut angles; rafters are cut to the roof pitch) and ' +
+    'a BO block for bolt holes where the model has them (column flange holes at eaves moment connections). Base plates and connection ' +
+    'end plates become separate code-B files with an AK contour and BO holes. Identical pieces are grouped into one file with a ' +
+    'quantity. All numbers are millimetres whatever the document unit. data.files[].content holds each NC1 file text.',
   params: z.object({
     memberIds: z
       .array(z.string())
@@ -172,13 +159,7 @@ export const exportNcFiles = defineCommand({
       const profile = findProfile(element.profile);
       const frame = sweepFrame(element.start, element.end, element.roll);
       if (!profile || !frame) continue;
-      pieces.push(
-        memberPiece(doc, element, profile, frame, {
-          connections: allConnections,
-          members: allMembers,
-          levels: building.levels,
-        }),
-      );
+      pieces.push(memberPiece(doc, element, profile, frame, { connections: allConnections, members: allMembers, levels: building.levels }));
     }
     if (pieces.length === 0) {
       return noop(

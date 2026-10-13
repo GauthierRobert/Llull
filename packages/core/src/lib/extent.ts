@@ -1,8 +1,8 @@
 /** Axis-aligned extent of flat component tuples. */
 
 /**
- * Component-wise min/max of `values` read as consecutive `components`-tuples (a trailing partial
- * tuple is ignored). With no whole tuple, min is `Infinity` and max `-Infinity` on every axis.
+ * Component-wise min/max of `values` read as consecutive `components`-tuples (a trailing partial tuple is ignored). With no whole tuple,
+ * min is `Infinity` and max `-Infinity` on every axis.
  */
 export function tupleExtent(values: ArrayLike<number>, components: number): { min: number[]; max: number[] } {
   const min = Array.from({ length: components }, () => Infinity);

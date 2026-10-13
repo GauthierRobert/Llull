@@ -7,7 +7,6 @@ export function flattenPoints(points: ReadonlyArray<Vec2>, z = 0): number[] {
   return points.flatMap(([x, y]) => [x, y, z]);
 }
 
-/** BufferGeometry whose `position` attribute is the given flat xyz list. */
 export function positionsGeometry(positions: ArrayLike<number>): THREE.BufferGeometry {
   return new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(Float32Array.from(positions), 3));
 }
@@ -59,10 +58,7 @@ export function ellipseOutline(cx: number, cy: number, radiusX: number, radiusY:
   return Array.from({ length: segments }, (_, index) => [vertex(index), vertex(index + 1)]).flat();
 }
 
-/**
- * Geometry for `vertices` (on plane `z`) stored relative to the first vertex, plus the anchor to
- * apply as the object's position — float32-safe far from the origin (see `rebaseToAnchor`).
- */
+/** Geometry relative to the first vertex + the anchor to use as the object position (see `rebaseToAnchor`). */
 export function anchoredGeometry(
   vertices: ReadonlyArray<Vec2>,
   z = 0,
@@ -72,11 +68,8 @@ export function anchoredGeometry(
 }
 
 /**
- * Vertices re-expressed relative to the first vertex's XY. GPU vertex attributes are float32
- * (about 0.06 units of resolution at 1e6); the anchor is added back on the CPU in float64 through
- * the object transform, so geometry far from the origin keeps its full precision.
- *
- * @invariant local[i] + anchor reproduces positions[i] (x, y); z is unchanged
+ * Vertices relative to the first vertex's XY: GPU attributes are float32 (~0.06 units at 1e6), the anchor is re-added
+ * in float64 by the object transform. @invariant local[i] + anchor reproduces positions[i] (x, y); z unchanged
  */
 export function rebaseToAnchor(positions: ReadonlyArray<number>): {
   anchor: [number, number, number];

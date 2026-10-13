@@ -11,62 +11,11 @@ import path from 'node:path';
 import request from 'supertest';
 import type { Express } from 'express';
 
-const DXF = [
-  '0',
-  'SECTION',
-  '2',
-  'ENTITIES',
-  '0',
-  'LINE',
-  '8',
-  'WALLS',
-  '10',
-  '0',
-  '20',
-  '0',
-  '30',
-  '0',
-  '11',
-  '5',
-  '21',
-  '0',
-  '31',
-  '0',
-  '0',
-  'POINT',
-  '8',
-  'TOPO',
-  '10',
-  '1',
-  '20',
-  '1',
-  '30',
-  '12.5',
-  '0',
-  'POINT',
-  '8',
-  'TOPO',
-  '10',
-  '2',
-  '20',
-  '1',
-  '30',
-  '13.5',
-  '0',
-  'POINT',
-  '8',
-  'TOPO',
-  '10',
-  '1',
-  '20',
-  '2',
-  '30',
-  '14.5',
-  '0',
-  'ENDSEC',
-  '0',
-  'EOF',
-].join('\n');
+const DXF =
+  '0 SECTION 2 ENTITIES 0 LINE 8 WALLS 10 0 20 0 30 0 11 5 21 0 31 0 0 POINT 8 TOPO 10 1 20 1 30 12.5 0 POINT 8 TOPO 10 2 20 1 30 13.5 0 POINT 8 TOPO 10 1 20 2 30 14.5 0 ENDSEC 0 EOF'.replaceAll(
+    ' ',
+    '\n',
+  );
 
 const DWG = Buffer.concat([Buffer.from('AC1032'), Buffer.alloc(64)]);
 
@@ -105,9 +54,7 @@ beforeAll(async () => {
     `#!/usr/bin/env node\nconst fs = require('fs');\nconst out = process.argv[process.argv.indexOf('-o') + 1];\nfs.writeFileSync(out, ${JSON.stringify(DXF)});\n`,
     { mode: 0o755 },
   );
-  await writeFile(slowScript, '#!/usr/bin/env node\nsetTimeout(() => {}, 30000);\n', {
-    mode: 0o755,
-  });
+  await writeFile(slowScript, '#!/usr/bin/env node\nsetTimeout(() => {}, 30000);\n', { mode: 0o755 });
 }, 60_000);
 
 afterAll(async () => {

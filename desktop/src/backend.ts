@@ -1,10 +1,7 @@
 /**
- * Lifecycle of the local backend process: pick a port (stable across launches, so the web app's
- * origin — and its localStorage preferences — stay the same), start the server bundle in its own
- * process, wait for `/health`, stop it on quit. The process launcher is injected: Electron's
- * `utilityProcess.fork` in the app, `child_process.fork` in tests.
+ * Local backend lifecycle: a port stable across launches (same origin -> same localStorage), start the server bundle,
+ * wait for `/health`, stop on quit. The launcher is injected (`utilityProcess.fork` / `child_process.fork` in tests).
  */
-
 import fs from 'fs';
 import net from 'net';
 import path from 'path';
@@ -41,9 +38,7 @@ function anyFreePort(): Promise<number> {
   });
 }
 
-function settingsPath(userDataDir: string): string {
-  return path.join(userDataDir, 'desktop-settings.json');
-}
+const settingsPath = (userDataDir: string): string => path.join(userDataDir, 'desktop-settings.json');
 
 function rememberedPort(userDataDir: string): number | null {
   const parsed = readJsonFile(settingsPath(userDataDir));
@@ -62,7 +57,7 @@ export async function chooseBackendPort(userDataDir: string): Promise<number> {
   return port;
 }
 
-/** The part of a child process the lifecycle needs (Electron UtilityProcess and ChildProcess both fit). */
+/** Fits Electron UtilityProcess and ChildProcess. */
 interface BackendProcess {
   kill(): boolean;
   once(event: 'exit', listener: (code: number | null) => void): unknown;
@@ -72,7 +67,7 @@ export type ForkBackend = (entry: string, env: Record<string, string>) => Backen
 
 export interface RunningBackend {
   readonly url: string;
-  /** Resolves once the process has exited (it is killed after a grace period). */
+  /** Resolves once the process exited (killed after a grace period). */
   stop(): Promise<void>;
 }
 
@@ -87,10 +82,7 @@ async function waitForHealth(url: string, exited: () => string | null): Promise<
   }
 }
 
-/**
- * Start the backend and resolve once `/health` answers.
- * @failure the process exits or never answers -> rejects (the process is killed)
- */
+/** Resolves once `/health` answers. @failure exits or never answers -> rejects (process killed) */
 export async function startBackend(fork: ForkBackend, entry: string, env: Record<string, string>, url: string): Promise<RunningBackend> {
   if (!fs.existsSync(entry)) throw new Error(`backend bundle missing: ${entry} (run npm run build in desktop/)`);
   const child = fork(entry, env);

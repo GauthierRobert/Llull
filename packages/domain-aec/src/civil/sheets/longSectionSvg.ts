@@ -1,6 +1,6 @@
 /**
- * Long-section (profile) drawing as SVG: ground line, design line with PVIs, vertical curves and
- * grades, a station axis and a station / ground / design / cut-fill table band.
+ * Long-section (profile) drawing as SVG: ground line, design line with PVIs, vertical curves and grades, a station axis and a station /
+ * ground / design / cut-fill table band.
  */
 
 import type { CadDocument } from '@core/model/types';

@@ -1,4 +1,4 @@
-/** solids (cylinder and sphere use disc/pole points), then grid fallback. */
+// 3D gizmo snapping: AABB corners / edge midpoints / face centres of solids (cylinder: disc + rim points, sphere: poles), then grid.
 
 import { type Entity, type CadDocument, is3D } from '@core/model/types';
 import { rotatedEntityBounds } from '@core/geometry/rotatedBounds';
@@ -8,7 +8,6 @@ import { nearestSnap } from '../nearestSnap';
 export type Snap3DType = 'vertex' | 'edge' | 'face-center' | 'grid' | 'none';
 
 export interface SnapPoint3D {
-  /** World-space position. */
   readonly x: number;
   readonly y: number;
   readonly z: number;
@@ -16,27 +15,18 @@ export interface SnapPoint3D {
 }
 
 interface SnapResult3D {
-  /** The snapped world position. */
   readonly x: number;
   readonly y: number;
   readonly z: number;
-  /** Which snap type was used. 'none' means raw cursor position was returned. */
+  /** 'none' = raw cursor returned. */
   readonly type: Snap3DType;
-  /** True when a snap (geometric or grid) was applied. */
   readonly snapped: boolean;
 }
 
-const SNAP3D_PRIORITY: Record<Snap3DType, number> = {
-  vertex: 0,
-  edge: 1,
-  'face-center': 2,
-  grid: 3,
-  none: 4,
-};
+const SNAP3D_PRIORITY: Record<Snap3DType, number> = { vertex: 0, edge: 1, 'face-center': 2, grid: 3, none: 4 };
 
 type Triple = readonly [number, number, number];
 
-/** World-space axis-aligned bounds. */
 interface AABB {
   readonly min: Triple;
   readonly max: Triple;
@@ -44,9 +34,7 @@ interface AABB {
 
 /** World AABB (rotation applied) of a 3D solid; null for non-solids. */
 function entityAABB(entity: Entity): AABB | null {
-  if (!is3D(entity)) return null;
-  const { min, max } = rotatedEntityBounds(entity);
-  return { min, max };
+  return is3D(entity) ? rotatedEntityBounds(entity) : null;
 }
 
 /** The 8 corners (x varies fastest), 6 face centres and 12 edge midpoints of an AABB. */
@@ -87,7 +75,7 @@ function worldPoints(entity: Entity, offsets: ReadonlyArray<Triple>): SnapPoint3
   });
 }
 
-/** Cylinder (axis +Z, centred on position): both disc centres plus 8 rim points on each disc. */
+/** Axis +Z, centred on position: both disc centres + 8 rim points per disc. */
 function cylinderSnapPoints(entity: Entity & { kind: 'cylinder' }): SnapPoint3D[] {
   const { radius, height } = entity;
   const half = height / 2;
@@ -104,7 +92,7 @@ function cylinderSnapPoints(entity: Entity & { kind: 'cylinder' }): SnapPoint3D[
   return worldPoints(entity, offsets);
 }
 
-/** Sphere: centre plus 6 axis-aligned poles, all 'vertex'. */
+/** Centre + 6 axis poles. */
 function sphereSnapPoints(entity: Entity & { kind: 'sphere' }): SnapPoint3D[] {
   const r = entity.radius;
   return worldPoints(entity, [
@@ -118,49 +106,24 @@ function sphereSnapPoints(entity: Entity & { kind: 'sphere' }): SnapPoint3D[] {
   ]);
 }
 
-/**
- * Derive all 3D snap candidate points from solid entities in a document.
- * Returns world-space 3D snap points for all 3D entities except the one
- * being dragged (identified by `excludeId`).
- *
- * @invariant Returns [] when document has no 3D entities (or only the excluded one).
- */
+/** World snap points of every 3D entity except `excludeId`. */
 export function collectSnapCandidates3D(document: CadDocument, excludeId: string | undefined): SnapPoint3D[] {
   const candidates: SnapPoint3D[] = [];
-
   for (const id of document.order) {
-    if (id === excludeId) continue;
-    const entity = document.entities[id];
+    const entity = id === excludeId ? undefined : document.entities[id];
     if (!entity || !is3D(entity)) continue;
-
-    if (entity.kind === 'cylinder') {
-      candidates.push(...cylinderSnapPoints(entity));
-      continue;
+    if (entity.kind === 'cylinder') candidates.push(...cylinderSnapPoints(entity));
+    else if (entity.kind === 'sphere') candidates.push(...sphereSnapPoints(entity));
+    else {
+      const bb = entityAABB(entity);
+      if (bb) candidates.push(...aabbSnapPoints(bb));
     }
-
-    if (entity.kind === 'sphere') {
-      candidates.push(...sphereSnapPoints(entity));
-      continue;
-    }
-
-    const bb = entityAABB(entity);
-    if (bb) candidates.push(...aabbSnapPoints(bb));
   }
 
   return candidates;
 }
 
-/**
- * Find the best 3D snap for a candidate world position.
- *
- * Priority: vertex > edge > face-center > grid.
- * When multiple candidates share the minimum distance, lower-priority type is beaten.
- * Falls back to the nearest grid point (rounded to gridStep on all axes) when no
- * geometric candidate is within tolerance. When gridStep <= 0 and no geometric snap
- * is found, returns the raw candidate position with type 'none'.
- *
- * @invariant Does not mutate the candidates array or the candidate positions.
- */
+/** Nearest candidate within tolerance (ties: vertex > edge > face-center), else the grid point, else 'none' (gridStep <= 0). */
 export function snap3d(
   candidateX: number,
   candidateY: number,
@@ -178,12 +141,9 @@ export function snap3d(
 
   if (best !== null) return { x: best.x, y: best.y, z: best.z, type: best.type, snapped: true };
 
-  // Grid fallback.
   if (gridStep > 0) {
-    const gx = Math.round(candidateX / gridStep) * gridStep;
-    const gy = Math.round(candidateY / gridStep) * gridStep;
-    const gz = Math.round(candidateZ / gridStep) * gridStep;
-    return { x: gx, y: gy, z: gz, type: 'grid', snapped: true };
+    const round = (v: number): number => Math.round(v / gridStep) * gridStep;
+    return { x: round(candidateX), y: round(candidateY), z: round(candidateZ), type: 'grid', snapped: true };
   }
 
   return { x: candidateX, y: candidateY, z: candidateZ, type: 'none', snapped: false };

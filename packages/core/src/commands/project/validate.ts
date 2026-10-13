@@ -1,8 +1,7 @@
 /**
- * `build_project` dry run (`validate: true`): structure, command names, required params, alias
- * refs, `=expr` evaluation and loop expansion, with issues located by path
- * (`step 4 › iter 2 › step 1`). Nothing executes; `set_parameter` actions are tracked so later
- * expressions and loop counts that read them evaluate.
+ * `build_project` dry run (`validate: true`): structure, command names, required params, alias refs, `=expr` evaluation and loop expansion,
+ * with issues located by path (`step 4 › iter 2 › step 1`). Nothing executes; `set_parameter` actions are tracked so later expressions and
+ * loop counts that read them evaluate.
  */
 
 import type { CadDocument } from '../../model/types';
@@ -108,29 +107,20 @@ function validateItems(
   items.forEach((raw, j) => {
     if (state.issues.length >= MAX_ISSUES) return;
     const label = nested ? `${parent} › step ${j}` : `step ${j}`;
-    if (isLoopNode(raw)) {
-      validateLoop(state, label, raw, vars);
-    } else if (isRepeatStep(raw) || isForEachStep(raw)) {
-      if (nested) {
-        state.issues.push(`${label}: a repeat/for_each with "step" cannot be nested; write { repeat, actions: [...] }`);
-      } else {
+    if (isLoopNode(raw)) validateLoop(state, label, raw, vars);
+    else if (isRepeatStep(raw) || isForEachStep(raw)) {
+      if (nested) state.issues.push(`${label}: a repeat/for_each with "step" cannot be nested; write { repeat, actions: [...] }`);
+      else {
         // Legacy single-step loops: inner expressions are validated at run time.
         state.defined.add(isRepeatStep(raw) ? (raw.repeat.as ?? '') : raw.for_each.as);
       }
-    } else {
-      validateAction(state, label, raw, vars);
-    }
+    } else validateAction(state, label, raw, vars);
   });
 }
 
 /** Static plan check with no side effects. @pure */
 export function validatePlan(doc: CadDocument, actions: ActionItem[]): CommandResult {
-  const state: Validation = {
-    issues: [],
-    defined: new Set<string>(),
-    parameters: parameterValues(doc.parameters),
-    loopIterations: 0,
-  };
+  const state: Validation = { issues: [], defined: new Set<string>(), parameters: parameterValues(doc.parameters), loopIterations: 0 };
   validateItems(state, actions, '', {}, false);
   const issues =
     state.issues.length >= MAX_ISSUES ? [...state.issues, `… further issues omitted (stopped at ${MAX_ISSUES})`] : state.issues;

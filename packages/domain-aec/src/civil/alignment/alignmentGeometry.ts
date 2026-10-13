@@ -1,6 +1,6 @@
 /**
- * Horizontal alignment geometry: tangents through PIs joined by simple circular curves.
- * All lengths and stations are in document units; angles in radians (0 = +X, counter-clockwise).
+ * Horizontal alignment geometry: tangents through PIs joined by simple circular curves. All lengths and stations are in document units;
+ * angles in radians (0 = +X, counter-clockwise).
  */
 
 import { clamp } from '@lib/clamp';
@@ -139,9 +139,8 @@ function spiralProblem(points: ReadonlyArray<Vec2>, radii: ReadonlyArray<number>
     if (!spiralCurve(radius, length, deflection)) {
       const spiralAngle = length / (2 * radius);
       return (
-        `PI ${i}: deflection ${toDegrees(deflection).toFixed(3)} deg is smaller than twice ` +
-        `the spiral angle (2 x ${toDegrees(spiralAngle).toFixed(3)} deg for Ls ${length} ` +
-        `and R ${radius}); shorten the spirals or reduce the radius.`
+        `PI ${i}: deflection ${toDegrees(deflection).toFixed(3)} deg is smaller than twice the spiral angle (2 x ` +
+        `${toDegrees(spiralAngle).toFixed(3)} deg for Ls ${length} and R ${radius}); shorten the spirals or reduce the radius.`
       );
     }
   }
@@ -206,14 +205,7 @@ export function horizontalElements(alignment: HorizontalInput): HorizontalElemen
     const length = Math.hypot(to[0] - cursor[0], to[1] - cursor[1]);
     if (length > EPS) {
       const direction = Math.atan2(to[1] - cursor[1], to[0] - cursor[0]);
-      elements.push({
-        kind: 'line',
-        start: cursor,
-        end: to,
-        startStation: station,
-        length,
-        direction,
-      });
+      elements.push({ kind: 'line', start: cursor, end: to, startStation: station, length, direction });
       station += length;
     }
     cursor = to;
@@ -287,7 +279,6 @@ function arcSign(arc: ArcElement): number {
   return arc.rotation === 'ccw' ? 1 : -1;
 }
 
-/** Polar angle of the arc start about its centre. */
 function arcStartAngle(arc: ArcElement): number {
   return Math.atan2(arc.start[1] - arc.center[1], arc.start[0] - arc.center[0]);
 }
@@ -379,8 +370,8 @@ export function centrelinePoints(alignment: HorizontalInput): Vec2[] {
 const MAX_SAMPLES = 2000;
 
 /**
- * Ascending stations for sampling: start, end, every `interval` from the start, curve PC / PT,
- * any `extra` stations, with arcs subdivided to chords of at most 5 degrees. Capped at ~2000.
+ * Ascending stations for sampling: start, end, every `interval` from the start, curve PC / PT, any `extra` stations, with arcs subdivided
+ * to chords of at most 5 degrees. Capped at ~2000.
  */
 export function sampleStations(alignment: HorizontalInput, interval: number, extra: ReadonlyArray<number> = []): number[] {
   const elements = horizontalElements(alignment);

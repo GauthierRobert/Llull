@@ -1,6 +1,6 @@
 /**
- * Instance expansion: bake an `InstanceEntity` into world-space copies of its component's entities
- * (scale -> rotate about origin -> translate; keep in sync with `scene.ts` `instanceBoundsFromDoc`).
+ * Instance expansion: bake an `InstanceEntity` into world-space copies of its component's entities (scale -> rotate about origin ->
+ * translate; keep in sync with `scene.ts` `instanceBoundsFromDoc`).
  */
 
 import { type CadDocument, type Component, type Entity, type InstanceEntity, type Vec3, is3D } from '../model/types';
@@ -14,9 +14,8 @@ import { soupIndices } from './meshVolume';
 export const UNIT_SCALE: Vec3 = [1, 1, 1];
 
 /**
- * The instance transform cannot stay parametric on `child` and is baked into a mesh: a negative or
- * zero scale component, or a non-uniform scale on anything but an unrotated box/wedge.
- * 2D shapes and nested instances never bake (they keep the `scaledChild` path).
+ * The instance transform cannot stay parametric on `child` and is baked into a mesh: a negative or zero scale component, or a non-uniform
+ * scale on anything but an unrotated box/wedge. 2D shapes and nested instances never bake (they keep the `scaledChild` path).
  */
 function needsMeshBake(child: Entity, scale: Vec3): boolean {
   if (!is3D(child) || child.kind === 'instance') return false;
@@ -27,9 +26,9 @@ function needsMeshBake(child: Entity, scale: Vec3): boolean {
 }
 
 /**
- * `child` (a 3D solid in component space) as a world-space `mesh`: its triangles mapped through the
- * full instance affine (scale -> rotate about origin -> translate). A mirroring scale (negative
- * determinant) reverses the winding so normals stay outward and the volume positive.
+ * `child` (a 3D solid in component space) as a world-space `mesh`: its triangles mapped through the full instance affine (scale -> rotate
+ * about origin -> translate). A mirroring scale (negative determinant) reverses the winding so normals stay outward and the volume
+ * positive.
  * @invariant result.position = result.rotation = [0, 0, 0] (mesh positions are world-space)
  */
 function bakedMeshChild(child: Entity, instance: InstanceEntity, scale: Vec3, id: string): Entity {
@@ -55,9 +54,9 @@ function bakedMeshChild(child: Entity, instance: InstanceEntity, scale: Vec3, id
 }
 
 /**
- * `entity` resized parametrically by the instance's `scale`: exact for a uniform positive scale and
- * for a per-axis scale on an unrotated box/wedge (everything else 3D is baked by `bakedMeshChild`).
- * 2D shapes and nested instances under a non-uniform scale use the geometric mean (approximation).
+ * `entity` resized parametrically by the instance's `scale`: exact for a uniform positive scale and for a per-axis scale on an unrotated
+ * box/wedge (everything else 3D is baked by `bakedMeshChild`). 2D shapes and nested instances under a non-uniform scale use the geometric
+ * mean (approximation).
  */
 function scaledChild(entity: Entity, scale: Vec3): Entity {
   const [ax, ay, az] = [Math.abs(scale[0]), Math.abs(scale[1]), Math.abs(scale[2])];
@@ -86,14 +85,12 @@ export function expandInstance(instance: InstanceEntity, component: Component): 
   const rot = instance.rotation;
   const pos = instance.position;
   const toWorld = instanceToWorld([sx, sy, sz], rot, pos);
-
   return component.order
     .map((cid) => component.entities[cid])
     .filter((e): e is Entity => e !== undefined)
     .map((childEntity): Entity => {
-      if (needsMeshBake(childEntity, [sx, sy, sz])) {
+      if (needsMeshBake(childEntity, [sx, sy, sz]))
         return bakedMeshChild(childEntity, instance, [sx, sy, sz], expandedId(instance.id, childEntity.id));
-      }
       return {
         ...scaledChild(childEntity, [sx, sy, sz]),
         id: expandedId(instance.id, childEntity.id),

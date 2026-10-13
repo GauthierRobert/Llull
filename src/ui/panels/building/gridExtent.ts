@@ -1,8 +1,4 @@
-/**
- * Plan bounds of the structural grid (param-gathering for "Grid extent" outlines): the outermost
- * axis crossings, so the bubble overshoot of the grid lines is not included. Without any crossing,
- * the line endpoints.
- */
+// Structural grid plan bounds: outermost axis crossings (bubble overshoot excluded), else the line endpoints.
 
 import type { BuildingModel, GridElement } from '@core/model/building';
 import { pointsExtent } from '@core/geometry/bounds';

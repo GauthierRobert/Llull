@@ -1,18 +1,12 @@
 /**
- * DWG -> ASCII DXF through an external converter (optional, like the Python STEP bridge). The core
- * only understands ASCII DXF (`import_dxf`); proprietary DWG bytes are converted here, then the
- * DXF text goes through the normal command path.
- *
- * Converters (tried in this order, first one installed wins):
+ * DWG -> ASCII DXF (then `import_dxf`) through an external converter; first installed wins:
  *   LibreDWG    `dwg2dxf -y -o <out.dxf> <in.dwg>`   env LLULL_DWG2DXF (default "dwg2dxf"; "off" disables)
  *   ODA         `<exe> <in-dir> <out-dir> ACAD2018 DXF 0 1 *.DWG`   env LLULL_ODA_CONVERTER (path)
  * Other env: LLULL_DWG_TIMEOUT_MS (default 60000), LLULL_DWG_MAX_BYTES (default 50 MB),
  *            LLULL_EXCHANGE_DIR (for the MCP tool's `path` argument).
  *
- * Safety: one private temp dir per request (removed always), argv-only spawn (no shell, fixed file
- * names — no user string reaches a command line), allowlisted child env, hard timeout, size caps.
+ * Safety: private temp dir per request (always removed), argv-only spawn with fixed file names, allowlisted env, timeout, size caps.
  */
-
 import { spawn } from 'node:child_process';
 import { mkdtemp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -40,7 +34,6 @@ const NO_DWG_CONVERTER_MESSAGE =
   'LLULL_ODA_CONVERTER=<executable>. Alternatively save the drawing as ASCII DXF ' +
   '(see docs/CAD_EXCHANGE.md).';
 
-/** HTTP-mappable conversion failure. */
 export class DwgConvertError extends Error {
   constructor(
     message: string,
@@ -71,12 +64,8 @@ export function dwgConfigFromEnv(env: NodeJS.ProcessEnv = process.env): DwgConve
   };
 }
 
-/** True when `bytes` start with an "AC10xx" DWG version stamp. */
-function hasDwgMagic(bytes: Uint8Array): boolean {
-  if (bytes.length < 6) return false;
-  const head = Buffer.from(bytes.subarray(0, 6)).toString('latin1');
-  return /^AC10\d\d$/.test(head);
-}
+const hasDwgMagic = (bytes: Uint8Array): boolean =>
+  bytes.length >= 6 && /^AC10\d\d$/.test(Buffer.from(bytes.subarray(0, 6)).toString('latin1'));
 
 type RunOutcome = { kind: 'missing' } | { kind: 'timeout' } | { kind: 'done'; code: number | null; stderr: string };
 
@@ -90,11 +79,7 @@ function runConverter(command: string, args: string[], timeoutMs: number): Promi
       clearTimeout(timer);
       resolve(outcome);
     };
-    const child = spawn(command, args, {
-      stdio: ['ignore', 'ignore', 'pipe'],
-      env: bridgeEnvironment(),
-      shell: false,
-    });
+    const child = spawn(command, args, { stdio: ['ignore', 'ignore', 'pipe'], env: bridgeEnvironment(), shell: false });
     const stderr = captureStderrTail(child.stderr, MAX_STDERR_BYTES);
     const timer = setTimeout(() => {
       child.kill('SIGKILL');
@@ -113,19 +98,12 @@ async function readDxfIn(dir: string, preferred: string): Promise<string | null>
   const name = names.includes(preferred) ? preferred : names.find((entry) => entry.toLowerCase().endsWith('.dxf'));
   if (name === undefined) return null;
   const file = path.join(dir, name);
-  const info = await stat(file);
-  if (info.size === 0) return null;
-  if (info.size > MAX_DXF_BYTES) {
-    throw new DwgConvertError('The converted DXF is too large to import.', 413);
-  }
-  return readFile(file, 'utf8');
+  const { size } = await stat(file);
+  if (size > MAX_DXF_BYTES) throw new DwgConvertError('The converted DXF is too large to import.', 413);
+  return size === 0 ? null : readFile(file, 'utf8');
 }
 
-/**
- * Convert DWG bytes to ASCII DXF text.
- * @failure bad magic -> 400; too big -> 413; no converter installed -> 503; timeout -> 504;
- *          converter failure -> 422
- */
+/** @failure bad magic -> 400; too big -> 413; no converter installed -> 503; timeout -> 504; converter failure -> 422 */
 export async function convertDwgToDxf(bytes: Uint8Array, config: DwgConvertConfig = dwgConfigFromEnv()): Promise<string> {
   if (bytes.length > config.maxBytes) {
     throw new DwgConvertError(`DWG file is ${bytes.length} bytes; the limit is ${config.maxBytes} bytes (LLULL_DWG_MAX_BYTES).`, 413);
@@ -143,21 +121,13 @@ export async function convertDwgToDxf(bytes: Uint8Array, config: DwgConvertConfi
     await mkdir(inDir);
     await mkdir(outDir);
     await writeFile(path.join(inDir, 'input.dwg'), bytes);
-    const attempts: Array<{ command: string; args: string[] }> = [];
-    if (config.dwg2dxf !== null) {
-      attempts.push({
-        command: config.dwg2dxf,
-        args: ['-y', '-o', path.join(outDir, 'input.dxf'), path.join(inDir, 'input.dwg')],
-      });
-    }
-    if (config.odaConverter !== null) {
-      attempts.push({
-        command: config.odaConverter,
-        args: [inDir, outDir, 'ACAD2018', 'DXF', '0', '1', '*.DWG'],
-      });
-    }
-    for (const attempt of attempts) {
-      const outcome = await runConverter(attempt.command, attempt.args, config.timeoutMs);
+    const attempts: Array<[string | null, string[]]> = [
+      [config.dwg2dxf, ['-y', '-o', path.join(outDir, 'input.dxf'), path.join(inDir, 'input.dwg')]],
+      [config.odaConverter, [inDir, outDir, 'ACAD2018', 'DXF', '0', '1', '*.DWG']],
+    ];
+    for (const [command, args] of attempts) {
+      if (command === null) continue;
+      const outcome = await runConverter(command, args, config.timeoutMs);
       if (outcome.kind === 'missing') continue;
       if (outcome.kind === 'timeout') {
         throw new DwgConvertError(`DWG conversion timed out after ${config.timeoutMs} ms (LLULL_DWG_TIMEOUT_MS).`, 504);
@@ -173,7 +143,6 @@ export async function convertDwgToDxf(bytes: Uint8Array, config: DwgConvertConfi
   }
 }
 
-/** The MCP-facing port; null when both converters are disabled. */
 function createDwgConverterPort(env: NodeJS.ProcessEnv = process.env): DwgConverterPort | null {
   const config = dwgConfigFromEnv(env);
   if (config.dwg2dxf === null && config.odaConverter === null) return null;
@@ -190,7 +159,6 @@ function createDwgConverterPort(env: NodeJS.ProcessEnv = process.env): DwgConver
   };
 }
 
-/** STEP/code exchange options plus the DWG converter, from the environment. */
 export function exchangeOptionsWithDwg(env: NodeJS.ProcessEnv = process.env): ExchangeOptions {
   return { ...exchangeOptionsFromEnv(env), dwg: createDwgConverterPort(env) };
 }

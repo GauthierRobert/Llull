@@ -1,6 +1,6 @@
 /**
- * Survey points from a DXF: 3D points, polyline / line vertices (contours, breaklines), 3D face
- * corners and numeric spot-height texts become a point group for create_surface.
+ * Survey points from a DXF: 3D points, polyline / line vertices (contours, breaklines), 3D face corners and numeric spot-height texts
+ * become a point group for create_surface.
  */
 
 import { type Vec3, DOCUMENT_UNITS } from '@core/model/types';
@@ -50,11 +50,10 @@ function samples(primitive: DxfPrimitive, sources: ReadonlySet<Source>): Vec3[] 
 export const importSurveyDxf = defineCommand({
   name: 'import_survey_dxf',
   description:
-    'Extract survey points from a topographic DXF into a point group, ready for create_surface: ' +
-    'POINT entities, vertices of 3D polylines / elevated contours / lines (breaklines), 3DFACE ' +
-    'corners and, optionally, numeric spot-height TEXT ("123.45" placed at the level). Filter by ' +
-    'DXF `layers` (e.g. ["TOPO_PTS", "CONTOURS"]). Points at elevation 0 are ignored unless ' +
-    '`keepZeroElevation`. Units from $INSUNITS unless `sourceUnit`.',
+    'Extract survey points from a topographic DXF into a point group, ready for create_surface: POINT entities, vertices of 3D polylines ' +
+    '/ elevated contours / lines (breaklines), 3DFACE corners and, optionally, numeric spot-height TEXT ("123.45" placed at the level). ' +
+    'Filter by DXF `layers` (e.g. ["TOPO_PTS", "CONTOURS"]). Points at elevation 0 are ignored unless `keepZeroElevation`. Units from ' +
+    '$INSUNITS unless `sourceUnit`.',
   params: z.object({
     text: z.string().describe('DXF file content (ASCII).'),
     name: z.string().optional().describe('Point group name. Default "DXF survey <n>".'),

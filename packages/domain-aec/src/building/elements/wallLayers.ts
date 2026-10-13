@@ -26,11 +26,7 @@ export function parseWallLayers(value: unknown): WallLayer[] | string {
     ) {
       return `each layer needs a material, a thickness > 0 and a function (${WALL_LAYER_FUNCTIONS.join(', ')})`;
     }
-    layers.push({
-      material: layer.material.trim(),
-      thickness: layer.thickness,
-      function: fn as WallLayerFunction,
-    });
+    layers.push({ material: layer.material.trim(), thickness: layer.thickness, function: fn as WallLayerFunction });
   }
   return layers;
 }
@@ -61,11 +57,10 @@ export function layerBoundaries(wall: WallElement): number[] {
 export const setWallLayers = defineCommand({
   name: 'set_wall_layers',
   description:
-    'Give walls a build-up (wall type), like Revit / ArchiCAD composite walls: layers listed from the ' +
-    'right-hand face (looking from start to end — the exterior of a counter-clockwise perimeter) to the ' +
-    'left-hand face, each { material, thickness, function: structure | insulation | membrane | air | ' +
-    'finish }. Wall thickness becomes the sum; quantities are reported per layer material; plans show ' +
-    'the layer lines; IFC gets a material layer set. layers: null removes the build-up.',
+    'Give walls a build-up (wall type), like Revit / ArchiCAD composite walls: layers listed from the right-hand face (looking from ' +
+    'start to end — the exterior of a counter-clockwise perimeter) to the left-hand face, each { material, thickness, function: ' +
+    'structure | insulation | membrane | air | finish }. Wall thickness becomes the sum; quantities are reported per layer material; ' +
+    'plans show the layer lines; IFC gets a material layer set. layers: null removes the build-up.',
   params: z.object({
     wallIds: z.array(z.string()).describe('Ids of existing straight walls (e.g. ["wall-1"]); curved walls are not accepted.'),
     layers: z

@@ -152,13 +152,11 @@ const MAX_WALL_POINTS = 500;
 export const drawWalls = defineCommand({
   name: 'draw_walls',
   description:
-    'Draw a chain of joined walls through plan points ([[x, y], …]); closed: true adds the closing ' +
-    'wall (e.g. a building perimeter); two points make one straight wall. Walls meeting at endpoints ' +
-    '(L/T/X corners) are joined automatically; doors and windows are then hosted with add_door / ' +
-    'add_window. A segment that duplicates an ' +
-    'existing wall (same end points either way, same base offset, same level) is skipped and ' +
-    'reported, so adjacent rooms can each be drawn as a closed loop sharing an edge; refused only ' +
-    'if every segment is a duplicate.',
+    'Draw a chain of joined walls through plan points ([[x, y], …]); closed: true adds the closing wall (e.g. a building perimeter); two ' +
+    'points make one straight wall. Walls meeting at endpoints (L/T/X corners) are joined automatically; doors and windows are then ' +
+    'hosted with add_door / add_window. A segment that duplicates an existing wall (same end points either way, same base offset, same ' +
+    'level) is skipped and reported, so adjacent rooms can each be drawn as a closed loop sharing an edge; refused only if every segment ' +
+    'is a duplicate.',
   params: z.object({
     points: z.array(z.array(z.number())).describe('Centerline vertices [[x, y], …], 2 to 500.'),
     closed: z.boolean().optional().describe('Close the loop back to the first point. Default false.'),
@@ -242,9 +240,8 @@ export const updateWall = defineCommand({
       doc,
       next,
       [wallId],
-      `Updated wall ${updated.mark} (${wallId}): [${updated.start.join(', ')}]→[${updated.end.join(', ')}], ` +
-        `thickness ${updated.thickness}, height ${updated.height}, ${updated.material}` +
-        `${!keepLayers && layers ? ' (build-up removed)' : ''}.`,
+      `Updated wall ${updated.mark} (${wallId}): [${updated.start.join(', ')}]→[${updated.end.join(', ')}], thickness ` +
+        `${updated.thickness}, height ${updated.height}, ${updated.material}${!keepLayers && layers ? ' (build-up removed)' : ''}.`,
     );
   },
 });

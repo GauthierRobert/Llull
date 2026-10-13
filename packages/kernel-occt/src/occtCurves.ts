@@ -77,9 +77,7 @@ function chainWire(api: OccApi, chain: ReadonlyArray<CurveSegment<Vec3>>): OccSh
 
 /** Planar face bounded by `outer`, minus optional `holes` (each reversed into an inner loop). */
 function wireFace(api: OccApi, outer: OccShape, holes: ReadonlyArray<OccShape & { Reverse(): void }> = []): OccShape | null {
-  const makeFace = new api.BRepBuilderAPI_MakeFace_15(outer, true) as OccMakeFace & {
-    Add(wire: OccShape): void;
-  };
+  const makeFace = new api.BRepBuilderAPI_MakeFace_15(outer, true) as OccMakeFace & { Add(wire: OccShape): void };
   for (const hole of holes) {
     hole.Reverse();
     makeFace.Add(hole);

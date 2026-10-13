@@ -1,6 +1,6 @@
 /**
- * Planar moment frames of a steel structure: columns and beams in one vertical plane joined by rigid
- * (moment) beam-to-column joints. A frame beam keeps its pinned ends (released in the frame model).
+ * Planar moment frames of a steel structure: columns and beams in one vertical plane joined by rigid (moment) beam-to-column joints. A
+ * frame beam keeps its pinned ends (released in the frame model).
  */
 
 import type { BeamResult } from './steelFraming';
@@ -21,10 +21,7 @@ export interface MomentFrame {
 }
 
 /** A solved frame as lateral system: the top of steel of its beams decides the storeys it stabilises. */
-export interface FrameCoverage {
-  readonly direction: FrameDirection;
-  readonly beamTops: number[];
-}
+export type FrameCoverage = { readonly direction: FrameDirection; readonly beamTops: number[] };
 
 interface FrameDetection {
   readonly frames: MomentFrame[];

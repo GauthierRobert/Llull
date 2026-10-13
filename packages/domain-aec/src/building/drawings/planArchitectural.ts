@@ -32,15 +32,7 @@ function openingSymbol(wall: Pick<WallElement, 'start' | 'end' | 'thickness'>, o
   }
   const { hinge, leafEnd, startAngle, endAngle } = doorSwing(wall, opening);
   return [
-    {
-      type: 'arc',
-      layer,
-      style: 'thin',
-      center: hinge,
-      radius: opening.width,
-      startAngle,
-      endAngle,
-    },
+    { type: 'arc', layer, style: 'thin', center: hinge, radius: opening.width, startAngle, endAngle },
     thinLine(layer, hinge, leafEnd),
   ];
 }
@@ -53,13 +45,7 @@ export function wallPrimitives(building: BuildingModel, wall: WallElement, cutHe
   const openings = openingsOf(building, wall.id);
   const extent = wallExtent(building, wall);
   const addCut = (from: number, to: number): void => {
-    primitives.push({
-      type: 'polygon',
-      layer,
-      style: 'cut',
-      fill: 'hatch',
-      points: band(wall, from, to, half),
-    });
+    primitives.push({ type: 'polygon', layer, style: 'cut', fill: 'hatch', points: band(wall, from, to, half) });
   };
   let cursor = extent.start;
   for (const opening of openings.filter((candidate) => isCut(candidate, cutHeight - wall.baseOffset))) {
@@ -135,24 +121,14 @@ export function stairPrimitives(
   const run = stair.riserCount * stair.treadDepth;
   const layer = layerName('stair');
   const primitives: DrawingPrimitive[] = [
-    {
-      type: 'polygon',
-      layer,
-      style: 'thin',
-      points: [at(0, -half), at(run, -half), at(run, half), at(0, half)],
-    },
+    { type: 'polygon', layer, style: 'thin', points: [at(0, -half), at(run, -half), at(run, half), at(0, half)] },
   ];
   for (let index = 1; index < stair.riserCount; index++) {
     const along = index * stair.treadDepth;
     primitives.push(thinLine(layer, at(along, -half), at(along, half)));
   }
   primitives.push(
-    {
-      type: 'polyline',
-      layer,
-      style: 'thin',
-      points: [at(stair.treadDepth / 2, 0), at(run - stair.treadDepth / 2, 0)],
-    },
+    { type: 'polyline', layer, style: 'thin', points: [at(stair.treadDepth / 2, 0), at(run - stair.treadDepth / 2, 0)] },
     annotationText(layer, at(-fromMm(doc, 400), 0), fromMm(doc, 200), `UP ${stair.riserCount}R`),
   );
   return primitives;
@@ -197,24 +173,11 @@ export function slabPrimitives(slab: SlabElement): DrawingPrimitive[] {
 export function columnPrimitive(column: ColumnElement): DrawingPrimitive {
   const layer = layerName('column');
   if (column.shape === 'circular') {
-    return {
-      type: 'circle',
-      layer,
-      style: 'cut',
-      fill: 'hatch',
-      center: column.location,
-      radius: column.width / 2,
-    };
+    return { type: 'circle', layer, style: 'cut', fill: 'hatch', center: column.location, radius: column.width / 2 };
   }
   const [x, y] = column.location;
   const axis = { start: [x - column.width / 2, y] as Vec2, end: [x + column.width / 2, y] as Vec2 };
-  return {
-    type: 'polygon',
-    layer,
-    style: 'cut',
-    fill: 'hatch',
-    points: band(axis, 0, column.width, column.depth / 2),
-  };
+  return { type: 'polygon', layer, style: 'cut', fill: 'hatch', points: band(axis, 0, column.width, column.depth / 2) };
 }
 
 /** Room name and "mark · area" tags at the outline centroid. */

@@ -1,8 +1,7 @@
 /**
- * Beam verification (EN 1993-1-1) of a simply supported floor beam: bending Mc,Rd (§6.2.5) with
- * lateral-torsional buckling Mb,Rd (§6.3.2) unless restrained, shear Vpl,Rd (§6.2.6) with the
- * moment reduction above 0.5 Vpl,Rd (§6.2.8), serviceability deflection under G + Q, and — for the
- * chord of a braced bay — strut compression with bending (§6.3.3).
+ * Beam verification (EN 1993-1-1) of a simply supported floor beam: bending Mc,Rd (§6.2.5) with lateral-torsional buckling Mb,Rd (§6.3.2)
+ * unless restrained, shear Vpl,Rd (§6.2.6) with the moment reduction above 0.5 Vpl,Rd (§6.2.8), serviceability deflection under G + Q, and
+ * — for the chord of a braced bay — strut compression with bending (§6.3.3).
  */
 
 import { lateralTorsionalReduction, memberBuckling } from './steelDesign';

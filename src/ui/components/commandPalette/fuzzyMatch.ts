@@ -1,9 +1,6 @@
-/**
- * Ranking for the command palette: every query token must match the haystack (as a substring or,
- * failing that, as an in-order subsequence). Prefix and word-start hits outrank scattered ones.
- */
+// Palette ranking: every token must match (substring, else in-order subsequence); prefix / word-start hits rank higher.
 
-/** Score of one token against `text`; 0 = no match, higher = better. */
+/** 0 = no match. */
 function scoreToken(token: string, text: string): number {
   const index = text.indexOf(token);
   if (index === 0) return 100;
@@ -22,11 +19,7 @@ function scoreToken(token: string, text: string): number {
   return Math.max(1, 30 - gaps);
 }
 
-/**
- * Score `query` against a primary label and secondary keyword text.
- * @invariant empty / whitespace query -> 1 (everything matches equally)
- * @failure any token unmatched in both label and keywords -> 0
- */
+/** @invariant blank query -> 1 @failure a token unmatched in label and keywords -> 0 */
 export function fuzzyScore(query: string, label: string, keywords = ''): number {
   const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (tokens.length === 0) return 1;

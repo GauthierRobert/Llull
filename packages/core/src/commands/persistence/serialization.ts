@@ -28,8 +28,8 @@ const READABLE_VERSIONS: ReadonlySet<unknown> = new Set([1, 2]);
 
 interface SerializeOptions {
   /**
-   * Keep evaluated geometry that the definition regenerates (building-element entities).
-   * Default false: files store the definition only. Hashing and diffing pass true.
+   * Keep evaluated geometry that the definition regenerates (building-element entities). Default false: files store the definition only.
+   * Hashing and diffing pass true.
    */
   readonly includeDerived?: boolean;
 }
@@ -55,21 +55,20 @@ const STEP_SCOPED_ID = /-(\d+)\.\d+$/;
 const STEP_ID = /^step-(\d+)$/;
 
 /**
- * `nextStepNumber` is at least one past every step number used by a step or entity id, so a file
- * whose counter is missing or stale can never make a new step re-mint an existing id.
+ * `nextStepNumber` is at least one past every step number used by a step or entity id, so a file whose counter is missing or stale can
+ * never make a new step re-mint an existing id.
  */
 function withSafeStepCounter(raw: Record<string, unknown>): Record<string, unknown> {
   let highest = 0;
-  // Entries are not validated yet: skip anything that is not a record with a string id so the
-  // value validation below reports "featureHistory[i] is malformed" instead of a TypeError.
+  // Entries are not validated yet: skip anything that is not a record with a string id so the value validation below reports
+  // "featureHistory[i] is malformed" instead of a TypeError.
   const steps: unknown[] = Array.isArray(raw['featureHistory']) ? raw['featureHistory'] : [];
   for (const step of steps) {
     if (!isRecord(step) || typeof step['id'] !== 'string') continue;
     highest = Math.max(highest, Number(STEP_ID.exec(step['id'])?.[1] ?? 0));
   }
-  for (const id of Object.keys(isRecord(raw['entities']) ? raw['entities'] : {})) {
+  for (const id of Object.keys(isRecord(raw['entities']) ? raw['entities'] : {}))
     highest = Math.max(highest, Number(STEP_SCOPED_ID.exec(id)?.[1] ?? 0));
-  }
   const stored = typeof raw['nextStepNumber'] === 'number' ? raw['nextStepNumber'] : 1;
   const next = Math.max(stored, highest + 1);
   return next === 1 && raw['nextStepNumber'] === undefined ? raw : { ...raw, nextStepNumber: next };
@@ -99,8 +98,8 @@ const COLLECTION_DEFAULTS: ReadonlyArray<readonly [string, 'record' | 'array']> 
 ];
 
 /**
- * Upgrade a raw document object (already shape-validated) to the current schema: the SINGLE
- * place for back-compat defaults. A new optional `CadDocument` field gets its default here.
+ * Upgrade a raw document object (already shape-validated) to the current schema: the SINGLE place for back-compat defaults. A new optional
+ * `CadDocument` field gets its default here.
  */
 function migrate(raw: Record<string, unknown>): Record<string, unknown> {
   const units = DOCUMENT_UNITS.find((unit) => unit === raw['units']) ?? 'mm';
@@ -119,8 +118,8 @@ function migrate(raw: Record<string, unknown>): Record<string, unknown> {
 
 /**
  * Parse and validate a `serializeDocument` string (old files gain defaults via `migrate()`).
- * @failure throws an Error naming the failing field (bad JSON, format, version, structure, values);
- *   `load_document` turns it into a no-op summary
+ * @failure throws an Error naming the failing field (bad JSON, format, version, structure, values); `load_document` turns it into a no-op
+ *   summary
  */
 export function deserializeDocument(json: string): CadDocument {
   let parsed: unknown;
@@ -129,34 +128,20 @@ export function deserializeDocument(json: string): CadDocument {
   } catch {
     throw new Error('load_document: invalid JSON — could not parse input string.');
   }
-
-  if (!isRecord(parsed)) {
-    throw new Error('load_document: expected a JSON object at the root level.');
-  }
-
-  if (parsed['format'] !== 'llull-document') {
+  if (!isRecord(parsed)) throw new Error('load_document: expected a JSON object at the root level.');
+  if (parsed['format'] !== 'llull-document')
     throw new Error(`load_document: unrecognized format '${String(parsed['format'])}' — expected 'llull-document'.`);
-  }
-
-  if (!READABLE_VERSIONS.has(parsed['version'])) {
+  if (!READABLE_VERSIONS.has(parsed['version']))
     throw new Error(`load_document: unsupported version ${String(parsed['version'])} — expected 1 or ${CURRENT_SCHEMA_VERSION}.`);
-  }
-
   const rawDoc = parsed['document'];
-  if (!validateDocumentShape(rawDoc)) {
+  if (!validateDocumentShape(rawDoc))
     throw new Error(
       'load_document: document structure is invalid — missing or malformed required fields ' +
         '(entities, order, layers, layerOrder, selection, camera).',
     );
-  }
-
   const migratedDoc = withSafeStepCounter(restoreDerivedEntities(migrateRetiredCommands(migrate(rawDoc))));
-
   const valueErrors = validateDocumentValues(migratedDoc);
-  if (valueErrors.length > 0) {
-    throw new Error(`load_document: document contains invalid values:\n  ${valueErrors.join('\n  ')}`);
-  }
-
+  if (valueErrors.length > 0) throw new Error(`load_document: document contains invalid values:\n  ${valueErrors.join('\n  ')}`);
   return migratedDoc as unknown as CadDocument;
 }
 
@@ -183,10 +168,8 @@ export const loadDocument = defineCommand({
     } catch (err) {
       return noop(doc, errorMessage(err));
     }
-
     const entityCount = Object.keys(parsed.entities).length;
     const layerCount = Object.keys(parsed.layers).length;
-
     return changed(
       parsed,
       `Loaded document: ${entityCount} ${entityCount === 1 ? 'entity' : 'entities'}, ${layerCount} ${layerCount === 1 ? 'layer' : 'layers'}.`,

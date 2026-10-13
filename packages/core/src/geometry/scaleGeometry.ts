@@ -1,7 +1,4 @@
-/**
- * Uniform scaling of an entity's kind-specific geometry about its local origin (scale_entity,
- * instance expansion).
- */
+/** Uniform scaling of an entity's kind-specific geometry about its local origin (scale_entity, instance expansion). */
 
 import type { Entity, SweepSection, Vec2, Vec3 } from '../model/types';
 import type { CurveSegment } from '../model/curve';
@@ -18,27 +15,16 @@ function scaledCurves(e: { curves?: ReadonlyArray<CurveSegment<Vec2>> }, f: numb
 function scaledSection(section: SweepSection, f: number): SweepSection {
   if (section.shape === 'circle') {
     const { radius, innerRadius } = section;
-    return {
-      shape: 'circle',
-      radius: radius * f,
-      ...(innerRadius !== undefined ? { innerRadius: innerRadius * f } : {}),
-    };
+    return { shape: 'circle', radius: radius * f, ...(innerRadius !== undefined ? { innerRadius: innerRadius * f } : {}) };
   }
-  return {
-    shape: 'profile',
-    profile: section.profile.map((p) => scale2(p, f)),
-    ...scaledCurves(section, f),
-  };
+  return { shape: 'profile', profile: section.profile.map((p) => scale2(p, f)), ...scaledCurves(section, f) };
 }
 
 /** Scaled copy of `e` about its local origin plus the summary fragment describing the result. */
 export function scaleGeometry(e: Entity, f: number): { scaled: Entity; dims: string } {
   const result = scaleKindGeometry(e, f);
   if (e.decals === undefined) return result;
-  return {
-    scaled: { ...result.scaled, decals: scaledDecals(e.decals, f) } as Entity,
-    dims: result.dims,
-  };
+  return { scaled: { ...result.scaled, decals: scaledDecals(e.decals, f) } as Entity, dims: result.dims };
 }
 
 function scaleKindGeometry(e: Entity, f: number): { scaled: Entity; dims: string } {
@@ -60,33 +46,21 @@ function scaleKindGeometry(e: Entity, f: number): { scaled: Entity; dims: string
     }
     case 'extrusion': {
       const depth = e.depth * f;
-      return {
-        scaled: { ...e, profile: e.profile.map((p) => scale2(p, f)), depth, ...scaledCurves(e, f) },
-        dims: `new depth ${depth}`,
-      };
+      return { scaled: { ...e, profile: e.profile.map((p) => scale2(p, f)), depth, ...scaledCurves(e, f) }, dims: `new depth ${depth}` };
     }
     case 'line': {
       const start = scale2(e.start, f);
       const end = scale2(e.end, f);
-      return {
-        scaled: { ...e, start, end },
-        dims: `new start [${start.join(', ')}] end [${end.join(', ')}]`,
-      };
+      return { scaled: { ...e, start, end }, dims: `new start [${start.join(', ')}] end [${end.join(', ')}]` };
     }
     case 'polyline':
     case 'spline':
-      return {
-        scaled: { ...e, points: e.points.map((p) => scale2(p, f)) },
-        dims: `scaled ${e.points.length} points`,
-      };
+      return { scaled: { ...e, points: e.points.map((p) => scale2(p, f)) }, dims: `scaled ${e.points.length} points` };
     case 'arc':
     case 'circle': {
       const center = scale2(e.center, f);
       const radius = e.radius * f;
-      return {
-        scaled: { ...e, center, radius },
-        dims: `new center [${center.join(', ')}] radius ${radius}`,
-      };
+      return { scaled: { ...e, center, radius }, dims: `new center [${center.join(', ')}] radius ${radius}` };
     }
     case 'rectangle':
     case 'image': {
@@ -125,10 +99,7 @@ function scaleKindGeometry(e: Entity, f: number): { scaled: Entity; dims: string
     case 'torus': {
       const ringRadius = e.ringRadius * f;
       const tubeRadius = e.tubeRadius * f;
-      return {
-        scaled: { ...e, ringRadius, tubeRadius },
-        dims: `new ringRadius ${ringRadius}, tubeRadius ${tubeRadius}`,
-      };
+      return { scaled: { ...e, ringRadius, tubeRadius }, dims: `new ringRadius ${ringRadius}, tubeRadius ${tubeRadius}` };
     }
     case 'pyramid': {
       const baseWidth = e.baseWidth * f;
@@ -152,12 +123,7 @@ function scaleKindGeometry(e: Entity, f: number): { scaled: Entity; dims: string
           path: e.path.map((segment) => mapSegment(segment, (p: Vec3) => scale3(p, f))),
           section: scaledSection(e.section, f),
           ...(e.stations !== undefined
-            ? {
-                stations: e.stations.map((station) => ({
-                  at: station.at,
-                  ring: station.ring.map((p) => scale2(p, f)),
-                })),
-              }
+            ? { stations: e.stations.map((station) => ({ at: station.at, ring: station.ring.map((p) => scale2(p, f)) })) }
             : {}),
         },
         dims: `scaled ${e.path.length}-segment path and section`,
@@ -168,10 +134,7 @@ function scaleKindGeometry(e: Entity, f: number): { scaled: Entity; dims: string
         dims: `scaled ${e.rings.length} section rings`,
       };
     case 'subdivision':
-      return {
-        scaled: { ...e, vertices: e.vertices.map((p) => scale3(p, f)) },
-        dims: `scaled ${e.vertices.length}-vertex cage`,
-      };
+      return { scaled: { ...e, vertices: e.vertices.map((p) => scale3(p, f)) }, dims: `scaled ${e.vertices.length}-vertex cage` };
     case 'instance': {
       const scale = scale3(e.scale ?? [1, 1, 1], f);
       return { scaled: { ...e, scale }, dims: `new scale [${scale.join(', ')}]` };

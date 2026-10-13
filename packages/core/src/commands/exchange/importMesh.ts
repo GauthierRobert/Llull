@@ -81,9 +81,7 @@ export const importMesh = defineCommand({
       const entity = newEntity(
         'mesh',
         id,
-        {
-          mesh: { positions: soup, indices: soupIndices(soup) },
-        },
+        { mesh: { positions: soup, indices: soupIndices(soup) } },
         [0, 0, 0],
         isHexColor(body.color) ? body.color : DEFAULT_MESH_COLOR,
         { name },

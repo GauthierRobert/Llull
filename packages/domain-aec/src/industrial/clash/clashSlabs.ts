@@ -49,8 +49,8 @@ export function slabsCrossedBy(building: BuildingModel, equipment: EquipmentElem
 }
 
 /**
- * Every (equipment, slab) pair where the slab's top lies strictly inside the equipment's height
- * (more than `tolerance` from its base and top) and solid slab is under part of its footprint.
+ * Every (equipment, slab) pair where the slab's top lies strictly inside the equipment's height (more than `tolerance` from its base and
+ * top) and solid slab is under part of its footprint.
  * @invariant the footprint is the equipment's plan bounding rectangle (vessels included: conservative)
  */
 export function slabPenetrations(building: BuildingModel, inScope: (levelId: string) => boolean, tolerance: number): SlabPenetration[] {

@@ -1,14 +1,6 @@
-/**
- * Maps `document.order` → a render branch per entity `kind` (architecture L7: every kind has one).
- * Layer-hidden and render-only hidden entities (UI store) are skipped; selection state is passed
- * to each branch. 2D kinds draw on their work plane via Shape2DRenderer.
- *
- * Click: plain click → select([id]); Shift/Ctrl/Meta click → toggleSelection(id). A click also
- * toggles the `trigger:'click'` animations that target the entity (directly or through a group).
- *
- * Batchable kinds (box / cylinder / sphere, see grouping.ts) are drawn by InstancedRenderer as one
- * InstancedMesh per geometry+color group; every other kind uses a per-entity mesh branch.
- */
+// `document.order` → one render branch per `kind` (L7). Batchable kinds (grouping.ts) draw through InstancedRenderer;
+// animated, finished (textured) and decaled entities take the per-entity path. A click also toggles the entity's
+// `trigger:'click'` animations (directly or via a group).
 
 import { memo, useCallback, useMemo } from 'react';
 import type { CadDocument, Entity, EntityId, InstanceEntity, SolidKind } from '@core/model/types';
@@ -16,21 +8,9 @@ import { useStore, useViewportStore } from '@ui/store';
 import { useSelectionSet } from '@ui/store/selectionHooks';
 import { animatedEntityIds, findClickAnimationsForEntity } from './animationClickHelpers';
 import { isEntityVisible } from '../entityVisibility';
-import { BoxMesh } from './entities/BoxMesh';
-import { CylinderMesh } from './entities/CylinderMesh';
-import { SphereMesh } from './entities/SphereMesh';
-import { ExtrusionMesh } from './entities/ExtrusionMesh';
-import { MeshSolidMesh } from './entities/MeshSolidMesh';
-import { ConeMesh } from './entities/ConeMesh';
-import { TorusMesh } from './entities/TorusMesh';
-import { WedgeMesh } from './entities/WedgeMesh';
-import { PyramidMesh } from './entities/PyramidMesh';
-import { RevolutionMesh } from './entities/RevolutionMesh';
-import { SweepMesh } from './entities/SweepMesh';
 import { DecalOverlay } from './entities/DecalOverlay';
-import { LoftMesh } from './entities/LoftMesh';
-import { SubdivisionMesh } from './entities/SubdivisionMesh';
 import { TextMesh } from './entities/TextMesh';
+import { SOLID_MESHES, type SolidMeshBranch } from './entities/solidMeshes';
 import { Shape2DRenderer } from '../2d/Shape2DRenderer';
 import { isBatchable, groupEntitiesForInstancing } from './grouping';
 import { InstancedRenderer } from './InstancedRenderer';
@@ -38,36 +18,8 @@ import { GridAnnotations3D } from './GridAnnotations3D';
 import { GRID_LAYER_NAME } from './gridAnnotations';
 import { expandInstance } from '@core/geometry/instanceExpansion';
 import type { PbrMaterial } from './useMaterialProps';
-import type { SolidMeshKindProps } from './entities/SolidMeshShell';
 
-type SolidMeshBranch<E extends Entity> = (props: SolidMeshKindProps<E>) => React.ReactElement | null;
-
-const SOLID_MESHES: { [K in SolidKind]: SolidMeshBranch<Extract<Entity, { kind: K }>> } = {
-  box: BoxMesh,
-  cylinder: CylinderMesh,
-  sphere: SphereMesh,
-  extrusion: ExtrusionMesh,
-  mesh: MeshSolidMesh,
-  cone: ConeMesh,
-  torus: TorusMesh,
-  wedge: WedgeMesh,
-  pyramid: PyramidMesh,
-  revolution: RevolutionMesh,
-  sweep: SweepMesh,
-  loft: LoftMesh,
-  subdivision: SubdivisionMesh,
-};
-
-/**
- * Renders a single InstanceEntity by expanding it into world-space entities via
- * `expandInstance` and delegating to the same per-kind EntityRenderer branches.
- *
- * All sub-mesh clicks are intercepted and re-routed to the INSTANCE id so that
- * selection always targets the instance as a unit (not its expanded children).
- *
- * The expanded entity list is memoized on (componentId, position, rotation, scale)
- * so it is only recomputed when the instance transform or component changes (R9 / R7).
- */
+/** Expands an instance; every sub-mesh click selects the INSTANCE id so it moves as a unit. */
 function InstanceEntityRenderer({
   instance,
   document,
@@ -81,9 +33,6 @@ function InstanceEntityRenderer({
 }): React.ReactElement | null {
   const component = document.components[instance.componentId];
 
-  // Route all sub-entity clicks to the instance id so the gizmo and selection
-  // operate on the instance as a unit. Must be declared before any early return
-  // to satisfy the Rules of Hooks (react-hooks/rules-of-hooks).
   const handleSubSelect = useCallback(
     (_childId: EntityId, additive: boolean): void => {
       onSelect(instance.id, additive);
@@ -104,14 +53,7 @@ function InstanceEntityRenderer({
   );
 }
 
-/**
- * Render a single entity; one pure branch per `kind`.
- * Used only for NON-batchable kinds — batchable kinds (box/cylinder/sphere)
- * are rendered by InstancedRenderer.
- *
- * Memoized: `document` is passed ONLY to `instance` entities, so a selection change does not
- * re-render every other mesh branch.
- */
+/** Memoized: only `instance` entities get `document`, so a selection change does not re-render every branch. */
 const EntityRenderer = memo(function EntityRenderer({
   entity,
   selected,
@@ -126,7 +68,6 @@ const EntityRenderer = memo(function EntityRenderer({
   document?: CadDocument | undefined;
 }): React.ReactElement | null {
   if (entity.kind in SOLID_MESHES) {
-    // Keyed by kind, so the branch picked always matches the entity's narrowed type.
     const Mesh = SOLID_MESHES[entity.kind as SolidKind] as SolidMeshBranch<Entity>;
     const mesh = <Mesh entity={entity} selected={selected} onSelect={onSelect} pbrMaterial={pbrMaterial} />;
     if (entity.decals === undefined) return mesh;
@@ -141,12 +82,10 @@ const EntityRenderer = memo(function EntityRenderer({
     case 'text':
       return <TextMesh entity={entity} selected={selected} onSelect={onSelect} />;
     case 'instance':
-      // `document` is required for the instance branch — it is always passed from Entities.
       if (!document) return null;
       return <InstanceEntityRenderer instance={entity} document={document} selected={selected} onSelect={onSelect} />;
     default:
-      // Remaining 2D shape kinds (line/arc/circle/point/…) draw on their own work plane, at its
-      // elevation, through the same renderers as the 2D view (architecture L7).
+      // 2D kinds draw on their own work plane through the 2D view's renderers (L7).
       return <Shape2DRenderer entity={entity} selected={selected} />;
   }
 });
@@ -159,13 +98,10 @@ export function Entities(): React.ReactElement {
   const select = useStore((s) => s.select);
   const toggleSelection = useStore((s) => s.toggleSelection);
 
-  // Render-only visibility overrides — never touch the document (PRIME DIRECTIVE).
   const hiddenEntityIds = useViewportStore((s) => s.hiddenEntityIds);
   const hiddenLayerIds = useViewportStore((s) => s.hiddenLayerIds);
   const toggleClickAnimation = useViewportStore((s) => s.toggleClickAnimation);
 
-  // Called by each mesh on click: plain click → single-select; Shift/Ctrl/Meta → toggle. Also
-  // toggles the `trigger:'click'` animations targeting this entity (directly or via a group).
   const handleSelect = useCallback(
     (id: EntityId, additive: boolean): void => {
       if (additive) toggleSelection(id);
@@ -185,14 +121,11 @@ export function Entities(): React.ReactElement {
       .filter((entity): entity is Entity => entity !== undefined && isEntityVisible(entity, layers, hiddenLayerIds, hiddenEntityIds));
   }, [order, entities, layers, hiddenLayerIds, hiddenEntityIds]);
 
-  // Pass the materials map so batches can carry per-batch PBR overrides.
-  // Textured (finish) materials and decals need per-entity geometry, so they skip instancing.
   const hasFinish = useCallback(
     (entity: Entity): boolean =>
       entity.decals !== undefined || (entity.materialId !== undefined && materials[entity.materialId]?.finish !== undefined),
     [materials],
   );
-  // Animated entities are located by scene-object name, so they take the per-entity path.
   const animatedIds = useMemo(() => animatedEntityIds(animations, groups), [animations, groups]);
   const batches = useMemo(
     () =>
@@ -213,26 +146,20 @@ export function Entities(): React.ReactElement {
 
   return (
     <group name="entities">
-      {/* Structural grid (S-GRID): screen-space lines + camera-facing labelled bubbles */}
       <GridAnnotations3D document={document} />
 
-      {/* Instanced rendering: box / cylinder / sphere — one draw call per batch */}
       <InstancedRenderer batches={batches} selectionSet={selectionSet} onSelect={handleSelect} />
 
-      {/* Per-entity rendering: non-batchable kinds (extrusion, mesh, cone, torus, wedge, pyramid, instance) */}
-      {nonBatchableEntities.map((entity) => {
-        const material = entity.materialId ? materials[entity.materialId] : undefined;
-        return (
-          <EntityRenderer
-            key={entity.id}
-            entity={entity}
-            selected={selectionSet.has(entity.id)}
-            onSelect={handleSelect}
-            document={entity.kind === 'instance' ? document : undefined}
-            pbrMaterial={material}
-          />
-        );
-      })}
+      {nonBatchableEntities.map((entity) => (
+        <EntityRenderer
+          key={entity.id}
+          entity={entity}
+          selected={selectionSet.has(entity.id)}
+          onSelect={handleSelect}
+          document={entity.kind === 'instance' ? document : undefined}
+          pbrMaterial={entity.materialId ? materials[entity.materialId] : undefined}
+        />
+      ))}
     </group>
   );
 }

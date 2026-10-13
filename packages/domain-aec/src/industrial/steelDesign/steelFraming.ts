@@ -1,7 +1,7 @@
 /**
- * Floor framing load path: each beam is simply supported between its end nodes; its end reactions
- * go to the column at the node, or as a point load to the beam it frames into (secondary on
- * primary). Beams are analysed supporters-last, so every transferred reaction is in place.
+ * Floor framing load path: each beam is simply supported between its end nodes; its end reactions go to the column at the node, or as a
+ * point load to the beam it frames into (secondary on primary). Beams are analysed supporters-last, so every transferred reaction is in
+ * place.
  */
 
 import { projectOntoSegment } from '@lib/polygon';
@@ -51,9 +51,7 @@ function columnAt(point: readonly [number, number], z: number, columns: Readonly
     const distance = Math.hypot(column.start[0] - point[0], column.start[1] - point[1]);
     const low = Math.min(column.start[2], column.end[2]) - 150;
     const high = Math.max(column.start[2], column.end[2]) + 150;
-    if (distance <= half && z >= low && z <= high && (!best || distance < best.distance)) {
-      best = { column, distance };
-    }
+    if (distance <= half && z >= low && z <= high && (!best || distance < best.distance)) best = { column, distance };
   }
   return best?.column;
 }
@@ -70,17 +68,13 @@ function beamAt(point: readonly [number, number], carried: BeamLoads, beams: Rea
     const [bx, by] = direction(beam);
     if (Math.abs(cx * by - cy * bx) < 0.1) continue;
     const depth = beam.bar.profile?.h ?? 0;
-    if (carried.top > beam.top + BEAM_TOP_TOLERANCE || carried.top < beam.top - depth - BEAM_TOP_TOLERANCE) {
-      continue;
-    }
+    if (carried.top > beam.top + BEAM_TOP_TOLERANCE || carried.top < beam.top - depth - BEAM_TOP_TOLERANCE) continue;
     const { distance, t } = projectOntoSegment(point, beam.a, beam.b);
     const along = t * beam.lengthM * 1000;
     const flange = (beam.bar.profile?.b ?? 0) / 2 + 50;
     if (distance > flange) continue;
     if (along < BEAM_END_CLEARANCE || along > beam.lengthM * 1000 - BEAM_END_CLEARANCE) continue;
-    if (!best || distance < best.distance) {
-      best = { ref: { type: 'beam', id: beam.bar.id, at: along }, distance };
-    }
+    if (!best || distance < best.distance) best = { ref: { type: 'beam', id: beam.bar.id, at: along }, distance };
   }
   return best?.ref ?? { type: 'none' };
 }

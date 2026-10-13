@@ -26,10 +26,7 @@ export function solveCombination(
     if (target) target.fx += force.fx;
   }
   return solveFrame(
-    frame.nodes.map((node, index) => ({
-      ...node,
-      load: nodeLoads[index] ?? { fx: 0, fy: 0, mz: 0 },
-    })),
+    frame.nodes.map((node, index) => ({ ...node, load: nodeLoads[index] ?? { fx: 0, fy: 0, mz: 0 } })),
     frame.members.map((member) => {
       let [qx, qy] = [0, 0];
       for (const [loadCase, load] of Object.entries(member.loads) as [LoadCase, { qx: number; qy: number }][]) {
@@ -46,8 +43,8 @@ export interface BaseReaction {
   readonly frame: string;
   readonly columnId: string;
   /**
-   * Characteristic support reaction per load case on the column: horizontal (N, +x), vertical
-   * (N, + up) and base moment (N·mm, counter-clockwise +; 0 for pinned bases).
+   * Characteristic support reaction per load case on the column: horizontal (N, +x), vertical (N, + up) and base moment (N·mm,
+   * counter-clockwise +; 0 for pinned bases).
    */
   readonly cases: Partial<Record<LoadCase, { readonly horizontal: number; readonly vertical: number; readonly moment: number }>>;
 }
@@ -65,10 +62,7 @@ export function baseReactions(
   return frames.flatMap((frame) => {
     const present = (loadCase: LoadCase): boolean =>
       loadCase !== 'WLp' && loadCase !== 'WRp' ? true : frame.windCases.some((windCase) => windCase.loadCase === loadCase);
-    const results = LOAD_CASES.filter(present).map((loadCase) => ({
-      loadCase,
-      result: solveCombination(frame, { [loadCase]: 1 }),
-    }));
+    const results = LOAD_CASES.filter(present).map((loadCase) => ({ loadCase, result: solveCombination(frame, { [loadCase]: 1 }) }));
     return frame.members.flatMap((member, index): BaseReaction[] => {
       const [a, b] = [frame.nodes[member.geometry.a], frame.nodes[member.geometry.b]];
       if (member.role !== 'column' || !member.ends[0] || !a || !b) return [];
@@ -80,11 +74,7 @@ export function baseReactions(
         const forces = result?.members[index];
         if (!forces) continue;
         const [axial, shear] = [-forces.axial[0], forces.shear[0]];
-        cases[loadCase] = {
-          horizontal: c * axial - s * shear,
-          vertical: s * axial + c * shear,
-          moment: fixed ? -forces.moment[0] : 0,
-        };
+        cases[loadCase] = { horizontal: c * axial - s * shear, vertical: s * axial + c * shear, moment: fixed ? -forces.moment[0] : 0 };
       }
       return [{ frame: frame.label, columnId: member.elementId, cases }];
     });

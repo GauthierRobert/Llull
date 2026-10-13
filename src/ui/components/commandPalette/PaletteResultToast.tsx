@@ -1,9 +1,5 @@
-/**
- * Result toast for commands run from the palette: the palette closes on run, so the command's
- * `summary` (its feedback signal) is shown here until dismissed or timed out (paused on hover /
- * focus). The live region stays mounted so screen readers announce each new result.
- * Presentation only.
- */
+// Palette closes on run, so the command `summary` toasts here until dismissed / timed out (paused on hover / focus);
+// the live region stays mounted so each result is announced.
 
 import React, { useEffect, useState } from 'react';
 import { usePaletteStore } from '@ui/store';
@@ -14,7 +10,7 @@ import { humanizeName } from './paramForm';
 
 const TOAST_MS = 6000;
 
-/** One toast; keyed by result id so its pause/timer state never leaks into the next one. */
+/** Keyed by result id: pause/timer state never leaks into the next one. */
 function ResultCard({ result }: { result: PaletteResult }): React.ReactElement {
   const dismissResult = usePaletteStore((s) => s.dismissResult);
   const [paused, setPaused] = useState(false);

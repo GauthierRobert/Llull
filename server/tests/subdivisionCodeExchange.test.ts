@@ -37,10 +37,7 @@ describe.skipIf(!hasPython)('python subdivision port', () => {
       'cage = json.load(sys.stdin)',
       "print(json.dumps(_subdivision_patches(cage['vertices'], cage['faces'], cage['creases'])))",
     ].join('\n');
-    const run = spawnSync('python3', ['-c', driver], {
-      input: JSON.stringify(cage),
-      encoding: 'utf8',
-    });
+    const run = spawnSync('python3', ['-c', driver], { input: JSON.stringify(cage), encoding: 'utf8' });
     expect(run.status, run.stderr).toBe(0);
     const fromPython = JSON.parse(run.stdout) as number[][][];
     const fromTypeScript = subdivisionPatches(cage);
@@ -53,22 +50,14 @@ describe.skipIf(!hasPython)('python subdivision port', () => {
 
 describe.skipIf(!hasPython)('exported subdivision code', () => {
   const cage = creasedCage();
-  const doc = execute(createEmptyDocument(), 'add_subdivision_solid', {
-    ...cage,
-    levels: 2,
-    position: [5, 0, 0],
-    name: 'grip',
-  }).document;
+  const doc = execute(createEmptyDocument(), 'add_subdivision_solid', { ...cage, levels: 2, position: [5, 0, 0], name: 'grip' }).document;
 
   it.each(['cadquery', 'build123d', 'freecad'] as const)('%s calls subdivision(...) and parses as Python', (language) => {
     const text = (execute(doc, 'export_code', { language }).data as { text: string }).text;
     expect(text).toMatch(/= subdivision\(\[/);
     expect(text).toContain('levels=2');
     expect(text).not.toMatch(/= mesh\(\[/);
-    const parse = spawnSync('python3', ['-c', 'import ast, sys; ast.parse(sys.stdin.read())'], {
-      input: text,
-      encoding: 'utf8',
-    });
+    const parse = spawnSync('python3', ['-c', 'import ast, sys; ast.parse(sys.stdin.read())'], { input: text, encoding: 'utf8' });
     expect(parse.status, parse.stderr).toBe(0);
   });
 

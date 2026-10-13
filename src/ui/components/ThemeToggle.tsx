@@ -1,7 +1,4 @@
-/**
- * ThemeToggle — icon button flipping the dark / light color theme.
- * Reads/writes useThemeStore only (presentation state).
- */
+// Dark / light theme toggle (useThemeStore).
 
 import React from 'react';
 import { useThemeStore } from '@ui/store';

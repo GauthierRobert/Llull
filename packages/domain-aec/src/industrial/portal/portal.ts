@@ -149,16 +149,8 @@ export const addPortalFrameBuilding = defineCommand({
     const used = new Set(gridLabels(building));
     const overrun = mm(1500);
     const lines: Array<{ numbered: boolean; from: Vec2; to: Vec2 }> = [
-      ...columnLines.map((x) => ({
-        numbered: false,
-        from: [x, y0 - overrun] as Vec2,
-        to: [x, yEnd + overrun] as Vec2,
-      })),
-      ...ys.map((y) => ({
-        numbered: true,
-        from: [x0 - overrun, y] as Vec2,
-        to: [x1 + overrun, y] as Vec2,
-      })),
+      ...columnLines.map((x) => ({ numbered: false, from: [x, y0 - overrun] as Vec2, to: [x, yEnd + overrun] as Vec2 })),
+      ...ys.map((y) => ({ numbered: true, from: [x0 - overrun, y] as Vec2, to: [x1 + overrun, y] as Vec2 })),
     ];
     for (const { numbered, from, to } of lines) {
       const label = nextFreeLabel(used, numbered);
@@ -281,13 +273,7 @@ export const addPortalFrameBuilding = defineCommand({
         `${memberCount} steel members (${tonnes.toFixed(1)} t)` +
         `${monopitch ? ', monopitch roof' : ''}${columnBase === 'fixed' ? ', fixed column bases' : ''}` +
         `${params.crane ? `, crane runway ${params.crane.capacity ?? 10} t` : ''}, ${gridCount} grid lines, ${ids.length - memberCount - gridCount} other element(s).`,
-      {
-        elementIds: ids,
-        steelTonnes: tonnes,
-        frames: bays + 1,
-        baySpacing: bay,
-        spans: spanWidths.length,
-      },
+      { elementIds: ids, steelTonnes: tonnes, frames: bays + 1, baySpacing: bay, spans: spanWidths.length },
     );
   },
 });

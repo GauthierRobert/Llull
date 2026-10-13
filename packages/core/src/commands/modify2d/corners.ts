@@ -20,8 +20,8 @@ interface Corner {
 }
 
 /**
- * `poly` with `vertexIndex` replaced by `first`, `second`, plus a new corner piece (`kind`, `id`,
- * `geometry`) placed on the polyline's plane, colour and layer.
+ * `poly` with `vertexIndex` replaced by `first`, `second`, plus a new corner piece (`kind`, `id`, `geometry`) placed on the polyline's
+ * plane, colour and layer.
  */
 function commitCorner<K extends 'arc' | 'line'>(
   doc: CadDocument,
@@ -31,47 +31,34 @@ function commitCorner<K extends 'arc' | 'line'>(
   piece: { kind: K; id: string; geometry: Omit<Extract<Entity, { kind: K }>, keyof BaseEntity> },
 ): { document: CadDocument; pointCount: number } {
   const points = poly.points.flatMap((p, i): Vec2[] => (i === vertexIndex ? [first, second] : [p]));
-  const updated: Entity = { ...poly, points };
   const extra = newEntity(piece.kind, piece.id, piece.geometry, poly.position, poly.color, {
     rotation: poly.rotation,
     layerId: poly.layerId,
   });
-  return {
-    document: withEntity(replaceEntity(doc, updated), extra),
-    pointCount: points.length,
-  };
+  return { document: withEntity(replaceEntity(doc, { ...poly, points }), extra), pointCount: points.length };
 }
 
 /**
- * The corner of `poly` at `vertexIndex` (vertex, vectors to its two neighbours, their lengths), or
- * the no-op result when the index is out of range or a neighbouring segment has zero length.
- * Also rejects polylines with fewer than 3 points.
+ * The corner of `poly` at `vertexIndex` (vertex, vectors to its two neighbours, their lengths), or the no-op result when the index is out
+ * of range or a neighbouring segment has zero length. Also rejects polylines with fewer than 3 points.
  */
 function resolveCorner(doc: CadDocument, command: string, verb: string, poly: PolylineEntity, vertexIndex: number): Corner | CommandResult {
   const n = poly.points.length;
-  if (n < 3) {
-    return noop(doc, `${command}: polyline ${poly.id} needs at least 3 points to ${verb} a corner (got ${n}).`);
-  }
+  if (n < 3) return noop(doc, `${command}: polyline ${poly.id} needs at least 3 points to ${verb} a corner (got ${n}).`);
   const isValidIndex = poly.closed ? vertexIndex >= 0 && vertexIndex < n : vertexIndex >= 1 && vertexIndex <= n - 2;
-  if (!isValidIndex) {
+  if (!isValidIndex)
     return noop(
       doc,
       `${command}: vertexIndex ${vertexIndex} is out of range for a ${poly.closed ? 'closed' : 'open'} polyline with ${n} points. ` +
         `Valid range: ${poly.closed ? `0..${n - 1}` : `1..${n - 2}`}.`,
     );
-  }
-  const prevIdx = poly.closed ? (vertexIndex - 1 + n) % n : vertexIndex - 1;
-  const nextIdx = poly.closed ? (vertexIndex + 1) % n : vertexIndex + 1;
-  const prev = elementAt(poly.points, prevIdx);
   const vertex = elementAt(poly.points, vertexIndex);
-  const next = elementAt(poly.points, nextIdx);
-  const toPrev = sub2(prev, vertex);
-  const toNext = sub2(next, vertex);
+  const toPrev = sub2(elementAt(poly.points, poly.closed ? (vertexIndex - 1 + n) % n : vertexIndex - 1), vertex);
+  const toNext = sub2(elementAt(poly.points, poly.closed ? (vertexIndex + 1) % n : vertexIndex + 1), vertex);
   const lenPrev = len2(toPrev);
   const lenNext = len2(toNext);
-  if (lenPrev < 1e-12 || lenNext < 1e-12) {
+  if (lenPrev < 1e-12 || lenNext < 1e-12)
     return noop(doc, `${command}: degenerate segment at vertex ${vertexIndex} — zero-length segment.`);
-  }
   return { poly, vertex, toPrev, toNext, lenPrev, lenNext };
 }
 
@@ -96,8 +83,7 @@ export const fillet2D = defineCommand({
       .number()
       .int()
       .describe(
-        '0-based index of the polyline vertex to fillet. ' +
-          'For open polylines: valid range is 1 to N-2 (interior vertices). ' +
+        '0-based index of the polyline vertex to fillet. For open polylines: valid range is 1 to N-2 (interior vertices). ' +
           'For closed polylines: valid range is 0 to N-1.',
       ),
   }),
@@ -108,28 +94,20 @@ export const fillet2D = defineCommand({
     const corner = resolveCorner(doc, 'fillet_2d', 'fillet', found, vertexIndex);
     if ('summary' in corner) return corner;
     const { poly, vertex, toPrev, toNext, lenPrev, lenNext } = corner;
-
     const dirPrev = normalize2(toPrev);
     const dirNext = normalize2(toNext);
-
     const halfAngle = angleFromCosine(dot2(dirPrev, dirNext)) / 2;
-
-    if (halfAngle < 1e-9 || Math.abs(halfAngle - Math.PI / 2) < 1e-9) {
+    if (halfAngle < 1e-9 || Math.abs(halfAngle - Math.PI / 2) < 1e-9)
       return noop(doc, `fillet_2d: segments at vertex ${vertexIndex} are collinear — no fillet possible.`);
-    }
-
     const tanHalf = Math.tan(halfAngle);
     if (!isFinite(tanHalf) || tanHalf < 1e-12) return noop(doc, `fillet_2d: degenerate angle at vertex ${vertexIndex}.`);
     const tangentDist = radius / tanHalf;
-
-    if (tangentDist > lenPrev - 1e-9 || tangentDist > lenNext - 1e-9) {
+    if (tangentDist > lenPrev - 1e-9 || tangentDist > lenNext - 1e-9)
       return noop(
         doc,
         `fillet_2d: radius ${radius} is too large for the adjacent segments at vertex ${vertexIndex} ` +
           `(need tangent distance ${tangentDist.toFixed(4)}, available: prev=${lenPrev.toFixed(4)}, next=${lenNext.toFixed(4)}).`,
       );
-    }
-
     const tangentPrev = add2(vertex, scale2(dirPrev, tangentDist));
     const tangentNext = add2(vertex, scale2(dirNext, tangentDist));
     // The arc centre lies on the bisector at radius / sin(halfAngle) from the vertex.
@@ -141,14 +119,12 @@ export const fillet2D = defineCommand({
     const leftTurn = cross2(dirPrev, dirNext) > 0;
     const arcStart = leftTurn ? endAngle : startAngle;
     const arcEnd = leftTurn ? startAngle : endAngle;
-
     const arcId = nextId('arc');
     const { document, pointCount } = commitCorner(doc, poly, vertexIndex, [tangentPrev, tangentNext], {
       kind: 'arc',
       id: arcId,
       geometry: { center: arcCenter, radius, startAngle: arcStart, endAngle: arcEnd },
     });
-
     return changed(
       document,
       `Filleted polyline ${id} at vertex ${vertexIndex} with radius ${radius} → ` + `updated polyline (${pointCount} pts) + arc ${arcId}.`,
@@ -170,8 +146,7 @@ export const chamfer2D = defineCommand({
     'located distance back from the vertex along each adjacent segment, ' +
     'and a new line entity is added connecting those two points (the bevel face). ' +
     'vertexIndex is 0-based; for an open polyline valid range is 1 to N-2 (interior vertices only); ' +
-    'for a closed polyline any vertex 0 to N-1 is valid. ' +
-    'No-op if distance is too large for the adjacent segment lengths.',
+    'for a closed polyline any vertex 0 to N-1 is valid. No-op if distance is too large for the adjacent segment lengths.',
   params: z.object({
     id: z.string().describe('Id of the polyline entity to chamfer.'),
     distance: z.number().describe('Chamfer setback distance from the vertex along each adjacent segment. Must be > 0.'),
@@ -179,8 +154,7 @@ export const chamfer2D = defineCommand({
       .number()
       .int()
       .describe(
-        '0-based index of the polyline vertex to chamfer. ' +
-          'For open polylines: valid range is 1 to N-2. ' +
+        '0-based index of the polyline vertex to chamfer. For open polylines: valid range is 1 to N-2. ' +
           'For closed polylines: valid range is 0 to N-1.',
       ),
   }),
@@ -191,28 +165,22 @@ export const chamfer2D = defineCommand({
     const corner = resolveCorner(doc, 'chamfer_2d', 'chamfer', found, vertexIndex);
     if ('summary' in corner) return corner;
     const { poly, vertex, toPrev, toNext, lenPrev, lenNext } = corner;
-
-    if (distance > lenPrev - 1e-9 || distance > lenNext - 1e-9) {
+    if (distance > lenPrev - 1e-9 || distance > lenNext - 1e-9)
       return report(
         doc,
         `chamfer_2d: distance ${distance} is too large for the adjacent segments at vertex ${vertexIndex} ` +
           `(prev segment length=${lenPrev.toFixed(4)}, next segment length=${lenNext.toFixed(4)}).`,
       );
-    }
-
     const dirPrev = normalize2(toPrev);
     const dirNext = normalize2(toNext);
-
     const bevelPrev = add2(vertex, scale2(dirPrev, distance));
     const bevelNext = add2(vertex, scale2(dirNext, distance));
-
     const bevelId = nextId('line');
     const { document, pointCount } = commitCorner(doc, poly, vertexIndex, [bevelPrev, bevelNext], {
       kind: 'line',
       id: bevelId,
       geometry: { start: bevelPrev, end: bevelNext },
     });
-
     return changed(
       document,
       `Chamfered polyline ${id} at vertex ${vertexIndex} with distance ${distance} → ` +

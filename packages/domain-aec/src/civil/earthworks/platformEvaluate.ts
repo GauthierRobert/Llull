@@ -13,10 +13,7 @@ import { toMetres } from '@core/model/units';
 const CUT_COLOR = '#c0794a';
 const FILL_COLOR = '#8fae6b';
 
-interface MeshBuffer {
-  positions: number[];
-  indices: number[];
-}
+type MeshBuffer = { positions: number[]; indices: number[] };
 
 /** Pushes a triangle wound so its normal faces up (+Z). */
 function pushTriangle(
@@ -32,10 +29,7 @@ function pushTriangle(
 }
 
 function batterMeshes(points: ReadonlyArray<DaylightPoint>, elevation: number): Record<'cut' | 'fill', MeshBuffer> {
-  const meshes = {
-    cut: { positions: [], indices: [] } as MeshBuffer,
-    fill: { positions: [], indices: [] } as MeshBuffer,
-  };
+  const meshes = { cut: { positions: [], indices: [] } as MeshBuffer, fill: { positions: [], indices: [] } as MeshBuffer };
   points.forEach((current, i) => {
     const next = points[(i + 1) % points.length] as DaylightPoint;
     const mode = current.mode === 'none' ? next.mode : current.mode;

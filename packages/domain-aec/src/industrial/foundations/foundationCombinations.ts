@@ -24,9 +24,9 @@ export function combine(reaction: BaseReaction, factors: Factors): { v: number; 
 }
 
 /**
- * Moment (kN·m, magnitude) the column delivers to the footing about its base: the reaction moment
- * m on the column acts on the footing reversed, the reaction h at the footing top (height `lever`)
- * contributes h·lever, so M = |m − h·lever| (both add under wind from either side).
+ * Moment (kN·m, magnitude) the column delivers to the footing about its base: the reaction moment m on the column acts on the footing
+ * reversed, the reaction h at the footing top (height `lever`) contributes h·lever, so M = |m − h·lever| (both add under wind from either
+ * side).
  */
 export function footingMoment(m: number, h: number, lever: number): number {
   return Math.abs(m - h * lever);
@@ -54,8 +54,8 @@ export function hasCase(reaction: BaseReaction, loadCase: LoadCase): boolean {
 }
 
 /**
- * Wind cases of the foundation combinations: the four suction cases plus the windward roof-pressure
- * cases of steep / flat roofs (absent cases contribute nothing in `combine`).
+ * Wind cases of the foundation combinations: the four suction cases plus the windward roof-pressure cases of steep / flat roofs (absent
+ * cases contribute nothing in `combine`).
  */
 export const FOUNDATION_WIND_CASES = [...WIND_CASES, ...WIND_PRESSURE_CASES];
 
@@ -98,10 +98,7 @@ export function ultimateCombinations(wind: boolean, crane: boolean, favourable: 
   }
   if (crane) {
     for (const [label, loadCase] of CRANE_CASES) {
-      list.push({
-        name: name(`1.35${label}`),
-        factors: { G: g, [loadCase]: GAMMA_CRANE, ...companion },
-      });
+      list.push({ name: name(`1.35${label}`), factors: { G: g, [loadCase]: GAMMA_CRANE, ...companion } });
     }
   }
   return list;
@@ -132,12 +129,7 @@ export function findPlate(building: BuildingModel, columnId: string): BasePlateE
   return elementsOf(building, 'plate').find((plate) => plate.memberId === columnId) ?? null;
 }
 
-export interface Candidate {
-  value: number;
-  limit: number;
-  combination: string;
-  utilisation: number;
-}
+export type Candidate = { value: number; limit: number; combination: string; utilisation: number };
 
 export function worst<T extends Candidate>(candidates: ReadonlyArray<T>): T | null {
   return highestUtilisation(candidates) ?? null;

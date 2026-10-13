@@ -1,7 +1,6 @@
 /**
- * Moment-frame analysis behind check_steel_members: detects the frames from the rigid joints,
- * solves each as a 2D frame, and returns the member rows, the frame reports and the storeys they
- * stabilise.
+ * Moment-frame analysis behind check_steel_members: detects the frames from the rigid joints, solves each as a 2D frame, and returns the
+ * member rows, the frame reports and the storeys they stabilise.
  */
 
 import { notionalLabel } from './steelBracingChecks';
@@ -60,13 +59,7 @@ function analyseFrame(
   const bars = [...frame.columns, ...frame.beams.map((beam) => beam.loads.bar)];
   const failed = (reason: string): ReturnType<typeof analyseFrame> => ({
     rows: new Map(bars.map((bar) => [bar.id, skippedRow(bar, reason)])),
-    report: {
-      ...marks,
-      status: 'mechanism',
-      alphaCritical: null,
-      amplification: 1,
-      jointMoments: {},
-    },
+    report: { ...marks, status: 'mechanism', alphaCritical: null, amplification: 1, jointMoments: {} },
     warnings: [`${frame.label}: ${reason}`],
   });
   const solutions = solveFrameSystem(system, params.notionalFactor);
@@ -143,10 +136,7 @@ export function analyseFrames(
     reports.push(outcome.report);
     warnings.push(...outcome.warnings);
     if (outcome.report.status === 'solved') {
-      coverage.push({
-        direction: frame.direction,
-        beamTops: frame.beams.map((beam) => beam.loads.top),
-      });
+      coverage.push({ direction: frame.direction, beamTops: frame.beams.map((beam) => beam.loads.top) });
     }
   }
   return { rows, reports, coverage, warnings };

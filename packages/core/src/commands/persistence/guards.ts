@@ -138,20 +138,10 @@ export function validateLayer(v: unknown): v is Layer {
   );
 }
 
-/**
- * Validate the base fields shared by all entities, plus kind-specific numeric fields.
- * Returns a descriptive error string on failure, or `null` on success.
- */
+/** First problem of an entity's base fields, then its kind-specific fields, or null. */
 export function validateEntityValue(v: unknown): string | null {
   if (!isRecord(v)) return 'entity is not an object';
-
-  const id = v['id'];
-  const kind = v['kind'];
-  const position = v['position'];
-  const rotation = v['rotation'];
-  const layerId = v['layerId'];
-  const color = v['color'];
-
+  const { id, kind, position, rotation, layerId, color } = v;
   if (typeof id !== 'string') return 'entity.id is not a string';
   if (typeof kind !== 'string') return `entity ${id}: kind is not a string`;
   if (!VALID_ENTITY_KINDS.has(kind)) return `entity ${id}: unknown kind '${kind}'`;
@@ -159,89 +149,51 @@ export function validateEntityValue(v: unknown): string | null {
   if (!isVec3(rotation)) return `entity ${id}: rotation must be a Vec3 of finite numbers`;
   if (typeof layerId !== 'string') return `entity ${id}: layerId is not a string`;
   if (!isHexColor(color)) return `entity ${id}: color '${String(color)}' is not a valid hex color (#rrggbb)`;
-
   const decals = decalsProblem(v['decals']);
   if (decals !== null) return `entity ${id}: ${decals}`;
-
-  // Kind-specific numeric invariants.
   for (const field of POSITIVE_FIELDS[kind] ?? []) {
     const value = v[field];
     if (!isPositiveNumber(value)) return `entity ${id} (${kind}): ${field} must be finite and > 0, got ${String(value)}`;
   }
-  switch (kind) {
-    case 'box':
-    case 'wedge': {
-      const size = v['size'];
-      if (!Array.isArray(size) || size.length !== 3) return `entity ${id} (${kind}): size must be a 3-element array`;
-      for (let i = 0; i < 3; i++) {
-        const c = size[i] as unknown;
-        if (!isPositiveNumber(c)) return `entity ${id} (${kind}): size[${i}] must be finite and > 0, got ${String(c)}`;
-      }
-      break;
-    }
-    case 'extrusion': {
-      const depth = v['depth'];
-      if (!isFiniteNumber(depth)) return `entity ${id} (extrusion): depth must be a finite number, got ${String(depth)}`;
-      const curves = curvesProblem(v['curves']);
-      if (curves !== null) return `entity ${id} (extrusion): ${curves}`;
-      break;
-    }
-    case 'revolution': {
-      const curves = curvesProblem(v['curves']);
-      if (curves !== null) return `entity ${id} (revolution): ${curves}`;
-      break;
-    }
-    case 'sweep': {
-      const problem = sweepProblem(v);
-      if (problem !== null) return `entity ${id} (sweep): ${problem}`;
-      break;
-    }
-    case 'loft': {
-      const problem = ringsProblem(v['rings'], 3, 2);
-      if (problem !== null) return `entity ${id} (loft): ${problem}`;
-      if (typeof v['ruled'] !== 'boolean') return `entity ${id} (loft): ruled must be a boolean`;
-      break;
-    }
-    case 'subdivision': {
-      const problem = subdivisionProblem(v);
-      if (problem !== null) return `entity ${id} (subdivision): ${problem}`;
-      break;
-    }
-    case 'image': {
-      const problem = imageProblem(v);
-      if (problem !== null) return `entity ${id} (image): ${problem}`;
-      break;
-    }
-    case 'mesh': {
-      const brep = v['brep'];
-      if (brep === undefined) break;
-      const problem = validateShapeRecipe(brep, validateEntityValue);
-      if (problem !== null) return `entity ${id} (mesh): brep recipe invalid — ${problem}`;
-      break;
-    }
-    case 'instance': {
-      const componentId = v['componentId'];
-      if (typeof componentId !== 'string' || componentId.length === 0)
-        return `entity ${id} (instance): componentId must be a non-empty string, got ${String(componentId)}`;
-      // scale is optional; when present must be a 3-element finite array
-      const scale = v['scale'];
-      if (scale !== undefined) {
-        if (!Array.isArray(scale) || scale.length !== 3) return `entity ${id} (instance): scale must be a 3-element array when present`;
-        for (let i = 0; i < 3; i++) {
-          const c = scale[i] as unknown;
-          if (!isFiniteNumber(c)) return `entity ${id} (instance): scale[${i}] must be a finite number, got ${String(c)}`;
-        }
-      }
-      break;
-    }
-  }
-
-  return null;
+  const problem = KIND_PROBLEMS[kind]?.(v) ?? null;
+  return problem === null ? null : `entity ${id} (${kind}): ${problem}`;
 }
 
-/**
- * Validate a Material entry. Returns a descriptive error string on failure, or `null` on success.
- */
+/** First problem of `v[key]` as a `length`-component array whose items pass `ok`, or null. */
+function tupleProblem(v: Record<string, unknown>, key: string, ok: (c: unknown) => boolean, what: string): string | null {
+  const value = v[key];
+  if (!Array.isArray(value) || value.length !== 3) return `${key} must be a 3-element array`;
+  const bad = value.findIndex((c: unknown) => !ok(c));
+  return bad < 0 ? null : `${key}[${bad}] must be ${what}, got ${String(value[bad])}`;
+}
+
+const sizeProblem = (v: Record<string, unknown>): string | null => tupleProblem(v, 'size', isPositiveNumber, 'finite and > 0');
+
+/** Kind-specific structural checks (message tail after `entity <id> (<kind>): `). */
+const KIND_PROBLEMS: Readonly<Record<string, (v: Record<string, unknown>) => string | null>> = {
+  box: sizeProblem,
+  wedge: sizeProblem,
+  extrusion: (v) => (isFiniteNumber(v['depth']) ? curvesProblem(v['curves']) : `depth must be a finite number, got ${String(v['depth'])}`),
+  revolution: (v) => curvesProblem(v['curves']),
+  sweep: sweepProblem,
+  loft: (v) => ringsProblem(v['rings'], 3, 2) ?? (typeof v['ruled'] === 'boolean' ? null : 'ruled must be a boolean'),
+  subdivision: subdivisionProblem,
+  image: imageProblem,
+  mesh: (v) => {
+    const problem = v['brep'] === undefined ? null : validateShapeRecipe(v['brep'], validateEntityValue);
+    return problem === null ? null : `brep recipe invalid — ${problem}`;
+  },
+  instance: (v) => {
+    const componentId = v['componentId'];
+    if (typeof componentId !== 'string' || componentId.length === 0)
+      return `componentId must be a non-empty string, got ${String(componentId)}`;
+    if (v['scale'] === undefined) return null;
+    const problem = tupleProblem(v, 'scale', isFiniteNumber, 'a finite number');
+    return problem?.startsWith('scale must') ? `${problem} when present` : problem;
+  },
+};
+
+/** First problem of a Material entry, or null. */
 export function validateMaterialValue(name: string, v: unknown): string | null {
   if (!isRecord(v)) return `material '${name}' is not an object`;
   const { density, color, metalness, roughness } = v;
@@ -262,9 +214,7 @@ export function validateMaterialValue(name: string, v: unknown): string | null {
   return null;
 }
 
-/**
- * Validate a Parameter entry. Returns a descriptive error string or `null`.
- */
+/** First problem of a Parameter entry, or null. */
 export function validateParameterValue(name: string, v: unknown): string | null {
   if (!isRecord(v)) return `parameter '${name}' is not an object`;
   if (typeof v['name'] !== 'string') return `parameter '${name}': name field must be a string`;

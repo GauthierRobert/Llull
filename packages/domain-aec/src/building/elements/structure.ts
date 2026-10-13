@@ -16,8 +16,8 @@ import { levelIdParam } from '../levelParams';
 const concreteMaterialParam = z.string().optional().describe('Material. Default concrete.');
 
 /**
- * Drops walls with a free endpoint (one touching no other wall's endpoint) until none remain —
- * removes partitions T-joined to a perimeter so the enclosing loop is left.
+ * Drops walls with a free endpoint (one touching no other wall's endpoint) until none remain — removes partitions T-joined to a perimeter
+ * so the enclosing loop is left.
  */
 function pruneDanglingWalls(walls: ReadonlyArray<WallElement>, tolerance: number): WallElement[] {
   let kept = [...walls];
@@ -75,9 +75,7 @@ function resolveOutline(
     };
   }
   const walls = (source.wallIds ?? []).map((id) => building.elements[id]);
-  if (source.wallIds === undefined || !walls.every((wall): wall is WallElement => wall?.category === 'wall')) {
-    return { outline: null };
-  }
+  if (source.wallIds === undefined || !walls.every((wall): wall is WallElement => wall?.category === 'wall')) return { outline: null };
   if (new Set(walls.map((wall) => wall.levelId)).size > 1) return { outline: null, failure: 'wallIds belong to different levels' };
   const loop = wallLoop(walls);
   const shift = wallShift(Math.max(...walls.map((wall) => wall.thickness)) / 2);
@@ -341,10 +339,9 @@ const MAX_RISERS = 200;
 export const addStair = defineCommand({
   name: 'add_stair',
   description:
-    'Add a straight-run stair climbing one full level. Riser count defaults to the level height ÷ 175 mm ' +
-    '(rounded up), so risers are equal; tread default 280 mm. The summary reports the Blondel rule ' +
-    '(2R + G, comfortable between 600 and 650 mm). Refused above 200 risers or if a stair with the same ' +
-    'start and angle already exists on the level.',
+    'Add a straight-run stair climbing one full level. Riser count defaults to the level height ÷ 175 mm (rounded up), so risers are ' +
+    'equal; tread default 280 mm. The summary reports the Blondel rule (2R + G, comfortable between 600 and 650 mm). Refused above 200 ' +
+    'risers or if a stair with the same start and angle already exists on the level.',
   params: z.object({
     start: vec2('Plan point [x, y] at the middle of the first riser.'),
     angle: z.number().optional().describe('Run direction in radians, counter-clockwise from +X. Default 0 (climbs toward +X).'),
@@ -377,9 +374,7 @@ export const addStair = defineCommand({
       resolution.level.id,
       (element) => element.angle === angle && samePoint(element.start, start),
     );
-    if (stairTwin) {
-      return noop(doc, duplicateSummary('add_stair', stairTwin, 'a stair from this start and angle'));
-    }
+    if (stairTwin) return noop(doc, duplicateSummary('add_stair', stairTwin, 'a stair from this start and angle'));
     const stair: StairElement = {
       id: nextElementId(resolution.building, 'stair'),
       category: 'stair',

@@ -1,17 +1,15 @@
 /**
- * glTF 2.0 scene of a document: one node + mesh per exported part (an entity, or each child of an
- * instance) and one deduplicated PBR material per appearance (assigned document material, else the
- * entity colour with the viewport's default metalness/roughness; a material finish embeds its
- * procedural albedo / normal / roughness maps with box-projected UVs). Colours are converted from sRGB
- * hex to the linear factors glTF requires; normals are creased (smooth below CREASE_ANGLE) so
- * curved surfaces shade smoothly in external renderers.
+ * glTF 2.0 scene of a document: one node + mesh per exported part (an entity, or each child of an instance) and one deduplicated PBR
+ * material per appearance (assigned document material, else the entity colour with the viewport's default metalness/roughness; a material
+ * finish embeds its procedural albedo / normal / roughness maps with box-projected UVs). Colours are converted from sRGB hex to the linear
+ * factors glTF requires; normals are creased (smooth below CREASE_ANGLE) so curved surfaces shade smoothly in external renderers.
  */
 
 import type { CadDocument, Entity, MaterialFinish, Vec3 } from '../../model/types';
 import { decalPatch } from '../../geometry/decal';
 import { rasterizeText } from '../../lib/blockFont';
 import { entityLocalToWorld } from '../../geometry/entityFrame';
-import { dot3 } from '../../lib/vec3';
+import { dot3, vec3At } from '../../lib/vec3';
 import { parseHexRgb } from '../../lib/isHexColor';
 import { boxUv, finishMaps } from '../../geometry/finishMaps';
 import { encodePng } from '../../lib/png';
@@ -55,51 +53,26 @@ function appearanceOf(doc: CadDocument, entity: Entity, inherited?: string): Par
     const { name, color, metalness, roughness, finish } = material;
     return { name, color, metalness, roughness, ...(finish !== undefined ? { finish } : {}) };
   }
-  return {
-    name: entity.color,
-    color: entity.color,
-    metalness: DEFAULT_METALNESS,
-    roughness: DEFAULT_ROUGHNESS,
-  };
+  return { name: entity.color, color: entity.color, metalness: DEFAULT_METALNESS, roughness: DEFAULT_ROUGHNESS };
 }
 
-/**
- * Exported parts of the entities named by `ids` (instances expand into one part per child; 2D and
- * empty parts are dropped).
- */
+/** Exported parts of the entities named by `ids` (instances expand into one part per child; 2D and empty parts are dropped). */
 export function collectSceneParts(doc: CadDocument, ids: readonly string[]): ScenePart[] {
   const parts: ScenePart[] = [];
+  const add = (name: string, entityId: string, solid: Entity, appearance: PartAppearance): void => {
+    const tris = solidTriangles(solid);
+    if (tris.length > 0) parts.push({ name, entityId, kind: solid.kind, tris, localTris: localTriangles(solid), appearance });
+  };
   for (const id of ids) {
     const entity = doc.entities[id];
     if (entity === undefined) continue;
     const label = entity.name ?? entity.id;
-    if (entity.kind === 'instance') {
+    if (entity.kind !== 'instance') add(label, id, entity, appearanceOf(doc, entity));
+    else {
       const component = doc.components[entity.componentId];
-      if (component === undefined) continue;
-      for (const child of expandInstance(entity, component)) {
-        const tris = solidTriangles(child);
-        if (tris.length === 0) continue;
-        parts.push({
-          name: `${label}/${child.name ?? child.id}`,
-          entityId: entity.id,
-          kind: child.kind,
-          tris,
-          localTris: localTriangles(child),
-          appearance: appearanceOf(doc, child, entity.materialId),
-        });
-      }
-      continue;
+      for (const child of component === undefined ? [] : expandInstance(entity, component))
+        add(`${label}/${child.name ?? child.id}`, entity.id, child, appearanceOf(doc, child, entity.materialId));
     }
-    const tris = solidTriangles(entity);
-    if (tris.length === 0) continue;
-    parts.push({
-      name: label,
-      entityId: id,
-      kind: entity.kind,
-      tris,
-      localTris: localTriangles(entity),
-      appearance: appearanceOf(doc, entity),
-    });
   }
   return parts;
 }
@@ -124,10 +97,7 @@ export function collectDecalParts(doc: CadDocument, ids: readonly string[]): Dec
       const patch = decalPatch(decal, local);
       if (patch.positions.length === 0) continue;
       const positions: number[] = [];
-      for (let i = 0; i < patch.positions.length; i += 3) {
-        const p: Vec3 = [patch.positions[i] ?? 0, patch.positions[i + 1] ?? 0, patch.positions[i + 2] ?? 0];
-        positions.push(...entityLocalToWorld(entity, p));
-      }
+      for (let i = 0; i < patch.positions.length; i += 3) positions.push(...entityLocalToWorld(entity, vec3At(patch.positions, i)));
       parts.push({
         name: `${entity.name ?? entity.id}/decal "${decal.text}"`,
         entityId: entity.id,
@@ -203,7 +173,7 @@ function boxUvs(tris: readonly Triangle[], scale: number): Float32Array {
 /** glTF material of an appearance; a finish embeds its maps (+ clearcoat extension). */
 function materialOf(builder: GltfBuilder, appearance: PartAppearance): Record<string, unknown> {
   const maps = finishMaps(appearance);
-  if (maps === null || appearance.finish === undefined) {
+  if (maps === null || appearance.finish === undefined)
     return {
       name: appearance.name,
       pbrMetallicRoughness: {
@@ -212,7 +182,6 @@ function materialOf(builder: GltfBuilder, appearance: PartAppearance): Record<st
         roughnessFactor: appearance.roughness,
       },
     };
-  }
   const png = (rgba: Uint8Array): Uint8Array => encodePng(maps.size, maps.size, rgba);
   const clearcoat = appearance.finish.clearcoat ?? 0;
   if (clearcoat > 0) builder.useExtension('KHR_materials_clearcoat');
@@ -225,13 +194,7 @@ function materialOf(builder: GltfBuilder, appearance: PartAppearance): Record<st
       roughnessFactor: 1,
     },
     normalTexture: { index: builder.texture(png(maps.normal)) },
-    ...(clearcoat > 0
-      ? {
-          extensions: {
-            KHR_materials_clearcoat: { clearcoatFactor: clearcoat, clearcoatRoughnessFactor: 0.04 },
-          },
-        }
-      : {}),
+    ...(clearcoat > 0 ? { extensions: { KHR_materials_clearcoat: { clearcoatFactor: clearcoat, clearcoatRoughnessFactor: 0.04 } } } : {}),
   };
 }
 
@@ -246,12 +209,7 @@ export function buildGltfScene(
   parts: readonly ScenePart[],
   decals: readonly DecalPart[] = [],
   groupOf: GroupOf = () => undefined,
-): {
-  json: Record<string, unknown>;
-  bin: Uint8Array;
-  nodeCount: number;
-  materialCount: number;
-} {
+): { json: Record<string, unknown>; bin: Uint8Array; nodeCount: number; materialCount: number } {
   const builder = new GltfBuilder();
   const groupNodes = new Map<string, number>();
   const parentOf = (entityId: string): number | undefined => {
@@ -281,9 +239,7 @@ export function buildGltfScene(
       name: decal.name,
       alphaMode: 'BLEND',
       pbrMetallicRoughness: {
-        baseColorTexture: {
-          index: builder.texture(encodePng(decal.image.width, decal.image.height, decal.image.rgba)),
-        },
+        baseColorTexture: { index: builder.texture(encodePng(decal.image.width, decal.image.height, decal.image.rgba)) },
         metallicFactor: 0,
         roughnessFactor: 0.6,
       },

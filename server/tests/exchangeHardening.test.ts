@@ -102,8 +102,6 @@ describe('exportStepFile', () => {
     expect(await exportStepFile(() => withBox, fakePort, { language: 'openscad' })).toEqual({
       error: expect.stringMatching(/language must be/),
     });
-    expect(await exportStepFile(() => createEmptyDocument(), fakePort, {})).toEqual({
-      error: expect.stringMatching(/no 3D solids/),
-    });
+    expect(await exportStepFile(() => createEmptyDocument(), fakePort, {})).toEqual({ error: expect.stringMatching(/no 3D solids/) });
   });
 });

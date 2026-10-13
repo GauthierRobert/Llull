@@ -44,17 +44,11 @@ export function elementOptions(building: BuildingModel | undefined): ElementOpti
         options.pipes.push({ id: `pipe:${id}`, label: `${element.mark} · DN${element.dn ?? '?'}` });
       } else if (!lineNumbers.has(line)) {
         lineNumbers.add(line);
-        options.pipes.push({
-          id: `line:${line}`,
-          label: `${line} · ${element.mark} · DN${element.dn ?? '?'}`,
-        });
+        options.pipes.push({ id: `line:${line}`, label: `${line} · ${element.mark} · DN${element.dn ?? '?'}` });
       }
     } else if (element.category === 'stair') {
       const level = building.levels[element.levelId]?.name ?? element.levelId;
-      options.stairs.push({
-        id,
-        label: `${element.mark} · ${element.riserCount} risers · ${level}`,
-      });
+      options.stairs.push({ id, label: `${element.mark} · ${element.riserCount} risers · ${level}` });
     } else if (element.category === 'slab') {
       const level = building.levels[element.levelId]?.name ?? element.levelId;
       options.slabs.push({ id, label: `${element.mark} · ${element.role} · ${level}` });

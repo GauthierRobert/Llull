@@ -27,10 +27,7 @@ export function alignmentParamsOf(input: AlignmentInput): Gathered {
     return { ok: false, error: 'Radii: numbers separated by commas, one per interior point.' };
   }
   if (spirals === null) {
-    return {
-      ok: false,
-      error: 'Spirals: lengths separated by commas, one per interior point (0 = none).',
-    };
+    return { ok: false, error: 'Spirals: lengths separated by commas, one per interior point (0 = none).' };
   }
   return {
     ok: true,

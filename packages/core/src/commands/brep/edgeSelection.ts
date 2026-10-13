@@ -1,11 +1,8 @@
 /**
- * Edge selection for fillet_edge / chamfer_edge against a solid's exact topology: explicit indices,
- * points (`edgesNear`: the roundable edge nearest each point, measured to the curve itself), and the checks
- * that reject a selection the kernel would silently drop.
- *
- * @invariant points resolve against the topology of the solid AS IT IS NOW, so a feature-history step
- *   that recorded points keeps selecting the same edge after an upstream parametric edit reorders the
- *   kernel's edge numbering (indices do not)
+ * Edge selection for fillet_edge / chamfer_edge against a solid's exact topology: explicit indices, points (`edgesNear`: the roundable edge
+ * nearest each point, measured to the curve itself), and the checks that reject a selection the kernel would silently drop.
+ * @invariant points resolve against the topology of the solid AS IT IS NOW, so a feature-history step that recorded points keeps selecting
+ *   the same edge after an upstream parametric edit reorders the kernel's edge numbering (indices do not)
  */
 
 import type { Vec3 } from '../../model/types';
@@ -35,20 +32,15 @@ function edgeDistanceSquared(edge: ShapeEdge, point: Vec3): number {
 }
 
 /**
- * Index of the roundable edge nearest `point` (a point anywhere along a long edge picks it, not a
- * short neighbour whose mid point happens to be closer); ties (a point on a shared vertex) go to
- * the edge whose mid point is nearer. Undefined when no edge is roundable.
+ * Index of the roundable edge nearest `point` (a point anywhere along a long edge picks it, not a short neighbour whose mid point happens
+ * to be closer); ties (a point on a shared vertex) go to the edge whose mid point is nearer. Undefined when no edge is roundable.
  */
 function nearestEdge(topology: ShapeTopology, point: Vec3): number | undefined {
   const EPSILON = 1e-9;
   let best: { edge: ShapeEdge; distance: number; mid: number } | undefined;
   for (const edge of topology.edges) {
     if (!roundable(edge)) continue;
-    const candidate = {
-      edge,
-      distance: edgeDistanceSquared(edge, point),
-      mid: distanceSq3(edge.mid, point),
-    };
+    const candidate = { edge, distance: edgeDistanceSquared(edge, point), mid: distanceSq3(edge.mid, point) };
     if (
       best === undefined ||
       candidate.distance < best.distance - EPSILON ||
@@ -60,8 +52,8 @@ function nearestEdge(topology: ShapeTopology, point: Vec3): number | undefined {
 }
 
 /**
- * Why `edges` cannot be selected on a shape of `topology` (out of range, repeated, seam or degenerate),
- * or null; a kernel without exact topology (null) cannot check, so it accepts.
+ * Why `edges` cannot be selected on a shape of `topology` (out of range, repeated, seam or degenerate), or null; a kernel without exact
+ * topology (null) cannot check, so it accepts.
  */
 function selectionProblem(topology: ShapeTopology | null, edges: readonly number[]): string | null {
   if (topology === null) return null;

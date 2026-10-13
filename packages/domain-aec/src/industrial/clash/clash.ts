@@ -17,11 +17,7 @@ import { slabPenetrations } from './clashSlabs';
 
 const CLEARANCE_OBSTACLES: ReadonlySet<BimCategory> = new Set(['equipment', 'member', 'column', 'wall', 'curvedWall', 'stair']);
 
-interface Solid {
-  readonly elementId: string;
-  readonly category: BimCategory;
-  readonly box: OrientedBox;
-}
+type Solid = { readonly elementId: string; readonly category: BimCategory; readonly box: OrientedBox };
 
 /** Category pairs that are checked (structure–structure joints are intentional and skipped). */
 function relevant(a: BimCategory, b: BimCategory): boolean {
@@ -162,12 +158,11 @@ export const checkClashes = defineCommand({
   name: 'check_clashes',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Read-only clash detection (like Navisworks / Plant 3D): hard clashes between pipes, cable trays, equipment, steel ' +
-    'members, walls, concrete columns, beams and stairs, equipment passing through a floor / grating that has no ' +
-    'opening around it (add_slab_opening), plus equipment maintenance-clearance violations. ' +
-    'Steel-to-steel joints, run connections (a pipe end inside equipment, a pipe / tray ending on another) and a pipe ' +
-    'support touching its own pipe and the steel it bears on are not ' +
-    'reported. Returns element ids, kind and penetration depth (document units; summary in mm).',
+    'Read-only clash detection (like Navisworks / Plant 3D): hard clashes between pipes, cable trays, equipment, steel members, walls, ' +
+    'concrete columns, beams and stairs, equipment passing through a floor / grating that has no opening around it (add_slab_opening), ' +
+    'plus equipment maintenance-clearance violations. Steel-to-steel joints, run connections (a pipe end inside equipment, a pipe / tray ' +
+    'ending on another) and a pipe support touching its own pipe and the steel it bears on are not reported. Returns element ids, kind ' +
+    'and penetration depth (document units; summary in mm).',
   params: z.object({
     levelId: z.string().optional().describe('Only this level. Default: the whole building.'),
     tolerance: z.number().optional().describe('Ignore penetrations up to this depth, in document units (>= 0). Default 5 mm.'),

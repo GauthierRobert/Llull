@@ -1,31 +1,9 @@
 /**
- * Entity → painter's-algorithm polygons for render_view: filled faces for 3D solids (rotated about
- * their position, three.js intrinsic XYZ order) and stroked paths for 2D shapes (Z-up throughout).
+ * Entity → painter's-algorithm polygons for render_view: filled faces for 3D solids (rotated about their position, three.js intrinsic XYZ
+ * order) and stroked paths for 2D shapes (Z-up throughout).
  */
 
-import type {
-  ArcEntity,
-  BoxEntity,
-  CircleEntity,
-  ConeEntity,
-  CylinderEntity,
-  EllipseEntity,
-  Entity,
-  ExtrusionEntity,
-  LineEntity,
-  MeshSolidEntity,
-  PointEntity,
-  PolylineEntity,
-  PyramidEntity,
-  RectangleEntity,
-  RevolutionEntity,
-  SphereEntity,
-  SplineEntity,
-  TorusEntity,
-  Vec2,
-  Vec3,
-  WedgeEntity,
-} from '../../model/types';
+import type { Entity, SplineEntity, Vec2, Vec3 } from '../../model/types';
 import { applyEulerXYZ, isZeroRotation } from '../../lib/eulerRotation';
 import { ORIGIN } from '../../lib/vec3';
 import { revolutionPolygons } from '../../geometry/revolution';
@@ -68,59 +46,6 @@ function prism(bottom: Vec3[], top: Vec3[], color: string): PreDepthPolygon[] {
   return makePolygons([[...bottom].reverse(), [...top], ...sideQuads(bottom, top)], color);
 }
 
-function tessellateBox(e: BoxEntity): PreDepthPolygon[] {
-  return makePolygons(boxFaces(e.position, e.size), e.color);
-}
-
-/** Z-up cylinder: axis along Z, centered at position. */
-function tessellateCylinder(e: CylinderEntity): PreDepthPolygon[] {
-  const { bottom, top } = cylinderRings(e);
-  return prism(bottom, top, e.color);
-}
-
-function tessellateSphere(e: SphereEntity): PreDepthPolygon[] {
-  return makePolygons(sphereQuads(e.position, e.radius), e.color);
-}
-
-/** Z-up cone: base circle in XY at position, apex at position+[0,0,height]. */
-function tessellateCone(e: ConeEntity): PreDepthPolygon[] {
-  const { base, sides } = coneSurface(e);
-  // Base cap (reversed winding = face down), then the side triangles.
-  return makePolygons([[...base].reverse(), ...sides], e.color);
-}
-
-/** Torus: ring in XY plane, tube extends ±tubeRadius in Z. */
-function tessellateTorus(e: TorusEntity): PreDepthPolygon[] {
-  return makePolygons(torusQuads(e.position, e.ringRadius, e.tubeRadius), e.color);
-}
-
-/** Wedge: lower-front-left corner at position; the back edge is degenerate, so there is no back face. */
-function tessellateWedge(e: WedgeEntity): PreDepthPolygon[] {
-  return makePolygons(wedgeFaces(e.position, e.size), e.color);
-}
-
-/** Pyramid: rectangular base centered at position in XY, apex at position+[0,0,height]. */
-function tessellatePyramid(e: PyramidEntity): PreDepthPolygon[] {
-  return makePolygons(pyramidFaces(e), e.color);
-}
-
-/** Revolution: closed profile swept about an axis (frames and caps: geometry/revolution.ts). */
-function tessellateRevolution(e: RevolutionEntity): PreDepthPolygon[] {
-  return makePolygons(revolutionPolygons(e.profile, e.axis, e.angle, e.segments, e.position), e.color);
-}
-
-/** Extrusion: closed XY profile at position, extruded +Z by depth. */
-function tessellateExtrusion(e: ExtrusionEntity): PreDepthPolygon[] {
-  if (e.profile.length < 3) return [];
-  const { bottom, top } = extrusionRings(e);
-  return prism(bottom, top, e.color);
-}
-
-/** Mesh solid: world-space triangles — indexed (kernel output) or a soup when indices is empty. */
-function tessellateMesh(e: MeshSolidEntity): PreDepthPolygon[] {
-  return makePolygons(meshTriangles(e.mesh), e.color);
-}
-
 /** Rotate polygons about `position` by `rotation`; normals rotate without translation. */
 function applyRotation(polys: PreDepthPolygon[], position: Vec3, rotation: Vec3): PreDepthPolygon[] {
   if (isZeroRotation(rotation)) return polys;
@@ -137,12 +62,7 @@ function place2D(localPt: Vec2, entity: { position: Vec3; rotation: Vec3 }): Vec
   return planeToWorld(entity.position, entity.rotation, localPt);
 }
 
-const stroke = (verts: Vec3[], color: string): PreDepthPolygon => ({
-  verts,
-  color,
-  normal: [0, 0, 1],
-  stroke: true,
-});
+const stroke = (verts: Vec3[], color: string): PreDepthPolygon => ({ verts, color, normal: [0, 0, 1], stroke: true });
 
 /** SEG_CIRCLE+1 samples of an ellipse arc from `startAngle` sweeping `span` radians. */
 function strokeEllipseArc(
@@ -154,46 +74,6 @@ function strokeEllipseArc(
 ): PreDepthPolygon[] {
   const verts = arcPolyline(e.center, radiusX, startAngle, span, SEG_CIRCLE, radiusY).map((point) => place2D(point, e));
   return [stroke(verts, e.color)];
-}
-
-function tessellate2DLine(e: LineEntity): PreDepthPolygon[] {
-  return [stroke([place2D(e.start, e), place2D(e.end, e)], e.color)];
-}
-
-function tessellate2DPolyline(e: PolylineEntity): PreDepthPolygon[] {
-  if (e.points.length < 2) return [];
-  const verts = e.points.map((pt) => place2D(pt, e));
-  if (e.closed) verts.push(verts[0] as Vec3);
-  return [stroke(verts, e.color)];
-}
-
-function tessellate2DArc(e: ArcEntity): PreDepthPolygon[] {
-  const span = positiveSweep(e.endAngle - e.startAngle);
-  return strokeEllipseArc(e, e.radius, e.radius, e.startAngle, span);
-}
-
-function tessellate2DCircle(e: CircleEntity): PreDepthPolygon[] {
-  return strokeEllipseArc(e, e.radius, e.radius, 0, 2 * Math.PI);
-}
-
-function tessellate2DRectangle(e: RectangleEntity): PreDepthPolygon[] {
-  const corners: Vec2[] = [
-    [0, 0],
-    [e.width, 0],
-    [e.width, e.height],
-    [0, e.height],
-    [0, 0],
-  ];
-  return [
-    stroke(
-      corners.map((corner) => place2D(corner, e)),
-      e.color,
-    ),
-  ];
-}
-
-function tessellate2DEllipse(e: EllipseEntity): PreDepthPolygon[] {
-  return strokeEllipseArc(e, e.radiusX, e.radiusY, 0, 2 * Math.PI);
 }
 
 /** The spline's centripetal Catmull-Rom curve (the same one the viewport and bounds use), 8 samples per segment. */
@@ -211,78 +91,83 @@ function tessellate2DSpline(e: SplineEntity): PreDepthPolygon[] {
   return [stroke(verts, e.color)];
 }
 
-/** A tiny cross: two short segments. */
-function tessellate2DPoint(e: PointEntity): PreDepthPolygon[] {
-  const s = 0.1;
-  const arm = (from: Vec2, to: Vec2): PreDepthPolygon => stroke([place2D(from, e), place2D(to, e)], e.color);
-  return [arm([-s, 0], [s, 0]), arm([0, -s], [0, s])];
-}
-
 /** Polygons of one entity; 3D solids carry their rotation, 2D shapes ignore it (plane orientation is out of scope). */
 export function tessellateEntity(e: Entity): PreDepthPolygon[] {
-  const rotated = (polys: PreDepthPolygon[]): PreDepthPolygon[] => applyRotation(polys, e.position, e.rotation);
+  const rotated = (faces: Vec3[][]): PreDepthPolygon[] => applyRotation(makePolygons(faces, e.color), e.position, e.rotation);
+  const rotatedPrism = ({ bottom, top }: { bottom: Vec3[]; top: Vec3[] }): PreDepthPolygon[] =>
+    applyRotation(prism(bottom, top, e.color), e.position, e.rotation);
+  const strokePoints = (points: readonly Vec2[]): PreDepthPolygon[] => [
+    stroke(
+      points.map((point) => place2D(point, e)),
+      e.color,
+    ),
+  ];
   switch (e.kind) {
     case 'box':
-      return rotated(tessellateBox(e));
+      return rotated(boxFaces(e.position, e.size));
     case 'cylinder':
-      return rotated(tessellateCylinder(e));
+      return rotatedPrism(cylinderRings(e));
     case 'sphere':
-      return rotated(tessellateSphere(e));
-    case 'cone':
-      return rotated(tessellateCone(e));
+      return rotated(sphereQuads(e.position, e.radius));
+    case 'cone': {
+      const { base, sides } = coneSurface(e);
+      return rotated([[...base].reverse(), ...sides]);
+    }
     case 'torus':
-      return rotated(tessellateTorus(e));
+      return rotated(torusQuads(e.position, e.ringRadius, e.tubeRadius));
     case 'wedge':
-      return rotated(tessellateWedge(e));
+      return rotated(wedgeFaces(e.position, e.size));
     case 'pyramid':
-      return rotated(tessellatePyramid(e));
+      return rotated(pyramidFaces(e));
     case 'extrusion':
-      return rotated(tessellateExtrusion(e));
+      return e.profile.length < 3 ? [] : rotatedPrism(extrusionRings(e));
     case 'revolution':
-      return rotated(tessellateRevolution(e));
+      return rotated(revolutionPolygons(e.profile, e.axis, e.angle, e.segments, e.position));
     case 'mesh':
-      return rotated(tessellateMesh(e));
+      return rotated(meshTriangles(e.mesh));
     case 'loft':
-      return rotated(
-        makePolygons(
-          loftTriangles(e, e.position).map((triangle) => [...triangle]),
-          e.color,
-        ),
-      );
+      return rotated(loftTriangles(e, e.position).map((triangle) => [...triangle]));
     case 'subdivision':
-      return rotated(
-        makePolygons(
-          subdivisionTriangles(e, e.position).map((triangle) => [...triangle]),
-          e.color,
-        ),
-      );
+      return rotated(subdivisionTriangles(e, e.position).map((triangle) => [...triangle]));
     case 'sweep':
-      return rotated(
-        makePolygons(
-          sweepTriangles(e, e.position).map((triangle) => [...triangle]),
-          e.color,
-        ),
-      );
+      return rotated(sweepTriangles(e, e.position).map((triangle) => [...triangle]));
     case 'line':
-      return tessellate2DLine(e);
+      return strokePoints([e.start, e.end]);
     case 'polyline':
-      return tessellate2DPolyline(e);
+      return e.points.length < 2 ? [] : strokePoints(e.closed ? [...e.points, e.points[0] as Vec2] : e.points);
     case 'arc':
-      return tessellate2DArc(e);
+      return strokeEllipseArc(e, e.radius, e.radius, e.startAngle, positiveSweep(e.endAngle - e.startAngle));
     case 'circle':
-      return tessellate2DCircle(e);
+      return strokeEllipseArc(e, e.radius, e.radius, 0, 2 * Math.PI);
     case 'rectangle':
-      return tessellate2DRectangle(e);
-    case 'point':
-      return tessellate2DPoint(e);
+      return strokePoints([
+        [0, 0],
+        [e.width, 0],
+        [e.width, e.height],
+        [0, e.height],
+        [0, 0],
+      ]);
+    case 'point': {
+      // A tiny cross: two short segments.
+      const s = 0.1;
+      return [
+        ...strokePoints([
+          [-s, 0],
+          [s, 0],
+        ]),
+        ...strokePoints([
+          [0, -s],
+          [0, s],
+        ]),
+      ];
+    }
     case 'ellipse':
-      return tessellate2DEllipse(e);
+      return strokeEllipseArc(e, e.radiusX, e.radiusY, 0, 2 * Math.PI);
     case 'spline':
       return tessellate2DSpline(e);
     case 'text':
-      return []; // not drawn in render_view SVG; the viewport renders text
     case 'dimension':
-      return []; // not drawn in render_view SVG; the viewport renders dimensions
+      return []; // the viewport renders text and dimensions; render_view SVG does not
     case 'image':
       return []; // drawn by renderScene as an <image> underlay behind every polygon
     case 'instance':

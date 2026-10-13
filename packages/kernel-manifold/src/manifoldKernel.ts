@@ -18,9 +18,7 @@ import { entityTrianglePositions } from '@core/geometry/entityTriangles';
 import { toCounterClockwise } from '@lib/polygon';
 import { release, withOwned } from '@core/geometry/nativeObject';
 
-// Minimal local interface for the Manifold WASM module (avoids `any`).
-// We only model the subset we actually call; the cast is at one boundary point.
-
+// The subset of the Manifold WASM module we call (one cast at the boundary).
 interface ManifoldMesh {
   readonly numProp: number;
   readonly vertProperties: Float32Array;
@@ -64,14 +62,10 @@ let _cachedModule: ManifoldModule | null = null;
 
 async function getManifoldModule(): Promise<ManifoldModule> {
   if (_cachedModule) return _cachedModule;
-  // manifold-3d default export is an async factory.
-  const factory = (await import('manifold-3d')) as unknown as {
-    default: (opts?: unknown) => Promise<ManifoldModule>;
-  };
+  const factory = (await import('manifold-3d')) as unknown as { default: (opts?: unknown) => Promise<ManifoldModule> };
   const loaded = await factory.default();
   loaded.setup();
-  _cachedModule = loaded;
-  return _cachedModule;
+  return (_cachedModule = loaded);
 }
 
 const RAD_TO_DEG = 180 / Math.PI;
@@ -82,22 +76,15 @@ function applyTransform(
   rotation: readonly [number, number, number],
 ): ManifoldShape {
   const [rx, ry, rz] = rotation;
-  const [px, py, pz] = position;
-
   // llull rotation is M = Rx·Ry·Rz (Rz applied first); Manifold's rotate([x,y,z]) applies X
   // first, so compose the three axes explicitly: Z, then Y, then X (degrees).
   const aboutZ = solid.rotate([0, 0, rz * RAD_TO_DEG]);
   const aboutY = aboutZ.rotate([0, ry * RAD_TO_DEG, 0]);
   const aboutX = aboutY.rotate([rx * RAD_TO_DEG, 0, 0]);
-  const translated = aboutX.translate([px, py, pz]);
-  aboutZ.delete();
-  aboutY.delete();
-  aboutX.delete();
+  const translated = aboutX.translate([...position]);
+  [aboutZ, aboutY, aboutX].forEach((step) => step.delete());
   return translated;
 }
-
-// Entity → Manifold solid tessellation.
-// Returns null for unsupported / degenerate input.
 
 /**
  * Build a Manifold from triangles, merging coincident corners so the result is an oriented
@@ -129,11 +116,7 @@ function weldedManifold(
   }
   const outwardTriVerts = orientOutward(vertProperties, triVerts);
   try {
-    const mesh = new m.Mesh({
-      numProp: 3,
-      vertProperties: new Float32Array(vertProperties),
-      triVerts: new Uint32Array(outwardTriVerts),
-    });
+    const mesh = new m.Mesh({ numProp: 3, vertProperties: new Float32Array(vertProperties), triVerts: new Uint32Array(outwardTriVerts) });
     const prim = m.Manifold.ofMesh(mesh);
     // Tessellated primitives are already world-space; a mesh entity still honours its transform.
     if (entity.kind !== 'mesh') return prim;
@@ -222,10 +205,7 @@ function manifoldToMeshData(solid: ManifoldShape): MeshData | null {
 
 const COMBINE = { union: 'add', subtract: 'subtract', intersect: 'intersect' } as const;
 
-/**
- * Native Manifold operations behind the recipe evaluator. Manifold is a mesh kernel: no B-rep, so
- * fillet / chamfer / shell / blend, `topology` and `exportStep` are null.
- */
+/** Manifold is a mesh kernel: no B-rep, so fillet / chamfer / shell / blend, `topology` and `exportStep` are null. */
 function manifoldOps(mod: ManifoldModule): KernelOps<ManifoldShape> {
   return {
     unsupported: new Set(['fillet', 'chamfer', 'shell', 'blend']),
@@ -244,11 +224,7 @@ function manifoldOps(mod: ManifoldModule): KernelOps<ManifoldShape> {
   };
 }
 
-/**
- * Initialize the Manifold WASM module and return a synchronous GeometryKernel.
- * Call once at startup; install it as the process default (`setGeometryKernel`) or pass it
- * as an `ExecutionContext.kernel`.
- */
+/** Load the WASM once at startup; install via `setGeometryKernel` or pass as `ExecutionContext.kernel`. */
 export async function createManifoldKernel(): Promise<CachingKernel> {
   return kernelFromOps(manifoldOps(await getManifoldModule()));
 }

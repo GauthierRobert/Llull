@@ -1,7 +1,4 @@
-/**
- * CommandForm — the `<form>` chrome shared by the panel forms that gather one command's params:
- * fields, inline error, submit button.
- */
+// `<form>` chrome of the one-command panel forms: fields, inline error, submit.
 
 import React from 'react';
 import { classNames } from '@ui/classNames';

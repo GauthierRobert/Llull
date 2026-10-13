@@ -1,7 +1,6 @@
 /**
- * Model-space geometry of an aligned dimension primitive — extension lines, dimension line, oblique
- * ticks and the value's placement. The one construction the 2D view and DXF draw (sheets draw the
- * same construction in paper space, `paperDimension`).
+ * Model-space geometry of an aligned dimension primitive — extension lines, dimension line, oblique ticks and the value's placement. The
+ * one construction the 2D view and DXF draw (sheets draw the same construction in paper space, `paperDimension`).
  */
 
 import type { Vec2 } from '../model/vectors';
@@ -40,10 +39,6 @@ export function dimensionGeometry(primitive: Dimension): DimensionGeometry {
   const lift = offset * 0.22;
   return {
     segments,
-    label: {
-      at: [(a[0] + b[0]) / 2 - Math.sin(angle) * lift, (a[1] + b[1]) / 2 + Math.cos(angle) * lift],
-      angle,
-      height: offset * 0.25,
-    },
+    label: { at: [(a[0] + b[0]) / 2 - Math.sin(angle) * lift, (a[1] + b[1]) / 2 + Math.cos(angle) * lift], angle, height: offset * 0.25 },
   };
 }

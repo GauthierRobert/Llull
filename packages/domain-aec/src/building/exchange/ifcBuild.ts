@@ -76,14 +76,7 @@ function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
   const modelContext = writer.add(`IFCGEOMETRICREPRESENTATIONCONTEXT($,'Model',3,1.E-05,${worldAxes},$)`);
   const body = writer.add(`IFCGEOMETRICREPRESENTATIONSUBCONTEXT('Body','Model',*,*,*,*,${modelContext},$,.MODEL_VIEW.,$)`);
   const salt = building.uid ?? 'llull';
-  const context: Context = {
-    writer,
-    guid: (seed) => ifcGuid(`${salt}:${seed}`),
-    mm: (value) => value * factor,
-    body,
-    zAxis,
-    xAxis,
-  };
+  const context: Context = { writer, guid: (seed) => ifcGuid(`${salt}:${seed}`), mm: (value) => value * factor, body, zAxis, xAxis };
   const units = [
     writer.add('IFCSIUNIT(*,.LENGTHUNIT.,.MILLI.,.METRE.)'),
     writer.add('IFCSIUNIT(*,.AREAUNIT.,$,.SQUARE_METRE.)'),
@@ -171,10 +164,9 @@ export const exportIfc = defineCommand({
   name: 'export_ifc',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Export the building model as IFC4 (OpenBIM, ISO 16739) for Revit, ArchiCAD, Tekla, Solibri, BIMcollab, ' +
-    'Navisworks…: project / site / building / storeys, walls with real openings (IfcOpeningElement) filled by ' +
-    'doors and windows, slabs (floor / roof / base slab), columns, beams, stairs, spaces and materials. ' +
-    'GlobalIds are stable across exports. data.ifc holds the file text.',
+    'Export the building model as IFC4 (OpenBIM, ISO 16739) for Revit, ArchiCAD, Tekla, Solibri, BIMcollab, Navisworks…: project / site ' +
+    '/ building / storeys, walls with real openings (IfcOpeningElement) filled by doors and windows, slabs (floor / roof / base slab), ' +
+    'columns, beams, stairs, spaces and materials. GlobalIds are stable across exports. data.ifc holds the file text.',
   params: z.object({
     timestamp: z
       .string()
@@ -183,9 +175,7 @@ export const exportIfc = defineCommand({
   }),
   run: (doc, { timestamp }): CommandResult => {
     const building = getBuilding(doc);
-    if (building.levelOrder.length === 0) {
-      return noop(doc, 'export_ifc: the building model has no levels (add_level / draw_walls first).');
-    }
+    if (building.levelOrder.length === 0) return noop(doc, 'export_ifc: the building model has no levels (add_level / draw_walls first).');
     const isoDate = /^\d{4}-\d{2}-\d{2}$/.test(building.project.date);
     const stamp = timestamp ?? (isoDate ? `${building.project.date}T00:00:00` : '1970-01-01T00:00:00');
     const result = buildIfc(doc, stamp);

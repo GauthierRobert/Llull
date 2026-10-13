@@ -1,8 +1,7 @@
 /**
- * Member verification of a moment frame from its solved load cases: beams (rigid ends → end moments,
- * hogging lateral-torsional buckling over the hogging length), columns (N + M interaction §6.3.3 on
- * the axis the frame plane bends), storey drift and sway stability. Moments are amplified by
- * 1/(1 − 1/αcr) when αcr < 10 (EN 1993-1-1 §5.2.2(5)); the buckling length is the storey piece.
+ * Member verification of a moment frame from its solved load cases: beams (rigid ends → end moments, hogging lateral-torsional buckling
+ * over the hogging length), columns (N + M interaction §6.3.3 on the axis the frame plane bends), storey drift and sway stability. Moments
+ * are amplified by 1/(1 − 1/αcr) when αcr < 10 (EN 1993-1-1 §5.2.2(5)); the buckling length is the storey piece.
  */
 
 import { toDegrees } from '@lib/angle';
@@ -42,7 +41,6 @@ const mega = (value: number): number => value / 1e6;
 
 const combinationOf = (input: FrameCheckInput): string => `${ULS_COMBINATION} + notional horizontal force ${input.phiText} (frame)`;
 
-/** Keeps the line of highest utilisation. */
 const worstOf = (current: CheckLine | undefined, next: CheckLine): CheckLine =>
   current === undefined || next.utilisation > current.utilisation ? next : current;
 
@@ -68,9 +66,7 @@ function beamDiagram(result: FrameResult, layout: BarLayout, amplification: numb
     if (index === 0) stations.push(low * amplification);
     stations.push(high * amplification);
     const peak = member.maxMoment * amplification;
-    if (peak > Math.max(Math.abs(low), Math.abs(high)) * amplification + 1) {
-      interior = Math.max(interior, peak);
-    }
+    if (peak > Math.max(Math.abs(low), Math.abs(high)) * amplification + 1) interior = Math.max(interior, peak);
     shear = Math.max(shear, ...member.shear.map(Math.abs));
     compression = Math.max(compression, ...member.axial.map((value) => -value));
   });
@@ -189,10 +185,7 @@ function deflectionLine(bar: SteelBar, layout: BarLayout, result: FrameResult, r
   const value = Math.max(0, ...sag);
   const limit = (cantilever ? 2 * bar.length : bar.length) / ratio;
   const label = cantilever ? `cantilever 2L/${ratio}` : `L/${ratio}`;
-  return {
-    value,
-    line: deflectionCheckLine(`${bar.profileName} L ${metres(bar.length)} m`, label, value, limit),
-  };
+  return { value, line: deflectionCheckLine(`${bar.profileName} L ${metres(bar.length)} m`, label, value, limit) };
 }
 
 function columnRow(bar: SteelBar, layout: BarLayout, input: FrameCheckInput): MemberRow {
@@ -230,11 +223,7 @@ function columnRow(bar: SteelBar, layout: BarLayout, input: FrameCheckInput): Me
       const zText = `z ${metres(bottom?.y ?? 0)}–${metres(top?.y ?? 0)} m`;
       const buckling =
         axis === 'strong'
-          ? memberBuckling(profile, bar.fy, compression, moment, {
-              major: length,
-              minor: length,
-              lateralTorsional: length,
-            })
+          ? memberBuckling(profile, bar.fy, compression, moment, { major: length, minor: length, lateralTorsional: length })
           : undefined;
       const weak = axis === 'weak' ? weakAxisBuckling(profile, bar.fy, compression, moment, length) : undefined;
       const utilisation = buckling?.utilisation ?? weak?.utilisation ?? 0;

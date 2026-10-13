@@ -1,7 +1,4 @@
-/**
- * Civil / site-engineering commands — survey, terrain, earthworks, roads, drainage — the `civil`
- * plugin's catalog (see plugin.ts).
- */
+/** Civil / site-engineering commands — survey, terrain, earthworks, roads, drainage — the `civil` plugin's catalog (see plugin.ts). */
 
 import { commandCatalog } from '@core/commands/schema';
 import { createSurface, importSurveyPoints, updateSurface } from './survey/surveyCommands';
@@ -15,20 +12,8 @@ import { civilExchangeCommands } from './exchange/exchangeCommands';
 import { crsCommands } from './crs/crsCommands';
 import { civilSheetCommands } from './sheets/civilSheetCommands';
 
-/** Civil / site-engineering commands. */
+// prettier-ignore
 export const civilCommands = commandCatalog(
-  importSurveyPoints,
-  importSurveyDxf,
-  createSurface,
-  updateSurface,
-  surfaceElevation,
-  surfaceReport,
-  describeCivil,
-  deleteCivilObject,
-  ...earthworksCommands,
-  ...roadCommands,
-  ...drainageCommands,
-  ...civilExchangeCommands,
-  ...crsCommands,
-  ...civilSheetCommands,
+  importSurveyPoints, importSurveyDxf, createSurface, updateSurface, surfaceElevation, surfaceReport, describeCivil, deleteCivilObject,
+  ...earthworksCommands, ...roadCommands, ...drainageCommands, ...civilExchangeCommands, ...crsCommands, ...civilSheetCommands,
 );

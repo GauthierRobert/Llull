@@ -1,7 +1,4 @@
-/**
- * Shared body of the circle / arc / ellipse render branches: an EllipseCurve outline in the
- * entity's XY plane, memoized on its inputs.
- */
+// Shared circle / arc / ellipse body: a memoized EllipseCurve outline in the entity's XY plane.
 
 import { useMemo } from 'react';
 import * as THREE from 'three';

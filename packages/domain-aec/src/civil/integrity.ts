@@ -1,7 +1,4 @@
-/**
- * Keeps evaluated civil geometry consistent with the civil model (architecture L4/L8), and lists
- * the references between civil objects.
- */
+/** Keeps evaluated civil geometry consistent with the civil model (architecture L4/L8), and lists the references between civil objects. */
 
 import type { DerivationGuard } from '@core/commands/derivation';
 import { editedOwners, ownerTag } from '../shared/derived';

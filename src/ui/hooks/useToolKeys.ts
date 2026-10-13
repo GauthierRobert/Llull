@@ -1,23 +1,20 @@
-/**
- * Shared keyboard contract of the armed 2D tools (draw and modify): two-stage Escape (first press
- * drops the operation in progress, the next disarms the tool) and Enter to commit/finish. Keys typed
- * into fields or dialogs are never consumed.
- */
+// Keyboard contract of armed 2D tools: Escape drops the operation in progress, then disarms; Enter commits.
+// Keys typed into fields or dialogs are never consumed.
 
 import { useCallback } from 'react';
 import { useCaptureKeydown } from './useCaptureKeydown';
 import { isEditingKeyEvent } from './useKeyboardShortcuts';
 
 interface ToolKeys {
-  /** A tool is armed; Escape does nothing otherwise. */
+  /** Escape does nothing otherwise. */
   armed: boolean;
-  /** An operation is in progress: Escape cancels it instead of disarming the tool. */
+  /** Escape cancels it instead of disarming. */
   inProgress: boolean;
   onCancel: () => void;
   onDisarm: () => void;
-  /** Enter handler, or null when Enter does not apply in the current state. */
+  /** null when Enter does not apply. */
   onEnter: (() => void) | null;
-  /** Any other key (tool hotkeys). */
+  /** Tool hotkeys. */
   onOtherKey?: (event: KeyboardEvent) => void;
 }
 

@@ -1,11 +1,5 @@
-/**
- * Maps `document.order` → the 2D drafting view: ONE pure render branch per Shape2DKind, and the
- * 3D solids together as their technical top view (SolidsTechnicalView2D — one projection, so a
- * solid hides the edges of those beneath it).
- *
- * Respects layer visibility. Selection state is forwarded to each branch.
- * Uses entity `id` as React key (R8).
- */
+// `document.order` → the 2D view: ONE branch per Shape2DKind; 3D solids together as one technical top view
+// (SolidsTechnicalView2D), so a solid hides edges beneath it.
 
 import { useMemo } from 'react';
 import { type Entity, type EntityId, type LineEntity, is2D } from '@core/model/types';
@@ -22,7 +16,6 @@ export function Entities2D(): React.ReactElement {
   const layers = useStore((s) => s.document.layers);
   const selection = useStore((s) => s.document.selection);
 
-  // Render-only hide filters — never touch the document (PRIME DIRECTIVE).
   const hiddenLayerIds = useViewportStore((s) => s.hiddenLayerIds);
   const hiddenEntityIds = useViewportStore((s) => s.hiddenEntityIds);
 
@@ -38,12 +31,10 @@ export function Entities2D(): React.ReactElement {
       }),
     [order, entities, layers, hiddenLayerIds, hiddenEntityIds],
   );
-  // Solids are projected together; the list keeps its identity through selection changes and
-  // edits of other entities, so the projection only reruns when a solid changes.
+  // Stable through selection changes and unrelated edits: the projection reruns only when a solid changes.
   const solids = useStableList(useMemo(() => visible.filter((entity) => !is2D(entity)), [visible]));
 
-  // Unselected lines are drawn in ONE batched draw call; everything else (and selected lines, for
-  // their highlight) keeps its own renderer.
+  // Unselected lines share ONE batched draw call; selected lines keep their own renderer for the highlight.
   const { batchedLines, individual } = useMemo(() => {
     const lines: LineEntity[] = [];
     const rest: Array<{ entity: Entity; selected: boolean }> = [];

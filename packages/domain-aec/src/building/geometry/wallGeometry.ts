@@ -5,24 +5,14 @@ import { arcOffsetOf, curvedWallExtent, tangentWall } from './curvedWallGeometry
 import type { WallExtent } from './wallExtent';
 import { elementsOf, orderedElements } from '../model';
 
-interface WallFrame {
-  readonly length: number;
-  readonly angle: number;
-  readonly direction: Vec2;
-  readonly normal: Vec2;
-}
+type WallFrame = { readonly length: number; readonly angle: number; readonly direction: Vec2; readonly normal: Vec2 };
 
 export function wallFrame(wall: Pick<WallElement, 'start' | 'end'>): WallFrame {
   const dx = wall.end[0] - wall.start[0];
   const dy = wall.end[1] - wall.start[1];
   const length = Math.hypot(dx, dy);
   const direction: Vec2 = length === 0 ? [1, 0] : [dx / length, dy / length];
-  return {
-    length,
-    angle: Math.atan2(dy, dx),
-    direction,
-    normal: [-direction[1], direction[0]],
-  };
+  return { length, angle: Math.atan2(dy, dx), direction, normal: [-direction[1], direction[0]] };
 }
 
 export function pointAlong(wall: Pick<WallElement, 'start'>, frame: WallFrame, s: number, n = 0): Vec2 {
@@ -38,8 +28,8 @@ export function openingsOf(building: BuildingModel, wallId: string): OpeningElem
 }
 
 /**
- * Plan extension (+) or retraction (−) at one wall end so joints close cleanly (square-cut butt
- * joints). With φ the angle between the two walls' away-from-joint directions:
+ * Plan extension (+) or retraction (−) at one wall end so joints close cleanly (square-cut butt joints). With φ the angle between the two
+ * walls' away-from-joint directions:
  * - L/X joint, earlier wall: its OUTER edge reaches the other wall's outer face —
  *   (t_other/2 + (t_self/2)·cos φ) / sin φ (signed cos: ≈ (t/2)·cot(φ/2) for obtuse joints);
  * - later wall at an L/X joint, or abutting wall at a T joint: retracts to the other wall's near
@@ -80,10 +70,7 @@ export function endAdjustment(building: BuildingModel, wall: WallElement, end: '
 
 export function wallExtent(building: BuildingModel, wall: WallElement): WallExtent {
   const startAdjustment = endAdjustment(building, wall, 'start');
-  return {
-    start: startAdjustment === 0 ? 0 : -startAdjustment,
-    end: wallFrame(wall).length + endAdjustment(building, wall, 'end'),
-  };
+  return { start: startAdjustment === 0 ? 0 : -startAdjustment, end: wallFrame(wall).length + endAdjustment(building, wall, 'end') };
 }
 
 /** Plan swing of a door in a straight wall: hinge point, open-leaf end and the arc's angles. */
@@ -105,12 +92,7 @@ export function builtExtent(building: BuildingModel, wall: WallElement | CurvedW
   return wall.category === 'wall' ? wallExtent(building, wall) : curvedWallExtent(building, wall);
 }
 
-interface WallPiece {
-  readonly s0: number;
-  readonly s1: number;
-  readonly z0: number;
-  readonly z1: number;
-}
+type WallPiece = { readonly s0: number; readonly s1: number; readonly z0: number; readonly z1: number };
 
 /** Vertical rectangular pieces [s0,s1]×[z0,z1] (wall-local) left solid after cutting the openings. */
 export function wallPieces<Wall extends { readonly height: number }>(

@@ -1,9 +1,7 @@
 /**
- * Centre lines of round features (ISO 128 chain lines): an axis seen end-on gets a centre mark
- * (cross), an axis seen side-on gets a centre line along it, and three or more equal end-on marks
- * spaced evenly about a common centre get their pitch circle (PCD). Round features are found in the
- * entity itself, in the leaves of its B-rep recipe (holes cut by a boolean included) and in the
- * children of an instance.
+ * Centre lines of round features (ISO 128 chain lines): an axis seen end-on gets a centre mark (cross), an axis seen side-on gets a centre
+ * line along it, and three or more equal end-on marks spaced evenly about a common centre get their pitch circle (PCD). Round features are
+ * found in the entity itself, in the leaves of its B-rep recipe (holes cut by a boolean included) and in the children of an instance.
  */
 
 import type { CadDocument, Entity, ShapeRecipe, Vec2, Vec3 } from '../model/types';
@@ -62,15 +60,7 @@ function axisOf(entity: Entity, place: Placement, scale: number): RoundAxis | nu
       return line(direction, Math.min(...axial), Math.max(...axial), radius * scale);
     }
     case 'sphere':
-      return entity.radius > 0
-        ? {
-            origin: world([0, 0, 0]),
-            direction: null,
-            from: 0,
-            to: 0,
-            radius: entity.radius * scale,
-          }
-        : null;
+      return entity.radius > 0 ? { origin: world([0, 0, 0]), direction: null, from: 0, to: 0, radius: entity.radius * scale } : null;
     default:
       return null;
   }
@@ -101,9 +91,8 @@ function recipeAxes(recipe: ShapeRecipe, place: Placement, scale: number, depth:
 }
 
 /**
- * The part of `axis` inside `box` (slab test), or null when it misses: a boolean tool that only
- * trims the part, or lies beyond it, gets no centre line, and a through-hole tool longer than the
- * part is cut to the part.
+ * The part of `axis` inside `box` (slab test), or null when it misses: a boolean tool that only trims the part, or lies beyond it, gets no
+ * centre line, and a through-hole tool longer than the part is cut to the part.
  */
 function axisWithin(axis: RoundAxis, box: Bounds): RoundAxis | null {
   const margin = axis.radius * 1e-3;
@@ -170,8 +159,8 @@ interface CentreMark {
 }
 
 /**
- * Pitch circles (PCD) of ≥ 3 equal marks at one depth, equally distant from their common centre
- * AND evenly spaced around it (a rectangle's four corners are not a bolt circle).
+ * Pitch circles (PCD) of ≥ 3 equal marks at one depth, equally distant from their common centre AND evenly spaced around it (a rectangle's
+ * four corners are not a bolt circle).
  */
 function pitchCircles(marks: ReadonlyArray<CentreMark>, unit: number): Array<Omit<CentreMark, 'depth'>> {
   const groups = new Map<string, CentreMark[]>();
@@ -202,8 +191,8 @@ function pitchCircles(marks: ReadonlyArray<CentreMark>, unit: number): Array<Omi
 }
 
 /**
- * Centre-line primitives (style `center`, on `layer`) of the round features of `entity` in `frame`;
- * features in front of the section plane at `cutDepth` are cut away with the material.
+ * Centre-line primitives (style `center`, on `layer`) of the round features of `entity` in `frame`; features in front of the section plane
+ * at `cutDepth` are cut away with the material.
  * @returns [] for an entity without round features or with axes oblique to the view
  */
 export function centerLinePrimitives(
@@ -250,8 +239,6 @@ export function centerLinePrimitives(
       if (mark.type === 'line') line(mark.a, mark.b);
     }
   }
-  for (const circle of pitchCircles([...marks.values()], unit)) {
-    primitives.push({ type: 'circle', layer, style: 'center', ...circle });
-  }
+  for (const circle of pitchCircles([...marks.values()], unit)) primitives.push({ type: 'circle', layer, style: 'center', ...circle });
   return primitives;
 }

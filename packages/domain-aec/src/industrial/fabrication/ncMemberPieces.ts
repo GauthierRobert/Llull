@@ -16,12 +16,7 @@ export const ANCHOR_HOLE_CLEARANCE_MM = 4;
 
 type DstvFace = 'o' | 'u' | 'v';
 
-export interface NcHole {
-  readonly face: DstvFace;
-  readonly x: number;
-  readonly y: number;
-  readonly diameter: number;
-}
+export type NcHole = { readonly face: DstvFace; readonly x: number; readonly y: number; readonly diameter: number };
 
 export interface NcPiece {
   readonly kind: 'member' | 'plate';
@@ -44,15 +39,7 @@ export interface NcPiece {
   readonly sourceIds: ReadonlyArray<string>;
 }
 
-const CODE_BY_SHAPE: Readonly<Record<SteelProfile['shape'], string>> = {
-  I: 'I',
-  U: 'U',
-  C: 'U',
-  SHS: 'M',
-  RHS: 'M',
-  CHS: 'RO',
-  L: 'L',
-};
+const CODE_BY_SHAPE: Readonly<Record<SteelProfile['shape'], string>> = { I: 'I', U: 'U', C: 'U', SHS: 'M', RHS: 'M', CHS: 'RO', L: 'L' };
 
 /** Rafter end cut: the end plate is vertical, so the cut equals the roof pitch. */
 function pitchCut(member: SteelMemberElement): number {
@@ -123,18 +110,8 @@ function memberHoles(doc: CadDocument, member: SteelMemberElement, profile: Stee
       const x = round(mm(dot3(offset, frame.d)));
       holes.push(
         throughFlange
-          ? {
-              face: dot3(solid.along, frame.v) > 0 ? 'o' : 'u',
-              x,
-              y: round(mm(dot3(offset, frame.u)) + profile.b / 2),
-              diameter,
-            }
-          : {
-              face: 'v',
-              x,
-              y: round(mm(dot3(offset, frame.v)) + profile.h / 2),
-              diameter,
-            },
+          ? { face: dot3(solid.along, frame.v) > 0 ? 'o' : 'u', x, y: round(mm(dot3(offset, frame.u)) + profile.b / 2), diameter }
+          : { face: 'v', x, y: round(mm(dot3(offset, frame.v)) + profile.h / 2), diameter },
       );
     }
   }

@@ -1,7 +1,6 @@
 /**
- * Scene inspection: `computeSceneSnapshot` (pure) backs the read-only `describe_scene` command and
- * the `build_project` report. Bounds are world-space AABBs; rotated entities use their rotated OBB
- * corners and carry `oriented: true`.
+ * Scene inspection: `computeSceneSnapshot` (pure) backs the read-only `describe_scene` command and the `build_project` report. Bounds are
+ * world-space AABBs; rotated entities use their rotated OBB corners and carry `oriented: true`.
  */
 
 import type { CadDocument } from '../../model/types';
@@ -17,7 +16,6 @@ export function computeSceneSnapshot(doc: CadDocument): SceneSnapshot {
   const entities: EntitySummary[] = [];
   let sceneBounds: Bounds | null = null;
   const layerCounts: Record<string, number> = {};
-
   for (const id of doc.order) {
     const e = doc.entities[id];
     if (!e) continue;
@@ -27,24 +25,11 @@ export function computeSceneSnapshot(doc: CadDocument): SceneSnapshot {
     sceneBounds = sceneBounds ? mergeBounds(sceneBounds, bounds) : bounds;
     layerCounts[e.layerId] = (layerCounts[e.layerId] ?? 0) + 1;
   }
-
   const layers: LayerSummary[] = doc.layerOrder
     .map((lid) => doc.layers[lid])
     .filter((l): l is NonNullable<typeof l> => l !== undefined)
-    .map((l) => ({
-      id: l.id,
-      name: l.name,
-      visible: l.visible,
-      locked: l.locked,
-      entityCount: layerCounts[l.id] ?? 0,
-    }));
-
-  const groups: GroupSummary[] = Object.values(doc.groups).map((g) => ({
-    id: g.id,
-    name: g.name,
-    memberIds: [...g.memberIds],
-  }));
-
+    .map((l) => ({ id: l.id, name: l.name, visible: l.visible, locked: l.locked, entityCount: layerCounts[l.id] ?? 0 }));
+  const groups: GroupSummary[] = Object.values(doc.groups).map((g) => ({ id: g.id, name: g.name, memberIds: [...g.memberIds] }));
   const animations: AnimationSummary[] = Object.values(doc.animations).map((a) => ({
     id: a.id,
     targetId: a.targetId,
@@ -52,16 +37,7 @@ export function computeSceneSnapshot(doc: CadDocument): SceneSnapshot {
     channel: a.channel,
     mode: a.mode,
   }));
-
-  return {
-    entityCount: entities.length,
-    entities,
-    layers,
-    groups,
-    bounds: sceneBounds,
-    selection: [...doc.selection],
-    animations,
-  };
+  return { entityCount: entities.length, entities, layers, groups, bounds: sceneBounds, selection: [...doc.selection], animations };
 }
 
 /**

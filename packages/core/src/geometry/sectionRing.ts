@@ -1,8 +1,7 @@
 /**
- * Section rings: any closed section resampled to SECTION_RING_POINTS points (counter-clockwise,
- * arc-length spaced, starting at the +x side) and read as a closed centripetal Catmull-Rom curve.
- * Every ring has the same point count, so rings can be interpolated (variable-section sweeps) or
- * skinned (lofts), and the exact kernel gets wires with the same number of Bézier edges.
+ * Section rings: any closed section resampled to SECTION_RING_POINTS points (counter-clockwise, arc-length spaced, starting at the +x side)
+ * and read as a closed centripetal Catmull-Rom curve. Every ring has the same point count, so rings can be interpolated (variable-section
+ * sweeps) or skinned (lofts), and the exact kernel gets wires with the same number of Bézier edges.
  */
 
 import type { CurveSegment } from '../model/curve';
@@ -16,8 +15,8 @@ import { centroid2 } from '../lib/vec2';
 export const SECTION_RING_POINTS = 24;
 
 /**
- * `count` points evenly spaced by arc length around a closed polygon, counter-clockwise, starting
- * where the boundary crosses the +x ray from the centroid of its vertices.
+ * `count` points evenly spaced by arc length around a closed polygon, counter-clockwise, starting where the boundary crosses the +x ray
+ * from the centroid of its vertices.
  * @invariant polygon has >= 3 points and non-zero area
  */
 export function resampleRing(polygon: ReadonlyArray<Vec2>, count = SECTION_RING_POINTS): Vec2[] {

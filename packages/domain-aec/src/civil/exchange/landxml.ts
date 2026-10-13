@@ -1,7 +1,6 @@
 /**
- * LandXML 1.2 writer of the civil model: point groups (CgPoints), TIN surfaces, gravity pipe
- * networks and (via the roads module) alignments. LandXML coordinates are "northing easting
- * elevation" in metres.
+ * LandXML 1.2 writer of the civil model: point groups (CgPoints), TIN surfaces, gravity pipe networks and (via the roads module)
+ * alignments. LandXML coordinates are "northing easting elevation" in metres.
  */
 
 import { compactNumber, fixedNumber } from '@lib/compactNumber';
@@ -93,9 +92,8 @@ function structXml(doc: Doc, manhole: ManholeObject, pipes: ReadonlyArray<PipeOb
     return result;
   });
   return [
-    `        <Struct${attr('name', names.get(manhole.id) ?? manhole.id)}` +
-      `${attr('elevRim', metres(doc, manhole.rimElevation))}` +
-      `${attr('elevSump', metres(doc, manhole.invertElevation))}>`,
+    '        ' +
+      `<Struct${attr('name', names.get(manhole.id) ?? manhole.id)}${attr('elevRim', metres(doc, manhole.rimElevation))}${attr('elevSump', metres(doc, manhole.invertElevation))}>`,
     `          <Center>${northEast(doc, manhole.position)}</Center>`,
     `          <CircStruct${attr('diameter', fixedNumber(toMetres(doc, manhole.diameter) * 1000, 1))}/>`,
     ...inverts,
@@ -110,10 +108,8 @@ function pipeXml(doc: Doc, pipe: PipeObject, manholes: ReadonlyMap<string, Manho
   // Percent, per the LandXML 2.0 schema annotation and the buildingSMART InfraModel profile.
   const slopePercent = planLength > 0 ? ((pipe.invertFrom - pipe.invertTo) / planLength) * 100 : 0;
   return [
-    `        <Pipe${attr('name', names.get(pipe.id) ?? pipe.id)}` +
-      `${attr('refStart', names.get(pipe.fromId) ?? pipe.fromId)}` +
-      `${attr('refEnd', names.get(pipe.toId) ?? pipe.toId)}` +
-      `${attr('length', metres(doc, planLength))}${attr('slope', compactNumber(slopePercent))}>`,
+    '        ' +
+      `<Pipe${attr('name', names.get(pipe.id) ?? pipe.id)}${attr('refStart', names.get(pipe.fromId) ?? pipe.fromId)}${attr('refEnd', names.get(pipe.toId) ?? pipe.toId)}${attr('length', metres(doc, planLength))}${attr('slope', compactNumber(slopePercent))}>`,
     `          <CircPipe${attr('diameter', fixedNumber(toMetres(doc, pipe.diameter) * 1000, 1))}` +
       `${attr('material', pipe.material)}${attr('mannings', String(pipe.manningN))}/>`,
     '        </Pipe>',
@@ -150,9 +146,8 @@ function coordinateSystemXml(doc: Doc, frame: CoordinateFrame): string[] {
   const crs = doc.civil?.crs;
   if (!crs || (crs.calibration && frame === 'local')) return [];
   return [
-    `  <CoordinateSystem${attr('name', crs.name)}` +
-      `${crs.epsg !== undefined ? attr('epsgCode', String(crs.epsg)) : ''}` +
-      `${crs.verticalDatum !== undefined ? attr('verticalDatum', crs.verticalDatum) : ''}/>`,
+    '  ' +
+      `<CoordinateSystem${attr('name', crs.name)}${crs.epsg !== undefined ? attr('epsgCode', String(crs.epsg)) : ''}${crs.verticalDatum !== undefined ? attr('verticalDatum', crs.verticalDatum) : ''}/>`,
   ];
 }
 
@@ -173,9 +168,8 @@ export function buildLandXml(doc: Doc, { projectName, date, coordinates }: LandX
     '<?xml version="1.0" encoding="UTF-8"?>',
     `<LandXML xmlns="${LANDXML_NAMESPACE}" version="1.2"${attr('date', date)} time="00:00:00">`,
     '  <Units>',
-    '    <Metric linearUnit="meter" areaUnit="squareMeter" volumeUnit="cubicMeter" ' +
-      'temperatureUnit="celsius" pressureUnit="milliBars" diameterUnit="millimeter" ' +
-      'angularUnit="decimal degrees" directionUnit="decimal degrees"/>',
+    '    <Metric linearUnit="meter" areaUnit="squareMeter" volumeUnit="cubicMeter" temperatureUnit="celsius" pressureUnit="milliBars" ' +
+      'diameterUnit="millimeter" angularUnit="decimal degrees" directionUnit="decimal degrees"/>',
     '  </Units>',
     ...coordinateSystemXml(doc, frame),
     `  <Project${attr('name', projectName)}/>`,

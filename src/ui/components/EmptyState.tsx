@@ -1,9 +1,5 @@
-/**
- * EmptyState — a centered "start here" card over the viewport while the document has no entities.
- * Offers one-click starts (add a box, draw a rectangle) and explains how to move things and how to
- * let an MCP agent build the model. Auto-hides once any entity exists; dismissal is local state.
- * Actions only dispatch through the shared toolbar helpers (PRIME DIRECTIVE).
- */
+// Centered "start here" card while the document is empty: one-click starts, how to move things, how to let an MCP agent
+// build. Dismissal is local state.
 
 import React, { useState } from 'react';
 import { useLayoutStore, useStore, useToolStore } from '@ui/store';
@@ -33,7 +29,7 @@ export function EmptyState(): React.ReactElement | null {
   const [dismissed, setDismissed] = useState(false);
   const [civilLoading, setCivilLoading] = useState(false);
 
-  // Hidden while a 2D tool is armed so the card never covers the drawing area.
+  // Never covers the drawing area while a 2D tool is armed.
   if (entityCount > 0 || dismissed || drawToolArmed) return null;
 
   const showBuildingTab = (): void => {

@@ -13,11 +13,7 @@ import {
 } from './ifcStep';
 import type { Exported } from './ifcElementExport';
 
-const SLAB_TYPE: Readonly<Record<SlabElement['role'], string>> = {
-  floor: '.FLOOR.',
-  roof: '.ROOF.',
-  foundation: '.BASESLAB.',
-};
+const SLAB_TYPE: Readonly<Record<SlabElement['role'], string>> = { floor: '.FLOOR.', roof: '.ROOF.', foundation: '.BASESLAB.' };
 
 export function exportOther(
   context: Context,

@@ -43,10 +43,9 @@ function runPipes(civil: CivilModel, fromId: string, toId: string | undefined): 
 export const exportDrainageLongSection = defineCommand({
   name: 'export_drainage_long_section',
   description:
-    'Long section of a drainage pipe run as SVG text in `data.text` (`data.fileName`): ground (rim) ' +
-    'line, manholes with labels, pipe invert and obvert, the hydraulic grade line (same method as ' +
-    'check_drainage_network) and a table band of chainage, rim, invert, pipe (diameter, slope, length) ' +
-    'and HGL. The run starts at `fromManholeId` and ends at `toManholeId`, or, when omitted, follows the ' +
+    'Long section of a drainage pipe run as SVG text in `data.text` (`data.fileName`): ground (rim) line, manholes with labels, pipe ' +
+    'invert and obvert, the hydraulic grade line (same method as check_drainage_network) and a table band of chainage, rim, invert, pipe ' +
+    '(diameter, slope, length) and HGL. The run starts at `fromManholeId` and ends at `toManholeId`, or, when omitted, follows the ' +
     'largest pipe at each fork down to the outfall. Returns data { text, fileName, pipeIds, manholeIds }.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({

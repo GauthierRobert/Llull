@@ -22,10 +22,9 @@ export type SolidVolume =
   | { readonly error: string };
 
 /**
- * Exact volume of a kernel result (a mesh entity that keeps its B-rep recipe), or null when no
- * kernel with exact topology (OCC) is installed. The display mesh is a coarse tessellation (0.1
- * linear / 0.5 rad angular deflection), so its volume is off by up to ~1 % on small curved parts —
- * too much for a mass check against a drawing.
+ * Exact volume of a kernel result (a mesh entity that keeps its B-rep recipe), or null when no kernel with exact topology (OCC) is
+ * installed. The display mesh is a coarse tessellation (0.1 linear / 0.5 rad angular deflection), so its volume is off by up to ~1 % on
+ * small curved parts — too much for a mass check against a drawing.
  */
 function exactVolume(e: Entity, ctx: ExecutionContext | undefined): number | null {
   if (e.kind !== 'mesh' || e.brep === undefined) return null;
@@ -55,13 +54,12 @@ function closedMeshVolume(positions: number[]): number {
  * @failure instance with a missing component, or a non-solid kind -> { error }
  */
 export function solidVolume(doc: CadDocument, e: Entity, ctx: ExecutionContext | undefined): SolidVolume {
-  if (is2D(e)) {
+  if (is2D(e))
     return {
       error:
         `entity '${e.id}' is kind '${e.kind}'; ` +
         "supported kinds are 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', 'subdivision', 'instance'.",
     };
-  }
   switch (e.kind) {
     case 'box':
       return { volume: e.size[0] * e.size[1] * e.size[2] };
@@ -94,8 +92,8 @@ export function solidVolume(doc: CadDocument, e: Entity, ctx: ExecutionContext |
       return { volume };
     }
     case 'revolution': {
-      // Pappus: V = sweepAngle * |centroid x| * profile area; profile x = distance from the axis.
-      // A profile crossing the axis falls back to the bounding-box volume.
+      // Pappus: V = sweepAngle * |centroid x| * profile area; profile x = distance from the axis. A profile crossing the axis falls back to
+      // the bounding-box volume.
       if (e.profile.some(([x]) => x < 0)) {
         const b = entityBounds(e);
         return {
@@ -104,9 +102,7 @@ export function solidVolume(doc: CadDocument, e: Entity, ctx: ExecutionContext |
         };
       }
       const profileArea = polygonArea(e.profile);
-      return {
-        volume: profileArea < 1e-12 ? 0 : (e.angle ?? 2 * Math.PI) * Math.abs(polygonCentroid(e.profile)[0]) * profileArea,
-      };
+      return { volume: profileArea < 1e-12 ? 0 : (e.angle ?? 2 * Math.PI) * Math.abs(polygonCentroid(e.profile)[0]) * profileArea };
     }
     case 'sweep':
       return { volume: sweepVolume(e) };

@@ -102,9 +102,7 @@ export const addSlabOpening = defineCommand({
     } else if (isVec2List(boundary, 3)) {
       outline = boundary.map(toVec2);
     }
-    if (!outline) {
-      return noop(doc, 'add_slab_opening failed: give a boundary of ≥ 3 [x, y] points or a stairId.');
-    }
+    if (!outline) return noop(doc, 'add_slab_opening failed: give a boundary of ≥ 3 [x, y] points or a stairId.');
     if (slabId !== undefined) {
       const candidate = building.elements[slabId];
       slab = candidate?.category === 'slab' ? candidate : undefined;

@@ -30,27 +30,24 @@ export const runwayCheck = defineCommand({
   name: 'check_crane_runways',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Preliminary check of the crane runway beams (steel members with role crane, from ' +
-    'add_crane_runway / add_portal_frame_building crane) of a level. Each segment between supports ' +
-    'is a simply supported beam (conservative vs continuous) loaded by one 2-wheel crane group per ' +
-    'rail: wheel load P = max rail reaction / 2 from the statics of the bridge with the trolley at ' +
-    'the minimum hook approach (EN 1991-3 load group 1: φ1 = 1.1 on Gc, φ2 by hoisting class), lateral ' +
-    'rail force = envelope of the transverse drive force HT (group 1, φ5 = 1.5) and the skewing force HS ' +
-    '(group 5, §2.7.4, α = 0.015) split on the wheels, longitudinal stop force HL = φ5 K/nr as axial force, ULS factor 1.35, runway + rail self-weight (railSize). ' +
-    'Checks: (1) strength - biaxial My/Mpl,y + Mz/Mpl,z with lateral bending carried by the top ' +
-    'flange only (Wpl,z/2), and shear; (2) ltb - χLT from Mcr (C1 = 1.13, Lcr = span, I-sections ' +
-    'only, 0.85 Mcr for the top-flange load application); (3) SLS EN 1993-6 §7.3 - vertical and ' +
-    'lateral deflection <= L/600 under characteristic wheel loads (static P, two-wheel exact ' +
-    'midspan formula); (4) fatigue EN 1993-1-9 - ΔσE2 = λ φfat Δσ at the bottom flange, λ = 0.315 / ' +
-    '0.397 / 0.500 (normal stresses, EN 1991-3 Tab. 2.12) for class S2 / S3 / S4, φfat 1.05, detail category 71, γMf 1.15, γFf 1.0. ' +
-    '(5) local - EN 1993-6 §5.7.1: leff = 3.25 (Irf/tw)^(1/3), Irf = 0.75 Ir(rail, wear) + If (rail not rigidly ' +
-    'fixed, Tab. 5.1 case b), beff = foot + hr + tf <= b, σoz = 1.35 P / (leff tw) <= fy/γM0; local fatigue with λ x 1.26 ' +
-    '(2 cycles per passage), φfat 1.05, category 160 (girder rolled) / 71 (welded-full, full-penetration) / 36 (welded-fillet) / γMf 1.15. ' +
-    '(6) buffer forces, load group 7 (§2.11.1): HB,1 = φ7 v1 √(mc SB), φ7 = 1.25 (ξb ≤ 0.5), v1 = 0.7 travelSpeed, mc = crane mass (free hook), SB = bufferStiffness; ' +
-    'shared by the 2 rails, accidental γ = 1.0 (Tab. A.1); rows: stop force vs top-flange weld transfer (b tf fy, stop welded to the top flange) and end-bay axial + bending at the beam centroid (eccentricity h/2 + rail height). ' +
-    '(7) test load, group 8 (§2.10): Qtest = max(φ6 · 1.1, 1.25) Qh, φ6 = 0.5 (1 + φ2), γ = 1.1, bending row. ' +
-    'Utilisation > 1 fails. Not covered: torsion, rail-wheel contact, continuity, ' +
-    'connections - not a substitute for the engineer of record.',
+    'Preliminary check of the crane runway beams (steel members with role crane, from add_crane_runway / add_portal_frame_building ' +
+    'crane) of a level. Each segment between supports is a simply supported beam (conservative vs continuous) loaded by one 2-wheel ' +
+    'crane group per rail: wheel load P = max rail reaction / 2 from the statics of the bridge with the trolley at the minimum hook ' +
+    'approach (EN 1991-3 load group 1: φ1 = 1.1 on Gc, φ2 by hoisting class), lateral rail force = envelope of the transverse drive ' +
+    'force HT (group 1, φ5 = 1.5) and the skewing force HS (group 5, §2.7.4, α = 0.015) split on the wheels, longitudinal stop force HL ' +
+    '= φ5 K/nr as axial force, ULS factor 1.35, runway + rail self-weight (railSize). Checks: (1) strength - biaxial My/Mpl,y + Mz/Mpl,z ' +
+    'with lateral bending carried by the top flange only (Wpl,z/2), and shear; (2) ltb - χLT from Mcr (C1 = 1.13, Lcr = span, I-sections ' +
+    'only, 0.85 Mcr for the top-flange load application); (3) SLS EN 1993-6 §7.3 - vertical and lateral deflection <= L/600 under ' +
+    'characteristic wheel loads (static P, two-wheel exact midspan formula); (4) fatigue EN 1993-1-9 - ΔσE2 = λ φfat Δσ at the bottom ' +
+    'flange, λ = 0.315 / 0.397 / 0.500 (normal stresses, EN 1991-3 Tab. 2.12) for class S2 / S3 / S4, φfat 1.05, detail category 71, γMf ' +
+    '1.15, γFf 1.0. (5) local - EN 1993-6 §5.7.1: leff = 3.25 (Irf/tw)^(1/3), Irf = 0.75 Ir(rail, wear) + If (rail not rigidly fixed, ' +
+    'Tab. 5.1 case b), beff = foot + hr + tf <= b, σoz = 1.35 P / (leff tw) <= fy/γM0; local fatigue with λ x 1.26 (2 cycles per ' +
+    'passage), φfat 1.05, category 160 (girder rolled) / 71 (welded-full, full-penetration) / 36 (welded-fillet) / γMf 1.15. (6) buffer ' +
+    'forces, load group 7 (§2.11.1): HB,1 = φ7 v1 √(mc SB), φ7 = 1.25 (ξb ≤ 0.5), v1 = 0.7 travelSpeed, mc = crane mass (free hook), SB ' +
+    '= bufferStiffness; shared by the 2 rails, accidental γ = 1.0 (Tab. A.1); rows: stop force vs top-flange weld transfer (b tf fy, ' +
+    'stop welded to the top flange) and end-bay axial + bending at the beam centroid (eccentricity h/2 + rail height). (7) test load, ' +
+    'group 8 (§2.10): Qtest = max(φ6 · 1.1, 1.25) Qh, φ6 = 0.5 (1 + φ2), γ = 1.1, bending row. Utilisation > 1 fails. Not covered: ' +
+    'torsion, rail-wheel contact, continuity, connections - not a substitute for the engineer of record.',
   params: z.object({
     craneCapacity: z
       .number()
@@ -192,12 +189,7 @@ export const runwayCheck = defineCommand({
       `Checked ${beams} crane runway beam(s), ${rows.length} check(s) (${[...capacities].join('/')} t, class ${craneClass}, wheelBase ${wheelBase} mm): ` +
         `max utilisation ${round(worst.utilisation)} (${worst.mark} ${worst.kind}: ${worst.check}); ` +
         failureSummary(failures, (row) => `${row.mark} ${row.kind}`, 'all OK (preliminary, simply supported spans).'),
-      {
-        rows,
-        csv,
-        maxUtilisation: worst.utilisation,
-        failures: [...new Set(failures.map((row) => row.elementId))],
-      },
+      { rows, csv, maxUtilisation: worst.utilisation, failures: [...new Set(failures.map((row) => row.elementId))] },
     );
   },
 });

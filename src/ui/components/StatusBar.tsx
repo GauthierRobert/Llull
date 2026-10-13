@@ -1,19 +1,18 @@
-/**
- * StatusBar — slim bottom bar: live / syncing / sync-failed indicator, last command summary,
- * entity + selection counts, units. Presentation only (PRIME DIRECTIVE).
- */
+// Bottom bar: live / syncing / sync-failed, last summary, entity + selection counts, units.
 
 import React, { useEffect, useState } from 'react';
 import { useStore } from '@ui/store';
 import { fetchLicenseLabel } from '@ui/services/serverFiles';
 
-interface StatusItemProps {
+function StatusItem({
+  label,
+  value,
+  'aria-label': ariaLabel,
+}: {
   label: string;
   value: string;
   'aria-label'?: string;
-}
-
-function StatusItem({ label, value, 'aria-label': ariaLabel }: StatusItemProps): React.ReactElement {
+}): React.ReactElement {
   return (
     <span className="status-item" aria-label={ariaLabel ?? `${label}: ${value}`}>
       <span className="status-item__label">{label}</span>

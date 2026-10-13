@@ -1,6 +1,6 @@
 /**
- * set_parameter / delete_parameter: the parameter table is document INPUT state (architecture L8),
- * so both are `metaHistory`; dependents re-evaluate in topological order after any change.
+ * set_parameter / delete_parameter: the parameter table is document INPUT state (architecture L8), so both are `metaHistory`; dependents
+ * re-evaluate in topological order after any change.
  */
 
 import type { CadDocument, Parameter } from '../../model/types';
@@ -12,10 +12,7 @@ import { evaluateExpression, expressionSyntaxError, extractReferences } from './
 import { regenerateParameterDependents } from '../history/dependents';
 
 /** Parameter names ordered by dependency; names in a reference cycle are appended and listed in `cycleSet`. */
-function topoSort(parameters: Readonly<Record<string, Parameter>>): {
-  sorted: string[];
-  cycleSet: Set<string>;
-} {
+function topoSort(parameters: Readonly<Record<string, Parameter>>): { sorted: string[]; cycleSet: Set<string> } {
   const names = Object.keys(parameters);
   const edges = names.flatMap((name) =>
     [...extractReferences((parameters[name] as Parameter).expression)]
@@ -27,14 +24,13 @@ function topoSort(parameters: Readonly<Record<string, Parameter>>): {
 }
 
 /**
- * Re-evaluate every parameter in dependency order; cycles and unknown references get an `error`
- * (the last good value is kept). Shared with `activate_configuration`.
+ * Re-evaluate every parameter in dependency order; cycles and unknown references get an `error` (the last good value is kept). Shared with
+ * `activate_configuration`.
  */
 export function reEvaluateAll(parameters: Readonly<Record<string, Parameter>>): Record<string, Parameter> {
   const { sorted, cycleSet } = topoSort(parameters);
   const result: Record<string, Parameter> = {};
   const env: Record<string, number> = {};
-
   for (const name of sorted) {
     const param = parameters[name];
     if (!param) continue;
@@ -52,7 +48,6 @@ export function reEvaluateAll(parameters: Readonly<Record<string, Parameter>>): 
       };
     }
   }
-
   return result;
 }
 
@@ -79,8 +74,7 @@ export const setParameter = defineCommand({
     'parameters by name using +, -, *, / and parentheses (e.g. "width * 2 + 5"). ' +
     'After setting the parameter, all dependent parameters are re-evaluated ' +
     'in topological order. An invalid expression is stored with an error message ' +
-    'rather than rejecting the call. Parameter names must be non-empty strings ' +
-    'containing only letters, digits, and underscores.',
+    'rather than rejecting the call. Parameter names must be non-empty strings containing only letters, digits, and underscores.',
   params: z.object({
     name: z
       .string()
@@ -92,21 +86,18 @@ export const setParameter = defineCommand({
     expression: z
       .string()
       .describe(
-        'Numeric expression defining the parameter value. ' +
-          'May be a plain number ("10", "3.14") or a formula referencing other ' +
+        'Numeric expression defining the parameter value. May be a plain number ("10", "3.14") or a formula referencing other ' +
           'parameter names ("width * 2", "base_height + offset", "(a + b) / 2"). ' +
           'Supports +, -, *, /, parentheses, unary minus, and decimal numbers.',
       ),
   }),
   run: (doc, { name, expression }, ctx): CommandResult => {
-    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name) || name === '__proto__') {
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name) || name === '__proto__')
       return noop(
         doc,
         `set_parameter failed: name '${name}' is invalid. Use letters, digits, and underscores; must not start with a digit.`,
       );
-    }
     if (expression.trim() === '') return noop(doc, `set_parameter failed: expression must be a non-empty string.`);
-
     const syntaxError = expressionSyntaxError(expression);
     if (syntaxError !== null) {
       const previous = Object.hasOwn(doc.parameters, name) ? doc.parameters[name] : undefined;
@@ -118,24 +109,18 @@ export const setParameter = defineCommand({
             : 'The parameter was not created.'),
       );
     }
-
     const evaluated = reEvaluateAll(withParameterExpression(doc.parameters, name, expression));
     const param = evaluated[name];
     if (!param) return noop(doc, `set_parameter failed: could not store parameter '${name}'.`);
-
     const newDoc: CadDocument = { ...doc, parameters: evaluated };
-
-    if (param.error) {
+    if (param.error)
       return report(
         newDoc,
         `set_parameter '${name}': expression '${expression}' could not be evaluated — ${param.error}. Parameter stored with error.`,
       );
-    }
-
     const dependentCount = Object.values(evaluated).filter((p) => p.name !== name && extractReferences(p.expression).has(name)).length;
     const { document, dependentSteps, refusal } = regenerateParameterDependents(doc, newDoc, ctx);
     if (refusal !== undefined) return noop(doc, `set_parameter '${name}': ${refusal}`);
-
     return changed(
       document,
       `set_parameter '${name}' = ${param.value} (expression: '${expression}')` +
@@ -155,31 +140,24 @@ export const deleteParameter = defineCommand({
   name: 'delete_parameter',
   annotations: { destructive: true, metaHistory: true },
   description:
-    'Remove a named parameter from the document. ' +
-    'The parameter record is deleted; any other parameters whose expressions ' +
+    'Remove a named parameter from the document. The parameter record is deleted; any other parameters whose expressions ' +
     'reference this name are re-evaluated and will have their error field set to ' +
-    '"unknown parameter: <name>" until they are updated. ' +
-    'If the parameter does not exist, the document is left unchanged.',
+    '"unknown parameter: <name>" until they are updated. If the parameter does not exist, the document is left unchanged.',
   params: z.object({
     name: z
       .string()
       .describe(
-        'Name of the parameter to delete. ' +
-          'Must match an existing parameter name exactly (case-sensitive). ' +
+        'Name of the parameter to delete. Must match an existing parameter name exactly (case-sensitive). ' +
           'Example: "width", "wall_thickness".',
       ),
   }),
   run: (doc, { name }): CommandResult => {
     if (!Object.hasOwn(doc.parameters, name)) return noop(doc, `delete_parameter: parameter '${name}' does not exist — no change made.`);
-
     const evaluated = reEvaluateAll(Object.fromEntries(Object.entries(doc.parameters).filter(([key]) => key !== name)));
-
     const erroredDependents = Object.values(evaluated)
       .filter((p) => p.error)
       .map((p) => p.name);
-
     const newDoc: CadDocument = { ...doc, parameters: evaluated };
-
     return report(
       newDoc,
       `delete_parameter '${name}': removed.` +

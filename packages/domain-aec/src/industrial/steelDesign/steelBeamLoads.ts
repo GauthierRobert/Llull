@@ -78,11 +78,6 @@ export function flushBins(beam: BeamLoads): void {
     const permanent = beam.binsPermanent[index] ?? 0;
     const imposed = beam.binsImposed[index] ?? 0;
     if (permanent === 0 && imposed === 0) continue;
-    beam.pieces.push({
-      from: index * width,
-      to: (index + 1) * width,
-      permanent: permanent / width,
-      imposed: imposed / width,
-    });
+    beam.pieces.push({ from: index * width, to: (index + 1) * width, permanent: permanent / width, imposed: imposed / width });
   }
 }

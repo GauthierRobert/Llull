@@ -153,12 +153,11 @@ export const exportElevationSheet = defineCommand({
   name: 'export_elevation_sheet',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Produce a printable elevation or section drawing (SVG in real millimetres, print to PDF at 100%) ' +
-    'drawn as an ISO 128 line drawing from the 3D model with hidden lines removed (visible edges heavy, ' +
-    'centre lines chain-dotted): north / south / east / west elevation (+Y is north), or a section when ' +
-    'cutAt is given (the model nearer to the viewer than the cut plane is removed; cut faces outlined heavy, ' +
-    'hatched at 45°, steel filled solid). Shows level datums, grid bubbles, scale bar and the title block. ' +
-    'Use exclude: ["panel"] to show the steel frame behind the cladding. data.svg holds the file text.',
+    'Produce a printable elevation or section drawing (SVG in real millimetres, print to PDF at 100%) drawn as an ISO 128 line drawing ' +
+    'from the 3D model with hidden lines removed (visible edges heavy, centre lines chain-dotted): north / south / east / west elevation ' +
+    '(+Y is north), or a section when cutAt is given (the model nearer to the viewer than the cut plane is removed; cut faces outlined ' +
+    'heavy, hatched at 45°, steel filled solid). Shows level datums, grid bubbles, scale bar and the title block. Use exclude: ["panel"] ' +
+    'to show the steel frame behind the cladding. data.svg holds the file text.',
   params: z.object({
     direction: z
       .enum(ELEVATION_DIRECTIONS)
@@ -172,9 +171,7 @@ export const exportElevationSheet = defineCommand({
   }),
   run: (doc, { direction = 'south', cutAt, exclude, paper = 'A3', scale, title }): CommandResult => {
     const sheet = buildElevationSheet(doc, { direction, cutAt, exclude, paper, scale, title });
-    if (!sheet) {
-      return noop(doc, 'export_elevation_sheet failed: no 3D geometry to draw (on that side of the cut) or invalid scale.');
-    }
+    if (!sheet) return noop(doc, 'export_elevation_sheet failed: no 3D geometry to draw (on that side of the cut) or invalid scale.');
     return report(
       doc,
       `Elevation sheet ${sheet.filename}: ${sheet.lines} drawn line(s) / cut face(s) at 1:${sheet.scale} on ${sheet.paper}.${sheetFitWarning(sheet.fits, 'view')}`,

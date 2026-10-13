@@ -18,12 +18,11 @@ import { buildPlanProfileSheet } from './planProfileSheet';
 export const exportCivilPlanSheet = defineCommand({
   name: 'export_civil_plan_sheet',
   description:
-    'Printable civil plan drawing (SVG in real millimetres, print to PDF at 100 %): every civil ' +
-    'entity (contours with labels, survey points, pads and daylight lines, alignment centreline ' +
-    'with stations, corridor edges, manholes and pipes with labels) at a true scale 1:N on ISO paper ' +
-    'A4-A0 landscape, clipped to the drawing viewport, with the title block from set_project_info, ' +
-    'north arrow, scale bar, layer legend and, on a calibrated site (set_site_calibration), grid ' +
-    'coordinate ticks. data.text holds the file, data.fileName its name.',
+    'Printable civil plan drawing (SVG in real millimetres, print to PDF at 100 %): every civil entity (contours with labels, survey ' +
+    'points, pads and daylight lines, alignment centreline with stations, corridor edges, manholes and pipes with labels) at a true ' +
+    'scale 1:N on ISO paper A4-A0 landscape, clipped to the drawing viewport, with the title block from set_project_info, north arrow, ' +
+    'scale bar, layer legend and, on a calibrated site (set_site_calibration), grid coordinate ticks. data.text holds the file, ' +
+    'data.fileName its name.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
     paper: z.enum(PAPER_SIZES).describe('Paper size, landscape: A4, A3, A2, A1 or A0.'),
@@ -69,10 +68,9 @@ export const exportCivilPlanSheet = defineCommand({
 export const exportPlanProfileSheet = defineCommand({
   name: 'export_plan_profile_sheet',
   description:
-    'Printable plan-and-profile sheet of an alignment (SVG, print to PDF at 100 %): a stationed ' +
-    'plan strip (road edges, station ticks, horizontal curves with radius) above the long section ' +
-    '(ground, design, PVIs, table band), both at the horizontal scale 1:N so stations line up. ' +
-    'Needs set_alignment_profile. data.text holds the file, data.fileName its name.',
+    'Printable plan-and-profile sheet of an alignment (SVG, print to PDF at 100 %): a stationed plan strip (road edges, station ticks, ' +
+    'horizontal curves with radius) above the long section (ground, design, PVIs, table band), both at the horizontal scale 1:N so ' +
+    'stations line up. Needs set_alignment_profile. data.text holds the file, data.fileName its name.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
     alignmentId: alignmentIdParam,

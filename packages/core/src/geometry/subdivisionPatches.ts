@@ -1,11 +1,9 @@
 /**
- * Exact-surface form of a subdivision solid: one bicubic Bézier patch per quad of the once-refined
- * cage (Loop & Schaefer geometry patches). Around regular vertices (four smooth edges) the patch
- * IS the Catmull-Clark limit surface (uniform bicubic B-spline converted to Bézier form); near
- * extraordinary vertices and next to creases it approximates it closely. Neighbouring patches share their boundary
- * control points exactly, so the patches sew into a closed solid. Crease edges follow the
- * crease's cubic B-spline curve; crease corners stay put. Pure; the OCC kernel builds B-spline
- * faces from these poles.
+ * Exact-surface form of a subdivision solid: one bicubic Bézier patch per quad of the once-refined cage (Loop & Schaefer geometry patches).
+ * Around regular vertices (four smooth edges) the patch IS the Catmull-Clark limit surface (uniform bicubic B-spline converted to Bézier
+ * form); near extraordinary vertices and next to creases it approximates it closely. Neighbouring patches share their boundary control
+ * points exactly, so the patches sew into a closed solid. Crease edges follow the crease's cubic B-spline curve; crease corners stay put.
+ * Pure; the OCC kernel builds B-spline faces from these poles.
  */
 
 import type { SubdivisionEntity, Vec3 } from '../model/types';
@@ -25,7 +23,7 @@ export function quadCagePatches(cage: Cage): BezierPatch[] {
   const valence = vertices.map(() => 0);
   const creaseNeighbours = vertices.map((): number[] => []);
   const seen = new Set<string>();
-  for (const face of faces) {
+  for (const face of faces)
     face.forEach((a, i) => {
       const b = face[(i + 1) % 4] as number;
       if (seen.has(edgeKey(a, b))) return;
@@ -37,7 +35,6 @@ export function quadCagePatches(cage: Cage): BezierPatch[] {
         creaseNeighbours[b]?.push(a);
       }
     });
-  }
   /** Interior point of face `f` next to its corner `k`. */
   const interior = faces.map((face) =>
     face.map((v, k) => {
@@ -110,9 +107,7 @@ export function patchPoint(patch: BezierPatch, u: number, v: number): Vec3 {
   const bv = bernstein(v);
   let point: Vec3 = [0, 0, 0];
   for (let i = 0; i < 4; i++) {
-    for (let j = 0; j < 4; j++) {
-      point = add3(point, scale3(patch[i * 4 + j] as Vec3, (bu[i] as number) * (bv[j] as number)));
-    }
+    for (let j = 0; j < 4; j++) point = add3(point, scale3(patch[i * 4 + j] as Vec3, (bu[i] as number) * (bv[j] as number)));
   }
   return point;
 }

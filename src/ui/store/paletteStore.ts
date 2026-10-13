@@ -1,8 +1,4 @@
-/**
- * Command palette store — open state, the most recently run palette items (persisted, so the
- * empty-query list starts with what the user reaches for) and the result toast of the last
- * command run from the palette. Presentation-only; never CadDocument.
- */
+// Command palette UI state: open, persisted recents (the empty-query list), last result toast.
 
 import { create } from 'zustand';
 import { readStored, writeStored } from './persistence';
@@ -15,25 +11,23 @@ function readRecent(): string[] {
   return Array.isArray(stored) ? stored.filter((id): id is string => typeof id === 'string').slice(0, RECENT_LIMIT) : [];
 }
 
-/** Outcome of a command run from the palette, shown as a toast. */
 export interface PaletteResult {
-  /** Increments per result, so a repeated identical summary is still a new toast. */
+  /** Per result, so a repeated summary is still a new toast. */
   id: number;
   commandName: string;
   summary: string;
-  /** A mutating command that changed nothing (rejected / no-op). */
+  /** Mutating command that changed nothing. */
   failed: boolean;
 }
 
 interface PaletteStoreState {
   open: boolean;
-  /** Palette item ids, most recent first, at most RECENT_LIMIT. */
+  /** Most recent first, ≤ RECENT_LIMIT. */
   recentIds: readonly string[];
   result: PaletteResult | null;
   setOpen(open: boolean): void;
   showResult(result: Omit<PaletteResult, 'id'>): void;
   dismissResult(): void;
-  /** Move `id` to the front of the recent list. */
   recordRecent(id: string): void;
 }
 

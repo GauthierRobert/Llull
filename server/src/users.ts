@@ -1,11 +1,7 @@
 /**
- * Named users and roles (opt-in via `LLULL_USERS_FILE`). Transport-level authentication only:
- * the bearer token resolves to a user, the role gates routes / MCP tools. No business logic (L6).
- *
- * File: JSON `[{ id, name, role: 'viewer'|'editor'|'admin', tokenSha256 }]`; only the SHA-256 of
- * each token is stored. Re-read when the file changes (no restart after `add-user.mjs`).
+ * Named users + roles (opt-in `LLULL_USERS_FILE`): bearer token -> user, role gates routes / MCP tools.
+ * File: JSON `[{ id, name, role, tokenSha256 }]` (token hashes only), re-read when it changes.
  */
-
 import crypto from 'crypto';
 import fs from 'fs';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
@@ -24,7 +20,7 @@ export interface NamedUser {
   readonly tokenSha256: string;
 }
 
-/** JSON body of every 401 (REST mutation guard, `/mcp` bearer auth, named-user guard). */
+/** JSON body of every 401. */
 export const UNAUTHORIZED_BODY = { error: 'Unauthorized — valid Bearer token required.' };
 
 export const sha256Hex = (value: string): string => crypto.createHash('sha256').update(value).digest('hex');
@@ -32,14 +28,7 @@ export const sha256Hex = (value: string): string => crypto.createHash('sha256').
 /** The digest bytes of `value` (compared with `timingSafeEqual`: no length leak). */
 export const sha256Digest = (value: string): Buffer => Buffer.from(sha256Hex(value), 'hex');
 
-function isRole(value: unknown): value is Role {
-  return value === 'viewer' || value === 'editor' || value === 'admin';
-}
-
-/** True when `role` is at least `required`. */
-function roleAtLeast(role: Role, required: Role): boolean {
-  return ROLE_RANK[role] >= ROLE_RANK[required];
-}
+const isRole = (value: unknown): value is Role => typeof value === 'string' && Object.hasOwn(ROLE_RANK, value);
 
 function parseUser(raw: unknown): NamedUser | null {
   if (!isRecord(raw)) return null;
@@ -51,11 +40,7 @@ function parseUser(raw: unknown): NamedUser | null {
 
 let cache: { path: string; stamp: string; users: NamedUser[] } | null = null;
 
-/** Users file path, or undefined when named-user mode is off. */
-function usersFilePath(): string | undefined {
-  const value = process.env['LLULL_USERS_FILE'];
-  return value === undefined || value.trim() === '' ? undefined : value.trim();
-}
+const usersFilePath = (): string | undefined => nonEmptyString(process.env['LLULL_USERS_FILE']?.trim());
 
 /** Named-user mode: supersedes the shared token (even with an empty/unreadable file: all 401). */
 export function isUserMode(): boolean {
@@ -107,15 +92,15 @@ export function authenticateToken(token: string): NamedUser | null {
   return found;
 }
 
-/** Bearer header token, or (when `allowQuery`) `?access_token=` for EventSource / downloads. */
-function presentedToken(req: Request, allowQuery: boolean): string | undefined {
+/** `Authorization: Bearer <token>` (scheme case-insensitive). */
+export function bearerToken(req: Request): string | undefined {
   const header = req.headers['authorization'];
-  if (typeof header === 'string') {
-    const presented = /^bearer +(.+)$/i.exec(header)?.[1];
-    if (presented !== undefined) return presented;
-  }
-  return allowQuery ? nonEmptyString(req.query['access_token']) : undefined;
+  return typeof header === 'string' ? /^bearer +(.+)$/i.exec(header)?.[1] : undefined;
 }
+
+/** Bearer token, or (when `allowQuery`) `?access_token=` for EventSource / downloads. */
+const presentedToken = (req: Request, allowQuery: boolean): string | undefined =>
+  bearerToken(req) ?? (allowQuery ? nonEmptyString(req.query['access_token']) : undefined);
 
 /** The authenticated user of this request (set by `requireRole`), if any. */
 export function requestUser(res: Response): NamedUser | undefined {
@@ -133,32 +118,24 @@ function isNamedUser(value: unknown): value is NamedUser {
   );
 }
 
-/**
- * Express guard for named-user mode: 401 unknown/missing token, 402 beyond the license seats,
- * 403 when the role is below `required`. Sets `res.locals.llullUser` on success.
- */
+/** Named-user guard: 401 unknown token, 402 beyond license seats, 403 role below `required`; sets `res.locals.llullUser`. */
 export function requireRole(required: Role, allowQuery: boolean): RequestHandler {
   return (req: Request, res: Response, next: NextFunction): void => {
     const token = presentedToken(req, allowQuery);
     const user = token === undefined ? null : authenticateToken(token);
-    if (user === null) {
-      res.status(401).json(UNAUTHORIZED_BODY);
-      return;
-    }
+    if (user === null) return void res.status(401).json(UNAUTHORIZED_BODY);
     const license = getLicense();
     if (!licensedUserIds(loadUsers(), license.seats).has(user.id)) {
-      res.status(402).json({
+      return void res.status(402).json({
         error:
           `License seat limit reached: ${license.seats} named user(s) allowed (${license.label}). ` +
           `User "${user.id}" has no seat — remove an unused user or install a larger license.`,
       });
-      return;
     }
-    if (!roleAtLeast(user.role, required)) {
-      res.status(403).json({
-        error: `Forbidden — role "${user.role}" cannot do this; role "${required}" or higher is required.`,
-      });
-      return;
+    if (ROLE_RANK[user.role] < ROLE_RANK[required]) {
+      return void res
+        .status(403)
+        .json({ error: `Forbidden — role "${user.role}" cannot do this; role "${required}" or higher is required.` });
     }
     res.locals['llullUser'] = user;
     next();

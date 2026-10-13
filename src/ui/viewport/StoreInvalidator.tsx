@@ -1,16 +1,11 @@
-/**
- * Calls r3f `invalidate()` whenever watched store state changes, so the 2D and 3D Canvases repaint
- * under `frameloop="demand"` (architecture L7: one model, two views). Subscribes outside React
- * (no re-render); commands are pure (L3), so reference equality is a sufficient change test.
- * Mount inside a Canvas.
- */
+// In-Canvas: `invalidate()` on watched store changes (demand frameloop), subscribed outside React; pure commands make
+// reference equality a sufficient change test.
 
 import { useEffect } from 'react';
 import { useThree } from '@react-three/fiber';
 import type { StoreApi } from 'zustand';
 import { useStore, useViewportStore } from '@ui/store';
 
-/** Invalidate the canvas whenever `changed(state, previous)` holds for `store`. */
 function useInvalidateOnChange<T>(store: Pick<StoreApi<T>, 'subscribe'>, changed: (state: T, previous: T) => boolean): void {
   const invalidate = useThree((s) => s.invalidate);
   useEffect(

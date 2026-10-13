@@ -1,174 +1,77 @@
-/**
- * Unit tests for liveDocument.ts
- *
- * Covers:
- *   (a) A mutating MCP tools/call (via applyToolCall + setLiveDoc) updates the
- *       shared live document: getLiveDoc() reflects the new state.
- *   (b) subscribeLive immediately emits the current snapshot; setLiveDoc broadcasts
- *       a fresh snapshot to every subscriber.
- */
-
 import { describe, it, expect, beforeEach } from 'vitest';
 import { frameEntityIds, makeFakeRes, parseSseFrame } from './sseTestHelpers';
-import { getLiveDoc, getLiveSnapshot, setLiveDoc, subscribeLive, _resetLiveDoc, _subscriberCount } from '../src/liveDocument';
+import { getLiveDoc, getLiveSnapshot, setLiveDoc, subscribeLive, _resetLiveDoc, liveSubscriberCount } from '../src/liveDocument';
 import { applyToolCall } from '../../tests/helpers/applyToolCall';
 import { createEmptyDocument } from '@core/model/types';
-
-// Reset shared state before each test so tests are independent.
 
 beforeEach(() => {
   _resetLiveDoc();
 });
 
-// (a) Mutating MCP tool call updates the shared live document
+/** What the MCP router does after a call: run it on the live doc, store the result. */
+function callLive(name: string, params: Record<string, unknown>): ReturnType<typeof applyToolCall> {
+  const result = applyToolCall(getLiveDoc(), name, params);
+  setLiveDoc(result.document);
+  return result;
+}
+const addBox = (): ReturnType<typeof applyToolCall> => callLive('add_box', { size: [1, 1, 1], position: [0, 0, 0] });
+const entityCount = (): number => Object.keys(getLiveDoc().entities).length;
 
 describe('setLiveDoc via applyToolCall', () => {
-  it('starts with an empty document (0 entities)', () => {
-    const doc = getLiveDoc();
-    expect(Object.keys(doc.entities)).toHaveLength(0);
+  it('starts empty; tool calls accumulate entities', () => {
+    expect(entityCount()).toBe(0);
+    expect(addBox().isError).toBe(false);
+    expect(entityCount()).toBe(1);
+    expect(getLiveDoc().order).toHaveLength(1);
+    callLive('add_box', { size: [2, 2, 2], position: [5, 0, 0] });
+    expect(entityCount()).toBe(2);
   });
 
-  it('after an add_box tool call, getLiveDoc() contains 1 entity', () => {
-    const doc = getLiveDoc();
-    const result = applyToolCall(doc, 'add_box', {
-      size: [1, 1, 1],
-      position: [0, 0, 0],
-    });
-
-    // Simulate what the MCP router does after a successful call.
-    setLiveDoc(result.document);
-
-    expect(result.isError).toBe(false);
-    const live = getLiveDoc();
-    expect(Object.keys(live.entities)).toHaveLength(1);
-    expect(live.order).toHaveLength(1);
-  });
-
-  it('successive tool calls accumulate entities in the shared doc', () => {
-    // First call
-    const r1 = applyToolCall(getLiveDoc(), 'add_box', {
-      size: [1, 1, 1],
-      position: [0, 0, 0],
-    });
-    setLiveDoc(r1.document);
-
-    // Second call reads the updated live doc
-    const r2 = applyToolCall(getLiveDoc(), 'add_box', {
-      size: [2, 2, 2],
-      position: [5, 0, 0],
-    });
-    setLiveDoc(r2.document);
-
-    const live = getLiveDoc();
-    expect(Object.keys(live.entities)).toHaveLength(2);
-  });
-
-  it('unknown tool name leaves the live document unchanged', () => {
+  it('an unknown tool leaves the live document unchanged', () => {
     const before = getLiveDoc();
-    const result = applyToolCall(before, 'no_such_tool', {});
-    setLiveDoc(result.document);
-
-    expect(result.isError).toBe(true);
-    // The document reference returned is the same (no-op).
+    expect(callLive('no_such_tool', {}).isError).toBe(true);
     expect(getLiveDoc()).toBe(before);
   });
 });
 
-// (b) subscribeLive: initial snapshot + broadcast on mutation
-
 describe('subscribeLive', () => {
-  it('immediately writes the current document as an SSE data event on subscribe', () => {
-    // Seed the live doc with one entity so the snapshot is non-trivial.
-    const r = applyToolCall(getLiveDoc(), 'add_box', {
-      size: [1, 1, 1],
-      position: [0, 0, 0],
-    });
-    setLiveDoc(r.document);
-
+  it('writes the current document as an opening snapshot frame', () => {
+    addBox();
     const res = makeFakeRes();
     const unsubscribe = subscribeLive(res);
-
-    // Exactly one SSE message written at subscription time.
     expect(res.written).toHaveLength(1);
     const msg = res.written[0] ?? '';
     expect(msg.startsWith('event: snapshot\ndata: ')).toBe(true);
     expect(msg.endsWith('\n\n')).toBe(true);
     expect(frameEntityIds(msg)).toHaveLength(1);
-
     unsubscribe();
   });
 
-  it('broadcasts a fresh snapshot to subscribers after setLiveDoc', () => {
-    const resA = makeFakeRes();
-    const resB = makeFakeRes();
-    const unsubA = subscribeLive(resA);
-    const unsubB = subscribeLive(resB);
-
-    // Both got the initial empty snapshot.
-    expect(resA.written).toHaveLength(1);
-    expect(resB.written).toHaveLength(1);
-
-    // Now a mutation arrives.
-    const r = applyToolCall(getLiveDoc(), 'add_box', {
-      size: [1, 1, 1],
-      position: [0, 0, 0],
-    });
-    setLiveDoc(r.document);
-
-    // Each subscriber gets the mutation broadcast (total 2 writes each).
+  it('broadcasts a snapshot to every subscriber after setLiveDoc, never to an unsubscribed one', () => {
+    const [resA, resB, gone] = [makeFakeRes(), makeFakeRes(), makeFakeRes()];
+    const unsubs = [subscribeLive(resA), subscribeLive(resB)];
+    subscribeLive(gone)();
+    addBox();
     expect(resA.written).toHaveLength(2);
     expect(resB.written).toHaveLength(2);
-
-    // The second write carries the updated document.
-    const mutationMsg = resA.written[1] ?? '';
-    expect(parseSseFrame(mutationMsg).event).toBe('snapshot');
-    expect(frameEntityIds(mutationMsg)).toHaveLength(1);
-
-    unsubA();
-    unsubB();
+    expect(gone.written).toHaveLength(1);
+    expect(parseSseFrame(resA.written[1] ?? '').event).toBe('snapshot');
+    expect(frameEntityIds(resA.written[1] ?? '')).toHaveLength(1);
+    unsubs.forEach((unsub) => unsub());
   });
 
-  it('unsubscribed response no longer receives broadcasts', () => {
-    const res = makeFakeRes();
-    const unsubscribe = subscribeLive(res);
-
-    // Unsubscribe before the mutation.
-    unsubscribe();
-
-    const r = applyToolCall(getLiveDoc(), 'add_box', {
-      size: [1, 1, 1],
-      position: [0, 0, 0],
-    });
-    setLiveDoc(r.document);
-
-    // Still only the initial snapshot write — mutation was not received.
-    expect(res.written).toHaveLength(1);
-  });
-
-  it('subscriber count tracks subscribe/unsubscribe correctly', () => {
-    expect(_subscriberCount()).toBe(0);
-
-    const res = makeFakeRes();
-    const unsub = subscribeLive(res);
-    expect(_subscriberCount()).toBe(1);
-
+  it('subscriber count tracks subscribe/unsubscribe', () => {
+    expect(liveSubscriberCount()).toBe(0);
+    const unsub = subscribeLive(makeFakeRes());
+    expect(liveSubscriberCount()).toBe(1);
     unsub();
-    expect(_subscriberCount()).toBe(0);
+    expect(liveSubscriberCount()).toBe(0);
   });
 
-  it('_resetLiveDoc restores an empty document', () => {
-    const r = applyToolCall(getLiveDoc(), 'add_box', {
-      size: [1, 1, 1],
-      position: [0, 0, 0],
-    });
-    setLiveDoc(r.document);
-    expect(Object.keys(getLiveDoc().entities)).toHaveLength(1);
-
+  it('_resetLiveDoc restores an empty or a given document', () => {
+    addBox();
     _resetLiveDoc();
-    expect(Object.keys(getLiveDoc().entities)).toHaveLength(0);
-  });
-
-  it('_resetLiveDoc accepts a custom document', () => {
+    expect(entityCount()).toBe(0);
     const custom = createEmptyDocument();
     _resetLiveDoc(custom);
     expect(getLiveDoc()).toBe(custom);
@@ -179,12 +82,10 @@ describe('epoch', () => {
   it('snapshots and command events carry the same per-process epoch', () => {
     const snapshot = getLiveSnapshot();
     expect(snapshot.epoch.length).toBeGreaterThan(0);
-
     const res = makeFakeRes();
-
     subscribeLive(res);
     setLiveDoc(createEmptyDocument(), { name: 'noop', params: {} });
-    const commandFrame = parseSseFrame(res.written[res.written.length - 1] ?? '');
+    const commandFrame = parseSseFrame(res.written.at(-1) ?? '');
     expect(commandFrame.event).toBe('command');
     expect(commandFrame.data['epoch']).toBe(snapshot.epoch);
   });

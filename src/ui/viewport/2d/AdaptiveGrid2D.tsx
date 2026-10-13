@@ -1,9 +1,5 @@
-/**
- * Minor + major line grids on the XY plane. Each is a finite patch sized to the visible viewport
- * (`localGridPatch`) and re-centred on the step-snapped camera every frame, so it appears infinite
- * while the line count stays bounded at any zoom. Geometry is rebuilt only when the step or
- * division count changes (R9: refs in useFrame, no per-frame allocation or setState).
- */
+// Minor + major XY grids: viewport-sized patches (localGridPatch) re-centred on the step-snapped camera each frame, so
+// they look infinite with bounded line counts; geometry rebuilt only on step / division changes.
 
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -13,11 +9,10 @@ import { adaptiveGridStep, majorGridStep, localGridPatch } from './gridHelpers';
 interface AdaptiveGrid2DProps {
   minorColor: number;
   majorColor: number;
-  /** Render-space z of the lowest drawn plane; the grid sits just beneath it. */
+  /** Render-space z of the lowest drawn plane. */
   baseZ: number;
 }
 
-/** A flat grid helper lying on the XY plane. */
 function createFlatGrid(extent: number, divisions: number, color: number): THREE.GridHelper {
   const grid = new THREE.GridHelper(extent, divisions, color, color);
   grid.rotation.x = Math.PI / 2;
@@ -30,7 +25,7 @@ function disposeGrid(grid: THREE.GridHelper): void {
   (grid.material as THREE.Material).dispose();
 }
 
-/** Swap in a new patch geometry; the helper keeps its own material. */
+/** The helper keeps its own material. */
 function resizeGrid(grid: THREE.GridHelper, extent: number, divisions: number, color: number): void {
   const scratch = new THREE.GridHelper(extent, divisions, color, color);
   grid.geometry.dispose();
@@ -62,16 +57,12 @@ export function AdaptiveGrid2D({ minorColor, majorColor, baseZ }: AdaptiveGrid2D
 
     const built = lastBuilt.current;
     if (step !== built.step || minorPatch.divisions !== built.minorDivisions || majorPatch.divisions !== built.majorDivisions) {
-      lastBuilt.current = {
-        step,
-        minorDivisions: minorPatch.divisions,
-        majorDivisions: majorPatch.divisions,
-      };
+      lastBuilt.current = { step, minorDivisions: minorPatch.divisions, majorDivisions: majorPatch.divisions };
       resizeGrid(minorGrid, minorPatch.extent, minorPatch.divisions, minorColor);
       resizeGrid(majorGrid, majorPatch.extent, majorPatch.divisions, majorColor);
     }
 
-    // Snapped to the step so lines stay aligned to world-step multiples (matching the snap grid).
+    // Step-snapped: lines stay on world-step multiples (the snap grid).
     const snapX = Math.round(ortho.position.x / step) * step;
     const snapY = Math.round(ortho.position.y / step) * step;
     minorGrid.position.set(snapX, snapY, baseZ - 0.01);

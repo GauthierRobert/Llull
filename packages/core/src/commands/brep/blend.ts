@@ -1,6 +1,6 @@
 /**
- * blend_union: weld several solids into one exact piece and round every joint where they meet —
- * the "one-piece frame" operation (tubes + lugs + dropouts → a single blended carbon frame).
+ * blend_union: weld several solids into one exact piece and round every joint where they meet — the "one-piece frame" operation (tubes +
+ * lugs + dropouts → a single blended carbon frame).
  */
 
 import { type Entity, type ShapeRecipe, is3D } from '../../model/types';
@@ -17,8 +17,8 @@ const MAX_BLEND_OPERANDS = 200;
 /**
  * @affects removes the operand solids; creates 1 mesh entity (their union, joints filleted)
  * @invariant >= 2 distinct 3D solids; radius > 0; a kernel with fillets (OCC)
- * @failure missing / duplicate / 2D / instance operand, bad radius, no kernel, kernel lacks blends,
- *   kernel refusal (radius too large for a joint) -> no-op, affected:[]
+ * @failure missing / duplicate / 2D / instance operand, bad radius, no kernel, kernel lacks blends, kernel refusal (radius too large for a
+ *   joint) -> no-op, affected:[]
  */
 export const blendUnion = defineCommand({
   name: 'blend_union',
@@ -53,11 +53,7 @@ export const blendUnion = defineCommand({
     const kernel = (ctx ?? currentContext()).kernel;
     if (!kernel) return noop(doc, kernelUnavailable('blend_union'));
     if (!kernel.supports('blend')) return fail(`this kernel cannot fillet joints; use ${OCC_KERNEL_HINT}, or boolean op union`);
-    const recipe: ShapeRecipe = {
-      op: 'blend',
-      sources: operands.map((entity) => operandRecipe(kernel, entity)),
-      radius,
-    };
+    const recipe: ShapeRecipe = { op: 'blend', sources: operands.map((entity) => operandRecipe(kernel, entity)), radius };
     const result = evaluateRecipe(kernel, recipe);
     if (result === 'refused')
       return fail(

@@ -1,7 +1,6 @@
 /**
- * Assembly commands: create_component, insert_instance, explode_instance.
- * Instances reference a component by id; `expandInstance` (./instanceExpansion) bakes one into
- * world-space entities.
+ * Assembly commands: create_component, insert_instance, explode_instance. Instances reference a component by id; `expandInstance`
+ * (./instanceExpansion) bakes one into world-space entities.
  */
 
 import { type Component, type Entity, type InstanceEntity, type Vec3, DEFAULT_LAYER_ID } from '../../model/types';
@@ -31,9 +30,8 @@ export function instanceEntity(id: string, componentId: string, position: Vec3, 
 }
 
 /**
- * A component reference cycle reachable from `startId` (e.g. `['A', 'B', 'A']`: A contains an
- * instance of B which contains an instance of A), or null when the component graph is acyclic.
- * Missing components are ignored. @pure
+ * A component reference cycle reachable from `startId` (e.g. `['A', 'B', 'A']`: A contains an instance of B which contains an instance of
+ * A), or null when the component graph is acyclic. Missing components are ignored. @pure
  */
 export function findComponentCycle(components: Readonly<Record<string, Component>>, startId: string): string[] | null {
   const visit = (id: string, path: string[]): string[] | null => {
@@ -92,19 +90,14 @@ export const createComponent = defineCommand({
   }),
   run: (doc, { name, entityIds, componentId, replace = false }): CommandResult => {
     if (entityIds.length === 0) return noop(doc, 'create_component: entityIds must be a non-empty array.');
-
     const missing = entityIds.filter((id) => !(id in doc.entities));
-    if (missing.length > 0) {
-      return noop(doc, `create_component: entity id(s) not found: [${missing.join(', ')}]. Document unchanged.`);
-    }
-
+    if (missing.length > 0) return noop(doc, `create_component: entity id(s) not found: [${missing.join(', ')}]. Document unchanged.`);
     const compId = componentId ?? nextId('comp');
-    if (!replace && Object.hasOwn(doc.components, compId)) {
+    if (!replace && Object.hasOwn(doc.components, compId))
       return noop(
         doc,
         `create_component: component "${compId}" already exists; choose another componentId, or pass replace:true to overwrite it (its instances would then show the new definition). Document unchanged.`,
       );
-    }
     const component: Component = {
       id: compId,
       name,
@@ -112,17 +105,15 @@ export const createComponent = defineCommand({
       order: [...entityIds],
     };
     const cycle = findComponentCycle({ ...doc.components, [compId]: component }, compId);
-    if (cycle) {
+    if (cycle)
       return noop(
         doc,
         `create_component: component "${compId}" would contain itself (${cycle.join(' -> ')}); ` +
           'a component cannot (indirectly) hold an instance of itself. Document unchanged.',
       );
-    }
     const instanceId = nextId('instance');
     const instance = instanceEntity(instanceId, compId, ORIGIN, ORIGIN);
     const replaced = replaceEntities(doc, entityIds, instance);
-
     return changed(
       { ...replaced, components: { ...doc.components, [compId]: component } },
       `Created component "${name}" (id: ${compId}) from ${entityIds.length} entit${entityIds.length === 1 ? 'y' : 'ies'} [${entityIds.join(', ')}]; placed instance ${instanceId}.${referenceLossSuffix(doc, replaced)}`,
@@ -154,10 +145,8 @@ export const insertInstance = defineCommand({
     const rotation = rawRotation ?? ORIGIN;
     const component = doc.components[componentId];
     if (!component) return noop(doc, `insert_instance: component "${componentId}" not found in doc.components.`);
-
     const instanceId = nextId('instance');
     const instance = instanceEntity(instanceId, componentId, position, rotation, scale ?? UNIT_SCALE);
-
     return commitEntity(
       doc,
       instance,
@@ -180,20 +169,13 @@ export const explodeInstance = defineCommand({
     'Each produced entity receives a fresh id. The component definition is NOT removed. ' +
     'The instance entity is removed and its order position is filled with the produced entities. ' +
     'Returns the new entity ids in affected.',
-  params: z.object({
-    id: z.string().describe('Id of an InstanceEntity to explode into its world-space component entities.'),
-  }),
+  params: z.object({ id: z.string().describe('Id of an InstanceEntity to explode into its world-space component entities.') }),
   run: (doc, { id }): CommandResult => {
     const entity = entityOfKind(doc, id, ['instance']);
     if (typeof entity === 'string') return noop(doc, `explode_instance: ${entity}.`);
-
     const component = doc.components[entity.componentId];
-    if (!component) {
-      return noop(doc, `explode_instance: component "${entity.componentId}" referenced by instance "${id}" not found.`);
-    }
-
+    if (!component) return noop(doc, `explode_instance: component "${entity.componentId}" referenced by instance "${id}" not found.`);
     const bakedEntities = expandInstance(entity, component);
-
     const bakedIds = bakedEntities.map((e) => e.id);
     const { document: rest, prunedReferences } = withoutEntities(doc, new Set([id]));
     const document = {
@@ -201,7 +183,6 @@ export const explodeInstance = defineCommand({
       entities: { ...rest.entities, ...Object.fromEntries(bakedEntities.map((e) => [e.id, e])) },
       order: doc.order.flatMap((orderId) => (orderId === id ? bakedIds : [orderId])),
     };
-
     return changed(
       document,
       `Exploded instance "${id}" (component "${component.name}", ${entity.componentId}) into ${bakedEntities.length} concrete entit${bakedEntities.length === 1 ? 'y' : 'ies'}: [${bakedIds.join(', ')}].${referenceSuffix(prunedReferences)}`,

@@ -1,26 +1,12 @@
-/**
- * Typed fetch helpers for the server command bus.
- *
- * The server is the single source of truth. Every document mutation is sent here;
- * the updated document arrives back via the /live SSE stream, never in the response
- * body (architecture L1, PRIME DIRECTIVE).
- *
- * Error handling:
- *   - Network failure / non-ok status → throws a ServerCommandError.
- *   - Callers (`dispatch`, `undo`, `redo` in the store) catch it; see store.ts for the
- *     network-vs-HTTP and offline policy.
- * Server URL and optional bearer token come from @ui/serverConfig.
- */
+// Fetch helpers of the server command bus. The new document arrives over the /live SSE stream, never in the
+// response body (L1). Network failure / non-ok status → ServerCommandError (offline policy: store.ts).
 
 import { SERVER_BASE, serverAuthHeaders } from '@ui/serverConfig';
 import { errorMessage } from '@lib/errorMessage';
 import type { LiveSnapshotEvent } from '@mcp/liveSync';
 import type { CommandResponseBody } from '@mcp/restProtocol';
 
-/**
- * Shape returned by POST /command, POST /undo, and POST /redo (`@mcp/restProtocol`).
- * `changed` is absent from older servers.
- */
+/** POST /command, /undo, /redo body (`@mcp/restProtocol`); older servers omit `changed`. */
 export type ServerCommandResponse = Omit<CommandResponseBody, 'changed'> & { changed?: boolean };
 
 export class ServerCommandError extends Error {
@@ -44,25 +30,19 @@ const COMMAND_REFUSAL_STATUSES: ReadonlySet<number> = new Set([400, 413, 422]);
 /** Statuses that refuse the REQUEST itself (server/src/security.ts: token, origin, route). */
 const CONNECTION_REFUSAL_STATUSES: ReadonlySet<number> = new Set([401, 403, 404]);
 
-/**
- * The server refused this one command and retrying cannot fix it (400, 413, 422): drop the request.
- * Every other failure (connection refusals, 408, 429, 5xx, network) keeps it.
- */
+/** Refused this one command, retrying cannot fix it: drop it. Anything else (connection refusals, 408, 429, 5xx, network) keeps it. */
 export function isCommandRefusal(err: unknown): err is ServerCommandError {
   const status = httpStatusOf(err);
   return status !== undefined && COMMAND_REFUSAL_STATUSES.has(status);
 }
 
-/**
- * The server refused the request whatever the command (401, 403, 404: auth, origin, missing
- * route): stop syncing, keep queued edits, never adopt the server snapshot over them.
- */
+/** Refused whatever the command (auth, origin, missing route): stop syncing, keep queued edits, never adopt the server snapshot over them. */
 export function isConnectionRefusal(err: unknown): err is ServerCommandError {
   const status = httpStatusOf(err);
   return status !== undefined && CONNECTION_REFUSAL_STATUSES.has(status);
 }
 
-/** GET `path`, or POST it with `postBody` as JSON when given. Resolves to the parsed JSON response. */
+/** GET `path`, or POST `postBody` as JSON. */
 async function request<Body>(path: string, postBody?: unknown): Promise<Body> {
   let response: Response;
   try {
@@ -85,27 +65,20 @@ async function request<Body>(path: string, postBody?: unknown): Promise<Body> {
   return response.json() as Promise<Body>;
 }
 
-/**
- * POST /command — send a named command with params to the server.
- * `commandId` makes the request idempotent server-side (a repeated id is not re-applied).
- *
- * @throws ServerCommandError on network failure or non-ok HTTP status (also for undo / redo / snapshot).
- */
+/** `commandId` makes it idempotent server-side. @throws ServerCommandError (as do undo / redo / snapshot) */
 export function postCommand(name: string, params: unknown, commandId?: string): Promise<ServerCommandResponse> {
   return request('/command', commandId === undefined ? { name, params } : { name, params, commandId });
 }
 
-/** POST /undo — walk back one step in server-side history. */
 export function postUndo(): Promise<ServerCommandResponse> {
   return request('/undo', {});
 }
 
-/** POST /redo — re-apply the last undone step. */
 export function postRedo(): Promise<ServerCommandResponse> {
   return request('/redo', {});
 }
 
-/** GET /live/snapshot — the server document with its log position (resync). */
+/** Server document with its log position (resync). */
 export function fetchLiveSnapshot(): Promise<LiveSnapshotEvent> {
   return request('/live/snapshot');
 }

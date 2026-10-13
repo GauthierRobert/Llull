@@ -1,9 +1,5 @@
-/**
- * Main toolbar — the one place a user creates and edits things: labeled groups for selection,
- * 2D drawing, 3D solids, transforms and edit actions. Drawing arms a 2D tool (switching to the
- * 2D view); a solid button creates the primitive in view, selects it and shows the move gizmo.
- * Param-gathering + dispatch only (react R1).
- */
+// Main toolbar: selection, 2D drawing (arms a tool, switches to 2D), 3D solids (created in view, selected, move gizmo),
+// transforms, edit actions.
 
 import React from 'react';
 import { type GizmoMode, useStore, useToolStore } from '@ui/store';
@@ -17,7 +13,7 @@ import { createSolid } from '@ui/actions/createSolid';
 interface ToolButtonProps {
   label: string;
   icon: IconName;
-  /** Tooltip body; the shortcut key is appended when given. */
+  /** The shortcut key is appended when given. */
   tip: string;
   shortcut?: string | undefined;
   pressed?: boolean | undefined;

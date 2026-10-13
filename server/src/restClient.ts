@@ -49,9 +49,7 @@ export async function requestJson(url: string, request: RestRequest = {}): Promi
 /** `GET <url>/health` answers 2xx within `timeoutMs`. */
 export async function isHealthy(url: string, fetchImpl?: FetchLike, timeoutMs = 2_000): Promise<boolean> {
   try {
-    const response = await (fetchImpl ?? globalFetch)(`${url}/health`, {
-      signal: AbortSignal.timeout(timeoutMs),
-    });
+    const response = await (fetchImpl ?? globalFetch)(`${url}/health`, { signal: AbortSignal.timeout(timeoutMs) });
     return response.ok;
   } catch {
     return false;

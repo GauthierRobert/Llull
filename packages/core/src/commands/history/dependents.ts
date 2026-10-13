@@ -1,6 +1,5 @@
 /**
- * Parameter → feature dependencies: which history steps read which parameters, and
- * regeneration of only what a parameter change affects.
+ * Parameter → feature dependencies: which history steps read which parameters, and regeneration of only what a parameter change affects.
  */
 
 import type { CadDocument, FeatureStep, Parameter } from '../../model/types';
@@ -38,8 +37,8 @@ function bareExpressionRefs(params: unknown): string[] {
 }
 
 /**
- * Parameters a step reads: its own `=expr` params, the steps of an instantiated recipe, and the
- * bare dimensional expressions of constraint steps.
+ * Parameters a step reads: its own `=expr` params, the steps of an instantiated recipe, and the bare dimensional expressions of constraint
+ * steps.
  */
 function parametersReadByStep(step: FeatureStep, doc: Pick<CadDocument, 'recipes'>, depth = 0): Set<string> {
   const names = parametersReadBy(step.params);
@@ -67,12 +66,10 @@ export function stepsReading(
 }
 
 /**
- * After a parameter-table edit (`before` → `after`), regenerate the model when any step reads a
- * changed parameter. Unchanged history prefixes come from the replay cache, so only the steps
- * from the first dependent onward re-run.
+ * After a parameter-table edit (`before` → `after`), regenerate the model when any step reads a changed parameter. Unchanged history
+ * prefixes come from the replay cache, so only the steps from the first dependent onward re-run.
  * @returns the regenerated document and the number of dependent steps (0 → `after` untouched)
- * @failure dependents need the geometry kernel and none is available -> `refusal` set, `after`
- *   returned unregenerated (the caller no-ops)
+ * @failure dependents need the geometry kernel and none is available -> `refusal` set, `after` returned unregenerated (the caller no-ops)
  */
 export function regenerateParameterDependents(
   before: CadDocument,

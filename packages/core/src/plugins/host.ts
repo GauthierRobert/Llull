@@ -1,6 +1,5 @@
 /**
  * Installed plugins — the composition state the registry, persistence and toolsets read.
- *
  * @invariant installation is idempotent per plugin name; order of installation is preserved
  */
 
@@ -46,8 +45,8 @@ export function documentExtensions(): DocumentExtension[] {
 }
 
 /**
- * Entity ids regenerated from the definition by an installed plugin's pure deriver (today: the
- * building plugin). Persistence omits these and re-derives them on load (architecture L8).
+ * Entity ids regenerated from the definition by an installed plugin's pure deriver (today: the building plugin). Persistence omits these
+ * and re-derives them on load (architecture L8).
  */
 export function derivedEntityIds(doc: CadDocument): Set<string> {
   return new Set(documentExtensions().flatMap((extension) => [...extension.derivedEntityIds(doc)]));

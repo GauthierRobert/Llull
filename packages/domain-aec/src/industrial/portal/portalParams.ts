@@ -10,8 +10,7 @@ export const portalFrameParams = z.object({
     .array(z.number())
     .optional()
     .describe(
-      'Multi-span hall: widths of side-by-side spans along X (internal columns on shared lines, ' +
-        'valley between roofs). Overrides span.',
+      'Multi-span hall: widths of side-by-side spans along X (internal columns on shared lines, valley between roofs). Overrides span.',
     ),
   length: z.number().optional().describe('Hall length (Y), in document units. Default 48000 mm.'),
   baySpacing: z.number().optional().describe('Target frame spacing; adjusted to divide the length, in document units. Default 6000 mm.'),
@@ -21,11 +20,10 @@ export const portalFrameParams = z.object({
     .enum(['duopitch', 'monopitch'])
     .optional()
     .describe(
-      "Roof shape: 'duopitch' (default: ridge mid-span, eaveHeight at both column lines) or 'monopitch' " +
-        '(one rafter per span rising at roofPitch from the low eaves at the left (x = origin, height eaveHeight) ' +
-        'to the high eaves on the right; the columns get different heights, with several spans the slope ' +
-        'continues across the internal column lines; no apex connection, two eaves connections per frame; wind ' +
-        'with EN 1991-1-4 Tab. 7.3a monopitch coefficients).',
+      "Roof shape: 'duopitch' (default: ridge mid-span, eaveHeight at both column lines) or 'monopitch' (one rafter per span rising " +
+        'at roofPitch from the low eaves at the left (x = origin, height eaveHeight) to the high eaves on the right; the columns get ' +
+        'different heights, with several spans the slope continues across the internal column lines; no apex connection, two eaves ' +
+        'connections per frame; wind with EN 1991-1-4 Tab. 7.3a monopitch coefficients).',
     ),
   columnProfile: z.string().optional().describe('Default HEA400.'),
   rafterProfile: z.string().optional().describe('Default IPE450.'),
@@ -42,9 +40,8 @@ export const portalFrameParams = z.object({
     .enum(['pinned', 'fixed'])
     .optional()
     .describe(
-      "Column base fixity: 'pinned' (default) or 'fixed' (rotation restrained in the frame analysis: " +
-        'stiffer sway, base moments in the reactions and footing / base plate M+N checks; requires basePlates; ' +
-        'size the plates with design_portal_frames).',
+      "Column base fixity: 'pinned' (default) or 'fixed' (rotation restrained in the frame analysis: stiffer sway, base moments in " +
+        'the reactions and footing / base plate M+N checks; requires basePlates; size the plates with design_portal_frames).',
     ),
   cladding: z.boolean().optional().describe('Roof, side and gable cladding. Default true.'),
   floorSlab: z.boolean().optional().describe('Ground-bearing slab. Default true.'),

@@ -1,22 +1,4 @@
-/**
- * Visual snap indicator for the 2D drafting viewport.
- *
- * Tracks the pointer over the 2D canvas via an invisible ground plane, computes the snapped
- * position and renders a small glyph whose shape encodes the snap type:
- *
- *   endpoint      → square (magenta)
- *   midpoint      → triangle (cyan)
- *   center        → circle (yellow)
- *   intersection  → X cross (orange)
- *   perpendicular → right-angle symbol (green)
- *   tangent       → T-mark (lime)
- *   extension     → dashed line cap (teal)
- *   nearest       → dot with ring (blue)
- *   grid          → plus (dim white)
- *
- * Presentation only — reads the document via useSnap; NEVER mutates it (R1).
- * Geometries/materials are disposed on unmount (R9).
- */
+// 2D snap glyph under the pointer (tracked via an invisible ground plane); the shape encodes the snap type. Read-only (R1).
 
 import { useState } from 'react';
 import * as THREE from 'three';
@@ -29,22 +11,15 @@ import { pixelsToWorld } from './gridHelpers';
 import type { SnapType } from './snapping/types';
 import { GroundPlane, toDocumentPoint } from './GroundPlane';
 
-/**
- * Base glyph half-size the geometry is built at (world units). The rendered glyph is rescaled so
- * its ON-SCREEN size stays ~GLYPH_TARGET_PX regardless of zoom — otherwise it would be invisible
- * when zoomed out and enormous when zoomed in. GLYPH_SIZE × default-zoom (50) ≈ GLYPH_TARGET_PX,
- * so the scale is 1 at the default zoom.
- */
+/** Glyph half-size the geometry is built at; rescaled to a constant ~GLYPH_TARGET_PX on screen (scale 1 at default zoom 50). */
 const GLYPH_SIZE = 0.22;
 
-/** Target on-screen glyph half-size in pixels (≈ GLYPH_SIZE × default zoom 50). */
 const GLYPH_TARGET_PX = 11;
 
 const HALF = GLYPH_SIZE;
 const TRIANGLE_HEIGHT = HALF * Math.sqrt(3);
 const TICK = HALF * 0.35;
 
-/** Segment vertex pairs of each glyph, centred on the snap point. */
 const GLYPH_VERTICES: Record<SnapType, Vec2[]> = {
   endpoint: loopSegments([
     [-HALF, -HALF],
@@ -64,7 +39,7 @@ const GLYPH_VERTICES: Record<SnapType, Vec2[]> = {
     [-HALF, HALF],
     [HALF, -HALF],
   ],
-  // L-shaped right-angle symbol with a small corner tick.
+  // Right angle with a corner tick.
   perpendicular: [
     ...chainSegments([
       [0, -HALF],
@@ -77,14 +52,13 @@ const GLYPH_VERTICES: Record<SnapType, Vec2[]> = {
       [0, TICK],
     ]),
   ],
-  // Horizontal bar with a vertical stem.
   tangent: [
     [-HALF, HALF * 0.5],
     [HALF, HALF * 0.5],
     [0, HALF * 0.5],
     [0, -HALF],
   ],
-  // Short horizontal line with a gap, marked by a vertical tick.
+  // Gap marked by a vertical tick.
   extension: [
     [-HALF, 0],
     [-HALF * 0.3, 0],
@@ -93,7 +67,7 @@ const GLYPH_VERTICES: Record<SnapType, Vec2[]> = {
     [-HALF * 0.1, -HALF * 0.4],
     [-HALF * 0.1, HALF * 0.4],
   ],
-  // Small dot inside a larger ring.
+  // Dot inside a ring.
   nearest: [...ellipseOutline(0, 0, HALF, HALF, 10), ...ellipseOutline(0, 0, HALF * 0.3, HALF * 0.3, 4)],
   grid: [
     [-HALF, 0],
@@ -107,19 +81,13 @@ interface GlyphProps {
   snapType: SnapType;
   x: number;
   y: number;
-  /** Ortho camera zoom — used to keep the glyph a constant on-screen size. */
   zoom: number;
 }
 
 function SnapGlyph({ snapType, x, y, zoom }: GlyphProps): React.ReactElement {
   const geometry = useDisposable(() => segmentsGeometry(GLYPH_VERTICES[snapType]), [snapType]);
   const material = useDisposable(
-    () =>
-      new THREE.LineBasicMaterial({
-        color: SNAP_COLORS_2D[snapType],
-        linewidth: 2,
-        depthTest: false,
-      }),
+    () => new THREE.LineBasicMaterial({ color: SNAP_COLORS_2D[snapType], linewidth: 2, depthTest: false }),
     [snapType],
   );
   return (
@@ -133,13 +101,8 @@ function SnapGlyph({ snapType, x, y, zoom }: GlyphProps): React.ReactElement {
   );
 }
 
-interface SnapIndicatorProps {
-  /** Current ortho camera zoom — drives the adaptive snap grid + glyph size. */
-  zoom: number;
-}
-
-/** Mount inside the r3f scene in Viewport2D: tracks the pointer and renders the snap glyph. */
-export function SnapIndicator({ zoom }: SnapIndicatorProps): React.ReactElement {
+/** Mount inside the Viewport2D scene. */
+export function SnapIndicator({ zoom }: { zoom: number }): React.ReactElement {
   const [cursor, setCursor] = useState<Vec2 | null>(null);
 
   const snapResult = useZoomSnap(cursor, zoom);

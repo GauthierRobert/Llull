@@ -1,12 +1,10 @@
 /**
- * Riser rule of check_pipe_supports. A riser is a run of segments steeper than 44° from horizontal
- * (|dz| / length > 0.7) and at least 0.5 m long. Rule of this check (a design-aid rule, not a quoted
- * code clause): lateral restraints (attached guides and anchors on the riser, an end carried by
- * equipment or a header) at most the MSS SP-69 span of the DN × spanFactor apart, a free end (elbow)
- * at most overhangRatio × that span from the nearest restraint, and the riser weight carried by an end
- * in equipment / on a header (nozzle), a shoe or anchor clamp on the riser, or an attached support of
- * the pipe within overhangRatio × that span (along the pipe) of one of its elbows — the riser hangs on
- * the elbow like a free end, so the leg to the next support is limited as an overhang is.
+ * Riser rule of check_pipe_supports. A riser is a run of segments steeper than 44° from horizontal (|dz| / length > 0.7) and at least 0.5 m
+ * long. Rule of this check (a design-aid rule, not a quoted code clause): lateral restraints (attached guides and anchors on the riser, an
+ * end carried by equipment or a header) at most the MSS SP-69 span of the DN × spanFactor apart, a free end (elbow) at most overhangRatio ×
+ * that span from the nearest restraint, and the riser weight carried by an end in equipment / on a header (nozzle), a shoe or anchor clamp
+ * on the riser, or an attached support of the pipe within overhangRatio × that span (along the pipe) of one of its elbows — the riser hangs
+ * on the elbow like a free end, so the leg to the next support is limited as an overhang is.
  */
 
 import { round, roundedMetres } from '../../shared/numeric';

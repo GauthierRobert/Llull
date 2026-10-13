@@ -1,6 +1,6 @@
 /**
- * Shared profile-group mechanics of the iterative design commands (design_portal_frames,
- * design_purlins): members of one role and section are up-sized together so rows stay uniform.
+ * Shared profile-group mechanics of the iterative design commands (design_portal_frames, design_purlins): members of one role and section
+ * are up-sized together so rows stay uniform.
  */
 
 import { z } from '@core/commands/schema';
@@ -22,10 +22,7 @@ export function isValidTargetUtilisation(value: number): boolean {
   return isFiniteNumber(value) && value >= 0.5 && value <= 1;
 }
 
-interface ProfileGroup {
-  role: string;
-  profile: string;
-}
+type ProfileGroup = { role: string; profile: string };
 
 export type ProfileGroups = Map<string, ProfileGroup>;
 
@@ -35,8 +32,8 @@ export function addProfileGroup(groups: ProfileGroups, member: SteelMemberElemen
 }
 
 /**
- * Re-profile every member of the group accepted by `isTarget`; `resize` returns the building with
- * the resized member applied (it may also refit dependents).
+ * Re-profile every member of the group accepted by `isTarget`; `resize` returns the building with the resized member applied (it may also
+ * refit dependents).
  */
 export function resizeProfileGroup(
   building: BuildingModel,
@@ -56,22 +53,15 @@ export function resizeProfileGroup(
 }
 
 /**
- * One design iteration: up-size every group to `nextSize(profile)` via `resizeGroup` (which also
- * re-seats dependents). Groups without a larger size set `limited`; `progressed` is false when no
- * group could grow.
+ * One design iteration: up-size every group to `nextSize(profile)` via `resizeGroup` (which also re-seats dependents). Groups without a
+ * larger size set `limited`; `progressed` is false when no group could grow.
  */
 export function upsizeProfileGroups(
   building: BuildingModel,
   groups: ProfileGroups,
   nextSize: (profile: string) => string | null,
   resizeGroup: (building: BuildingModel, group: ProfileGroup, larger: string) => { building: BuildingModel; changedIds: string[] },
-): {
-  building: BuildingModel;
-  progressed: boolean;
-  limited: boolean;
-  changes: string[];
-  changedIds: string[];
-} {
+): { building: BuildingModel; progressed: boolean; limited: boolean; changes: string[]; changedIds: string[] } {
   let next = building;
   let progressed = false;
   let limited = false;
@@ -95,9 +85,8 @@ export function upsizeProfileGroups(
 type UpsizeStep = ReturnType<typeof upsizeProfileGroups>;
 
 /**
- * Iterate `step` (one upsize pass on the current document; `null` = nothing left to upsize) up
- * to MAX_ITERATIONS, accumulating the change texts and ids. `limited` when a group had no larger
- * size or the iteration cap was hit.
+ * Iterate `step` (one upsize pass on the current document; `null` = nothing left to upsize) up to MAX_ITERATIONS, accumulating the change
+ * texts and ids. `limited` when a group had no larger size or the iteration cap was hit.
  */
 export function iterateUpsizing(
   doc: CadDocument,
@@ -121,8 +110,8 @@ export function iterateUpsizing(
 }
 
 /**
- * Next heavier profile of the same family; at the top of the family, the lightest I-section
- * (IPE / HEA / HEB) with a larger plastic modulus. Null when nothing larger exists.
+ * Next heavier profile of the same family; at the top of the family, the lightest I-section (IPE / HEA / HEB) with a larger plastic
+ * modulus. Null when nothing larger exists.
  */
 export function nextProfile(name: string): string | null {
   const profile = findProfile(name);

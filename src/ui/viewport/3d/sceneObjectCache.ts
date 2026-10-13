@@ -1,8 +1,5 @@
-/**
- * Name → Object3D lookup for per-frame code. `Object3D.getObjectByName` walks the whole scene on
- * every call; this memoizes hits and re-resolves when the cached object (or an ancestor) was
- * removed from the scene (entity unmounted / remounted). Misses are not cached.
- */
+// Memoized name → Object3D for per-frame code (getObjectByName walks the scene); re-resolves when a hit left the scene.
+// Misses are not cached.
 
 import type * as THREE from 'three';
 

@@ -1,6 +1,6 @@
 /**
- * FreeCAD macro emitter: FeatureProgram → a .FCMacro (Python, Part workbench) that rebuilds the model
- * in a new FreeCAD document with named, coloured Part::Feature objects.
+ * FreeCAD macro emitter: FeatureProgram → a .FCMacro (Python, Part workbench) that rebuilds the model in a new FreeCAD document with named,
+ * coloured Part::Feature objects.
  */
 
 import type { Feature, FeatureProgram } from './program';
@@ -131,11 +131,7 @@ def show(shape, name, color):
     return feature
 `;
 
-const OPERATIONS: Readonly<Record<'union' | 'cut' | 'intersect', string>> = {
-  union: 'fuse',
-  cut: 'cut',
-  intersect: 'common',
-};
+const OPERATIONS: Readonly<Record<'union' | 'cut' | 'intersect', string>> = { union: 'fuse', cut: 'cut', intersect: 'common' };
 
 function featureLine(feature: Feature): string {
   const v = feature.variable;

@@ -23,10 +23,7 @@ afterAll(() => setGeometryKernel(null));
 function frameJunction(): CadDocument {
   return execute(createEmptyDocument(), 'build_project', {
     actions: [
-      {
-        command: 'add_cylinder',
-        params: { radius: 22, height: 70, rotation: [Math.PI / 2, 0, 0] },
-      },
+      { command: 'add_cylinder', params: { radius: 22, height: 70, rotation: [Math.PI / 2, 0, 0] } },
       {
         command: 'sweep_profile',
         params: {
@@ -82,12 +79,7 @@ describe('blend_union on the live OCC kernel', () => {
 
   it('fillet_edge varies the radius along a box edge', () => {
     const box = execute(createEmptyDocument(), 'add_box', { size: [40, 40, 40] });
-    const rounded = execute(box.document, 'fillet_edge', {
-      id: box.affected[0],
-      edgeIndices: [0],
-      radius: 2,
-      radiusEnd: 10,
-    });
+    const rounded = execute(box.document, 'fillet_edge', { id: box.affected[0], edgeIndices: [0], radius: 2, radiusEnd: 10 });
     expect(rounded.affected, rounded.summary).toHaveLength(1);
     const { volume } = solidsAndVolume(rounded.document, rounded.affected[0] as string);
     expect(volume).toBeLessThan(40 ** 3);

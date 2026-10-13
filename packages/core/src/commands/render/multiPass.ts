@@ -1,6 +1,6 @@
 /**
- * Multi-pass render_view compositions: turntable strip, isolate, section. Each re-renders
- * partial / transformed copies of the document; the input document is never mutated.
+ * Multi-pass render_view compositions: turntable strip, isolate, section. Each re-renders partial / transformed copies of the document; the
+ * input document is never mutated.
  */
 
 import type { CadDocument, Vec3 } from '../../model/types';
@@ -67,10 +67,7 @@ function rotateCut(cut: CutSpec, cx: number, cy: number, angleRad: number): CutS
       const pointOffset = offset / (lengthSq || 1);
       const p: Vec3 = [nx * pointOffset - cx, ny * pointOffset - cy, nz * pointOffset];
       const moved: Vec3 = [cx + cos * p[0] - sin * p[1], cy + sin * p[0] + cos * p[1], p[2]];
-      return {
-        normal: turned,
-        offset: dot3(turned, moved),
-      };
+      return { normal: turned, offset: dot3(turned, moved) };
     }),
   };
 }
@@ -104,10 +101,7 @@ export function buildTurntableSvg(
     );
   }
   const totalWidth = width * frames;
-  return {
-    svg: svgDocument(totalWidth, height, [...layers, ...angleLabels], backgroundOf(options)),
-    width: totalWidth,
-  };
+  return { svg: svgDocument(totalWidth, height, [...layers, ...angleLabels], backgroundOf(options)), width: totalWidth };
 }
 
 /** Highlighted entities at full color over the rest at low opacity, with an ISOLATED caption. */

@@ -26,9 +26,8 @@ import { openingFitIssues } from './walls';
 export const addLevel = defineCommand({
   name: 'add_level',
   description:
-    'Add a building level (storey). Elevation is the finished-floor height; height is floor-to-floor. ' +
-    'Defaults: elevation = top of the highest existing level (or 0), height = 3000 mm. ' +
-    'Building elements (walls, slabs, columns…) are placed relative to their level.',
+    'Add a building level (storey). Elevation is the finished-floor height; height is floor-to-floor. Defaults: elevation = top of the ' +
+    'highest existing level (or 0), height = 3000 mm. Building elements (walls, slabs, columns…) are placed relative to their level.',
   params: z.object({
     name: z.string().optional().describe('Level name, e.g. "Ground floor", "Level 1".'),
     elevation: z.number().optional().describe('Finished-floor elevation in document units. Default: stacks on the top level.'),
@@ -98,12 +97,7 @@ export const updateLevel = defineCommand({
         'levelId' in element && element.levelId === levelId ? followLevelHeight(element, level.height, updated.height) : element,
       ]),
     );
-    const next: BuildingModel = {
-      ...building,
-      levels,
-      levelOrder: sortLevelOrder(levels),
-      elements,
-    };
+    const next: BuildingModel = { ...building, levels, levelOrder: sortLevelOrder(levels), elements };
     const issues = openingFitIssues(next, new Set([levelId]));
     if (issues.length > 0) return noop(doc, `update_level refused: ${issues[0]}.`);
     const document = regenerateBuilding(doc, next);
@@ -202,9 +196,7 @@ export const setProjectInfo = defineCommand({
       if (typeof value === 'string') changes[field] = value;
     }
     const changed = Object.keys(changes);
-    if (changed.length === 0) {
-      return noop(doc, `set_project_info: no fields given (allowed: ${PROJECT_FIELDS.join(', ')}).`);
-    }
+    if (changed.length === 0) return noop(doc, `set_project_info: no fields given (allowed: ${PROJECT_FIELDS.join(', ')}).`);
     if (Object.entries(changes).every(([field, value]) => building.project[field as keyof ProjectInfo] === value)) {
       return noop(doc, 'set_project_info: the given fields already hold these values.');
     }
@@ -221,9 +213,8 @@ export const describeBuilding = defineCommand({
   name: 'describe_building',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Read-only: list the building model — project info, levels (id, name, elevation, height, element ' +
-    'counts) and every element (id, category, mark, level, key dimensions). Use it to find element ids ' +
-    'before editing walls, openings, slabs, etc.',
+    'Read-only: list the building model — project info, levels (id, name, elevation, height, element counts) and every element (id, ' +
+    'category, mark, level, key dimensions). Use it to find element ids before editing walls, openings, slabs, etc.',
   params: z.object({}),
   run: (doc): CommandResult => {
     const building = getBuilding(doc);

@@ -68,14 +68,12 @@ export function civilObjectOrNoop<C extends CivilCategory>(
 export function civilObjectsOf<C extends CivilCategory>(civil: CivilModel, category: C): Array<Extract<CivilObject, { category: C }>> {
   return civil.order
     .map((id) => civil.objects[id])
-    .filter((object): object is Extract<CivilObject, { category: C }> => {
-      return object?.category === category;
-    });
+    .filter((object): object is Extract<CivilObject, { category: C }> => object?.category === category);
 }
 
 /**
- * Object ids first (replay / build_project aliases re-link references), then the entities of those
- * objects and of every object regenerated because it depends on them.
+ * Object ids first (replay / build_project aliases re-link references), then the entities of those objects and of every object regenerated
+ * because it depends on them.
  */
 export function civilAffected(document: CadDocument, objectIds: ReadonlyArray<string>): string[] {
   const civil = document.civil;

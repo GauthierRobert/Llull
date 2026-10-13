@@ -18,7 +18,7 @@ function buildAsciiStl(tris: Triangle[], solidName: string): string {
 /** One `solid <name>` … `endsolid <name>` block, as lines. */
 function asciiSolidBlock(tris: Triangle[], solidName: string): string[] {
   const lines = [`solid ${solidName}`];
-  for (const [v0, v1, v2] of tris) {
+  for (const [v0, v1, v2] of tris)
     lines.push(
       `  facet normal ${formatVec3(facetNormal(v0, v1, v2))}`,
       '    outer loop',
@@ -28,7 +28,6 @@ function asciiSolidBlock(tris: Triangle[], solidName: string): string[] {
       '    endloop',
       '  endfacet',
     );
-  }
   lines.push(`endsolid ${solidName}`);
   return lines;
 }
@@ -50,9 +49,7 @@ function cleanSolidName(name: string | undefined): string {
 function buildBinaryStl(tris: Triangle[], headerText: string): Uint8Array {
   const buf = new Uint8Array(84 + tris.length * 50);
   const view = new DataView(buf.buffer);
-  for (let i = 0; i < headerText.length && i < 80; i += 1) {
-    buf[i] = headerText.charCodeAt(i) & 0x7f;
-  }
+  for (let i = 0; i < headerText.length && i < 80; i += 1) buf[i] = headerText.charCodeAt(i) & 0x7f;
   view.setUint32(80, tris.length, true);
   let offset = 84;
   for (const [v0, v1, v2] of tris) {
@@ -93,17 +90,14 @@ export const exportStl = defineCommand({
     'interchange format accepted by slicers, mesh editors, and 3D printers. ' +
     'Produces a triangle tessellation in world space for every exportable 3D solid entity. ' +
     '2D shape entities (line, polyline, arc, circle, rectangle, text, dimension, etc.) are ' +
-    'silently skipped — STL is a solid/mesh format. ' +
-    'Returns the UNCHANGED document, affected:[], and a data object with: ' +
-    '  format ("ascii"|"binary"), triangleCount (number of exported triangles), ' +
-    '  stl (ASCII STL string — when format="ascii"), ' +
+    'silently skipped — STL is a solid/mesh format. Returns the UNCHANGED document, affected:[], and a data object with: ' +
+    '  format ("ascii"|"binary"), triangleCount (number of exported triangles),   stl (ASCII STL string — when format="ascii"), ' +
     '  stlBase64 (base64-encoded binary STL bytes — when format="binary"). ' +
     'Supported entity kinds: box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, mesh. ' +
     'entityIds: omit to export all 3D entities; provide an array to export a subset. ' +
     'format: "ascii" (default, human-readable) or "binary" (more compact, required by some importers). ' +
     'name: optional solid name embedded in the STL header (default: the entity name when exactly one named ' +
-    'entity is exported, else "llull"). perEntity: one named solid block per entity (ASCII). ' +
-    'Does NOT modify the document.',
+    'entity is exported, else "llull"). perEntity: one named solid block per entity (ASCII). Does NOT modify the document.',
   params: z.object({
     format: z
       .enum(['ascii', 'binary'])
@@ -111,8 +105,7 @@ export const exportStl = defineCommand({
       .describe(
         'STL output format. "ascii" (default): returns data.stl as a human-readable ASCII STL string. ' +
           '"binary": returns data.stlBase64 as a base64-encoded binary STL blob ' +
-          '(84-byte header + 50 bytes per triangle). Most slicers accept both; ' +
-          'binary is more compact for large meshes.',
+          '(84-byte header + 50 bytes per triangle). Most slicers accept both; binary is more compact for large meshes.',
       ),
     entityIds: z
       .array(z.string())

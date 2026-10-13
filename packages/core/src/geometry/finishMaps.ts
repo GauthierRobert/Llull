@@ -1,8 +1,7 @@
 /**
- * Procedural, tileable PBR maps of a material finish — albedo (sRGB RGBA), tangent-space normal
- * (OpenGL +Y convention, glTF / three.js) and glTF metallicRoughness (G = roughness, B = metal) —
- * computed from a height field per pattern. Pure and deterministic: the viewport and the glTF
- * export build byte-identical textures.
+ * Procedural, tileable PBR maps of a material finish — albedo (sRGB RGBA), tangent-space normal (OpenGL +Y convention, glTF / three.js) and
+ * glTF metallicRoughness (G = roughness, B = metal) — computed from a height field per pattern. Pure and deterministic: the viewport and
+ * the glTF export build byte-identical textures.
  */
 
 import type { FinishPattern, Material } from '../model/types';
@@ -74,12 +73,7 @@ function sampleAt(pattern: FinishPattern, u: number, v: number, size: number): S
     case 'brushed': {
       const row = Math.floor(v * size);
       const streak = 0.5 * hash(row, 7) + 0.5 * hash(Math.floor(u * 6), row);
-      return {
-        height: streak * 0.4,
-        tint: 0,
-        shade: 0.9 + 0.12 * streak,
-        rough: 0.75 + 0.5 * streak,
-      };
+      return { height: streak * 0.4, tint: 0, shade: 0.9 + 0.12 * streak, rough: 0.75 + 0.5 * streak };
     }
     case 'knurl': {
       const n = 12;
@@ -97,8 +91,8 @@ function sampleAt(pattern: FinishPattern, u: number, v: number, size: number): S
 const clampByte = (value: number): number => clamp(Math.round(value), 0, 255);
 
 /**
- * Tileable maps of `material.finish` (null without a finish). `color2` defaults to the base
- * colour lightened by 18 % (the sheen of crossing tows).
+ * Tileable maps of `material.finish` (null without a finish). `color2` defaults to the base colour lightened by 18 % (the sheen of crossing
+ * tows).
  */
 export function finishMaps(
   material: Pick<Material, 'color' | 'metalness' | 'roughness' | 'finish'>,
@@ -148,8 +142,8 @@ export function finishMaps(
 }
 
 /**
- * Box-projected texture coordinates of one triangle corner: the facet's dominant normal axis
- * picks the projection plane, one texture tile per `scale` document units.
+ * Box-projected texture coordinates of one triangle corner: the facet's dominant normal axis picks the projection plane, one texture tile
+ * per `scale` document units.
  */
 export function boxUv(point: readonly number[], facetNormal: readonly number[], scale: number): [number, number] {
   const [ax, ay, az] = facetNormal.map(Math.abs) as [number, number, number];

@@ -38,11 +38,7 @@ type ScheduleKind = (typeof SCHEDULE_KINDS)[number];
 
 type Row = Array<string | number>;
 
-interface Schedule {
-  readonly kind: ScheduleKind;
-  readonly columns: string[];
-  readonly rows: Row[];
-}
+type Schedule = { readonly kind: ScheduleKind; readonly columns: string[]; readonly rows: Row[] };
 
 function levelName(building: BuildingModel, levelId: string): string {
   return building.levels[levelId]?.name ?? levelId;

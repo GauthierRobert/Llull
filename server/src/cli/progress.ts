@@ -55,12 +55,7 @@ export function createStepObserver(options: StepObserverOptions): StepObserver {
 
   const onStart = (event: PlanStepEvent): void => {
     if (deadline !== undefined && timeoutSeconds !== undefined && now() > deadline) {
-      stopped = {
-        seconds: timeoutSeconds,
-        ordinal: event.ordinal,
-        total: event.total,
-        command: event.command,
-      };
+      stopped = { seconds: timeoutSeconds, ordinal: event.ordinal, total: event.total, command: event.command };
       const abort = new Error(`--timeout ${timeoutSeconds}s exceeded before step ${event.ordinal}`);
       abort.stack = abort.message; // the registry logs a thrown error's stack: keep that to one line
       throw abort;

@@ -1,9 +1,8 @@
 /**
- * Feature program — the language-neutral intermediate form a document is lowered to (featureProgram.ts)
- * before it is emitted as CadQuery, build123d, OpenSCAD or FreeCAD source.
- *
- * @invariant every Term's `value` equals the evaluated document geometry; `expression` (identifiers
- *   already mapped through `program.parameters`) is attached only when it evaluates to that value.
+ * Feature program — the language-neutral intermediate form a document is lowered to (featureProgram.ts) before it is emitted as CadQuery,
+ * build123d, OpenSCAD or FreeCAD source.
+ * @invariant every Term's `value` equals the evaluated document geometry; `expression` (identifiers already mapped through
+ *   `program.parameters`) is attached only when it evaluates to that value.
  * @invariant features follow featureHistory order; one variable per live solid.
  */
 
@@ -25,12 +24,7 @@ export type ShapeSpec =
   | { readonly kind: 'cone'; readonly radius: Term; readonly height: Term }
   | { readonly kind: 'torus'; readonly ringRadius: Term; readonly tubeRadius: Term }
   | { readonly kind: 'wedge'; readonly size: Term3 }
-  | {
-      readonly kind: 'pyramid';
-      readonly baseWidth: Term;
-      readonly baseDepth: Term;
-      readonly height: Term;
-    }
+  | { readonly kind: 'pyramid'; readonly baseWidth: Term; readonly baseDepth: Term; readonly height: Term }
   | { readonly kind: 'extrusion'; readonly profile: readonly Term2[]; readonly depth: Term }
   | {
       readonly kind: 'revolution';
@@ -68,16 +62,10 @@ export type Feature =
       readonly color: string;
       readonly name?: string;
     })
-  | (FeatureBase & {
-      readonly op: 'boolean';
-      readonly kind: 'union' | 'cut' | 'intersect';
-      readonly left: string;
-      readonly right: string;
-    })
+  | (FeatureBase & { readonly op: 'boolean'; readonly kind: 'union' | 'cut' | 'intersect'; readonly left: string; readonly right: string })
   /**
-   * Round (fillet) or bevel (chamfer) edges of `variable` in place. `edges`: unique-edge indices (OCC
-   * map order; [] = all); `near`: each selected edge's mid point, preferred over indices when present
-   * (robust to edge-order differences between OCC builds).
+   * Round (fillet) or bevel (chamfer) edges of `variable` in place. `edges`: unique-edge indices (OCC map order; [] = all); `near`: each
+   * selected edge's mid point, preferred over indices when present (robust to edge-order differences between OCC builds).
    */
   | (FeatureBase & {
       readonly op: 'fillet' | 'chamfer';
@@ -88,11 +76,7 @@ export type Feature =
       readonly mesh?: readonly number[];
     })
   /** Hollow `variable` in place: the solid minus its inward offset by `thickness`. */
-  | (FeatureBase & {
-      readonly op: 'shell';
-      readonly thickness: Term;
-      readonly mesh?: readonly number[];
-    })
+  | (FeatureBase & { readonly op: 'shell'; readonly thickness: Term; readonly mesh?: readonly number[] })
   | (FeatureBase & { readonly op: 'translate'; readonly delta: Term3 })
   | (FeatureBase & { readonly op: 'remove' })
   | (FeatureBase & { readonly op: 'label'; readonly name: string });

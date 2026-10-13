@@ -1,16 +1,7 @@
 /**
- * Single mutation path for the shared live document.
- *
- * `applyCommand` is the ONLY function that mutates the live document. Both the MCP transport
- * (tools/call) and the REST endpoints (/command, /undo, /redo) route through here, so every change
- * — from Claude or from the browser UI — lands in the same undo/redo history and is broadcast to
- * all SSE subscribers.
- *
- * Transport/state glue (L6): no entity construction or geometry here. History mirrors
- * src/ui/store/store.ts dispatch/undo/redo; query commands (data present, document unchanged)
- * return their data without touching history or the broadcast.
+ * The ONLY mutation path of the shared live document (MCP tools/call and REST /command, /undo, /redo): one
+ * undo/redo history (mirrors src/ui/store/store.ts) + SSE broadcast. Queries/no-ops skip history and broadcast.
  */
-
 import type { CadDocument } from '@core/model/types';
 import { withMonotonicStepCounter } from '@core/model/stepCounter';
 import { getCommand } from '@core/commands/registry';
@@ -19,11 +10,8 @@ import { ANONYMOUS_ACTOR, appendAudit, hashJson, type Actor } from './audit';
 import { runCommandOutcome } from '@mcp/commandOutcome';
 import type { CommandResponseBody } from '@mcp/restProtocol';
 
-/** Maximum undo/redo depth (the same cap as the UI store's local history). */
-const MAX_UNDO_DEPTH = 100;
-
-/** Idempotency cache size: commandId -> result, least recently used evicted first. */
-const MAX_IDEMPOTENCY_ENTRIES = 1000;
+const MAX_UNDO_DEPTH = 100; // = the UI store's cap
+const MAX_IDEMPOTENCY_ENTRIES = 1000; // commandId -> result LRU
 interface CachedResult {
   readonly requestHash: string;
   readonly result: CommandResponseBody;
@@ -40,19 +28,9 @@ function withHistoryFlags(result: Omit<CommandResponseBody, 'canUndo' | 'canRedo
 }
 
 /**
- * Apply a command to the shared live document.
- * - Unknown command → isError true, document unchanged, no history push.
- * - Query command (data present, document unchanged) → return data; no history, no broadcast.
- * - Mutating command (result.document !== prior) → push prior to the undo stack (capped), clear the
- *   redo stack, `setLiveDoc` (broadcasts). Returns summary/affected (+ data).
- * - No-op (document unchanged, no data) → no history, no broadcast.
- *
- * @param name   - snake_case command name (== MCP tool name).
- * @param params - raw params object forwarded to execute().
- * @param actor - who is acting (audit line + live event attribution); omitted = anonymous/untracked.
- * @param commandId - optional client id; a repeated id returns the cached result without re-applying
- *   (network retries are safe). Only document-changing, non-readOnly results are cached; reuse with
- *   a different name/params is an error result. Bounded LRU of MAX_IDEMPOTENCY_ENTRIES.
+ * Apply a command to the live document; a change pushes the undo stack, clears redo, broadcasts and audits.
+ * @param commandId repeated id -> cached result, not re-applied (only changing, non-readOnly results are cached;
+ *   reuse with different name/params -> error result)
  */
 export function applyCommand(name: string, params: unknown, commandId?: string, actor?: Actor): CommandResponseBody {
   if (commandId === undefined) return runCommand(name, params, actor);
@@ -81,37 +59,24 @@ export function applyCommand(name: string, params: unknown, commandId?: string, 
   return result;
 }
 
-/** Largest `data` payload (JSON characters) kept in the idempotency cache; bigger ones are dropped. */
 const MAX_CACHED_DATA_CHARS = 64 * 1024;
 
-/**
- * The result to remember for a commandId replay. `data` of a huge result (a build_project report,
- * a scene snapshot) would pin megabytes per entry, 1000 entries deep; a replay then reports the
- * same outcome without it and says so.
- */
+/** The result remembered for a commandId replay: huge `data` (build reports, scenes) is dropped, and the summary says so. */
 function boundedForReplay(result: CommandResponseBody): CommandResponseBody {
   if (result.data === undefined) return result;
   if ((JSON.stringify(result.data)?.length ?? 0) <= MAX_CACHED_DATA_CHARS) return result;
   const { data: _dropped, ...rest } = result;
   void _dropped;
-  return {
-    ...rest,
-    summary: `${result.summary} (replay: the result data was not kept, re-query the scene)`,
-  };
+  return { ...rest, summary: `${result.summary} (replay: the result data was not kept, re-query the scene)` };
 }
 
-/** `changed` = the live document was replaced by this call. */
 function runCommand(name: string, params: unknown, actor?: Actor): CommandResponseBody {
   const prior = getLiveDoc();
   const { document, outcome } = runCommandOutcome(prior, name, params);
   if (outcome.changed) {
     history.undo = pushCapped(history.undo, prior);
     history.redo = [];
-    setLiveDoc(document, {
-      name,
-      params,
-      ...(actor?.named === true ? { user: { id: actor.userId, name: actor.userName } } : {}),
-    });
+    setLiveDoc(document, { name, params, ...(actor?.named === true ? { user: { id: actor.userId, name: actor.userName } } : {}) });
     recordAudit(actor, name, params, outcome.summary, outcome.affected.length);
   }
   return withHistoryFlags(outcome);
@@ -132,10 +97,7 @@ function recordAudit(actor: Actor | undefined, command: string, params: unknown,
   });
 }
 
-/**
- * Restore the document on top of `history[from]` and park the displaced one on `history[to]`
- * (`setLiveDoc` broadcasts). An empty `from` stack is a normal no-op result, not an error.
- */
+/** Restore the top of `history[from]`, park the current doc on `history[to]`; empty stack -> no-op result. */
 function travelHistory(
   from: HistoryDirection,
   to: HistoryDirection,
@@ -145,12 +107,7 @@ function travelHistory(
 ): CommandResponseBody {
   const target = history[from].at(-1);
   if (target === undefined) {
-    return withHistoryFlags({
-      summary: emptySummary,
-      affected: [],
-      isError: false,
-      changed: false,
-    });
+    return withHistoryFlags({ summary: emptySummary, affected: [], isError: false, changed: false });
   }
   const current = getLiveDoc();
   history[from] = history[from].slice(0, -1);
@@ -160,12 +117,10 @@ function travelHistory(
   return withHistoryFlags({ summary, affected: [], isError: false, changed: true });
 }
 
-/** Undo the last mutating command. */
 export function undo(actor?: Actor): CommandResponseBody {
   return travelHistory('undo', 'redo', 'Undid last change.', 'Nothing to undo.', actor);
 }
 
-/** Redo the last undone command. */
 export function redo(actor?: Actor): CommandResponseBody {
   return travelHistory('redo', 'undo', 'Redid last change.', 'Nothing to redo.', actor);
 }
@@ -178,7 +133,7 @@ export function canRedo(): boolean {
   return history.redo.length > 0;
 }
 
-/** @internal — exposed for tests only. */
+/** @internal tests only */
 export function _resetHistory(): void {
   _resultsByCommandId.clear();
   history.undo = [];

@@ -1,6 +1,6 @@
 /**
- * Result rows of check_steel_members: one row per steel member, worst check first-class, and the
- * gates that turn a bar the checks do not cover into its skipped row.
+ * Result rows of check_steel_members: one row per steel member, worst check first-class, and the gates that turn a bar the checks do not
+ * cover into its skipped row.
  */
 
 import type { MemberRole } from '@core/model/building';
@@ -119,9 +119,7 @@ export function analysedRow(
 /** Row of a bar whose catalogue profile is unknown. */
 export const noProfileRow = (bar: SteelBar): MemberRow => skippedRow(bar, bar.skipReason ?? 'profile not in the catalogue');
 
-interface Skipped {
-  readonly skipped: MemberRow;
-}
+type Skipped = { readonly skipped: MemberRow };
 
 const skip = (bar: SteelBar, reason: string): Skipped => ({ skipped: skippedRow(bar, reason) });
 
@@ -149,13 +147,9 @@ export function withBeamSection(
 }
 
 /** Profile, compression class and resistance of a column, or the row of a bar not covered (shape, class 4). */
-export function columnSection(bar: SteelBar):
-  | {
-      profile: SteelProfile;
-      sectionClass: 1 | 2 | 3;
-      resistance: ReturnType<typeof sectionResistance>;
-    }
-  | Skipped {
+export function columnSection(
+  bar: SteelBar,
+): { profile: SteelProfile; sectionClass: 1 | 2 | 3; resistance: ReturnType<typeof sectionResistance> } | Skipped {
   const { profile } = bar;
   if (!profile) return { skipped: noProfileRow(bar) };
   const sectionClass = compressionClass(profile, bar.fy);

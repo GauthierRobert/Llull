@@ -46,10 +46,7 @@ describe('paramsSource', () => {
   });
 
   it('keeps string-typed keys raw', () => {
-    expect(paramsSource(['name=123', 'n=123'], new Set(['name']))).toEqual({
-      kind: 'pairs',
-      params: { name: '123', n: 123 },
-    });
+    expect(paramsSource(['name=123', 'n=123'], new Set(['name']))).toEqual({ kind: 'pairs', params: { name: '123', n: 123 } });
   });
 
   it('finds a value flag given without its value', () => {

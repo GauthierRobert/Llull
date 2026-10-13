@@ -1,7 +1,6 @@
 /**
- * Parameter-expression resolution and id remapping for the regeneration pass: string params
- * starting with `=` are expressions resolved against `doc.parameters`; a failing one keeps its
- * `=expr` text and is reported in `ResolveResult.errors` (never throws).
+ * Parameter-expression resolution and id remapping for the regeneration pass: string params starting with `=` are expressions resolved
+ * against `doc.parameters`; a failing one keeps its `=expr` text and is reported in `ResolveResult.errors` (never throws).
  */
 
 import type { Parameter } from '../../model/types';
@@ -31,21 +30,16 @@ export function buildParamEnv(parameters: Readonly<Record<string, Parameter>>): 
 }
 
 /**
- * Rebuild `value` with every STRING leaf replaced by `mapLeaf(text, path)`; arrays and plain
- * objects are walked recursively, other primitives pass through. `path` is `size[0]` / `a.b` style.
- *
+ * Rebuild `value` with every STRING leaf replaced by `mapLeaf(text, path)`; arrays and plain objects are walked recursively, other
+ * primitives pass through. `path` is `size[0]` / `a.b` style.
  * @invariant `value` is never mutated; new objects/arrays are always returned.
  */
 export function mapStringLeaves(value: unknown, mapLeaf: (text: string, path: string) => unknown, path = ''): unknown {
   if (typeof value === 'string') return mapLeaf(value, path);
-  if (Array.isArray(value)) {
-    return value.map((item, i) => mapStringLeaves(item, mapLeaf, path ? `${path}[${i}]` : `[${i}]`));
-  }
+  if (Array.isArray(value)) return value.map((item, i) => mapStringLeaves(item, mapLeaf, path ? `${path}[${i}]` : `[${i}]`));
   if (value !== null && typeof value === 'object') {
     const result: Record<string, unknown> = {};
-    for (const [key, val] of Object.entries(value)) {
-      result[key] = mapStringLeaves(val, mapLeaf, path ? `${path}.${key}` : key);
-    }
+    for (const [key, val] of Object.entries(value)) result[key] = mapStringLeaves(val, mapLeaf, path ? `${path}.${key}` : key);
     return result;
   }
   return value;

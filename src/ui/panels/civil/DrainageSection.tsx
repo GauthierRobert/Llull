@@ -1,9 +1,5 @@
-/**
- * DrainageSection — storm network: manhole / pipe forms and lists, network check
- * (`check_drainage_network`: failures + CSV, design storm as a constant intensity or an IDF curve,
- * outfall tailwater for the HGL), automatic sizing (`size_drainage_pipes`) and the structure / pipe
- * schedule CSV (`drainage_schedule`).
- */
+// Storm network: manhole / pipe forms + lists, `check_drainage_network` (failures + CSV; constant intensity or IDF storm;
+// outfall tailwater for the HGL), `size_drainage_pipes`, `drainage_schedule` CSV.
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
@@ -85,7 +81,7 @@ function NetworkChecks(): React.ReactElement {
       {failures.length > 0 && (
         <ul className="civil-failures" aria-label="Drainage failures">
           {failures.map((failure, index) => (
-            // Messages may repeat, so the position disambiguates the key.
+            // Messages may repeat: the position disambiguates the key.
             <li key={`${index}:${failure}`} className="panel__error">
               {failure}
             </li>

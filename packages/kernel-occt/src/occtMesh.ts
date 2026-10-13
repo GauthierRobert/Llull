@@ -41,9 +41,7 @@ function isClosedSolid(api: OccApi, shape: OccShape): boolean {
 }
 
 function triangulate(api: OccApi, shape: OccShape, [linear, angular]: readonly [number, number]): Triangulated {
-  const mesher = new api.BRepMesh_IncrementalMesh_2(shape, linear, false, angular, false) as OccHandle & {
-    Perform(): void;
-  };
+  const mesher = new api.BRepMesh_IncrementalMesh_2(shape, linear, false, angular, false) as OccHandle & { Perform(): void };
   mesher.Perform();
   let missingFaces = 0;
 

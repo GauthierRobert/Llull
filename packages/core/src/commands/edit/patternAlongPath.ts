@@ -1,8 +1,7 @@
 /**
- * pattern_along_path: copies of an entity (or fresh instances of a component) laid along a curve —
- * a polyline/spline, a sketch curve or a circular arc — optionally oriented by the curve's
- * rotation-minimizing frame (the same frame sweeps use): chain links, tyre tread blocks, sprocket
- * teeth, fence posts, rivets along a seam, parts fanned round an arc.
+ * pattern_along_path: copies of an entity (or fresh instances of a component) laid along a curve — a polyline/spline, a sketch curve or a
+ * circular arc — optionally oriented by the curve's rotation-minimizing frame (the same frame sweeps use): chain links, tyre tread blocks,
+ * sprocket teeth, fence posts, rivets along a seam, parts fanned round an arc.
  */
 
 import type { CurveSegment } from '../../model/curve';
@@ -148,10 +147,7 @@ export const patternAlongPath = defineCommand({
       const roll = rollStep * k;
       const y = add3(scale3(normal, Math.cos(roll)), scale3(binormal, Math.sin(roll)));
       const z = cross3(tangent, y);
-      return {
-        position: point,
-        rotation: composeEulerXYZ(eulerFromAxes(tangent, y, z), baseRotation),
-      };
+      return { position: point, rotation: composeEulerXYZ(eulerFromAxes(tangent, y, z), baseRotation) };
     });
     const { document, newIds } = addCopies(doc, source, placements);
     const what = sourceId ?? `component ${componentId}`;

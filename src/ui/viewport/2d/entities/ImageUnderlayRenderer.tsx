@@ -1,10 +1,5 @@
-/**
- * Render branch for `kind:'image'` (shared by the 2D and 3D views through Shape2DRenderer): the
- * raster as a textured plane on its work plane, drawn first (`renderOrder` −1) and without depth
- * writes so every shape and solid paints over it; `opacity` from the entity. Not raycast — picking
- * goes through the pure 2D pick helpers, which skip locked underlays. A selected underlay shows its
- * frame in the selection color.
- */
+// `kind:'image'` (2D + 3D via Shape2DRenderer): textured plane drawn first (renderOrder −1, no depth write) so all
+// geometry paints over it; not raycast (pure pick helpers skip locked underlays); selected = frame in selection color.
 
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';

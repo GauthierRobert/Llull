@@ -1,10 +1,5 @@
-/**
- * Command palette (Ctrl/Cmd+K) — one searchable entry point to every app action and every
- * registry command. ARIA combobox + listbox; arrows / Home / End move, Enter runs, Escape closes.
- * A command with parameters (or a destructive one) opens its generated form; any other runs at
- * once. Modal: focus stays inside (Tab is trapped). Every document change goes through
- * `dispatch` (PRIME DIRECTIVE); its own result is toasted via `onResult`.
- */
+// Ctrl/Cmd+K palette over every app action + registry command (ARIA combobox/listbox, Tab trapped). A command with
+// params (or destructive) opens its generated form, others run at once; the result is toasted via `onResult`.
 
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { CommandDefinition } from '@core/commands/types';
@@ -19,15 +14,11 @@ function runCommand(command: CommandDefinition<unknown>, params: Record<string, 
   useStore.getState().dispatch(command.name, params, {
     selectAffected: true,
     onResult: ({ summary, changed }) =>
-      usePaletteStore.getState().showResult({
-        commandName: command.name,
-        summary,
-        failed: !changed && !readOnly,
-      }),
+      usePaletteStore.getState().showResult({ commandName: command.name, summary, failed: !changed && !readOnly }),
   });
 }
 
-/** A command opens its form first when it takes input or would destroy content. */
+/** Takes input or would destroy content. */
 function needsForm(command: CommandDefinition<unknown>): boolean {
   return Object.keys(command.paramsSchema.properties).length > 0 || command.annotations?.destructive === true;
 }

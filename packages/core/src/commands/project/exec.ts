@@ -41,13 +41,9 @@ export function execStep(
     run.steps.push({ index, command, ok, summary, affected, ...(path ? { path } : {}) });
     return { ok, affected };
   };
-  if (!getCommand(command)) {
-    return report(false, `Unknown command: ${command}${label ? ` (${label})` : ''}`);
-  }
+  if (!getCommand(command)) return report(false, `Unknown command: ${command}${label ? ` (${label})` : ''}`);
   const resolved = resolveExprInParam(params, bindings, env);
-  if (resolved.error) {
-    return report(false, `Param error${label ? ` in ${label}` : ''}: ${resolved.error}`);
-  }
+  if (resolved.error) return report(false, `Param error${label ? ` in ${label}` : ''}: ${resolved.error}`);
   const recorded = recordableParams(params, resolved.value, run.current.parameters);
   const event = { ordinal: ++run.startedSteps, total: run.totalSteps, command, index };
   run.onStep?.({ phase: 'start', ...event });

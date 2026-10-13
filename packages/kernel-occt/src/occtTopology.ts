@@ -109,16 +109,7 @@ function edgeInfo(api: OccApi, shape: OccShape, index: number, faceCount: number
     const point = api.BRep_Tool.Pnt(vertex) as OccPoint;
     const at: Vec3 = [point.X(), point.Y(), point.Z()];
     [point, vertex, edge].forEach(release);
-    return {
-      index,
-      curve: 'other',
-      length: 0,
-      start: at,
-      end: at,
-      mid: at,
-      seam: false,
-      degenerate,
-    };
+    return { index, curve: 'other', length: 0, start: at, end: at, mid: at, seam: false, degenerate };
   }
   const adaptor = new api.BRepAdaptor_Curve_2(edge) as OccHandle & {
     GetType(): unknown;
@@ -139,9 +130,7 @@ function edgeInfo(api: OccApi, shape: OccShape, index: number, faceCount: number
     mid: pointAt(adaptor, (first + last) / 2),
     ...(curve === 'line'
       ? {}
-      : {
-          samples: Array.from({ length: EDGE_SAMPLES + 1 }, (_, k) => pointAt(adaptor, first + ((last - first) * k) / EDGE_SAMPLES)),
-        }),
+      : { samples: Array.from({ length: EDGE_SAMPLES + 1 }, (_, k) => pointAt(adaptor, first + ((last - first) * k) / EDGE_SAMPLES)) }),
     seam: faceCount === 1,
     degenerate,
   };
@@ -154,11 +143,7 @@ function faceInfo(api: OccApi, shape: OccShape, index: number): ShapeFace {
   const adaptor = new api.BRepAdaptor_Surface_2(face, true) as OccHandle & { GetType(): unknown };
   const props = new api.GProp_GProps_1() as GProps;
   api.BRepGProp.SurfaceProperties_1(face, props, false, false);
-  const info: ShapeFace = {
-    index,
-    surface: classify(api.GeomAbs_SurfaceType, SURFACES, adaptor.GetType(), 'other'),
-    area: props.Mass(),
-  };
+  const info: ShapeFace = { index, surface: classify(api.GeomAbs_SurfaceType, SURFACES, adaptor.GetType(), 'other'), area: props.Mass() };
   [props, adaptor, face].forEach(release);
   return info;
 }

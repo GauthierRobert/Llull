@@ -1,6 +1,6 @@
 /**
- * Pipe supports follow their pipe when a level is copied: each copied pipe gets copies of its
- * supports, re-attached to the copied steel member (unattached when that member was not copied).
+ * Pipe supports follow their pipe when a level is copied: each copied pipe gets copies of its supports, re-attached to the copied steel
+ * member (unattached when that member was not copied).
  */
 
 import type { BuildingModel } from '@core/model/building';

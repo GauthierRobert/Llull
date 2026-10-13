@@ -1,12 +1,4 @@
-/**
- * MeasureBBoxRect2D — renders the `measure_bounding_box` result as a rectangle outline on the XY
- * plane in the 2D orthographic viewport (the Z extent is ignored in a top-down view).
- *
- * Mounted inside the floating-origin group in SceneContents2D (Viewport2D.tsx).
- * - Geometry and material are disposed on unmount (R9).
- * - useBoundingBoxMeasure invalidates the demand-mode canvas when the bbox data changes.
- * - Purely presentational — no document mutation (PRIME DIRECTIVE).
- */
+// `measure_bounding_box` result as an XY rectangle (Z ignored) in the 2D view, inside the floating-origin group.
 
 import type { Vec3 } from '@core/model/types';
 import { useAnchoredGeometry } from '../useDisposable';
@@ -14,7 +6,7 @@ import { useBoundingBoxMeasure } from '../useBoundingBoxMeasure';
 import { useOverlayMaterial } from '../useOverlayMaterial';
 import { OVERLAY_ACCENT } from '../viewportPalette';
 
-/** Draw height: slightly above the entities. */
+/** Slightly above the entities. */
 const RECT_Z = 0.1;
 
 function RectLines2D({ min, max }: { min: Vec3; max: Vec3 }): React.ReactElement {
@@ -33,7 +25,6 @@ function RectLines2D({ min, max }: { min: Vec3; max: Vec3 }): React.ReactElement
   );
   const material = useOverlayMaterial(OVERLAY_ACCENT, 0.9);
 
-  // lineLoop closes the last→first segment automatically.
   return <lineLoop geometry={anchored.geometry} position={anchored.anchor} material={material} renderOrder={999} />;
 }
 

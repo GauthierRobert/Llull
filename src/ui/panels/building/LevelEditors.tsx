@@ -1,7 +1,4 @@
-/**
- * Inline level editors: LevelEditForm → update_level (changed fields only); CopyLevelForm →
- * copy_level_elements (source level's elements to chosen upper levels, optional categories).
- */
+// LevelEditForm → update_level (changed fields); CopyLevelForm → copy_level_elements (to upper levels, optional categories).
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
@@ -34,13 +31,7 @@ const COPYABLE_CATEGORIES: ReadonlyArray<readonly [string, string]> = COPYABLE.m
   (category) => [category, CATEGORY_LABELS[category]] as const,
 );
 
-interface LevelEditFormProps {
-  level: BuildingLevel;
-  units: string;
-  onDone: () => void;
-}
-
-export function LevelEditForm({ level, units, onDone }: LevelEditFormProps): React.ReactElement {
+export function LevelEditForm({ level, units, onDone }: { level: BuildingLevel; units: string; onDone: () => void }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const [name, setName] = useState(level.name);
   const [elevation, setElevation] = useState(String(level.elevation));
@@ -65,13 +56,15 @@ export function LevelEditForm({ level, units, onDone }: LevelEditFormProps): Rea
   );
 }
 
-interface CopyLevelFormProps {
+export function CopyLevelForm({
+  source,
+  targets,
+  onDone,
+}: {
   source: BuildingLevel;
   targets: ReadonlyArray<BuildingLevel>;
   onDone: () => void;
-}
-
-export function CopyLevelForm({ source, targets, onDone }: CopyLevelFormProps): React.ReactElement {
+}): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const [targetIds, setTargetIds] = useState<string[]>([]);
   const [categories, setCategories] = useState<string[]>([]);

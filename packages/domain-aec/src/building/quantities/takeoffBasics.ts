@@ -34,11 +34,7 @@ export function scaleFor(doc: CadDocument): Scale {
   };
 }
 
-interface WallQuantities {
-  readonly length: number;
-  readonly netArea: number;
-  readonly volume: number;
-}
+type WallQuantities = { readonly length: number; readonly netArea: number; readonly volume: number };
 
 /** Built body (joints applied) in document units: length, net one-face area, volume. */
 export function wallQuantities(building: BuildingModel, wall: WallElement | CurvedWallElement): WallQuantities {
@@ -111,9 +107,6 @@ export class TakeoffAccumulator {
   }
 
   result(): TakeoffLine[] {
-    return [...this.lines.values()].map((line) => ({
-      ...line,
-      quantity: round(line.quantity, 3),
-    }));
+    return [...this.lines.values()].map((line) => ({ ...line, quantity: round(line.quantity, 3) }));
   }
 }

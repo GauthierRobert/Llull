@@ -1,6 +1,6 @@
 /**
- * Gravity-pipe hydraulics in SI (metres, seconds, litres per second): Manning full-bore capacity,
- * partial-flow depth in a circular section, rational-method runoff.
+ * Gravity-pipe hydraulics in SI (metres, seconds, litres per second): Manning full-bore capacity, partial-flow depth in a circular section,
+ * rational-method runoff.
  */
 import { bisect } from '@lib/bisect';
 
@@ -42,8 +42,8 @@ export function partialFlowDischarge(diameter: number, slope: number, manningN: 
 }
 
 /**
- * Depth ratio and velocity for discharge `flow` (m^3/s). Bisection on the rising branch of the
- * discharge curve; flows above the open-channel maximum are reported surcharged at ratio 1.
+ * Depth ratio and velocity for discharge `flow` (m^3/s). Bisection on the rising branch of the discharge curve; flows above the
+ * open-channel maximum are reported surcharged at ratio 1.
  */
 export function solvePartialFlow(diameter: number, slope: number, manningN: number, flow: number): PartialFlow {
   if (!(flow > 0)) return { depthRatio: 0, velocity: 0, surcharged: false };

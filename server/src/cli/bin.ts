@@ -29,10 +29,7 @@ function supervisedTimeout(argv: readonly string[], env: NodeJS.ProcessEnv): num
 }
 
 function supervise(seconds: number): void {
-  const child = spawn(process.execPath, process.argv.slice(1), {
-    stdio: 'inherit',
-    env: { ...process.env, [CHILD_ENV]: '1' },
-  });
+  const child = spawn(process.execPath, process.argv.slice(1), { stdio: 'inherit', env: { ...process.env, [CHILD_ENV]: '1' } });
   let killed = false;
   const timer = setTimeout(
     () => {

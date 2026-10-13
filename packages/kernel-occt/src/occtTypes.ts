@@ -1,6 +1,4 @@
 /** Minimal typings for the subset of the OCC WASM API the kernel uses, plus the two handle helpers. */
-
-/** Minimal typings for the subset of the OCC WASM API this kernel uses. */
 export interface OccHandle {
   delete(): void;
 }
@@ -24,12 +22,7 @@ export interface OccTriangulation extends OccHandle {
   get(): {
     NbTriangles(): number;
     NbNodes(): number;
-    Node(i: number): OccHandle & {
-      X(): number;
-      Y(): number;
-      Z(): number;
-      Transform(placement: OccHandle): void;
-    };
+    Node(i: number): OccHandle & { X(): number; Y(): number; Z(): number; Transform(placement: OccHandle): void };
     Triangle(i: number): OccHandle & { Value(j: number): number };
   };
 }

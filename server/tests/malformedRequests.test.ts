@@ -104,15 +104,7 @@ describe('/mcp with malformed input', () => {
   it.each([
     ['an unknown method', { jsonrpc: '2.0', id: 1, method: 'nope/nothing' }],
     ['a batch', [{ jsonrpc: '2.0', id: 1, method: 'tools/list' }]],
-    [
-      'initialize with a wrong protocolVersion type',
-      {
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'initialize',
-        params: { protocolVersion: 5 },
-      },
-    ],
+    ['initialize with a wrong protocolVersion type', { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: 5 } }],
   ])('%s before a session exists is a JSON-RPC error, not a crash', async (_label, body) => {
     const res = await post('/mcp').set(MCP).send(body);
     expectCleanError(res, 400);
@@ -131,12 +123,7 @@ describe('/mcp with malformed input', () => {
   });
 
   it('a client that does not accept event streams gets a 406 JSON-RPC error', async () => {
-    const res = await post('/mcp').send({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'initialize',
-      params: {},
-    });
+    const res = await post('/mcp').send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
     expectCleanError(res, 406);
   });
 

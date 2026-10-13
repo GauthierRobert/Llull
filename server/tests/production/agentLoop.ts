@@ -110,10 +110,7 @@ function toResultContent(content: unknown): Array<Anthropic.Beta.BetaTextBlockPa
     if (block.type === 'text' && typeof block.text === 'string') {
       blocks.push({ type: 'text', text: block.text });
     } else if (block.type === 'image' && typeof block.data === 'string' && block.mimeType === 'image/png') {
-      blocks.push({
-        type: 'image',
-        source: { type: 'base64', media_type: 'image/png', data: block.data },
-      });
+      blocks.push({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: block.data } });
     }
   }
   return blocks.length > 0 ? blocks : [{ type: 'text', text: '(no content)' }];
@@ -179,10 +176,7 @@ export async function runAgent(brief: string, options: AgentOptions, send: SendT
       messages.push({ role: 'assistant', content: message.content });
       const results: Anthropic.Beta.BetaToolResultBlockParam[] = [];
       for (const toolUse of toolUses) {
-        const raw = await session.client.callTool({
-          name: toolUse.name,
-          arguments: (toolUse.input ?? {}) as Record<string, unknown>,
-        });
+        const raw = await session.client.callTool({ name: toolUse.name, arguments: (toolUse.input ?? {}) as Record<string, unknown> });
         const content = toResultContent(raw.content);
         const isError = raw.isError === true;
         run.toolCalls++;

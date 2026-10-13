@@ -1,8 +1,7 @@
 /**
- * Boolean solid commands (union, subtract, intersect): two 3D solid operands become one mesh
- * entity whose `brep` is the boolean recipe of their exact shapes (so later fillets/booleans see real
- * edges and faces); the mesh is the kernel's display tessellation. A missing kernel or a null result
- * is a no-op.
+ * Boolean solid commands (union, subtract, intersect): two 3D solid operands become one mesh entity whose `brep` is the boolean recipe of
+ * their exact shapes (so later fillets/booleans see real edges and faces); the mesh is the kernel's display tessellation. A missing kernel
+ * or a null result is a no-op.
  */
 
 import { type CadDocument, type Entity, is3D } from '../../model/types';
@@ -29,35 +28,22 @@ function runBoolean(
   const missing = ids.find((_, i) => !operands[i]);
   if (missing !== undefined) return noop(doc, `${opName}: entity '${missing}' not found.`);
   const flat = ids.find((_, i) => !is3D(operands[i] as Entity));
-  if (flat !== undefined) {
-    return noop(doc, `${opName}: entity '${flat}' is a 2D shape; boolean operations require 3D solids.`);
-  }
+  if (flat !== undefined) return noop(doc, `${opName}: entity '${flat}' is a 2D shape; boolean operations require 3D solids.`);
   const instanced = ids.find((_, i) => (operands[i] as Entity).kind === 'instance');
-  if (instanced !== undefined) {
+  if (instanced !== undefined)
     return noop(doc, `${opName}: entity '${instanced}' is a component instance; run explode_instance first to get solids.`);
-  }
   const [entA, entB] = operands as [Entity, Entity];
-
   const kernel = (ctx ?? currentContext()).kernel;
   if (!kernel) return noop(doc, kernelUnavailable(opName));
-
-  const recipe: ShapeRecipe = {
-    op: 'boolean',
-    boolean: op,
-    a: operandRecipe(kernel, entA),
-    b: operandRecipe(kernel, entB),
-  };
+  const recipe: ShapeRecipe = { op: 'boolean', boolean: op, a: operandRecipe(kernel, entA), b: operandRecipe(kernel, entB) };
   const result = evaluateRecipe(kernel, recipe);
-  if (result === 'refused') {
+  if (result === 'refused')
     return noop(doc, `${opName}: kernel returned null for operands '${a}' and '${b}'. The geometry may be degenerate or unsupported.`);
-  }
-  if (result === 'empty') {
+  if (result === 'empty')
     return noop(
       doc,
       `${opName}: the result of '${a}' and '${b}' has no usable mesh — it is empty (no volume remains, e.g. disjoint solids for an intersection) or its solid could not be meshed closed; operands kept.`,
     );
-  }
-
   return commitKernelResult(
     doc,
     kernel,

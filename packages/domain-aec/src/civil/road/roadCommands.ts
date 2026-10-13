@@ -1,7 +1,4 @@
-/**
- * Road alignment, profile and cross-section commands (create / edit); queries and drawings live in
- * roadReportCommands.ts.
- */
+/** Road alignment, profile and cross-section commands (create / edit); queries and drawings live in roadReportCommands.ts. */
 
 import { compactNumber } from '@lib/compactNumber';
 import type { CadDocument } from '@core/model/types';
@@ -49,13 +46,11 @@ function surfaceProblem(doc: CadDocument, surfaceId: string | undefined): string
 export const addAlignment = defineCommand({
   name: 'add_alignment',
   description:
-    'Create a road / channel alignment from points of intersection (PIs, document units). Each ' +
-    'interior PI can carry a simple circular curve of the given radius (0 = sharp corner). Draws the ' +
-    'centreline, station ticks labelled km+mmm.mm every `stationInterval`, and PC / PT / R labels. ' +
-    'Optional `spirals` adds a symmetric clothoid transition (TS-SC ... CS-ST, length Ls each side) per ' +
-    'curved PI; the deflection must be at least twice the spiral angle Ls / (2 R). ' +
-    'Add a design profile with set_alignment_profile and a road template with set_road_section to get ' +
-    'the corridor, batters to daylight and earthworks; report with alignment_report.',
+    'Create a road / channel alignment from points of intersection (PIs, document units). Each interior PI can carry a simple circular ' +
+    'curve of the given radius (0 = sharp corner). Draws the centreline, station ticks labelled km+mmm.mm every `stationInterval`, and ' +
+    'PC / PT / R labels. Optional `spirals` adds a symmetric clothoid transition (TS-SC ... CS-ST, length Ls each side) per curved PI; ' +
+    'the deflection must be at least twice the spiral angle Ls / (2 R). Add a design profile with set_alignment_profile and a road ' +
+    'template with set_road_section to get the corridor, batters to daylight and earthworks; report with alignment_report.',
   params: z.object({
     points: pointsInput().describe('PIs from start to end, at least 2: [[x, y], ...].'),
     radii: z.array(z.number()).optional().describe('Curve radius per interior PI (length = points - 2); 0 = no curve. Default all 0.'),
@@ -102,10 +97,9 @@ export const addAlignment = defineCommand({
       doc,
       withObject(getCivil(doc), alignment),
       [id],
-      `Created alignment ${alignment.name} (${id}): ${params.points.length} PIs, ` +
-        `${radii.filter((radius) => radius > 0).length} curve(s)` +
-        `${spirals.some((length) => length > 0) ? ` (${spirals.filter((length) => length > 0).length} with spirals)` : ''}, length ${lengthM.toFixed(2)} m, ` +
-        `stations ${stationText(doc, startStation)} to ${stationText(doc, endStation(alignment))}.`,
+      `Created alignment ${alignment.name} (${id}): ${params.points.length} PIs, ${radii.filter((radius) => radius > 0).length} ` +
+        `curve(s)${spirals.some((length) => length > 0) ? ` (${spirals.filter((length) => length > 0).length} with spirals)` : ''}, ` +
+        `length ${lengthM.toFixed(2)} m, stations ${stationText(doc, startStation)} to ${stationText(doc, endStation(alignment))}.`,
       { alignmentId: id, lengthM: Number(lengthM.toFixed(3)) },
     );
   },
@@ -118,11 +112,10 @@ export const addAlignment = defineCommand({
 export const updateAlignment = defineCommand({
   name: 'update_alignment',
   description:
-    'Edit an alignment: new PI `points`, curve `radii`, `startStation`, `stationInterval`, linked ' +
-    '`surfaceId` ("" removes the link) or `name`. `spirals` sets the clothoid length on each side of ' +
-    'each curve (per interior PI, 0 = none; deflection must be >= 2 x Ls / (2 R)). Profile, road section and everything derived ' +
-    '(corridor, batters, report) follow. If `points` changes length without `radii`, radii are padded ' +
-    'with 0 / truncated.',
+    'Edit an alignment: new PI `points`, curve `radii`, `startStation`, `stationInterval`, linked `surfaceId` ("" removes the link) or ' +
+    '`name`. `spirals` sets the clothoid length on each side of each curve (per interior PI, 0 = none; deflection must be >= 2 x Ls / (2 ' +
+    'R)). Profile, road section and everything derived (corridor, batters, report) follow. If `points` changes length without `radii`, ' +
+    'radii are padded with 0 / truncated.',
   params: z.object({
     alignmentId: alignmentIdParam,
     points: pointsInput().optional().describe('New PIs, at least 2.'),
@@ -199,10 +192,9 @@ const PVI_END_SNAP_M = 0.05;
 export const setAlignmentProfile = defineCommand({
   name: 'set_alignment_profile',
   description:
-    'Set the vertical design profile of an alignment from PVIs [{ station, elevation, curveLength? }] ' +
-    '(document units). Grades are straight between PVIs; an interior PVI with `curveLength` > 0 gets a ' +
-    'symmetric parabolic vertical curve centred on it (first / last PVI cannot). The first and last ' +
-    'PVI stations must lie within the alignment stations. The summary lists grades and K values.',
+    'Set the vertical design profile of an alignment from PVIs [{ station, elevation, curveLength? }] (document units). Grades are ' +
+    'straight between PVIs; an interior PVI with `curveLength` > 0 gets a symmetric parabolic vertical curve centred on it (first / last ' +
+    'PVI cannot). The first and last PVI stations must lie within the alignment stations. The summary lists grades and K values.',
   params: z.object({
     alignmentId: alignmentIdParam,
     pvis: z
@@ -255,10 +247,9 @@ export const setAlignmentProfile = defineCommand({
 export const setRoadSection = defineCommand({
   name: 'set_road_section',
   description:
-    'Set the symmetric road template of an alignment: carriageway `laneWidth` and `shoulderWidth` each ' +
-    'side of the centreline (document units), `crossfall` (ratio falling away from the centreline, ' +
-    '0.025 = 2.5 %), and the `cutSlope` / `fillSlope` batters (horizontal per 1 vertical). Defaults: ' +
-    '3.5 m lane, 1.0 m shoulder, 0.025, 1.5, 2.0 - or the current template values. With a profile the ' +
+    'Set the symmetric road template of an alignment: carriageway `laneWidth` and `shoulderWidth` each side of the centreline (document ' +
+    'units), `crossfall` (ratio falling away from the centreline, 0.025 = 2.5 %), and the `cutSlope` / `fillSlope` batters (horizontal ' +
+    'per 1 vertical). Defaults: 3.5 m lane, 1.0 m shoulder, 0.025, 1.5, 2.0 - or the current template values. With a profile the ' +
     'corridor is drawn; with a surface too, batters run to daylight.',
   params: z.object({
     alignmentId: alignmentIdParam,

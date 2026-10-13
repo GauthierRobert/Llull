@@ -1,8 +1,7 @@
 /**
- * Pipe weight through explicit supports: each attached support carries the pipe weight over half
- * the span to its neighbours (the full overhang to a free end, half the span to an end carried by an
- * equipment nozzle or a header) as a point load on its member — on a floor beam at the support
- * (shoe on the top flange, hanger at the rod attachment) or axially on a column.
+ * Pipe weight through explicit supports: each attached support carries the pipe weight over half the span to its neighbours (the full
+ * overhang to a free end, half the span to an end carried by an equipment nozzle or a header) as a point load on its member — on a floor
+ * beam at the support (shoe on the top flange, hanger at the rod attachment) or axially on a column.
  */
 
 import { clamp } from '@lib/clamp';
@@ -114,12 +113,7 @@ export function applySupportedPipe(
     } else if (bar?.kind === 'column') {
       columnNodes.push([
         bar.id,
-        {
-          beamId: station.id,
-          zAxis: clamp(station.point[2], bar.start[2], bar.end[2]),
-          permanent: weight,
-          imposed: 0,
-        },
+        { beamId: station.id, zAxis: clamp(station.point[2], bar.start[2], bar.end[2]), permanent: weight, imposed: 0 },
       ]);
       const top = Math.max(bar.start[2], bar.end[2]);
       if (station.point[2] - run.diameterMm / 2 < top - COLUMN_TOP_TOLERANCE) {

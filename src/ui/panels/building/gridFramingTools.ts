@@ -1,7 +1,4 @@
-/**
- * Form specs for the grid framing tools (columns / beams / bracing laid out from the structural
- * grid): each maps form values to ONE command (param-gathering only, react R1).
- */
+// Grid framing tool specs (columns / beams / bracing from the structural grid): form values → ONE command.
 
 import { toRadians } from '@lib/angle';
 import {

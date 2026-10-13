@@ -1,6 +1,6 @@
 /**
- * Incremental Delaunay triangulation (Bowyer–Watson with point-location walking and a directed-edge
- * map), used to build terrain TINs from survey points.
+ * Incremental Delaunay triangulation (Bowyer–Watson with point-location walking and a directed-edge map), used to build terrain TINs from
+ * survey points.
  */
 
 import type { Vec2 } from '@core/model/types';

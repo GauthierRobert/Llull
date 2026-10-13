@@ -142,12 +142,7 @@ export function analyseBracing(
     const xHigh = round(Math.max(start[0], end[0]), 0);
     const side = start[0] <= centre ? 'west' : 'east';
     const key = roof ? `roof|${bay}|${xLow}|${xHigh}` : `wall|${bay}|${xLow}`;
-    const panel = panels.get(key) ?? {
-      group: roof ? 'roof bracing' : `wall bracing ${side}`,
-      roof,
-      bay,
-      braces: [],
-    };
+    const panel = panels.get(key) ?? { group: roof ? 'roof bracing' : `wall bracing ${side}`, roof, bay, braces: [] };
     panel.braces.push(located);
     panels.set(key, panel);
   }
@@ -243,12 +238,7 @@ export function analyseBracing(
           `crane longitudinal (group 1 / group 7): ${craneForce.governing} governs, 1.35 HL ${craneForce.driveGroup1.toFixed(1)} kN vs HB (γ 1.0) ${craneForce.bufferGroup7.toFixed(1)} kN per runway, share ${craneShare.toFixed(1)} kN on bay ${panel.bay} mm, tension ${craneTension.toFixed(1)} kN ≤ Npl,Rd ${npl.toFixed(1)} kN (included in the wall bracing row above)`,
         ),
       );
-      craneFoundation.push({
-        side,
-        braced: wallPanelsOnSide(side),
-        total: craneShare,
-        perColumn: craneShare / 2,
-      });
+      craneFoundation.push({ side, braced: wallPanelsOnSide(side), total: craneShare, perColumn: craneShare / 2 });
     }
     // Compression strut: rafter (roof) / column (wall) at either end of the bay.
     const [bayStart, bayEnd] = [Math.min(start[1], end[1]), Math.max(start[1], end[1])];

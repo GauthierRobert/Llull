@@ -1,8 +1,8 @@
-/** Pure intersection helpers between segments and circular curves (circles / arcs). */
+// Pure segment / circle-arc intersections.
 
 import { isAngleOnArc, type Segment } from './geometry';
 
-/** Circular curve in world space; `full` = whole circle, else the CCW sweep startAngle→endAngle. */
+/** World space; `full` = whole circle, else the CCW sweep startAngle→endAngle. */
 export interface CircularCurve {
   readonly cx: number;
   readonly cy: number;
@@ -17,10 +17,7 @@ type Point = [number, number];
 const onCurve = (curve: CircularCurve, x: number, y: number): boolean =>
   curve.full || isAngleOnArc(Math.atan2(y - curve.cy, x - curve.cx), curve.startAngle, curve.endAngle);
 
-/**
- * Intersections of a finite segment with a circle/arc (0, 1 or 2 points).
- * @failure degenerate segment or non-positive radius -> []
- */
+/** 0–2 points. @failure degenerate segment or non-positive radius -> [] */
 export function segmentCurveIntersections(segment: Segment, curve: CircularCurve): Point[] {
   const [ax, ay, bx, by] = segment;
   const dx = bx - ax;
@@ -42,9 +39,7 @@ export function segmentCurveIntersections(segment: Segment, curve: CircularCurve
     .filter(([x, y]) => onCurve(curve, x, y));
 }
 
-/**
- * Intersections of two circles/arcs (0, 1 or 2 points); concentric curves yield none.
- */
+/** 0–2 points; concentric curves yield none. */
 export function curveCurveIntersections(p: CircularCurve, q: CircularCurve): Point[] {
   const dx = q.cx - p.cx;
   const dy = q.cy - p.cy;

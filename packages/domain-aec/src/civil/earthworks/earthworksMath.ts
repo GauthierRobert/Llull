@@ -1,6 +1,5 @@
 /**
- * Earthworks math (document units): grid-method cut / fill between a TIN and a graded pad with
- * cut / fill batters, and between two TINs.
+ * Earthworks math (document units): grid-method cut / fill between a TIN and a graded pad with cut / fill batters, and between two TINs.
  */
 
 import type { Vec2 } from '@core/model/types';
@@ -58,8 +57,8 @@ export function daylightReach(tin: Tin, elevation: number, cutSlope: number, fil
 const cellsAlong = (length: number, spacing: number): number => Math.max(1, Math.ceil(length / spacing - 1e-9));
 
 /**
- * Columns × rows of a grid of `step` cells over width × height, capped to MAX_SAMPLES after
- * rounding each axis (a thin strip cannot blow up one axis).
+ * Columns × rows of a grid of `step` cells over width × height, capped to MAX_SAMPLES after rounding each axis (a thin strip cannot blow up
+ * one axis).
  */
 export function gridSize(width: number, height: number, step: number): { columns: number; rows: number } {
   const spacing = (width / step) * (height / step) > MAX_SAMPLES ? Math.sqrt((width * height) / MAX_SAMPLES) : step;
@@ -87,18 +86,12 @@ function cellCentres(minX: number, minY: number, width: number, height: number, 
 }
 
 function emptySamples(): GridSamples {
-  return {
-    ground: new Float64Array(0),
-    distance: new Float64Array(0),
-    cellArea: 0,
-    spacing: 0,
-    outsideTin: 0,
-  };
+  return { ground: new Float64Array(0), distance: new Float64Array(0), cellArea: 0, spacing: 0, outsideTin: 0 };
 }
 
 /**
- * Samples the ground of `tin` on a grid covering `boundary` expanded by `margin` (clipped to the
- * TIN extent). `spacing` defaults so the pad gets ~2500 cells; always capped at 250k samples.
+ * Samples the ground of `tin` on a grid covering `boundary` expanded by `margin` (clipped to the TIN extent). `spacing` defaults so the pad
+ * gets ~2500 cells; always capped at 250k samples.
  */
 export function buildSamples(tin: Tin, boundary: ReadonlyArray<Vec2>, margin: number, spacing?: number): GridSamples {
   const bounds = tinBounds(tin);
@@ -214,16 +207,7 @@ export interface SurfaceComparison {
 export function compareSurfaceVolumes(base: Tin, comparison: Tin, spacing?: number): SurfaceComparison {
   const a = tinBounds(base);
   const b = tinBounds(comparison);
-  const none: SurfaceComparison = {
-    cutVolume: 0,
-    fillVolume: 0,
-    cutArea: 0,
-    fillArea: 0,
-    area: 0,
-    spacing: 0,
-    samples: 0,
-    outsideTin: 0,
-  };
+  const none: SurfaceComparison = { cutVolume: 0, fillVolume: 0, cutArea: 0, fillArea: 0, area: 0, spacing: 0, samples: 0, outsideTin: 0 };
   if (!a || !b) return none;
   const minX = Math.max(a.min[0], b.min[0]);
   const maxX = Math.min(a.max[0], b.max[0]);

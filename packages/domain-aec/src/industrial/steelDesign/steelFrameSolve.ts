@@ -1,7 +1,7 @@
 /**
- * Load cases of a moment frame: ULS 1.35 G + 1.5 Q with the equivalent horizontal forces of EN
- * 1993-1-1 §5.3.2 (φ × the vertical load at each level, both directions), SLS G + Q (+ the same
- * forces for the storey drift), and αcr from the drift under V/200 (Horne, EN 1993-1-1 §5.2.1(4)B).
+ * Load cases of a moment frame: ULS 1.35 G + 1.5 Q with the equivalent horizontal forces of EN 1993-1-1 §5.3.2 (φ × the vertical load at
+ * each level, both directions), SLS G + Q (+ the same forces for the storey drift), and αcr from the drift under V/200 (Horne, EN 1993-1-1
+ * §5.2.1(4)B).
  */
 
 import { solveFrame, type FrameResult } from '@lib/frame2d';
@@ -49,10 +49,7 @@ function solveCase(system: FrameSystem, factors: LoadFactors, sway: number): Fra
     system.nodes.map((node, index) => ({ ...node, load: loads[index] ?? { fx: 0, fy: 0, mz: 0 } })),
     system.members.map((member) => ({
       ...member.geometry,
-      load: {
-        qx: 0,
-        qy: -(factors.permanent * member.permanent + factors.imposed * member.imposed),
-      },
+      load: { qx: 0, qy: -(factors.permanent * member.permanent + factors.imposed * member.imposed) },
     })),
   );
 }

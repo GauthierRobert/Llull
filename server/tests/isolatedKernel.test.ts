@@ -25,10 +25,7 @@ const box = (size: number): Entity =>
 
 const kernels: IsolatedKernel[] = [];
 const make = (callTimeoutMs?: number): IsolatedKernel => {
-  const kernel = createIsolatedKernel({
-    testHooks: true,
-    ...(callTimeoutMs !== undefined ? { callTimeoutMs } : {}),
-  });
+  const kernel = createIsolatedKernel({ testHooks: true, ...(callTimeoutMs !== undefined ? { callTimeoutMs } : {}) });
   kernels.push(kernel);
   return kernel;
 };
@@ -39,10 +36,7 @@ describe('isolated OCC kernel', () => {
   it('tessellates and runs booleans through the worker', () => {
     const kernel = make();
     expect(meshOf(kernel, box(2))?.indices).toHaveLength(36);
-    const union = booleanMesh(kernel, 'union', box(2), {
-      ...box(2),
-      position: [1, 0, 0],
-    } as Entity);
+    const union = booleanMesh(kernel, 'union', box(2), { ...box(2), position: [1, 0, 0] } as Entity);
     expect(union).not.toBeNull();
     expect(kernel.crashCount()).toBe(0);
   }, 120_000);
@@ -173,11 +167,7 @@ describe('isolated OCC kernel', () => {
   it('retries once when the background-loaded replacement worker dies on start', () => {
     const counterFile = path.join(os.tmpdir(), `llull-flaky-worker-${process.pid}`);
     rmSync(counterFile, { force: true });
-    const kernel = createIsolatedKernel({
-      entry: path.join(__dirname, 'fixtures', 'flakyStartWorker.cjs'),
-      execArgv: [],
-      testHooks: true,
-    });
+    const kernel = createIsolatedKernel({ entry: path.join(__dirname, 'fixtures', 'flakyStartWorker.cjs'), execArgv: [], testHooks: true });
     kernels.push(kernel);
     try {
       expect(kernel.topology(handleOf(leaf(box(2))))).toEqual({ loads: 0 });
@@ -190,10 +180,7 @@ describe('isolated OCC kernel', () => {
   }, 60_000);
 
   it('returns null promptly instead of throwing when the worker cannot load', () => {
-    const kernel = createIsolatedKernel({
-      entry: path.join(__dirname, 'missing-worker.js'),
-      startTimeoutMs: 30_000,
-    });
+    const kernel = createIsolatedKernel({ entry: path.join(__dirname, 'missing-worker.js'), startTimeoutMs: 30_000 });
     const started = Date.now();
     expect(meshOf(kernel, box(2))).toBeNull();
     expect(Date.now() - started).toBeLessThan(15_000);

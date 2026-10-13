@@ -11,8 +11,7 @@ import { panelFrame } from '../evaluate';
 export const MAX_GENERATED_MEMBERS = 5000;
 
 /**
- * Plan positions of every column foot on a level (steel columns and concrete columns),
- * de-duplicated; restricted to `onlyIds` when given.
+ * Plan positions of every column foot on a level (steel columns and concrete columns), de-duplicated; restricted to `onlyIds` when given.
  */
 export function columnFeet(building: BuildingModel, levelId: string, tolerance: number, onlyIds?: ReadonlySet<string>): Vec2[] {
   const feet: Vec2[] = [];
@@ -77,12 +76,7 @@ export function appendPanel(
   doc: CadDocument,
   building: BuildingModel,
   levelId: string,
-  spec: {
-    corners: Vec3[];
-    role: 'roof' | 'wall';
-    thickness?: number | undefined;
-    material?: string | undefined;
-  },
+  spec: { corners: Vec3[]; role: 'roof' | 'wall'; thickness?: number | undefined; material?: string | undefined },
 ): { building: BuildingModel; id: string } | null {
   if (spec.corners.length < 3 || !panelFrame(spec.corners)) return null;
   const panel: PanelElement = {

@@ -1,7 +1,6 @@
 /**
- * Civil plan sheet: every civil entity in plan at a true scale on ISO paper, clipped to the
- * drawing viewport, with grid ticks (calibrated sites), layer legend, north arrow, scale bar and
- * the shared title block.
+ * Civil plan sheet: every civil entity in plan at a true scale on ISO paper, clipped to the drawing viewport, with grid ticks (calibrated
+ * sites), layer legend, north arrow, scale bar and the shared title block.
  */
 
 import { clamp } from '@lib/clamp';
@@ -70,11 +69,7 @@ export function civilPlanEntities(
     if (!entity?.tags?.includes('civil') || !isDrawable(entity)) continue;
     const layer = doc.layers[entity.layerId]?.name ?? '0';
     if (layerNames && !layerNames.includes(layer)) continue;
-    result.push({
-      entity,
-      layer,
-      color: entity.color ?? doc.layers[entity.layerId]?.color ?? '#000',
-    });
+    result.push({ entity, layer, color: entity.color ?? doc.layers[entity.layerId]?.color ?? '#000' });
   }
   return result;
 }
@@ -97,15 +92,7 @@ function gridTicks(doc: CadDocument, scale: number, viewport: Viewport, center: 
   for (let easting = first(gridCentre[0]); easting <= gridCentre[0] + reach; easting += stepUnits) {
     for (let northing = first(gridCentre[1]); northing <= gridCentre[1] + reach; northing += stepUnits) {
       const [x, y] = toPaper(gridToLocal(calibration, [easting, northing]));
-      if (
-        !insideRect([x, y], {
-          x: viewport.x + 6,
-          y: viewport.y + 4,
-          width: viewport.width - 12,
-          height: viewport.height - 8,
-        })
-      )
-        continue;
+      if (!insideRect([x, y], { x: viewport.x + 6, y: viewport.y + 4, width: viewport.width - 12, height: viewport.height - 8 })) continue;
       parts.push(
         `<path class="grid-tick" d="M${n(x - 2)} ${n(y)}H${n(x + 2)}M${n(x)} ${n(y - 2)}V${n(y + 2)}" stroke="#666" stroke-width="0.15" fill="none"/>`,
         `<text class="grid-label" x="${n(x + 1.5)}" y="${n(y - 1)}" font-size="1.8" fill="#444">${escapeXml(`E ${toMetres(doc, easting).toFixed(0)}  N ${toMetres(doc, northing).toFixed(0)}`)}</text>`,
@@ -128,8 +115,8 @@ function legend(x: number, y: number, layers: ReadonlyArray<{ name: string; colo
 }
 
 /**
- * Plan sheet of the civil entities of `doc`; null when there is nothing to draw, the scale is
- * not positive or no entity lies on the requested layers.
+ * Plan sheet of the civil entities of `doc`; null when there is nothing to draw, the scale is not positive or no entity lies on the
+ * requested layers.
  */
 export function buildCivilPlanSheet(doc: CadDocument, options: CivilSheetOptions): CivilPlanSheet | null {
   const items = civilPlanEntities(doc, options.layers);
@@ -198,13 +185,5 @@ export function buildCivilPlanSheet(doc: CadDocument, options: CivilSheetOptions
       `<rect x="${n(viewport.x)}" y="${n(viewport.y)}" width="${n(viewport.width)}" height="${n(viewport.height)}" class="frame-thin"/>`,
     overlays: [northArrow(width - MARGIN - 12, MARGIN + 12), legend(viewport.x + viewport.width + 2, MARGIN + 28, layers)],
   });
-  return {
-    text: `${text}\n`,
-    scale,
-    center,
-    drawn: items.length - clipped,
-    clipped,
-    counts,
-    layers,
-  };
+  return { text: `${text}\n`, scale, center, drawn: items.length - clipped, clipped, counts, layers };
 }

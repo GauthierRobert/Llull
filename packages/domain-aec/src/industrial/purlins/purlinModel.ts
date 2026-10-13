@@ -17,12 +17,7 @@ export const pressureOf = (zone: ZoneCpe | undefined): number =>
   Math.max((zone ?? NO_COEFFICIENT).suction, (zone ?? NO_COEFFICIENT).pressure, 0);
 
 /** Wind zone candidate of a purlin: label, governing suction and the positive pressure of the same zone. */
-export interface WindOption {
-  readonly zone: string;
-  readonly cpe: number;
-  readonly pressure: number;
-  readonly direction: string;
-}
+export type WindOption = { readonly zone: string; readonly cpe: number; readonly pressure: number; readonly direction: string };
 
 /** F of the monopitch θ = 90° table is split in F_up / F_low (equal values). */
 export const zoneOf = (coefficients: RoofCoefficients, zone: RoofZone): ZoneCpe | undefined =>

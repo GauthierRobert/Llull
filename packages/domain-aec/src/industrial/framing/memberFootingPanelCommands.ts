@@ -16,12 +16,10 @@ import { levelIdParam } from '../../building/levelParams';
 export const addFooting = defineCommand({
   name: 'add_footing',
   description:
-    'Add concrete pad footings: one at a plan location, or (underColumns: true) one under every steel and ' +
-    'concrete column foot of the level (underColumns wins over location). With underColumns, feet that ' +
-    'already carry a footing on the level (within 10 mm) are skipped and the command is refused when none ' +
-    'is left; an explicit location that already carries a footing on the level (within 10 mm) is refused. ' +
-    'Top of footing at level + topOffset ' +
-    '(default −300 mm); default 1500 × 1500 × 600 mm.',
+    'Add concrete pad footings: one at a plan location, or (underColumns: true) one under every steel and concrete column foot of the ' +
+    'level (underColumns wins over location). With underColumns, feet that already carry a footing on the level (within 10 mm) are ' +
+    'skipped and the command is refused when none is left; an explicit location that already carries a footing on the level (within 10 ' +
+    'mm) is refused. Top of footing at level + topOffset (default −300 mm); default 1500 × 1500 × 600 mm.',
   params: z.object({
     location: vec2('Footing centre [x, y].').optional(),
     underColumns: z.boolean().optional().describe('Place one under each steel or concrete column foot of the level (ignores location).'),
@@ -78,9 +76,8 @@ const MAX_PANEL_CORNERS = 500;
 export const addPanel = defineCommand({
   name: 'add_panel',
   description:
-    'Add a planar cladding, roofing or sandwich panel through 3D corners [[x, y, z], …] (z above the level). ' +
-    'The panel thickness grows along the plane normal (right-hand rule on the corner order). Use for ' +
-    'pitched roofs, façades and gables.',
+    'Add a planar cladding, roofing or sandwich panel through 3D corners [[x, y, z], …] (z above the level). The panel thickness grows ' +
+    'along the plane normal (right-hand rule on the corner order). Use for pitched roofs, façades and gables.',
   params: z.object({
     corners: z.array(z.array(z.number())).describe('Coplanar corners [[x, y, z], …], 3 to 500.'),
     role: z.enum(['roof', 'wall']).optional().describe('Roofing or wall cladding. Default wall.'),
@@ -101,12 +98,7 @@ export const addPanel = defineCommand({
     if (thickness !== undefined && !(thickness > 0)) return noop(doc, 'add_panel failed: thickness must be > 0.');
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_panel failed: ${resolution.reason}.`);
-    const added = appendPanel(doc, resolution.building, resolution.level.id, {
-      corners: points as Vec3[],
-      role,
-      thickness,
-      material,
-    });
+    const added = appendPanel(doc, resolution.building, resolution.level.id, { corners: points as Vec3[], role, thickness, material });
     if (!added) return noop(doc, 'add_panel failed: the corners do not span a plane.');
     return commitBuilding(
       doc,

@@ -20,10 +20,9 @@ export const trayLength = (tray: CableTrayElement): number => routeLength(tray.p
 export const addCableTray = defineCommand({
   name: 'add_cable_tray',
   description:
-    'Route a cable tray (open U section) through 3D points [[x, y, z], …] (z = tray centre above the ' +
-    'level) with a width, side height and cable system (power, data, instrumentation…). Lengths feed ' +
-    'the takeoff; clashes with steel, pipes and equipment are reported by check_clashes. Refused if a tray of the same ' +
-    'size already follows the same route (either direction) on the level.',
+    'Route a cable tray (open U section) through 3D points [[x, y, z], …] (z = tray centre above the level) with a width, side height ' +
+    'and cable system (power, data, instrumentation…). Lengths feed the takeoff; clashes with steel, pipes and equipment are reported by ' +
+    'check_clashes. Refused if a tray of the same size already follows the same route (either direction) on the level.',
   params: z.object({
     points: z.array(z.array(z.number())).describe('Tray centreline [[x, y, z], …], 2 to 1000 points.'),
     width: z.number().optional().describe('Tray width, in document units. Default 300 mm.'),

@@ -1,10 +1,9 @@
 /**
- * Injected geometry kernel interface (architecture L9). Interface only: no WASM, no three.js, no async.
- * Commands read it from `ctx.kernel` and no-op when it is null; the composition root installs it.
+ * Injected geometry kernel interface (architecture L9). Interface only: no WASM, no three.js, no async. Commands read it from `ctx.kernel`
+ * and no-op when it is null; the composition root installs it.
  *
- * The kernel boundary is a SHAPE, not a mesh: a command hands the kernel a `ShapeRecipe` (the
- * construction tree) and gets back an opaque, kernel-owned `ShapeHandle` (an exact B-rep under OCC).
- * Meshes only come OUT of the kernel (`tessellate`), for display and mesh exports.
+ * The kernel boundary is a SHAPE, not a mesh: a command hands the kernel a `ShapeRecipe` (the construction tree) and gets back an opaque,
+ * kernel-owned `ShapeHandle` (an exact B-rep under OCC). Meshes only come OUT of the kernel (`tessellate`), for display and mesh exports.
  */
 
 import type { MeshData, ShapeRecipe, Vec3 } from '../model/types';
@@ -12,8 +11,8 @@ import type { MeshData, ShapeRecipe, Vec3 } from '../model/types';
 declare const shapeHandleBrand: unique symbol;
 
 /**
- * Opaque reference to a kernel-owned shape. Core never inspects it: it only passes it back to the
- * kernel that minted it. It stays valid after the kernel evicts or restarts (it re-evaluates).
+ * Opaque reference to a kernel-owned shape. Core never inspects it: it only passes it back to the kernel that minted it. It stays valid
+ * after the kernel evicts or restarts (it re-evaluates).
  */
 export interface ShapeHandle {
   readonly [shapeHandleBrand]: true;
@@ -55,10 +54,9 @@ export interface ShapeTopology {
 }
 
 /**
- * Every operation returns null when it cannot be performed (unsupported op, degenerate geometry,
- * kernel limitation); commands treat null as a no-op. Implementors must not mutate arguments.
- * Exact topology and STEP: OCC only (Manifold is a mesh kernel: `topology` / `exportStep` -> null,
- * and fillet / chamfer / shell recipes evaluate to null).
+ * Every operation returns null when it cannot be performed (unsupported op, degenerate geometry, kernel limitation); commands treat null as
+ * a no-op. Implementors must not mutate arguments. Exact topology and STEP: OCC only (Manifold is a mesh kernel: `topology` / `exportStep`
+ * -> null, and fillet / chamfer / shell recipes evaluate to null).
  */
 export interface GeometryKernel {
   /** Whether this kernel can perform recipe nodes of `op` at all (Manifold: no fillet/chamfer/shell). */

@@ -31,18 +31,14 @@ export function polygonArea(points: ReadonlyArray<Point2>): number {
 /** Perimeter of the closed polygon. */
 export function polygonPerimeter(points: ReadonlyArray<Point2>): number {
   let total = 0;
-  for (let i = 0; i < points.length; i++) {
-    total += distance(points[i] as Point2, points[(i + 1) % points.length] as Point2);
-  }
+  for (let i = 0; i < points.length; i++) total += distance(points[i] as Point2, points[(i + 1) % points.length] as Point2);
   return total;
 }
 
 /** Area centroid; falls back to the vertex average for degenerate (zero-area) input. */
 export function polygonCentroid(points: ReadonlyArray<Point2>): Point2 {
   const area = signedArea(points);
-  if (Math.abs(area) < 1e-12) {
-    return centroid2(points);
-  }
+  if (Math.abs(area) < 1e-12) return centroid2(points);
   let cx = 0;
   let cy = 0;
   forEachEdge(points, (x1, y1, x2, y2, cross) => {
@@ -84,9 +80,8 @@ export function isValidPolygon(points: ReadonlyArray<Point2>): boolean {
 }
 
 /**
- * Offsets every edge of a closed polygon by `delta` along its outward normal (CCW input assumed;
- * the result is computed on the CCW copy) and joins consecutive edges with mitred corners.
- * Parallel consecutive edges keep the shifted vertex.
+ * Offsets every edge of a closed polygon by `delta` along its outward normal (CCW input assumed; the result is computed on the CCW copy)
+ * and joins consecutive edges with mitred corners. Parallel consecutive edges keep the shifted vertex.
  */
 export function offsetPolygon(points: ReadonlyArray<Point2>, delta: number): Point2[] {
   const ccw = toCounterClockwise(points);
@@ -107,8 +102,8 @@ export function offsetPolygon(points: ReadonlyArray<Point2>, delta: number): Poi
 }
 
 /**
- * Parameters `{ t, u }` of the crossing of the infinite lines P(t) = p + t(q − p) and
- * Q(u) = r + u(s − r), or null when parallel/collinear. t and u are not clamped to [0, 1].
+ * Parameters `{ t, u }` of the crossing of the infinite lines P(t) = p + t(q − p) and Q(u) = r + u(s − r), or null when parallel/collinear.
+ * t and u are not clamped to [0, 1].
  */
 export function lineIntersectionParams(p: Point2, q: Point2, r: Point2, s: Point2): { t: number; u: number } | null {
   const dx1 = q[0] - p[0];
@@ -147,9 +142,7 @@ export function pointInPolygon(point: Point2, polygon: ReadonlyArray<Point2>): b
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
     const [xi, yi] = polygon[i] as Point2;
     const [xj, yj] = polygon[j] as Point2;
-    if (yi > point[1] !== yj > point[1] && point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi) {
-      inside = !inside;
-    }
+    if (yi > point[1] !== yj > point[1] && point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi) inside = !inside;
   }
   return inside;
 }

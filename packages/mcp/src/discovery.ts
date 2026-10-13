@@ -1,11 +1,7 @@
 /**
- * Tool-discovery meta-tools — `search_tools` and `enable_toolset`. They are MCP-layer tools, NOT
- * registry commands (the command contract / toolSchemas snapshot stay unchanged); both belong to
- * the always-enabled `core` toolset. A host exposes only `core` by default; an agent finds a tool
- * with `search_tools` and loads its schema by enabling the toolset (the host then sends
- * `notifications/tools/list_changed`).
+ * Discovery meta-tools `search_tools` / `enable_toolset`: MCP-layer (not registry commands), in the always-on `core`
+ * toolset. A host exposes `core` by default; enabling a toolset makes the host send `notifications/tools/list_changed`.
  */
-
 import { clamp } from '@lib/clamp';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { isRecord } from '@lib/isRecord';
@@ -23,7 +19,6 @@ export interface ToolSearchResult {
 
 interface DiscoveryOutcome {
   readonly result: McpShapedResult;
-  /** true when the session's tool list changed (host must send tools/list_changed). */
   readonly toolsListChanged: boolean;
 }
 
@@ -41,14 +36,8 @@ export function buildDiscoveryToolDefinitions(): McpToolDefinition[] {
       inputSchema: {
         type: 'object',
         properties: {
-          query: {
-            type: 'string',
-            description: 'Keywords, e.g. "wall", "fillet edge", "export step", "measure volume".',
-          },
-          limit: {
-            type: 'number',
-            description: `Max results (default ${SEARCH_TOOLS_DEFAULT_LIMIT}, max ${SEARCH_TOOLS_MAX_LIMIT}).`,
-          },
+          query: { type: 'string', description: 'Keywords, e.g. "wall", "fillet edge", "export step", "measure volume".' },
+          limit: { type: 'number', description: `Max results (default ${SEARCH_TOOLS_DEFAULT_LIMIT}, max ${SEARCH_TOOLS_MAX_LIMIT}).` },
         },
         required: ['query'],
       },
@@ -62,10 +51,7 @@ export function buildDiscoveryToolDefinitions(): McpToolDefinition[] {
       inputSchema: {
         type: 'object',
         properties: {
-          toolset: {
-            type: 'string',
-            description: `Toolset name: ${TOOLSET_NAMES.join(', ')}, or "all" (see search_tools results).`,
-          },
+          toolset: { type: 'string', description: `Toolset name: ${TOOLSET_NAMES.join(', ')}, or "all" (see search_tools results).` },
         },
         required: ['toolset'],
       },
@@ -86,58 +72,19 @@ function stem(word: string): string {
   return word;
 }
 
-function tokenize(text: string): string[] {
-  return text
+const tokenize = (text: string): string[] =>
+  text
     .toLowerCase()
     .split(/[^a-z0-9]+/)
     .filter((token) => token.length > 0)
     .map(stem);
-}
 
 /** Words that carry no tool meaning in an agent's phrasing. */
-const STOPWORDS: ReadonlySet<string> = new Set([
-  'a',
-  'an',
-  'the',
-  'in',
-  'on',
-  'of',
-  'to',
-  'for',
-  'and',
-  'or',
-  'with',
-  'by',
-  'at',
-  'from',
-  'out',
-  'it',
-  'is',
-  'are',
-  'be',
-  'how',
-  'do',
-  'does',
-  'can',
-  'i',
-  'me',
-  'my',
-  'we',
-  'you',
-  'this',
-  'that',
-  'what',
-  'which',
-  'want',
-  'need',
-  'make',
-  'some',
-  'all',
-  'into',
-  'many',
-  'between',
-  'two',
-]);
+const STOPWORDS: ReadonlySet<string> = new Set(
+  'a an the in on of to for and or with by at from out it is are be how do does can i me my we you this that what which want need make some all into many between two'.split(
+    ' ',
+  ),
+);
 
 /** Everyday phrasing -> the vocabulary tool names use. */
 const SYNONYMS: Readonly<Record<string, readonly string[]>> = {
@@ -172,14 +119,11 @@ const SYNONYMS: Readonly<Record<string, readonly string[]>> = {
 /** Query tokens: stopwords and one-letter words dropped, synonyms appended (deduplicated). */
 function queryTokens(query: string): string[] {
   const own = tokenize(query).filter((token) => token.length > 1 && !STOPWORDS.has(token));
-  const expanded = own.flatMap((token) => [token, ...(SYNONYMS[token] ?? [])]);
-  return [...new Set(expanded)];
+  return [...new Set(own.flatMap((token) => [token, ...(SYNONYMS[token] ?? [])]))];
 }
 
-/** True when `word` is `token` or extends it (prefix match needs ≥ 3 letters: "fill" -> "fillet"). */
-function wordMatches(word: string, token: string): boolean {
-  return word === token || (token.length >= 3 && word.startsWith(token));
-}
+/** `word` is `token` or extends it (prefix needs ≥ 3 letters: "fill" -> "fillet"). */
+const wordMatches = (word: string, token: string): boolean => word === token || (token.length >= 3 && word.startsWith(token));
 
 /**
  * Keyword score: name word equals the token 10, name word starts with it 6, token inside the name
@@ -235,10 +179,7 @@ function editDistance(a: string, b: string): number {
   return previous[b.length] ?? 0;
 }
 
-/**
- * Tool names within a typo's edit distance of `name` (closest first, ties by name); empty when
- * nothing is close. For "Unknown command" hints; keyword search is the fallback.
- */
+/** Tool names within a typo's edit distance of `name` (closest first, ties by name). */
 export function closestToolNames(name: string, limit: number): string[] {
   const wanted = name.toLowerCase();
   const maxDistance = Math.max(2, Math.floor(wanted.length / 3));
@@ -250,20 +191,14 @@ export function closestToolNames(name: string, limit: number): string[] {
     .map(({ name: toolName }) => toolName);
 }
 
-/**
- * "Did you mean" names for an unknown tool: typo matches first, else keyword search of the name
- * (`foo_bar` -> "foo bar") within the enabled toolsets.
- */
+/** "Did you mean" names: typo matches, else keyword search of `foo_bar` as "foo bar". */
 export function suggestToolNames(name: string, limit: number, enabledToolsets: ReadonlySet<ToolsetName>): string[] {
   const typoMatches = closestToolNames(name, limit);
   return typoMatches.length > 0 ? typoMatches : searchTools(name.replace(/_/g, ' '), limit, enabledToolsets).map((r) => r.name);
 }
 
 function outcome(summary: string, isError: boolean, data?: unknown, toolsListChanged = false): DiscoveryOutcome {
-  return {
-    result: shapeToolCallContent({ summary, affected: [], isError, data }),
-    toolsListChanged,
-  };
+  return { result: shapeToolCallContent({ summary, affected: [], isError, data }), toolsListChanged };
 }
 
 function runSearchTools(args: Record<string, unknown>, enabledToolsets: ReadonlySet<ToolsetName>): DiscoveryOutcome {
@@ -309,12 +244,6 @@ function runEnableToolset(args: Record<string, unknown>, enabledToolsets: Set<To
  */
 export function applyDiscoveryToolCall(toolName: string, rawArgs: unknown, enabledToolsets: Set<ToolsetName>): DiscoveryOutcome | null {
   const args = isRecord(rawArgs) ? rawArgs : {};
-  switch (toolName) {
-    case 'search_tools':
-      return runSearchTools(args, enabledToolsets);
-    case 'enable_toolset':
-      return runEnableToolset(args, enabledToolsets);
-    default:
-      return null;
-  }
+  if (toolName === 'search_tools') return runSearchTools(args, enabledToolsets);
+  return toolName === 'enable_toolset' ? runEnableToolset(args, enabledToolsets) : null;
 }

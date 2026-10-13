@@ -1,7 +1,4 @@
-/**
- * ClashSection — runs the read-only check_clashes command and lists hard clashes / clearance
- * violations; clicking a row selects both elements' geometry. Presentation only.
- */
+// Read-only check_clashes: hard clashes / clearance violations; a row selects both elements' geometry.
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';

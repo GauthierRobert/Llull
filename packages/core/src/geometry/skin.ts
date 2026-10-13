@@ -1,8 +1,8 @@
 /**
- * Skin a closed solid through ordered rings of equal point count: quad walls between neighbouring
- * rings and planar-projected caps on the first and last ring.
- * @invariant rings wind counter-clockwise seen from the direction of travel (first → last ring),
- *   so walls face outward; shared ring vertices are reused, so the soup welds watertight
+ * Skin a closed solid through ordered rings of equal point count: quad walls between neighbouring rings and planar-projected caps on the
+ * first and last ring.
+ * @invariant rings wind counter-clockwise seen from the direction of travel (first → last ring), so walls face outward; shared ring
+ *   vertices are reused, so the soup welds watertight
  */
 
 import type { Vec2, Vec3 } from '../model/types';
@@ -54,9 +54,8 @@ export function skinTriangles(rings: ReadonlyArray<ReadonlyArray<Vec3>>): Triang
   if (rings.length < 2 || first === undefined || last === undefined || first.length < 3) return [];
   if (rings.some((ring) => ring.length !== first.length)) return [];
   const triangles: Triangle[] = [];
-  for (let i = 0; i + 1 < rings.length; i++) {
+  for (let i = 0; i + 1 < rings.length; i++)
     triangles.push(...ringWalls(rings[i] as readonly Vec3[], rings[i + 1] as readonly Vec3[], false));
-  }
   const travel = sub3(centroid3(last), centroid3(first));
   const direction: Vec3 = Math.hypot(...travel) > 1e-12 ? travel : normalize3(ringNormal(first));
   triangles.push(...cap(first, scale3(direction, -1)), ...cap(last, direction));

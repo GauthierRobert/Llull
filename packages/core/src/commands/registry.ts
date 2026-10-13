@@ -1,8 +1,7 @@
 /**
- * The registry: the composition point that fills the command table with every feature's catalog
- * (`<feature>/catalog.ts`) and every installed plugin's commands. UI menus, MCP tool schemas
- * (`toToolSchemas`) and `execute` all read that table — register once, every surface gains it.
- * Surfaces import from this module so that importing the API also registers the core catalog.
+ * The registry: the composition point that fills the command table with every feature's catalog (`<feature>/catalog.ts`) and every
+ * installed plugin's commands. UI menus, MCP tool schemas (`toToolSchemas`) and `execute` all read that table — register once, every
+ * surface gains it. Surfaces import from this module so that importing the API also registers the core catalog.
  *
  * Adding a core command: define it in its feature folder, list it in that folder's catalog.
  */

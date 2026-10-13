@@ -10,7 +10,7 @@ import os from 'os';
 import path from 'path';
 import express from 'express';
 import { app } from '../src/index';
-import { _resetLiveDoc, subscribeLive, _subscriberCount, closeAllSubscribers } from '../src/liveDocument';
+import { _resetLiveDoc, subscribeLive, liveSubscriberCount, closeAllSubscribers } from '../src/liveDocument';
 import { _resetHistory, applyCommand } from '../src/commandBus';
 import { guardMutation, buildRestRateLimiter, getAllowedOrigins } from '../src/security';
 import { safeFileName as sanitizeFilename } from '@lib/safeFileName';
@@ -191,11 +191,7 @@ describe('createAutosaver', () => {
 
   it('flush writes pending doc immediately; flush with nothing pending is a no-op', () => {
     const file = path.join(dir, 'b.json');
-    const saver = createAutosaver({
-      filePath: file,
-      debounceMs: 60_000,
-      serialize: () => '{"x":1}',
-    });
+    const saver = createAutosaver({ filePath: file, debounceMs: 60_000, serialize: () => '{"x":1}' });
     saver.flush();
     expect(fs.existsSync(file)).toBe(false);
     saver.schedule(createEmptyDocument());
@@ -226,10 +222,10 @@ describe('shutdown helpers', () => {
     const end = vi.fn();
     const fakeRes = { write: vi.fn(), end } as unknown as Parameters<typeof subscribeLive>[0];
     subscribeLive(fakeRes);
-    expect(_subscriberCount()).toBe(1);
+    expect(liveSubscriberCount()).toBe(1);
     closeAllSubscribers();
     expect(end).toHaveBeenCalled();
-    expect(_subscriberCount()).toBe(0);
+    expect(liveSubscriberCount()).toBe(0);
   });
 
   it('closeAllSessions leaves no sessions', async () => {

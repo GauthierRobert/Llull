@@ -1,7 +1,4 @@
-/**
- * Evaluation of industrial elements: steel members, footings, cladding panels, equipment, pipes,
- * cable trays.
- */
+/** Evaluation of industrial elements: steel members, footings, cladding panels, equipment, pipes, cable trays. */
 
 import type { CadDocument, Entity, SphereEntity, Vec2, Vec3 } from '@core/model/types';
 import type {
@@ -23,14 +20,9 @@ import { cross3, dot3, sub3 } from '@lib/vec3';
 import { normalize } from '../shared/vec3';
 import { shapeOf } from './equipment/equipmentShape';
 
+// prettier-ignore
 const ROLE_LABEL: Readonly<Record<MemberRole, string>> = {
-  column: 'Column',
-  rafter: 'Rafter',
-  beam: 'Beam',
-  brace: 'Brace',
-  purlin: 'Purlin',
-  rail: 'Side rail',
-  crane: 'Crane beam',
+  column: 'Column', rafter: 'Rafter', beam: 'Beam', brace: 'Brace', purlin: 'Purlin', rail: 'Side rail', crane: 'Crane beam',
 };
 
 /** World position of a level-relative point. */
@@ -47,11 +39,7 @@ export function evaluateMember(doc: CadDocument, member: SteelMemberElement, lev
   return [
     meshEntity(
       member,
-      {
-        part: 'body',
-        label: `${ROLE_LABEL[member.role]} ${member.mark} ${profile.name}`,
-        layer: MEMBER_LAYER[member.role].name,
-      },
+      { part: 'body', label: `${ROLE_LABEL[member.role]} ${member.mark} ${profile.name}`, layer: MEMBER_LAYER[member.role].name },
       mesh,
       colorForMaterial(member.material, '#6e8296'),
     ),
@@ -84,12 +72,7 @@ export function polygonNormal(points: ReadonlyArray<Vec3>): Vec3 {
 }
 
 /** Local plane frame of a panel: origin, in-plane axes (e1, e2) and unit normal. */
-export function panelFrame(corners: ReadonlyArray<Vec3>): {
-  origin: Vec3;
-  e1: Vec3;
-  e2: Vec3;
-  normal: Vec3;
-} | null {
+export function panelFrame(corners: ReadonlyArray<Vec3>): { origin: Vec3; e1: Vec3; e2: Vec3; normal: Vec3 } | null {
   const normalVector = polygonNormal(corners);
   if (Math.hypot(...normalVector) < 1e-9 || corners.length < 3) return null;
   const normal = normalize(normalVector);
@@ -127,8 +110,8 @@ const VESSEL_SEGMENTS = 40;
 const EQUIPMENT_COLOR = '#c27c2c';
 
 /**
- * @invariant box -> oriented box; vessels -> watertight cylinder mesh inscribed in `size`
- * (vertical: axis +Z from the level; horizontal: axis along local x at mid-height, bottom on the level)
+ * @invariant box -> oriented box; vessels -> watertight cylinder mesh inscribed in `size` (vertical: axis +Z from the level; horizontal:
+ * axis along local x at mid-height, bottom on the level)
  */
 export function evaluateEquipment(equipment: EquipmentElement, level: BuildingLevel): Entity[] {
   const [length, width, height] = equipment.size;

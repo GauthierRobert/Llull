@@ -6,21 +6,14 @@ import { newEntity } from '../entity/newEntity';
 import { MAX_GEAR_TEETH } from '../limits';
 
 /** Euler rotation taking the local +Z gear axis to the world axis. */
-export const AXIS_ROTATION: Readonly<Record<'x' | 'y' | 'z', Vec3>> = {
-  x: [0, Math.PI / 2, 0],
-  y: [-Math.PI / 2, 0, 0],
-  z: [0, 0, 0],
-};
+export const AXIS_ROTATION: Readonly<Record<'x' | 'y' | 'z', Vec3>> = { x: [0, Math.PI / 2, 0], y: [-Math.PI / 2, 0, 0], z: [0, 0, 0] };
 
 /** Why `mod` is not a usable gear module, or `null` when it is. */
 export function moduleProblem(mod: number): string | null {
   return mod > 0 && Number.isFinite(mod) ? null : `module must be finite and > 0, got ${String(mod)}.`;
 }
 
-/**
- * Why `count` (a tooth count named `label`) is not an integer in [`min`, MAX_GEAR_TEETH], or `null`
- * when it is; `shown` (default `count`) is the value quoted in the message.
- */
+/** Why tooth count `count` (named `label`) is not an integer in [`min`, MAX_GEAR_TEETH], else null; `shown` is the value quoted. */
 export function teethCountProblem(label: string, count: number, min: number, shown: unknown = count): string | null {
   return Number.isInteger(count) && count >= min && count <= MAX_GEAR_TEETH
     ? null
@@ -32,22 +25,15 @@ export function pressureAngleProblem(pressureAngle: number): string | null {
   return pressureAngle > 0 && pressureAngle < Math.PI / 2 ? null : `pressureAngle must be in (0, π/2), got ${String(pressureAngle)}.`;
 }
 
-/** Why `faceWidth` is not a usable gear face width, or `null` when it is. */
-function faceWidthProblem(faceWidth: number): string | null {
-  return faceWidth > 0 && Number.isFinite(faceWidth) ? null : `faceWidth must be finite and > 0, got ${String(faceWidth)}.`;
-}
-
-/** First of `pressureAngleProblem` / `faceWidthProblem` that fails, or `null` when both pass. */
+/** First failing check of `pressureAngle` then `faceWidth`, or `null` when both pass. */
 export function toothShapeProblem(pressureAngle: number, faceWidth: number): string | null {
-  return pressureAngleProblem(pressureAngle) ?? faceWidthProblem(faceWidth);
+  return (
+    pressureAngleProblem(pressureAngle) ??
+    (faceWidth > 0 && Number.isFinite(faceWidth) ? null : `faceWidth must be finite and > 0, got ${String(faceWidth)}.`)
+  );
 }
 
-/** Local-frame mesh → world-space `mesh` entity (position/rotation baked, entity transform identity). */
-export function meshGearEntity(id: string, mesh: MeshData, color: string, name: string | undefined): Entity {
-  return newEntity('mesh', id, { mesh }, [0, 0, 0], color, { name });
-}
-
-/** Bakes `position` + extrinsic-XYZ `rotation` into the local mesh and wraps it as an entity. */
+/** Bakes `position` + extrinsic-XYZ `rotation` into the local mesh → world-space `mesh` entity (entity transform identity). */
 export function placedMeshEntity(
   id: string,
   local: MeshData,
@@ -56,5 +42,5 @@ export function placedMeshEntity(
   color: string,
   name: string | undefined,
 ): Entity {
-  return meshGearEntity(id, placeMesh(local, position, rotation), color, name);
+  return newEntity('mesh', id, { mesh: placeMesh(local, position, rotation) }, [0, 0, 0], color, { name });
 }

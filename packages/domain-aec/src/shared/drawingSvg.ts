@@ -1,6 +1,6 @@
 /**
- * The one SVG painter of technical-drawing primitives on a sheet (plans, elevations, sections,
- * anchor plans): ISO line weights and patterns come from the sheet style classes (`sheetFrame`).
+ * The one SVG painter of technical-drawing primitives on a sheet (plans, elevations, sections, anchor plans): ISO line weights and patterns
+ * come from the sheet style classes (`sheetFrame`).
  */
 
 import { clamp } from '@lib/clamp';
@@ -9,7 +9,6 @@ import type { Vec2 } from '@core/model/types';
 import type { DrawingFill, DrawingPrimitive } from '@core/model/drawing';
 import { n, readableDimensionLabel, svgPoints, svgText } from './sheetFrame';
 
-/** Sheet style class of a line type. */
 function classOf(style: DrawingPrimitive['style']): string {
   switch (style) {
     case 'cut':
@@ -34,8 +33,8 @@ export const svgLine = (a: Vec2, b: Vec2, cssClass: string): string =>
   `<line x1="${n(a[0])}" y1="${n(a[1])}" x2="${n(b[0])}" y2="${n(b[1])}" class="${cssClass}"/>`;
 
 /**
- * Aligned dimension between paper points `a`, `b`: extension lines, the dimension line `side`
- * paper mm off a→b (positive = left of a→b on paper), oblique ticks and a readable label.
+ * Aligned dimension between paper points `a`, `b`: extension lines, the dimension line `side` paper mm off a→b (positive = left of a→b on
+ * paper), oblique ticks and a readable label.
  */
 export function paperDimension(a: Vec2, b: Vec2, side: number, label: string, textSize: number): string[] {
   const dx = b[0] - a[0];

@@ -1,7 +1,4 @@
-/**
- * Keeps annotation text readable when zoomed out: scales the referenced object (per frame, no
- * React state) so text of `worldHeight` never appears smaller than `minPixels` on screen.
- */
+// Scales an object per frame so text of `worldHeight` never appears below `minPixels` when zoomed out.
 
 import type { RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';

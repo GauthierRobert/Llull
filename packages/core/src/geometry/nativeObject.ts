@@ -15,8 +15,7 @@ export function release(native: NativeObject | null): void {
 }
 
 /**
- * Run `body` with an `own` registrar and release every native it registered afterwards. A throw
- * is reported to `onError` and maps to null.
+ * Run `body` with an `own` registrar and release every native it registered afterwards. A throw is reported to `onError` and maps to null.
  */
 export function withOwned<N extends NativeObject, T>(
   body: (own: <H extends N | null>(native: H) => H) => T | null,

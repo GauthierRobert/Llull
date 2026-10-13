@@ -46,14 +46,7 @@ function gridTwin(building: BuildingModel, start: Vec2, end: Vec2): GridElement 
 }
 
 export function addGrid(building: BuildingModel, label: string, start: Vec2, end: Vec2): BuildingModel {
-  const element: GridElement = {
-    id: nextElementId(building, 'grid'),
-    category: 'grid',
-    mark: label,
-    entityIds: [],
-    start,
-    end,
-  };
+  const element: GridElement = { id: nextElementId(building, 'grid'), category: 'grid', mark: label, entityIds: [], start, end };
   return withElement(building, element);
 }
 
@@ -78,14 +71,10 @@ export const addGridLine = defineCommand({
     const resolvedLabel = label?.trim() || nextFreeLabel(used, true);
     if (used.has(resolvedLabel)) return noop(doc, `add_grid_line failed: grid label "${resolvedLabel}" already exists.`);
     const twin = gridTwin(building, start, end);
-    if (twin) {
-      return noop(doc, `add_grid_line failed: axis ${twin.mark} (${twin.id}) already runs between these points; nothing added.`);
-    }
+    if (twin) return noop(doc, `add_grid_line failed: axis ${twin.mark} (${twin.id}) already runs between these points; nothing added.`);
     const next = addGrid(building, resolvedLabel, start, end);
     const id = next.elementOrder[next.elementOrder.length - 1] as string;
-    return commitBuilding(doc, next, [id], `Added grid axis ${resolvedLabel} (${id}).`, {
-      elementId: id,
-    });
+    return commitBuilding(doc, next, [id], `Added grid axis ${resolvedLabel} (${id}).`, { elementId: id });
   },
 });
 
@@ -98,10 +87,9 @@ const MAX_GRID_BAYS = 100;
 export const addGridSystem = defineCommand({
   name: 'add_grid_system',
   description:
-    'Lay out a rectangular structural grid. Numbered axes 1, 2, 3… run parallel to Y and are spaced ' +
-    'along X by xSpacings; lettered axes A, B, C… (I and O skipped) run parallel to X, spaced along Y ' +
-    'by ySpacings. E.g. xSpacings [6000, 6000] gives axes 1–3 six metres apart. Refused when every axis ' +
-    'of the new grid already exists; otherwise labels continue after the existing ones.',
+    'Lay out a rectangular structural grid. Numbered axes 1, 2, 3… run parallel to Y and are spaced along X by xSpacings; lettered axes ' +
+    'A, B, C… (I and O skipped) run parallel to X, spaced along Y by ySpacings. E.g. xSpacings [6000, 6000] gives axes 1–3 six metres ' +
+    'apart. Refused when every axis of the new grid already exists; otherwise labels continue after the existing ones.',
   params: z.object({
     xSpacings: z.array(z.number()).describe('Bay widths along X between consecutive numbered axes (each > 0, at most 100).'),
     ySpacings: z.array(z.number()).describe('Bay widths along Y between consecutive lettered axes (each > 0, at most 100).'),

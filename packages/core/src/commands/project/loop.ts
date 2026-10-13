@@ -1,8 +1,7 @@
 /**
- * Runner of nestable plan loops (`{ repeat | for, actions }`). A loop that starts a top-level plan
- * item is recorded in featureHistory as ONE `build_project` step holding the loop itself (outer
- * `$alias` refs frozen to ids), so replay re-expands it against the current parameters: changing
- * the loop count or any `=expr` input regenerates the geometry (architecture L8).
+ * Runner of nestable plan loops (`{ repeat | for, actions }`). A loop that starts a top-level plan item is recorded in featureHistory as
+ * ONE `build_project` step holding the loop itself (outer `$alias` refs frozen to ids), so replay re-expands it against the current
+ * parameters: changing the loop count or any `=expr` input regenerates the geometry (architecture L8).
  */
 
 import { stepIdSource } from '../../lib/id';
@@ -60,9 +59,8 @@ function runItem(run: PlanRun, index: number, item: ActionItem, path: string, va
 function runLoopNode(run: PlanRun, index: number, node: LoopNode, path: string, vars: Vars): boolean {
   const header = resolveLoopHeader(node, buildEnv(run.current, vars));
   if (header.error !== null) return failStep(run, index, 'loop', `${path}: ${header.error}`, path);
-  if (run.loopIterations + header.values.length > MAX_LOOP_ITERATIONS) {
+  if (run.loopIterations + header.values.length > MAX_LOOP_ITERATIONS)
     return failStep(run, index, 'loop', `${path}: loops expand to more than MAX_LOOP_ITERATIONS (${MAX_LOOP_ITERATIONS}) iterations`, path);
-  }
   run.loopIterations += header.values.length;
   for (let k = 0; k < header.values.length; k++) {
     const scope = { ...vars, [header.variable]: header.values[k] as number };
@@ -102,7 +100,6 @@ export function runLoopItem(run: PlanRun, index: number, node: LoopNode): boolea
   const path = `step ${index}`;
   const context = currentContext();
   if (context.stepKey !== undefined) return runLoopNode(run, index, node, path, {});
-
   const before = run.current;
   const stepNumber = before.nextStepNumber ?? 1;
   const stepKey = String(stepNumber);
@@ -114,10 +111,7 @@ export function runLoopItem(run: PlanRun, index: number, node: LoopNode): boolea
     const step: FeatureStep = {
       id: `step-${stepKey}`,
       name: 'build_project',
-      params: {
-        actions: [freezeOuterRefs(node, outerBindings)],
-        ...(run.onError === 'continue' ? { onError: 'continue' } : {}),
-      },
+      params: { actions: [freezeOuterRefs(node, outerBindings)], ...(run.onError === 'continue' ? { onError: 'continue' } : {}) },
       suppressed: false,
       affected: run.allAffected.slice(firstAffected),
     };

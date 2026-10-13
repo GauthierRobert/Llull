@@ -12,14 +12,7 @@ import { common, booleanMesh, volume } from './kernelTestSupport';
 
 const sphere = (rotation: Vec3): Entity => ({ id: 's', kind: 'sphere', position: [1, 1, 0], rotation, radius: 3, ...common }) as Entity;
 // Top face at z = 3 touches the sphere (centre z = 0, r = 3) at a single point.
-const tangentBox: Entity = {
-  id: 'b',
-  kind: 'box',
-  position: [2, 1, 1],
-  rotation: [0, 0, 0],
-  size: [5, 3, 4],
-  ...common,
-} as Entity;
+const tangentBox: Entity = { id: 'b', kind: 'box', position: [2, 1, 1], rotation: [0, 0, 0], size: [5, 3, 4], ...common } as Entity;
 
 describe.each([
   ['axis-aligned', [0, 0, 0]],

@@ -13,11 +13,7 @@ import { arcPoints, curvedWallArc, curvedWallBand } from '../../building/geometr
 import { supportShape } from '../piping/supportParts';
 
 /** Oriented box: centre, orthonormal axes and half sizes along them. */
-export interface OrientedBox {
-  readonly center: Vec3;
-  readonly axes: readonly [Vec3, Vec3, Vec3];
-  readonly half: Vec3;
-}
+export type OrientedBox = { readonly center: Vec3; readonly axes: readonly [Vec3, Vec3, Vec3]; readonly half: Vec3 };
 
 /** Penetration depth of two oriented boxes along their best separating axis (≤ 0 when apart). */
 export function boxOverlap(a: OrientedBox, b: OrientedBox): number {
@@ -59,11 +55,7 @@ function polylineBoxes(level: BuildingLevel, points: ReadonlyArray<Vec3>, halfWi
     const end = atLevel(level, points[index + 1] as Vec3);
     const frame = sweepFrame(start, end);
     if (!frame) continue;
-    boxes.push({
-      center: midpoint(start, end),
-      axes: [frame.u, frame.v, frame.d],
-      half: [halfWidth, halfDepth, frame.length / 2],
-    });
+    boxes.push({ center: midpoint(start, end), axes: [frame.u, frame.v, frame.d], half: [halfWidth, halfDepth, frame.length / 2] });
   }
   return boxes;
 }
@@ -138,22 +130,10 @@ export function elementBoxes(doc: CadDocument, building: BuildingModel, element:
       return element.entityIds.flatMap((id) => {
         const entity = doc.entities[id];
         if (entity?.kind === 'box') {
-          return [
-            {
-              center: entity.position,
-              axes: zRotated(entity.rotation[2]),
-              half: scale3(entity.size, 0.5),
-            },
-          ];
+          return [{ center: entity.position, axes: zRotated(entity.rotation[2]), half: scale3(entity.size, 0.5) }];
         }
         if (entity?.kind === 'cylinder') {
-          return [
-            {
-              center: entity.position,
-              axes: zRotated(0),
-              half: [entity.radius, entity.radius, entity.height / 2] as Vec3,
-            },
-          ];
+          return [{ center: entity.position, axes: zRotated(0), half: [entity.radius, entity.radius, entity.height / 2] as Vec3 }];
         }
         return [];
       });
