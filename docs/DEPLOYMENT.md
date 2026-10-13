@@ -24,9 +24,9 @@ Set in a `.env` next to `docker-compose.yml`:
 Every other server variable (rate limits, session caps, timeouts, Python bridge, kernel) is listed
 in [server/README.md](../server/README.md#environment-variables).
 
-The image ships no Python/CadQuery (`LLULL_PYTHON=off`): STEP export/import and CadQuery code
-exchange answer "disabled". Use the desktop app for STEP, or extend the image with a CadQuery
-Python and set `LLULL_PYTHON`. Never build a public image with `VITE_LLULL_API_TOKEN`: it is baked
+The image ships no Python/CadQuery (`LLULL_PYTHON=off`): STEP import and CadQuery code exchange
+answer "disabled". STEP export still works with `LLULL_KERNEL=occt` (OpenCascade writes it). For
+STEP import use the desktop app, or extend the image with a CadQuery Python and set `LLULL_PYTHON`. Never build a public image with `VITE_LLULL_API_TOKEN`: it is baked
 into the JavaScript every visitor downloads.
 
 Without Docker: `npm ci && npm --prefix server ci && npm run build && npm --prefix server run build`,
@@ -52,7 +52,7 @@ the file is re-read on change). To revoke or rotate, delete the entry and add th
 | `editor` | + `/command`, `/undo`, `/redo`, `/import/*`, every MCP tool                           |
 | `admin`  | + `/admin/users`, `/admin/audit`, `/admin/license`                                    |
 
-Tokens are sent as `Authorization: Bearer <token>` (MCP agents, scripts) or `?access_token=` (SSE).
+Tokens are sent as `Authorization: Bearer <token>` (MCP agents, scripts) or, for the SSE stream, a single-use 30 s `?ticket=` minted by `POST /live/ticket` (header auth). `?access_token=` in a URL is deprecated: it ends up in proxy/access logs and browser history.
 Browser users open the app once at `https://cad.example.com/#token=<their token>`; it is kept in
 `localStorage` and the fragment is removed. Unknown token: 401. Role too low: 403.
 Named-user mode supersedes `MCP_AUTH_TOKEN`.
@@ -106,7 +106,7 @@ Set `LLULL_PUBLIC_URL=https://cad.example.com` and `LLULL_ALLOWED_HOSTS=cad.exam
 
 The image builds LibreDWG's `dwg2dxf` from a pinned GNU release (`LIBREDWG_VERSION`, default
 0.14 — Debian stable does not package LibreDWG, and Debian's tracker lists CVEs up to 0.13.4).
-Verify the download by passing the published checksum:
+The download is verified against its GNU signature (`gnu-keyring.gpg`); pin the exact bytes too with the published checksum:
 `docker build --build-arg LIBREDWG_SHA256=<sha256 from ftp.gnu.org/gnu/libredwg> …`. Build without
 DWG support with `--build-arg WITH_DWG=0`. Check with `docker compose exec llull dwg2dxf --version`.
 Alternatives: mount the ODA File Converter and set `LLULL_ODA_CONVERTER=<executable>`, or set
