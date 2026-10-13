@@ -18,6 +18,9 @@ services:
       # Host header(s) accepted behind the proxy, e.g. cad.example.com
       LLULL_ALLOWED_HOSTS: ${LLULL_ALLOWED_HOSTS:-localhost}
       LLULL_TOOLSETS: ${LLULL_TOOLSETS:-core}
+      # Reverse-proxy hops to trust for the client IP (per-client rate limits). The container is
+      # published on loopback only, so the one hop in front is your TLS proxy.
+      LLULL_TRUST_PROXY: ${LLULL_TRUST_PROXY:-1}
       # License verification (PEM from `license.mjs keygen`, one line with \n escapes).
       LLULL_LICENSE_PUBLIC_KEY: ${LLULL_LICENSE_PUBLIC_KEY:-}
       LLULL_AUDIT_MAX_BYTES: ${LLULL_AUDIT_MAX_BYTES:-10485760}

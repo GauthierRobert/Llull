@@ -1,11 +1,11 @@
 /** Per-user audit trail: JSONL lines (REST + MCP + undo), params hashed, rotation, admin query. */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import request from 'supertest';
 import fs from 'fs';
 import path from 'path';
 import { app } from '../src/index';
 import { applyCommand } from '../src/commandBus';
-import { appendAudit, type AuditEntry } from '../src/audit';
+import { appendAudit, readAudit, type AuditEntry } from '../src/audit';
 import { ADMIN, EDITOR, VIEWER, bearer, sha256, withUserFixture } from './userTestSupport';
 import { mcpRequest } from './mcpTestSupport';
 
@@ -110,6 +110,18 @@ describe('audit trail', () => {
     expect(fs.existsSync(`${auditFile}.3`)).toBe(false);
     expect(fs.statSync(auditFile).size).toBeLessThanOrEqual(600);
     expect(lines().at(-1)?.command).toBe('c11');
+  });
+});
+
+describe('readAudit', () => {
+  it('reads asynchronously (no readFileSync on the request path) across rotated files, oldest first', async () => {
+    fs.writeFileSync(`${auditFile}.1`, `${JSON.stringify({ ts: '2020-01-01T00:00:00Z', userId: 'u', command: 'old' })}\ntorn{\n`);
+    fs.writeFileSync(auditFile, `${JSON.stringify({ ts: '2021-01-01T00:00:00Z', userId: 'u', command: 'new' })}\n`);
+    const sync = vi.spyOn(fs, 'readFileSync');
+    const entries = await readAudit({ limit: 10 });
+    expect(sync).not.toHaveBeenCalled();
+    expect(entries.map((e) => e.command)).toEqual(['old', 'new']);
+    sync.mockRestore();
   });
 });
 

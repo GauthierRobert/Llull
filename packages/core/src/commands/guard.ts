@@ -1,6 +1,7 @@
 /** The safety wrapper `execute` sees around every registered command. */
 
 import type { CommandDefinition, CommandResult, ParamsSchema } from './types';
+import { isReservedKey } from '../lib/reservedKey';
 import { formatIssues } from './schema';
 import { derivationViolation } from './derivation';
 import { pluginGuards } from '../plugins/host';
@@ -36,7 +37,7 @@ const ID_LIKE_KEY = /^id$|Ids?$|^ids$/;
  * lookups. Free text (names, content) is never scanned.
  */
 function hasPrototypeIdKey(value: unknown, keyHint = '', depth = 0): boolean {
-  if (typeof value === 'string') return ID_LIKE_KEY.test(keyHint) && value in Object.prototype;
+  if (typeof value === 'string') return ID_LIKE_KEY.test(keyHint) && isReservedKey(value);
   if (typeof value !== 'object' || value === null || depth > 8) return false;
   if (Array.isArray(value)) return value.some((v) => hasPrototypeIdKey(v, keyHint, depth + 1));
   return Object.entries(value).some(([k, v]) => hasPrototypeIdKey(v, k, depth + 1));
@@ -60,7 +61,7 @@ function warnAndDescribe(message: string, error: unknown): string {
   return errorMessage(error);
 }
 
-function corruptionReason(entity: unknown): string | null {
+export function corruptionReason(entity: unknown): string | null {
   if (containsNonFinite(entity)) return 'non-finite numbers (NaN/Infinity/undefined components)';
   if (hasMalformedPosition(entity)) return 'a malformed position (must be a 3-number [x, y, z])';
   return null;

@@ -8,6 +8,7 @@
 import { type CadDocument, type Material, type MaterialFinish, FINISH_PATTERNS } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
+import { isReservedKey } from '../../lib/reservedKey';
 import { isHexColor } from '../../lib/isHexColor';
 import { changed, noop, report } from '../noop';
 
@@ -96,6 +97,11 @@ export const createMaterial = defineCommand({
     { name, density, color, metalness, roughness, finish: pattern, finishScale: requestedScale, color2, normalStrength, clearcoat },
   ): CommandResult => {
     if (name.trim() === '') return noop(doc, 'create_material failed: name must be a non-empty string.');
+    if (isReservedKey(name))
+      return noop(
+        doc,
+        `create_material failed: name '${name}' is a reserved JavaScript property name (constructor, toString, __proto__, ...); choose another.`,
+      );
     if (density <= 0) return noop(doc, `create_material '${name}' failed: density must be a finite number > 0, got ${String(density)}.`);
     for (const [field, value] of [
       ['metalness', metalness],
@@ -123,7 +129,7 @@ export const createMaterial = defineCommand({
           };
     const material: Material = { name, density, color, metalness, roughness, ...(finish !== undefined ? { finish } : {}) };
     const newDoc: CadDocument = { ...doc, materials: { ...doc.materials, [name]: material } };
-    const action = doc.materials[name] ? 'replaced' : 'created';
+    const action = Object.hasOwn(doc.materials, name) ? 'replaced' : 'created';
     return report(
       newDoc,
       `create_material '${name}': ${action} (density=${density} g/${doc.units}³, color=${color}, metalness=${metalness}, roughness=${roughness}${finish !== undefined ? `, finish=${finish.pattern} every ${finish.scale} ${doc.units}` : ''}).`,

@@ -4,6 +4,8 @@ import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { UNAUTHORIZED_BODY, bearerToken, isUserMode, requireRole, sha256Digest, type Role } from './users';
 import { positiveInteger } from './env';
+import { consumeTicket } from './tickets';
+import { warnQueryTokenOnce } from './queryTokenWarning';
 
 const DEFAULT_ALLOWED_ORIGINS: readonly string[] = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'];
 
@@ -33,7 +35,9 @@ export function hasValidBearer(req: Request, token: string): boolean {
 /** Constant-time check of the `?access_token=` query parameter (EventSource cannot set headers). */
 function hasValidAccessToken(req: Request, token: string): boolean {
   const presented = req.query['access_token'];
-  return typeof presented === 'string' && presented.length > 0 && tokensMatch(presented, token);
+  if (typeof presented !== 'string' || presented.length === 0) return false;
+  warnQueryTokenOnce();
+  return tokensMatch(presented, token);
 }
 
 /** True for 127.0.0.0/8, ::1, ::ffff:127.*, and `localhost`. */
@@ -103,9 +107,28 @@ export function guardMutation(): RequestHandler {
   return buildGuard(false, 'editor');
 }
 
-/** Guard for /live, /live/snapshot, /export/*: `guardMutation` policy + `?access_token=` (EventSource); no token -> open. */
+/**
+ * Guard for /live, /live/snapshot, /export/*: `guardMutation` policy + deprecated `?access_token=`; no token -> open.
+ * `GET /live` (EventSource cannot send headers) also takes a single-use `?ticket=` (see tickets.ts); a request
+ * carrying an Authorization header is judged by that header alone.
+ */
 export function guardRead(): RequestHandler {
-  return buildGuard(true, 'viewer');
+  const inner = buildGuard(true, 'viewer');
+  return (req, res, next) => {
+    const presented = req.query['ticket'];
+    const isLiveStream = req.method === 'GET' && req.baseUrl + req.path === '/live';
+    if (typeof presented !== 'string' || presented === '' || !isLiveStream || req.headers.authorization !== undefined)
+      return inner(req, res, next);
+    const redeemed = consumeTicket(presented);
+    if (redeemed === null) return void res.status(401).json(UNAUTHORIZED_BODY);
+    if (redeemed.user !== undefined) res.locals['llullUser'] = redeemed.user;
+    next();
+  };
+}
+
+/** Guard for `POST /live/ticket`: viewer role, header auth ONLY (never a query token or a ticket). */
+export function guardTicketIssue(): RequestHandler {
+  return buildGuard(false, 'viewer');
 }
 
 /** Guard for `/admin/*`: role `admin` (named users), the shared token, or (no token) loopback peers only. */
@@ -130,7 +153,9 @@ function buildGuard(acceptQueryToken: boolean, role: Role): RequestHandler {
   return userRoleOr(role, acceptQueryToken, (req, res, next) => {
     const token = process.env['MCP_AUTH_TOKEN'];
     if (!token && acceptQueryToken) {
-      next();
+      const refusal = crossSiteRefusal(req);
+      if (refusal === null) next();
+      else res.status(403).json({ error: refusal });
       return;
     }
     if (token && (hasValidBearer(req, token) || (acceptQueryToken && hasValidAccessToken(req, token)))) {
@@ -152,6 +177,64 @@ function buildGuard(acceptQueryToken: boolean, role: Role): RequestHandler {
     }
     next();
   });
+}
+
+/** Why a token-less read request must be refused as cross-site (CSRF of CPU-heavy exports), else null. */
+function crossSiteRefusal(req: Request): string | null {
+  const origin = req.headers['origin'];
+  if (typeof origin === 'string') {
+    if (getAllowedOrigins().includes(origin) || isSameHostOrigin(origin, req.headers['host'])) return null;
+    return `Origin ${origin} is not allowed.`;
+  }
+  return req.headers['sec-fetch-site'] === 'cross-site' ? 'Cross-site requests are not allowed.' : null;
+}
+
+function isSameHostOrigin(origin: string, host: string | undefined): boolean {
+  try {
+    return host !== undefined && new URL(origin).host.toLowerCase() === host.trim().toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
+/** `LLULL_TRUST_PROXY` -> Express `trust proxy` value (`true`/`false`, hop count, or a name/subnet list); undefined when unset. */
+export function trustProxySetting(raw: string | undefined): boolean | number | string | undefined {
+  const value = raw?.trim();
+  if (value === undefined || value === '') return undefined;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return /^\d+$/.test(value) ? Number(value) : value;
+}
+
+/** CSP for the served web app (wasm kernels, blob workers/images; connect-src = same origin + allowed origins). */
+export function contentSecurityPolicy(): string {
+  return [
+    "default-src 'self'",
+    "script-src 'self' 'wasm-unsafe-eval'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    ['connect-src', "'self'", ...getAllowedOrigins()].join(' '),
+    "worker-src 'self' blob:",
+    "frame-ancestors 'none'",
+    "object-src 'none'",
+    "base-uri 'self'",
+  ].join('; ');
+}
+
+/** Set the CSP on an HTML response (static `index.html` and the SPA fallback). */
+export function setHtmlSecurityHeaders(res: Response): void {
+  res.setHeader('Content-Security-Policy', contentSecurityPolicy());
+}
+
+/** Baseline hardening headers on every response. */
+export function securityHeaders(): RequestHandler {
+  return (_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    next();
+  };
 }
 
 /** Per-IP limiter: env `maxVariable` requests (default 600) per env `windowVariable` ms (default 60000). */

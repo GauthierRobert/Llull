@@ -9,6 +9,7 @@ import { isRecord } from '@lib/isRecord';
 import { errorMessage } from '@lib/errorMessage';
 import { nonEmptyString } from '@lib/nonEmptyString';
 import { getLicense } from './license';
+import { warnQueryTokenOnce } from './queryTokenWarning';
 
 export type Role = 'viewer' | 'editor' | 'admin';
 const ROLE_RANK: Readonly<Record<Role, number>> = { viewer: 1, editor: 2, admin: 3 };
@@ -99,8 +100,13 @@ export function bearerToken(req: Request): string | undefined {
 }
 
 /** Bearer token, or (when `allowQuery`) `?access_token=` for EventSource / downloads. */
-const presentedToken = (req: Request, allowQuery: boolean): string | undefined =>
-  bearerToken(req) ?? (allowQuery ? nonEmptyString(req.query['access_token']) : undefined);
+function presentedToken(req: Request, allowQuery: boolean): string | undefined {
+  const bearer = bearerToken(req);
+  if (bearer !== undefined || !allowQuery) return bearer;
+  const query = nonEmptyString(req.query['access_token']);
+  if (query !== undefined) warnQueryTokenOnce();
+  return query;
+}
 
 /** The authenticated user of this request (set by `requireRole`), if any. */
 export function requestUser(res: Response): NamedUser | undefined {

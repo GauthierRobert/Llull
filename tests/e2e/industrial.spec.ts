@@ -87,8 +87,8 @@ test.describe('industrial workflow', () => {
     await page.getByRole('checkbox', { name: 'Hide cladding' }).check();
     const section = await downloadText(page, () => page.getByRole('button', { name: 'Section sheet' }).click());
     expect(section.text).toContain('Section at x = 12000, viewed from east');
-    expect(section.text).toContain('class="section"');
-    await expect(page.getByTestId('building-export-status')).toContainText('visible face');
+    expect(section.text).toMatch(/class="cut(-hatch)?"/);
+    await expect(page.getByTestId('building-export-status')).toContainText('cut face');
   });
   test('I11–I16 — multi-span hall, base plates, cable tray, curved wall, hatched DXF', async ({ page }) => {
     await openBuilding(page);
@@ -107,7 +107,8 @@ test.describe('industrial workflow', () => {
     await page.getByLabel('Elevation direction').selectOption('south');
     await page.getByLabel('Section cut position').fill('12000');
     const section = await downloadText(page, () => page.getByRole('button', { name: 'Section sheet' }).click());
-    expect(section.text).toContain('class="poche-steel"');
+    // Steel cut faces are filled solid (class "cut").
+    expect(section.text).toContain('class="cut"');
     const ifc = await downloadText(page, () => page.getByRole('button', { name: 'IFC (BIM)' }).click());
     for (const entity of ['IFCCABLECARRIERSEGMENT(', 'IFCPLATE(', 'IFCMECHANICALFASTENER(']) {
       expect(ifc.text).toContain(entity);

@@ -92,6 +92,14 @@ describe('UpdateBanner + appUpdates', () => {
     first.applyAppUpdate();
     expect(firstWorker.postMessage).not.toHaveBeenCalled();
   });
+  it('does not reload when the first-ever visit gets its worker claimed', async () => {
+    const { registerAppServiceWorker } = await load();
+    const { container } = fakeContainer(null, false);
+    const reload = vi.fn();
+    await registerAppServiceWorker(container, reload);
+    container.dispatchEvent(new Event('controllerchange'));
+    expect(reload).not.toHaveBeenCalled();
+  });
   it('checks for updates every hour until stopped', async () => {
     vi.useFakeTimers();
     const { registerAppServiceWorker } = await load();

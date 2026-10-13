@@ -73,7 +73,11 @@ function rotate(file: string, keep: number): void {
   fs.renameSync(file, `${file}.1`);
 }
 
-/** Append one line (rotating first when it would exceed the size cap). Never throws. */
+/**
+ * Append one line (rotating first when it would exceed the size cap). Never throws.
+ * @invariant synchronous on purpose: the line exists, in order, before the command is acknowledged, so a crash can never
+ * leave an acknowledged mutation unaudited (an async queue would). Cost ~30 µs per mutating command (page-cache append).
+ */
 export function appendAudit(entry: AuditEntry): void {
   const file = auditFilePath(defaultDirectory);
   if (file === null) return;
@@ -96,8 +100,8 @@ interface AuditQuery {
   readonly limit: number;
 }
 
-/** Newest-last entries matching the query, across rotated files (oldest file first). */
-export function readAudit(query: AuditQuery): AuditEntry[] {
+/** Newest-last entries matching the query, across rotated files (oldest file first). Async reads: never blocks the event loop on I/O. */
+export async function readAudit(query: AuditQuery): Promise<AuditEntry[]> {
   const file = auditFilePath(defaultDirectory);
   if (file === null) return [];
   const sinceMs = query.since === undefined ? -Infinity : Date.parse(query.since);
@@ -107,7 +111,7 @@ export function readAudit(query: AuditQuery): AuditEntry[] {
   for (const candidate of files) {
     let text = '';
     try {
-      text = fs.readFileSync(candidate, 'utf8');
+      text = await fs.promises.readFile(candidate, 'utf8');
     } catch {
       /* not rotated yet */
     }

@@ -8,7 +8,7 @@ import { Router, type RequestHandler } from 'express';
 import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
 import { runLiveExchangeTool } from './liveExchange';
-import type { ExchangeOptions } from './pythonExchange';
+import { PYTHON_BUSY_MESSAGE, type ExchangeOptions } from './pythonExchange';
 import { guardMutation } from './security';
 import { actorOf } from './audit';
 
@@ -28,7 +28,7 @@ export function buildExchangeRouter(restLimiter: RequestHandler, exchange: Excha
           res.status(404).json({ error: `"${name}" is not an exchange tool; use POST /command.` });
           return;
         }
-        res.status(200).json(outcome);
+        res.status(outcome.isError && outcome.summary.includes(PYTHON_BUSY_MESSAGE) ? 503 : 200).json(outcome);
       })
       .catch((error: unknown) => {
         res.status(500).json({ error: errorMessage(error) });

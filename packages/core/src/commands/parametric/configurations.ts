@@ -3,6 +3,7 @@
  */
 
 import type { CadDocument, Configuration } from '../../model/types';
+import { isReservedKey } from '../../lib/reservedKey';
 import { kernelRefusal } from '../kernelRefusal';
 import { currentContext } from '../context';
 import type { CommandResult } from '../types';
@@ -46,6 +47,12 @@ export const createConfiguration = defineCommand({
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, { name, parameterValues }): CommandResult => {
     if (name.trim() === '') return noop(doc, 'create_configuration failed: name must be a non-empty string.');
+    const reserved = [name, ...Object.keys(parameterValues)].find(isReservedKey);
+    if (reserved !== undefined)
+      return noop(
+        doc,
+        `create_configuration failed: '${reserved}' is a reserved JavaScript property name (constructor, toString, __proto__, ...); choose another.`,
+      );
     const expressions: Record<string, string> = {};
     for (const [k, v] of Object.entries(parameterValues)) {
       if (typeof v === 'string') expressions[k] = v;

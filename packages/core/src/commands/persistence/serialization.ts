@@ -60,18 +60,28 @@ const STEP_ID = /^step-(\d+)$/;
  */
 function withSafeStepCounter(raw: Record<string, unknown>): Record<string, unknown> {
   let highest = 0;
+  const noteStepNumber = (digits: string | undefined, what: string): void => {
+    if (digits === undefined) return;
+    const n = Number(digits);
+    if (!Number.isSafeInteger(n)) throw new Error(`load_document: ${what} has a step number that is not a safe integer.`);
+    // `-0.<n>` is a legal user-chosen id suffix: it can never collide with a step-minted id (steps start at 1)
+    if (n >= 1) highest = Math.max(highest, n);
+  };
   // Entries are not validated yet: skip anything that is not a record with a string id so the value validation below reports
   // "featureHistory[i] is malformed" instead of a TypeError.
   const steps: unknown[] = Array.isArray(raw['featureHistory']) ? raw['featureHistory'] : [];
   for (const step of steps) {
     if (!isRecord(step) || typeof step['id'] !== 'string') continue;
-    highest = Math.max(highest, Number(STEP_ID.exec(step['id'])?.[1] ?? 0));
+    noteStepNumber(STEP_ID.exec(step['id'])?.[1], `history step '${step['id']}'`);
   }
   for (const id of Object.keys(isRecord(raw['entities']) ? raw['entities'] : {}))
-    highest = Math.max(highest, Number(STEP_SCOPED_ID.exec(id)?.[1] ?? 0));
-  const stored = typeof raw['nextStepNumber'] === 'number' ? raw['nextStepNumber'] : 1;
-  const next = Math.max(stored, highest + 1);
-  return next === 1 && raw['nextStepNumber'] === undefined ? raw : { ...raw, nextStepNumber: next };
+    noteStepNumber(STEP_SCOPED_ID.exec(id)?.[1], `entity id '${id}'`);
+  const stored = raw['nextStepNumber'];
+  if (stored !== undefined && (typeof stored !== 'number' || !Number.isSafeInteger(stored) || stored < 1))
+    throw new Error(`load_document: nextStepNumber must be a safe integer >= 1, got ${String(stored)}.`);
+  const next = Math.max(stored ?? 1, highest + 1);
+  if (!Number.isSafeInteger(next)) throw new Error('load_document: nextStepNumber would exceed the safe integer range.');
+  return next === 1 && stored === undefined ? raw : { ...raw, nextStepNumber: next };
 }
 
 /** Re-derive geometry the file omitted, via every installed plugin's document extension. */
@@ -97,6 +107,20 @@ const COLLECTION_DEFAULTS: ReadonlyArray<readonly [string, 'record' | 'array']> 
   ['driveRelationOrder', 'array'],
 ];
 
+/** `layerOrder` without duplicates, with any layer it omits appended (benign drift); ids that are not layers are kept for validation. */
+function repairedLayerOrder(raw: Record<string, unknown>): string[] {
+  const order = [...new Set(raw['layerOrder'] as string[])];
+  const missing = Object.keys(raw['layers'] as Record<string, unknown>).filter((id) => !order.includes(id));
+  return [...order, ...missing];
+}
+
+/** `order` with any entity it omits appended (benign drift; every entity is value-checked regardless of `order`). */
+function repairedOrder(raw: Record<string, unknown>): string[] {
+  const order = raw['order'] as string[];
+  const listed = new Set(order);
+  return [...order, ...Object.keys(raw['entities'] as Record<string, unknown>).filter((id) => !listed.has(id))];
+}
+
 /**
  * Upgrade a raw document object (already shape-validated) to the current schema: the SINGLE place for back-compat defaults. A new optional
  * `CadDocument` field gets its default here.
@@ -113,11 +137,13 @@ function migrate(raw: Record<string, unknown>): Record<string, unknown> {
       return [key, shape === 'record' ? (isRecord(value) ? value : {}) : Array.isArray(value) ? value : []];
     }),
   );
-  return { ...raw, units, displayPrecision, ...collections };
+  return { ...raw, units, displayPrecision, order: repairedOrder(raw), layerOrder: repairedLayerOrder(raw), ...collections };
 }
 
 /**
  * Parse and validate a `serializeDocument` string (old files gain defaults via `migrate()`).
+ * @invariant every document a registered command produced reloads and re-serializes equal (tests/unit/persistenceRoundTrip.test.ts); the
+ *   feature-history command-name check is skipped while the command table is empty (registry not imported)
  * @failure throws an Error naming the failing field (bad JSON, format, version, structure, values); `load_document` turns it into a no-op
  *   summary
  */

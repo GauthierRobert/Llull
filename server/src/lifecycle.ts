@@ -5,6 +5,7 @@ import type { Express } from 'express';
 import { installGeometryKernel } from './geometryKernel';
 import { flushAutosave, stopAutosave, closeAllSubscribers } from './liveDocument';
 import { closeAllSessions } from './mcp/sessions';
+import { killAllChildren } from './childProcesses';
 import { checkBindSafety, isLoopbackAddress } from './security';
 
 const SESSION_CLOSE_TIMEOUT_MS = 3_000;
@@ -18,6 +19,7 @@ const delay = (ms: number): Promise<void> => new Promise<void>((resolve) => setT
  */
 async function shutdown(server: Server): Promise<void> {
   stopAutosave();
+  killAllChildren();
   const closed = new Promise<void>((resolve) => server.close(() => resolve()));
   closeAllSubscribers();
   await Promise.race([closeAllSessions(), delay(SESSION_CLOSE_TIMEOUT_MS)]);

@@ -45,14 +45,14 @@ export function buildAdminRouter(restLimiter: RequestHandler): Router {
       .json({ userMode: isUserMode(), users: users.map(({ id, name, role }) => ({ id, name, role, licensed: licensed.has(id) })) });
   });
 
-  router.get('/admin/audit', restLimiter, adminGuard, (req, res) => {
+  router.get('/admin/audit', restLimiter, adminGuard, async (req, res) => {
     const { since, user, limit } = req.query;
     if (typeof since === 'string' && Number.isNaN(Date.parse(since))) {
       res.status(400).json({ error: '"since" must be an ISO date-time.' });
       return;
     }
     const requested = typeof limit === 'string' ? Number.parseInt(limit, 10) : 100;
-    const entries = readAudit({
+    const entries = await readAudit({
       ...(typeof since === 'string' ? { since } : {}),
       ...(typeof user === 'string' && user !== '' ? { user } : {}),
       limit: Math.min(Number.isFinite(requested) && requested > 0 ? requested : 100, MAX_AUDIT_LIMIT),

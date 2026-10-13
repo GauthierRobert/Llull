@@ -27,11 +27,22 @@ import { buildExportRouter } from './exportRoutes';
 import { buildAdminRouter } from './adminRoutes';
 import { errorMessage } from '@lib/errorMessage';
 import { startServer } from './lifecycle';
-import { getAllowedOrigins, hostAllowlist, buildRestRateLimiter, jsonErrorHandler } from './security';
+import {
+  getAllowedOrigins,
+  hostAllowlist,
+  buildRestRateLimiter,
+  jsonErrorHandler,
+  securityHeaders,
+  setHtmlSecurityHeaders,
+  trustProxySetting,
+} from './security';
 
 const app = express();
 
-app.use(hostAllowlist());
+app.disable('x-powered-by');
+const trustProxy = trustProxySetting(process.env['LLULL_TRUST_PROXY']);
+if (trustProxy !== undefined) app.set('trust proxy', trustProxy);
+app.use(securityHeaders());
 // Disallowed origins get no CORS headers. Before the body parser so its 400/413 errors stay readable by the UI.
 app.use(
   cors({
@@ -40,6 +51,9 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization'],
   }),
 );
+// Before the Host allowlist: LB / k8s probes arrive with the pod IP as Host.
+app.get('/health', (_req, res) => void res.json({ status: 'ok', kernel: getActiveKernelName() }));
+app.use(hostAllowlist());
 const jsonBody = express.json({ limit: process.env['LLULL_BODY_LIMIT'] ?? '2mb' });
 // /import/dwg parses its own (much larger) body.
 app.use((req, res, next) => (req.path === '/import/dwg' ? next() : jsonBody(req, res, next)));
@@ -47,7 +61,6 @@ app.use((req, res, next) => (req.path === '/import/dwg' ? next() : jsonBody(req,
 const restLimiter = buildRestRateLimiter();
 const exchange = exchangeOptionsWithDwg();
 
-app.get('/health', (_req, res) => void res.json({ status: 'ok', kernel: getActiveKernelName() }));
 app.use(buildLiveRouter(restLimiter));
 app.use(buildAdminRouter(restLimiter));
 app.use('/export', restLimiter, buildExportRouter(exchange));
@@ -57,8 +70,18 @@ app.use('/mcp', buildMcpRouter(exchange));
 // On-prem: serve the built web app (`LLULL_STATIC_DIR`, e.g. /app/dist) from the same origin.
 const staticDir = process.env['LLULL_STATIC_DIR'];
 if (staticDir !== undefined && staticDir !== '') {
-  app.use(express.static(staticDir));
-  app.get('/{*path}', (req, res, next) => (req.accepts('html') === 'html' ? res.sendFile(path.resolve(staticDir, 'index.html')) : next()));
+  app.use(
+    express.static(staticDir, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) setHtmlSecurityHeaders(res);
+      },
+    }),
+  );
+  app.get('/{*path}', (req, res, next) => {
+    if (req.accepts('html') !== 'html') return next();
+    setHtmlSecurityHeaders(res);
+    res.sendFile(path.resolve(staticDir, 'index.html'));
+  });
 }
 app.use((req, res) => void res.status(404).json({ error: `Not found: ${req.method} ${req.path}` }));
 app.use(jsonErrorHandler);

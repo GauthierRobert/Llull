@@ -36,3 +36,13 @@ nsis:
 linux:
   category: Graphics
   target: [AppImage, deb]
+# Electron fuses: no NODE_OPTIONS / --inspect injection into the packaged app, and only the
+# integrity-checked asar loads. RunAsNode stays on: the `llull` CLI shim runs the bundled CLI
+# with ELECTRON_RUN_AS_NODE.
+electronFuses:
+  runAsNode: true
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true

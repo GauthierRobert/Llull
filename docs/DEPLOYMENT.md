@@ -19,6 +19,15 @@ Set in a `.env` next to `docker-compose.yml`:
 | `LLULL_BIND`               | Host interface to publish (`127.0.0.1` default; use the proxy to expose) |
 | `LLULL_TOOLSETS`           | MCP toolsets per session (`core` default, `all`)                         |
 | `LLULL_LICENSE_PUBLIC_KEY` | Vendor public key PEM (see section 3)                                    |
+| `LLULL_TRUST_PROXY`        | Proxy hops trusted for the client IP (`1` default; per-client limits)    |
+
+Every other server variable (rate limits, session caps, timeouts, Python bridge, kernel) is listed
+in [server/README.md](../server/README.md#environment-variables).
+
+The image ships no Python/CadQuery (`LLULL_PYTHON=off`): STEP import and CadQuery code exchange
+answer "disabled". STEP export still works with `LLULL_KERNEL=occt` (OpenCascade writes it). For
+STEP import use the desktop app, or extend the image with a CadQuery Python and set `LLULL_PYTHON`. Never build a public image with `VITE_LLULL_API_TOKEN`: it is baked
+into the JavaScript every visitor downloads.
 
 Without Docker: `npm ci && npm --prefix server ci && npm run build && npm --prefix server run build`,
 then `LLULL_STATIC_DIR=$PWD/dist HOST=0.0.0.0 LLULL_USERS_FILE=... node server/dist/index.js`.
@@ -43,7 +52,7 @@ the file is re-read on change). To revoke or rotate, delete the entry and add th
 | `editor` | + `/command`, `/undo`, `/redo`, `/import/*`, every MCP tool                           |
 | `admin`  | + `/admin/users`, `/admin/audit`, `/admin/license`                                    |
 
-Tokens are sent as `Authorization: Bearer <token>` (MCP agents, scripts) or `?access_token=` (SSE).
+Tokens are sent as `Authorization: Bearer <token>` (MCP agents, scripts) or, for the SSE stream, a single-use 30 s `?ticket=` minted by `POST /live/ticket` (header auth). `?access_token=` in a URL is deprecated: it ends up in proxy/access logs and browser history.
 Browser users open the app once at `https://cad.example.com/#token=<their token>`; it is kept in
 `localStorage` and the fragment is removed. Unknown token: 401. Role too low: 403.
 Named-user mode supersedes `MCP_AUTH_TOKEN`.
@@ -80,21 +89,26 @@ Caddy:
 
 ```
 cad.example.com {
+    encode zstd gzip           # the OCC kernel WASM is 66 MB raw, ~14 MB compressed
     reverse_proxy 127.0.0.1:3001 {
         flush_interval -1      # SSE (/live, /mcp) must not be buffered
     }
 }
 ```
 
-nginx: `proxy_buffering off; proxy_read_timeout 1h; proxy_http_version 1.1;` on `/live` and `/mcp`.
+nginx: `proxy_buffering off; proxy_read_timeout 1h; proxy_http_version 1.1;` on `/live` and `/mcp`,
+and `gzip on; gzip_types application/javascript application/wasm text/css application/json;`.
+Keep `LLULL_TRUST_PROXY` equal to the number of proxies in front, so rate limits apply per client
+rather than to the proxy's single address.
 Set `LLULL_PUBLIC_URL=https://cad.example.com` and `LLULL_ALLOWED_HOSTS=cad.example.com`.
 
 ## 5. DWG converter
 
 The image builds LibreDWG's `dwg2dxf` from a pinned GNU release (`LIBREDWG_VERSION`, default
 0.14 — Debian stable does not package LibreDWG, and Debian's tracker lists CVEs up to 0.13.4).
-Verify the download by passing the published checksum:
-`docker build --build-arg LIBREDWG_SHA256=<sha256 from ftp.gnu.org/gnu/libredwg> …`. Build without
+The tarball must match the pinned `LIBREDWG_SHA256` (checked against the maintainer's signature
+when pinned); when bumping `LIBREDWG_VERSION`, verify the new `.sig` and pin its checksum. Fetch
+from a mirror with `--build-arg LIBREDWG_URL=<url>` — the checksum still applies. Build without
 DWG support with `--build-arg WITH_DWG=0`. Check with `docker compose exec llull dwg2dxf --version`.
 Alternatives: mount the ODA File Converter and set `LLULL_ODA_CONVERTER=<executable>`, or set
 `LLULL_DWG2DXF=off`. Without a converter `POST /import/dwg` answers 503; DXF import is unaffected.

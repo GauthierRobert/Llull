@@ -40,6 +40,14 @@ describe('LLULL_STATIC_DIR', () => {
     expect(response.text).toContain('<title>llull</title>');
   });
 
+  it('sets a CSP on HTML (index and SPA fallback) but not on assets', async () => {
+    for (const url of ['/', '/some/route']) {
+      const response = await request(app).get(url).set('Accept', 'text/html');
+      expect(response.headers['content-security-policy']).toContain("frame-ancestors 'none'");
+    }
+    expect((await request(app).get('/app.js')).headers['content-security-policy']).toBeUndefined();
+  });
+
   it('keeps JSON 404s for API clients', async () => {
     const response = await request(app).get('/nope').set('Accept', 'application/json');
     expect(response.status).toBe(404);

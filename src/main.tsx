@@ -16,6 +16,7 @@ import { setGeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { parseKernelChoice } from '@core/geometry/kernelChoice';
 import { registerAppServiceWorker } from '@ui/services/appUpdates';
+import { useKernelStatusStore } from '@ui/store/kernelStatus';
 
 // Kernel selection: Manifold by default (fast, no large WASM asset); ?kernel=occt swaps in OCC
 // (dev/power-user toggle, opt-in only). OCC carries a 63 MB WASM binary (~800–1000 ms cold init),
@@ -25,14 +26,23 @@ const useOcct = typeof window !== 'undefined' && parseKernelChoice(new URLSearch
 
 function installManifoldKernel(): void {
   createManifoldKernel()
-    .then(setGeometryKernel)
-    .catch((e: unknown) => console.error('Manifold kernel init failed', e));
+    .then((kernel) => {
+      setGeometryKernel(kernel);
+      useKernelStatusStore.getState().setStatus('ready');
+    })
+    .catch((e: unknown) => {
+      console.error('Manifold kernel init failed', e);
+      useKernelStatusStore.getState().setStatus('failed');
+    });
 }
 
 if (useOcct) {
   import('@ui/geometry/occtKernelBrowser')
     .then(({ createBrowserOcctKernel }) => createBrowserOcctKernel())
-    .then(setGeometryKernel)
+    .then((kernel) => {
+      setGeometryKernel(kernel);
+      useKernelStatusStore.getState().setStatus('ready');
+    })
     .catch((e: unknown) => {
       console.warn('OCC kernel init failed — falling back to Manifold', e);
       installManifoldKernel();

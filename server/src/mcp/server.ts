@@ -25,7 +25,7 @@ import {
   isToolEnabled,
   toolsetOf,
 } from '@mcp/index';
-import { getCommand } from '@core/commands/registry';
+import { getCommand, listCommands } from '@core/commands/registry';
 import type { ToolsetName } from '@mcp/index';
 import { errorMessage } from '@lib/errorMessage';
 import { getLiveDoc } from '../liveDocument';
@@ -52,7 +52,14 @@ interface McpCaller {
 }
 
 /** What a viewer may call. */
-const isReadOnlyTool = (name: string): boolean => buildAllMcpTools().find((t) => t.name === name)?.annotations?.readOnlyHint === true;
+let readOnlyCache: { readonly count: number; readonly names: ReadonlySet<string> } | null = null;
+const isReadOnlyTool = (name: string): boolean => {
+  const count = listCommands().length; // registry changes (plugin install) change the count
+  if (readOnlyCache === null || readOnlyCache.count !== count) {
+    readOnlyCache = { count, names: new Set(buildAllMcpTools().flatMap((t) => (t.annotations?.readOnlyHint === true ? [t.name] : []))) };
+  }
+  return readOnlyCache.names.has(name);
+};
 
 export function buildMcpServer(
   exchange: ExchangeOptions,

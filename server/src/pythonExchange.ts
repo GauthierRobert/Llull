@@ -4,6 +4,7 @@
  *   LLULL_PYTHON              python with CadQuery (default "python3"; "off" disables the bridge)
  *   LLULL_PYTHON_BUILD123D    python with build123d (default: LLULL_PYTHON)
  *   LLULL_PYTHON_TIMEOUT_MS   per-request timeout (default 120000)
+ *   LLULL_PYTHON_QUEUE_MAX    requests allowed to wait for a free slot (default 16); more -> "busy" error (REST 503)
  *   LLULL_EXCHANGE_DIR        directory that tool `path` arguments resolve inside (optional)
  *   LLULL_ALLOW_CODE_EXECUTION=1   enables import_code (arbitrary Python execution)
  */
@@ -15,10 +16,12 @@ import type { Readable } from 'node:stream';
 import type { PythonBackend } from '@core/codegen/pythonRuntime';
 import type { CadExchangePort, DwgConverterPort, ProgramRun } from '@mcp/index';
 import { exchangeDirOf, positiveInteger } from './env';
+import { trackChild } from './childProcesses';
 
 const MAX_OUTPUT_BYTES = 128 * 1024 * 1024; // JSON.parse'd in memory; ~96 MB of base64 STEP
 const MAX_STDERR_BYTES = 64 * 1024; // tail kept for error messages
 const MAX_CONCURRENT_RUNS = 2; // CadQuery processes are heavy; the rest queue
+const DEFAULT_QUEUE_MAX = 16;
 
 /** Environment the Python child may see — never the server's secrets. */
 const ENV_ALLOWLIST =
@@ -83,7 +86,7 @@ export function callBridge(
   timeoutMs: number,
 ): Promise<BridgeResponse> {
   return new Promise((resolve, reject) => {
-    const child = spawn(python, [bridgeScript], { stdio: ['pipe', 'pipe', 'pipe'], env: bridgeEnvironment() });
+    const child = trackChild(spawn(python, [bridgeScript], { stdio: ['pipe', 'pipe', 'pipe'], env: bridgeEnvironment() }));
     const stdout: Buffer[] = [];
     const stderr = captureStderrTail(child.stderr, MAX_STDERR_BYTES);
     let size = 0;
@@ -156,12 +159,25 @@ export async function confinedPath(root: string, relative: string, mode: 'read' 
   return target;
 }
 
-/** A FIFO limiter: at most `limit` tasks in flight. */
-export function concurrencyLimiter(limit: number): <T>(task: () => Promise<T>) => Promise<T> {
+export const PYTHON_BUSY_MESSAGE = 'Python bridge is busy (queue full), retry later.';
+
+/** Thrown by a bounded limiter when its queue is full; REST maps it to 503. */
+export class BusyError extends Error {
+  constructor(message: string = PYTHON_BUSY_MESSAGE) {
+    super(message);
+    this.name = 'BusyError';
+  }
+}
+
+/** A FIFO limiter: at most `limit` tasks in flight, at most `maxQueue` waiting (default unbounded; more -> `BusyError`). */
+export function concurrencyLimiter(limit: number, maxQueue: number = Infinity): <T>(task: () => Promise<T>) => Promise<T> {
   let active = 0;
   const waiting: Array<() => void> = [];
   return async <T>(task: () => Promise<T>): Promise<T> => {
-    if (active >= limit) await new Promise<void>((resolve) => waiting.push(resolve));
+    if (active >= limit) {
+      if (waiting.length >= maxQueue) throw new BusyError();
+      await new Promise<void>((resolve) => waiting.push(resolve));
+    }
     active++;
     try {
       return await task();
@@ -173,7 +189,7 @@ export function concurrencyLimiter(limit: number): <T>(task: () => Promise<T>) =
 }
 
 export function createPythonExchangePort(config: PythonExchangeConfig): CadExchangePort {
-  const limit = concurrencyLimiter(MAX_CONCURRENT_RUNS);
+  const limit = concurrencyLimiter(MAX_CONCURRENT_RUNS, positiveInteger(process.env['LLULL_PYTHON_QUEUE_MAX'], DEFAULT_QUEUE_MAX));
   const run = async (language: PythonBackend | 'step', request: Record<string, unknown>): Promise<BridgeResponse> => {
     const python = language === 'build123d' ? config.build123dPython : config.python;
     const response = await limit(() => callBridge(python, config.bridgeScript, request, config.timeoutMs));

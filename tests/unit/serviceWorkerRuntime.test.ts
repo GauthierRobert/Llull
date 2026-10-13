@@ -99,6 +99,12 @@ describe('service worker runtime', () => {
     expect(scope.request('https://cdn.example.com/assets/a.js').handled).toBe(false);
     expect(scope.request('/mcp', 'navigate').handled).toBe(false);
   });
+  it('does not cache an HTML fallback served for an asset request', async () => {
+    const scope = workerScope(async () => new Response('<html>', { headers: { 'content-type': 'text/html; charset=utf-8' } }));
+    await scope.request('/assets/missing-x.js').response;
+    await scope.request('/assets/missing-x.js').response;
+    expect(scope.fetchMock).toHaveBeenCalledTimes(2);
+  });
   it('navigations go to the network first and fall back to the cached shell offline', async () => {
     let online = true;
     const scope = workerScope(async () => {

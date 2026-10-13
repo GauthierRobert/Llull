@@ -10,3 +10,8 @@ playwright-report
 server/.env
 server/.autosave.json
 *.pem
+desktop
+.claude
+.playwright-mcp
+.cache
+*.log

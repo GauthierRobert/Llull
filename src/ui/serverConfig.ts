@@ -17,6 +17,7 @@ function serverBaseOf(configured: string | undefined): string {
 
 export const SERVER_BASE: string = serverBaseOf(readEnvString(import.meta.env['VITE_LLULL_SERVER_URL'])).replace(/\/+$/, '');
 
+// WARNING: VITE_* values are inlined into the PUBLIC bundle; never set VITE_LLULL_API_TOKEN for a public deployment.
 const BUILD_API_TOKEN: string | undefined = readEnvString(import.meta.env['VITE_LLULL_API_TOKEN']);
 const TOKEN_STORAGE_KEY = 'llull.apiToken';
 
@@ -40,9 +41,21 @@ export function serverAuthHeaders(): Record<string, string> {
   return token === undefined ? {} : { Authorization: `Bearer ${token}` };
 }
 
-/** `/live` SSE URL; carries `?access_token=` when a token is set (EventSource cannot send headers). */
+/** Plain `/live` SSE URL (no credentials; with a token use `liveTicketStreamUrl`). */
 export function liveStreamUrl(): string {
-  const base = `${SERVER_BASE}/live`;
-  const token = currentApiToken();
-  return token === undefined ? base : `${base}?access_token=${encodeURIComponent(token)}`;
+  return `${SERVER_BASE}/live`;
+}
+
+export const hasApiToken = (): boolean => currentApiToken() !== undefined;
+
+/**
+ * `/live` SSE URL carrying a fresh single-use `?ticket=` (EventSource cannot send headers; a bearer token in the URL would
+ * leak into access logs). The ticket is minted over header auth; call again on every reconnect. Rejects when the mint fails.
+ */
+export async function liveTicketStreamUrl(): Promise<string> {
+  const response = await fetch(`${SERVER_BASE}/live/ticket`, { method: 'POST', headers: serverAuthHeaders() });
+  if (!response.ok) throw new Error(`live ticket request failed (${response.status})`);
+  const body = (await response.json()) as { ticket?: unknown };
+  if (typeof body.ticket !== 'string' || body.ticket === '') throw new Error('live ticket response malformed');
+  return `${liveStreamUrl()}?ticket=${encodeURIComponent(body.ticket)}`;
 }

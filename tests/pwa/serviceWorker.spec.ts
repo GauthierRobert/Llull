@@ -25,7 +25,8 @@ test.describe('service worker', () => {
     }, names[0] ?? '');
     expect(entries).toContain('/index.html');
     expect(entries.some((path) => /^\/assets\/index-.+\.js$/.test(path))).toBe(true);
-    expect(entries.some((path) => /occt|opencascade|\.wasm$/.test(path))).toBe(false);
+    expect(entries.some((path) => /occt|opencascade/.test(path))).toBe(false);
+    expect(entries.some((path) => /\.wasm$/.test(path))).toBe(true);
     await context.setOffline(true);
     await page.reload();
     await expect(page.getByRole('main', { name: 'Viewport' })).toBeVisible();

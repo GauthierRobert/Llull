@@ -15,6 +15,11 @@ export const MAX_IMPORT_TRIANGLES = 2_000_000;
 export const MAX_TRACE_FEATURES = 10_000;
 export const MAX_DISPLAY_PRECISION = 20;
 export const MAX_PROFILE_POINTS = 10_000;
+/**
+ * Load-side ceiling for a stored extrusion / revolution profile. Generators emit more than MAX_PROFILE_POINTS (the cap on caller-supplied
+ * profiles): a toothed outline has 2 * flank samples + 2 points per tooth (16 at the default 7 samples) and up to MAX_GEAR_TEETH teeth.
+ */
+export const MAX_STORED_PROFILE_POINTS = MAX_GEAR_TEETH * 16;
 export const MAX_REVOLVE_SEGMENTS = 1_024;
 /** Image underlay data URL length in characters (~6 MB of PNG/JPEG); keeps saved documents sane. */
 export const MAX_IMAGE_DATA_URL_LENGTH = 8_000_000;

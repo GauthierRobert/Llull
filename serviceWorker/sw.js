@@ -36,7 +36,9 @@ async function cacheFirst(request) {
   const cached = await cache.match(request);
   if (cached) return cached;
   const response = await fetch(request);
-  if (response.ok) await cache.put(request, response.clone());
+  // A SPA fallback page served for a missing asset must never be cached as that asset.
+  const isHtml = (response.headers.get('content-type') ?? '').includes('text/html');
+  if (response.ok && !isHtml) await cache.put(request, response.clone());
   return response;
 }
 

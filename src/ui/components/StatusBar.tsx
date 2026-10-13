@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useStore } from '@ui/store';
+import { useKernelStatusStore } from '@ui/store/kernelStatus';
 import { fetchLicenseLabel } from '@ui/services/serverFiles';
 
 function StatusItem({
@@ -49,6 +50,21 @@ function LiveIndicator(): React.ReactElement {
   );
 }
 
+/** Hidden once the kernel is ready; solid/boolean commands do nothing until then. */
+function KernelIndicator(): React.ReactElement | null {
+  const status = useKernelStatusStore((s) => s.status);
+  if (status === 'ready') return null;
+  const label =
+    status === 'loading'
+      ? 'Loading geometry kernel…'
+      : 'Geometry kernel failed to load — 3D solid operations are unavailable. Reload to retry.';
+  return (
+    <span className={`status-summary status-kernel status-kernel--${status}`} role={status === 'failed' ? 'alert' : 'status'} title={label}>
+      {label}
+    </span>
+  );
+}
+
 /** License mode from the public `GET /license`; renders nothing offline / on any failure. */
 function LicenseBadge(): React.ReactElement | null {
   const liveStatus = useStore((s) => s.liveStatus);
@@ -91,6 +107,7 @@ export function StatusBar(): React.ReactElement {
     <footer className="status-bar-bottom" aria-label="Document status">
       <div className="status-bar-bottom__items">
         <LiveIndicator />
+        <KernelIndicator />
         {lastSummary !== null && (
           <span className="status-summary" aria-live="polite" aria-label={`Last command: ${lastSummary}`} title={lastSummary}>
             {lastSummary}

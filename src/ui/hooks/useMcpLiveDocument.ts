@@ -1,5 +1,5 @@
 /**
- * Subscribes to the server SSE command log (`GET <SERVER_BASE>/live`, token via liveStreamUrl). Events (`@mcp/liveSync`,
+ * Subscribes to the server SSE command log (`GET <SERVER_BASE>/live`, `?ticket=` via liveTicketStreamUrl when a token is set). Events (`@mcp/liveSync`,
  * seq per server `epoch`): `snapshot` (connect, undo/redo) → hydrateLiveDocument; `command` → applyLiveCommand, and on a
  * seq gap / hash mismatch a `GET /live/snapshot` resync. onerror → 'disconnected', reconnect with 1s..30s backoff.
  */
@@ -7,7 +7,7 @@
 import { useEffect } from 'react';
 import { useStore } from '@ui/store';
 import type { LiveCommandEvent, LiveSnapshotEvent } from '@mcp/liveSync';
-import { liveStreamUrl } from '@ui/serverConfig';
+import { hasApiToken, liveStreamUrl, liveTicketStreamUrl } from '@ui/serverConfig';
 import { fetchLiveSnapshot } from '@ui/store/serverCommands';
 import { isOwnCommandId, markLiveOrigin } from '@ui/store/liveOrigin';
 
@@ -63,9 +63,24 @@ export function useMcpLiveDocument(): void {
       }, delay);
     };
 
+    // With a token: a fresh single-use ticket per (re)connect, so no credential ever sits in the URL.
     const connect = (): void => {
       setLiveStatus('connecting');
-      const es = new EventSource(liveStreamUrl());
+      if (!hasApiToken()) return open(liveStreamUrl());
+      liveTicketStreamUrl().then(
+        (url) => {
+          if (!disposed) open(url);
+        },
+        () => {
+          if (disposed) return;
+          setLiveStatus('disconnected');
+          scheduleReconnect();
+        },
+      );
+    };
+
+    const open = (url: string): void => {
+      const es = new EventSource(url);
       source = es;
 
       es.onopen = () => {

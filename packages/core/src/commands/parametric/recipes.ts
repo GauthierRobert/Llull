@@ -1,4 +1,5 @@
 import type { CadDocument, FeatureStep, Recipe } from '../../model/types';
+import { isReservedKey } from '../../lib/reservedKey';
 import { kernelRefusal } from '../kernelRefusal';
 import { currentContext, runInContext } from '../context';
 import type { ExecutionContext } from '../types';
@@ -66,6 +67,11 @@ export const saveRecipe = defineCommand({
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, { name, label }): CommandResult => {
     if (name.trim() === '') return noop(doc, 'save_recipe failed: name must be a non-empty, non-whitespace-only string.');
+    if (isReservedKey(name))
+      return noop(
+        doc,
+        `save_recipe failed: name '${name}' is a reserved JavaScript property name (constructor, toString, __proto__, ...); choose another.`,
+      );
     const steps: FeatureStep[] = doc.featureHistory.map((s) => ({ ...s }));
     const recipe: Recipe = { name, steps, ...(label !== undefined ? { label } : {}) };
     const newDoc: CadDocument = { ...doc, recipes: { ...doc.recipes, [name]: recipe } };

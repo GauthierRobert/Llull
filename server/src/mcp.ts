@@ -11,6 +11,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { type Request, type Response, type Router, Router as createRouter } from 'express';
+import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { type ToolsetName, parseToolsets } from '@mcp/index';
@@ -82,7 +83,8 @@ export function buildMcpRouter(
   router.post('/', (req: Request, res: Response) => {
     void (async () => {
       if (await routeToExistingSession(req, res)) return;
-      evictForCapacity();
+      // Anything else is rejected by the transport and must not push other sessions out.
+      if (isInitializeRequest(req.body)) evictForCapacity(requestUser(res)?.id);
       const transport = allocateSession(requestUser(res)?.id);
       try {
         await buildMcpServer(exchange, enabledToolsets, { actor: actorOf(res, 'mcp'), role: requestUser(res)?.role ?? null }).connect(

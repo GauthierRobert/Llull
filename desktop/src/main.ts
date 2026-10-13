@@ -11,7 +11,7 @@ import { createDocumentSession, type DocumentSession } from './documents';
 import { DEFAULT_SAVE_NAME, DOCUMENT_EXTENSIONS, DOCUMENT_FILE_PATTERN } from '@mcp/documentFiles';
 import { desktopLayout } from './layout';
 import { agentHelpText, menuTemplate } from './menu';
-import { navigationDecision } from './navigation';
+import { navigationDecision, permissionAllowed } from './navigation';
 
 const FILE_FILTERS = [
   { name: 'llull document', extensions: [...DOCUMENT_EXTENSIONS] },
@@ -186,6 +186,12 @@ function createWindow(url: string): BrowserWindow {
   created.webContents.on('will-navigate', (event, target) => {
     if (navigationDecision(target, origin) !== 'app') event.preventDefault();
   });
+  created.webContents.session.setPermissionRequestHandler((_contents, permission, callback, details) =>
+    callback(permissionAllowed(permission, details.requestingUrl, origin)),
+  );
+  created.webContents.session.setPermissionCheckHandler((_contents, permission, requestingOrigin) =>
+    permissionAllowed(permission, requestingOrigin, origin),
+  );
   created.on('close', interceptQuit);
   void created.loadURL(`${url}/#token=${token}`);
   return created;

@@ -5,7 +5,7 @@ import { isRecord } from '@lib/isRecord';
 import { errorMessage } from '@lib/errorMessage';
 import { applyCommand } from './commandBus';
 import { getLiveDoc } from './liveDocument';
-import type { ExchangeOptions } from './pythonExchange';
+import { BusyError, type ExchangeOptions } from './pythonExchange';
 import { safeFileName } from '@lib/safeFileName';
 import { guardRead } from './security';
 import { fileOfRecord } from './cli/saveFiles';
@@ -51,7 +51,10 @@ export function buildExportRouter(exchange: ExchangeOptions): Router {
         if ('error' in file) res.status(port === null ? 503 : 500).json({ error: file.error });
         else sendDownload(res, file.fileName, 'model/step', Buffer.from(file.stepBase64, 'base64'));
       })
-      .catch((error: unknown) => void res.status(500).json({ error: `export_step failed: ${errorMessage(error)}` }));
+      .catch(
+        (error: unknown) =>
+          void res.status(error instanceof BusyError ? 503 : 500).json({ error: `export_step failed: ${errorMessage(error)}` }),
+      );
   });
 
   return router;

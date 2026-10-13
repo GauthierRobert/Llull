@@ -1,4 +1,5 @@
 import type React from 'react';
+import { useStore } from '@ui/store';
 
 /** Clears the input so re-picking the same file fires again. */
 export function takeChosenFile(event: React.ChangeEvent<HTMLInputElement>): File | undefined {
@@ -19,7 +20,7 @@ export function readChosenFile(event: React.ChangeEvent<HTMLInputElement>, onTex
   file
     .text()
     .then((text) => onText(text, file.name))
-    .catch(() => undefined);
+    .catch(() => useStore.getState().setStatusMessage(`Could not read ${file.name}.`));
 }
 
 /** Images embedded in the document. */

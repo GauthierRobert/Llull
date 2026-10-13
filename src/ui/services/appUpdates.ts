@@ -7,6 +7,7 @@ const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 const SKIP_WAITING = 'SKIP_WAITING';
 
 let waitingWorker: ServiceWorker | null = null;
+let updateRequested = false;
 const listeners = new Set<() => void>();
 
 function setWaitingWorker(worker: ServiceWorker | null): void {
@@ -44,9 +45,11 @@ export async function registerAppServiceWorker(
   reload: () => void = () => window.location.reload(),
 ): Promise<() => void> {
   if (container === undefined) return () => undefined;
+  // First-ever visit: clients.claim() fires controllerchange with nothing stale to replace; do not reload.
+  const hadController = container.controller !== null;
   let reloading = false;
   container.addEventListener('controllerchange', () => {
-    if (reloading) return;
+    if (reloading || !(hadController || updateRequested)) return;
     reloading = true;
     reload();
   });
@@ -63,5 +66,6 @@ export async function registerAppServiceWorker(
 
 /** The `controllerchange` it triggers reloads the page once. */
 export function applyAppUpdate(): void {
+  updateRequested = true;
   waitingWorker?.postMessage(SKIP_WAITING);
 }

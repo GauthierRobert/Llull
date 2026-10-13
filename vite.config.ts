@@ -24,6 +24,10 @@ export default defineConfig(({ command }) => ({
             { name: 'vendor-react', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/, priority: 2 },
             { name: 'vendor-r3f', test: /node_modules[\\/](@react-three|postprocessing)[\\/]/, priority: 1 },
             { name: 'vendor-three', test: /node_modules[\\/](three|three-stdlib|three-mesh-bvh)[\\/]/, priority: 3 },
+            // The registry needs every plugin at startup, so these load eagerly; separate chunks
+            // keep them cached across UI-only deploys and keep each chunk under the warning limit.
+            { name: 'llull-core', test: /packages[\\/]core[\\/]src[\\/]/, priority: 1 },
+            { name: 'llull-aec', test: /packages[\\/]domain-aec[\\/]src[\\/]/, priority: 1 },
           ],
         },
       },
